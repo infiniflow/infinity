@@ -12,23 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:sum.impl;
 
 import :sum;
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;
 import :aggregate_function;
 import :aggregate_function_set;
 
-import :third_party;
 import logical_type;
 import internal_types;
 import data_type;
-import :logger;
 
 namespace infinity {
 
@@ -40,22 +35,22 @@ public:
         RecoverableError(status);
     }
 
-    inline void Update(const ValueType *__restrict, SizeT) {
+    inline void Update(const ValueType *__restrict, size_t) {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
     }
 
-    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) {
+    inline void ConstantUpdate(const ValueType *__restrict, size_t, size_t) {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
     }
 
-    inline ptr_t Finalize() {
+    inline char *Finalize() {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
     }
 
-    inline static SizeT Size(const DataType &) {
+    inline static size_t Size(const DataType &) {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
     }
@@ -68,13 +63,13 @@ public:
 
     inline void Initialize() { this->sum_ = 0; }
 
-    inline void Update(const TinyIntT *__restrict input, SizeT idx) { sum_ += input[idx]; }
+    inline void Update(const TinyIntT *__restrict input, size_t idx) { sum_ += input[idx]; }
 
-    inline void ConstantUpdate(const TinyIntT *__restrict input, SizeT idx, SizeT count) { sum_ += input[idx] * count; }
+    inline void ConstantUpdate(const TinyIntT *__restrict input, size_t idx, size_t count) { sum_ += input[idx] * count; }
 
-    inline ptr_t Finalize() { return (ptr_t)&sum_; }
+    inline char *Finalize() { return (char *)&sum_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(i64); }
+    inline static size_t Size(const DataType &) { return sizeof(i64); }
 };
 
 template <>
@@ -84,13 +79,13 @@ public:
 
     inline void Initialize() { this->sum_ = 0; }
 
-    inline void Update(const SmallIntT *__restrict input, SizeT idx) { sum_ += input[idx]; }
+    inline void Update(const SmallIntT *__restrict input, size_t idx) { sum_ += input[idx]; }
 
-    inline void ConstantUpdate(const SmallIntT *__restrict input, SizeT idx, SizeT count) { sum_ += input[idx] * count; }
+    inline void ConstantUpdate(const SmallIntT *__restrict input, size_t idx, size_t count) { sum_ += input[idx] * count; }
 
-    inline ptr_t Finalize() { return (ptr_t)&sum_; }
+    inline char *Finalize() { return (char *)&sum_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(i64); }
+    inline static size_t Size(const DataType &) { return sizeof(i64); }
 };
 
 template <>
@@ -100,13 +95,13 @@ public:
 
     inline void Initialize() { this->sum_ = 0; }
 
-    inline void Update(const IntegerT *__restrict input, SizeT idx) { sum_ += input[idx]; }
+    inline void Update(const IntegerT *__restrict input, size_t idx) { sum_ += input[idx]; }
 
-    inline void ConstantUpdate(const IntegerT *__restrict input, SizeT idx, SizeT count) { sum_ += input[idx] * count; }
+    inline void ConstantUpdate(const IntegerT *__restrict input, size_t idx, size_t count) { sum_ += input[idx] * count; }
 
-    inline ptr_t Finalize() { return (ptr_t)&sum_; }
+    inline char *Finalize() { return (char *)&sum_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(i64); }
+    inline static size_t Size(const DataType &) { return sizeof(i64); }
 };
 
 template <>
@@ -116,13 +111,13 @@ public:
 
     inline void Initialize() { this->sum_ = 0; }
 
-    inline void Update(const BigIntT *__restrict input, SizeT idx) { sum_ += input[idx]; }
+    inline void Update(const BigIntT *__restrict input, size_t idx) { sum_ += input[idx]; }
 
-    inline void ConstantUpdate(const BigIntT *__restrict input, SizeT idx, SizeT count) { sum_ += input[idx] * count; }
+    inline void ConstantUpdate(const BigIntT *__restrict input, size_t idx, size_t count) { sum_ += input[idx] * count; }
 
-    inline ptr_t Finalize() { return (ptr_t)&sum_; }
+    inline char *Finalize() { return (char *)&sum_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(i64); }
+    inline static size_t Size(const DataType &) { return sizeof(i64); }
 };
 
 template <>
@@ -132,13 +127,13 @@ public:
 
     inline void Initialize() { this->sum_ = 0; }
 
-    inline void Update(const Float16T *__restrict input, SizeT idx) { sum_ += static_cast<float>(input[idx]); }
+    inline void Update(const Float16T *__restrict input, size_t idx) { sum_ += static_cast<float>(input[idx]); }
 
-    inline void ConstantUpdate(const Float16T *__restrict input, SizeT idx, SizeT count) { sum_ += static_cast<float>(input[idx]) * count; }
+    inline void ConstantUpdate(const Float16T *__restrict input, size_t idx, size_t count) { sum_ += static_cast<float>(input[idx]) * count; }
 
-    inline ptr_t Finalize() { return (ptr_t)&sum_; }
+    inline char *Finalize() { return (char *)&sum_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(DoubleT); }
+    inline static size_t Size(const DataType &) { return sizeof(DoubleT); }
 };
 
 template <>
@@ -148,13 +143,13 @@ public:
 
     inline void Initialize() { this->sum_ = 0; }
 
-    inline void Update(const BFloat16T *__restrict input, SizeT idx) { sum_ += static_cast<float>(input[idx]); }
+    inline void Update(const BFloat16T *__restrict input, size_t idx) { sum_ += static_cast<float>(input[idx]); }
 
-    inline void ConstantUpdate(const BFloat16T *__restrict input, SizeT idx, SizeT count) { sum_ += static_cast<float>(input[idx]) * count; }
+    inline void ConstantUpdate(const BFloat16T *__restrict input, size_t idx, size_t count) { sum_ += static_cast<float>(input[idx]) * count; }
 
-    inline ptr_t Finalize() { return (ptr_t)&sum_; }
+    inline char *Finalize() { return (char *)&sum_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(DoubleT); }
+    inline static size_t Size(const DataType &) { return sizeof(DoubleT); }
 };
 
 template <>
@@ -164,13 +159,13 @@ public:
 
     inline void Initialize() { this->sum_ = 0; }
 
-    inline void Update(const FloatT *__restrict input, SizeT idx) { sum_ += input[idx]; }
+    inline void Update(const FloatT *__restrict input, size_t idx) { sum_ += input[idx]; }
 
-    inline void ConstantUpdate(const FloatT *__restrict input, SizeT idx, SizeT count) { sum_ += input[idx] * count; }
+    inline void ConstantUpdate(const FloatT *__restrict input, size_t idx, size_t count) { sum_ += input[idx] * count; }
 
-    inline ptr_t Finalize() { return (ptr_t)&sum_; }
+    inline char *Finalize() { return (char *)&sum_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(DoubleT); }
+    inline static size_t Size(const DataType &) { return sizeof(DoubleT); }
 };
 
 template <>
@@ -180,19 +175,19 @@ public:
 
     inline void Initialize() { this->sum_ = 0; }
 
-    inline void Update(const DoubleT *__restrict input, SizeT idx) { sum_ += input[idx]; }
+    inline void Update(const DoubleT *__restrict input, size_t idx) { sum_ += input[idx]; }
 
-    inline void ConstantUpdate(const DoubleT *__restrict input, SizeT idx, SizeT count) { sum_ += input[idx] * count; }
+    inline void ConstantUpdate(const DoubleT *__restrict input, size_t idx, size_t count) { sum_ += input[idx] * count; }
 
-    inline ptr_t Finalize() { return (ptr_t)&sum_; }
+    inline char *Finalize() { return (char *)&sum_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(DoubleT); }
+    inline static size_t Size(const DataType &) { return sizeof(DoubleT); }
 };
 
 void RegisterSumFunction(NewCatalog *catalog_ptr) {
-    String func_name = "SUM";
+    std::string func_name = "SUM";
 
-    SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
+    std::shared_ptr<AggregateFunctionSet> function_set_ptr = std::make_shared<AggregateFunctionSet>(func_name);
 
     {
         AggregateFunction sum_function = UnaryAggregate<SumState<TinyIntT, BigIntT>, TinyIntT, BigIntT>(func_name,

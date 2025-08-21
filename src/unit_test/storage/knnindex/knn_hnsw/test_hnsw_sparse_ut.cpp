@@ -12,29 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_hnsw_sparse;
 
 import :ut.base_test;
-import :stl;
 import :hnsw_alg;
 import :vec_store_type;
 import :hnsw_common;
 import :sparse_util;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :sparse_test_util;
 import :virtual_store;
 import :local_file_handle;
-#endif
 
 import compilation_config;
 
@@ -55,7 +48,7 @@ protected:
         int ef_construction = 200;
         int chunk_size = 128;
         int max_chunk_n = 10;
-        SizeT element_size = max_chunk_n * chunk_size;
+        size_t element_size = max_chunk_n * chunk_size;
 
         SparseMatrix dataset = SparseTestUtil<f32, i32>::GenerateDataset(element_size, max_dim, sparsity, 0, 1.0);
         auto [gt_idx, gt_score] = SparseTestUtil<f32, i32>::GenerateGroundtruth(dataset, dataset, 1);
@@ -66,7 +59,7 @@ protected:
             hnsw_index->InsertVecs(std::move(iter));
 
             {
-                Path dump_path = Path(tmp_data_path()) / "dump.txt";
+                std::filesystem::path dump_path = std::filesystem::path(tmp_data_path()) / "dump.txt";
                 std::fstream ss(dump_path, std::fstream::out);
                 if (!ss.is_open()) {
                     UnrecoverableError("Failed to open file");
@@ -76,12 +69,12 @@ protected:
             }
 
             KnnSearchOption search_option{.ef_ = 50};
-            for (SizeT i = 0; i < element_size; ++i) {
+            for (size_t i = 0; i < element_size; ++i) {
                 SparseVecRef<f32, IdxT> query = dataset.at(i);
                 if (gt_score[i] == 0.0 || query.nnz_ == 0) {
                     continue;
                 }
-                Vector<Pair<f32, LabelT>> res = hnsw_index->KnnSearchSorted(query, 1, search_option);
+                std::vector<std::pair<f32, LabelT>> res = hnsw_index->KnnSearchSorted(query, 1, search_option);
                 //                if (int(res[0].second) != gt_idx[i]) {
                 //                    std::cout << (fmt::format("{}, {}", res[0].second, gt_idx[i])) << std::endl;
                 //                    std::cout << (fmt::format("{}, {}", -res[0].first, gt_score[i])) << std::endl;
@@ -104,12 +97,12 @@ protected:
 
             auto hnsw_index = Hnsw::Load(*file_handle);
             KnnSearchOption search_option{.ef_ = 50};
-            for (SizeT i = 0; i < element_size; ++i) {
+            for (size_t i = 0; i < element_size; ++i) {
                 SparseVecRef<f32, IdxT> query = dataset.at(i);
                 if (gt_score[i] == 0.0 || query.nnz_ == 0) {
                     continue;
                 }
-                Vector<Pair<f32, LabelT>> res = hnsw_index->KnnSearchSorted(query, 1, search_option);
+                std::vector<std::pair<f32, LabelT>> res = hnsw_index->KnnSearchSorted(query, 1, search_option);
                 //                if (int(res[0].second) != gt_idx[i]) {
                 //                    std::cout << (fmt::format("{}, {}", res[0].second, gt_idx[i])) << std::endl;
                 //                    std::cout << (fmt::format("{}, {}", -res[0].first, gt_score[i])) << std::endl;
@@ -122,13 +115,13 @@ protected:
 
 private:
     template <typename T>
-    Vector<T> MakeRandom(T min, T max, SizeT num, std::mt19937 &rng) {
+    std::vector<T> MakeRandom(T min, T max, size_t num, std::mt19937 &rng) {
         std::uniform_real_distribution<float> distrib_real;
-        HashSet<T> set;
+        std::unordered_set<T> set;
         while (set.size() < num) {
             set.insert(distrib_real(rng) * (max - min) + min);
         }
-        return Vector<T>(set.begin(), set.end());
+        return std::vector<T>(set.begin(), set.end());
     }
 };
 

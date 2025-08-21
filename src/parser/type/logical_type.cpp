@@ -15,9 +15,12 @@
 #include "type/logical_type.h"
 #include "complex/array_type.h"
 #include "complex/sparse_type.h"
-#include <memory>
-#include <string>
-#include <unordered_map>
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 namespace infinity {
 
@@ -201,23 +204,23 @@ static int64_t type_size[] = {
 
     // Nested types
     sizeof(ArrayType), // Array
-    4, // Tuple
+    4,                 // Tuple
 
     // Geography
     16, // Point
     24, // Line
     32, // LineSegment
     32, // Box
-        //    16, // Path
-        //    48, // Polygon
+    //    16, // Path
+    //    48, // Polygon
     24, // Circle
 
     // Other
     //    16, // Bitmap
     16, // UUID
-        //    16, // Blob
-    8,  // Embedding
-    8,  // RowID
+    //    16, // Blob
+    8, // Embedding
+    8, // RowID
 
     // Heterogeneous
     16, // Mixed

@@ -12,18 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <vector>
-
 module infinity_core:emvb_index_in_mem.impl;
 
 import :emvb_index_in_mem;
-
-import :stl;
-import logical_type;
-import internal_types;
-import column_def;
 import :roaring_bitmap;
 import :default_values;
 import :buffer_manager;
@@ -33,14 +24,9 @@ import :emvb_index;
 import :index_emvb;
 import :buffer_handle;
 import :index_base;
-import :logger;
-import logical_type;
-import type_info;
-import embedding_info;
 import :emvb_product_quantization;
 import :column_vector;
 import :block_index;
-
 import :table_meeta;
 import :segment_meta;
 import :new_txn;
@@ -48,13 +34,22 @@ import :buffer_obj;
 import :kv_store;
 import :chunk_index_meta;
 
+import std;
+
+import logical_type;
+import internal_types;
+import column_def;
+import logical_type;
+import type_info;
+import embedding_info;
+
 namespace infinity {
 
 EMVBIndexInMem::EMVBIndexInMem(const u32 residual_pq_subspace_num,
                                const u32 residual_pq_subspace_bits,
                                const u32 embedding_dimension,
                                const RowID begin_row_id,
-                               SharedPtr<ColumnDef> column_def)
+                               std::shared_ptr<ColumnDef> column_def)
     : residual_pq_subspace_num_(residual_pq_subspace_num), residual_pq_subspace_bits_(residual_pq_subspace_bits),
       embedding_dimension_(embedding_dimension), begin_row_id_(begin_row_id), column_def_(std::move(column_def)) {
     // build_index_threshold_
@@ -86,8 +81,10 @@ void EMVBIndexInMem::Insert(const ColumnVector &column_vector, u32 row_offset, u
         }
         // build index if have enough data
         if (embedding_count_ >= build_index_threshold_) {
-            emvb_index_ =
-                MakeUnique<EMVBIndex>(begin_row_id_.segment_offset_, embedding_dimension_, residual_pq_subspace_num_, residual_pq_subspace_bits_);
+            emvb_index_ = std::make_unique<EMVBIndex>(begin_row_id_.segment_offset_,
+                                                      embedding_dimension_,
+                                                      residual_pq_subspace_num_,
+                                                      residual_pq_subspace_bits_);
 
             TableMeeta table_meta(db_id_str_, table_id_str_, &kv_instance, begin_ts, MAX_TIMESTAMP);
             SegmentMeta segment_meta(segment_id_, table_meta);
@@ -113,8 +110,8 @@ void EMVBIndexInMem::Dump(BufferObj *buffer_obj) {
     emvb_index_.reset();
 }
 
-SharedPtr<EMVBIndexInMem>
-EMVBIndexInMem::NewEMVBIndexInMem(const SharedPtr<IndexBase> &index_base, const SharedPtr<ColumnDef> &column_def, RowID begin_row_id) {
+std::shared_ptr<EMVBIndexInMem>
+EMVBIndexInMem::NewEMVBIndexInMem(const std::shared_ptr<IndexBase> &index_base, const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id) {
     const auto *emvb_def = dynamic_cast<const IndexEMVB *>(index_base.get());
     if (emvb_def == nullptr) {
         UnrecoverableError("IndexBase is not EMVBIndex");
@@ -130,21 +127,21 @@ EMVBIndexInMem::NewEMVBIndexInMem(const SharedPtr<IndexBase> &index_base, const 
         UnrecoverableError("EMVBIndex only supports float type");
     }
     const u32 embedding_dimension = embedding_type->Dimension();
-    return MakeShared<EMVBIndexInMem>(residual_pq_subspace_num, residual_pq_subspace_bits, embedding_dimension, begin_row_id, column_def);
+    return std::make_shared<EMVBIndexInMem>(residual_pq_subspace_num, residual_pq_subspace_bits, embedding_dimension, begin_row_id, column_def);
 }
 
 // return id: offset in the segment
-std::variant<Pair<u32, u32>, EMVBInMemQueryResultType> EMVBIndexInMem::SearchWithBitmask(const f32 *query_ptr,
-                                                                                         const u32 query_embedding_num,
-                                                                                         const u32 top_n,
-                                                                                         Bitmask &bitmask,
-                                                                                         const BlockIndex *block_index,
-                                                                                         const TxnTimeStamp begin_ts,
-                                                                                         const u32 centroid_nprobe,
-                                                                                         const f32 threshold_first,
-                                                                                         const u32 n_doc_to_score,
-                                                                                         const u32 out_second_stage,
-                                                                                         const f32 threshold_final) const {
+std::variant<std::pair<u32, u32>, EMVBInMemQueryResultType> EMVBIndexInMem::SearchWithBitmask(const f32 *query_ptr,
+                                                                                              const u32 query_embedding_num,
+                                                                                              const u32 top_n,
+                                                                                              Bitmask &bitmask,
+                                                                                              const BlockIndex *block_index,
+                                                                                              const TxnTimeStamp begin_ts,
+                                                                                              const u32 centroid_nprobe,
+                                                                                              const f32 threshold_first,
+                                                                                              const u32 n_doc_to_score,
+                                                                                              const u32 out_second_stage,
+                                                                                              const f32 threshold_final) const {
     std::shared_lock lock(rw_mutex_);
     if (is_built_.test(std::memory_order_acquire)) {
         // use index

@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:kv_utility;
 
-import :stl;
 import :status;
+
 import internal_types;
 
 namespace infinity {
@@ -25,48 +23,55 @@ namespace infinity {
 class KVInstance;
 class IndexBase;
 
-export Vector<SegmentID> GetTableSegments(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
-
-export Vector<SegmentID> GetTableIndexSegments(KVInstance *kv_instance,
-                                               const String &db_id_str,
-                                               const String &table_id_str,
-                                               const String &index_id_str,
+export std::vector<SegmentID> GetTableSegments(KVInstance *kv_instance,
+                                               const std::string &db_id_str,
+                                               const std::string &table_id_str,
                                                TxnTimeStamp begin_ts,
                                                TxnTimeStamp commit_ts);
 
-export Vector<BlockID> GetTableSegmentBlocks(KVInstance *kv_instance,
-                                             const String &db_id_str,
-                                             const String &table_id_str,
-                                             SegmentID segment_id,
-                                             TxnTimeStamp begin_ts,
-                                             TxnTimeStamp commit_ts);
+export std::vector<SegmentID> GetTableIndexSegments(KVInstance *kv_instance,
+                                                    const std::string &db_id_str,
+                                                    const std::string &table_id_str,
+                                                    const std::string &index_id_str,
+                                                    TxnTimeStamp begin_ts,
+                                                    TxnTimeStamp commit_ts);
 
-export Vector<ColumnID> GetTableSegmentBlockColumns(KVInstance *kv_instance,
-                                                    const String &db_id_str,
-                                                    const String &table_id_str,
-                                                    SegmentID segment_id,
-                                                    BlockID block_id,
-                                                    TxnTimeStamp begin_ts);
-export SharedPtr<IndexBase>
-GetTableIndexDef(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, const String &index_id_str, TxnTimeStamp begin_ts);
+export std::vector<BlockID> GetTableSegmentBlocks(KVInstance *kv_instance,
+                                                  const std::string &db_id_str,
+                                                  const std::string &table_id_str,
+                                                  SegmentID segment_id,
+                                                  TxnTimeStamp begin_ts,
+                                                  TxnTimeStamp commit_ts);
 
-export SizeT GetBlockRowCount(KVInstance *kv_instance,
-                              const String &db_id_str,
-                              const String &table_id_str,
-                              SegmentID segment_id,
-                              BlockID block_id,
-                              TxnTimeStamp begin_ts,
-                              TxnTimeStamp commit_ts);
+export std::vector<ColumnID> GetTableSegmentBlockColumns(KVInstance *kv_instance,
+                                                         const std::string &db_id_str,
+                                                         const std::string &table_id_str,
+                                                         SegmentID segment_id,
+                                                         BlockID block_id,
+                                                         TxnTimeStamp begin_ts);
+export std::shared_ptr<IndexBase> GetTableIndexDef(KVInstance *kv_instance,
+                                                   const std::string &db_id_str,
+                                                   const std::string &table_id_str,
+                                                   const std::string &index_id_str,
+                                                   TxnTimeStamp begin_ts);
 
-export SizeT GetSegmentRowCount(KVInstance *kv_instance,
-                                const String &db_id_str,
-                                const String &table_id_str,
-                                SegmentID segment_id,
-                                TxnTimeStamp begin_ts,
-                                TxnTimeStamp commit_ts);
+export size_t GetBlockRowCount(KVInstance *kv_instance,
+                               const std::string &db_id_str,
+                               const std::string &table_id_str,
+                               SegmentID segment_id,
+                               BlockID block_id,
+                               TxnTimeStamp begin_ts,
+                               TxnTimeStamp commit_ts);
 
-export String GetLastPartOfKey(const String& key, char delimiter = '|');
+export size_t GetSegmentRowCount(KVInstance *kv_instance,
+                                 const std::string &db_id_str,
+                                 const std::string &table_id_str,
+                                 SegmentID segment_id,
+                                 TxnTimeStamp begin_ts,
+                                 TxnTimeStamp commit_ts);
 
-export u64 GetTimestampFromKey(const String& key);
+export std::string GetLastPartOfKey(const std::string &key, char delimiter = '|');
+
+export u64 GetTimestampFromKey(const std::string &key);
 
 } // namespace infinity

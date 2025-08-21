@@ -12,22 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:keyword_iterator;
 
-import :stl;
 import :index_defines;
 import :doc_iterator;
 import :multi_doc_iterator;
 import :or_iterator;
+
 import internal_types;
 
 namespace infinity {
 
 export class KeywordIterator final : public MultiDocIterator {
 public:
-    KeywordIterator(Vector<UniquePtr<DocIterator>> iterators, const float weight) : MultiDocIterator(std::move(iterators)), weight_(weight) {
+    KeywordIterator(std::vector<std::unique_ptr<DocIterator>> iterators, const float weight)
+        : MultiDocIterator(std::move(iterators)), weight_(weight) {
         bm25_score_upper_bound_ = weight;
         estimate_iterate_cost_ = {};
         for (u32 i = 0; i < children_.size(); ++i) {
@@ -37,7 +36,7 @@ public:
 
     DocIteratorType GetType() const override { return DocIteratorType::kKeywordIterator; }
 
-    String Name() const override { return "KeywordIterator"; }
+    std::string Name() const override { return "KeywordIterator"; }
 
     /* pure virtual methods implementation */
     bool Next(const RowID doc_id) override {

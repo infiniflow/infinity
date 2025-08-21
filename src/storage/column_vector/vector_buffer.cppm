@@ -12,18 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:vector_buffer;
 
-import :stl;
-import global_resource_usage;
 import :buffer_handle;
 import :var_buffer;
-import data_type;
 import :sparse_util;
+
 import sparse_info;
 import internal_types;
+import data_type;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -40,10 +38,10 @@ export enum class VectorBufferType {
 
 export class VectorBuffer {
 public:
-    static SharedPtr<VectorBuffer> Make(SizeT data_type_size, SizeT capacity, VectorBufferType buffer_type);
+    static std::shared_ptr<VectorBuffer> Make(size_t data_type_size, size_t capacity, VectorBufferType buffer_type);
 
-    static SharedPtr<VectorBuffer>
-    Make(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, SizeT data_type_size, SizeT capacity, VectorBufferType buffer_type);
+    static std::shared_ptr<VectorBuffer>
+    Make(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, size_t data_type_size, size_t capacity, VectorBufferType buffer_type);
 
 public:
     explicit VectorBuffer() {
@@ -58,55 +56,55 @@ public:
 #endif
     }
 
-    void Initialize(SizeT type_size, SizeT capacity);
+    void Initialize(size_t type_size, size_t capacity);
 
-    void InitializeCompactBit(SizeT capacity);
+    void InitializeCompactBit(size_t capacity);
 
-    void InitializeCompactBit(BufferObj *buffer_obj, SizeT capacity);
+    void InitializeCompactBit(BufferObj *buffer_obj, size_t capacity);
 
-    void Initialize(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, SizeT type_size, SizeT capacity);
+    void Initialize(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, size_t type_size, size_t capacity);
 
     void SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj);
 
     void ResetToInit(VectorBufferType type);
 
-    void Copy(ptr_t input, SizeT size);
+    void Copy(char *input, size_t size);
 
-    [[nodiscard]] ptr_t GetDataMut() {
-        if (std::holds_alternative<UniquePtr<char[]>>(ptr_)) {
-            return std::get<UniquePtr<char[]>>(ptr_).get();
+    [[nodiscard]] char *GetDataMut() {
+        if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
+            return std::get<std::unique_ptr<char[]>>(ptr_).get();
         } else {
-            return static_cast<ptr_t>(std::get<BufferHandle>(ptr_).GetDataMut());
+            return static_cast<char *>(std::get<BufferHandle>(ptr_).GetDataMut());
         }
     }
 
-    [[nodiscard]] const_ptr_t GetData() const {
-        if (std::holds_alternative<UniquePtr<char[]>>(ptr_)) {
-            return std::get<UniquePtr<char[]>>(ptr_).get();
+    [[nodiscard]] const char *GetData() const {
+        if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
+            return std::get<std::unique_ptr<char[]>>(ptr_).get();
         } else {
-            return static_cast<const_ptr_t>(std::get<BufferHandle>(ptr_).GetData());
+            return static_cast<const char *>(std::get<BufferHandle>(ptr_).GetData());
         }
     }
 
-    [[nodiscard]] bool GetCompactBit(SizeT idx) const;
+    [[nodiscard]] bool GetCompactBit(size_t idx) const;
 
-    void SetCompactBit(SizeT idx, bool val);
+    void SetCompactBit(size_t idx, bool val);
 
-    [[nodiscard]] static bool RawPointerGetCompactBit(const u8 *src_ptr_u8, SizeT idx);
+    [[nodiscard]] static bool RawPointerGetCompactBit(const u8 *src_ptr_u8, size_t idx);
 
-    static void RawPointerSetCompactBit(u8 *dst_ptr_u8, SizeT idx, bool val);
+    static void RawPointerSetCompactBit(u8 *dst_ptr_u8, size_t idx, bool val);
 
-    static bool CompactBitIsSame(const SharedPtr<VectorBuffer> &lhs, SizeT lhs_cnt, const SharedPtr<VectorBuffer> &rhs, SizeT rhs_cnt);
+    static bool CompactBitIsSame(const std::shared_ptr<VectorBuffer> &lhs, size_t lhs_cnt, const std::shared_ptr<VectorBuffer> &rhs, size_t rhs_cnt);
 
-    static void CopyCompactBits(u8 *dst, const u8 *src, SizeT dst_start_id, SizeT src_start_id, SizeT count);
+    static void CopyCompactBits(u8 *dst, const u8 *src, size_t dst_start_id, size_t src_start_id, size_t count);
 
 private:
     bool initialized_{false};
 
-    std::variant<UniquePtr<char[]>, BufferHandle> ptr_;
+    std::variant<std::unique_ptr<char[]>, BufferHandle> ptr_;
 
-    SizeT data_size_{0};
-    SizeT capacity_{0};
+    size_t data_size_{0};
+    size_t capacity_{0};
 
 public:
     VectorBufferType buffer_type_{VectorBufferType::kInvalid};
@@ -114,55 +112,55 @@ public:
 public:
     void Reset() { var_buffer_mgr_ = nullptr; }
 
-    SizeT TotalSize(const DataType *data_type) const;
+    size_t TotalSize(const DataType *data_type) const;
 
     void WriteAdv(char *&ptr, const DataType *data_type) const;
 
     void ReadAdv(const char *&ptr, const DataType *data_type);
 
-    const char *GetVarchar(SizeT offset, SizeT len) const;
+    const char *GetVarchar(size_t offset, size_t len) const;
 
-    SizeT AppendVarchar(const char *data, SizeT len);
+    size_t AppendVarchar(const char *data, size_t len);
 
-    Pair<const char *, const char *> GetSparseRaw(SizeT offset, SizeT nnz, const SparseInfo *sparse_info) const;
+    std::pair<const char *, const char *> GetSparseRaw(size_t offset, size_t nnz, const SparseInfo *sparse_info) const;
 
-    SizeT AppendSparseRaw(const char *raw_data, const char *raw_idx, SizeT nnz, const SparseInfo *sparse_info);
-
-    template <typename DataType, typename IdxType>
-    SparseVecRef<DataType, IdxType> GetSparse(SizeT offset, SizeT nnz) const;
+    size_t AppendSparseRaw(const char *raw_data, const char *raw_idx, size_t nnz, const SparseInfo *sparse_info);
 
     template <typename DataType, typename IdxType>
-    SizeT AppendSparse(const SparseVecRef<DataType, IdxType> &sparse_vec);
+    SparseVecRef<DataType, IdxType> GetSparse(size_t offset, size_t nnz) const;
 
-    const char *GetMultiVectorRaw(SizeT offset, SizeT size) const;
+    template <typename DataType, typename IdxType>
+    size_t AppendSparse(const SparseVecRef<DataType, IdxType> &sparse_vec);
 
-    SizeT AppendMultiVectorRaw(const char *raw_data, SizeT size);
+    const char *GetMultiVectorRaw(size_t offset, size_t size) const;
 
-    const char *GetTensorRaw(SizeT offset, SizeT size) const;
+    size_t AppendMultiVectorRaw(const char *raw_data, size_t size);
 
-    SizeT AppendTensorRaw(const char *raw_data, SizeT size);
+    const char *GetTensorRaw(size_t offset, size_t size) const;
 
-    const char *GetTensorArrayMeta(SizeT offset, SizeT array_num) const;
+    size_t AppendTensorRaw(const char *raw_data, size_t size);
 
-    SizeT AppendTensorArrayMeta(Span<const TensorT> tensor_metas) const;
+    const char *GetTensorArrayMeta(size_t offset, size_t array_num) const;
 
-    const char *GetArrayRaw(SizeT offset, SizeT size) const;
+    size_t AppendTensorArrayMeta(std::span<const TensorT> tensor_metas) const;
 
-    SizeT AppendArrayRaw(const char *raw_data, SizeT size) const;
+    const char *GetArrayRaw(size_t offset, size_t size) const;
+
+    size_t AppendArrayRaw(const char *raw_data, size_t size) const;
 
     VarBufferManager *var_buffer_mgr() const { return var_buffer_mgr_.get(); }
 
 private:
-    UniquePtr<VarBufferManager> var_buffer_mgr_{nullptr};
+    std::unique_ptr<VarBufferManager> var_buffer_mgr_{nullptr};
 };
 
 template <typename DataType, typename IdxType>
-SparseVecRef<DataType, IdxType> VectorBuffer::GetSparse(SizeT offset, SizeT nnz) const {
+SparseVecRef<DataType, IdxType> VectorBuffer::GetSparse(size_t offset, size_t nnz) const {
     if (nnz == 0) {
         return {0, nullptr, nullptr};
     }
-    SizeT indice_size = SparseInfo::IndiceSize<IdxType>(nnz);
-    SizeT data_size = SparseInfo::DataSize<DataType>(nnz);
+    size_t indice_size = SparseInfo::IndiceSize<IdxType>(nnz);
+    size_t data_size = SparseInfo::DataSize<DataType>(nnz);
     const char *raw_indice = var_buffer_mgr_->Get(offset, indice_size);
     const char *raw_data = nullptr;
     if (data_size > 0) {
@@ -172,10 +170,10 @@ SparseVecRef<DataType, IdxType> VectorBuffer::GetSparse(SizeT offset, SizeT nnz)
 }
 
 template <typename DataType, typename IdxType>
-SizeT VectorBuffer::AppendSparse(const SparseVecRef<DataType, IdxType> &sparse_vec) {
-    SizeT indice_size = SparseInfo::IndiceSize<IdxType>(sparse_vec.nnz_);
-    SizeT data_size = SparseInfo::DataSize<DataType>(sparse_vec.nnz_);
-    SizeT file_offset = var_buffer_mgr_->Append(reinterpret_cast<const char *>(sparse_vec.indices_), indice_size);
+size_t VectorBuffer::AppendSparse(const SparseVecRef<DataType, IdxType> &sparse_vec) {
+    size_t indice_size = SparseInfo::IndiceSize<IdxType>(sparse_vec.nnz_);
+    size_t data_size = SparseInfo::DataSize<DataType>(sparse_vec.nnz_);
+    size_t file_offset = var_buffer_mgr_->Append(reinterpret_cast<const char *>(sparse_vec.indices_), indice_size);
     if (data_size > 0) {
         var_buffer_mgr_->Append(reinterpret_cast<const char *>(sparse_vec.data_), data_size);
     }

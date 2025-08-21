@@ -12,19 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:add.impl;
 
 import :add;
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import :logger;
-import :third_party;
+
 import logical_type;
 import internal_types;
 import data_type;
@@ -216,9 +212,9 @@ inline bool AddFunction::Run(MixedT, MixedT, MixedT &) {
 }
 
 void RegisterAddFunction(NewCatalog *catalog_ptr) {
-    String func_name = "+";
+    std::string func_name = "+";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     // Add function
     ScalarFunction add_function_int8(func_name,

@@ -12,24 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.column_def;
 
 import :ut.base_test;
 import :infinity_exception;
-import :stl;
-import :third_party;
+import third_party;
 import :logger;
 import :infinity_context;
-#endif
 
 import global_resource_usage;
 import internal_types;
@@ -46,7 +39,7 @@ TEST_F(ColumnDefTest, test1) {
     std::set<ConstraintType> constraints;
     constraints.insert(ConstraintType::kUnique);
     constraints.insert(ConstraintType::kNotNull);
-    auto column_def_ptr = MakeShared<ColumnDef>(0, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
+    auto column_def_ptr = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
     EXPECT_EQ(*column_def_ptr->type(), DataType(LogicalType::kTinyInt));
     EXPECT_EQ(column_def_ptr->id(), 0);
     EXPECT_STREQ(column_def_ptr->name().c_str(), "c1");
@@ -58,7 +51,7 @@ TEST_F(ColumnDefTest, test2) {
 
     std::set<ConstraintType> constraints;
     constraints.insert(ConstraintType::kPrimaryKey);
-    auto column_def_ptr = MakeShared<ColumnDef>(3, MakeShared<DataType>(LogicalType::kVarchar), "c2", constraints);
+    auto column_def_ptr = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "c2", constraints);
     EXPECT_EQ(*column_def_ptr->type(), DataType(LogicalType::kVarchar));
     EXPECT_EQ(column_def_ptr->id(), 3);
     EXPECT_EQ(column_def_ptr->name(), "c2");

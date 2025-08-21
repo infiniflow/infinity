@@ -1,17 +1,13 @@
-module;
-
-#include <fstream>
-#include <sstream>
-
 module infinity_core:analyze_context.impl;
 
 import :analyze_context;
-import :stl;
 import :quick_sort_set;
 import :character_util;
 import :lexeme;
 import :lexeme_path;
 import :ik_dict;
+
+import std;
 
 namespace infinity {
 AnalyzeContext::AnalyzeContext(Dictionary *dict, bool ik_smart) : dict_(dict), ik_smart_(ik_smart) {
@@ -53,7 +49,7 @@ bool AnalyzeContext::AddLexeme(Lexeme *lexeme) { return org_lexemes_->AddLexeme(
 
 void AnalyzeContext::AddLexemePath(LexemePath *path) {
     if (path != nullptr) {
-        path_map_[path->GetPathBegin()] = UniquePtr<LexemePath>(path);
+        path_map_[path->GetPathBegin()] = std::unique_ptr<LexemePath>(path);
     }
 }
 
@@ -116,7 +112,7 @@ Lexeme *AnalyzeContext::GetNextLexeme() {
 }
 
 void AnalyzeContext::Reset() {
-    org_lexemes_ = MakeUnique<QuickSortSet>();
+    org_lexemes_ = std::make_unique<QuickSortSet>();
     available_ = 0;
     buff_offset_ = 0;
     char_types_.clear();

@@ -14,15 +14,16 @@
 
 module;
 
-#include <iterator>
-
 module infinity_core:obj_status.impl;
 
 import :obj_status;
-import serialize;
 import :status;
 import :logger;
-import :third_party;
+
+import std;
+import third_party;
+
+import serialize;
 
 namespace infinity {
 
@@ -40,7 +41,7 @@ nlohmann::json ObjStat::Serialize() const {
     return obj;
 }
 
-String ObjStat::ToString() const {
+std::string ObjStat::ToString() const {
     nlohmann::json obj;
     obj["obj_size"] = obj_size_;
     obj["parts"] = parts_;
@@ -62,23 +63,23 @@ void ObjStat::Deserialize(std::string_view str) {
     obj_size_ = doc["obj_size"];
     parts_ = doc["parts"];
     if (simdjson::array array; doc["deleted_ranges"].get(array) == simdjson::SUCCESS) {
-        SizeT start = 0;
-        SizeT end = 0;
+        size_t start = 0;
+        size_t end = 0;
         for (auto range_obj : array) {
             if (auto item = range_obj["start"]; item.error() == simdjson::SUCCESS) {
-                start = item.get<SizeT>();
+                start = item.get<size_t>();
             }
             if (auto item = range_obj["end"]; item.error() == simdjson::SUCCESS) {
-                end = item.get<SizeT>();
+                end = item.get<size_t>();
             }
             deleted_ranges_.emplace(Range{.start_ = start, .end_ = end});
         }
     }
 }
 
-SizeT ObjStat::GetSizeInBytes() const {
-    SizeT size = sizeof(SizeT) + sizeof(SizeT) + sizeof(SizeT);
-    size += (sizeof(SizeT) + sizeof(SizeT)) * deleted_ranges_.size();
+size_t ObjStat::GetSizeInBytes() const {
+    size_t size = sizeof(size_t) + sizeof(size_t) + sizeof(size_t);
+    size += (sizeof(size_t) + sizeof(size_t)) * deleted_ranges_.size();
     return size;
 }
 
@@ -94,33 +95,33 @@ void ObjStat::WriteBufAdv(char *&buf) const {
 
 ObjStat ObjStat::ReadBufAdv(const char *&buf) {
     ObjStat ret;
-    ret.obj_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
-    ret.parts_ = ::infinity::ReadBufAdv<SizeT>(buf);
+    ret.obj_size_ = ::infinity::ReadBufAdv<size_t>(buf);
+    ret.parts_ = ::infinity::ReadBufAdv<size_t>(buf);
     ret.ref_count_ = 0;
 
-    SizeT start, end;
-    SizeT len = ::infinity::ReadBufAdv<SizeT>(buf);
-    for (SizeT i = 0; i < len; ++i) {
-        start = ::infinity::ReadBufAdv<SizeT>(buf);
-        end = ::infinity::ReadBufAdv<SizeT>(buf);
+    size_t start, end;
+    size_t len = ::infinity::ReadBufAdv<size_t>(buf);
+    for (size_t i = 0; i < len; ++i) {
+        start = ::infinity::ReadBufAdv<size_t>(buf);
+        end = ::infinity::ReadBufAdv<size_t>(buf);
         ret.deleted_ranges_.emplace(Range{.start_ = start, .end_ = end});
     }
     return ret;
 }
 
-void ObjStat::CheckValid(const String &obj_key, SizeT current_object_size) const {
-    const Set<Range> &deleted_ranges = deleted_ranges_;
+void ObjStat::CheckValid(const std::string &obj_key, size_t current_object_size) const {
+    const std::set<Range> &deleted_ranges = deleted_ranges_;
     if (deleted_ranges.size() >= 2) {
         auto it1 = deleted_ranges.begin();
         auto it2 = std::next(it1);
         while (it2 != deleted_ranges.end()) {
             if (it1->end_ >= it2->start_) {
-                String error_message = fmt::format("CurrentObjFinalize Object {} deleted ranges intersect: [{}, {}), [{}, {})",
-                                                   obj_key,
-                                                   it1->start_,
-                                                   it1->end_,
-                                                   it2->start_,
-                                                   it2->end_);
+                std::string error_message = fmt::format("CurrentObjFinalize Object {} deleted ranges intersect: [{}, {}), [{}, {})",
+                                                        obj_key,
+                                                        it1->start_,
+                                                        it1->end_,
+                                                        it2->start_,
+                                                        it2->end_);
                 LOG_ERROR(error_message);
             }
             it1 = it2;
@@ -129,7 +130,7 @@ void ObjStat::CheckValid(const String &obj_key, SizeT current_object_size) const
     } else if (deleted_ranges.size() == 1) {
         auto it1 = deleted_ranges.begin();
         if (it1->start_ == 0 && it1->end_ == current_object_size) {
-            String error_message = fmt::format("CurrentObjFinalize Object {} is fully deleted", obj_key);
+            std::string error_message = fmt::format("CurrentObjFinalize Object {} is fully deleted", obj_key);
             LOG_ERROR(error_message);
         }
     }

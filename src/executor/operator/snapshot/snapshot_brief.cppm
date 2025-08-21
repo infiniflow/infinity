@@ -12,24 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:snapshot_brief;
 
-import :stl;
-import command_statement;
 import :status;
+
+import command_statement;
 
 namespace infinity {
 
 export struct SnapshotBrief {
-    String snapshot_name_; // snapshot_name_
-    SnapshotScope scope_{SnapshotScope::kInvalid};  // system / db / table snapshot
-    String create_time_;      // when create the snapshot
-    u64 commit_ts_;        // txn ts the snapshot created.
-    u64 size_;             // total snapshot size
+    std::string snapshot_name_;                    // snapshot_name_
+    SnapshotScope scope_{SnapshotScope::kInvalid}; // system / db / table snapshot
+    std::string create_time_;                      // when create the snapshot
+    u64 commit_ts_;                                // txn ts the snapshot created.
+    u64 size_;                                     // total snapshot size
 
-    static Vector<SnapshotBrief> GetSnapshots(const String& dir);
+    static std::vector<SnapshotBrief> GetSnapshots(const std::string &dir);
 };
 
 } // namespace infinity

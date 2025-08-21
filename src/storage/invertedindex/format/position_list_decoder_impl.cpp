@@ -1,12 +1,6 @@
-module;
-
-#include "common/utility/builtin.h"
-
 module infinity_core:position_list_decoder.impl;
 
 import :position_list_decoder;
-
-import :stl;
 import :byte_slice;
 import :byte_slice_reader;
 import :in_doc_pos_state;
@@ -15,7 +9,8 @@ import :position_list_format_option;
 import :posting_field;
 import :short_list_optimize_util;
 import :index_defines;
-import :third_party;
+
+import third_party;
 
 namespace infinity {
 

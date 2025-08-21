@@ -11,17 +11,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module;
 
 module infinity_core:physical_source.impl;
 
 import :physical_source;
-
-import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
-
 import :physical_operator_type;
 import :operator_state;
 import :data_block;
@@ -33,7 +29,7 @@ import :physical_source;
 
 namespace infinity {
 
-String ToString(SourceType source_type) {
+std::string ToString(SourceType source_type) {
     switch (source_type) {
         case SourceType::kInvalid: {
             return "Invalid";
@@ -53,7 +49,7 @@ String ToString(SourceType source_type) {
     }
 }
 
-void PhysicalSource::Init(QueryContext* query_context) {}
+void PhysicalSource::Init(QueryContext *query_context) {}
 
 bool PhysicalSource::Execute(QueryContext *, OperatorState *) { return true; }
 
@@ -61,8 +57,7 @@ bool PhysicalSource::Execute(QueryContext *, OperatorState *) { return true; }
 bool PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
     switch (source_state->state_type_) {
         case SourceStateType::kInvalid: {
-            String error_message = "Unsupported source state type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unsupported source state type.");
             break;
         }
         case SourceStateType::kMatchTensorScan:

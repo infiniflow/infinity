@@ -16,7 +16,9 @@ module;
 
 export module infinity_core:expression_state;
 
-import :stl;
+import :infinity_type;
+
+import std;
 
 namespace infinity {
 export class BaseExpression;
@@ -40,41 +42,42 @@ export enum class AggregateFlag : i8 {
 export class ExpressionState {
 public:
     // Static functions
-    static SharedPtr<ExpressionState> CreateState(const SharedPtr<BaseExpression> &expression, char * = nullptr);
+    static std::shared_ptr<ExpressionState> CreateState(const std::shared_ptr<BaseExpression> &expression, char * = nullptr);
 
-    static SharedPtr<ExpressionState> CreateState(const SharedPtr<AggregateExpression> &agg_expr, char *agg_state, const AggregateFlag agg_flag);
+    static std::shared_ptr<ExpressionState>
+    CreateState(const std::shared_ptr<AggregateExpression> &agg_expr, char *agg_state, const AggregateFlag agg_flag);
 
-    static SharedPtr<ExpressionState> CreateState(const SharedPtr<CaseExpression> &agg_expr);
+    static std::shared_ptr<ExpressionState> CreateState(const std::shared_ptr<CaseExpression> &agg_expr);
 
-    static SharedPtr<ExpressionState> CreateState(const SharedPtr<CastExpression> &agg_expr);
+    static std::shared_ptr<ExpressionState> CreateState(const std::shared_ptr<CastExpression> &agg_expr);
 
-    static SharedPtr<ExpressionState> CreateState(const SharedPtr<ReferenceExpression> &agg_expr);
+    static std::shared_ptr<ExpressionState> CreateState(const std::shared_ptr<ReferenceExpression> &agg_expr);
 
-    static SharedPtr<ExpressionState> CreateState(const SharedPtr<FunctionExpression> &agg_expr);
+    static std::shared_ptr<ExpressionState> CreateState(const std::shared_ptr<FunctionExpression> &agg_expr);
 
-    static SharedPtr<ExpressionState> CreateState(const SharedPtr<ValueExpression> &agg_expr);
+    static std::shared_ptr<ExpressionState> CreateState(const std::shared_ptr<ValueExpression> &agg_expr);
 
-    static SharedPtr<ExpressionState> CreateState(const SharedPtr<InExpression> &in_expr);
+    static std::shared_ptr<ExpressionState> CreateState(const std::shared_ptr<InExpression> &in_expr);
 
-    static SharedPtr<ExpressionState> CreateState(const SharedPtr<FilterFulltextExpression> &filter_fulltext_expr);
+    static std::shared_ptr<ExpressionState> CreateState(const std::shared_ptr<FilterFulltextExpression> &filter_fulltext_expr);
 
 public:
-    void AddChild(const SharedPtr<BaseExpression> &expression);
+    void AddChild(const std::shared_ptr<BaseExpression> &expression);
 
-    Vector<SharedPtr<ExpressionState>> &Children() { return children_; }
+    std::vector<std::shared_ptr<ExpressionState>> &Children() { return children_; }
 
-    SharedPtr<ColumnVector> &OutputColumnVector() { return column_vector_; }
+    std::shared_ptr<ColumnVector> &OutputColumnVector() { return column_vector_; }
 
     char *agg_state_{};
 
     AggregateFlag agg_flag_{AggregateFlag::kUninitialized};
 
 private:
-    Vector<SharedPtr<ExpressionState>> children_;
-    String name_;
+    std::vector<std::shared_ptr<ExpressionState>> children_;
+    std::string name_;
 
     // output blocks and each block have one output column;
-    SharedPtr<ColumnVector> column_vector_{nullptr};
+    std::shared_ptr<ColumnVector> column_vector_{nullptr};
 };
 
 } // namespace infinity

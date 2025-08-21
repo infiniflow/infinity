@@ -14,26 +14,25 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:subquery_expression.impl;
 
 import :subquery_expression;
 
-import :stl;
 import :bound_select_statement;
 import :expression_type;
-import subquery_expr;
 
+import std;
+
+import subquery_expr;
 import logical_type;
 import data_type;
 
 namespace infinity {
 
-SubqueryExpression::SubqueryExpression(UniquePtr<BoundSelectStatement> bound_select_statement, SubqueryType subquery_type)
+SubqueryExpression::SubqueryExpression(std::unique_ptr<BoundSelectStatement> bound_select_statement, SubqueryType subquery_type)
     : BaseExpression(ExpressionType::kSubQuery, {}), bound_select_statement_ptr_(std::move(bound_select_statement)), subquery_type_(subquery_type) {}
 
-String SubqueryExpression::ToString() const {
+std::string SubqueryExpression::ToString() const {
     std::stringstream ss;
     ss << "Subquery: " << std::endl;
     return ss.str();

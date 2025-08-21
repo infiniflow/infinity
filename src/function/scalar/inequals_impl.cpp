@@ -12,27 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <compare>
-#include <type_traits>
-
 module infinity_core:inequals.impl;
 
 import :inequals;
-
-import logical_type;
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
 
-import :third_party;
+import std;
+
+import logical_type;
 import internal_types;
 import data_type;
-import :logger;
 
 namespace infinity {
 
@@ -109,8 +102,8 @@ inline void InEqualsFunction::Run(VarcharT left, MixedT right, bool &result) {
 }
 
 template <typename CompareType, typename InEqualsFunction>
-static void GenerateInEqualsFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr, DataType data_type) {
-    String func_name = "<>";
+static void GenerateInEqualsFunction(std::shared_ptr<ScalarFunctionSet> &function_set_ptr, DataType data_type) {
+    std::string func_name = "<>";
     ScalarFunction inequals_function(func_name,
                                      {data_type, data_type},
                                      DataType(LogicalType::kBoolean),
@@ -119,9 +112,9 @@ static void GenerateInEqualsFunction(SharedPtr<ScalarFunctionSet> &function_set_
 }
 
 void RegisterInEqualFunction(NewCatalog *catalog_ptr) {
-    String func_name = "<>";
+    std::string func_name = "<>";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     GenerateInEqualsFunction<BooleanT, BooleanInEqualsFunction>(function_set_ptr, DataType(LogicalType::kBoolean));
     GenerateInEqualsFunction<TinyIntT, PODTypeInEqualsFunction>(function_set_ptr, DataType(LogicalType::kTinyInt));
@@ -204,9 +197,9 @@ void RegisterInEqualFunction(NewCatalog *catalog_ptr) {
 }
 
 void RegisterInEqualAliasFunction(NewCatalog *catalog_ptr) {
-    String func_name = "!=";
+    std::string func_name = "!=";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     GenerateInEqualsFunction<BooleanT, BooleanInEqualsFunction>(function_set_ptr, DataType(LogicalType::kBoolean));
     GenerateInEqualsFunction<TinyIntT, PODTypeInEqualsFunction>(function_set_ptr, DataType(LogicalType::kTinyInt));

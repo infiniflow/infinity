@@ -12,19 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <vector>
-
 module infinity_core:physical_explain.impl;
 
 import :physical_explain;
-
-import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
-
 import :physical_operator_type;
 import :operator_state;
 import :column_vector;
@@ -33,32 +26,35 @@ import :default_values;
 import :value;
 import :status;
 import :infinity_exception;
-import logical_type;
 import :logger;
 import :plan_fragment;
 import :fragment_task;
-import :third_party;
+
+import std;
+import third_party;
+
 import explain_statement;
 import data_type;
+import logical_type;
 
 namespace infinity {
 
-void PhysicalExplain::AlignParagraphs(Vector<SharedPtr<String>> &array1, Vector<SharedPtr<String>> &array2) {
-    SizeT size1 = array1.size();
-    SizeT size2 = array2.size();
+void PhysicalExplain::AlignParagraphs(std::vector<std::shared_ptr<std::string>> &array1, std::vector<std::shared_ptr<std::string>> &array2) {
+    size_t size1 = array1.size();
+    size_t size2 = array2.size();
 
     if (size1 < size2) {
-        array1.resize(size2, MakeShared<String>(""));
+        array1.resize(size2, std::make_shared<std::string>(""));
     } else if (size2 < size1) {
-        array2.resize(size1, MakeShared<String>(""));
+        array2.resize(size1, std::make_shared<std::string>(""));
     }
 }
 
 void PhysicalExplain::Init(QueryContext *query_context) {
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
 
-    output_names_ = MakeShared<Vector<String>>();
-    output_types_ = MakeShared<Vector<SharedPtr<DataType>>>();
+    output_names_ = std::make_shared<std::vector<std::string>>();
+    output_types_ = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
 
     switch (explain_type_) {
         case ExplainType::kAnalyze: {
@@ -92,8 +88,7 @@ void PhysicalExplain::Init(QueryContext *query_context) {
             break;
         }
         case ExplainType::kInvalid: {
-            String error_message = "Invalid explain type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid explain type");
         }
     }
     output_types_->emplace_back(varchar_type);
@@ -104,10 +99,10 @@ void PhysicalExplain::Init(QueryContext *query_context) {
 }
 
 bool PhysicalExplain::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    String title;
+    std::string title;
 
-    auto column_vector_ptr = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
-    auto task_vector_ptr = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
+    auto column_vector_ptr = ColumnVector::Make(std::make_shared<DataType>(LogicalType::kVarchar));
+    auto task_vector_ptr = ColumnVector::Make(std::make_shared<DataType>(LogicalType::kVarchar));
 
     auto output_data_block = DataBlock::MakeUniquePtr();
 
@@ -141,46 +136,45 @@ bool PhysicalExplain::Execute(QueryContext *query_context, OperatorState *operat
             break;
         }
         case ExplainType::kInvalid: {
-            String error_message = "Invalid explain type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid explain type");
         }
     }
 
-    SizeT capacity = DEFAULT_VECTOR_SIZE; // DEFAULT VECTOR SIZE is too large for it.
+    size_t capacity = DEFAULT_VECTOR_SIZE; // DEFAULT VECTOR SIZE is too large for it.
 
     column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
     task_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
 
     if (explain_type_ == ExplainType::kPipeline) {
-        Vector<SharedPtr<String>> task_texts;
+        std::vector<std::shared_ptr<std::string>> task_texts;
         ExplainPipeline(task_texts, plan_fragment_ptr_, query_context->query_profiler());
 
         AlignParagraphs(*this->texts_, task_texts);
-        for (SizeT idx = 0; idx < this->texts_->size(); ++idx) {
+        for (size_t idx = 0; idx < this->texts_->size(); ++idx) {
             column_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->texts_)[idx]));
         }
-        for (SizeT idx = 0; idx < task_texts.size(); ++idx) {
+        for (size_t idx = 0; idx < task_texts.size(); ++idx) {
             task_vector_ptr->AppendValue(Value::MakeVarchar(*task_texts[idx]));
         }
     } else if (explain_type_ == ExplainType::kAnalyze) {
-        Vector<SharedPtr<String>> task_texts;
+        std::vector<std::shared_ptr<std::string>> task_texts;
         ExplainAnalyze(task_texts, plan_fragment_ptr_, query_context->query_profiler());
 
         AlignParagraphs(*this->texts_, task_texts);
-        for (SizeT idx = 0; idx < this->texts_->size(); ++idx) {
+        for (size_t idx = 0; idx < this->texts_->size(); ++idx) {
             column_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->texts_)[idx]));
         }
-        for (SizeT idx = 0; idx < task_texts.size(); ++idx) {
+        for (size_t idx = 0; idx < task_texts.size(); ++idx) {
             task_vector_ptr->AppendValue(Value::MakeVarchar(*task_texts[idx]));
         }
 
     } else {
-        for (SizeT idx = 0; idx < this->texts_->size(); ++idx) {
+        for (size_t idx = 0; idx < this->texts_->size(); ++idx) {
             column_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->texts_)[idx]));
         }
     }
 
-    Vector<SharedPtr<ColumnVector>> column_vectors;
+    std::vector<std::shared_ptr<ColumnVector>> column_vectors;
     column_vectors.reserve(2);
 
     column_vectors.push_back(column_vector_ptr);
@@ -197,32 +191,35 @@ bool PhysicalExplain::Execute(QueryContext *query_context, OperatorState *operat
 
 void PhysicalExplain::SetPlanFragment(PlanFragment *plan_fragment_ptr) { plan_fragment_ptr_ = plan_fragment_ptr; }
 
-void PhysicalExplain::ExplainAnalyze(Vector<SharedPtr<String>> &result, PlanFragment *plan_fragment_ptr, QueryProfiler *query_profiler) {
-    Vector<UniquePtr<FragmentTask>> &tasks = plan_fragment_ptr->GetContext()->Tasks();
+void PhysicalExplain::ExplainAnalyze(std::vector<std::shared_ptr<std::string>> &result,
+                                     PlanFragment *plan_fragment_ptr,
+                                     QueryProfiler *query_profiler) {
+    std::vector<std::unique_ptr<FragmentTask>> &tasks = plan_fragment_ptr->GetContext()->Tasks();
     u64 fragment_id = plan_fragment_ptr->FragmentID();
     {
-        String fragment_header = fmt::format("Fragment #{} * {} Tasks", fragment_id, tasks.size());
-        result.emplace_back(MakeShared<String>(fragment_header));
+        std::string fragment_header = fmt::format("Fragment #{} * {} Tasks", fragment_id, tasks.size());
+        result.emplace_back(std::make_shared<std::string>(fragment_header));
     }
     for (const auto &task : tasks) {
         i64 task_id = task->TaskID();
 
-        Vector<TaskProfiler> &task_profiles = query_profiler->GetTaskProfile(fragment_id, task_id);
+        std::vector<TaskProfiler> &task_profiles = query_profiler->GetTaskProfile(fragment_id, task_id);
         for (const auto &task_profile : task_profiles) {
             i64 times = 0;
-            result.emplace_back(MakeShared<String>(fmt::format("-> Task {}, Seq: {}", task_id, times)));
+            result.emplace_back(std::make_shared<std::string>(fmt::format("-> Task {}, Seq: {}", task_id, times)));
             for (const auto &operator_info : task_profile.timings_) {
-                String operator_info_str = fmt::format("  -> {} : ElapsedTime: {}, Output: {}",
-                                                       operator_info.name_,
-                                                       BaseProfiler::ElapsedToString(static_cast<infinity::NanoSeconds>(operator_info.elapsed_)),
-                                                       operator_info.output_rows_);
-                result.emplace_back(MakeShared<String>(operator_info_str));
+                std::string operator_info_str =
+                    fmt::format("  -> {} : ElapsedTime: {}, Output: {}",
+                                operator_info.name_,
+                                BaseProfiler::ElapsedToString(static_cast<std::chrono::nanoseconds>(operator_info.elapsed_)),
+                                operator_info.output_rows_);
+                result.emplace_back(std::make_shared<std::string>(operator_info_str));
             }
             ++times;
         }
     }
     // NOTE: Insert blank elements after each Fragment for alignment
-    result.emplace_back(MakeShared<String>());
+    result.emplace_back(std::make_shared<std::string>());
 
     if (plan_fragment_ptr->HasChild()) {
         // current fragment have children
@@ -232,15 +229,17 @@ void PhysicalExplain::ExplainAnalyze(Vector<SharedPtr<String>> &result, PlanFrag
     }
 }
 
-void PhysicalExplain::ExplainPipeline(Vector<SharedPtr<String>> &result, PlanFragment *plan_fragment_ptr, QueryProfiler *query_profiler) {
-    Vector<UniquePtr<FragmentTask>> &tasks = plan_fragment_ptr->GetContext()->Tasks();
+void PhysicalExplain::ExplainPipeline(std::vector<std::shared_ptr<std::string>> &result,
+                                      PlanFragment *plan_fragment_ptr,
+                                      QueryProfiler *query_profiler) {
+    std::vector<std::unique_ptr<FragmentTask>> &tasks = plan_fragment_ptr->GetContext()->Tasks();
     u64 fragment_id = plan_fragment_ptr->FragmentID();
     {
-        String fragment_header = fmt::format("Fragment #{} * {} Tasks", fragment_id, tasks.size());
-        result.emplace_back(MakeShared<String>(fragment_header));
+        std::string fragment_header = fmt::format("Fragment #{} * {} Tasks", fragment_id, tasks.size());
+        result.emplace_back(std::make_shared<std::string>(fragment_header));
     }
     // NOTE: Insert blank elements after each Fragment for alignment
-    result.emplace_back(MakeShared<String>());
+    result.emplace_back(std::make_shared<std::string>());
 
     if (plan_fragment_ptr->HasChild()) {
         // current fragment have children

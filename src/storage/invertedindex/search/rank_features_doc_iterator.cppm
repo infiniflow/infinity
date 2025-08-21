@@ -12,27 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:rank_features_doc_iterator;
 
-import :stl;
 import :index_defines;
 import :doc_iterator;
 import :multi_doc_iterator;
+
 import internal_types;
 
 namespace infinity {
 
 export class RankFeaturesDocIterator : public MultiDocIterator {
 public:
-    explicit RankFeaturesDocIterator(Vector<UniquePtr<DocIterator>> &&iterators);
+    explicit RankFeaturesDocIterator(std::vector<std::unique_ptr<DocIterator>> &&iterators);
 
     ~RankFeaturesDocIterator() override;
 
     DocIteratorType GetType() const override { return DocIteratorType::kRankFeaturesDocIterator; }
 
-    String Name() const override { return "RankFeaturesDocIterator"; }
+    std::string Name() const override { return "RankFeaturesDocIterator"; }
 
     void UpdateScoreThreshold(float threshold) override {}
 

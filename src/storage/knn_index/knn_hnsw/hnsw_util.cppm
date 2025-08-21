@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <vector>
-
 export module infinity_core:hnsw_util;
 
-import :stl;
-import statement_common;
 import :infinity_exception;
 import :status;
+
+import std;
+
+import statement_common;
 
 namespace infinity {
 
@@ -31,12 +29,12 @@ export struct HnswOptimizeOptions {
 };
 
 export struct HnswUtil {
-    static Optional<HnswOptimizeOptions> ParseOptimizeOptions(const Vector<UniquePtr<InitParameter>> &opt_params) {
+    static std::optional<HnswOptimizeOptions> ParseOptimizeOptions(const std::vector<std::unique_ptr<InitParameter>> &opt_params) {
         HnswOptimizeOptions options;
         for (const auto &param : opt_params) {
-            if (IsEqual(param->param_name_, "compress_to_lvq")) {
+            if (param->param_name_ == "compress_to_lvq") {
                 options.compress_to_lvq = true;
-            } else if (IsEqual(param->param_name_, "lvq_avg")) {
+            } else if (param->param_name_ == "lvq_avg") {
                 options.lvq_avg = true;
             }
         }
@@ -44,7 +42,7 @@ export struct HnswUtil {
             RecoverableError(Status::InvalidIndexParam("compress_to_lvq and lvq_avg cannot be set at the same time"));
         }
         if (!options.compress_to_lvq && !options.lvq_avg) {
-            return None;
+            return std::nullopt;
         }
         return options;
     }

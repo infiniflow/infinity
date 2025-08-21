@@ -12,30 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:bound_compact_statement.impl;
 
 import :bound_compact_statement;
-
-import :stl;
 import :logical_compact;
 import :base_table_ref;
 import :block_index;
 import :logical_node;
 import :query_context;
 import :bind_context;
-import :logger;
-import :third_party;
+
+import third_party;
+
 import compact_statement;
 
 namespace infinity {
 
-Vector<SharedPtr<LogicalNode>> BoundCompactStatement::BuildPlans(QueryContext *query_context) {
-    Vector<SharedPtr<LogicalNode>> res;
-    const SharedPtr<BindContext> &bind_context = this->bind_context_;
+std::vector<std::shared_ptr<LogicalNode>> BoundCompactStatement::BuildPlans(QueryContext *query_context) {
+    std::vector<std::shared_ptr<LogicalNode>> res;
+    const std::shared_ptr<BindContext> &bind_context = this->bind_context_;
 
-    auto compact_node = MakeShared<LogicalCompact>(bind_context->GetNewLogicalNodeId(), base_table_ref_, compact_type_);
+    auto compact_node = std::make_shared<LogicalCompact>(bind_context->GetNewLogicalNodeId(), base_table_ref_, compact_type_);
     res.emplace_back(compact_node);
     return res;
 }

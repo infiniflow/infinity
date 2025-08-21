@@ -1,18 +1,12 @@
-
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.posting_merger;
 
 import :ut.base_test;
 import :posting_merger;
-import :stl;
+
 import :segment_term_posting;
 import :memory_indexer;
 import :column_vector;
@@ -36,7 +30,6 @@ import :infinity_context;
 import :persistence_manager;
 import :persist_result_handler;
 import :local_file_handle;
-#endif
 
 import data_type;
 import internal_types;
@@ -51,9 +44,9 @@ public:
 
 public:
     struct ExpectedPosting {
-        String term;
-        Vector<RowID> doc_ids;
-        Vector<u32> tfs;
+        std::string term;
+        std::vector<RowID> doc_ids;
+        std::vector<u32> tfs;
     };
 
 protected:
@@ -61,8 +54,8 @@ protected:
 
 protected:
     optionflag_t flag_{OPTION_FLAG_ALL};
-    static constexpr SizeT BUFFER_SIZE_ = 1024;
-    String config_path_{};
+    static constexpr size_t BUFFER_SIZE_ = 1024;
+    std::string config_path_{};
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
@@ -75,12 +68,12 @@ void PostingMergerTest::CreateIndex() {
         R"#(A)#",
         R"#(A A)#",
     };
-    const SizeT num_paragraph = sizeof(paragraphs) / sizeof(char *);
+    const size_t num_paragraph = sizeof(paragraphs) / sizeof(char *);
 
-    SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
+    std::shared_ptr<ColumnVector> column = ColumnVector::Make(std::make_shared<DataType>(LogicalType::kVarchar));
     column->Initialize();
-    for (SizeT i = 0; i < num_paragraph; ++i) {
-        Value v = Value::MakeVarchar(String(paragraphs[i]));
+    for (size_t i = 0; i < num_paragraph; ++i) {
+        Value v = Value::MakeVarchar(std::string(paragraphs[i]));
         column->AppendValue(v);
     }
 
@@ -97,31 +90,31 @@ TEST_P(PostingMergerTest, Basic) {
     // using namespace infinity;
     CreateIndex();
 
-    const String index_dir = GetFullDataDir();
+    const std::string index_dir = GetFullDataDir();
 
-    String dst_base_name = "merged_index";
-    Path path = Path(index_dir) / dst_base_name;
-    String index_prefix = path.string();
-    String dict_file = index_prefix;
+    std::string dst_base_name = "merged_index";
+    std::filesystem::path path = std::filesystem::path(index_dir) / dst_base_name;
+    std::string index_prefix = path.string();
+    std::string dict_file = index_prefix;
     dict_file.append(DICT_SUFFIX);
 
-    String posting_file = path.string();
+    std::string posting_file = path.string();
     posting_file.append(POSTING_SUFFIX);
 
-    Vector<String> base_names = {"chunk1", "chunk2"};
-    Vector<RowID> row_ids = {RowID{0U, 0U}, RowID{0U, 1U}};
-    Vector<SegmentTermPosting *> segment_term_postings;
+    std::vector<std::string> base_names = {"chunk1", "chunk2"};
+    std::vector<RowID> row_ids = {RowID{0U, 0U}, RowID{0U, 1U}};
+    std::vector<SegmentTermPosting *> segment_term_postings;
 
-    Vector<Vector<u32>> expected_pos{{0}, {0, 1}};
+    std::vector<std::vector<u32>> expected_pos{{0}, {0, 1}};
     for (size_t i = 0; i < base_names.size(); ++i) {
         auto base_name = base_names[i];
         auto row_id = row_ids[i];
         {
-            String expected_term("a");
-            auto segment_term_posting1 = MakeUnique<SegmentTermPosting>(index_dir, base_name, row_id, flag_);
+            std::string expected_term("a");
+            auto segment_term_posting1 = std::make_unique<SegmentTermPosting>(index_dir, base_name, row_id, flag_);
             auto column_index_iterator = segment_term_posting1->column_index_iterator_;
             PostingDecoder *decoder;
-            String term_str;
+            std::string term_str;
             while (column_index_iterator->Next(term_str, decoder)) {
                 EXPECT_EQ(term_str, expected_term);
                 u32 pos_list_buf[1000];
@@ -147,7 +140,7 @@ TEST_P(PostingMergerTest, Basic) {
     }
 
     VectorWithLock<u32> column_length_array;
-    Vector<u32> &unsafe_column_length_array = column_length_array.UnsafeVec();
+    std::vector<u32> &unsafe_column_length_array = column_length_array.UnsafeVec();
     {
         // prepare column length info
         // the indexes to be merged should be from the same segment
@@ -156,8 +149,8 @@ TEST_P(PostingMergerTest, Basic) {
         PersistResultHandler handler(pm);
         unsafe_column_length_array.clear();
         for (u32 i = 0; i < base_names.size(); ++i) {
-            String column_len_file = (Path(index_dir) / base_names[i]).string() + LENGTH_SUFFIX;
-            String real_column_len_file = column_len_file;
+            std::string column_len_file = (std::filesystem::path(index_dir) / base_names[i]).string() + LENGTH_SUFFIX;
+            std::string real_column_len_file = column_len_file;
             if (pm != nullptr) {
                 PersistReadResult result = pm->GetObjCache(real_column_len_file);
                 const ObjAddr &obj_addr = handler.HandleReadResult(result);
@@ -167,16 +160,14 @@ TEST_P(PostingMergerTest, Basic) {
             u32 id_offset = base_row_id - merge_base_rowid;
             auto [file_handle, status] = VirtualStore::Open(real_column_len_file, FileAccessMode::kRead);
             if (!status.ok()) {
-                String error_message = status.message();
-                UnrecoverableError(error_message);
+                UnrecoverableError(status.message());
             }
             const i64 file_size = file_handle->FileSize();
             u32 file_read_array_len = file_size / sizeof(u32);
             unsafe_column_length_array.resize(id_offset + file_read_array_len);
             auto [read_count, _] = file_handle->Read(unsafe_column_length_array.data() + id_offset, file_size);
-            if (read_count != (SizeT)file_size) {
-                String error_message = "ColumnIndexMerger: when loading column length file, read_count != file_size";
-                UnrecoverableError(error_message);
+            if (read_count != (size_t)file_size) {
+                UnrecoverableError("ColumnIndexMerger: when loading column length file, read_count != file_size");
             }
             if (pm != nullptr) {
                 PersistWriteResult res = pm->PutObjCache(column_len_file);
@@ -185,7 +176,7 @@ TEST_P(PostingMergerTest, Basic) {
         }
     }
 
-    auto posting_merger = MakeShared<PostingMerger>(flag_, column_length_array);
+    auto posting_merger = std::make_shared<PostingMerger>(flag_, column_length_array);
 
     posting_merger->Merge(segment_term_postings, merge_base_rowid);
     EXPECT_EQ(posting_merger->GetDF(), static_cast<u32>(2));

@@ -12,22 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.skiplist;
 
 import :ut.base_test;
-import :stl;
+
 import :logger;
 import :skiplist;
-#endif
 
 using namespace infinity;
 
@@ -40,8 +34,8 @@ static String available_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTU
 static String RandStr() {
     u32 len = random() % 100 + 50;
     String ret(len, '\0');
-    for (SizeT i = 0; i < len; i++) {
-        SizeT rand_i = random() % available_chars.size();
+    for (size_t i = 0; i < len; i++) {
+        size_t rand_i = random() % available_chars.size();
         ret[i] = available_chars[rand_i];
     }
     return ret;

@@ -12,22 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:match_sparse_scan_function_data;
 
-import :stl;
 import :table_function;
 import :global_block_id;
 import :merge_knn;
 import :data_block;
-import match_sparse_expr;
 import :match_sparse_expression;
 import :infinity_exception;
-import :third_party;
 import :knn_result_handler;
 import :sparse_vector_distance;
 import :sparse_util;
+
+import match_sparse_expr;
 
 namespace infinity {
 
@@ -59,13 +56,13 @@ public:
         return Calculate(vec1.data_, vec1.indices_, vec1.nnz_, vec2.data_, vec2.indices_, vec2.nnz_);
     }
 
-    ResultType Calculate(const DataType *data, const IndexType *index, SizeT nnz, const DataType *data2, const IndexType *index2, SizeT nnz2) {
+    ResultType Calculate(const DataType *data, const IndexType *index, size_t nnz, const DataType *data2, const IndexType *index2, size_t nnz2) {
         return dist_func_(data, index, nnz, data2, index2, nnz2);
     }
 
 public:
     using DistFunc =
-        ResultType (*)(const DataType *data, const IndexType *index, SizeT nnz, const DataType *data2, const IndexType *index2, SizeT nnz2);
+        ResultType (*)(const DataType *data, const IndexType *index, size_t nnz, const DataType *data2, const IndexType *index2, size_t nnz2);
 
     DistFunc dist_func_{};
 };
@@ -92,10 +89,12 @@ public:
         return Calculate(vec1.indices_, vec1.nnz_, vec2.indices_, vec2.nnz_);
     }
 
-    ResultType Calculate(const IndexType *index1, SizeT nnz1, const IndexType *index2, SizeT nnz2) { return dist_func_(index1, nnz1, index2, nnz2); }
+    ResultType Calculate(const IndexType *index1, size_t nnz1, const IndexType *index2, size_t nnz2) {
+        return dist_func_(index1, nnz1, index2, nnz2);
+    }
 
 public:
-    using DistFunc = ResultType (*)(const IndexType *raw1, SizeT nnz1, const IndexType *raw2, SizeT nnz2);
+    using DistFunc = ResultType (*)(const IndexType *raw1, size_t nnz1, const IndexType *raw2, size_t nnz2);
 
     DistFunc dist_func_{};
 };
@@ -104,25 +103,26 @@ export class MatchSparseScanFunctionData : public TableFunctionData {
 public:
     MatchSparseScanFunctionData() = default;
 
-    MatchSparseScanFunctionData(const SharedPtr<Vector<GlobalBlockID>> &global_block_ids, const SharedPtr<Vector<SegmentID>> &segment_ids)
+    MatchSparseScanFunctionData(const std::shared_ptr<std::vector<GlobalBlockID>> &global_block_ids,
+                                const std::shared_ptr<std::vector<SegmentID>> &segment_ids)
         : global_block_ids_(global_block_ids), segment_ids_(segment_ids), query_data_(DataBlock::Make()) {}
 
 public:
-    SharedPtr<Vector<GlobalBlockID>> global_block_ids_;
-    SharedPtr<Vector<SegmentID>> segment_ids_;
+    std::shared_ptr<std::vector<GlobalBlockID>> global_block_ids_;
+    std::shared_ptr<std::vector<SegmentID>> segment_ids_;
 
     bool evaluated_ = false;
-    SharedPtr<DataBlock> query_data_{};
+    std::shared_ptr<DataBlock> query_data_{};
 
     u32 current_block_ids_idx_ = 0;
     u32 current_segment_ids_idx_ = 0;
-    UniquePtr<MergeKnnBase> merge_knn_base_{};
-    UniquePtr<SparseDistanceBase> sparse_distance_{};
+    std::unique_ptr<MergeKnnBase> merge_knn_base_{};
+    std::unique_ptr<SparseDistanceBase> sparse_distance_{};
 };
 
 export class MergeSparseFunctionData : public TableFunctionData {
 public:
-    UniquePtr<MergeKnnBase> merge_knn_base_{};
+    std::unique_ptr<MergeKnnBase> merge_knn_base_{};
 };
 
 } // namespace infinity

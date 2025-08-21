@@ -12,14 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:create_index_data;
 
-import :stl;
-import :third_party;
 import :infinity_exception;
-// import :logger;
 
 namespace infinity {
 
@@ -32,7 +27,7 @@ export struct CreateIndexSharedData {
 
     void Init(BlockIndex *block_index);
 
-    HashMap<u32, atomic_u64> create_index_idxes_{};
+    std::unordered_map<u32, std::atomic_uint64_t> create_index_idxes_{};
 };
 
 }; // namespace infinity

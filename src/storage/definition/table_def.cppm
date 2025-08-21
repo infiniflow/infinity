@@ -11,13 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module;
 
 export module infinity_core:table_def;
 
-import :stl;
-
 import :index_base;
+
 import column_def;
 import global_resource_usage;
 
@@ -26,17 +24,22 @@ namespace infinity {
 export class TableDef {
 
 public:
-    static inline SharedPtr<TableDef>
-    Make(SharedPtr<String> schema, SharedPtr<String> table_name, SharedPtr<String> table_comment, Vector<SharedPtr<ColumnDef>> columns) {
-        return MakeShared<TableDef>(std::move(schema), std::move(table_name), std::move(table_comment), std::move(columns));
+    static inline std::shared_ptr<TableDef> Make(std::shared_ptr<std::string> schema,
+                                                 std::shared_ptr<std::string> table_name,
+                                                 std::shared_ptr<std::string> table_comment,
+                                                 std::vector<std::shared_ptr<ColumnDef>> columns) {
+        return std::make_shared<TableDef>(std::move(schema), std::move(table_name), std::move(table_comment), std::move(columns));
     }
 
 public:
-    explicit TableDef(SharedPtr<String> schema, SharedPtr<String> table_name, SharedPtr<String> table_comment,  Vector<SharedPtr<ColumnDef>> columns)
+    explicit TableDef(std::shared_ptr<std::string> schema,
+                      std::shared_ptr<std::string> table_name,
+                      std::shared_ptr<std::string> table_comment,
+                      std::vector<std::shared_ptr<ColumnDef>> columns)
         : schema_name_(std::move(schema)), table_name_(std::move(table_name)), table_comment_(std::move(table_comment)),
           columns_(std::move(columns)) {
-        SizeT column_count = columns_.size();
-        for (SizeT idx = 0; idx < column_count; ++idx) {
+        size_t column_count = columns_.size();
+        for (size_t idx = 0; idx < column_count; ++idx) {
             column_name2id_[columns_[idx]->name()] = idx;
         }
 
@@ -61,21 +64,21 @@ public:
     // Write to a char buffer
     void WriteAdv(char *&ptr) const;
     // Read from a serialized version
-    static SharedPtr<TableDef> ReadAdv(const char *&ptr, i32 maxbytes);
+    static std::shared_ptr<TableDef> ReadAdv(const char *&ptr, i32 maxbytes);
 
-    [[nodiscard]] inline const Vector<SharedPtr<ColumnDef>> &columns() const { return columns_; }
+    [[nodiscard]] inline const std::vector<std::shared_ptr<ColumnDef>> &columns() const { return columns_; }
 
-    [[nodiscard]] inline Vector<SharedPtr<ColumnDef>> &columns() { return columns_; }
+    [[nodiscard]] inline std::vector<std::shared_ptr<ColumnDef>> &columns() { return columns_; }
 
-    [[nodiscard]] inline SizeT column_count() const { return columns_.size(); }
+    [[nodiscard]] inline size_t column_count() const { return columns_.size(); }
 
-    [[nodiscard]] inline const SharedPtr<String> &table_name() const { return table_name_; }
+    [[nodiscard]] inline const std::shared_ptr<std::string> &table_name() const { return table_name_; }
 
-    [[nodiscard]] inline const SharedPtr<String> &schema_name() const { return schema_name_; }
+    [[nodiscard]] inline const std::shared_ptr<std::string> &schema_name() const { return schema_name_; }
 
-    [[nodiscard]] inline const SharedPtr<String> &table_comment() const { return table_comment_; }
+    [[nodiscard]] inline const std::shared_ptr<std::string> &table_comment() const { return table_comment_; }
 
-    [[nodiscard]] inline SizeT GetColIdByName(const String &name) const {
+    [[nodiscard]] inline size_t GetColIdByName(const std::string &name) const {
         if (column_name2id_.contains(name)) {
             return column_name2id_.at(name);
         } else {
@@ -83,16 +86,16 @@ public:
         }
     }
 
-    String ToString() const;
+    std::string ToString() const;
 
-    void UnionWith(const SharedPtr<TableDef> &other);
+    void UnionWith(const std::shared_ptr<TableDef> &other);
 
 private:
-    SharedPtr<String> schema_name_{};
-    SharedPtr<String> table_name_{};
-    SharedPtr<String> table_comment_{};
-    Vector<SharedPtr<ColumnDef>> columns_{};
-    HashMap<String, SizeT> column_name2id_{};
+    std::shared_ptr<std::string> schema_name_{};
+    std::shared_ptr<std::string> table_name_{};
+    std::shared_ptr<std::string> table_comment_{};
+    std::vector<std::shared_ptr<ColumnDef>> columns_{};
+    std::unordered_map<std::string, size_t> column_name2id_{};
 };
 
 } // namespace infinity

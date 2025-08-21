@@ -1,24 +1,16 @@
-
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.skiplist_writer;
 
 import :ut.base_test;
-import :stl;
 import :skiplist_writer;
 import :posting_byte_slice_reader;
 import :posting_byte_slice;
 import :index_defines;
 import :posting_field;
 import :file_writer;
-#endif
 
 using namespace infinity;
 
@@ -26,19 +18,21 @@ class SkipListWriterTest : public BaseTest {
 public:
     SkipListWriterTest() {}
     ~SkipListWriterTest() {}
-    void SetUp() override { skiplist_writer_ = MakeShared<SkipListWriter>(); }
+    void SetUp() override { skiplist_writer_ = std::make_shared<SkipListWriter>(); }
 
     void TearDown() override { skiplist_writer_.reset(); }
 
 protected:
-    SharedPtr<FileWriter> CreateFileWriter(String file_name);
+    std::shared_ptr<FileWriter> CreateFileWriter(std::string file_name);
 
 protected:
-    SharedPtr<SkipListWriter> skiplist_writer_ = nullptr;
-    static constexpr SizeT BUFFER_SIZE_ = 1024;
+    std::shared_ptr<SkipListWriter> skiplist_writer_ = nullptr;
+    static constexpr size_t BUFFER_SIZE_ = 1024;
 };
 
-SharedPtr<FileWriter> SkipListWriterTest::CreateFileWriter(infinity::String file_path) { return MakeShared<FileWriter>(file_path, BUFFER_SIZE_); }
+std::shared_ptr<FileWriter> SkipListWriterTest::CreateFileWriter(std::string file_path) {
+    return std::make_shared<FileWriter>(file_path, BUFFER_SIZE_);
+}
 
 TEST_F(SkipListWriterTest, test1) {
     using namespace infinity;
@@ -51,10 +45,10 @@ TEST_F(SkipListWriterTest, test1) {
     skiplist_writer_->Init(&posting_fields);
     const u32 delta = 10;
 
-    String file_path = String(GetFullTmpDir()) + "/skiplist_writer_test1.txt";
+    std::string file_path = std::string(GetFullTmpDir()) + "/skiplist_writer_test1.txt";
     auto file_writer = CreateFileWriter(file_path);
 
-    Vector<u32> expected_values;
+    std::vector<u32> expected_values;
     u32 now_value = 0;
     for (int i = 0; i < SKIP_LIST_BUFFER_SIZE + 2; ++i) {
         skiplist_writer_->AddItem(delta);
@@ -64,11 +58,11 @@ TEST_F(SkipListWriterTest, test1) {
 
     skiplist_writer_->Dump(file_writer);
 
-    auto reader = MakeShared<PostingByteSliceReader>();
+    auto reader = std::make_shared<PostingByteSliceReader>();
     reader->Open(skiplist_writer_.get());
 
     u32 val_buffer[BUFFER_SIZE_];
-    SizeT decode_len;
+    size_t decode_len;
     ASSERT_TRUE(reader->Decode<u32>(val_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
     ASSERT_TRUE(reader->Decode<u32>(val_buffer + SKIP_LIST_BUFFER_SIZE, 2, decode_len));
 
@@ -105,11 +99,11 @@ TEST_F(SkipListWriterTest, test2) {
     skiplist_writer_->Init(&posting_fields);
     const u32 delta = 10;
 
-    String file_path = String(GetFullTmpDir()) + "/skiplist_writer_test2.txt";
+    std::string file_path = std::string(GetFullTmpDir()) + "/skiplist_writer_test2.txt";
     auto file_writer = CreateFileWriter(file_path);
 
-    Vector<u32> expected_keys;
-    Vector<u32> expected_values;
+    std::vector<u32> expected_keys;
+    std::vector<u32> expected_values;
 
     u32 now_key = 0;
     u32 now_value = 0;
@@ -128,12 +122,12 @@ TEST_F(SkipListWriterTest, test2) {
 
     skiplist_writer_->Dump(file_writer);
 
-    auto reader = MakeShared<PostingByteSliceReader>();
+    auto reader = std::make_shared<PostingByteSliceReader>();
     reader->Open(skiplist_writer_.get());
 
     u32 key_buffer[BUFFER_SIZE_];
     u32 val_buffer[BUFFER_SIZE_];
-    SizeT decode_len;
+    size_t decode_len;
 
     ASSERT_TRUE(reader->Decode(key_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
     ASSERT_TRUE(reader->Decode(val_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
@@ -187,12 +181,12 @@ TEST_F(SkipListWriterTest, test3) {
     skiplist_writer_->Init(&posting_fields);
     const u32 delta = 10;
 
-    String file_path = String(GetFullTmpDir()) + "/skiplist_writer_test3.txt";
+    std::string file_path = std::string(GetFullTmpDir()) + "/skiplist_writer_test3.txt";
     auto file_writer = CreateFileWriter(file_path);
 
-    Vector<u32> expected_keys;
-    Vector<u32> expected_values1;
-    Vector<u32> expected_values2;
+    std::vector<u32> expected_keys;
+    std::vector<u32> expected_values1;
+    std::vector<u32> expected_values2;
 
     u32 now_key = 0;
     u32 now_value1 = 0;
@@ -214,13 +208,13 @@ TEST_F(SkipListWriterTest, test3) {
 
     skiplist_writer_->Dump(file_writer);
 
-    auto reader = MakeShared<PostingByteSliceReader>();
+    auto reader = std::make_shared<PostingByteSliceReader>();
     reader->Open(skiplist_writer_.get());
 
     u32 key_buffer[BUFFER_SIZE_];
     u32 val1_buffer[BUFFER_SIZE_];
     u32 val2_buffer[BUFFER_SIZE_];
-    SizeT decode_len;
+    size_t decode_len;
 
     ASSERT_TRUE(reader->Decode(key_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
     ASSERT_TRUE(reader->Decode(val1_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));

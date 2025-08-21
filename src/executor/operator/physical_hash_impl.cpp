@@ -17,7 +17,6 @@ module;
 module infinity_core:physical_hash.impl;
 
 import :physical_hash;
-
 import :query_context;
 import :operator_state;
 import :physical_hash;

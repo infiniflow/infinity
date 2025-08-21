@@ -12,46 +12,44 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:logical_project;
 
-import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
-import data_type;
-import :third_party;
 import :base_expression;
-import internal_types;
 import :highlighter;
+
+import data_type;
+import third_party;
+import internal_types;
 
 namespace infinity {
 
 export class LogicalProject : public LogicalNode {
 public:
     inline LogicalProject(u64 node_id,
-                          Vector<SharedPtr<BaseExpression>> expressions,
+                          std::vector<std::shared_ptr<BaseExpression>> expressions,
                           u64 projection_index,
-                          Map<SizeT, SharedPtr<HighlightInfo>> highlight_columns)
+                          std::map<size_t, std::shared_ptr<HighlightInfo>> highlight_columns)
         : LogicalNode(node_id, LogicalNodeType::kProjection), expressions_(std::move(expressions)), table_index_(projection_index),
           highlight_columns_(std::move(highlight_columns)) {}
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return fmt::format("logical_project_{}", std::to_string(table_index_)); }
+    inline std::string name() final { return fmt::format("logical_project_{}", std::to_string(table_index_)); }
 
-    Vector<SharedPtr<BaseExpression>> expressions_{};
+    std::vector<std::shared_ptr<BaseExpression>> expressions_{};
 
     u64 table_index_{};
 
-    Map<SizeT, SharedPtr<HighlightInfo>> highlight_columns_{};
+    std::map<size_t, std::shared_ptr<HighlightInfo>> highlight_columns_{};
 
     bool total_hits_count_flag_{false};
 };

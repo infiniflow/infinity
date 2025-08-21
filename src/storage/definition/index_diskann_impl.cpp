@@ -12,33 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-#include <string>
-#include <vector>
-#include <memory>
-
 module infinity_core:index_diskann.impl;
 
 import :index_diskann;
-
-import :stl;
 import :status;
 import :index_base;
-import :third_party;
 import :infinity_exception;
-import serialize;
 import :default_values;
 import :index_base;
+import :index_diskann;
+
+import std;
+import third_party;
+
 import logical_type;
 import statement_common;
-import :logger;
-import :index_diskann;
+import serialize;
 
 namespace infinity {
 
-String DiskAnnEncodeTypeToString(DiskAnnEncodeType encode_type) {
+std::string DiskAnnEncodeTypeToString(DiskAnnEncodeType encode_type) {
     switch (encode_type) {
         case DiskAnnEncodeType::kPlain:
             return "plain";
@@ -47,7 +40,7 @@ String DiskAnnEncodeTypeToString(DiskAnnEncodeType encode_type) {
     }
 }
 
-DiskAnnEncodeType StringToDiskAnnEncodeType(const String &str) {
+DiskAnnEncodeType StringToDiskAnnEncodeType(const std::string &str) {
     if (str == "plain") {
         return DiskAnnEncodeType::kPlain;
     } else {
@@ -55,15 +48,15 @@ DiskAnnEncodeType StringToDiskAnnEncodeType(const String &str) {
     }
 }
 
-SharedPtr<IndexBase> IndexDiskAnn::Make(SharedPtr<String> index_name,
-                                        SharedPtr<String> index_comment,
-                                        const String &file_name,
-                                        Vector<String> column_names,
-                                        const Vector<InitParameter *> &index_param_list) {
-    SizeT R = DISKANN_R;
-    SizeT L = DISKANN_L;
-    SizeT num_pq_chunks = DISKANN_NUM_PQ_CHUNKS;
-    SizeT num_parts = DISKANN_NUM_PARTS;
+std::shared_ptr<IndexBase> IndexDiskAnn::Make(std::shared_ptr<std::string> index_name,
+                                              std::shared_ptr<std::string> index_comment,
+                                              const std::string &file_name,
+                                              std::vector<std::string> column_names,
+                                              const std::vector<InitParameter *> &index_param_list) {
+    size_t R = DISKANN_R;
+    size_t L = DISKANN_L;
+    size_t num_pq_chunks = DISKANN_NUM_PQ_CHUNKS;
+    size_t num_parts = DISKANN_NUM_PARTS;
 
     DiskAnnEncodeType encode_type = DiskAnnEncodeType::kPlain;
     MetricType metric_type = MetricType::kInvalid;
@@ -112,7 +105,7 @@ bool IndexDiskAnn::operator==(const IndexDiskAnn &other) const {
 bool IndexDiskAnn::operator!=(const IndexDiskAnn &other) const { return !(*this == other); }
 
 i32 IndexDiskAnn::GetSizeInBytes() const {
-    SizeT size = IndexBase::GetSizeInBytes();
+    size_t size = IndexBase::GetSizeInBytes();
     size += sizeof(metric_type_);
     size += sizeof(encode_type_);
     size += sizeof(R_);
@@ -132,14 +125,14 @@ void IndexDiskAnn::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, num_parts_);
 }
 
-String IndexDiskAnn::ToString() const {
+std::string IndexDiskAnn::ToString() const {
     std::stringstream ss;
     ss << IndexBase::ToString() << ", " << MetricTypeToString(metric_type_) << ", " << R_ << ", " << L_ << ", " << num_pq_chunks_ << ", "
        << num_parts_;
     return ss.str();
 }
 
-String IndexDiskAnn::BuildOtherParamsString() const {
+std::string IndexDiskAnn::BuildOtherParamsString() const {
     std::stringstream ss;
     ss << "metric_type=" << MetricTypeToString(metric_type_) << ", encode_type=" << DiskAnnEncodeTypeToString(encode_type_) << ", R=" << R_
        << ", L=" << L_ << ", num_pq_chunks=" << num_pq_chunks_ << ", num_parts=" << num_parts_;
@@ -157,10 +150,10 @@ nlohmann::json IndexDiskAnn::Serialize() const {
     return res;
 }
 
-void IndexDiskAnn::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name) {
+void IndexDiskAnn::ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref, const std::string &column_name) {
     auto &column_names_vector = *(base_table_ref->column_names_);
     auto &column_types_vector = *(base_table_ref->column_types_);
-    SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
+    size_t column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
         Status status = Status::ColumnNotExist(column_name);
         RecoverableError(status);

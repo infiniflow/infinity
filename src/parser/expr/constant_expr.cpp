@@ -13,18 +13,25 @@
 // limitations under the License.
 
 #include "constant_expr.h"
+#include "cstring"
 #include "definition/column_def.h"
 #include "expr/parsed_expr.h"
 #include "parser_assert.h"
-#include "spdlog/fmt/fmt.h"
 #include "type/datetime/interval_type.h"
-#include "type/internal_types.h"
 #include "type/info/sparse_info.h"
+#include "type/internal_types.h"
 #include "type/serialize.h"
-#include "simdjson.h"
-#include <cstdint>
-#include <cstring>
-#include <sstream>
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
+
+#ifndef PARESER_USE_THIRD_PARTY_MODULE
+#define PARESER_USE_THIRD_PARTY_MODULE 1
+import third_party;
+#endif
 
 namespace infinity {
 
@@ -500,9 +507,9 @@ nlohmann::json ConstantExpr::Serialize() const {
 }
 
 std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(std::string_view constant_expr_str) {
-    simdjson::ondemand::parser parser;
+    simdjson::parser parser;
     simdjson::padded_string constant_expr_json(constant_expr_str);
-    simdjson::ondemand::document doc = parser.iterate(constant_expr_json);
+    simdjson::document doc = parser.iterate(constant_expr_json);
     LiteralType literal_type = (LiteralType)(int32_t)doc["type"].get<int32_t>();
     auto const_expr = new ConstantExpr(literal_type);
     switch (literal_type) {
@@ -542,7 +549,7 @@ std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(std::string_view constant_
             break;
         }
         case LiteralType::kSubArrayArray: {
-            for (simdjson::ondemand::array array = doc["value"]; simdjson::simdjson_result<simdjson::ondemand::value> val : array) {
+            for (simdjson::array array = doc["value"]; simdjson::simdjson_result<simdjson::value> val : array) {
                 auto sub_arr = std::static_pointer_cast<ConstantExpr>(ConstantExpr::Deserialize(val.raw_json()));
                 const_expr->sub_array_array_.push_back(std::move(sub_arr));
             }
@@ -562,7 +569,7 @@ std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(std::string_view constant_
             break;
         }
         case LiteralType::kCurlyBracketsArray: {
-            for (simdjson::ondemand::array array = doc["value"]; simdjson::simdjson_result<simdjson::ondemand::value> val : array) {
+            for (simdjson::array array = doc["value"]; simdjson::simdjson_result<simdjson::value> val : array) {
                 auto sub_arr = std::static_pointer_cast<ConstantExpr>(Deserialize(val.raw_json()));
                 const_expr->curly_brackets_array_.push_back(std::move(sub_arr));
             }

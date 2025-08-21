@@ -12,42 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:embedding_unary_operator;
 
-import :stl;
 import :roaring_bitmap;
 import :column_vector;
 import :infinity_exception;
-import embedding_info;
 import :logger;
+
+import embedding_info;
 
 namespace infinity {
 
 export class EmbeddingUnaryOperator {
 public:
     template <typename InputElemType, typename OutputElemType, typename Operator>
-    static void inline Execute(const SharedPtr<ColumnVector> &input, SharedPtr<ColumnVector> &result, SizeT count, void *state_ptr, bool nullable) {
+    static void inline Execute(const std::shared_ptr<ColumnVector> &input,
+                               std::shared_ptr<ColumnVector> &result,
+                               size_t count,
+                               void *state_ptr,
+                               bool nullable) {
         const auto *input_ptr = (const InputElemType *)(input->data());
-        const SharedPtr<Bitmask> &input_null = input->nulls_ptr_;
+        const std::shared_ptr<Bitmask> &input_null = input->nulls_ptr_;
 
         auto *result_ptr = (OutputElemType *)(result->data());
-        SharedPtr<Bitmask> &result_null = result->nulls_ptr_;
+        std::shared_ptr<Bitmask> &result_null = result->nulls_ptr_;
 
         auto embedding_info = static_cast<EmbeddingInfo *>(input->data_type()->type_info().get());
-        SizeT dim = embedding_info->Dimension();
+        size_t dim = embedding_info->Dimension();
 
         switch (input->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                String error_message = "Invalid column vector type.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid column vector type.");
                 break;
             }
             case ColumnVectorType::kFlat: {
                 if (result->vector_type() != ColumnVectorType::kFlat) {
-                    String error_message = "Target vector type isn't flat.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Target vector type isn't flat.");
                     break;
                 }
                 if (nullable) {
@@ -67,8 +67,7 @@ public:
             }
             case ColumnVectorType::kConstant: {
                 if (count != 1) {
-                    String error_message = "Attempting to execute more than one row of the constant column vector.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Attempting to execute more than one row of the constant column vector.");
                 }
                 if (nullable) {
                     result_null->SetAllTrue();
@@ -80,13 +79,11 @@ public:
                 return;
             }
             case ColumnVectorType::kHeterogeneous: {
-                String error_message = "Heterogeneous embedding is not implemented yet.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Heterogeneous embedding is not implemented yet.");
                 // return ExecuteHeterogeneous<InputElemType, OutputElemType, Operator>(input, result, count, state_ptr, nullable);
             }
             case ColumnVectorType::kCompactBit: {
-                String error_message = "Compact Bit embedding is not implemented yet.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Compact Bit embedding is not implemented yet.");
                 // return ExecuteHeterogeneous<InputElemType, OutputElemType, Operator>(input, result, count, state_ptr, nullable);
             }
         }
@@ -96,22 +93,22 @@ private:
     template <typename InputElemType, typename OutputElemType, typename Operator>
     static void inline ExecuteFlat(const InputElemType *input_ptr,
                                    OutputElemType *result_ptr,
-                                   SizeT dim,
+                                   size_t dim,
                                    Bitmask *result_null,
-                                   SizeT count,
+                                   size_t count,
                                    void *state_ptr) {
-        for (SizeT i = 0; i < count; ++i) {
+        for (size_t i = 0; i < count; ++i) {
             Operator::template Execute<InputElemType, OutputElemType>(input_ptr + dim * i, result_ptr + dim * i, dim, result_null, i, state_ptr);
         }
     }
 
     template <typename InputElemType, typename ResultElemType, typename Operator>
     static void inline ExecuteFlatWithNull(const InputElemType *input_ptr,
-                                           const SharedPtr<Bitmask> &input_null,
+                                           const std::shared_ptr<Bitmask> &input_null,
                                            ResultElemType *result_ptr,
-                                           SharedPtr<Bitmask> &result_null,
-                                           SizeT dim,
-                                           SizeT count,
+                                           std::shared_ptr<Bitmask> &result_null,
+                                           size_t dim,
+                                           size_t count,
                                            void *state_ptr) {
         *result_null = *input_null;
         result_null->RoaringBitmapApplyFunc([&](u32 row_index) {

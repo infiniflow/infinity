@@ -20,20 +20,14 @@ module;
 #pragma clang diagnostic ignored "-Wmissing-field-initializers"
 #pragma clang diagnostic ignored "-W#pragma-messages"
 
-#include <ctpl_stl.h>
-
 #pragma clang diagnostic pop
 
 #include <cassert>
-#include <filesystem>
-#include <iostream>
-#include <string.h>
+#include <cstdio>
 
 module infinity_core:memory_indexer.impl;
 
 import :memory_indexer;
-
-import :stl;
 import :status;
 import :index_defines;
 import :posting_writer;
@@ -43,7 +37,6 @@ import :analyzer_pool;
 import :term;
 import :column_inverter;
 import :invert_task;
-import :third_party;
 import :ring;
 import :external_sort_merger;
 import :file_writer;
@@ -58,7 +51,6 @@ import :infinity_exception;
 import :mmap;
 import :buf_writer;
 import :profiler;
-import :third_party;
 import :infinity_context;
 import :defer_op;
 import :blocking_queue;
@@ -69,27 +61,36 @@ import :virtual_store;
 import :local_file_handle;
 import :mem_usage_change;
 import :bg_task;
-import row_id;
 import :fst.build;
 import :default_values;
 
+import std;
+import std.compat;
+import third_party;
+
+import row_id;
+
 namespace infinity {
-bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) const {
+bool MemoryIndexer::KeyComp::operator()(const std::string &lhs, const std::string &rhs) const {
     int ret = strcmp(lhs.c_str(), rhs.c_str());
     return ret < 0;
 }
 
 MemoryIndexer::PostingTable::PostingTable() {}
 
-MemoryIndexer::MemoryIndexer(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag, const String &analyzer)
+MemoryIndexer::MemoryIndexer(const std::string &index_dir,
+                             const std::string &base_name,
+                             RowID base_row_id,
+                             optionflag_t flag,
+                             const std::string &analyzer)
     : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), posting_format_(PostingFormatOption(flag_)),
       analyzer_(analyzer), inverting_thread_pool_(infinity::InfinityContext::instance().GetFulltextInvertingThreadPool()),
       commiting_thread_pool_(infinity::InfinityContext::instance().GetFulltextCommitingThreadPool()), ring_inverted_(15UL), ring_sorted_(13UL) {
     assert(std::filesystem::path(index_dir).is_absolute());
-    posting_table_ = MakeShared<PostingTable>();
-    prepared_posting_ = MakeShared<PostingWriter>(posting_format_, column_lengths_);
-    spill_full_path_ = Path(index_dir) / (base_name + ".tmp.merge");
-    spill_full_path_ = Path(InfinityContext::instance().config()->TempDir()) / StringTransform(spill_full_path_, "/", "_");
+    posting_table_ = std::make_shared<PostingTable>();
+    prepared_posting_ = std::make_shared<PostingWriter>(posting_format_, column_lengths_);
+    spill_full_path_ = std::filesystem::path(index_dir) / (base_name + ".tmp.merge");
+    spill_full_path_ = std::filesystem::path(InfinityContext::instance().config()->TempDir()) / StringTransform(spill_full_path_, "/", "_");
 }
 
 MemoryIndexer::~MemoryIndexer() {
@@ -99,7 +100,7 @@ MemoryIndexer::~MemoryIndexer() {
     Reset();
 }
 
-void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, bool offline) {
+void MemoryIndexer::Insert(std::shared_ptr<ColumnVector> column_vector, u32 row_offset, u32 row_count, bool offline) {
     if (is_spilled_) {
         Load();
     }
@@ -113,10 +114,10 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
         doc_count_ += row_count;
     }
     // if ((doc_count & 0x0FFF) == 0) {
-    //     SizeT inverting_que_size = inverting_thread_pool_.queue_size();
-    //     SizeT commiting_que_size = commiting_thread_pool_.queue_size();
-    //     SizeT inverted_ring_size = ring_inverted_.Size();
-    //     SizeT sorted_ring_size = ring_sorted_.Size();
+    //     size_t inverting_que_size = inverting_thread_pool_.queue_size();
+    //     size_t commiting_que_size = commiting_thread_pool_.queue_size();
+    //     size_t inverted_ring_size = ring_inverted_.Size();
+    //     size_t sorted_ring_size = ring_sorted_.Size();
     //     LOG_INFO(fmt::format("doc_count {}, inverting_que_size {}, commiting_que_size {}, inverted_ring_size {}, sorted_ring_size {}",
     //                          doc_count,
     //                          inverting_que_size,
@@ -125,13 +126,13 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
     //                          sorted_ring_size));
     // }
 
-    auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
+    auto task = std::make_shared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
     if (offline) {
-        PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
-        auto inverter = MakeShared<ColumnInverter>(provider, column_lengths_);
+        PostingWriterProvider provider = [this](const std::string &term) -> std::shared_ptr<PostingWriter> { return GetOrAddPosting(term); };
+        auto inverter = std::make_shared<ColumnInverter>(provider, column_lengths_);
         inverter->InitAnalyzer(this->analyzer_);
         auto func = [this, task, inverter](int id) {
-            SizeT column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
+            size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
             column_length_sum_ += column_length_sum;
             if (column_length_sum > 0) {
                 inverter->SortForOfflineDump();
@@ -146,12 +147,12 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
     } else {
         // mem trace : the column_lengths_;
         IncreaseMemoryUsage(sizeof(u32) * row_count);
-        PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
-        auto inverter = MakeShared<ColumnInverter>(provider, column_lengths_);
+        PostingWriterProvider provider = [this](const std::string &term) -> std::shared_ptr<PostingWriter> { return GetOrAddPosting(term); };
+        auto inverter = std::make_shared<ColumnInverter>(provider, column_lengths_);
         inverter->InitAnalyzer(this->analyzer_);
         auto func = [this, task, inverter](int id) {
             // LOG_INFO(fmt::format("online inverter {} begin", id));
-            SizeT column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
+            size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
             column_length_sum_ += column_length_sum;
             this->ring_inverted_.Put(task->task_seq_, inverter);
             // LOG_INFO(fmt::format("online inverter {} end", id));
@@ -182,7 +183,7 @@ void MemoryIndexer::AsyncInsertTop(AppendMemIndexTask *append_mem_index_task) {
     append_mem_index_task->doc_count_ = doc_count;
 }
 
-void MemoryIndexer::AsyncInsertBottom(const SharedPtr<ColumnVector> &column_vector,
+void MemoryIndexer::AsyncInsertBottom(const std::shared_ptr<ColumnVector> &column_vector,
                                       u32 row_offset,
                                       u32 row_count,
                                       u64 seq_inserted,
@@ -200,15 +201,15 @@ void MemoryIndexer::AsyncInsertBottom(const SharedPtr<ColumnVector> &column_vect
     //        doc_count = doc_count_;
     //        doc_count_ += row_count;
     //    }
-    auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
+    auto task = std::make_shared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
 
     IncreaseMemoryUsage(sizeof(u32) * row_count);
-    PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
-    auto inverter = MakeShared<ColumnInverter>(provider, column_lengths_);
+    PostingWriterProvider provider = [this](const std::string &term) -> std::shared_ptr<PostingWriter> { return GetOrAddPosting(term); };
+    auto inverter = std::make_shared<ColumnInverter>(provider, column_lengths_);
     inverter->InitAnalyzer(this->analyzer_);
     auto func = [this, task, inverter, append_batch](int id) {
         // LOG_INFO(fmt::format("online inverter {} begin", id));
-        SizeT column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
+        size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
         column_length_sum_ += column_length_sum;
         this->ring_inverted_.Put(task->task_seq_, inverter);
         // LOG_INFO(fmt::format("online inverter {} end", id));
@@ -227,7 +228,7 @@ void MemoryIndexer::AsyncInsertBottom(const SharedPtr<ColumnVector> &column_vect
     inverting_thread_pool_.push(std::move(func));
 }
 
-UniquePtr<std::binary_semaphore> MemoryIndexer::AsyncInsert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count) {
+std::unique_ptr<std::binary_semaphore> MemoryIndexer::AsyncInsert(std::shared_ptr<ColumnVector> column_vector, u32 row_offset, u32 row_count) {
     if (is_spilled_) {
         Load();
     }
@@ -241,17 +242,17 @@ UniquePtr<std::binary_semaphore> MemoryIndexer::AsyncInsert(SharedPtr<ColumnVect
         doc_count_ += row_count;
     }
 
-    auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
-    auto sema = MakeUnique<std::binary_semaphore>(0);
+    auto task = std::make_shared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
+    auto sema = std::make_unique<std::binary_semaphore>(0);
 
     IncreaseMemoryUsage(sizeof(u32) * row_count);
-    PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
-    auto inverter = MakeShared<ColumnInverter>(provider, column_lengths_);
+    PostingWriterProvider provider = [this](const std::string &term) -> std::shared_ptr<PostingWriter> { return GetOrAddPosting(term); };
+    auto inverter = std::make_shared<ColumnInverter>(provider, column_lengths_);
     inverter->InitAnalyzer(this->analyzer_);
     inverter->AddSema(sema.get());
     auto func = [this, task, inverter](int id) {
         // LOG_INFO(fmt::format("online inverter {} begin", id));
-        SizeT column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
+        size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
         column_length_sum_ += column_length_sum;
         this->ring_inverted_.Put(task->task_seq_, inverter);
         // LOG_INFO(fmt::format("online inverter {} end", id));
@@ -287,15 +288,15 @@ void MemoryIndexer::Commit(bool offline) {
     });
 }
 
-SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
+size_t MemoryIndexer::CommitOffline(size_t wait_if_empty_ms) {
     std::unique_lock<std::mutex> lock(mutex_commit_, std::defer_lock);
     if (!lock.try_lock()) {
         return 0;
     }
 
-    Vector<SharedPtr<ColumnInverter>> inverters;
+    std::vector<std::shared_ptr<ColumnInverter>> inverters;
     this->ring_sorted_.GetBatch(inverters, wait_if_empty_ms);
-    SizeT num = inverters.size();
+    size_t num = inverters.size();
     if (!num) {
         return num;
     }
@@ -317,14 +318,14 @@ SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
     return num;
 }
 
-SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
+size_t MemoryIndexer::CommitSync(size_t wait_if_empty_ms) {
     std::shared_lock commit_sync_lock(mutex_commit_sync_share_);
-    Vector<SharedPtr<ColumnInverter>> inverters;
+    std::vector<std::shared_ptr<ColumnInverter>> inverters;
     // LOG_INFO("MemoryIndexer::CommitSync begin");
     u64 seq_commit = this->ring_inverted_.GetBatch(inverters);
-    SizeT num_sorted = inverters.size();
-    SizeT num_generated = 0;
-    // SizeT num_merged = 0;
+    size_t num_sorted = inverters.size();
+    size_t num_generated = 0;
+    // size_t num_merged = 0;
     if (num_sorted > 0) {
         ColumnInverter::Merge(inverters);
         inverters[0]->Sort();
@@ -337,7 +338,7 @@ SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
     }
 
     MemUsageChange mem_usage_change = {true, 0};
-    while (1) {
+    while (true) {
         this->ring_sorted_.GetBatch(inverters, wait_if_empty_ms);
         // num_merged = inverters.size();
         if (inverters.empty()) {
@@ -396,17 +397,17 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     }
     std::unique_lock commit_sync_lock(mutex_commit_sync_share_);
 
-    String posting_file = Path(index_dir_) / (base_name_ + POSTING_SUFFIX + (spill ? SPILL_SUFFIX : ""));
-    String dict_file = Path(index_dir_) / (base_name_ + DICT_SUFFIX + (spill ? SPILL_SUFFIX : ""));
-    String column_length_file = Path(index_dir_) / (base_name_ + LENGTH_SUFFIX + (spill ? SPILL_SUFFIX : ""));
-    String tmp_posting_file(posting_file);
-    String tmp_dict_file(dict_file);
-    String tmp_column_length_file(column_length_file);
+    std::string posting_file = std::filesystem::path(index_dir_) / (base_name_ + POSTING_SUFFIX + (spill ? SPILL_SUFFIX : ""));
+    std::string dict_file = std::filesystem::path(index_dir_) / (base_name_ + DICT_SUFFIX + (spill ? SPILL_SUFFIX : ""));
+    std::string column_length_file = std::filesystem::path(index_dir_) / (base_name_ + LENGTH_SUFFIX + (spill ? SPILL_SUFFIX : ""));
+    std::string tmp_posting_file(posting_file);
+    std::string tmp_dict_file(dict_file);
+    std::string tmp_column_length_file(column_length_file);
 
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr && !spill;
     if (use_object_cache) {
-        Path tmp_dir = Path(InfinityContext::instance().config()->TempDir());
+        std::filesystem::path tmp_dir = std::filesystem::path(InfinityContext::instance().config()->TempDir());
         tmp_posting_file = tmp_dir / StringTransform(tmp_posting_file, "/", "_");
         tmp_dict_file = tmp_dir / StringTransform(tmp_dict_file, "/", "_");
         tmp_column_length_file = tmp_dir / StringTransform(tmp_column_length_file, "/", "_");
@@ -417,11 +418,11 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         }
     }
 
-    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(tmp_posting_file, 128000);
-    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(tmp_dict_file, 128000);
+    std::shared_ptr<FileWriter> posting_file_writer = std::make_shared<FileWriter>(tmp_posting_file, 128000);
+    std::shared_ptr<FileWriter> dict_file_writer = std::make_shared<FileWriter>(tmp_dict_file, 128000);
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
 
-    String tmp_fst_file = tmp_dict_file + ".fst";
+    std::string tmp_fst_file = tmp_dict_file + ".fst";
     std::ofstream ofs(tmp_fst_file.c_str(), std::ios::binary | std::ios::trunc);
     OstreamWriter wtr(ofs);
     FstBuilder fst_builder(wtr);
@@ -435,9 +436,9 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
             const MemoryIndexer::PostingPtr posting_writer = it->second;
             TermMeta term_meta(posting_writer->GetDF(), posting_writer->GetTotalTF());
             posting_writer->Dump(posting_file_writer, term_meta, spill);
-            SizeT term_meta_offset = dict_file_writer->TotalWrittenBytes();
+            size_t term_meta_offset = dict_file_writer->TotalWrittenBytes();
             term_meta_dumpler.Dump(dict_file_writer, term_meta);
-            const String &term = it->first;
+            const std::string &term = it->first;
             fst_builder.Insert((u8 *)term.c_str(), term.length(), term_meta_offset);
         }
         posting_file_writer->Sync();
@@ -455,7 +456,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         UnrecoverableError(status.message());
     }
 
-    Vector<u32> &column_length_array = column_lengths_.UnsafeVec();
+    std::vector<u32> &column_length_array = column_lengths_.UnsafeVec();
     file_handle->Append(&column_length_array[0], sizeof(column_length_array[0]) * column_length_array.size());
     file_handle->Sync();
     if (use_object_cache) {
@@ -478,30 +479,30 @@ void MemoryIndexer::Load() {
     if (!is_spilled_) {
         assert(doc_count_ == 0);
     }
-    Path path = Path(index_dir_) / base_name_;
-    String index_prefix = path.string();
-    String posting_file = index_prefix + POSTING_SUFFIX + SPILL_SUFFIX;
-    String dict_file = index_prefix + DICT_SUFFIX + SPILL_SUFFIX;
+    std::filesystem::path path = std::filesystem::path(index_dir_) / base_name_;
+    std::string index_prefix = path.string();
+    std::string posting_file = index_prefix + POSTING_SUFFIX + SPILL_SUFFIX;
+    std::string dict_file = index_prefix + DICT_SUFFIX + SPILL_SUFFIX;
 
-    SharedPtr<DictionaryReader> dict_reader = MakeShared<DictionaryReader>(dict_file, PostingFormatOption(flag_));
-    SharedPtr<FileReader> posting_reader = MakeShared<FileReader>(posting_file, 1024);
-    String term;
+    std::shared_ptr<DictionaryReader> dict_reader = std::make_shared<DictionaryReader>(dict_file, PostingFormatOption(flag_));
+    std::shared_ptr<FileReader> posting_reader = std::make_shared<FileReader>(posting_file, 1024);
+    std::string term;
     TermMeta term_meta;
     doc_count_ = (u32)posting_reader->ReadVInt();
 
     while (dict_reader->Next(term, term_meta)) {
-        SharedPtr<PostingWriter> posting = GetOrAddPosting(term);
+        std::shared_ptr<PostingWriter> posting = GetOrAddPosting(term);
         posting_reader->Seek(term_meta.doc_start_);
         posting->Load(posting_reader);
     }
 
-    String column_length_file = index_prefix + LENGTH_SUFFIX + SPILL_SUFFIX;
+    std::string column_length_file = index_prefix + LENGTH_SUFFIX + SPILL_SUFFIX;
     auto [file_handle, status] = VirtualStore::Open(column_length_file, FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 
-    Vector<u32> &column_lengths = column_lengths_.UnsafeVec();
+    std::vector<u32> &column_lengths = column_lengths_.UnsafeVec();
     column_lengths.resize(doc_count_);
     file_handle->Read(&column_lengths[0], sizeof(column_lengths[0]) * column_lengths.size());
     u32 column_length_sum = column_lengths_.Sum();
@@ -510,7 +511,7 @@ void MemoryIndexer::Load() {
     is_spilled_ = false;
 }
 
-SharedPtr<PostingWriter> MemoryIndexer::GetOrAddPosting(const String &term) {
+std::shared_ptr<PostingWriter> MemoryIndexer::GetOrAddPosting(const std::string &term) {
     assert(posting_table_.get() != nullptr);
     MemoryIndexer::PostingTableStore &posting_store = posting_table_->store_;
     PostingPtr posting;
@@ -518,7 +519,7 @@ SharedPtr<PostingWriter> MemoryIndexer::GetOrAddPosting(const String &term) {
     if (!found) {
         // mem trace : add term's size
         IncreaseMemoryUsage(term.size());
-        prepared_posting_ = MakeShared<PostingWriter>(posting_format_, column_lengths_);
+        prepared_posting_ = std::make_shared<PostingWriter>(posting_format_, column_lengths_);
     }
     return posting;
 }
@@ -533,12 +534,16 @@ void MemoryIndexer::Reset() {
 }
 
 MemIndexTracerInfo MemoryIndexer::GetInfo() const {
-    return MemIndexTracerInfo(MakeShared<String>(index_name_), MakeShared<String>(table_name_), MakeShared<String>(db_name_), MemUsed(), doc_count_);
+    return MemIndexTracerInfo(std::make_shared<std::string>(index_name_),
+                              std::make_shared<std::string>(table_name_),
+                              std::make_shared<std::string>(db_name_),
+                              MemUsed(),
+                              doc_count_);
 }
 
 const ChunkIndexMetaInfo MemoryIndexer::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{base_name_, base_row_id_, GetDocCount(), 0}; }
 
-SizeT MemoryIndexer::MemUsed() const { return mem_used_; }
+size_t MemoryIndexer::MemUsed() const { return mem_used_; }
 
 void MemoryIndexer::ApplyMemUseChange(MemUsageChange mem_change) {
     if (mem_change.is_add_) {
@@ -548,42 +553,42 @@ void MemoryIndexer::ApplyMemUseChange(MemUsageChange mem_change) {
     }
 }
 
-void MemoryIndexer::IncreaseMemoryUsage(SizeT mem) {
+void MemoryIndexer::IncreaseMemoryUsage(size_t mem) {
     mem_used_ += mem;
     BaseMemIndex::IncreaseMemoryUsageBase(mem);
 }
 
-void MemoryIndexer::DecreaseMemoryUsage(SizeT mem) {
+void MemoryIndexer::DecreaseMemoryUsage(size_t mem) {
     assert(mem_used_ >= mem);
     mem_used_ -= mem;
     BaseMemIndex::DecreaseMemoryUsageBase(mem);
 }
 
-void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple, u32>> &merger) {
+void MemoryIndexer::TupleListToIndexFile(std::unique_ptr<SortMergerTermTuple<TermTuple, u32>> &merger) {
     auto &count = merger->Count();
     auto &term_tuple_list_queue = merger->TermTupleListQueue();
-    Path path = Path(index_dir_) / base_name_;
-    String index_prefix = path.string();
+    std::filesystem::path path = std::filesystem::path(index_dir_) / base_name_;
+    std::string index_prefix = path.string();
 
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    auto *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
-    String posting_file = index_prefix + POSTING_SUFFIX;
-    String dict_file = index_prefix + DICT_SUFFIX;
-    String column_length_file = index_prefix + LENGTH_SUFFIX;
-    String tmp_posting_file(posting_file);
-    String tmp_dict_file(dict_file);
-    String tmp_column_length_file(column_length_file);
+    std::string posting_file = index_prefix + POSTING_SUFFIX;
+    std::string dict_file = index_prefix + DICT_SUFFIX;
+    std::string column_length_file = index_prefix + LENGTH_SUFFIX;
+    std::string tmp_posting_file(posting_file);
+    std::string tmp_dict_file(dict_file);
+    std::string tmp_column_length_file(column_length_file);
 
     if (use_object_cache) {
-        Path tmp_dir = Path(InfinityContext::instance().config()->TempDir());
+        auto tmp_dir = std::filesystem::path(InfinityContext::instance().config()->TempDir());
         tmp_posting_file = tmp_dir / StringTransform(tmp_posting_file, "/", "_");
         tmp_dict_file = tmp_dir / StringTransform(tmp_dict_file, "/", "_");
         tmp_column_length_file = tmp_dir / StringTransform(tmp_column_length_file, "/", "_");
     }
-    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(tmp_posting_file, 128000);
-    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(tmp_dict_file, 128000);
+    std::shared_ptr<FileWriter> posting_file_writer = std::make_shared<FileWriter>(tmp_posting_file, 128000);
+    std::shared_ptr<FileWriter> dict_file_writer = std::make_shared<FileWriter>(tmp_dict_file, 128000);
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
-    String tmp_fst_file = tmp_dict_file + ".fst";
+    std::string tmp_fst_file = tmp_dict_file + ".fst";
     std::ofstream ofs(tmp_fst_file.c_str(), std::ios::binary | std::ios::trunc);
     OstreamWriter wtr(ofs);
     FstBuilder fst_builder(wtr);
@@ -591,18 +596,18 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
     u32 term_length = 0;
     u32 doc_pos_list_size = 0;
 
-    String last_term_str;
+    std::string last_term_str;
     std::string_view last_term;
     u32 last_doc_id = INVALID_DOCID;
     u32 last_doc_payload = 0;
-    UniquePtr<PostingWriter> posting;
+    std::unique_ptr<PostingWriter> posting;
 
     while (count > 0) {
-        Deque<SharedPtr<TermTupleList>> temp_term_tuple_queue;
+        std::deque<std::shared_ptr<TermTupleList>> temp_term_tuple_queue;
         term_tuple_list_queue.DequeueBulk(temp_term_tuple_queue);
 
         while (!temp_term_tuple_queue.empty()) {
-            SharedPtr<TermTupleList> temp_term_tuple = temp_term_tuple_queue.front();
+            std::shared_ptr<TermTupleList> temp_term_tuple = temp_term_tuple_queue.front();
             temp_term_tuple_queue.pop_front();
             doc_pos_list_size = temp_term_tuple->Size();
             term_length = temp_term_tuple->term_.size();
@@ -626,17 +631,17 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
                 if (posting.get()) {
                     TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
                     posting->Dump(posting_file_writer, term_meta);
-                    SizeT term_meta_offset = dict_file_writer->TotalWrittenBytes();
+                    size_t term_meta_offset = dict_file_writer->TotalWrittenBytes();
                     term_meta_dumpler.Dump(dict_file_writer, term_meta);
                     fst_builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
                 }
-                posting = MakeUnique<PostingWriter>(posting_format_, column_lengths_);
-                last_term_str = String(term);
+                posting = std::make_unique<PostingWriter>(posting_format_, column_lengths_);
+                last_term_str = std::string(term);
                 last_term = std::string_view(last_term_str);
                 last_doc_id = INVALID_DOCID;
                 last_doc_payload = 0;
             }
-            for (SizeT i = 0; i < doc_pos_list_size; ++i) {
+            for (size_t i = 0; i < doc_pos_list_size; ++i) {
                 u32 &doc_id = std::get<0>(temp_term_tuple->doc_pos_list_[i]);
                 u32 &term_pos = std::get<1>(temp_term_tuple->doc_pos_list_[i]);
                 u16 &doc_payload = std::get<2>(temp_term_tuple->doc_pos_list_[i]);
@@ -656,7 +661,7 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
         posting->EndDocument(last_doc_id, last_doc_payload);
         TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
         posting->Dump(posting_file_writer, term_meta);
-        SizeT term_meta_offset = dict_file_writer->TotalWrittenBytes();
+        size_t term_meta_offset = dict_file_writer->TotalWrittenBytes();
         term_meta_dumpler.Dump(dict_file_writer, term_meta);
         fst_builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
     }
@@ -675,7 +680,7 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
         UnrecoverableError(status.message());
     }
 
-    Vector<u32> &unsafe_column_lengths = column_lengths_.UnsafeVec();
+    std::vector<u32> &unsafe_column_lengths = column_lengths_.UnsafeVec();
     file_handle->Append(&unsafe_column_lengths[0], sizeof(unsafe_column_lengths[0]) * unsafe_column_lengths.size());
     if (use_object_cache) {
         PersistResultHandler handler(pm);
@@ -698,11 +703,12 @@ void MemoryIndexer::OfflineDump() {
     // LOG_INFO(fmt::format("MemoryIndexer::OfflineDump begin, num_runs_ {}\n", num_runs_));
     FinalSpillFile();
     constexpr u32 buffer_size_of_each_run = 2 * 1024 * 1024;
-    UniquePtr<SortMergerTermTuple<TermTuple, u32>> merger =
-        MakeUnique<SortMergerTermTuple<TermTuple, u32>>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
-    Vector<UniquePtr<Thread>> threads;
+    std::unique_ptr<SortMergerTermTuple<TermTuple, u32>> merger =
+        std::make_unique<SortMergerTermTuple<TermTuple, u32>>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
+    std::vector<std::unique_ptr<std::thread>> threads;
     merger->Run(threads);
-    UniquePtr<Thread> output_thread = MakeUnique<Thread>(std::bind(&MemoryIndexer::TupleListToIndexFile, this, std::ref(merger)));
+    std::unique_ptr<std::thread> output_thread =
+        std::make_unique<std::thread>(std::bind(&MemoryIndexer::TupleListToIndexFile, this, std::ref(merger)));
     threads.emplace_back(std::move(output_thread));
 
     merger->JoinThreads(threads);
@@ -723,8 +729,8 @@ void MemoryIndexer::FinalSpillFile() {
 void MemoryIndexer::PrepareSpillFile() {
     spill_file_handle_ = fopen(spill_full_path_.c_str(), "w");
     fwrite(&tuple_count_, sizeof(u64), 1, spill_file_handle_);
-    const SizeT write_buf_size = 128000;
-    buf_writer_ = MakeUnique<BufWriter>(spill_file_handle_, write_buf_size);
+    const size_t write_buf_size = 128000;
+    buf_writer_ = std::make_unique<BufWriter>(spill_file_handle_, write_buf_size);
 }
 
 } // namespace infinity

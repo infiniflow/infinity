@@ -12,21 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:column_index_reader;
 
-import :stl;
-import :third_party;
 import :segment_posting;
 import :index_segment_reader;
 import :posting_iterator;
 import :index_defines;
-// import :memory_indexer;
-import internal_types;
 import :logger;
 import :status;
 import :default_values;
+
+import third_party;
+
+import internal_types;
 
 namespace infinity {
 export class TermDocIterator;
@@ -51,9 +49,9 @@ public:
 
     Status Open(optionflag_t flag, TableIndexMeeta &table_index_meta);
 
-    UniquePtr<PostingIterator> Lookup(const String &term, bool fetch_position = true);
+    std::unique_ptr<PostingIterator> Lookup(const std::string &term, bool fetch_position = true);
 
-    Pair<u64, float> GetTotalDfAndAvgColumnLength();
+    std::pair<u64, float> GetTotalDfAndAvgColumnLength();
 
     optionflag_t GetOptionFlag() const { return flag_; }
 
@@ -61,34 +59,34 @@ public:
 
     void InvalidateChunk(SegmentID segment_id, ChunkID chunk_id);
 
-    inline String GetAnalyzer() const { return analyzer_; }
+    inline std::string GetAnalyzer() const { return analyzer_; }
 
-    inline String GetColumnName() const { return column_name_; }
+    inline std::string GetColumnName() const { return column_name_; }
 
 private:
     std::mutex mutex_;
 
     optionflag_t flag_;
-    Vector<SharedPtr<IndexSegmentReader>> segment_readers_;
-    Map<SegmentID, SharedPtr<SegmentIndexFtInfo>> segment_index_ft_infos_;
+    std::vector<std::shared_ptr<IndexSegmentReader>> segment_readers_;
+    std::map<SegmentID, std::shared_ptr<SegmentIndexFtInfo>> segment_index_ft_infos_;
 
     u64 total_df_ = 0;
     float avg_column_length_ = 0.0f;
 
 public:
-    String column_name_;
-    String analyzer_;
+    std::string column_name_;
+    std::string analyzer_;
     // for loading column length files
-    String index_dir_;
-    SharedPtr<MemoryIndexer> memory_indexer_{nullptr};
+    std::string index_dir_;
+    std::shared_ptr<MemoryIndexer> memory_indexer_{nullptr};
 
-    Vector<ColumnReaderChunkInfo> chunk_index_meta_infos_;
+    std::vector<ColumnReaderChunkInfo> chunk_index_meta_infos_;
 };
 
 namespace detail {
 template <class T>
 struct Hash {
-    inline SizeT operator()(const T &val) const { return val; }
+    inline size_t operator()(const T &val) const { return val; }
 };
 } // namespace detail
 
@@ -96,7 +94,7 @@ export struct IndexReader {
     // Get a index reader on a column based on hints.
     // If no such column exists, return nullptr.
     // If column exists, but no index with a hint name is found, return a random one.
-    ColumnIndexReader *GetColumnIndexReader(u64 column_id, const Vector<String> &hints) const {
+    ColumnIndexReader *GetColumnIndexReader(u64 column_id, const std::vector<std::string> &hints) const {
         const auto &column_index_map = column_index_readers_->find(column_id);
         // if no fulltext index exists, or the map is empty.
         if (column_index_map == column_index_readers_->end() || column_index_map->second->size() == 0) {
@@ -104,7 +102,7 @@ export struct IndexReader {
         }
 
         auto indices_map = column_index_map->second;
-        for (SizeT i = 0; i < hints.size(); i++) {
+        for (size_t i = 0; i < hints.size(); i++) {
             if (auto it = indices_map->find(hints[i]); it != indices_map->end()) {
                 return indices_map->at(hints[i]).get();
             }
@@ -113,8 +111,8 @@ export struct IndexReader {
     }
 
     // return map: column_name -> analyzer_name based on hints.
-    Map<String, String> GetColumn2Analyzer(const Vector<String> &hints) const {
-        Map<String, String> rst;
+    std::map<std::string, std::string> GetColumn2Analyzer(const std::vector<std::string> &hints) const {
+        std::map<std::string, std::string> rst;
         for (const auto &id_index_map : *column_index_readers_) {
             ColumnIndexReader *column_index_reader = GetColumnIndexReader(id_index_map.first, hints);
             if (column_index_reader != nullptr) {
@@ -125,25 +123,27 @@ export struct IndexReader {
     }
 
     // column_id -> [index_name -> column_index_reader]
-    SharedPtr<FlatHashMap<u64, SharedPtr<Map<String, SharedPtr<ColumnIndexReader>>>, detail::Hash<u64>>> column_index_readers_;
+    std::shared_ptr<FlatHashMap<u64, std::shared_ptr<std::map<std::string, std::shared_ptr<ColumnIndexReader>>>, detail::Hash<u64>>>
+        column_index_readers_;
 };
 
 export class TableIndexReaderCache {
 public:
-    TableIndexReaderCache(String db_id_str, String table_id_str) : db_id_str_(db_id_str), table_id_str_(table_id_str) {}
+    TableIndexReaderCache(std::string db_id_str, std::string table_id_str) : db_id_str_(db_id_str), table_id_str_(table_id_str) {}
 
-    SharedPtr<IndexReader> GetIndexReader(NewTxn *txn);
+    std::shared_ptr<IndexReader> GetIndexReader(NewTxn *txn);
 
     // User shall call this function only once when all transactions using `GetIndexReader()` have finished.
     void Invalidate();
 
 private:
     std::mutex mutex_;
-    String db_id_str_;
-    String table_id_str_;
+    std::string db_id_str_;
+    std::string table_id_str_;
 
     TxnTimeStamp cache_ts_ = UNCOMMIT_TS;
-    SharedPtr<FlatHashMap<u64, SharedPtr<Map<String, SharedPtr<ColumnIndexReader>>>, detail::Hash<u64>>> cache_column_readers_;
+    std::shared_ptr<FlatHashMap<u64, std::shared_ptr<std::map<std::string, std::shared_ptr<ColumnIndexReader>>>, detail::Hash<u64>>>
+        cache_column_readers_;
 };
 
 } // namespace infinity

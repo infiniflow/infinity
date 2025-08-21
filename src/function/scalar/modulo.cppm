@@ -16,8 +16,6 @@ module;
 
 export module infinity_core:modulo;
 
-import :stl;
-
 namespace infinity {
 
 export class NewCatalog;

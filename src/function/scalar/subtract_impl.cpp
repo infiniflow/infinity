@@ -12,20 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:subtract.impl;
 
 import :subtract;
-
-import :stl;
 import :new_catalog;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import :logger;
-import :third_party;
+
+import logical_type;
 import internal_types;
 import data_type;
 
@@ -34,8 +29,7 @@ namespace infinity {
 struct SubFunction {
     template <typename TA, typename TB, typename TC>
     static inline bool Run(TA, TB, TC &) {
-        String error_message = "Not implement: SubFunction::Run";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Not implement: SubFunction::Run");
     }
 };
 
@@ -74,8 +68,7 @@ inline bool SubFunction::Run(BigIntT left, BigIntT right, BigIntT &result) {
 // HugeIntT - HugeIntT = HugeIntT, and check overflow
 template <>
 inline bool SubFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
-    String error_message = "Not implement: SubFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
@@ -122,8 +115,7 @@ inline bool SubFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 // Decimal - Decimal = Decimal
 template <>
 inline bool SubFunction::Run(DecimalT, DecimalT, DecimalT &) {
-    String error_message = "Not implement: SubFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
@@ -154,47 +146,42 @@ inline bool SubFunction::Run(TimestampT left, IntervalT right, TimestampT &resul
 // Mixed Type - i64
 template <>
 inline bool SubFunction::Run(MixedT, BigIntT, MixedT &) {
-    String error_message = "Not implement: SubFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
 // i64 - Mixed Type
 template <>
 inline bool SubFunction::Run(BigIntT, MixedT, MixedT &) {
-    String error_message = "Not implement: SubFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
 // Mixed Type - f64
 template <>
 inline bool SubFunction::Run(MixedT, DoubleT, MixedT &) {
-    String error_message = "Not implement: SubFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
 // f64 - Mixed Type
 template <>
 inline bool SubFunction::Run(DoubleT, MixedT, MixedT &) {
-    String error_message = "Not implement: SubFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
 // Mixed Type - Mixed Type
 template <>
 inline bool SubFunction::Run(MixedT, MixedT, MixedT &) {
-    String error_message = "Not implement: SubFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
 void RegisterSubtractFunction(NewCatalog *catalog_ptr) {
-    String func_name = "-";
+    std::string func_name = "-";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     //    GenerateAddFunction<bool>(function_set_ptr, LogicalTypeId::kBoolean);
     ScalarFunction sub_function_int8(func_name,

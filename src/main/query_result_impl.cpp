@@ -12,21 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-
 module infinity_core:query_result.impl;
 
 import :query_result;
-
 import :logical_node_type;
 import :data_block;
 import :data_table;
 
+import std;
+
 namespace infinity {
 
-String QueryResult::ToString() const {
+std::string QueryResult::ToString() const {
     std::stringstream ss;
 
     switch (root_operator_type_) {
@@ -44,9 +41,9 @@ String QueryResult::ToString() const {
         }
     }
 
-    SizeT column_count = result_table_->ColumnCount();
-    for (SizeT idx = 0; idx < column_count; ++idx) {
-        String end;
+    size_t column_count = result_table_->ColumnCount();
+    for (size_t idx = 0; idx < column_count; ++idx) {
+        std::string end;
         if (idx != column_count - 1) {
             end = " ";
         }
@@ -55,10 +52,10 @@ String QueryResult::ToString() const {
     ss << std::endl;
 
     // Get Block count
-    SizeT block_count = result_table_->DataBlockCount();
+    size_t block_count = result_table_->DataBlockCount();
 
     // Iterate all blocks
-    for (SizeT idx = 0; idx < block_count; ++idx) {
+    for (size_t idx = 0; idx < block_count; ++idx) {
         // Get current block
         DataBlock *current_block = result_table_->GetDataBlockById(idx).get();
         ss << current_block->ToString();

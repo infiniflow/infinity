@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:logical_match_sparse_scan;
 
-import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
@@ -24,19 +21,22 @@ import :logical_match_scan_base;
 import :base_expression;
 import :match_sparse_expression;
 import :base_table_ref;
-import internal_types;
-import data_type;
 import :fast_rough_filter;
 import :common_query_filter;
+
+import internal_types;
+import data_type;
 
 namespace infinity {
 
 export class LogicalMatchSparseScan final : public LogicalMatchScanBase {
 public:
-    explicit LogicalMatchSparseScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<MatchSparseExpression> match_sparse_expr)
+    explicit LogicalMatchSparseScan(u64 node_id,
+                                    std::shared_ptr<BaseTableRef> base_table_ref,
+                                    std::shared_ptr<MatchSparseExpression> match_sparse_expr)
         : LogicalMatchScanBase(node_id, LogicalNodeType::kMatchSparseScan, base_table_ref, match_sparse_expr) {}
 
-    String name() override { return "LogicalMatchSparseScan"; }
+    std::string name() override { return "LogicalMatchSparseScan"; }
 
 public:
 };

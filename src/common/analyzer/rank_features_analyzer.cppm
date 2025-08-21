@@ -12,17 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:rank_features_analyzer;
-import :stl;
+
 import :term;
 import :analyzer;
 
 namespace infinity {
 
 export class RankFeaturesAnalyzer : public Analyzer {
-    String delimiters_{};
+    std::string delimiters_{};
 
 public:
     RankFeaturesAnalyzer() = default;

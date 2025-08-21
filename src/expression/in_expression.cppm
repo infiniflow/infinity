@@ -11,14 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 module;
 
 export module infinity_core:in_expression;
 
-import :stl;
 import :value;
 import :infinity_exception;
 import :base_expression;
+
 import data_type;
 import logical_type;
 import internal_types;
@@ -106,17 +107,16 @@ private:
                 case LogicalType::kDouble:
                     return std::hash<DoubleT>{}(val.GetValue<DoubleT>());
                 case LogicalType::kVarchar:
-                    return std::hash<String>{}(val.GetVarchar());
+                    return std::hash<std::string>{}(val.GetVarchar());
                 default:
-                    String error_message = fmt::format("Not supported type : {}", val.type().ToString());
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Not supported type : {}", val.type().ToString()));
                     break;
             }
             return 0;
         }
     };
     DataType data_type_;
-    HashSet<Value, ValueHasher, ValueComparator> set_;
+    std::unordered_set<Value, ValueHasher, ValueComparator> set_;
 };
 
 export enum class InType {
@@ -127,15 +127,15 @@ export enum class InType {
 
 export class InExpression : public BaseExpression {
 public:
-    InExpression(InType in_type, SharedPtr<BaseExpression> left_operand, Vector<SharedPtr<BaseExpression>> arguments);
+    InExpression(InType in_type, std::shared_ptr<BaseExpression> left_operand, std::vector<std::shared_ptr<BaseExpression>> arguments);
 
-    String ToString() const override;
+    std::string ToString() const override;
 
     inline DataType Type() const override { return DataType{LogicalType::kBoolean}; }
 
-    inline const SharedPtr<BaseExpression> &left_operand() const { return left_operand_ptr_; }
+    inline const std::shared_ptr<BaseExpression> &left_operand() const { return left_operand_ptr_; }
 
-    inline SharedPtr<BaseExpression> &left_operand() { return left_operand_ptr_; }
+    inline std::shared_ptr<BaseExpression> &left_operand() { return left_operand_ptr_; }
 
     inline InType in_type() const { return in_type_; }
 
@@ -150,7 +150,7 @@ public:
     bool Eq(const BaseExpression &other) const override;
 
 private:
-    SharedPtr<BaseExpression> left_operand_ptr_;
+    std::shared_ptr<BaseExpression> left_operand_ptr_;
     InType in_type_;
     ValueSet set_;
 };

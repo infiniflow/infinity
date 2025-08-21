@@ -14,24 +14,22 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:in_expression.impl;
 
 import :in_expression;
-
 import :infinity_exception;
-import :stl;
+
 import :expression_type;
-import :logger;
+
+import std;
 
 namespace infinity {
 
-InExpression::InExpression(InType in_type, SharedPtr<BaseExpression> left_operand, Vector<SharedPtr<BaseExpression>> arguments)
+InExpression::InExpression(InType in_type, std::shared_ptr<BaseExpression> left_operand, std::vector<std::shared_ptr<BaseExpression>> arguments)
     : BaseExpression(ExpressionType::kIn, arguments), left_operand_ptr_(std::move(left_operand)), in_type_(in_type),
       set_(left_operand_ptr_->Type().type()) {}
 
-String InExpression::ToString() const {
+std::string InExpression::ToString() const {
 
     std::stringstream op;
 
@@ -47,8 +45,7 @@ String InExpression::ToString() const {
             break;
         }
         default: {
-            String error_message = "Unknown IN operator type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unknown IN operator type.");
             break;
         }
     }
@@ -89,7 +86,7 @@ bool InExpression::Eq(const BaseExpression &other_base) const {
     if (arguments_.size() != other.arguments_.size()) {
         return false;
     }
-    for (SizeT i = 0; i < arguments_.size(); ++i) {
+    for (size_t i = 0; i < arguments_.size(); ++i) {
         if (!arguments_[i]->Eq(*other.arguments_[i])) {
             return false;
         }

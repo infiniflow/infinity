@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:logger.impl;
 
 import :logger;
@@ -21,24 +19,24 @@ import :config;
 
 namespace infinity {
 
-static SharedPtr<spdlog::sinks::stdout_color_sink_mt> stdout_sinker = nullptr;
-static SharedPtr<spdlog::sinks::rotating_file_sink_mt> rotating_file_sinker = nullptr;
+static std::shared_ptr<spdlog::sinks::stdout_color_sink_mt> stdout_sinker = nullptr;
+static std::shared_ptr<spdlog::sinks::rotating_file_sink_mt> rotating_file_sinker = nullptr;
 
-SharedPtr<spdlog::logger> infinity_logger = nullptr;
+std::shared_ptr<spdlog::logger> infinity_logger = nullptr;
 
 Status Logger::Initialize(Config *config_ptr) {
 
-    SizeT log_file_max_size = config_ptr->LogFileMaxSize();
-    SizeT log_file_rotate_count = config_ptr->LogFileRotateCount();
+    size_t log_file_max_size = config_ptr->LogFileMaxSize();
+    size_t log_file_rotate_count = config_ptr->LogFileRotateCount();
     bool log_stdout = config_ptr->LogToStdout();
 
     if (rotating_file_sinker.get() == nullptr) {
         try {
-            rotating_file_sinker = MakeShared<spdlog::sinks::rotating_file_sink_mt>(config_ptr->LogFilePath(),
-                                                                                    log_file_max_size,
-                                                                                    log_file_rotate_count); // NOLINT
+            rotating_file_sinker = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(config_ptr->LogFilePath(),
+                                                                                          log_file_max_size,
+                                                                                          log_file_rotate_count); // NOLINT
         } catch (const std::exception &e) {
-            String error_message = fmt::format("Error to create log sinker, cause: {}", e.what());
+            std::string error_message = fmt::format("Error to create log sinker, cause: {}", e.what());
             fmt::print("{}", error_message);
             return Status::UnexpectedError(error_message);
         }
@@ -46,17 +44,17 @@ Status Logger::Initialize(Config *config_ptr) {
 
     if (log_stdout) {
         if (stdout_sinker.get() == nullptr) {
-            stdout_sinker = MakeShared<spdlog::sinks::stdout_color_sink_mt>(); // NOLINT
+            stdout_sinker = std::make_shared<spdlog::sinks::stdout_color_sink_mt>(); // NOLINT
         }
-        Vector<spdlog::sink_ptr> sinks{stdout_sinker, rotating_file_sinker};
+        std::vector<spdlog::sink_ptr> sinks{stdout_sinker, rotating_file_sinker};
 
-        infinity_logger = MakeShared<spdlog::logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
+        infinity_logger = std::make_shared<spdlog::logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
         infinity_logger->set_pattern("[%H:%M:%S.%e] [%t] [%^%l%$] %v");
         infinity_logger->flush_on(spdlog::level::warn);
         spdlog::details::registry::instance().register_logger(infinity_logger);
     } else {
-        Vector<spdlog::sink_ptr> sinks{rotating_file_sinker};
-        infinity_logger = MakeShared<spdlog::logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
+        std::vector<spdlog::sink_ptr> sinks{rotating_file_sinker};
+        infinity_logger = std::make_shared<spdlog::logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
         infinity_logger->set_pattern("[%H:%M:%S.%e] [%t] [%^%l%$] %v");
         infinity_logger->flush_on(spdlog::level::warn);
         spdlog::details::registry::instance().register_logger(infinity_logger);
@@ -72,22 +70,22 @@ Status Logger::Initialize(Config *config_ptr) {
 void Logger::Initialize(const LoggerConfig &config) {
     bool log_stdout = config.log_to_stdout_;
     if (rotating_file_sinker.get() == nullptr) {
-        rotating_file_sinker = MakeShared<spdlog::sinks::rotating_file_sink_mt>(config.log_file_path_,
-                                                                                config.log_file_max_size_,
-                                                                                config.log_file_rotate_count_); // NOLINT
+        rotating_file_sinker = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(config.log_file_path_,
+                                                                                      config.log_file_max_size_,
+                                                                                      config.log_file_rotate_count_); // NOLINT
     }
     if (log_stdout) {
         if (stdout_sinker.get() == nullptr) {
-            stdout_sinker = MakeShared<spdlog::sinks::stdout_color_sink_mt>(); // NOLINT
+            stdout_sinker = std::make_shared<spdlog::sinks::stdout_color_sink_mt>(); // NOLINT
         }
-        Vector<spdlog::sink_ptr> sinks{stdout_sinker, rotating_file_sinker};
+        std::vector<spdlog::sink_ptr> sinks{stdout_sinker, rotating_file_sinker};
 
-        infinity_logger = MakeShared<spdlog::logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
+        infinity_logger = std::make_shared<spdlog::logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
         infinity_logger->set_pattern("[%H:%M:%S.%e] [%t] [%^%l%$] %v");
         spdlog::details::registry::instance().register_logger(infinity_logger);
     } else {
-        Vector<spdlog::sink_ptr> sinks{rotating_file_sinker};
-        infinity_logger = MakeShared<spdlog::logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
+        std::vector<spdlog::sink_ptr> sinks{rotating_file_sinker};
+        infinity_logger = std::make_shared<spdlog::logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
         infinity_logger->set_pattern("[%H:%M:%S.%e] [%t] [%^%l%$] %v");
         spdlog::details::registry::instance().register_logger(infinity_logger);
     }

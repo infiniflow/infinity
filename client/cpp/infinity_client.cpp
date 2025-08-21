@@ -127,13 +127,10 @@ ClientStatus Client::DropTable(const std::string &table_name, DropOption drop_op
     ListTableRequest request;
     ListTableResponse response;
 
-
     return std::vector<std::string>();
 }
 
 /// Show table
-TableInfo Client::ShowTable(const std::string &db_name, const std::string &table_name) const {
-    return {};
-}
+TableInfo Client::ShowTable(const std::string &db_name, const std::string &table_name) const { return {}; }
 
 } // namespace infinity::client

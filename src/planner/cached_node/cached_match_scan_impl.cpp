@@ -17,7 +17,6 @@ module;
 module infinity_core:cached_match_scan.impl;
 
 import :cached_match_scan;
-
 import :logical_match_sparse_scan;
 import :logical_match_tensor_scan;
 import :logical_node_type;

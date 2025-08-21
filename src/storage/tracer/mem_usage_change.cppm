@@ -4,13 +4,13 @@ module;
 
 export module infinity_core:mem_usage_change;
 
-import :stl;
+import std.compat;
 
 namespace infinity {
 
 export struct MemUsageChange {
     bool is_add_{true};
-    SizeT mem_{0};
+    size_t mem_{0};
 
     void Add(const MemUsageChange &other) {
         if (this->mem_ == 0) {
@@ -31,7 +31,7 @@ export struct MemUsageChange {
         }
     }
 
-    SizeT Apply(SizeT original) {
+    size_t Apply(size_t original) {
         if (is_add_) {
             return original + mem_;
         } else {

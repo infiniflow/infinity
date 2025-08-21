@@ -1,17 +1,10 @@
-
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.skiplist_reader;
 
 import :ut.base_test;
-import :stl;
 import :posting_byte_slice;
 import :in_doc_pos_state;
 import :byte_slice;
@@ -22,10 +15,9 @@ import :posting_field;
 import :posting_byte_slice_reader;
 import :skiplist_reader;
 import :posting_list_format;
-import :third_party;
+import third_party;
 import :byte_slice_reader;
 import :random;
-#endif
 
 using namespace infinity;
 
@@ -33,28 +25,28 @@ class SkiplistReaderTest : public BaseTest {
 public:
     SkiplistReaderTest() {}
     ~SkiplistReaderTest() {}
-    void SetUp() override { skiplist_writer_ = MakeShared<SkipListWriter>(); }
+    void SetUp() override { skiplist_writer_ = std::make_shared<SkipListWriter>(); }
     void TearDown() override { skiplist_writer_.reset(); }
 
 protected:
     void InitSkiplistWriter(PostingFields &posting_fields,
-                            SizeT doc_num,
-                            Vector<u32> &doc_ids,
-                            Vector<u32> &tfs,
-                            Vector<u32> &deltas,
-                            Vector<u32> &offsets);
+                            size_t doc_num,
+                            std::vector<u32> &doc_ids,
+                            std::vector<u32> &tfs,
+                            std::vector<u32> &deltas,
+                            std::vector<u32> &offsets);
 
 protected:
-    SharedPtr<SkipListWriter> skiplist_writer_ = nullptr;
-    static constexpr SizeT BUFFER_SIZE_ = 1024;
+    std::shared_ptr<SkipListWriter> skiplist_writer_ = nullptr;
+    static constexpr size_t BUFFER_SIZE_ = 1024;
 };
 
 void SkiplistReaderTest::InitSkiplistWriter(PostingFields &posting_fields,
-                                            SizeT doc_num,
-                                            Vector<infinity::u32> &doc_ids,
-                                            Vector<infinity::u32> &tfs,
-                                            Vector<infinity::u32> &deltas,
-                                            Vector<infinity::u32> &offsets) {
+                                            size_t doc_num,
+                                            std::vector<u32> &doc_ids,
+                                            std::vector<u32> &tfs,
+                                            std::vector<u32> &deltas,
+                                            std::vector<u32> &offsets) {
     u8 row_count = 0;
     u32 offset = 0;
 
@@ -83,7 +75,7 @@ void SkiplistReaderTest::InitSkiplistWriter(PostingFields &posting_fields,
     skiplist_writer_->Init(&posting_fields);
 
     u32 now_offset = 0;
-    for (SizeT i = 0; i < doc_num; ++i) {
+    for (size_t i = 0; i < doc_num; ++i) {
         doc_ids.emplace_back(i);
         tfs.emplace_back(i * 10);
         deltas.emplace_back(i * 100);
@@ -97,10 +89,10 @@ void SkiplistReaderTest::InitSkiplistWriter(PostingFields &posting_fields,
 TEST_F(SkiplistReaderTest, SkipListReaderByteSliceTest) {
     PostingFields posting_fields;
     auto doc_num = SKIP_LIST_BUFFER_SIZE + 2;
-    Vector<u32> doc_ids;
-    Vector<u32> tfs;
-    Vector<u32> deltas;
-    Vector<u32> offsets;
+    std::vector<u32> doc_ids;
+    std::vector<u32> tfs;
+    std::vector<u32> deltas;
+    std::vector<u32> offsets;
     InitSkiplistWriter(posting_fields, doc_num, doc_ids, tfs, deltas, offsets);
 
     auto byte_slice_list = skiplist_writer_->GetByteSliceList();
@@ -114,7 +106,7 @@ TEST_F(SkiplistReaderTest, SkipListReaderByteSliceTest) {
     u32 res_delta = -1;
 
     {
-        auto skiplist_reader = MakeShared<SkipListReaderByteSlice>(doc_list_format_option);
+        auto skiplist_reader = std::make_shared<SkipListReaderByteSlice>(doc_list_format_option);
         skiplist_reader->Load(byte_slice_list, static_cast<u32>(0), static_cast<u32>(byte_slice_list->GetTotalSize()));
         for (auto query_doc_id = 0; query_doc_id < doc_num; ++query_doc_id) {
             skiplist_reader->SkipTo(query_doc_id, res_doc_id, res_prev_doc_id, res_offset, res_delta);
@@ -125,7 +117,7 @@ TEST_F(SkiplistReaderTest, SkipListReaderByteSliceTest) {
     }
 
     {
-        auto skiplist_reader = MakeShared<SkipListReaderByteSlice>(doc_list_format_option);
+        auto skiplist_reader = std::make_shared<SkipListReaderByteSlice>(doc_list_format_option);
         skiplist_reader->Load(byte_slice_list, static_cast<u32>(0), static_cast<u32>(byte_slice_list->GetTotalSize()));
         for (auto query_doc_id = 0; query_doc_id < doc_num; query_doc_id += 3) {
             skiplist_reader->SkipTo(query_doc_id, res_doc_id, res_prev_doc_id, res_offset, res_delta);
@@ -136,7 +128,7 @@ TEST_F(SkiplistReaderTest, SkipListReaderByteSliceTest) {
     }
 
     {
-        auto skiplist_reader = MakeShared<SkipListReaderByteSlice>(doc_list_format_option);
+        auto skiplist_reader = std::make_shared<SkipListReaderByteSlice>(doc_list_format_option);
         skiplist_reader->Load(byte_slice_list, static_cast<u32>(0), static_cast<u32>(byte_slice_list->GetTotalSize()));
         for (auto query_doc_id = 0; query_doc_id < doc_num; query_doc_id += random() % doc_num + 1) {
             skiplist_reader->SkipTo(query_doc_id, res_doc_id, res_prev_doc_id, res_offset, res_delta);
@@ -149,11 +141,11 @@ TEST_F(SkiplistReaderTest, SkipListReaderByteSliceTest) {
 
 TEST_F(SkiplistReaderTest, SkipListReaderPostingByteSliceTest) {
     PostingFields posting_fields;
-    SizeT doc_num = SKIP_LIST_BUFFER_SIZE + 2;
-    Vector<u32> doc_ids;
-    Vector<u32> tfs;
-    Vector<u32> deltas;
-    Vector<u32> offsets;
+    size_t doc_num = SKIP_LIST_BUFFER_SIZE + 2;
+    std::vector<u32> doc_ids;
+    std::vector<u32> tfs;
+    std::vector<u32> deltas;
+    std::vector<u32> offsets;
 
     InitSkiplistWriter(posting_fields, doc_num, doc_ids, tfs, deltas, offsets);
 
@@ -164,9 +156,9 @@ TEST_F(SkiplistReaderTest, SkipListReaderPostingByteSliceTest) {
     u32 res_offset = -1;
     u32 res_delta = -1;
     {
-        auto skiplist_reader = MakeShared<SkipListReaderPostingByteSlice>(doc_list_format_option);
+        auto skiplist_reader = std::make_shared<SkipListReaderPostingByteSlice>(doc_list_format_option);
         skiplist_reader->Load(skiplist_writer_.get());
-        for (SizeT query_doc_id = 0; query_doc_id < doc_num; ++query_doc_id) {
+        for (size_t query_doc_id = 0; query_doc_id < doc_num; ++query_doc_id) {
             skiplist_reader->SkipTo(query_doc_id, res_doc_id, res_prev_doc_id, res_offset, res_delta);
             EXPECT_EQ(res_doc_id, doc_ids[query_doc_id]);
             EXPECT_EQ(res_offset, offsets[query_doc_id]);
@@ -175,9 +167,9 @@ TEST_F(SkiplistReaderTest, SkipListReaderPostingByteSliceTest) {
     }
 
     {
-        auto skiplist_reader = MakeShared<SkipListReaderPostingByteSlice>(doc_list_format_option);
+        auto skiplist_reader = std::make_shared<SkipListReaderPostingByteSlice>(doc_list_format_option);
         skiplist_reader->Load(skiplist_writer_.get());
-        for (SizeT query_doc_id = 0; query_doc_id < doc_num; query_doc_id += 3) {
+        for (size_t query_doc_id = 0; query_doc_id < doc_num; query_doc_id += 3) {
             skiplist_reader->SkipTo(query_doc_id, res_doc_id, res_prev_doc_id, res_offset, res_delta);
             EXPECT_EQ(res_doc_id, doc_ids[query_doc_id]);
             EXPECT_EQ(res_offset, offsets[query_doc_id]);
@@ -186,9 +178,9 @@ TEST_F(SkiplistReaderTest, SkipListReaderPostingByteSliceTest) {
     }
 
     {
-        auto skiplist_reader = MakeShared<SkipListReaderPostingByteSlice>(doc_list_format_option);
+        auto skiplist_reader = std::make_shared<SkipListReaderPostingByteSlice>(doc_list_format_option);
         skiplist_reader->Load(skiplist_writer_.get());
-        for (SizeT query_doc_id = 0; query_doc_id < doc_num; query_doc_id += random() % doc_num + 1) {
+        for (size_t query_doc_id = 0; query_doc_id < doc_num; query_doc_id += random() % doc_num + 1) {
             skiplist_reader->SkipTo(query_doc_id, res_doc_id, res_prev_doc_id, res_offset, res_delta);
             EXPECT_EQ(res_doc_id, doc_ids[query_doc_id]);
             EXPECT_EQ(res_offset, offsets[query_doc_id]);

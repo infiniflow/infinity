@@ -16,8 +16,6 @@ module;
 
 export module infinity_core:count;
 
-import :stl;
-
 namespace infinity {
 
 class NewCatalog;

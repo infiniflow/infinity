@@ -12,30 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-#include <filesystem>
-#include <vector>
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
-#include <filesystem>
-#include <vector>
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.rag_analyzer;
 
 import :ut.base_test;
-import :stl;
 import :term;
 import :analyzer;
 import :rag_analyzer;
 import :darts_trie;
 import :darts;
 import :lemmatizer;
-#endif
 
 using namespace infinity;
 
@@ -65,7 +54,7 @@ TEST_F(RAGAnalyzerTest, test1) {
     RAGAnalyzer analyzer(ROOT_PATH.string());
     analyzer.Load();
     // analyzer.SetFineGrained(true);
-    Vector<String> queries = {
+    std::vector<std::string> queries = {
         R"#(哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈)#",
         R"#(公开征求意见稿提出，境外投资者可使用自有人民币或外汇投资。使用外汇投资的，可通过债券持有人在香港人民币业务清算行及香港地区经批准可进入境内银行间外汇市场进行交易的境外人民币业务参加行（以下统称香港结算行）办理外汇资金兑换。香港结算行由此所产生的头寸可到境内银行间外汇市场平盘。使用外汇投资的，在其投资的债券到期或卖出后，原则上应兑换回外汇。)#",
         R"#(多校划片就是一个小区对应多个小学初中，让买了学区房的家庭也不确定到底能上哪个学校。目的是通过这种方式为学区房降温，把就近入学落到实处。南京市长江大桥)#",

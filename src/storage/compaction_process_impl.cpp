@@ -12,20 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <ranges>
-#include <thread>
-#include <vector>
-
 module infinity_core:compaction_process.impl;
 
 import :compaction_process;
-import :stl;
 import :bg_task;
 import :logger;
 import :infinity_exception;
-import :third_party;
 import :blocking_queue;
 import :infinity_context;
 import :base_memindex;
@@ -40,6 +32,9 @@ import :db_meeta;
 import :segment_meta;
 import :bg_task;
 import :base_txn_store;
+
+import std;
+import third_party;
 
 import global_resource_usage;
 import compilation_config;
@@ -60,18 +55,18 @@ CompactionProcessor::~CompactionProcessor() {
 
 void CompactionProcessor::Start() {
     LOG_INFO("Compaction processor is started.");
-    processor_thread_ = Thread([this] { Process(); });
+    processor_thread_ = std::thread([this] { Process(); });
 }
 
 void CompactionProcessor::Stop() {
     LOG_INFO("Compaction processor is stopping.");
-    SharedPtr<StopProcessorTask> stop_task = MakeShared<StopProcessorTask>();
+    std::shared_ptr<StopProcessorTask> stop_task = std::make_shared<StopProcessorTask>();
     this->Submit(stop_task);
     stop_task->Wait();
     processor_thread_.join();
     // Ensure all pending tasks are processed before shutdown
     while (!task_queue_.Empty()) {
-        Deque<SharedPtr<BGTask>> tasks;
+        std::deque<std::shared_ptr<BGTask>> tasks;
         task_queue_.DequeueBulk(tasks);
         for (const auto &bg_task : tasks) {
             if (bg_task->type_ != BGTaskType::kStopProcessor) {
@@ -83,7 +78,7 @@ void CompactionProcessor::Stop() {
     LOG_INFO("Compaction processor is stopped.");
 }
 
-void CompactionProcessor::Submit(SharedPtr<BGTask> bg_task) {
+void CompactionProcessor::Submit(std::shared_ptr<BGTask> bg_task) {
     task_queue_.Enqueue(std::move(bg_task));
     ++task_count_;
 }
@@ -91,17 +86,17 @@ void CompactionProcessor::Submit(SharedPtr<BGTask> bg_task) {
 void CompactionProcessor::NewDoCompact() {
     LOG_TRACE("Background task triggered compaction");
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    Vector<Pair<String, String>> db_table_names;
+    std::vector<std::pair<std::string, std::string>> db_table_names;
     {
-        auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("list table for compaction"), TransactionType::kNormal);
+        auto *new_txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("list table for compaction"), TransactionType::kNormal);
 
-        Vector<String> db_names;
+        std::vector<std::string> db_names;
         Status status = new_txn->ListDatabase(db_names);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
         for (const auto &db_name : db_names) {
-            Vector<String> table_names;
+            std::vector<std::string> table_names;
             status = new_txn->ListTable(db_name, table_names);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
@@ -116,9 +111,9 @@ void CompactionProcessor::NewDoCompact() {
         }
     }
 
-    auto compact_table = [&](const String &db_name, const String &table_name, SharedPtr<BGTaskInfo> &bg_task_info) {
-        auto new_txn_shared =
-            new_txn_mgr->BeginTxnShared(MakeUnique<String>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kNormal);
+    auto compact_table = [&](const std::string &db_name, const std::string &table_name, std::shared_ptr<BGTaskInfo> &bg_task_info) {
+        auto new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>(fmt::format("compact table {}.{}", db_name, table_name)),
+                                                          TransactionType::kNormal);
         LOG_INFO(fmt::format("Compact begin ts: {}", new_txn_shared->BeginTS()));
         Status status = Status::OK();
         DeferFn defer_fn([&] {
@@ -131,13 +126,13 @@ void CompactionProcessor::NewDoCompact() {
                 CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(new_txn_shared->GetTxnStore());
                 if (compact_txn_store != nullptr) {
                     // Record compact info
-                    String task_text = fmt::format("Txn: {}, commit: {}, compact table: {}.{} with segments: {} into {}",
-                                                   new_txn_shared->TxnID(),
-                                                   new_txn_shared->CommitTS(),
-                                                   db_name,
-                                                   table_name,
-                                                   fmt::join(compact_txn_store->deprecated_segment_ids_, ","),
-                                                   compact_txn_store->new_segment_id_);
+                    std::string task_text = fmt::format("Txn: {}, commit: {}, compact table: {}.{} with segments: {} into {}",
+                                                        new_txn_shared->TxnID(),
+                                                        new_txn_shared->CommitTS(),
+                                                        db_name,
+                                                        table_name,
+                                                        fmt::join(compact_txn_store->deprecated_segment_ids_, ","),
+                                                        compact_txn_store->new_segment_id_);
 
                     bg_task_info->task_info_list_.emplace_back(task_text);
                     if (commit_status.ok()) {
@@ -152,21 +147,21 @@ void CompactionProcessor::NewDoCompact() {
                 if (!rollback_status.ok()) {
                     UnrecoverableError(rollback_status.message());
                 }
-                String task_text = fmt::format("Compact table: {}.{}", db_name, table_name);
+                std::string task_text = fmt::format("Compact table: {}.{}", db_name, table_name);
                 bg_task_info->task_info_list_.emplace_back(task_text);
                 bg_task_info->status_list_.emplace_back(status.message());
             }
         });
 
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
+        std::optional<DBMeeta> db_meta;
+        std::optional<TableMeeta> table_meta;
         status = new_txn_shared->GetTableMeta(db_name, table_name, db_meta, table_meta);
         if (!status.ok()) {
             return;
         }
-        Vector<SegmentID> segment_ids;
+        std::vector<SegmentID> segment_ids;
         {
-            Vector<SegmentID> *segment_ids_ptr = nullptr;
+            std::vector<SegmentID> *segment_ids_ptr = nullptr;
             std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
             if (!status.ok()) {
                 UnrecoverableError(status.message());
@@ -194,7 +189,7 @@ void CompactionProcessor::NewDoCompact() {
             return;
         }
 
-        Vector<SegmentID> compactible_segment_ids = GetCompactableSegments(*table_meta, segment_ids);
+        std::vector<SegmentID> compactible_segment_ids = GetCompactableSegments(*table_meta, segment_ids);
         if (!compactible_segment_ids.empty()) {
             status = new_txn_shared->Compact(db_name, table_name, compactible_segment_ids);
         }
@@ -203,7 +198,7 @@ void CompactionProcessor::NewDoCompact() {
     if (db_table_names.empty()) {
         LOG_TRACE("No table to compact.");
     } else {
-        SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kNotifyCompact);
+        std::shared_ptr<BGTaskInfo> bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kNotifyCompact);
         for (const auto &[db_name, table_name] : db_table_names) {
             compact_table(db_name, table_name, bg_task_info);
         }
@@ -213,21 +208,22 @@ void CompactionProcessor::NewDoCompact() {
     }
 }
 
-Status CompactionProcessor::NewManualCompact(const String &db_name, const String &table_name) {
-    UniquePtr<String> result_msg;
+Status CompactionProcessor::NewManualCompact(const std::string &db_name, const std::string &table_name) {
+    std::unique_ptr<std::string> result_msg;
     //    LOG_TRACE(fmt::format("Compact command triggered compaction: {}.{}", db_name, table_name));
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kNormal);
+    auto *new_txn =
+        new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kNormal);
 
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
+    std::optional<DBMeeta> db_meta;
+    std::optional<TableMeeta> table_meta;
     Status status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
     }
-    Vector<SegmentID> segment_ids;
+    std::vector<SegmentID> segment_ids;
     {
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
         if (!status.ok()) {
             return status;
@@ -244,7 +240,7 @@ Status CompactionProcessor::NewManualCompact(const String &db_name, const String
         }
     }
 
-    Vector<SegmentID> compactible_segment_ids = GetCompactableSegments(*table_meta, segment_ids);
+    std::vector<SegmentID> compactible_segment_ids = GetCompactableSegments(*table_meta, segment_ids);
     if (!compactible_segment_ids.empty()) {
         status = new_txn->Compact(db_name, table_name, compactible_segment_ids);
         if (!status.ok()) {
@@ -254,19 +250,19 @@ Status CompactionProcessor::NewManualCompact(const String &db_name, const String
         if (!status.ok()) {
             return status;
         }
-        result_msg = MakeUnique<String>(fmt::format("Compact segments {} into new segment", fmt::join(compactible_segment_ids, ",")));
+        result_msg = std::make_unique<std::string>(fmt::format("Compact segments {} into new segment", fmt::join(compactible_segment_ids, ",")));
     } else {
-        result_msg = MakeUnique<String>("No segment to compact");
+        result_msg = std::make_unique<std::string>("No segment to compact");
     }
     return Status(ErrorCode::kOk, std::move(result_msg));
 }
 
 void CompactionProcessor::NewScanAndOptimize() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    auto new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+    auto new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
     LOG_INFO(fmt::format("Optimize all indexes begin ts: {}", new_txn_shared->BeginTS()));
 
-    SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kNotifyOptimize);
+    std::shared_ptr<BGTaskInfo> bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kNotifyOptimize);
     Status status = new_txn_shared->OptimizeAllIndexes();
     if (status.ok()) {
         Status commit_status = new_txn_mgr->CommitTxn(new_txn_shared.get());
@@ -277,20 +273,20 @@ void CompactionProcessor::NewScanAndOptimize() {
         OptimizeIndexTxnStore *optimize_idx_store = static_cast<OptimizeIndexTxnStore *>(new_txn_shared->GetTxnStore());
         if (optimize_idx_store != nullptr) {
             for (const OptimizeIndexStoreEntry &store_entry : optimize_idx_store->entries_) {
-                SizeT size = store_entry.new_chunk_infos_.size();
+                size_t size = store_entry.new_chunk_infos_.size();
                 std::vector<ChunkID> chunk_ids(size);
-                for (SizeT i = 0; i < size; ++i) {
+                for (size_t i = 0; i < size; ++i) {
                     chunk_ids[i] = store_entry.new_chunk_infos_[i].chunk_id_;
                 }
-                String task_text = fmt::format("Txn: {}, commit: {}, optimize index: {}.{}.{} segment: {} with chunks: {} into {}",
-                                               new_txn_shared->TxnID(),
-                                               new_txn_shared->CommitTS(),
-                                               store_entry.db_name_,
-                                               store_entry.table_name_,
-                                               store_entry.index_name_,
-                                               store_entry.segment_id_,
-                                               fmt::join(store_entry.deprecate_chunks_, ","),
-                                               fmt::join(chunk_ids, ","));
+                std::string task_text = fmt::format("Txn: {}, commit: {}, optimize index: {}.{}.{} segment: {} with chunks: {} into {}",
+                                                    new_txn_shared->TxnID(),
+                                                    new_txn_shared->CommitTS(),
+                                                    store_entry.db_name_,
+                                                    store_entry.table_name_,
+                                                    store_entry.index_name_,
+                                                    store_entry.segment_id_,
+                                                    fmt::join(store_entry.deprecate_chunks_, ","),
+                                                    fmt::join(chunk_ids, ","));
 
                 bg_task_info->task_info_list_.emplace_back(task_text);
                 if (commit_status.ok()) {
@@ -306,7 +302,7 @@ void CompactionProcessor::NewScanAndOptimize() {
         if (!rollback_status.ok()) {
             UnrecoverableError(rollback_status.message());
         }
-        String task_text = "Optimize all indexes";
+        std::string task_text = "Optimize all indexes";
         bg_task_info->task_info_list_.emplace_back(task_text);
         bg_task_info->status_list_.emplace_back(status.message());
     }
@@ -319,7 +315,7 @@ void CompactionProcessor::NewScanAndOptimize() {
 void CompactionProcessor::Process() {
     bool running = true;
     while (running) {
-        Deque<SharedPtr<BGTask>> tasks;
+        std::deque<std::shared_ptr<BGTask>> tasks;
         task_queue_.DequeueBulk(tasks);
 
         for (const auto &bg_task : tasks) {
@@ -377,8 +373,7 @@ void CompactionProcessor::Process() {
                     break;
                 }
                 default: {
-                    String error_message = fmt::format("Invalid background task: {}", (u8)bg_task->type_);
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Invalid background task: {}", (u8)bg_task->type_));
                     break;
                 }
             }
@@ -389,7 +384,7 @@ void CompactionProcessor::Process() {
     }
 }
 
-Vector<SegmentID> CompactionProcessor::GetCompactableSegments(TableMeeta &table_meta, const Vector<SegmentID> &segment_ids) {
+std::vector<SegmentID> CompactionProcessor::GetCompactableSegments(TableMeeta &table_meta, const std::vector<SegmentID> &segment_ids) {
     auto compaction_alg = NewCompactionAlg::GetInstance();
 
     for (SegmentID segment_id : segment_ids) {

@@ -11,25 +11,25 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module;
-#include <chrono>
+
 module infinity_core:current_date.impl;
 
 import :current_date;
-import :stl;
 import :config;
 import :new_catalog;
 import :status;
-import logical_type;
 import :infinity_context;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import :third_party;
-import internal_types;
-import data_type;
 import :column_vector;
 import :singleton;
+
+import std;
+
+import internal_types;
+import data_type;
+import logical_type;
 
 namespace infinity {
 using namespace std::chrono;
@@ -44,17 +44,17 @@ struct CurrentDateFunction {
 
 template <>
 inline void CurrentDateFunction::Run(DateT &result) {
-    InfinityContext& infinityContext = InfinityContext::instance();
-    Config* config = infinityContext.config();
+    InfinityContext &infinityContext = InfinityContext::instance();
+    Config *config = infinityContext.config();
     auto now = system_clock::now() + config->hour_offset_;
     auto sys_days = std::chrono::floor<std::chrono::days>(now);
     result.value = sys_days.time_since_epoch().count();
 }
 
 void RegisterCurrentDateFunction(NewCatalog *catalog_ptr) {
-    String func_name = "current_date";
+    std::string func_name = "current_date";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction current_date_function(func_name, {}, DataType(LogicalType::kDate), &ScalarFunction::NullaryFunction<DateT, CurrentDateFunction>);
     function_set_ptr->AddFunction(current_date_function);

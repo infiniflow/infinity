@@ -12,22 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.inequals_functions;
 
 import :ut.base_test;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
-import :stl;
+
 import :infinity_context;
 import :new_catalog;
 import :inequals;
@@ -44,7 +39,6 @@ import :column_vector;
 import :config;
 import :status;
 import :kv_store;
-#endif
 
 import global_resource_usage;
 import logical_type;
@@ -57,28 +51,28 @@ class InEqualsFunctionsTest : public BaseTest {};
 TEST_F(InEqualsFunctionsTest, inequals_func) {
     using namespace infinity;
 
-    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    std::unique_ptr<Config> config_ptr = std::make_unique<Config>();
     Status status = config_ptr->Init(nullptr, nullptr);
     EXPECT_TRUE(status.ok());
-    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    std::unique_ptr<KVStore> kv_store_ptr = std::make_unique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
     EXPECT_TRUE(status.ok());
-    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+    std::unique_ptr<NewCatalog> catalog_ptr = std::make_unique<NewCatalog>(kv_store_ptr.get());
 
     RegisterInEqualFunction(catalog_ptr.get());
 
-    String op = "<>";
-    SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
+    std::string op = "<>";
+    std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
-    SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
+    std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBoolean);
+        std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBoolean);
+        std::shared_ptr<ColumnExpression> col1_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<ColumnExpression> col2_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -86,16 +80,16 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("<>(Boolean, Boolean)->Boolean", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             if (i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeBool(true));
                 data_block.AppendValue(1, Value::MakeBool(false));
@@ -106,7 +100,7 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kBoolean);
@@ -120,12 +114,12 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
             }
         }
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(result_type);
         result->Initialize();
 
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             EXPECT_EQ(v.value_.boolean, true);
@@ -133,12 +127,12 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
     }
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTinyInt);
+        std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBoolean);
+        std::shared_ptr<ColumnExpression> col1_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<ColumnExpression> col2_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -146,16 +140,16 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("<>(TinyInt, TinyInt)->Boolean", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             if (i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
                 data_block.AppendValue(1, Value::MakeTinyInt(static_cast<i8>(i)));
@@ -166,7 +160,7 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kTinyInt);
@@ -180,11 +174,11 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
             }
         }
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if (i % 2 == 0) {
@@ -196,12 +190,12 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
     }
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kSmallInt);
+        std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBoolean);
+        std::shared_ptr<ColumnExpression> col1_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<ColumnExpression> col2_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -209,16 +203,16 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("<>(SmallInt, SmallInt)->Boolean", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             if (i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeSmallInt(static_cast<i16>(i)));
                 data_block.AppendValue(1, Value::MakeSmallInt(static_cast<i16>(i)));
@@ -229,7 +223,7 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kSmallInt);
@@ -243,11 +237,11 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
             }
         }
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if (i % 2 == 0) {
@@ -259,12 +253,12 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
     }
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kInteger);
+        std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBoolean);
+        std::shared_ptr<ColumnExpression> col1_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<ColumnExpression> col2_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -272,16 +266,16 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("<>(Integer, Integer)->Boolean", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             if (i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeInt(static_cast<i32>(i)));
                 data_block.AppendValue(1, Value::MakeInt(static_cast<i32>(i)));
@@ -292,7 +286,7 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kInteger);
@@ -306,11 +300,11 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
             }
         }
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if (i % 2 == 0) {
@@ -322,12 +316,12 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
     }
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBigInt);
+        std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBoolean);
+        std::shared_ptr<ColumnExpression> col1_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<ColumnExpression> col2_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -335,16 +329,16 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("<>(BigInt, BigInt)->Boolean", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             if (i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeBigInt(static_cast<i64>(i)));
                 data_block.AppendValue(1, Value::MakeBigInt(static_cast<i64>(i)));
@@ -355,7 +349,7 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kBigInt);
@@ -369,11 +363,11 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
             }
         }
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if (i % 2 == 0) {
@@ -385,12 +379,12 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
     }
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kHugeInt);
+        std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBoolean);
+        std::shared_ptr<ColumnExpression> col1_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<ColumnExpression> col2_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -398,16 +392,16 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("<>(HugeInt, HugeInt)->Boolean", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             if (i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeHugeInt(HugeIntT(static_cast<i64>(i), static_cast<i64>(i))));
                 data_block.AppendValue(1, Value::MakeHugeInt(HugeIntT(static_cast<i64>(i), static_cast<i64>(i))));
@@ -418,7 +412,7 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kHugeInt);
@@ -432,11 +426,11 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
             }
         }
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if (i % 2 == 0) {
@@ -448,12 +442,12 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
     }
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kFloat);
+        std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBoolean);
+        std::shared_ptr<ColumnExpression> col1_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<ColumnExpression> col2_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -461,16 +455,16 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("<>(Float, Float)->Boolean", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             if (i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeFloat(static_cast<f32>(i)));
                 data_block.AppendValue(1, Value::MakeFloat(static_cast<f32>(i)));
@@ -481,7 +475,7 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kFloat);
@@ -495,11 +489,11 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
             }
         }
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if (i % 2 == 0) {
@@ -511,12 +505,12 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
     }
 
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDouble);
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDouble);
+        std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBoolean);
+        std::shared_ptr<ColumnExpression> col1_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<ColumnExpression> col2_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -524,16 +518,16 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("<>(Double, Double)->Boolean", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             if (i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeDouble(static_cast<f64>(i)));
                 data_block.AppendValue(1, Value::MakeDouble(static_cast<f64>(i)));
@@ -544,7 +538,7 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kDouble);
@@ -558,11 +552,11 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
             }
         }
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if (i % 2 == 0) {
@@ -574,13 +568,13 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
     }
 #if 0
     {
-        Vector<SharedPtr<BaseExpression>> inputs;
+        std::vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type1 = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<DataType> data_type2 = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type1, "t1", 1, "c1", 0, 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type2, "t1", 1, "c2", 1, 0);
+        std::shared_ptr<DataType> data_type1 = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<DataType> data_type2 = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kBoolean);
+        std::shared_ptr<ColumnExpression> col1_expr_ptr = std::make_shared<ColumnExpression>(*data_type1, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<ColumnExpression> col2_expr_ptr = std::make_shared<ColumnExpression>(*data_type2, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -588,16 +582,16 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("<>(Varchar, Varchar)->Boolean", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type1);
         column_types.emplace_back(data_type2);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             if (i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeVarchar("Helloworld" + std::to_string(i)));
                 data_block.AppendValue(1, Value::MakeVarchar("Helloworld" + std::to_string(i)));
@@ -608,7 +602,7 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kVarchar);
@@ -622,11 +616,11 @@ TEST_F(InEqualsFunctionsTest, inequals_func) {
             }
         }
 
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if (i % 2 == 0) {

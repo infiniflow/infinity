@@ -12,33 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-#include <atomic>
-#include <chrono>
-#include <iomanip>
-#include <random>
-#include <thread>
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
-#include <atomic>
-#include <chrono>
-#include <iomanip>
-#include <random>
-#include <thread>
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_rcu_multimap;
 
 import :ut.base_test;
-import :stl;
-import :third_party;
+import third_party;
 import :rcu_multimap;
 import :map_with_lock;
-#endif
 
 using namespace infinity;
 
@@ -53,18 +36,18 @@ public:
 
 protected:
     // Helper function to verify values in vector
-    void VerifyValues(const Vector<i32> &values, const Vector<i32> &expected) {
+    void VerifyValues(const std::vector<i32> &values, const std::vector<i32> &expected) {
         EXPECT_EQ(values.size(), expected.size());
-        Vector<i32> actual_values = values;
+        std::vector<i32> actual_values = values;
         std::sort(actual_values.begin(), actual_values.end());
-        Vector<i32> sorted_expected = expected;
+        std::vector<i32> sorted_expected = expected;
         std::sort(sorted_expected.begin(), sorted_expected.end());
         EXPECT_EQ(actual_values, sorted_expected);
     }
 };
 
 TEST_F(RcuMultiMapTest, TestBasicInsertAndGet) {
-    RcuMultiMap<String, i32> map;
+    RcuMultiMap<std::string, i32> map;
 
     // Insert some values
     map.Insert("key1", 10);
@@ -89,7 +72,7 @@ TEST_F(RcuMultiMapTest, TestBasicInsertAndGet) {
 }
 
 TEST_F(RcuMultiMapTest, TestLowercaseAliases) {
-    RcuMultiMap<String, i32> map;
+    RcuMultiMap<std::string, i32> map;
 
     // Test lowercase insert alias
     map.insert("test_key", 100);
@@ -102,7 +85,7 @@ TEST_F(RcuMultiMapTest, TestLowercaseAliases) {
 }
 
 TEST_F(RcuMultiMapTest, TestDelete) {
-    RcuMultiMap<String, i32> map;
+    RcuMultiMap<std::string, i32> map;
 
     map.Insert("key1", 10);
     map.Insert("key1", 20);
@@ -126,13 +109,13 @@ TEST_F(RcuMultiMapTest, TestDelete) {
 }
 
 TEST_F(RcuMultiMapTest, TestGetAllValuesWithRef) {
-    RcuMultiMap<String, i32> map;
+    RcuMultiMap<std::string, i32> map;
 
     map.Insert("key1", 10);
     map.Insert("key2", 20);
     map.Insert("key3", 30);
 
-    Vector<i32> all_values;
+    std::vector<i32> all_values;
     map.GetAllValuesWithRef(all_values);
 
     EXPECT_EQ(all_values.size(), 3);
@@ -140,7 +123,7 @@ TEST_F(RcuMultiMapTest, TestGetAllValuesWithRef) {
 }
 
 TEST_F(RcuMultiMapTest, TestGarbageCollection) {
-    RcuMultiMap<String, i32> map;
+    RcuMultiMap<std::string, i32> map;
 
     map.Insert("key1", 10);
     map.Insert("key2", 20);
@@ -161,7 +144,7 @@ TEST_F(RcuMultiMapTest, TestGarbageCollection) {
 }
 
 TEST_F(RcuMultiMapTest, TestExpiredEntries) {
-    RcuMultiMap<String, i32> map;
+    RcuMultiMap<std::string, i32> map;
 
     map.Insert("key1", 10);
     map.Insert("key2", 20);
@@ -174,7 +157,7 @@ TEST_F(RcuMultiMapTest, TestExpiredEntries) {
 
     u64 current_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 
-    Vector<String> expired_keys;
+    std::vector<std::string> expired_keys;
     map.CheckExpired(current_time + 1000, expired_keys); // Check for entries not accessed in last second
 
     // Should find some expired keys (exact behavior depends on implementation)
@@ -183,7 +166,7 @@ TEST_F(RcuMultiMapTest, TestExpiredEntries) {
 }
 
 TEST_F(RcuMultiMapTest, TestGetWithRcuTime) {
-    RcuMultiMap<String, i32> map;
+    RcuMultiMap<std::string, i32> map;
 
     map.Insert("key1", 10);
     map.Insert("key2", 20);
@@ -213,7 +196,7 @@ TEST_F(RcuMultiMapTest, TestMultipleValuesPerKey) {
     auto values = map.Get(42);
     EXPECT_EQ(values.size(), 10);
 
-    Vector<i32> expected_values;
+    std::vector<i32> expected_values;
     for (i32 i = 0; i < 10; ++i) {
         expected_values.push_back(i * 10);
     }
@@ -242,13 +225,13 @@ TEST_F(RcuMultiMapTest, TestIntegerKeys) {
 }
 
 TEST_F(RcuMultiMapTest, TestEmptyMap) {
-    RcuMultiMap<String, i32> map;
+    RcuMultiMap<std::string, i32> map;
 
     // Test operations on empty map
     auto values = map.Get("nonexistent");
     EXPECT_EQ(values.size(), 0);
 
-    Vector<i32> all_values;
+    std::vector<i32> all_values;
     map.GetAllValuesWithRef(all_values);
     EXPECT_EQ(all_values.size(), 0);
 
@@ -288,7 +271,7 @@ TEST_F(RcuMultiMapTest, TestStressInsertAndRetrieve) {
 }
 
 TEST_F(RcuMultiMapTest, TestDeleteFunctionality) {
-    RcuMultiMap<String, i32> map;
+    RcuMultiMap<std::string, i32> map;
 
     // Test that delete operations don't crash and maintain map integrity
     map.Insert("test_key", 42);
@@ -322,7 +305,7 @@ TEST_F(RcuMultiMapTest, TestDeleteFunctionality) {
 
 TEST_F(RcuMultiMapTest, TestDifferentValueTypes) {
     // Test with pointer to int
-    RcuMultiMap<String, i32> int_map;
+    RcuMultiMap<std::string, i32> int_map;
 
     i32 value1 = 42;
     i32 value2 = 84;
@@ -356,7 +339,7 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertAndRead) {
     std::atomic<i32> total_reads{0};
     std::atomic<bool> start_flag{false};
 
-    Vector<std::thread> threads;
+    std::vector<std::thread> threads;
 
     // Create writer threads
     for (i32 t = 0; t < num_threads / 2; ++t) {
@@ -441,7 +424,7 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertAndRead) {
 }
 
 TEST_F(RcuMultiMapTest, TestConcurrentInsertDeleteRead) {
-    RcuMultiMap<String, i32> map;
+    RcuMultiMap<std::string, i32> map;
 
     // Previous parameters (slower):
     // const i32 num_threads = 12;
@@ -458,7 +441,7 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertDeleteRead) {
     std::atomic<i32> total_reads{0};
     std::atomic<bool> start_flag{false};
 
-    Vector<std::thread> threads;
+    std::vector<std::thread> threads;
 
     // Create insert threads
     for (i32 t = 0; t < num_threads / 3; ++t) {
@@ -472,7 +455,7 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertDeleteRead) {
             std::uniform_int_distribution<i32> key_dist(0, key_range - 1);
 
             for (i32 i = 0; i < operations_per_thread; ++i) {
-                String key = "key_" + std::to_string(key_dist(gen));
+                std::string key = "key_" + std::to_string(key_dist(gen));
                 i32 value = t * operations_per_thread + i;
 
                 map.Insert(key, value);
@@ -504,7 +487,7 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertDeleteRead) {
             std::uniform_int_distribution<i32> key_dist(0, key_range - 1);
 
             for (i32 i = 0; i < operations_per_thread / 2; ++i) {
-                String key = "key_" + std::to_string(key_dist(gen));
+                std::string key = "key_" + std::to_string(key_dist(gen));
                 map.Delete(key);
                 total_deletions.fetch_add(1);
 
@@ -529,7 +512,7 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertDeleteRead) {
             std::uniform_int_distribution<i32> key_dist(0, key_range - 1);
 
             for (i32 i = 0; i < operations_per_thread; ++i) {
-                String key = "key_" + std::to_string(key_dist(gen));
+                std::string key = "key_" + std::to_string(key_dist(gen));
                 auto values = map.Get(key);
 
                 // No verification needed for POD types
@@ -581,7 +564,7 @@ TEST_F(RcuMultiMapTest, TestHighVolumeMultiThreading) {
     std::atomic<bool> start_flag{false};
     std::atomic<bool> stop_flag{false};
 
-    Vector<std::thread> threads;
+    std::vector<std::thread> threads;
 
     // Create mixed workload threads (insert + read)
     for (i32 t = 0; t < num_threads; ++t) {
@@ -665,7 +648,7 @@ TEST_F(RcuMultiMapTest, TestHighVolumeMultiThreading) {
 }
 
 TEST_F(RcuMultiMapTest, TestRcuSwapUnderLoad) {
-    RcuMultiMap<String, i32> map;
+    RcuMultiMap<std::string, i32> map;
 
     // Previous parameters (slower):
     // const i32 num_threads = 8;
@@ -680,7 +663,7 @@ TEST_F(RcuMultiMapTest, TestRcuSwapUnderLoad) {
     std::atomic<i32> total_gets{0};
     std::atomic<bool> start_flag{false};
 
-    Vector<std::thread> threads;
+    std::vector<std::thread> threads;
 
     // Create threads that will trigger RCU swaps through cache misses
     for (i32 t = 0; t < num_threads; ++t) {
@@ -697,14 +680,14 @@ TEST_F(RcuMultiMapTest, TestRcuSwapUnderLoad) {
             // Previous count (slower): 50
             // Faster count:
             for (i32 i = 0; i < 10; ++i) {
-                String key = "swap_key_" + std::to_string(key_dist(gen));
+                std::string key = "swap_key_" + std::to_string(key_dist(gen));
                 i32 value = t * 1000 + i;
                 map.Insert(key, value);
             }
 
             // Then perform many reads to trigger cache misses and swaps
             for (i32 i = 0; i < operations_per_thread; ++i) {
-                String key = "swap_key_" + std::to_string(key_dist(gen));
+                std::string key = "swap_key_" + std::to_string(key_dist(gen));
                 auto values = map.Get(key, true); // Update access time
 
                 total_gets.fetch_add(1);
@@ -718,7 +701,7 @@ TEST_F(RcuMultiMapTest, TestRcuSwapUnderLoad) {
                 if (i % 10 == 0) {
                     // Access multiple keys rapidly to increase miss_time
                     for (i32 j = 0; j < 5; ++j) {
-                        String rapid_key = "swap_key_" + std::to_string(j % key_range);
+                        std::string rapid_key = "swap_key_" + std::to_string(j % key_range);
                         auto rapid_values = map.Get(rapid_key, true);
                         total_gets.fetch_add(1); // Count these additional gets
                         // No cleanup needed for POD types
@@ -745,7 +728,7 @@ TEST_F(RcuMultiMapTest, TestRcuSwapUnderLoad) {
     i32 final_total_values = 0;
 
     for (i32 i = 0; i < key_range; ++i) {
-        String key = "swap_key_" + std::to_string(i);
+        std::string key = "swap_key_" + std::to_string(i);
         auto values = map.Get(key);
 
         if (!values.empty()) {
@@ -765,7 +748,7 @@ TEST_F(RcuMultiMapTest, TestRcuSwapUnderLoad) {
 }
 
 TEST_F(RcuMultiMapTest, TestRcuBehavior) {
-    RcuMultiMap<String, i32> map;
+    RcuMultiMap<std::string, i32> map;
 
     // Insert data (goes to dirty_map)
     map.Insert("key1", 100);
@@ -799,7 +782,7 @@ public:
 };
 
 TEST_F(RcuMapTest, TestBasicInsertAndGet) {
-    RcuMap<String, i32> map;
+    RcuMap<std::string, i32> map;
 
     // Insert some values (Map has unique keys)
     map.Insert("key1", 10);
@@ -832,7 +815,7 @@ TEST_F(RcuMapTest, TestBasicInsertAndGet) {
 }
 
 TEST_F(RcuMapTest, TestLowercaseAliases) {
-    RcuMap<String, i32> map;
+    RcuMap<std::string, i32> map;
 
     // Test lowercase insert alias
     map.insert("test_key", 100);
@@ -845,7 +828,7 @@ TEST_F(RcuMapTest, TestLowercaseAliases) {
 }
 
 TEST_F(RcuMapTest, TestDelete) {
-    RcuMap<String, i32> map;
+    RcuMap<std::string, i32> map;
 
     map.Insert("key1", 10);
     map.Insert("key2", 20);
@@ -869,29 +852,29 @@ TEST_F(RcuMapTest, TestDelete) {
 }
 
 TEST_F(RcuMapTest, TestGetAllValuesWithRef) {
-    RcuMap<String, i32> map;
+    RcuMap<std::string, i32> map;
 
     map.Insert("key1", 10);
     map.Insert("key2", 20);
     map.Insert("key3", 30);
 
-    Vector<i32> all_values;
+    std::vector<i32> all_values;
     map.GetAllValuesWithRef(all_values);
 
     EXPECT_EQ(all_values.size(), 3);
     std::sort(all_values.begin(), all_values.end());
-    Vector<i32> expected = {10, 20, 30};
+    std::vector<i32> expected = {10, 20, 30};
     EXPECT_EQ(all_values, expected);
 }
 
 TEST_F(RcuMapTest, TestGetAllKeyValuePairs) {
-    RcuMap<String, i32> map;
+    RcuMap<std::string, i32> map;
 
     map.Insert("key1", 10);
     map.Insert("key2", 20);
     map.Insert("key3", 30);
 
-    Vector<Pair<String, i32>> pairs;
+    std::vector<std::pair<std::string, i32>> pairs;
     map.GetAllKeyValuePairs(pairs);
 
     EXPECT_EQ(pairs.size(), 3);
@@ -908,7 +891,7 @@ TEST_F(RcuMapTest, TestGetAllKeyValuePairs) {
 }
 
 TEST_F(RcuMapTest, TestGarbageCollection) {
-    RcuMap<String, i32> map;
+    RcuMap<std::string, i32> map;
 
     map.Insert("key1", 10);
     map.Insert("key2", 20);
@@ -929,7 +912,7 @@ TEST_F(RcuMapTest, TestGarbageCollection) {
 }
 
 TEST_F(RcuMapTest, TestExpiredEntries) {
-    RcuMap<String, i32> map;
+    RcuMap<std::string, i32> map;
 
     map.Insert("key1", 10);
     map.Insert("key2", 20);
@@ -942,7 +925,7 @@ TEST_F(RcuMapTest, TestExpiredEntries) {
 
     u64 current_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 
-    Vector<String> expired_keys;
+    std::vector<std::string> expired_keys;
     map.CheckExpired(current_time + 1000, expired_keys); // Check for entries not accessed in last second
 
     // Should find some expired keys (exact behavior depends on implementation)
@@ -951,7 +934,7 @@ TEST_F(RcuMapTest, TestExpiredEntries) {
 }
 
 TEST_F(RcuMapTest, TestGetWithRcuTime) {
-    RcuMap<String, i32> map;
+    RcuMap<std::string, i32> map;
 
     map.Insert("key1", 10);
     map.Insert("key2", 20);
@@ -1009,7 +992,7 @@ TEST_F(RcuMapTest, TestIntegerKeys) {
 }
 
 TEST_F(RcuMapTest, TestEmptyMap) {
-    RcuMap<String, i32> map;
+    RcuMap<std::string, i32> map;
 
     // Test operations on empty map
     auto value_ptr = map.Get("nonexistent");
@@ -1018,7 +1001,7 @@ TEST_F(RcuMapTest, TestEmptyMap) {
     auto opt_value = map.GetValue("nonexistent");
     EXPECT_FALSE(opt_value.has_value());
 
-    Vector<i32> all_values;
+    std::vector<i32> all_values;
     map.GetAllValuesWithRef(all_values);
     EXPECT_EQ(all_values.size(), 0);
 
@@ -1029,7 +1012,7 @@ TEST_F(RcuMapTest, TestEmptyMap) {
 }
 
 TEST_F(RcuMapTest, TestEmplace) {
-    RcuMap<String, i32> map;
+    RcuMap<std::string, i32> map;
 
     // Test emplace functionality
     map.emplace("key1", 42);
@@ -1063,14 +1046,14 @@ TEST_F(RcuMapTest, TestRange) {
     map.Insert(9, 900);
 
     // Test range query
-    Vector<i32> result;
+    std::vector<i32> result;
     u32 count = map.range(3, 7, result);
 
     EXPECT_EQ(count, 3); // Should include keys 3, 5, 7
     EXPECT_EQ(result.size(), 3);
 
     std::sort(result.begin(), result.end());
-    Vector<i32> expected = {300, 500, 700};
+    std::vector<i32> expected = {300, 500, 700};
     EXPECT_EQ(result, expected);
 }
 
@@ -1106,7 +1089,7 @@ TEST_F(RcuMapTest, TestConcurrentInsertAndRead) {
     std::atomic<i32> successful_reads{0};
     std::atomic<bool> start_flag{false};
 
-    Vector<std::thread> threads;
+    std::vector<std::thread> threads;
 
     // Create writer threads
     for (i32 t = 0; t < num_threads / 2; ++t) {
@@ -1190,7 +1173,7 @@ TEST_F(RcuMapTest, TestConcurrentInsertAndRead) {
 }
 
 TEST_F(RcuMapTest, TestConcurrentInsertDeleteRead) {
-    RcuMap<String, i32> map;
+    RcuMap<std::string, i32> map;
 
     const i32 num_threads = 6;
     const i32 operations_per_thread = 50;
@@ -1201,7 +1184,7 @@ TEST_F(RcuMapTest, TestConcurrentInsertDeleteRead) {
     std::atomic<i32> total_reads{0};
     std::atomic<bool> start_flag{false};
 
-    Vector<std::thread> threads;
+    std::vector<std::thread> threads;
 
     // Create insert threads
     for (i32 t = 0; t < num_threads / 3; ++t) {
@@ -1215,7 +1198,7 @@ TEST_F(RcuMapTest, TestConcurrentInsertDeleteRead) {
             std::uniform_int_distribution<i32> key_dist(0, key_range - 1);
 
             for (i32 i = 0; i < operations_per_thread; ++i) {
-                String key = "key_" + std::to_string(key_dist(gen));
+                std::string key = "key_" + std::to_string(key_dist(gen));
                 i32 value = t * operations_per_thread + i;
 
                 map.Insert(key, value);
@@ -1243,7 +1226,7 @@ TEST_F(RcuMapTest, TestConcurrentInsertDeleteRead) {
             std::uniform_int_distribution<i32> key_dist(0, key_range - 1);
 
             for (i32 i = 0; i < operations_per_thread / 2; ++i) {
-                String key = "key_" + std::to_string(key_dist(gen));
+                std::string key = "key_" + std::to_string(key_dist(gen));
                 map.Delete(key);
                 total_deletions.fetch_add(1);
 
@@ -1266,7 +1249,7 @@ TEST_F(RcuMapTest, TestConcurrentInsertDeleteRead) {
             std::uniform_int_distribution<i32> key_dist(0, key_range - 1);
 
             for (i32 i = 0; i < operations_per_thread; ++i) {
-                String key = "key_" + std::to_string(key_dist(gen));
+                std::string key = "key_" + std::to_string(key_dist(gen));
                 auto value_ptr = map.Get(key);
 
                 total_reads.fetch_add(1);
@@ -1299,7 +1282,7 @@ TEST_F(RcuMapTest, TestConcurrentInsertDeleteRead) {
 }
 
 TEST_F(RcuMapTest, TestRcuSwapUnderLoad) {
-    RcuMap<String, i32> map;
+    RcuMap<std::string, i32> map;
 
     const i32 num_threads = 4;
     const i32 operations_per_thread = 100;
@@ -1308,7 +1291,7 @@ TEST_F(RcuMapTest, TestRcuSwapUnderLoad) {
     std::atomic<i32> total_gets{0};
     std::atomic<bool> start_flag{false};
 
-    Vector<std::thread> threads;
+    std::vector<std::thread> threads;
 
     // Create threads that will trigger RCU swaps through cache misses
     for (i32 t = 0; t < num_threads; ++t) {
@@ -1323,14 +1306,14 @@ TEST_F(RcuMapTest, TestRcuSwapUnderLoad) {
 
             // First, insert some data
             for (i32 i = 0; i < 5; ++i) {
-                String key = "swap_key_" + std::to_string(key_dist(gen));
+                std::string key = "swap_key_" + std::to_string(key_dist(gen));
                 i32 value = t * 1000 + i;
                 map.Insert(key, value);
             }
 
             // Then perform many reads to trigger cache misses and swaps
             for (i32 i = 0; i < operations_per_thread; ++i) {
-                String key = "swap_key_" + std::to_string(key_dist(gen));
+                std::string key = "swap_key_" + std::to_string(key_dist(gen));
                 auto value_ptr = map.Get(key, true); // Update access time
 
                 total_gets.fetch_add(1);
@@ -1344,7 +1327,7 @@ TEST_F(RcuMapTest, TestRcuSwapUnderLoad) {
                 if (i % 10 == 0) {
                     // Access multiple keys rapidly to increase miss_time
                     for (i32 j = 0; j < 3; ++j) {
-                        String rapid_key = "swap_key_" + std::to_string(j % key_range);
+                        std::string rapid_key = "swap_key_" + std::to_string(j % key_range);
                         map.Get(rapid_key, true);
                         total_gets.fetch_add(1);
                     }
@@ -1368,7 +1351,7 @@ TEST_F(RcuMapTest, TestRcuSwapUnderLoad) {
     i32 final_accessible_keys = 0;
 
     for (i32 i = 0; i < key_range; ++i) {
-        String key = "swap_key_" + std::to_string(i);
+        std::string key = "swap_key_" + std::to_string(i);
         auto value_ptr = map.Get(key);
 
         if (value_ptr != nullptr) {
@@ -1382,7 +1365,7 @@ TEST_F(RcuMapTest, TestRcuSwapUnderLoad) {
 }
 
 TEST_F(RcuMapTest, TestRcuBehavior) {
-    RcuMap<String, i32> map;
+    RcuMap<std::string, i32> map;
 
     // Insert data (goes to dirty_map)
     map.Insert("key1", 100);
@@ -1406,8 +1389,8 @@ TEST_F(RcuMapTest, TestRcuBehavior) {
 }
 
 TEST_F(RcuMapTest, TestMapVsMultiMapBehavior) {
-    RcuMap<String, i32> map;
-    RcuMultiMap<String, i32> multimap;
+    RcuMap<std::string, i32> map;
+    RcuMultiMap<std::string, i32> multimap;
 
     // Test that Map replaces values while MultiMap accumulates them
     map.Insert("test_key", 10);
@@ -1438,8 +1421,8 @@ TEST_F(RcuMapTest, TestMapVsMultiMapBehavior) {
     multimap.Insert("key2", 200);
     multimap.Insert("key3", 300);
 
-    Vector<i32> map_range_result;
-    Vector<i32> multimap_range_result;
+    std::vector<i32> map_range_result;
+    std::vector<i32> multimap_range_result;
 
     u32 map_count = map.range("key1", "key3", map_range_result);
     u32 multimap_count = multimap.range("key1", "key3", multimap_range_result);
@@ -1472,8 +1455,8 @@ protected:
     }
 
     // Helper to generate random keys
-    Vector<String> GenerateKeys(i32 count, i32 key_range) {
-        Vector<String> keys;
+    std::vector<std::string> GenerateKeys(i32 count, i32 key_range) {
+        std::vector<std::string> keys;
         std::random_device rd;
         std::mt19937 gen(rd());
         std::uniform_int_distribution<i32> dist(0, key_range - 1);
@@ -1491,13 +1474,13 @@ TEST_F(RcuMapBenchmarkTest, ReadHeavyWorkload) {
     const i32 key_range = 100000;           // 100K records
     const double read_ratio = 0.9;          // 90% reads
 
-    RcuMap<String, i32> rcu_map;
-    MapWithLock<String, i32> lock_map;
+    RcuMap<std::string, i32> rcu_map;
+    MapWithLock<std::string, i32> lock_map;
 
     // Pre-populate both maps with substantial data (50K records)
     std::cout << "Pre-populating maps with " << (key_range / 2) << " records..." << std::endl;
     for (i32 i = 0; i < key_range / 2; ++i) {
-        String key = "key_" + std::to_string(i);
+        std::string key = "key_" + std::to_string(i);
         rcu_map.Insert(key, i * 10);
         i32 temp_value;
         lock_map.GetOrAdd(key, temp_value, i * 10);
@@ -1516,7 +1499,7 @@ TEST_F(RcuMapBenchmarkTest, ReadHeavyWorkload) {
     // Benchmark RcuMap
     auto rcu_time = MeasureTime([&]() {
         std::atomic<bool> start_flag{false};
-        Vector<std::thread> threads;
+        std::vector<std::thread> threads;
 
         for (i32 t = 0; t < num_threads; ++t) {
             threads.emplace_back([&, t]() {
@@ -1529,7 +1512,7 @@ TEST_F(RcuMapBenchmarkTest, ReadHeavyWorkload) {
                 std::uniform_real_distribution<double> op_dist(0.0, 1.0);
 
                 for (i32 i = 0; i < operations_per_thread; ++i) {
-                    String key = "key_" + std::to_string(key_dist(gen));
+                    std::string key = "key_" + std::to_string(key_dist(gen));
 
                     if (op_dist(gen) < read_ratio) {
                         // Read operation - use GetReadOnly for absolute maximum performance
@@ -1552,7 +1535,7 @@ TEST_F(RcuMapBenchmarkTest, ReadHeavyWorkload) {
     // Benchmark MapWithLock
     auto lock_time = MeasureTime([&]() {
         std::atomic<bool> start_flag{false};
-        Vector<std::thread> threads;
+        std::vector<std::thread> threads;
 
         for (i32 t = 0; t < num_threads; ++t) {
             threads.emplace_back([&, t]() {
@@ -1565,7 +1548,7 @@ TEST_F(RcuMapBenchmarkTest, ReadHeavyWorkload) {
                 std::uniform_real_distribution<double> op_dist(0.0, 1.0);
 
                 for (i32 i = 0; i < operations_per_thread; ++i) {
-                    String key = "key_" + std::to_string(key_dist(gen));
+                    std::string key = "key_" + std::to_string(key_dist(gen));
 
                     if (op_dist(gen) < read_ratio) {
                         // Read operation
@@ -1601,13 +1584,13 @@ TEST_F(RcuMapBenchmarkTest, WriteHeavyWorkload) {
     const i32 key_range = 100000;           // 100K records
     const double read_ratio = 0.3;          // 30% reads, 70% writes
 
-    RcuMap<String, i32> rcu_map;
-    MapWithLock<String, i32> lock_map;
+    RcuMap<std::string, i32> rcu_map;
+    MapWithLock<std::string, i32> lock_map;
 
     // Pre-populate both maps (25K records)
     std::cout << "Pre-populating maps with " << (key_range / 4) << " records..." << std::endl;
     for (i32 i = 0; i < key_range / 4; ++i) {
-        String key = "key_" + std::to_string(i);
+        std::string key = "key_" + std::to_string(i);
         rcu_map.Insert(key, i * 10);
         i32 temp_value;
         lock_map.GetOrAdd(key, temp_value, i * 10);
@@ -1624,7 +1607,7 @@ TEST_F(RcuMapBenchmarkTest, WriteHeavyWorkload) {
     // Benchmark RcuMap
     auto rcu_time = MeasureTime([&]() {
         std::atomic<bool> start_flag{false};
-        Vector<std::thread> threads;
+        std::vector<std::thread> threads;
 
         for (i32 t = 0; t < num_threads; ++t) {
             threads.emplace_back([&, t]() {
@@ -1637,7 +1620,7 @@ TEST_F(RcuMapBenchmarkTest, WriteHeavyWorkload) {
                 std::uniform_real_distribution<double> op_dist(0.0, 1.0);
 
                 for (i32 i = 0; i < operations_per_thread; ++i) {
-                    String key = "key_" + std::to_string(key_dist(gen));
+                    std::string key = "key_" + std::to_string(key_dist(gen));
 
                     if (op_dist(gen) < read_ratio) {
                         auto value_ptr = rcu_map.Get(key);
@@ -1658,7 +1641,7 @@ TEST_F(RcuMapBenchmarkTest, WriteHeavyWorkload) {
     // Benchmark MapWithLock
     auto lock_time = MeasureTime([&]() {
         std::atomic<bool> start_flag{false};
-        Vector<std::thread> threads;
+        std::vector<std::thread> threads;
 
         for (i32 t = 0; t < num_threads; ++t) {
             threads.emplace_back([&, t]() {
@@ -1671,7 +1654,7 @@ TEST_F(RcuMapBenchmarkTest, WriteHeavyWorkload) {
                 std::uniform_real_distribution<double> op_dist(0.0, 1.0);
 
                 for (i32 i = 0; i < operations_per_thread; ++i) {
-                    String key = "key_" + std::to_string(key_dist(gen));
+                    std::string key = "key_" + std::to_string(key_dist(gen));
 
                     if (op_dist(gen) < read_ratio) {
                         i32 value;
@@ -1706,13 +1689,13 @@ TEST_F(RcuMapBenchmarkTest, ReadOnlyWorkload) {
     const i32 operations_per_thread = 10000; // Increased for more operations
     const i32 key_range = 100000;            // 100K records
 
-    RcuMap<String, i32> rcu_map;
-    MapWithLock<String, i32> lock_map;
+    RcuMap<std::string, i32> rcu_map;
+    MapWithLock<std::string, i32> lock_map;
 
     // Pre-populate both maps with all 100K records
     std::cout << "Pre-populating maps with " << key_range << " records..." << std::endl;
     for (i32 i = 0; i < key_range; ++i) {
-        String key = "key_" + std::to_string(i);
+        std::string key = "key_" + std::to_string(i);
         rcu_map.Insert(key, i * 10);
         i32 temp_value;
         lock_map.GetOrAdd(key, temp_value, i * 10);
@@ -1729,7 +1712,7 @@ TEST_F(RcuMapBenchmarkTest, ReadOnlyWorkload) {
     // Benchmark RcuMap
     auto rcu_time = MeasureTime([&]() {
         std::atomic<bool> start_flag{false};
-        Vector<std::thread> threads;
+        std::vector<std::thread> threads;
 
         for (i32 t = 0; t < num_threads; ++t) {
             threads.emplace_back([&, t]() {
@@ -1741,7 +1724,7 @@ TEST_F(RcuMapBenchmarkTest, ReadOnlyWorkload) {
                 std::uniform_int_distribution<i32> key_dist(0, key_range - 1);
 
                 for (i32 i = 0; i < operations_per_thread; ++i) {
-                    String key = "key_" + std::to_string(key_dist(gen));
+                    std::string key = "key_" + std::to_string(key_dist(gen));
                     auto value_ptr = rcu_map.Get(key);
                     (void)value_ptr;
                 }
@@ -1757,7 +1740,7 @@ TEST_F(RcuMapBenchmarkTest, ReadOnlyWorkload) {
     // Benchmark MapWithLock
     auto lock_time = MeasureTime([&]() {
         std::atomic<bool> start_flag{false};
-        Vector<std::thread> threads;
+        std::vector<std::thread> threads;
 
         for (i32 t = 0; t < num_threads; ++t) {
             threads.emplace_back([&, t]() {
@@ -1769,7 +1752,7 @@ TEST_F(RcuMapBenchmarkTest, ReadOnlyWorkload) {
                 std::uniform_int_distribution<i32> key_dist(0, key_range - 1);
 
                 for (i32 i = 0; i < operations_per_thread; ++i) {
-                    String key = "key_" + std::to_string(key_dist(gen));
+                    std::string key = "key_" + std::to_string(key_dist(gen));
                     i32 value;
                     bool found = lock_map.Get(key, value);
                     (void)found;
@@ -1797,12 +1780,12 @@ TEST_F(RcuMapBenchmarkTest, HighContentionWorkload) {
     const i32 key_range = 1000;             // Moderate key space for contention
     const double read_ratio = 0.8;          // 80% reads, 20% writes
 
-    RcuMap<String, i32> rcu_map;
-    MapWithLock<String, i32> lock_map;
+    RcuMap<std::string, i32> rcu_map;
+    MapWithLock<std::string, i32> lock_map;
 
     // Pre-populate with all keys
     for (i32 i = 0; i < key_range; ++i) {
-        String key = "key_" + std::to_string(i);
+        std::string key = "key_" + std::to_string(i);
         rcu_map.Insert(key, i * 10);
         i32 temp_value;
         lock_map.GetOrAdd(key, temp_value, i * 10);
@@ -1814,7 +1797,7 @@ TEST_F(RcuMapBenchmarkTest, HighContentionWorkload) {
     // Benchmark RcuMap
     auto rcu_time = MeasureTime([&]() {
         std::atomic<bool> start_flag{false};
-        Vector<std::thread> threads;
+        std::vector<std::thread> threads;
 
         for (i32 t = 0; t < num_threads; ++t) {
             threads.emplace_back([&, t]() {
@@ -1827,7 +1810,7 @@ TEST_F(RcuMapBenchmarkTest, HighContentionWorkload) {
                 std::uniform_real_distribution<double> op_dist(0.0, 1.0);
 
                 for (i32 i = 0; i < operations_per_thread; ++i) {
-                    String key = "key_" + std::to_string(key_dist(gen));
+                    std::string key = "key_" + std::to_string(key_dist(gen));
 
                     if (op_dist(gen) < read_ratio) {
                         auto value_ptr = rcu_map.Get(key);
@@ -1848,7 +1831,7 @@ TEST_F(RcuMapBenchmarkTest, HighContentionWorkload) {
     // Benchmark MapWithLock
     auto lock_time = MeasureTime([&]() {
         std::atomic<bool> start_flag{false};
-        Vector<std::thread> threads;
+        std::vector<std::thread> threads;
 
         for (i32 t = 0; t < num_threads; ++t) {
             threads.emplace_back([&, t]() {
@@ -1861,7 +1844,7 @@ TEST_F(RcuMapBenchmarkTest, HighContentionWorkload) {
                 std::uniform_real_distribution<double> op_dist(0.0, 1.0);
 
                 for (i32 i = 0; i < operations_per_thread; ++i) {
-                    String key = "key_" + std::to_string(key_dist(gen));
+                    std::string key = "key_" + std::to_string(key_dist(gen));
 
                     if (op_dist(gen) < read_ratio) {
                         i32 value;
@@ -1895,19 +1878,19 @@ TEST_F(RcuMapBenchmarkTest, ScalabilityTest) {
     const i32 key_range = 100000;           // 100K records
     const double read_ratio = 0.85;         // 85% reads
 
-    Vector<i32> thread_counts = {1, 2, 4, 8, 16};
+    std::vector<i32> thread_counts = {1, 2, 4, 8, 16};
 
     std::cout << "\n=== SCALABILITY BENCHMARK (85% reads, varying thread counts) ===" << std::endl;
     std::cout << "Operations per thread: " << operations_per_thread << std::endl;
 
     for (i32 num_threads : thread_counts) {
-        RcuMap<String, i32> rcu_map;
-        MapWithLock<String, i32> lock_map;
+        RcuMap<std::string, i32> rcu_map;
+        MapWithLock<std::string, i32> lock_map;
 
         // Pre-populate (50K records)
         std::cout << "Pre-populating for " << num_threads << " threads with " << (key_range / 2) << " records..." << std::endl;
         for (i32 i = 0; i < key_range / 2; ++i) {
-            String key = "key_" + std::to_string(i);
+            std::string key = "key_" + std::to_string(i);
             rcu_map.Insert(key, i * 10);
             i32 temp_value;
             lock_map.GetOrAdd(key, temp_value, i * 10);
@@ -1920,7 +1903,7 @@ TEST_F(RcuMapBenchmarkTest, ScalabilityTest) {
         // Benchmark RcuMap
         auto rcu_time = MeasureTime([&]() {
             std::atomic<bool> start_flag{false};
-            Vector<std::thread> threads;
+            std::vector<std::thread> threads;
 
             for (i32 t = 0; t < num_threads; ++t) {
                 threads.emplace_back([&, t]() {
@@ -1933,7 +1916,7 @@ TEST_F(RcuMapBenchmarkTest, ScalabilityTest) {
                     std::uniform_real_distribution<double> op_dist(0.0, 1.0);
 
                     for (i32 i = 0; i < operations_per_thread; ++i) {
-                        String key = "key_" + std::to_string(key_dist(gen));
+                        std::string key = "key_" + std::to_string(key_dist(gen));
 
                         if (op_dist(gen) < read_ratio) {
                             auto value_ptr = rcu_map.Get(key);
@@ -1954,7 +1937,7 @@ TEST_F(RcuMapBenchmarkTest, ScalabilityTest) {
         // Benchmark MapWithLock
         auto lock_time = MeasureTime([&]() {
             std::atomic<bool> start_flag{false};
-            Vector<std::thread> threads;
+            std::vector<std::thread> threads;
 
             for (i32 t = 0; t < num_threads; ++t) {
                 threads.emplace_back([&, t]() {
@@ -1967,7 +1950,7 @@ TEST_F(RcuMapBenchmarkTest, ScalabilityTest) {
                     std::uniform_real_distribution<double> op_dist(0.0, 1.0);
 
                     for (i32 i = 0; i < operations_per_thread; ++i) {
-                        String key = "key_" + std::to_string(key_dist(gen));
+                        std::string key = "key_" + std::to_string(key_dist(gen));
 
                         if (op_dist(gen) < read_ratio) {
                             i32 value;
@@ -2001,8 +1984,8 @@ TEST_F(RcuMapBenchmarkTest, MemoryAndGcPerformance) {
     const i32 num_operations = 100000; // 100K operations
     const i32 key_range = 100000;      // 100K key range
 
-    RcuMap<String, i32> rcu_map;
-    MapWithLock<String, i32> lock_map;
+    RcuMap<std::string, i32> rcu_map;
+    MapWithLock<std::string, i32> lock_map;
 
     std::cout << "\n=== MEMORY AND GC PERFORMANCE BENCHMARK (100K operations) ===" << std::endl;
     std::cout << "Operations: " << num_operations << ", Key range: " << key_range << std::endl;
@@ -2015,7 +1998,7 @@ TEST_F(RcuMapBenchmarkTest, MemoryAndGcPerformance) {
         std::uniform_int_distribution<i32> key_dist(0, key_range - 1);
 
         for (i32 i = 0; i < num_operations; ++i) {
-            String key = "key_" + std::to_string(key_dist(gen));
+            std::string key = "key_" + std::to_string(key_dist(gen));
             rcu_map.Insert(key, i);
 
             if (i % 10000 == 0 && i > 0) {
@@ -2031,7 +2014,7 @@ TEST_F(RcuMapBenchmarkTest, MemoryAndGcPerformance) {
         std::uniform_int_distribution<i32> key_dist(0, key_range - 1);
 
         for (i32 i = 0; i < num_operations; ++i) {
-            String key = "key_" + std::to_string(key_dist(gen));
+            std::string key = "key_" + std::to_string(key_dist(gen));
             i32 value;
             lock_map.GetOrAdd(key, value, i);
 
@@ -2065,28 +2048,28 @@ TEST_F(RcuMapBenchmarkTest, ComprehensiveBenchmarkSummary) {
     std::cout << std::endl;
 
     struct BenchmarkResult {
-        String scenario;
+        std::string scenario;
         double rcu_time;
         double lock_time;
         double speedup;
     };
 
-    Vector<BenchmarkResult> results;
+    std::vector<BenchmarkResult> results;
 
     // Quick benchmark for different scenarios with increased data
-    Vector<std::tuple<String, double, i32, i32>> scenarios = {{"Read-Heavy (95% reads)", 0.95, 8, 5000},
+    std::vector<std::tuple<std::string, double, i32, i32>> scenarios = {{"Read-Heavy (95% reads)", 0.95, 8, 5000},
                                                               {"Balanced (70% reads)", 0.70, 8, 3000},
                                                               {"Write-Heavy (40% reads)", 0.40, 8, 2000},
                                                               {"High Contention", 0.80, 16, 2000}};
 
     for (auto &[name, read_ratio, threads, ops] : scenarios) {
-        RcuMap<String, i32> rcu_map;
-        MapWithLock<String, i32> lock_map;
+        RcuMap<std::string, i32> rcu_map;
+        MapWithLock<std::string, i32> lock_map;
 
         // Pre-populate with substantial data (50K records)
         const i32 prepopulate_count = 50000;
         for (i32 i = 0; i < prepopulate_count; ++i) {
-            String key = "key_" + std::to_string(i);
+            std::string key = "key_" + std::to_string(i);
             rcu_map.Insert(key, i);
             i32 temp_value;
             lock_map.GetOrAdd(key, temp_value, i);
@@ -2095,7 +2078,7 @@ TEST_F(RcuMapBenchmarkTest, ComprehensiveBenchmarkSummary) {
         // Benchmark RcuMap
         auto rcu_time = MeasureTime([&]() {
             std::atomic<bool> start_flag{false};
-            Vector<std::thread> thread_vec;
+            std::vector<std::thread> thread_vec;
 
             for (i32 t = 0; t < threads; ++t) {
                 thread_vec.emplace_back([&, t]() {
@@ -2108,7 +2091,7 @@ TEST_F(RcuMapBenchmarkTest, ComprehensiveBenchmarkSummary) {
                     std::uniform_real_distribution<double> op_dist(0.0, 1.0);
 
                     for (i32 i = 0; i < ops; ++i) {
-                        String key = "key_" + std::to_string(key_dist(gen));
+                        std::string key = "key_" + std::to_string(key_dist(gen));
                         if (op_dist(gen) < read_ratio) {
                             auto value_ptr = rcu_map.Get(key);
                             (void)value_ptr;
@@ -2128,7 +2111,7 @@ TEST_F(RcuMapBenchmarkTest, ComprehensiveBenchmarkSummary) {
         // Benchmark MapWithLock
         auto lock_time = MeasureTime([&]() {
             std::atomic<bool> start_flag{false};
-            Vector<std::thread> thread_vec;
+            std::vector<std::thread> thread_vec;
 
             for (i32 t = 0; t < threads; ++t) {
                 thread_vec.emplace_back([&, t]() {
@@ -2141,7 +2124,7 @@ TEST_F(RcuMapBenchmarkTest, ComprehensiveBenchmarkSummary) {
                     std::uniform_real_distribution<double> op_dist(0.0, 1.0);
 
                     for (i32 i = 0; i < ops; ++i) {
-                        String key = "key_" + std::to_string(key_dist(gen));
+                        std::string key = "key_" + std::to_string(key_dist(gen));
                         if (op_dist(gen) < read_ratio) {
                             i32 value;
                             bool found = lock_map.Get(key, value);
@@ -2197,12 +2180,12 @@ TEST_F(RcuMapBenchmarkTest, QuickPerformanceVerification) {
     const i32 key_range = 10000;
     const double read_ratio = 0.9; // 90% reads
 
-    RcuMap<String, i32> rcu_map;
-    MapWithLock<String, i32> lock_map;
+    RcuMap<std::string, i32> rcu_map;
+    MapWithLock<std::string, i32> lock_map;
 
     // Pre-populate both maps
     for (i32 i = 0; i < key_range / 2; ++i) {
-        String key = "key_" + std::to_string(i);
+        std::string key = "key_" + std::to_string(i);
         rcu_map.Insert(key, i * 10);
         i32 temp_value;
         lock_map.GetOrAdd(key, temp_value, i * 10);
@@ -2213,7 +2196,7 @@ TEST_F(RcuMapBenchmarkTest, QuickPerformanceVerification) {
     // Benchmark RcuMap
     auto rcu_time = MeasureTime([&]() {
         std::atomic<bool> start_flag{false};
-        Vector<std::thread> threads;
+        std::vector<std::thread> threads;
 
         for (i32 t = 0; t < num_threads; ++t) {
             threads.emplace_back([&, t]() {
@@ -2226,7 +2209,7 @@ TEST_F(RcuMapBenchmarkTest, QuickPerformanceVerification) {
                 std::uniform_real_distribution<double> op_dist(0.0, 1.0);
 
                 for (i32 i = 0; i < operations_per_thread; ++i) {
-                    String key = "key_" + std::to_string(key_dist(gen));
+                    std::string key = "key_" + std::to_string(key_dist(gen));
 
                     if (op_dist(gen) < read_ratio) {
                         auto value_ptr = rcu_map.Get(key);
@@ -2247,7 +2230,7 @@ TEST_F(RcuMapBenchmarkTest, QuickPerformanceVerification) {
     // Benchmark MapWithLock
     auto lock_time = MeasureTime([&]() {
         std::atomic<bool> start_flag{false};
-        Vector<std::thread> threads;
+        std::vector<std::thread> threads;
 
         for (i32 t = 0; t < num_threads; ++t) {
             threads.emplace_back([&, t]() {
@@ -2260,7 +2243,7 @@ TEST_F(RcuMapBenchmarkTest, QuickPerformanceVerification) {
                 std::uniform_real_distribution<double> op_dist(0.0, 1.0);
 
                 for (i32 i = 0; i < operations_per_thread; ++i) {
-                    String key = "key_" + std::to_string(key_dist(gen));
+                    std::string key = "key_" + std::to_string(key_dist(gen));
 
                     if (op_dist(gen) < read_ratio) {
                         i32 value;

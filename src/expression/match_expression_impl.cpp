@@ -14,30 +14,29 @@
 
 module;
 
-#include <string>
-
 module infinity_core:match_expression.impl;
 
 import :match_expression;
 
-import :stl;
 import :logger;
 import :base_expression;
 import :expression_type;
-import :third_party;
+
+import std;
+import third_party;
 
 namespace infinity {
 
-void ParseMultiIndexHints(const String &index_hints, Vector<String> &index_names) {
+void ParseMultiIndexHints(const std::string &index_hints, std::vector<std::string> &index_names) {
     index_names.clear();
     if (index_hints.empty()) {
         return;
     }
-    SizeT begin_idx = 0;
-    SizeT len = index_hints.length();
+    size_t begin_idx = 0;
+    size_t len = index_hints.length();
     while (begin_idx < len) {
-        SizeT comma_idx = index_hints.find_first_of(',', begin_idx);
-        if (comma_idx == String::npos) {
+        size_t comma_idx = index_hints.find_first_of(',', begin_idx);
+        if (comma_idx == std::string::npos) {
             auto index_name = index_hints.substr(begin_idx);
             index_names.emplace_back(index_name);
             break;
@@ -48,31 +47,34 @@ void ParseMultiIndexHints(const String &index_hints, Vector<String> &index_names
     }
 }
 
-MatchExpression::MatchExpression(const String &fields, const String &matching_text, const String &options_text, const String &index_names)
-    : BaseExpression(ExpressionType::kMatch, Vector<SharedPtr<BaseExpression>>()), fields_(fields), matching_text_(matching_text),
+MatchExpression::MatchExpression(const std::string &fields,
+                                 const std::string &matching_text,
+                                 const std::string &options_text,
+                                 const std::string &index_names)
+    : BaseExpression(ExpressionType::kMatch, std::vector<std::shared_ptr<BaseExpression>>()), fields_(fields), matching_text_(matching_text),
       options_text_(options_text) {
     ParseMultiIndexHints(index_names, index_names_);
 }
 
-String MatchExpression::ToString() const {
+std::string MatchExpression::ToString() const {
     if (!alias_.empty()) {
         return alias_;
     }
-    String expr_str = fmt::format("MATCH TEXT ('{}', '{}', '{}'{})",
-                                  fields_,
-                                  matching_text_,
-                                  options_text_,
-                                  optional_filter_ ? fmt::format(", WHERE {}", optional_filter_->ToString()) : "");
+    std::string expr_str = fmt::format("MATCH TEXT ('{}', '{}', '{}'{})",
+                                       fields_,
+                                       matching_text_,
+                                       options_text_,
+                                       optional_filter_ ? fmt::format(", WHERE {}", optional_filter_->ToString()) : "");
     return expr_str;
 }
 
 u64 MatchExpression::Hash() const {
     u64 h = 0;
-    h ^= std::hash<String>()(fields_);
-    h ^= std::hash<String>()(matching_text_);
-    h ^= std::hash<String>()(options_text_);
-    for (SizeT i = 0; i < index_names_.size(); i++) {
-        h ^= std::hash<String>()(index_names_[i]);
+    h ^= std::hash<std::string>()(fields_);
+    h ^= std::hash<std::string>()(matching_text_);
+    h ^= std::hash<std::string>()(options_text_);
+    for (size_t i = 0; i < index_names_.size(); i++) {
+        h ^= std::hash<std::string>()(index_names_[i]);
     }
     return h;
 }
@@ -85,7 +87,7 @@ bool MatchExpression::Eq(const BaseExpression &other_base) const {
     bool eq = (fields_ == other.fields_ && matching_text_ == other.matching_text_ && options_text_ == other.options_text_ &&
                index_names_.size() == other.index_names_.size());
     if (eq) {
-        for (SizeT i = 0; i < index_names_.size(); i++) {
+        for (size_t i = 0; i < index_names_.size(); i++) {
             if (index_names_[i] == other.index_names_[i]) {
                 return false;
             }

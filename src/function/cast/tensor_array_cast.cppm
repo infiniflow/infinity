@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:tensor_array_cast;
 
-import :stl;
 import :column_vector;
 import :vector_buffer;
 import :bound_cast_func;
@@ -24,17 +21,16 @@ import :column_vector_cast;
 import :float_cast;
 import :integer_cast;
 import :infinity_exception;
-import :third_party;
-import :logger;
 import :status;
+import :default_values;
+import :embedding_cast;
+import :tensor_cast;
+
 import logical_type;
 import internal_types;
 import embedding_info;
 import knn_expr;
 import data_type;
-import :default_values;
-import :embedding_cast;
-import :tensor_cast;
 
 namespace infinity {
 
@@ -59,10 +55,10 @@ void TensorArrayTryCastToTensorArrayImpl(const u32 basic_embedding_dim,
                                          const ColumnVector *source_vector_ptr,
                                          TensorArrayT &target,
                                          ColumnVector *target_vector_ptr) {
-    const Vector<TensorT> &source_tensors = ColumnVector::GetTensorArrayMeta(source, source_vector_ptr->buffer_.get());
-    SizeT tensor_num = source_tensors.size();
-    Vector<TensorT> target_tensors(tensor_num);
-    for (SizeT i = 0; i < tensor_num; ++i) {
+    const std::vector<TensorT> &source_tensors = ColumnVector::GetTensorArrayMeta(source, source_vector_ptr->buffer_.get());
+    size_t tensor_num = source_tensors.size();
+    std::vector<TensorT> target_tensors(tensor_num);
+    for (size_t i = 0; i < tensor_num; ++i) {
         TensorTryCastToTensorImpl<TargetValueType, SourceValueType>(source_tensors.data()[i],
                                                                     source_vector_ptr,
                                                                     target_tensors[i],
@@ -128,8 +124,7 @@ void TensorArrayTryCastToTensorArrayImpl(const u32 basic_embedding_dim,
             break;
         }
         case EmbeddingDataType::kElemInvalid: {
-            String error_message = "Unreachable code";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unreachable code");
         }
     }
 }
@@ -183,8 +178,7 @@ void TensorArrayTryCastToTensorArrayFun(const u32 basic_embedding_dim,
             break;
         }
         case EmbeddingDataType::kElemInvalid: {
-            String error_message = "Unreachable code";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unreachable code");
         }
     }
 }
@@ -197,8 +191,7 @@ struct TensorArrayTryCastToTensorArray {
                     TargetT &target,
                     const DataType &target_type,
                     ColumnVector *target_vector_ptr) {
-        String error_message = "Unreachable case";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Unreachable case");
         return false;
     }
 };
@@ -218,8 +211,7 @@ bool TensorArrayTryCastToTensorArray::Run<TensorArrayT, TensorArrayT>(const Tens
         RecoverableError(Status::DataTypeMismatch(source_type.ToString(), target_type.ToString()));
     }
     if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kVarBuffer) {
-        String error_message = fmt::format("TensorArray column vector should use kHeap VectorBuffer.");
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("TensorArray column vector should use kHeap VectorBuffer."));
     }
     TensorArrayTryCastToTensorArrayFun(source_embedding_dim,
                                        source,

@@ -12,13 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:expression_evaluator.impl;
 
 import :expression_evaluator;
-
-import :stl;
 import :base_expression;
 import :aggregate_expression;
 import :case_expression;
@@ -33,21 +29,25 @@ import :data_block;
 import :column_vector;
 import :expression_state;
 import :status;
-import :third_party;
+import :roaring_bitmap;
+import :block_index;
 import :infinity_exception;
 import :expression_type;
 import :bound_cast_func;
 import :logger;
+
+import third_party;
+
 import logical_type;
 import internal_types;
-import :roaring_bitmap;
-import :block_index;
 
 namespace infinity {
 
 void ExpressionEvaluator::Init(const DataBlock *input_data_block) { input_data_block_ = input_data_block; }
 
-void ExpressionEvaluator::Execute(const SharedPtr<BaseExpression> &expr, SharedPtr<ExpressionState> &state, SharedPtr<ColumnVector> &output_column) {
+void ExpressionEvaluator::Execute(const std::shared_ptr<BaseExpression> &expr,
+                                  std::shared_ptr<ExpressionState> &state,
+                                  std::shared_ptr<ColumnVector> &output_column) {
 
     switch (expr->type()) {
         case ExpressionType::kAggregate:
@@ -69,26 +69,25 @@ void ExpressionEvaluator::Execute(const SharedPtr<BaseExpression> &expr, SharedP
         case ExpressionType::kFilterFullText:
             return Execute(std::static_pointer_cast<FilterFulltextExpression>(expr), state, output_column);
         default: {
-            String error_message = fmt::format("Unknown expression type: {}", expr->Name());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Unknown expression type: {}", expr->Name()));
         }
     }
 }
 
-void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
-                                  SharedPtr<ExpressionState> &state,
-                                  SharedPtr<ColumnVector> &output_column_vector) {
+void ExpressionEvaluator::Execute(const std::shared_ptr<AggregateExpression> &expr,
+                                  std::shared_ptr<ExpressionState> &state,
+                                  std::shared_ptr<ColumnVector> &output_column_vector) {
     if (in_aggregate_) {
         Status status = Status::RecursiveAggregate(expr->ToString());
         RecoverableError(status);
     }
     in_aggregate_ = true;
-    SharedPtr<ExpressionState> &child_state = state->Children()[0];
-    SharedPtr<BaseExpression> &child_expr = expr->arguments()[0];
+    std::shared_ptr<ExpressionState> &child_state = state->Children()[0];
+    std::shared_ptr<BaseExpression> &child_expr = expr->arguments()[0];
     // Create output chunk.
     // TODO: Now output chunk is pre-allocate memory in expression state
     // TODO: In the future, it can be implemented as on-demand allocation.
-    SharedPtr<ColumnVector> &child_output_col = child_state->OutputColumnVector();
+    std::shared_ptr<ColumnVector> &child_output_col = child_state->OutputColumnVector();
     this->Execute(child_expr, child_state, child_output_col);
 
     if (expr->aggregate_function_.return_type_ != *output_column_vector->data_type()) {
@@ -109,14 +108,14 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
         }
         case AggregateFlag::kFinish: {
             expr->aggregate_function_.update_func_(data_state, child_output_col);
-            const_ptr_t result_ptr = expr->aggregate_function_.finalize_func_(data_state);
+            const char *result_ptr = expr->aggregate_function_.finalize_func_(data_state);
             output_column_vector->AppendByPtr(result_ptr);
             break;
         }
         case AggregateFlag::kRunAndFinish: {
             expr->aggregate_function_.init_func_(data_state);
             expr->aggregate_function_.update_func_(data_state, child_output_col);
-            const_ptr_t result_ptr = expr->aggregate_function_.finalize_func_(data_state);
+            const char *result_ptr = expr->aggregate_function_.finalize_func_(data_state);
             output_column_vector->AppendByPtr(result_ptr);
             break;
         }
@@ -125,15 +124,15 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
     in_aggregate_ = false;
 }
 
-void ExpressionEvaluator::Execute(const SharedPtr<CastExpression> &expr,
-                                  SharedPtr<ExpressionState> &state,
-                                  SharedPtr<ColumnVector> &output_column_vector) {
-    SharedPtr<ExpressionState> &child_state = state->Children()[0];
-    SharedPtr<BaseExpression> &child_expr = expr->arguments()[0];
+void ExpressionEvaluator::Execute(const std::shared_ptr<CastExpression> &expr,
+                                  std::shared_ptr<ExpressionState> &state,
+                                  std::shared_ptr<ColumnVector> &output_column_vector) {
+    std::shared_ptr<ExpressionState> &child_state = state->Children()[0];
+    std::shared_ptr<BaseExpression> &child_expr = expr->arguments()[0];
     // Create output chunk.
     // TODO: Now output chunk is pre-allocate memory in expression state
     // TODO: In the future, it can be implemented as on-demand allocation.
-    SharedPtr<ColumnVector> &child_output = child_state->OutputColumnVector();
+    std::shared_ptr<ColumnVector> &child_output = child_state->OutputColumnVector();
     Execute(child_expr, child_state, child_output);
 
     CastParameters cast_parameters;
@@ -141,28 +140,26 @@ void ExpressionEvaluator::Execute(const SharedPtr<CastExpression> &expr,
     expr->func_.function(child_output, output_column_vector, child_output->Size(), cast_parameters);
 }
 
-void ExpressionEvaluator::Execute(const SharedPtr<CaseExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
-    String error_message = "Case execution";
-    UnrecoverableError(error_message);
+void ExpressionEvaluator::Execute(const std::shared_ptr<CaseExpression> &, std::shared_ptr<ExpressionState> &, std::shared_ptr<ColumnVector> &) {
+    UnrecoverableError("Case execution");
 }
 
-void ExpressionEvaluator::Execute(const SharedPtr<ColumnExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
-    String error_message = "Column expression";
-    UnrecoverableError(error_message);
+void ExpressionEvaluator::Execute(const std::shared_ptr<ColumnExpression> &, std::shared_ptr<ExpressionState> &, std::shared_ptr<ColumnVector> &) {
+    UnrecoverableError("Column expression");
 }
 
-void ExpressionEvaluator::Execute(const SharedPtr<FunctionExpression> &expr,
-                                  SharedPtr<ExpressionState> &state,
-                                  SharedPtr<ColumnVector> &output_column_vector) {
+void ExpressionEvaluator::Execute(const std::shared_ptr<FunctionExpression> &expr,
+                                  std::shared_ptr<ExpressionState> &state,
+                                  std::shared_ptr<ColumnVector> &output_column_vector) {
 
-    SizeT argument_count = expr->arguments().size();
-    Vector<SharedPtr<ColumnVector>> arguments;
+    size_t argument_count = expr->arguments().size();
+    std::vector<std::shared_ptr<ColumnVector>> arguments;
     arguments.reserve(argument_count);
 
-    for (SizeT i = 0; i < argument_count; ++i) {
-        SharedPtr<ExpressionState> &argument_state = state->Children()[i];
-        SharedPtr<BaseExpression> &argument_expr = expr->arguments()[i];
-        SharedPtr<ColumnVector> &argument_output = argument_state->OutputColumnVector();
+    for (size_t i = 0; i < argument_count; ++i) {
+        std::shared_ptr<ExpressionState> &argument_state = state->Children()[i];
+        std::shared_ptr<BaseExpression> &argument_expr = expr->arguments()[i];
+        std::shared_ptr<ColumnVector> &argument_output = argument_state->OutputColumnVector();
         Execute(argument_expr, argument_state, argument_output);
         arguments.emplace_back(argument_output);
     }
@@ -175,59 +172,57 @@ void ExpressionEvaluator::Execute(const SharedPtr<FunctionExpression> &expr,
     expr->func_.function_(func_input_data_block, output_column_vector);
 }
 
-void ExpressionEvaluator::Execute(const SharedPtr<ValueExpression> &expr,
-                                  SharedPtr<ExpressionState> &,
-                                  SharedPtr<ColumnVector> &output_column_vector) {
+void ExpressionEvaluator::Execute(const std::shared_ptr<ValueExpression> &expr,
+                                  std::shared_ptr<ExpressionState> &,
+                                  std::shared_ptr<ColumnVector> &output_column_vector) {
     // memory copy here.
     auto value = expr->GetValue();
     output_column_vector->SetValueByIndex(0, value);
     output_column_vector->Finalize(1);
 }
 
-void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
-                                  SharedPtr<ExpressionState> &,
-                                  SharedPtr<ColumnVector> &output_column_vector) {
-    SizeT column_index = expr->column_index();
+void ExpressionEvaluator::Execute(const std::shared_ptr<ReferenceExpression> &expr,
+                                  std::shared_ptr<ExpressionState> &,
+                                  std::shared_ptr<ColumnVector> &output_column_vector) {
+    size_t column_index = expr->column_index();
 
     if (input_data_block_ == nullptr) {
-        String error_message = "Input data block is NULL";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Input data block is NULL");
     }
     if (column_index >= input_data_block_->column_count()) {
-        String error_message = "Invalid column index";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Invalid column index");
     }
 
     output_column_vector = input_data_block_->column_vectors[column_index];
 }
 
-void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &expr,
-                                  SharedPtr<ExpressionState> &state,
-                                  SharedPtr<ColumnVector> &output_column_vector) {
-    SharedPtr<BaseExpression> &left_expression = expr->left_operand();
-    SharedPtr<ExpressionState> &left_state = state->Children()[0];
-    SharedPtr<ColumnVector> &left_state_output = left_state->OutputColumnVector();
+void ExpressionEvaluator::Execute(const std::shared_ptr<InExpression> &expr,
+                                  std::shared_ptr<ExpressionState> &state,
+                                  std::shared_ptr<ColumnVector> &output_column_vector) {
+    std::shared_ptr<BaseExpression> &left_expression = expr->left_operand();
+    std::shared_ptr<ExpressionState> &left_state = state->Children()[0];
+    std::shared_ptr<ColumnVector> &left_state_output = left_state->OutputColumnVector();
     Execute(left_expression, left_state, left_state_output);
 
     // in expression evaluates to a constant
     if (left_state->OutputColumnVector()->vector_type() == ColumnVectorType::kConstant) {
-        bool in_result =
-            (expr->in_type() == InType::kIn) ? expr->Exists(left_state_output->GetValueByIndex(0)) : !expr->Exists(left_state_output->GetValueByIndex(0));
-        for (SizeT idx = 0; idx < input_data_block_->row_count(); idx++) {
+        bool in_result = (expr->in_type() == InType::kIn) ? expr->Exists(left_state_output->GetValueByIndex(0))
+                                                          : !expr->Exists(left_state_output->GetValueByIndex(0));
+        for (size_t idx = 0; idx < input_data_block_->row_count(); idx++) {
             output_column_vector->buffer_->SetCompactBit(idx, in_result);
         }
         output_column_vector->Finalize(input_data_block_->row_count());
         return;
     }
     if (expr->in_type() == InType::kIn) {
-        for (SizeT idx = 0; idx < input_data_block_->row_count(); idx++) {
+        for (size_t idx = 0; idx < input_data_block_->row_count(); idx++) {
             output_column_vector->buffer_->SetCompactBit(idx, expr->Exists(left_state_output->GetValueByIndex(idx)));
         }
         output_column_vector->Finalize(input_data_block_->row_count());
         return;
     }
     if (expr->in_type() == InType::kNotIn) {
-        for (SizeT idx = 0; idx < input_data_block_->row_count(); idx++) {
+        for (size_t idx = 0; idx < input_data_block_->row_count(); idx++) {
             output_column_vector->buffer_->SetCompactBit(idx, !expr->Exists(left_state_output->GetValueByIndex(idx)));
         }
         output_column_vector->Finalize(input_data_block_->row_count());
@@ -235,9 +230,9 @@ void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &expr,
     }
 }
 
-void ExpressionEvaluator::Execute(const SharedPtr<FilterFulltextExpression> &expr,
-                                  SharedPtr<ExpressionState> &,
-                                  SharedPtr<ColumnVector> &output_column_vector) {
+void ExpressionEvaluator::Execute(const std::shared_ptr<FilterFulltextExpression> &expr,
+                                  std::shared_ptr<ExpressionState> &,
+                                  std::shared_ptr<ColumnVector> &output_column_vector) {
     if (input_data_block_->column_vectors.empty()) {
         UnrecoverableError("Input data block is empty");
     }

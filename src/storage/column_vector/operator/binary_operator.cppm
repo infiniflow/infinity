@@ -14,21 +14,20 @@
 
 module;
 
-#include <concepts>
-#include <type_traits>
-
 export module infinity_core:binary_operator;
 
-import :stl;
 import :column_vector;
 import :vector_buffer;
-
 import :infinity_exception;
 import :roaring_bitmap;
-import :third_party;
-import internal_types;
 import :status;
 import :logger;
+
+import std;
+import std.compat;
+
+import third_party;
+import internal_types;
 
 namespace infinity {
 
@@ -36,10 +35,10 @@ template <typename LeftType, typename RightType, typename Operator>
     requires std::same_as<LeftType, RightType> // if they are not same, we need to implement a new function
 class BooleanResultBinaryOperator {
 public:
-    static void inline Execute(const SharedPtr<ColumnVector> &left,
-                               const SharedPtr<ColumnVector> &right,
-                               SharedPtr<ColumnVector> &result,
-                               SizeT count,
+    static void inline Execute(const std::shared_ptr<ColumnVector> &left,
+                               const std::shared_ptr<ColumnVector> &right,
+                               std::shared_ptr<ColumnVector> &result,
+                               size_t count,
                                void *state_ptr,
                                bool nullable) {
 
@@ -50,8 +49,7 @@ public:
             return vector_type == ColumnVectorType::kFlat || vector_type == ColumnVectorType::kConstant;
         };
         if (!check_vector_type_valid(left_vector_type) || !check_vector_type_valid(right_vector_type)) {
-            String error_message = "Invalid input ColumnVectorType. Support only kFlat and kConstant.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid input ColumnVectorType. Support only kFlat and kConstant.");
         }
         const auto &left_null = left->nulls_ptr_;
         const auto &right_null = right->nulls_ptr_;
@@ -73,7 +71,7 @@ public:
                 auto left_ptr = ColumnValueReader<LeftType>(left);
                 auto right_ptr = ColumnValueReader<RightType>(right);
                 BooleanColumnWriter result_ptr(result);
-                for (SizeT i = 0; i < count; ++i) {
+                for (size_t i = 0; i < count; ++i) {
                     Operator::Execute(left_ptr[i], right_ptr[i], result_ptr[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
             } else {
@@ -88,7 +86,7 @@ public:
                 result_null->SetAllTrue();
                 auto right_ptr = ColumnValueReader<RightType>(right);
                 BooleanColumnWriter result_ptr(result);
-                for (SizeT i = 0; i < count; ++i) {
+                for (size_t i = 0; i < count; ++i) {
                     Operator::Execute(left_c, right_ptr[i], result_ptr[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
             } else {
@@ -103,7 +101,7 @@ public:
                 result_null->SetAllTrue();
                 auto left_ptr = ColumnValueReader<LeftType>(left);
                 BooleanColumnWriter result_ptr(result);
-                for (SizeT i = 0; i < count; ++i) {
+                for (size_t i = 0; i < count; ++i) {
                     Operator::Execute(left_ptr[i], right_c, result_ptr[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
             } else {
@@ -114,10 +112,10 @@ public:
     }
 
 private:
-    static inline void ResultBooleanExecuteWithNull(const SharedPtr<ColumnVector> &left,
-                                                    const SharedPtr<ColumnVector> &right,
-                                                    SharedPtr<ColumnVector> &result,
-                                                    SizeT count,
+    static inline void ResultBooleanExecuteWithNull(const std::shared_ptr<ColumnVector> &left,
+                                                    const std::shared_ptr<ColumnVector> &right,
+                                                    std::shared_ptr<ColumnVector> &result,
+                                                    size_t count,
                                                     void *state_ptr) {
         const auto &left_null = left->nulls_ptr_;
         const auto &right_null = right->nulls_ptr_;
@@ -144,9 +142,9 @@ private:
     }
 
     static inline void ResultBooleanExecuteWithNull(auto left_constant,
-                                                    const SharedPtr<ColumnVector> &right,
-                                                    SharedPtr<ColumnVector> &result,
-                                                    SizeT count,
+                                                    const std::shared_ptr<ColumnVector> &right,
+                                                    std::shared_ptr<ColumnVector> &result,
+                                                    size_t count,
                                                     void *state_ptr) {
         const auto &right_null = right->nulls_ptr_;
         auto &result_null = result->nulls_ptr_;
@@ -162,10 +160,10 @@ private:
         });
     }
 
-    static inline void ResultBooleanExecuteWithNull(const SharedPtr<ColumnVector> &left,
+    static inline void ResultBooleanExecuteWithNull(const std::shared_ptr<ColumnVector> &left,
                                                     auto right_constant,
-                                                    SharedPtr<ColumnVector> &result,
-                                                    SizeT count,
+                                                    std::shared_ptr<ColumnVector> &result,
+                                                    size_t count,
                                                     void *state_ptr) {
         const auto &left_null = left->nulls_ptr_;
         auto &result_null = result->nulls_ptr_;
@@ -185,10 +183,10 @@ private:
 template <typename Operator>
 class BooleanResultBinaryOperator<BooleanT, BooleanT, Operator> {
 public:
-    static void inline Execute(const SharedPtr<ColumnVector> &left,
-                               const SharedPtr<ColumnVector> &right,
-                               SharedPtr<ColumnVector> &result,
-                               SizeT count,
+    static void inline Execute(const std::shared_ptr<ColumnVector> &left,
+                               const std::shared_ptr<ColumnVector> &right,
+                               std::shared_ptr<ColumnVector> &result,
+                               size_t count,
                                void *state_ptr,
                                bool nullable) {
         const auto &left_null = left->nulls_ptr_;
@@ -218,12 +216,12 @@ public:
         } else if (left_vector_type == ColumnVectorType::kCompactBit && right_vector_type == ColumnVectorType::kCompactBit) {
             if (!nullable || (left_null->IsAllTrue() && right_null->IsAllTrue())) {
                 result_null->SetAllTrue();
-                SizeT count_bytes = count / 8;
-                SizeT count_tail = count % 8;
+                size_t count_bytes = count / 8;
+                size_t count_tail = count % 8;
                 auto left_u8 = reinterpret_cast<const u8 *>(left->data());
                 auto right_u8 = reinterpret_cast<const u8 *>(right->data());
                 auto result_u8 = reinterpret_cast<u8 *>(result->data());
-                for (SizeT i = 0; i < count_bytes; ++i) {
+                for (size_t i = 0; i < count_bytes; ++i) {
                     Operator::Execute(left_u8[i], right_u8[i], result_u8[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
                 if (count_tail > 0) {
@@ -239,16 +237,16 @@ public:
             result->Finalize(count);
         } else if (left_vector_type == ColumnVectorType::kConstant && right_vector_type == ColumnVectorType::kCompactBit) {
             bool left_value = left->buffer_->GetCompactBit(0);
-            u8 left_u8 = left_value ? u8(0xff) : u8(0x00);
+            u8 left_u8 = left_value ? static_cast<u8>(0xff) : static_cast<u8>(0x00);
             if (nullable && !(left_null->IsAllTrue())) {
                 result_null->SetAllFalse();
             } else if (!nullable || (left_null->IsAllTrue() && right_null->IsAllTrue())) {
                 result_null->SetAllTrue();
-                SizeT count_bytes = count / 8;
-                SizeT count_tail = count % 8;
+                size_t count_bytes = count / 8;
+                size_t count_tail = count % 8;
                 auto right_u8 = reinterpret_cast<const u8 *>(right->data());
                 auto result_u8 = reinterpret_cast<u8 *>(result->data());
-                for (SizeT i = 0; i < count_bytes; ++i) {
+                for (size_t i = 0; i < count_bytes; ++i) {
                     Operator::Execute(left_u8, right_u8[i], result_u8[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
                 if (count_tail > 0) {
@@ -264,23 +262,23 @@ public:
             result->Finalize(count);
         } else if (left_vector_type == ColumnVectorType::kCompactBit && right_vector_type == ColumnVectorType::kConstant) {
             bool right_value = right->buffer_->GetCompactBit(0);
-            u8 right_u8 = right_value ? u8(0xff) : u8(0x00);
+            u8 right_u8 = right_value ? static_cast<u8>(0xff) : static_cast<u8>(0x00);
             if (nullable && !(right_null->IsAllTrue())) {
                 result_null->SetAllFalse();
             } else if (!nullable || (left_null->IsAllTrue() && right_null->IsAllTrue())) {
                 result_null->SetAllTrue();
-                SizeT count_bytes = count / 8;
-                SizeT count_tail = count % 8;
+                size_t count_bytes = count / 8;
+                size_t count_tail = count % 8;
                 auto left_u8 = reinterpret_cast<const u8 *>(left->data());
                 auto result_u8 = reinterpret_cast<u8 *>(result->data());
-                for (SizeT i = 0; i < count_bytes; ++i) {
+                for (size_t i = 0; i < count_bytes; ++i) {
                     Operator::Execute(left_u8[i], right_u8, result_u8[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
                 if (count_tail > 0) {
                     u8 &tail_u8 = result_u8[count_bytes];
                     u8 ans;
                     Operator::Execute(left_u8[count_bytes], right_u8, ans, result_null.get(), 0, nullptr, nullptr, state_ptr);
-                    u8 keep_mask = u8(0xff) << count_tail;
+                    auto keep_mask = static_cast<u8>(0xff) << count_tail;
                     tail_u8 = (tail_u8 & keep_mask) | (ans & ~keep_mask);
                 }
             } else {
@@ -288,16 +286,15 @@ public:
             }
             result->Finalize(count);
         } else {
-            String error_message = "Wrong boolean operation.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Wrong boolean operation.");
         }
     }
 
 private:
-    static void inline AllBooleanExecuteWithNull(const SharedPtr<ColumnVector> &left,
-                                                 const SharedPtr<ColumnVector> &right,
-                                                 SharedPtr<ColumnVector> &result,
-                                                 SizeT count,
+    static void inline AllBooleanExecuteWithNull(const std::shared_ptr<ColumnVector> &left,
+                                                 const std::shared_ptr<ColumnVector> &right,
+                                                 std::shared_ptr<ColumnVector> &result,
+                                                 size_t count,
                                                  void *state_ptr) {
         const auto &left_null = left->nulls_ptr_;
         const auto &right_null = right->nulls_ptr_;
@@ -322,15 +319,15 @@ private:
         });
     }
 
-    static void inline AllBooleanExecuteWithNull(const SharedPtr<ColumnVector> &left,
+    static void inline AllBooleanExecuteWithNull(const std::shared_ptr<ColumnVector> &left,
                                                  const u8 right_u8,
-                                                 SharedPtr<ColumnVector> &result,
-                                                 SizeT count,
+                                                 std::shared_ptr<ColumnVector> &result,
+                                                 size_t count,
                                                  void *state_ptr) {
         const auto &left_null = left->nulls_ptr_;
         auto &result_null = result->nulls_ptr_;
         *result_null = *left_null;
-        const BooleanT right_boolean = right_u8 & (u8(1));
+        const BooleanT right_boolean = right_u8 & static_cast<u8>(1);
         result_null->RoaringBitmapApplyFunc([&](u32 row_index) -> bool {
             if (row_index >= count) {
                 return false;
@@ -350,14 +347,14 @@ private:
     }
 
     static void inline AllBooleanExecuteWithNull(const u8 left_u8,
-                                                 const SharedPtr<ColumnVector> &right,
-                                                 SharedPtr<ColumnVector> &result,
-                                                 SizeT count,
+                                                 const std::shared_ptr<ColumnVector> &right,
+                                                 std::shared_ptr<ColumnVector> &result,
+                                                 size_t count,
                                                  void *state_ptr) {
         const auto &right_null = right->nulls_ptr_;
         auto &result_null = result->nulls_ptr_;
         *result_null = *right_null;
-        const BooleanT left_boolean = left_u8 & (u8(1));
+        const BooleanT left_boolean = left_u8 & static_cast<u8>(1);
         result_null->RoaringBitmapApplyFunc([&](u32 row_index) -> bool {
             if (row_index >= count) {
                 return false;
@@ -382,24 +379,23 @@ public:
     // TODO: MixedType is not handled now.
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
         requires IsAnyOf<MixedT, LeftType, RightType, ResultType>
-    static void inline Execute(const SharedPtr<ColumnVector> &left,
-                               const SharedPtr<ColumnVector> &right,
-                               SharedPtr<ColumnVector> &result,
-                               SizeT count,
+    static void inline Execute(const std::shared_ptr<ColumnVector> &left,
+                               const std::shared_ptr<ColumnVector> &right,
+                               std::shared_ptr<ColumnVector> &result,
+                               size_t count,
                                void *state_ptr_left,
                                void *state_ptr_right,
                                void *state_ptr,
                                bool nullable) {
-        String error_message = "MixedType needs to be specialized.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("MixedType needs to be specialized.");
     }
 
     // case for BinaryOperator which returns BooleanT result
     template <BinaryGenerateBoolean LeftType, BinaryGenerateBoolean RightType, std::same_as<BooleanT> ResultType, typename Operator>
-    static void inline Execute(const SharedPtr<ColumnVector> &left,
-                               const SharedPtr<ColumnVector> &right,
-                               SharedPtr<ColumnVector> &result,
-                               SizeT count,
+    static void inline Execute(const std::shared_ptr<ColumnVector> &left,
+                               const std::shared_ptr<ColumnVector> &right,
+                               std::shared_ptr<ColumnVector> &result,
+                               size_t count,
                                void *state_ptr_left,
                                void *state_ptr_right,
                                void *state_ptr,
@@ -409,22 +405,20 @@ public:
 
     // case for type which can be accessed by type_ptr[i]
     template <PODValueType LeftType, PODValueType RightType, PODValueType ResultType, typename Operator>
-    static void inline Execute(const SharedPtr<ColumnVector> &left,
-                               const SharedPtr<ColumnVector> &right,
-                               SharedPtr<ColumnVector> &result,
-                               SizeT count,
+    static void inline Execute(const std::shared_ptr<ColumnVector> &left,
+                               const std::shared_ptr<ColumnVector> &right,
+                               std::shared_ptr<ColumnVector> &result,
+                               size_t count,
                                void *state_ptr_left,
                                void *state_ptr_right,
                                void *state_ptr,
                                bool nullable) {
         switch (left->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                String error_message = "Invalid column vector type.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid column vector type.");
             }
             case ColumnVectorType::kCompactBit: {
-                String error_message = "kCompactBit should not be in this branch.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("kCompactBit should not be in this branch.");
             }
             case ColumnVectorType::kFlat: {
                 return ExecuteFlat<LeftType, RightType, ResultType, Operator>(left,
@@ -462,10 +456,10 @@ public:
 private:
     // Level-1 switch case functions
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
-    static void inline ExecuteFlat(const SharedPtr<ColumnVector> &left,
-                                   const SharedPtr<ColumnVector> &right,
-                                   SharedPtr<ColumnVector> &result,
-                                   SizeT count,
+    static void inline ExecuteFlat(const std::shared_ptr<ColumnVector> &left,
+                                   const std::shared_ptr<ColumnVector> &right,
+                                   std::shared_ptr<ColumnVector> &result,
+                                   size_t count,
                                    void *state_ptr_left,
                                    void *state_ptr_right,
                                    void *state_ptr,
@@ -473,8 +467,7 @@ private:
 
         switch (right->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                String error_message = "Invalid column vector type.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid column vector type.");
             }
             case ColumnVectorType::kFlat: {
                 return ExecuteFlatFlat<LeftType, RightType, ResultType, Operator>(left,
@@ -507,17 +500,16 @@ private:
                                                                                            nullable);
             }
             case ColumnVectorType::kCompactBit: {
-                String error_message = "CompactBit isn't implemented.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("CompactBit isn't implemented.");
             }
         }
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
-    static void inline ExecuteConstant(const SharedPtr<ColumnVector> &left,
-                                       const SharedPtr<ColumnVector> &right,
-                                       SharedPtr<ColumnVector> &result,
-                                       SizeT count,
+    static void inline ExecuteConstant(const std::shared_ptr<ColumnVector> &left,
+                                       const std::shared_ptr<ColumnVector> &right,
+                                       std::shared_ptr<ColumnVector> &result,
+                                       size_t count,
                                        void *state_ptr_left,
                                        void *state_ptr_right,
                                        void *state_ptr,
@@ -525,8 +517,7 @@ private:
 
         switch (right->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                String error_message = "Invalid column vector type.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid column vector type.");
             }
             case ColumnVectorType::kFlat: {
                 return ExecuteConstantFlat<LeftType, RightType, ResultType, Operator>(left,
@@ -559,18 +550,17 @@ private:
                                                                                                nullable);
             }
             case ColumnVectorType::kCompactBit: {
-                String error_message = "CompactBit isn't implemented.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("CompactBit isn't implemented.");
                 return;
             }
         }
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
-    static void inline ExecuteHeterogeneous(const SharedPtr<ColumnVector> &left,
-                                            const SharedPtr<ColumnVector> &right,
-                                            SharedPtr<ColumnVector> &result,
-                                            SizeT count,
+    static void inline ExecuteHeterogeneous(const std::shared_ptr<ColumnVector> &left,
+                                            const std::shared_ptr<ColumnVector> &right,
+                                            std::shared_ptr<ColumnVector> &result,
+                                            size_t count,
                                             void *state_ptr_left,
                                             void *state_ptr_right,
                                             void *state_ptr,
@@ -578,8 +568,7 @@ private:
 
         switch (right->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                String error_message = "Invalid column vector type.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Invalid column vector type.");
                 break;
             }
             case ColumnVectorType::kFlat: {
@@ -613,8 +602,7 @@ private:
                                                                                                     nullable);
             }
             case ColumnVectorType::kCompactBit: {
-                String error_message = "CompactBit isn't implemented.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("CompactBit isn't implemented.");
                 break;
             }
         }
@@ -623,10 +611,10 @@ private:
 private:
     // Level-2 switch case function
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
-    static void inline ExecuteFlatFlat(const SharedPtr<ColumnVector> &left,
-                                       const SharedPtr<ColumnVector> &right,
-                                       SharedPtr<ColumnVector> &result,
-                                       SizeT count,
+    static void inline ExecuteFlatFlat(const std::shared_ptr<ColumnVector> &left,
+                                       const std::shared_ptr<ColumnVector> &right,
+                                       std::shared_ptr<ColumnVector> &result,
+                                       size_t count,
                                        void *state_ptr_left,
                                        void *state_ptr_right,
                                        void *state_ptr,
@@ -649,7 +637,7 @@ private:
                                                                                state_ptr);
         } else {
             result_null->SetAllTrue();
-            for (SizeT i = 0; i < count; i++) {
+            for (size_t i = 0; i < count; i++) {
                 Operator::template Execute<LeftType, RightType, ResultType>(left_ptr[i],
                                                                             right_ptr[i],
                                                                             result_ptr[i],
@@ -665,12 +653,12 @@ private:
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
     static void inline ExecuteFlatFlatWithNull(const LeftType *__restrict left_ptr,
-                                               const SharedPtr<Bitmask> &left_null,
+                                               const std::shared_ptr<Bitmask> &left_null,
                                                const RightType *__restrict right_ptr,
-                                               const SharedPtr<Bitmask> &right_null,
+                                               const std::shared_ptr<Bitmask> &right_null,
                                                ResultType *__restrict result_ptr,
-                                               SharedPtr<Bitmask> &result_null,
-                                               SizeT count,
+                                               std::shared_ptr<Bitmask> &result_null,
+                                               size_t count,
                                                void *state_ptr_left,
                                                void *state_ptr_right,
                                                void *state_ptr) {
@@ -693,10 +681,10 @@ private:
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
-    static void inline ExecuteFlatConstant(const SharedPtr<ColumnVector> &left,
-                                           const SharedPtr<ColumnVector> &right,
-                                           SharedPtr<ColumnVector> &result,
-                                           SizeT count,
+    static void inline ExecuteFlatConstant(const std::shared_ptr<ColumnVector> &left,
+                                           const std::shared_ptr<ColumnVector> &right,
+                                           std::shared_ptr<ColumnVector> &result,
+                                           size_t count,
                                            void *state_ptr_left,
                                            void *state_ptr_right,
                                            void *state_ptr,
@@ -718,7 +706,7 @@ private:
                                                                                    state_ptr);
         } else {
             result_null->SetAllTrue();
-            for (SizeT i = 0; i < count; i++) {
+            for (size_t i = 0; i < count; i++) {
                 Operator::template Execute<LeftType, RightType, ResultType>(left_ptr[i],
                                                                             right_ptr[0],
                                                                             result_ptr[i],
@@ -734,12 +722,12 @@ private:
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
     static void inline ExecuteFlatConstantWithNull(const LeftType *__restrict left_ptr,
-                                                   const SharedPtr<Bitmask> &left_null,
+                                                   const std::shared_ptr<Bitmask> &left_null,
                                                    const RightType *__restrict right_ptr,
-                                                   const SharedPtr<Bitmask> &right_null,
+                                                   const std::shared_ptr<Bitmask> &right_null,
                                                    ResultType *__restrict result_ptr,
-                                                   SharedPtr<Bitmask> &result_null,
-                                                   SizeT count,
+                                                   std::shared_ptr<Bitmask> &result_null,
+                                                   size_t count,
                                                    void *state_ptr_left,
                                                    void *state_ptr_right,
                                                    void *state_ptr) {
@@ -766,10 +754,10 @@ private:
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
-    static void inline ExecuteFlatHeterogeneous(const SharedPtr<ColumnVector> &,
-                                                const SharedPtr<ColumnVector> &,
-                                                SharedPtr<ColumnVector> &,
-                                                SizeT,
+    static void inline ExecuteFlatHeterogeneous(const std::shared_ptr<ColumnVector> &,
+                                                const std::shared_ptr<ColumnVector> &,
+                                                std::shared_ptr<ColumnVector> &,
+                                                size_t,
                                                 void *,
                                                 void *,
                                                 void *,
@@ -779,10 +767,10 @@ private:
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
-    static void inline ExecuteConstantFlat(const SharedPtr<ColumnVector> &left,
-                                           const SharedPtr<ColumnVector> &right,
-                                           SharedPtr<ColumnVector> &result,
-                                           SizeT count,
+    static void inline ExecuteConstantFlat(const std::shared_ptr<ColumnVector> &left,
+                                           const std::shared_ptr<ColumnVector> &right,
+                                           std::shared_ptr<ColumnVector> &result,
+                                           size_t count,
                                            void *state_ptr_left,
                                            void *state_ptr_right,
                                            void *state_ptr,
@@ -805,7 +793,7 @@ private:
                                                                                    state_ptr);
         } else {
             result_null->SetAllTrue();
-            for (SizeT i = 0; i < count; i++) {
+            for (size_t i = 0; i < count; i++) {
                 Operator::template Execute<LeftType, RightType, ResultType>(left_ptr[0],
                                                                             right_ptr[i],
                                                                             result_ptr[i],
@@ -821,12 +809,12 @@ private:
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
     static void inline ExecuteConstantFlatWithNull(const LeftType *__restrict left_ptr,
-                                                   const SharedPtr<Bitmask> &left_null,
+                                                   const std::shared_ptr<Bitmask> &left_null,
                                                    const RightType *__restrict right_ptr,
-                                                   const SharedPtr<Bitmask> &right_null,
+                                                   const std::shared_ptr<Bitmask> &right_null,
                                                    ResultType *__restrict result_ptr,
-                                                   SharedPtr<Bitmask> &result_null,
-                                                   SizeT count,
+                                                   std::shared_ptr<Bitmask> &result_null,
+                                                   size_t count,
                                                    void *state_ptr_left,
                                                    void *state_ptr_right,
                                                    void *state_ptr) {
@@ -853,10 +841,10 @@ private:
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
-    static void inline ExecuteConstantConstant(const SharedPtr<ColumnVector> &left,
-                                               const SharedPtr<ColumnVector> &right,
-                                               SharedPtr<ColumnVector> &result,
-                                               SizeT,
+    static void inline ExecuteConstantConstant(const std::shared_ptr<ColumnVector> &left,
+                                               const std::shared_ptr<ColumnVector> &right,
+                                               std::shared_ptr<ColumnVector> &result,
+                                               size_t,
                                                void *state_ptr_left,
                                                void *state_ptr_right,
                                                void *state_ptr,
@@ -882,10 +870,10 @@ private:
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
-    static void inline ExecuteConstantHeterogeneous(const SharedPtr<ColumnVector> &,
-                                                    const SharedPtr<ColumnVector> &,
-                                                    SharedPtr<ColumnVector> &,
-                                                    SizeT,
+    static void inline ExecuteConstantHeterogeneous(const std::shared_ptr<ColumnVector> &,
+                                                    const std::shared_ptr<ColumnVector> &,
+                                                    std::shared_ptr<ColumnVector> &,
+                                                    size_t,
                                                     void *,
                                                     void *,
                                                     void *,
@@ -895,10 +883,10 @@ private:
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
-    static void inline ExecuteHeterogeneousFlat(const SharedPtr<ColumnVector> &,
-                                                const SharedPtr<ColumnVector> &,
-                                                SharedPtr<ColumnVector> &,
-                                                SizeT,
+    static void inline ExecuteHeterogeneousFlat(const std::shared_ptr<ColumnVector> &,
+                                                const std::shared_ptr<ColumnVector> &,
+                                                std::shared_ptr<ColumnVector> &,
+                                                size_t,
                                                 void *,
                                                 void *,
                                                 void *,
@@ -908,10 +896,10 @@ private:
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
-    static void inline ExecuteHeterogeneousConstant(const SharedPtr<ColumnVector> &,
-                                                    const SharedPtr<ColumnVector> &,
-                                                    SharedPtr<ColumnVector> &,
-                                                    SizeT,
+    static void inline ExecuteHeterogeneousConstant(const std::shared_ptr<ColumnVector> &,
+                                                    const std::shared_ptr<ColumnVector> &,
+                                                    std::shared_ptr<ColumnVector> &,
+                                                    size_t,
                                                     void *,
                                                     void *,
                                                     void *,
@@ -921,10 +909,10 @@ private:
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
-    static void inline ExecuteHeterogeneousHeterogeneous(const SharedPtr<ColumnVector> &,
-                                                         const SharedPtr<ColumnVector> &,
-                                                         SharedPtr<ColumnVector> &,
-                                                         SizeT,
+    static void inline ExecuteHeterogeneousHeterogeneous(const std::shared_ptr<ColumnVector> &,
+                                                         const std::shared_ptr<ColumnVector> &,
+                                                         std::shared_ptr<ColumnVector> &,
+                                                         size_t,
                                                          void *,
                                                          void *,
                                                          void *,

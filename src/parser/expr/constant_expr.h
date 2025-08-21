@@ -14,13 +14,19 @@
 
 #pragma once
 
-#include "nlohmann/json.hpp"
 #include "parsed_expr.h"
 #include "type/datetime/interval_type.h"
 
-#include <cstdint>
-#include <memory>
-#include <vector>
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
+
+#ifndef PARESER_USE_THIRD_PARTY_MODULE
+#define PARESER_USE_THIRD_PARTY_MODULE 1
+import third_party;
+#endif
 
 namespace infinity {
 

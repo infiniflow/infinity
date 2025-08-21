@@ -12,17 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_drop_collection.impl;
 
 import :physical_drop_collection;
-
-import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
-
 import :physical_operator_type;
 import :operator_state;
 import :wal_manager;
@@ -31,7 +26,7 @@ import :status;
 
 namespace infinity {
 
-void PhysicalDropCollection::Init(QueryContext* query_context) {}
+void PhysicalDropCollection::Init(QueryContext *query_context) {}
 
 bool PhysicalDropCollection::Execute(QueryContext *, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

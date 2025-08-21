@@ -16,16 +16,16 @@ module;
 
 export module infinity_core:query_context;
 
-import :stl;
 import :session;
 import :config;
 import :storage;
 import :query_result;
+import :profiler;
+import :optimizer;
+
 import base_statement;
 import admin_statement;
-import :profiler;
 import sql_parser;
-import :optimizer;
 
 namespace infinity {
 enum class QueryPhase : i8;
@@ -65,7 +65,7 @@ public:
         persistence_manager_ = nullptr;
     }
 
-    QueryResult Query(const String &query);
+    QueryResult Query(const std::string &query);
 
     QueryResult QueryStatement(const BaseStatement *statement);
 
@@ -75,9 +75,9 @@ public:
 
     bool JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts, bool rollback = false);
 
-    inline void set_current_schema(const String &current_schema) { session_ptr_->set_current_schema(current_schema); }
+    inline void set_current_schema(const std::string &current_schema) { session_ptr_->set_current_schema(current_schema); }
 
-    [[nodiscard]] inline const String &schema_name() const { return session_ptr_->current_database(); }
+    [[nodiscard]] inline const std::string &schema_name() const { return session_ptr_->current_database(); }
 
     [[nodiscard]] inline u64 cpu_number_limit() const { return cpu_number_limit_; }
 
@@ -142,13 +142,13 @@ private:
 
 private:
     // Parser
-    UniquePtr<SQLParser> parser_{};
-    UniquePtr<LogicalPlanner> logical_planner_{};
-    UniquePtr<Optimizer> optimizer_{};
-    UniquePtr<PhysicalPlanner> physical_planner_{};
-    UniquePtr<FragmentBuilder> fragment_builder_{};
+    std::unique_ptr<SQLParser> parser_{};
+    std::unique_ptr<LogicalPlanner> logical_planner_{};
+    std::unique_ptr<Optimizer> optimizer_{};
+    std::unique_ptr<PhysicalPlanner> physical_planner_{};
+    std::unique_ptr<FragmentBuilder> fragment_builder_{};
 
-    SharedPtr<QueryProfiler> query_profiler_{};
+    std::shared_ptr<QueryProfiler> query_profiler_{};
     bool explain_analyze_{};
 
     Config *global_config_{};
@@ -162,8 +162,8 @@ private:
     u64 catalog_version_{};
 
     // User / Tenant information
-    String tenant_name_;
-    String user_name_;
+    std::string tenant_name_;
+    std::string user_name_;
 
     u64 query_id_{0};
     u64 tenant_id_{0};

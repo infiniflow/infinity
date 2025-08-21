@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:emvb_search;
-import :stl;
+
 import :emvb_shared_vec;
 import :simd_init;
 import :simd_functions;
@@ -59,26 +57,26 @@ public:
                const EMVBProductQuantizer *product_quantizer);
 
     // return docid: start from 0
-    Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>>
+    std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>>
     GetQueryResult(const f32 *query_ptr, u32 nprobe, f32 thresh, u32 n_doc_to_score, u32 out_second_stage, u32 k, f32 thresh_query) const;
 
     // return docid: start from start_segment_offset
-    Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> GetQueryResult(const f32 *query_ptr,
-                                                                  u32 nprobe,
-                                                                  f32 thresh,
-                                                                  u32 n_doc_to_score,
-                                                                  u32 out_second_stage,
-                                                                  u32 k,
-                                                                  f32 thresh_query,
-                                                                  Bitmask &bitmask,
-                                                                  u32 start_segment_offset,
-                                                                  const BlockIndex *block_index,
-                                                                  TxnTimeStamp begin_ts) const;
+    std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> GetQueryResult(const f32 *query_ptr,
+                                                                                   u32 nprobe,
+                                                                                   f32 thresh,
+                                                                                   u32 n_doc_to_score,
+                                                                                   u32 out_second_stage,
+                                                                                   u32 k,
+                                                                                   f32 thresh_query,
+                                                                                   Bitmask &bitmask,
+                                                                                   u32 start_segment_offset,
+                                                                                   const BlockIndex *block_index,
+                                                                                   TxnTimeStamp begin_ts) const;
 
 private:
     auto find_candidate_docs(const f32 *centroids_scores, u32 nprobe, f32 th) const;
 
-    auto compute_hit_frequency(Vector<u32> candidate_documents, u32 n_doc_to_score, auto centroid_q_token_sim) const;
+    auto compute_hit_frequency(std::vector<u32> candidate_documents, u32 n_doc_to_score, auto centroid_q_token_sim) const;
 
     auto second_stage_filtering(auto selected_cnt_and_docs, u32 out_second_stage, auto query_token_centroids_scores) const;
 

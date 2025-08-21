@@ -12,19 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:pg_protocol_handler.impl;
 
 import :pg_protocol_handler;
-import global_resource_usage;
 import :boost;
-import :stl;
 import :pg_message;
+
+import global_resource_usage;
 
 namespace infinity {
 
-PGProtocolHandler::PGProtocolHandler(const SharedPtr<boost::asio::ip::tcp::socket> &socket) : buffer_reader_(socket), buffer_writer_(socket) {}
+PGProtocolHandler::PGProtocolHandler(const std::shared_ptr<boost::asio::ip::tcp::socket> &socket) : buffer_reader_(socket), buffer_writer_(socket) {}
 
 PGProtocolHandler::~PGProtocolHandler() = default;
 
@@ -60,7 +58,7 @@ void PGProtocolHandler::send_authentication() {
     buffer_writer_.send_value_u32(AUTHENTICATION_ERROR_CODE);
 }
 
-void PGProtocolHandler::send_parameter(const String &key, const String &value) {
+void PGProtocolHandler::send_parameter(const std::string &key, const std::string &value) {
     buffer_writer_.send_value_u8(static_cast<u8>(PGMessageType::kParameterStatus));
     // length field size + key size + 1 null terminator + value size + 1 null terminator
     buffer_writer_.send_value_u32(static_cast<u32>(LENGTH_FIELD_SIZE + key.size() + value.size() + 2u));
@@ -77,12 +75,12 @@ void PGProtocolHandler::send_ready_for_query() {
 
 PGMessageType PGProtocolHandler::read_command_type() { return static_cast<PGMessageType>(buffer_reader_.read_value_i8()); }
 
-String PGProtocolHandler::read_command_body() {
+std::string PGProtocolHandler::read_command_body() {
     const auto command_length = buffer_reader_.read_value_u32() - LENGTH_FIELD_SIZE;
     return buffer_reader_.read_string(command_length);
 }
 
-void PGProtocolHandler::send_error_response(const HashMap<PGMessageType, String> &error_response_map) {
+void PGProtocolHandler::send_error_response(const std::unordered_map<PGMessageType, std::string> &error_response_map) {
     // message header
     buffer_writer_.send_value_u8(static_cast<u8>(PGMessageType::kError));
 
@@ -117,7 +115,7 @@ void PGProtocolHandler::SendDescriptionHeader(u32 total_column_name_length, u32 
     buffer_writer_.send_value_u16(column_count);
 }
 
-void PGProtocolHandler::SendDescription(const String &column_name, u32 object_id, u16 width) {
+void PGProtocolHandler::SendDescription(const std::string &column_name, u32 object_id, u16 width) {
     buffer_writer_.send_string(column_name);
 
     buffer_writer_.send_value_u32(0); // No OID for the table;
@@ -129,7 +127,7 @@ void PGProtocolHandler::SendDescription(const String &column_name, u32 object_id
     buffer_writer_.send_value_i16(0);         // Text format
 }
 
-void PGProtocolHandler::SendData(const Vector<Optional<String>> &values_as_strings, u64 string_length_sum) {
+void PGProtocolHandler::SendData(const std::vector<std::optional<std::string>> &values_as_strings, u64 string_length_sum) {
     // https://www.postgresql.org/docs/14/static/protocol-message-formats.html
     buffer_writer_.send_value_u8(static_cast<u8>(PGMessageType::kData));
 
@@ -144,9 +142,9 @@ void PGProtocolHandler::SendData(const Vector<Optional<String>> &values_as_strin
     buffer_writer_.send_value_u16(column_count);
 
     for (u16 idx = 0; idx < column_count; ++idx) {
-        const Optional<String> &value_string = values_as_strings[idx];
+        const std::optional<std::string> &value_string = values_as_strings[idx];
         if (value_string.has_value()) {
-            const String &value_ref = value_string.value();
+            const std::string &value_ref = value_string.value();
 
             // Value string size
             buffer_writer_.send_value_u32(value_ref.size());
@@ -160,7 +158,7 @@ void PGProtocolHandler::SendData(const Vector<Optional<String>> &values_as_strin
     }
 }
 
-void PGProtocolHandler::SendComplete(const String &complete_message) {
+void PGProtocolHandler::SendComplete(const std::string &complete_message) {
     // Field length + message size + null terminator
     u32 message_size = LENGTH_FIELD_SIZE + complete_message.size() + 1;
     buffer_writer_.send_value_u8(static_cast<u8>(PGMessageType::kComplete));

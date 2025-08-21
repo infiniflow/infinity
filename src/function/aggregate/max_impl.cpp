@@ -12,23 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:max.impl;
 
 import :max;
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;
 import :aggregate_function;
 import :aggregate_function_set;
 
-import :third_party;
 import logical_type;
 import internal_types;
 import data_type;
-import :logger;
 
 namespace infinity {
 
@@ -37,30 +32,15 @@ struct MaxState {
 public:
     ValueType value_;
 
-    void Initialize() {
-        String error_message = "Not implement: Max::Initialize";
-        UnrecoverableError(error_message);
-    }
+    void Initialize() { UnrecoverableError("Not implement: Max::Initialize"); }
 
-    void Update(const ValueType *__restrict, SizeT) {
-        String error_message = "Not implement: Max::Update";
-        UnrecoverableError(error_message);
-    }
+    void Update(const ValueType *__restrict, size_t) { UnrecoverableError("Not implement: Max::Update"); }
 
-    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) {
-        String error_message = "Not implement: Max::ConstantUpdate";
-        UnrecoverableError(error_message);
-    }
+    inline void ConstantUpdate(const ValueType *__restrict, size_t, size_t) { UnrecoverableError("Not implement: Max::ConstantUpdate"); }
 
-    [[nodiscard]] ptr_t Finalize() const {
-        String error_message = "Not implement: Max::Finalize";
-        UnrecoverableError(error_message);
-    }
+    [[nodiscard]] char *Finalize() const { UnrecoverableError("Not implement: Max::Finalize"); }
 
-    inline static SizeT Size(const DataType &) {
-        String error_message = "Not implement: Max::Size";
-        UnrecoverableError(error_message);
-    }
+    inline static size_t Size(const DataType &) { UnrecoverableError("Not implement: Max::Size"); }
 };
 
 template <>
@@ -70,13 +50,13 @@ public:
 
     void Initialize() { this->value_ = false; }
 
-    void Update(const BooleanT *__restrict input, SizeT idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    void Update(const BooleanT *__restrict input, size_t idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const BooleanT *__restrict input, SizeT idx, SizeT) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    inline void ConstantUpdate(const BooleanT *__restrict input, size_t idx, size_t) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline ptr_t Finalize() { return (ptr_t)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(BooleanT); }
+    inline static size_t Size(const DataType &) { return sizeof(BooleanT); }
 };
 
 template <>
@@ -86,13 +66,13 @@ public:
 
     void Initialize() { this->value_ = std::numeric_limits<i8>::min(); }
 
-    void Update(const TinyIntT *__restrict input, SizeT idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    void Update(const TinyIntT *__restrict input, size_t idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const TinyIntT *__restrict input, SizeT idx, SizeT) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    inline void ConstantUpdate(const TinyIntT *__restrict input, size_t idx, size_t) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline ptr_t Finalize() { return (ptr_t)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(TinyIntT); }
+    inline static size_t Size(const DataType &) { return sizeof(TinyIntT); }
 };
 
 template <>
@@ -102,13 +82,13 @@ public:
 
     void Initialize() { this->value_ = std::numeric_limits<i16>::min(); }
 
-    void Update(const SmallIntT *__restrict input, SizeT idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    void Update(const SmallIntT *__restrict input, size_t idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const SmallIntT *__restrict input, SizeT idx, SizeT) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    inline void ConstantUpdate(const SmallIntT *__restrict input, size_t idx, size_t) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline ptr_t Finalize() { return (ptr_t)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(SmallIntT); }
+    inline static size_t Size(const DataType &) { return sizeof(SmallIntT); }
 };
 
 template <>
@@ -118,13 +98,13 @@ public:
 
     void Initialize() { this->value_ = std::numeric_limits<i32>::min(); }
 
-    void Update(const IntegerT *__restrict input, SizeT idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    void Update(const IntegerT *__restrict input, size_t idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const IntegerT *__restrict input, SizeT idx, SizeT) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    inline void ConstantUpdate(const IntegerT *__restrict input, size_t idx, size_t) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline ptr_t Finalize() { return (ptr_t)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(IntegerT); }
+    inline static size_t Size(const DataType &) { return sizeof(IntegerT); }
 };
 
 template <>
@@ -134,13 +114,13 @@ public:
 
     void Initialize() { this->value_ = std::numeric_limits<i64>::min(); }
 
-    void Update(const BigIntT *__restrict input, SizeT idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    void Update(const BigIntT *__restrict input, size_t idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const BigIntT *__restrict input, SizeT idx, SizeT) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    inline void ConstantUpdate(const BigIntT *__restrict input, size_t idx, size_t) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline ptr_t Finalize() { return (ptr_t)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(BigIntT); }
+    inline static size_t Size(const DataType &) { return sizeof(BigIntT); }
 };
 
 template <>
@@ -153,13 +133,13 @@ public:
         this->value_.upper = std::numeric_limits<i64>::min();
     }
 
-    void Update(const HugeIntT *__restrict input, SizeT idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    void Update(const HugeIntT *__restrict input, size_t idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const HugeIntT *__restrict input, SizeT idx, SizeT) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    inline void ConstantUpdate(const HugeIntT *__restrict input, size_t idx, size_t) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline ptr_t Finalize() { return (ptr_t)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(HugeIntT); }
+    inline static size_t Size(const DataType &) { return sizeof(HugeIntT); }
 };
 
 template <>
@@ -169,13 +149,13 @@ public:
 
     void Initialize() { this->value_ = std::numeric_limits<Float16T>::min(); }
 
-    void Update(const Float16T *__restrict input, SizeT idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    void Update(const Float16T *__restrict input, size_t idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const Float16T *__restrict input, SizeT idx, SizeT) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    inline void ConstantUpdate(const Float16T *__restrict input, size_t idx, size_t) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline ptr_t Finalize() { return (ptr_t)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(Float16T); }
+    inline static size_t Size(const DataType &) { return sizeof(Float16T); }
 };
 
 template <>
@@ -185,13 +165,13 @@ public:
 
     void Initialize() { this->value_ = std::numeric_limits<BFloat16T>::min(); }
 
-    void Update(const BFloat16T *__restrict input, SizeT idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    void Update(const BFloat16T *__restrict input, size_t idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const BFloat16T *__restrict input, SizeT idx, SizeT) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    inline void ConstantUpdate(const BFloat16T *__restrict input, size_t idx, size_t) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline ptr_t Finalize() { return (ptr_t)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(BFloat16T); }
+    inline static size_t Size(const DataType &) { return sizeof(BFloat16T); }
 };
 
 template <>
@@ -201,13 +181,13 @@ public:
 
     void Initialize() { this->value_ = std::numeric_limits<f32>::min(); }
 
-    void Update(const FloatT *__restrict input, SizeT idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    void Update(const FloatT *__restrict input, size_t idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const FloatT *__restrict input, SizeT idx, SizeT) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    inline void ConstantUpdate(const FloatT *__restrict input, size_t idx, size_t) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline ptr_t Finalize() { return (ptr_t)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(FloatT); }
+    inline static size_t Size(const DataType &) { return sizeof(FloatT); }
 };
 
 template <>
@@ -217,19 +197,19 @@ public:
 
     void Initialize() { this->value_ = std::numeric_limits<f64>::min(); }
 
-    void Update(const DoubleT *__restrict input, SizeT idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    void Update(const DoubleT *__restrict input, size_t idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const DoubleT *__restrict input, SizeT idx, SizeT) { value_ = value_ < input[idx] ? input[idx] : value_; }
+    inline void ConstantUpdate(const DoubleT *__restrict input, size_t idx, size_t) { value_ = value_ < input[idx] ? input[idx] : value_; }
 
-    inline ptr_t Finalize() { return (ptr_t)&value_; }
+    inline char *Finalize() { return (char *)&value_; }
 
-    inline static SizeT Size(const DataType &) { return sizeof(DoubleT); }
+    inline static size_t Size(const DataType &) { return sizeof(DoubleT); }
 };
 
 void RegisterMaxFunction(NewCatalog *catalog_ptr) {
-    String func_name = "MAX";
+    std::string func_name = "MAX";
 
-    SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
+    std::shared_ptr<AggregateFunctionSet> function_set_ptr = std::make_shared<AggregateFunctionSet>(func_name);
 
     {
         AggregateFunction max_function = UnaryAggregate<MaxState<BooleanT, BooleanT>, BooleanT, BooleanT>(func_name,

@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:meta_info;
 
-import :stl;
-import column_def;
 import :default_values;
+import :infinity_type;
+
+import std;
+import std.compat;
+import third_party;
+
 import data_type;
 import create_index_info;
-import :third_party;
-
+import column_def;
 
 namespace infinity {
 
@@ -30,84 +31,84 @@ export struct WalChunkIndexInfo;
 export enum class SegmentStatus : u8;
 
 export struct DatabaseInfo {
-    SharedPtr<String> db_name_{};
-    SharedPtr<String> db_entry_dir_{};
-    SharedPtr<String> absolute_db_path_{};
-    SharedPtr<String> db_comment_{};
+    std::shared_ptr<std::string> db_name_{};
+    std::shared_ptr<std::string> db_entry_dir_{};
+    std::shared_ptr<std::string> absolute_db_path_{};
+    std::shared_ptr<std::string> db_comment_{};
     i64 table_count_{};
 };
 
 export struct TableInfo {
-    SharedPtr<String> db_name_{};
-    SharedPtr<String> table_name_{};
-    SharedPtr<String> table_comment_{};
-    SharedPtr<String> table_full_dir_{};
+    std::shared_ptr<std::string> db_name_{};
+    std::shared_ptr<std::string> table_name_{};
+    std::shared_ptr<std::string> table_comment_{};
+    std::shared_ptr<std::string> table_full_dir_{};
     i64 column_count_{};
     i64 segment_count_{};
     i64 row_count_{};
     TxnTimeStamp max_commit_ts_{UNCOMMIT_TS};
-    Vector<SharedPtr<ColumnDef>> column_defs_{};
-    String db_id_{};
-    String table_id_{};
-    String table_key_{};
+    std::vector<std::shared_ptr<ColumnDef>> column_defs_{};
+    std::string db_id_{};
+    std::string table_id_{};
+    std::string table_key_{};
 
 public:
-    u64 GetColumnIdByName(const String &column_name) const;
+    u64 GetColumnIdByName(const std::string &column_name) const;
     const ColumnDef *GetColumnDefByID(ColumnID column_id) const;
-    const ColumnDef *GetColumnDefByIdx(SizeT idx) const;
-    const ColumnDef *GetColumnDefByName(const String &column_name) const;
-    SizeT GetColumnIdxByID(ColumnID column_id) const;
+    const ColumnDef *GetColumnDefByIdx(size_t idx) const;
+    const ColumnDef *GetColumnDefByName(const std::string &column_name) const;
+    size_t GetColumnIdxByID(ColumnID column_id) const;
 };
 
 export struct TableIndexInfo {
-    SharedPtr<String> index_name_{};
-    SharedPtr<String> index_comment_{};
-    SharedPtr<String> index_entry_dir_{};
+    std::shared_ptr<std::string> index_name_{};
+    std::shared_ptr<std::string> index_comment_{};
+    std::shared_ptr<std::string> index_entry_dir_{};
     i64 segment_index_count_{};
-    SharedPtr<String> index_type_{};
-    SharedPtr<String> index_other_params_{};
-    SharedPtr<String> index_column_ids_{};
-    SharedPtr<String> index_column_names_{};
+    std::shared_ptr<std::string> index_type_{};
+    std::shared_ptr<std::string> index_other_params_{};
+    std::shared_ptr<std::string> index_column_ids_{};
+    std::shared_ptr<std::string> index_column_names_{};
 };
 
 export struct SegmentInfo {
     SegmentID segment_id_{};
     SegmentStatus status_{};
-    SharedPtr<String> segment_dir_{};
+    std::shared_ptr<std::string> segment_dir_{};
     i64 block_count_{};
     i64 row_count_{};
     i64 actual_row_count_{};
     i64 row_capacity_{};
     i64 column_count_{};
-    SizeT storage_size_{};
-    Vector<String> files_{};
+    size_t storage_size_{};
+    std::vector<std::string> files_{};
 };
 
 export struct BlockInfo {
     BlockID block_id_;
-    SharedPtr<String> block_dir_{};
+    std::shared_ptr<std::string> block_dir_{};
     i64 row_count_{};
     i64 row_capacity_{};
     i64 checkpoint_row_count_{};
     i64 column_count_{};
     TxnTimeStamp checkpoint_ts_{};
-    SizeT storage_size_{};
-    Vector<String> files_{};
+    size_t storage_size_{};
+    std::vector<std::string> files_{};
 };
 
 export struct BlockColumnInfo {
     ColumnID column_id_;
-    SharedPtr<DataType> data_type_{};
-    SharedPtr<String> filename_{};
+    std::shared_ptr<DataType> data_type_{};
+    std::shared_ptr<std::string> filename_{};
     i64 storage_size_{};
-    SizeT extra_file_count_{};
-    Vector<SharedPtr<String>> extra_file_names_{};
+    size_t extra_file_count_{};
+    std::vector<std::shared_ptr<std::string>> extra_file_names_{};
 };
 
 export struct TableDetail {
-    SharedPtr<String> db_name_{};
-    SharedPtr<String> table_name_{};
-    SharedPtr<String> table_comment_{};
+    std::shared_ptr<std::string> db_name_{};
+    std::shared_ptr<std::string> table_name_{};
+    std::shared_ptr<std::string> table_comment_{};
     i64 column_count_{};
     i64 row_count_{};
     i64 block_count_{};
@@ -117,17 +118,17 @@ export struct TableDetail {
 };
 
 export struct ViewDetail {
-    SharedPtr<String> db_name_{};
-    SharedPtr<String> view_name_{};
+    std::shared_ptr<std::string> db_name_{};
+    std::shared_ptr<std::string> view_name_{};
     i64 column_count_{};
 };
 
 export struct SegmentIndexInfo {
     SegmentID segment_id_{};
     IndexType index_type_{};
-    SharedPtr<String> index_dir_{};
-    SizeT chunk_count_{};
-    Vector<String> files_{};
+    std::shared_ptr<std::string> index_dir_{};
+    size_t chunk_count_{};
+    std::vector<std::string> files_{};
 };
 
 } // namespace infinity

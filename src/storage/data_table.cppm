@@ -12,21 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:data_table;
 
 import :table_def;
 import :base_table;
-import :stl;
-import data_type;
 import :data_block;
 import :infinity_exception;
-import internal_types;
-import :third_party;
-import column_def;
 import :logger;
 import :default_values;
+
+import third_party;
+
+import internal_types;
+import column_def;
+import data_type;
 
 namespace infinity {
 
@@ -44,70 +43,69 @@ export enum class TableType {
 export class DataTable : public BaseTable {
 
 public:
-    static SharedPtr<DataTable> Make(SharedPtr<TableDef> table_def_ptr, TableType type);
+    static std::shared_ptr<DataTable> Make(std::shared_ptr<TableDef> table_def_ptr, TableType type);
 
-    static SharedPtr<DataTable> MakeResultTable(const Vector<SharedPtr<ColumnDef>> &column_defs);
+    static std::shared_ptr<DataTable> MakeResultTable(const std::vector<std::shared_ptr<ColumnDef>> &column_defs);
 
-    static SharedPtr<DataTable> MakeEmptyResultTable();
+    static std::shared_ptr<DataTable> MakeEmptyResultTable();
 
-    static SharedPtr<DataTable> MakeSummaryResultTable(u64 counter, u64 sum);
-
-public:
-    explicit DataTable(SharedPtr<TableDef> table_def_ptr, TableType type);
+    static std::shared_ptr<DataTable> MakeSummaryResultTable(u64 counter, u64 sum);
 
 public:
-    [[nodiscard]] SizeT ColumnCount() const;
+    explicit DataTable(std::shared_ptr<TableDef> table_def_ptr, TableType type);
 
-    [[nodiscard]] SharedPtr<String> TableName() const;
+public:
+    [[nodiscard]] size_t ColumnCount() const;
 
-    [[nodiscard]] const SharedPtr<String> &SchemaName() const;
+    [[nodiscard]] std::shared_ptr<std::string> TableName() const;
 
-    SizeT GetColumnIdByName(const String &column_name);
+    [[nodiscard]] const std::shared_ptr<std::string> &SchemaName() const;
 
-    [[nodiscard]] SizeT row_count() const { return row_count_; }
+    size_t GetColumnIdByName(const std::string &column_name);
+
+    [[nodiscard]] size_t row_count() const { return row_count_; }
 
     [[nodiscard]] TableType type() const { return type_; }
 
-    [[nodiscard]] SizeT DataBlockCount() const { return data_blocks_.size(); }
+    [[nodiscard]] size_t DataBlockCount() const { return data_blocks_.size(); }
 
-    [[nodiscard]] SharedPtr<DataBlock> &GetDataBlockById(SizeT idx) {
+    [[nodiscard]] std::shared_ptr<DataBlock> &GetDataBlockById(size_t idx) {
         if (idx >= data_blocks_.size()) {
-            String error_message = fmt::format("Attempt to access invalid index: {}/{}", idx, DataBlockCount());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Attempt to access invalid index: {}/{}", idx, DataBlockCount()));
         }
         return data_blocks_[idx];
     }
 
-    [[nodiscard]] const String &GetColumnNameById(SizeT idx) const;
+    [[nodiscard]] const std::string &GetColumnNameById(size_t idx) const;
 
-    [[nodiscard]] SharedPtr<DataType> GetColumnTypeById(SizeT idx) const;
+    [[nodiscard]] std::shared_ptr<DataType> GetColumnTypeById(size_t idx) const;
 
-    void Append(const SharedPtr<DataBlock> &data_block);
+    void Append(const std::shared_ptr<DataBlock> &data_block);
 
-    inline void UpdateRowCount(SizeT row_count) { row_count_ += row_count; }
+    inline void UpdateRowCount(size_t row_count) { row_count_ += row_count; }
 
-    inline void SetResultMsg(UniquePtr<String> result_msg) { result_msg_ = std::move(result_msg); }
+    inline void SetResultMsg(std::unique_ptr<std::string> result_msg) { result_msg_ = std::move(result_msg); }
 
-    [[nodiscard]] inline String *result_msg() const { return result_msg_.get(); }
+    [[nodiscard]] inline std::string *result_msg() const { return result_msg_.get(); }
 
 public:
-    [[nodiscard]] String ToString() const;
+    [[nodiscard]] std::string ToString() const;
 
-    [[nodiscard]] SharedPtr<Vector<RowID>> GetRowIDVector() const;
+    [[nodiscard]] std::shared_ptr<std::vector<RowID>> GetRowIDVector() const;
 
     // Currently this method is used in aggregate operator.
-    void UnionWith(const SharedPtr<DataTable> &other);
+    void UnionWith(const std::shared_ptr<DataTable> &other);
 
-    void ShrinkBlocks(SizeT block_capacity = DEFAULT_VECTOR_SIZE);
+    void ShrinkBlocks(size_t block_capacity = DEFAULT_VECTOR_SIZE);
 
 public:
-    SharedPtr<TableDef> definition_ptr_{};
-    SizeT row_count_{0};
+    std::shared_ptr<TableDef> definition_ptr_{};
+    size_t row_count_{0};
     TableType type_{TableType::kInvalid};
-    Vector<SharedPtr<DataBlock>> data_blocks_{};
-    SharedPtr<String> result_msg_{};
+    std::vector<std::shared_ptr<DataBlock>> data_blocks_{};
+    std::shared_ptr<std::string> result_msg_{};
     bool total_hits_count_flag_{false};
-    SizeT total_hits_count_{};
+    size_t total_hits_count_{};
 };
 
 } // namespace infinity

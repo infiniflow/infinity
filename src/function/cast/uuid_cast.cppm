@@ -12,22 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:uuid_cast;
 
-import :stl;
 import :column_vector;
 import :vector_buffer;
 import :bound_cast_func;
-import data_type;
 import :column_vector_cast;
-import logical_type;
 import :infinity_exception;
-import :third_party;
-import internal_types;
 import :status;
-import :logger;
+
+import internal_types;
+import logical_type;
+import data_type;
 
 namespace infinity {
 
@@ -39,8 +35,7 @@ export inline BoundCastFunc BindUuidCast(DataType &target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<UuidT, VarcharT, UuidTryCastToVarlen>);
         }
         default: {
-            String error_message = fmt::format("Can't cast from Uuid type to {}", target.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Can't cast from Uuid type to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);

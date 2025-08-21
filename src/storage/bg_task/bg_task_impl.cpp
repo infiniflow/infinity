@@ -14,9 +14,6 @@
 
 module;
 
-#include <vector>
-#include <memory>
-
 module infinity_core:bg_task.impl;
 
 import :bg_task;
@@ -31,6 +28,9 @@ import :txn_state;
 import :column_vector;
 import :mem_index;
 import :base_txn_store;
+
+import std;
+
 import row_id;
 
 namespace infinity {
@@ -44,7 +44,7 @@ Status NewCheckpointTask::ExecuteWithinTxn() {
 
 Status NewCheckpointTask::ExecuteWithNewTxn() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    auto new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+    auto new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
     if (new_txn_shared == nullptr) {
         // System is checkpointing
         return Status::OK();
@@ -55,18 +55,18 @@ Status NewCheckpointTask::ExecuteWithNewTxn() {
     if (status.ok()) {
         status = new_txn_mgr->CommitTxn(new_txn_shared.get());
 
-        CheckpointTxnStore *ckp_idx_store = static_cast<CheckpointTxnStore *>(new_txn_shared->GetTxnStore());
+        auto *ckp_idx_store = static_cast<CheckpointTxnStore *>(new_txn_shared->GetTxnStore());
         if (ckp_idx_store != nullptr) {
-            SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kNewCheckpoint);
-            for (const SharedPtr<FlushDataEntry> &flush_data_entry : ckp_idx_store->entries_) {
-                String task_text = fmt::format("Txn: {}, commit: {}, checkpoint data: {}.{}.{}.{} {}",
-                                               new_txn_shared->TxnID(),
-                                               new_txn_shared->CommitTS(),
-                                               flush_data_entry->db_id_str_,
-                                               flush_data_entry->table_id_str_,
-                                               flush_data_entry->segment_id_,
-                                               flush_data_entry->block_id_,
-                                               flush_data_entry->to_flush_);
+            std::shared_ptr<BGTaskInfo> bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kNewCheckpoint);
+            for (const std::shared_ptr<FlushDataEntry> &flush_data_entry : ckp_idx_store->entries_) {
+                std::string task_text = fmt::format("Txn: {}, commit: {}, checkpoint data: {}.{}.{}.{} {}",
+                                                    new_txn_shared->TxnID(),
+                                                    new_txn_shared->CommitTS(),
+                                                    flush_data_entry->db_id_str_,
+                                                    flush_data_entry->table_id_str_,
+                                                    flush_data_entry->segment_id_,
+                                                    flush_data_entry->block_id_,
+                                                    flush_data_entry->to_flush_);
                 bg_task_info->task_info_list_.emplace_back(task_text);
                 bg_task_info->status_list_.emplace_back("OK");
             }
@@ -78,7 +78,7 @@ Status NewCheckpointTask::ExecuteWithNewTxn() {
 
 Status NewCleanupTask::Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_cleanup_ts) {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
+    auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("cleanup"), TransactionType::kCleanup);
     Status status = txn->Cleanup();
     if (!status.ok()) {
         return status;
@@ -87,19 +87,19 @@ Status NewCleanupTask::Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_c
     return Status::OK();
 }
 
-NewCompactTask::NewCompactTask(NewTxn *new_txn, String db_name, String table_name)
+NewCompactTask::NewCompactTask(NewTxn *new_txn, std::string db_name, std::string table_name)
     : BGTask(BGTaskType::kNewCompact, false), new_txn_(new_txn), db_name_(db_name), table_name_(table_name) {}
 
-DumpMemIndexTask::DumpMemIndexTask(const String &db_name,
-                                   const String &table_name,
-                                   const String &index_name,
+DumpMemIndexTask::DumpMemIndexTask(const std::string &db_name,
+                                   const std::string &table_name,
+                                   const std::string &index_name,
                                    SegmentID segment_id,
                                    RowID begin_row_id)
     : BGTask(BGTaskType::kDumpMemIndex, true), db_name_(db_name), table_name_(table_name), index_name_(index_name), segment_id_(segment_id),
       begin_row_id_(begin_row_id) {}
 
-AppendMemIndexTask::AppendMemIndexTask(const SharedPtr<MemIndex> &mem_index,
-                                       const SharedPtr<ColumnVector> &input_column,
+AppendMemIndexTask::AppendMemIndexTask(const std::shared_ptr<MemIndex> &mem_index,
+                                       const std::shared_ptr<ColumnVector> &input_column,
                                        BlockOffset offset,
                                        BlockOffset row_cnt)
     : BGTask(BGTaskType::kAppendMemIndex, false), mem_index_(mem_index), input_column_(input_column), offset_(offset), row_cnt_(row_cnt) {}
@@ -115,7 +115,8 @@ void AppendMemIndexBatch::WaitForCompletion() {
     cv_.wait(lock, [this] { return task_count_ == 0; });
 }
 
-TestCommandTask::TestCommandTask(String command_content) : BGTask(BGTaskType::kTestCommand, true), command_content_(std::move(command_content)) {}
+TestCommandTask::TestCommandTask(std::string command_content)
+    : BGTask(BGTaskType::kTestCommand, true), command_content_(std::move(command_content)) {}
 
 BGTaskInfo::BGTaskInfo(BGTaskType type) : type_(type), task_time_(std::chrono::system_clock::now()) {}
 

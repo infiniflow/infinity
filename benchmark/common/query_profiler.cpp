@@ -4,10 +4,10 @@
 
 #include "query_profiler.h"
 
-#include <iomanip>
-#include <sstream>
-#include <iostream>
 #include <cstdio>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
 
 namespace infinity {
 

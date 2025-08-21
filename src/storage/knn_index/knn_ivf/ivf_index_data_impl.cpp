@@ -14,35 +14,35 @@
 
 module;
 
-#include <algorithm>
 #include <cassert>
+
 module infinity_core:ivf_index_data.impl;
 
 import :ivf_index_data;
-
-import :stl;
 import :index_ivf;
 import :ivf_index_storage;
-import column_def;
 import :index_base;
-import embedding_info;
-import internal_types;
 import :buffer_manager;
 import :infinity_exception;
 import :status;
-import data_type;
 import :default_values;
 import :column_vector;
 import :logger;
 import :kmeans_partition;
-import logical_type;
 import :ivf_index_util_func;
-
 import :column_meta;
 import :block_meta;
 import :segment_meta;
 import :new_catalog;
 import :kv_store;
+
+import std;
+
+import logical_type;
+import data_type;
+import embedding_info;
+import internal_types;
+import column_def;
 
 namespace infinity {
 
@@ -50,19 +50,19 @@ class NewIVFDataAccessor : public IVFDataAccessorBase {
 public:
     NewIVFDataAccessor(SegmentMeta &segment_meta, ColumnID column_id) : segment_meta_(segment_meta), column_id_(column_id) {}
 
-    const_ptr_t GetEmbedding(SizeT offset) override {
-        SizeT block_offset = UpdateColumnVector(offset);
+    const char *GetEmbedding(size_t offset) override {
+        size_t block_offset = UpdateColumnVector(offset);
         return cur_column_vector_.data() + block_offset * cur_column_vector_.data_type_size_;
     }
 
-    Pair<Span<const char>, SizeT> GetMultiVector(SizeT offset) override {
-        SizeT block_offset = UpdateColumnVector(offset);
+    std::pair<std::span<const char>, size_t> GetMultiVector(size_t offset) override {
+        size_t block_offset = UpdateColumnVector(offset);
         return cur_column_vector_.GetMultiVectorRaw(block_offset);
     }
 
 private:
-    SizeT UpdateColumnVector(SizeT offset) {
-        SizeT block_offset = offset % DEFAULT_BLOCK_CAPACITY;
+    size_t UpdateColumnVector(size_t offset) {
+        size_t block_offset = offset % DEFAULT_BLOCK_CAPACITY;
         BlockID block_id = offset / DEFAULT_BLOCK_CAPACITY;
         if (block_id != last_block_id_) {
             last_block_id_ = block_id;
@@ -90,13 +90,16 @@ private:
     ColumnVector cur_column_vector_;
 };
 
-void IVFIndexInChunk::BuildIVFIndex(SegmentMeta &segment_meta, u32 row_count, SharedPtr<ColumnDef> column_def) {
+void IVFIndexInChunk::BuildIVFIndex(SegmentMeta &segment_meta, u32 row_count, std::shared_ptr<ColumnDef> column_def) {
     RowID base_rowid(segment_meta.segment_id(), 0);
     NewIVFDataAccessor data_accessor(segment_meta, column_def->id());
     BuildIVFIndex(base_rowid, row_count, &data_accessor, column_def);
 }
 
-void IVFIndexInChunk::BuildIVFIndex(RowID base_rowid, u32 row_count, IVFDataAccessorBase *data_accessor, const SharedPtr<ColumnDef> &column_def) {
+void IVFIndexInChunk::BuildIVFIndex(RowID base_rowid,
+                                    u32 row_count,
+                                    IVFDataAccessorBase *data_accessor,
+                                    const std::shared_ptr<ColumnDef> &column_def) {
     auto Call = [&]<LogicalType column_t> {
         static_assert(column_t == LogicalType::kEmbedding || column_t == LogicalType::kMultiVector);
         auto CallT = [&]<EmbeddingDataType embedding_t> {
@@ -143,14 +146,14 @@ template <LogicalType column_t, EmbeddingDataType embedding_t>
 void IVFIndexInChunk::BuildIVFIndexT(const RowID base_rowid,
                                      const u32 row_count,
                                      IVFDataAccessorBase *data_accessor,
-                                     const SharedPtr<ColumnDef> &column_def) {
+                                     const std::shared_ptr<ColumnDef> &column_def) {
     if (row_count <= 0) [[unlikely]] {
         UnrecoverableError("Empty input row count");
     }
     using EmbeddingElementT = EmbeddingDataTypeToCppTypeT<embedding_t>;
     const SegmentOffset start_segment_offset = base_rowid.segment_offset_;
     u64 embedding_count = 0;
-    Deque<Pair<u32, u32>> all_embedding_pos;
+    std::deque<std::pair<u32, u32>> all_embedding_pos;
     if constexpr (column_t == LogicalType::kEmbedding) {
         embedding_count = row_count;
     } else {
@@ -176,11 +179,11 @@ void IVFIndexInChunk::BuildIVFIndexT(const RowID base_rowid,
         UnrecoverableError(std::format("{}: centroid_count exceeds u32 limit!", __func__));
     }
     const auto training_embedding_num = std::min<u32>(centroid_count * ivf_option().centroid_option_.min_points_per_centroid_, embedding_count);
-    const auto training_data = MakeUniqueForOverwrite<f32[]>(training_embedding_num * embedding_dimension());
+    const auto training_data = std::make_unique_for_overwrite<f32[]>(training_embedding_num * embedding_dimension());
     if constexpr (column_t == LogicalType::kEmbedding) {
-        Vector<SegmentOffset> all_pos(row_count);
+        std::vector<SegmentOffset> all_pos(row_count);
         std::iota(all_pos.begin(), all_pos.end(), start_segment_offset);
-        Vector<SegmentOffset> sample_result;
+        std::vector<SegmentOffset> sample_result;
         sample_result.reserve(training_embedding_num);
         std::random_device rd;
         std::mt19937 gen(rd());
@@ -205,7 +208,7 @@ void IVFIndexInChunk::BuildIVFIndexT(const RowID base_rowid,
             }
         }
     } else if constexpr (column_t == LogicalType::kMultiVector) {
-        Vector<Pair<u32, u32>> sample_result;
+        std::vector<std::pair<u32, u32>> sample_result;
         sample_result.reserve(training_embedding_num);
         std::random_device rd;
         std::mt19937 gen(rd());
