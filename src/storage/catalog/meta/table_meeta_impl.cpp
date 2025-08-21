@@ -450,9 +450,9 @@ Status TableMeeta::GetTableDetail(TableDetail &table_detail) {
     }
     table_detail.db_name_ = std::make_shared<std::string>(db_name_);
     table_detail.table_name_ = std::make_shared<std::string>(table_name_);
+    table_detail.table_id_ = std::make_shared<std::string>(table_id_str_);
     table_detail.table_comment_ = table_info.table_comment_;
     table_detail.column_count_ = table_info.column_count_;
-    table_detail.row_count_ = table_info.row_count_;
 
     std::vector<SegmentID> *segment_ids_ptr = nullptr;
     std::tie(segment_ids_ptr, status) = GetSegmentIDs1();

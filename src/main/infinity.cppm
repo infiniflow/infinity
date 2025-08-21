@@ -116,8 +116,6 @@ public:
 
     QueryResult DropTable(const std::string &db_name, const std::string &table_name, const DropTableOptions &drop_table_options);
 
-    QueryResult ListTables(const std::string &db_name);
-
     QueryResult ShowTable(const std::string &db_name, const std::string &table_name);
 
     QueryResult ShowColumns(const std::string &db_name, const std::string &table_name);
