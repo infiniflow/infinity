@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:logical_create_view;
 
-import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
+
 import data_type;
 import internal_types;
 import create_view_info;
@@ -28,41 +26,41 @@ namespace infinity {
 
 export class LogicalCreateView : public LogicalNode {
 public:
-    static inline SharedPtr<LogicalCreateView> Make(u64 node_id,
-                                                    const SharedPtr<Vector<String>> &names_ptr,
-                                                    const SharedPtr<Vector<SharedPtr<DataType>>> &types_ptr,
-                                                    const SharedPtr<CreateViewInfo> &create_view_info) {
-        return MakeShared<LogicalCreateView>(node_id, names_ptr, types_ptr, create_view_info);
+    static inline std::shared_ptr<LogicalCreateView> Make(u64 node_id,
+                                                          const std::shared_ptr<std::vector<std::string>> &names_ptr,
+                                                          const std::shared_ptr<std::vector<std::shared_ptr<DataType>>> &types_ptr,
+                                                          const std::shared_ptr<CreateViewInfo> &create_view_info) {
+        return std::make_shared<LogicalCreateView>(node_id, names_ptr, types_ptr, create_view_info);
     }
 
 public:
     LogicalCreateView(u64 node_id,
-                      SharedPtr<Vector<String>> names_ptr,
-                      SharedPtr<Vector<SharedPtr<DataType>>> types_ptr,
-                      SharedPtr<CreateViewInfo> create_view_info)
+                      std::shared_ptr<std::vector<std::string>> names_ptr,
+                      std::shared_ptr<std::vector<std::shared_ptr<DataType>>> types_ptr,
+                      std::shared_ptr<CreateViewInfo> create_view_info)
         : LogicalNode(node_id, LogicalNodeType::kCreateView), names_ptr_(std::move(names_ptr)), types_ptr_(std::move(types_ptr)),
           create_view_info_(std::move(create_view_info)) {}
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalCreateView"; }
+    inline std::string name() final { return "LogicalCreateView"; }
 
-    [[nodiscard]] inline const SharedPtr<Vector<String>> &names_ptr() const { return names_ptr_; };
+    [[nodiscard]] inline const std::shared_ptr<std::vector<std::string>> &names_ptr() const { return names_ptr_; };
 
-    [[nodiscard]] inline const SharedPtr<Vector<SharedPtr<DataType>>> &types_ptr() const { return types_ptr_; }
+    [[nodiscard]] inline const std::shared_ptr<std::vector<std::shared_ptr<DataType>>> &types_ptr() const { return types_ptr_; }
 
-    [[nodiscard]] const SharedPtr<CreateViewInfo> create_view_info() const;
+    [[nodiscard]] const std::shared_ptr<CreateViewInfo> create_view_info() const;
 
 private:
-    SharedPtr<Vector<String>> names_ptr_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> types_ptr_{};
-    SharedPtr<CreateViewInfo> create_view_info_{nullptr};
+    std::shared_ptr<std::vector<std::string>> names_ptr_{};
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> types_ptr_{};
+    std::shared_ptr<CreateViewInfo> create_view_info_{nullptr};
 };
 
 } // namespace infinity

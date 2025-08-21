@@ -12,24 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.bool_cast;
 
 import :ut.base_test;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
-import :stl;
 import :infinity_context;
 import :function_set;
 import :aggregate_function_set;
@@ -43,7 +35,6 @@ import :cast_table;
 import :column_vector;
 import :bool_cast;
 import :bound_cast_func;
-#endif
 
 import global_resource_usage;
 import internal_types;
@@ -89,9 +80,9 @@ TEST_F(BoolCastTest, bool_cast0) {
 TEST_F(BoolCastTest, bool_cast1) {
     using namespace infinity;
 
-    SharedPtr<DataType> bool_type = MakeShared<DataType>(LogicalType::kBoolean);
+    std::shared_ptr<DataType> bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
 
-    SharedPtr<ColumnVector> col_bool = MakeShared<ColumnVector>(bool_type);
+    std::shared_ptr<ColumnVector> col_bool = std::make_shared<ColumnVector>(bool_type);
     col_bool->Initialize();
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
@@ -107,11 +98,11 @@ TEST_F(BoolCastTest, bool_cast1) {
 
     // cast bool column vector to varchar column vector
     //    {
-    //        SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    //        std::shared_ptr<DataType> varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
     //        auto bool2varchar_ptr = BindBoolCast(*bool_type, *varchar_type);
     //        EXPECT_NE(bool2varchar_ptr.function, nullptr);
     //
-    //        SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(varchar_type);
+    //        std::shared_ptr<ColumnVector> col_varchar_ptr = std::make_shared<ColumnVector>(varchar_type);
     //        col_varchar_ptr->Initialize();
     //
     //        CastParameters cast_parameters;

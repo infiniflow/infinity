@@ -16,10 +16,10 @@ module;
 
 export module infinity_core:meta_cache;
 
-import :stl;
+import std;
 import :default_values;
 import internal_types;
-import :third_party;
+import third_party;
 import :status;
 import column_def;
 
@@ -34,7 +34,7 @@ export enum class MetaCacheType {
     kCreateIndex,
 };
 
-export String ToString(MetaCacheType type);
+export std::string ToString(MetaCacheType type);
 
 export enum class EraseCacheType {
     kInvalid,
@@ -50,9 +50,9 @@ public:
     virtual ~MetaBaseCache() = default;
 
     MetaCacheType type() const;
-    virtual String name() const = 0;
+    virtual std::string name() const = 0;
     virtual u64 commit_ts() const = 0;
-    virtual String detail() const = 0;
+    virtual std::string detail() const = 0;
     virtual bool is_dropped() const = 0;
 
 protected:
@@ -64,105 +64,106 @@ protected:
 
 export class MetaDbCache final : public MetaBaseCache {
 public:
-    MetaDbCache(const String &db_name, u64 db_id, u64 commit_ts, const String &db_key, bool is_dropped, TransactionID reader_txn_id)
+    MetaDbCache(const std::string &db_name, u64 db_id, u64 commit_ts, const std::string &db_key, bool is_dropped, TransactionID reader_txn_id)
         : MetaBaseCache(MetaCacheType::kCreateDB, is_dropped, reader_txn_id), db_name_(db_name), db_id_(db_id), commit_ts_(commit_ts),
           db_key_(db_key) {}
-    ~MetaDbCache() final = default;
+    virtual ~MetaDbCache();
 
-    String name() const final;
+    std::string name() const final;
     u64 db_id() const;
-    const String &db_key() const;
+    const std::string &db_key() const;
     u64 commit_ts() const final;
-    String detail() const final;
+    std::string detail() const final;
     bool is_dropped() const final;
 
-    void set_comment(const SharedPtr<String> &comment);
+    void set_comment(const std::shared_ptr<std::string> &comment);
     bool get_comment() const;
-    SharedPtr<String> comment() const;
+    std::shared_ptr<std::string> comment() const;
 
 private:
-    String db_name_{};
+    std::string db_name_{};
     u64 db_id_{};
     u64 commit_ts_{};
-    String db_key_{};
+    std::string db_key_{};
 
     bool get_comment_{false};
-    SharedPtr<String> comment_{};
+    std::shared_ptr<std::string> comment_{};
 
     bool get_tables_{false};
-    Vector<String> table_ids_{};
-    Vector<String> table_names_{};
+    std::vector<std::string> table_ids_{};
+    std::vector<std::string> table_names_{};
 };
 
 export class MetaTableCache final : public MetaBaseCache {
 public:
     MetaTableCache(u64 db_id,
-                   const String &table_name,
+                   const std::string &table_name,
                    u64 table_id,
                    u64 commit_ts,
-                   const String &table_key,
+                   const std::string &table_key,
                    bool is_dropped,
                    TransactionID reader_txn_id)
         : MetaBaseCache(MetaCacheType::kCreateTable, is_dropped, reader_txn_id), db_id_(db_id), table_name_(table_name), table_id_(table_id),
           commit_ts_(commit_ts), table_key_(table_key) {}
-    ~MetaTableCache() final = default;
+    ~MetaTableCache() override = default;
 
-    String name() const final;
+    std::string name() const final;
     u64 db_id() const;
     u64 table_id() const;
-    const String &table_key() const;
+    const std::string &table_key() const;
     u64 commit_ts() const final;
-    String detail() const final;
+    std::string detail() const final;
     bool is_dropped() const final;
 
-    SharedPtr<Vector<SharedPtr<ColumnDef>>> get_columns() const;
-    void set_columns(const SharedPtr<Vector<SharedPtr<ColumnDef>>> &columns);
+    std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> get_columns() const;
+    void set_columns(const std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> &columns);
 
-    SharedPtr<Vector<SegmentID>> get_segments() const;
-    void set_segments(const SharedPtr<Vector<SegmentID>> &segments);
+    std::shared_ptr<std::vector<SegmentID>> get_segments() const;
+    void set_segments(const std::shared_ptr<std::vector<SegmentID>> &segments);
 
-    Tuple<SharedPtr<Vector<String>>, SharedPtr<Vector<String>>> get_index_ids() const;
-    void set_index_ids(const SharedPtr<Vector<String>> &index_names_ptr, const SharedPtr<Vector<String>> &index_ids_ptr);
+    std::tuple<std::shared_ptr<std::vector<std::string>>, std::shared_ptr<std::vector<std::string>>> get_index_ids() const;
+    void set_index_ids(const std::shared_ptr<std::vector<std::string>> &index_names_ptr,
+                       const std::shared_ptr<std::vector<std::string>> &index_ids_ptr);
 
 private:
     u64 db_id_{};
-    String table_name_{};
+    std::string table_name_{};
     u64 table_id_{};
     u64 commit_ts_{};
-    String table_key_{};
-    SharedPtr<Vector<SharedPtr<ColumnDef>>> columns_{};
-    SharedPtr<Vector<SegmentID>> segment_ids_{};
-    SharedPtr<Vector<String>> index_names_ptr_{};
-    SharedPtr<Vector<String>> index_ids_ptr_{};
+    std::string table_key_{};
+    std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> columns_{};
+    std::shared_ptr<std::vector<SegmentID>> segment_ids_{};
+    std::shared_ptr<std::vector<std::string>> index_names_ptr_{};
+    std::shared_ptr<std::vector<std::string>> index_ids_ptr_{};
 };
 
 export class MetaIndexCache final : public MetaBaseCache {
 public:
     MetaIndexCache(u64 db_id,
                    u64 table_id,
-                   const String &index_name,
+                   const std::string &index_name,
                    u64 index_id,
                    u64 commit_ts,
-                   const String &index_key,
+                   const std::string &index_key,
                    bool is_dropped,
                    TransactionID reader_txn_id)
         : MetaBaseCache(MetaCacheType::kCreateIndex, is_dropped, reader_txn_id), db_id_(db_id), table_id_(table_id), index_name_(index_name),
           index_id_(index_id), index_key_(index_key), commit_ts_(commit_ts) {};
-    ~MetaIndexCache() final = default;
+    ~MetaIndexCache() override = default;
 
-    String name() const final;
+    std::string name() const final;
     u64 db_id() const;
     u64 table_id() const;
     u64 commit_ts() const final;
-    String detail() const final;
+    std::string detail() const final;
     bool is_dropped() const final;
 
 private:
     u64 db_id_{};
     u64 table_id_{};
-    String index_name_{};
+    std::string index_name_{};
     u64 index_id_{};
-    String index_key_{};
+    std::string index_key_{};
     u64 commit_ts_{};
 };
 
@@ -173,32 +174,32 @@ export struct EraseBaseCache {
 };
 
 export struct MetaEraseDbCache : public EraseBaseCache {
-    explicit MetaEraseDbCache(const String &db_name) : EraseBaseCache(EraseCacheType::kEraseDB), db_name_(db_name) {}
-    String db_name_{};
+    explicit MetaEraseDbCache(const std::string &db_name) : EraseBaseCache(EraseCacheType::kEraseDB), db_name_(db_name) {}
+    std::string db_name_{};
 };
 
 export struct MetaEraseTableCache : public EraseBaseCache {
-    explicit MetaEraseTableCache(u64 db_id, const String &table_name)
+    explicit MetaEraseTableCache(u64 db_id, const std::string &table_name)
         : EraseBaseCache(EraseCacheType::kEraseTable), db_id_(db_id), table_name_(table_name) {}
     u64 db_id_{};
-    String table_name_{};
+    std::string table_name_{};
 };
 
 export struct MetaEraseIndexCache : public EraseBaseCache {
-    explicit MetaEraseIndexCache(u64 db_id, u64 table_id, const String &index_name)
+    explicit MetaEraseIndexCache(u64 db_id, u64 table_id, const std::string &index_name)
         : EraseBaseCache(EraseCacheType::kEraseIndex), db_id_(db_id), table_id_(table_id), index_name_(index_name) {}
     u64 db_id_{};
     u64 table_id_{};
-    String index_name_{};
+    std::string index_name_{};
 };
 
 struct CacheItem {
-    String name_;
-    SharedPtr<MetaBaseCache> meta_cache_;
+    std::string name_;
+    std::shared_ptr<MetaBaseCache> meta_cache_;
 };
 
 struct TableNameID {
-    String name_{};
+    std::string name_{};
     TxnTimeStamp commit_ts_{};
     MetaCacheType meta_type_{MetaCacheType::kInvalid};
 };
@@ -212,9 +213,9 @@ export struct CacheStatus {
 export class MetaCache {
 private:
     mutable std::mutex cache_mtx_{};
-    HashMap<String, Map<u64, List<CacheItem>::iterator>> dbs_;     // db_name -> (commit_ts -> MetaDbCache)
-    HashMap<String, Map<u64, List<CacheItem>::iterator>> tables_;  // table_name -> (commit_ts -> MetaTableCache)
-    HashMap<String, Map<u64, List<CacheItem>::iterator>> indexes_; // index_name -> (commit_ts -> MetaIndexCache)
+    std::unordered_map<std::string, std::map<u64, std::list<CacheItem>::iterator>> dbs_;     // db_name -> (commit_ts -> MetaDbCache)
+    std::unordered_map<std::string, std::map<u64, std::list<CacheItem>::iterator>> tables_;  // table_name -> (commit_ts -> MetaTableCache)
+    std::unordered_map<std::string, std::map<u64, std::list<CacheItem>::iterator>> indexes_; // index_name -> (commit_ts -> MetaIndexCache)
 
     u64 db_request_count_{};
     u64 table_request_count_{};
@@ -224,43 +225,43 @@ private:
     u64 table_hit_count_{};
     u64 index_hit_count_{};
 
-    SizeT capacity_{0};
-    List<CacheItem> lru_{};
+    size_t capacity_{0};
+    std::list<CacheItem> lru_{};
     TxnTimeStamp latest_erased_ts_{};
 
 public:
-    explicit MetaCache(SizeT capacity) : capacity_(capacity) {};
+    explicit MetaCache(size_t capacity) : capacity_(capacity) {};
 
-    void Put(const Vector<SharedPtr<MetaBaseCache>> &cache_items, TxnTimeStamp begin_ts);
+    void Put(const std::vector<std::shared_ptr<MetaBaseCache>> &cache_items, TxnTimeStamp begin_ts);
 
-    Status Erase(const Vector<SharedPtr<EraseBaseCache>> &cache_items, KVInstance *kv_instance, TxnTimeStamp commit_ts);
+    Status Erase(const std::vector<std::shared_ptr<EraseBaseCache>> &cache_items, KVInstance *kv_instance, TxnTimeStamp commit_ts);
 
-    Status PutOrErase(const Vector<SharedPtr<MetaBaseCache>> &cache_items, KVInstance *kv_instance);
+    Status PutOrErase(const std::vector<std::shared_ptr<MetaBaseCache>> &cache_items, KVInstance *kv_instance);
 
-    SharedPtr<MetaDbCache> GetDb(const String &db_name, TxnTimeStamp begin_ts);
+    std::shared_ptr<MetaDbCache> GetDb(const std::string &db_name, TxnTimeStamp begin_ts);
 
-    SharedPtr<MetaTableCache> GetTable(u64 db_id, const String &table_name, TxnTimeStamp begin_ts);
+    std::shared_ptr<MetaTableCache> GetTable(u64 db_id, const std::string &table_name, TxnTimeStamp begin_ts);
 
-    SharedPtr<MetaIndexCache> GetIndex(u64 db_id, u64 table_id, const String &index_name, TxnTimeStamp begin_ts);
+    std::shared_ptr<MetaIndexCache> GetIndex(u64 db_id, u64 table_id, const std::string &index_name, TxnTimeStamp begin_ts);
 
     CacheStatus GetCacheStatus(MetaCacheType type) const;
 
     void PrintLRU() const;
 
-    SizeT Size() const;
+    size_t Size() const;
 
-    Vector<SharedPtr<MetaBaseCache>> GetAllCacheItems() const;
+    std::vector<std::shared_ptr<MetaBaseCache>> GetAllCacheItems() const;
 
 private:
-    void PutOrEraseNolock(const SharedPtr<MetaBaseCache> &meta_base_cache);
-    void PutDbNolock(const SharedPtr<MetaDbCache> &db_cache);
-    void EraseDbNolock(const String &db_name);
-    void PutTableNolock(const SharedPtr<MetaTableCache> &table_cache);
-    void EraseTableNolock(u64 db_id, const String &table_name);
-    void PutIndexNolock(const SharedPtr<MetaIndexCache> &index_cache);
-    void EraseIndexNolock(u64 db_id, u64 table_id, const String &index_name);
+    void PutOrEraseNolock(const std::shared_ptr<MetaBaseCache> &meta_base_cache);
+    void PutDbNolock(const std::shared_ptr<MetaDbCache> &db_cache);
+    void EraseDbNolock(const std::string &db_name);
+    void PutTableNolock(const std::shared_ptr<MetaTableCache> &table_cache);
+    void EraseTableNolock(u64 db_id, const std::string &table_name);
+    void PutIndexNolock(const std::shared_ptr<MetaIndexCache> &index_cache);
+    void EraseIndexNolock(u64 db_id, u64 table_id, const std::string &index_name);
     void TrimCacheNolock();
-    void TouchNolock(List<CacheItem>::iterator iter);
+    void TouchNolock(std::list<CacheItem>::iterator iter);
 };
 
 } // namespace infinity

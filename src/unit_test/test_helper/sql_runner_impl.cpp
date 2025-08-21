@@ -12,19 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <memory>
-
-#ifdef CI
-module sql_runner;
-
-import infinity_core;
-#else
 module infinity_core:ut.sql_runner.impl;
 
 import :ut.sql_runner;
-import :stl;
 import :fragment_builder;
 import :data_table;
 import :infinity_context;
@@ -36,8 +26,8 @@ import :fragment_context;
 import :logical_planner;
 import :query_context;
 import :physical_planner;
-#endif
 
+import std;
 import sql_parser;
 import base_statement;
 import parser_result;
@@ -50,15 +40,15 @@ namespace infinity {
  * @param print
  * @return Table
  */
-SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
+std::shared_ptr<DataTable> SQLRunner::Run(const std::string &sql_text, bool print) {
     //    if (print) {
     //        LOG_TRACE(fmt::format("{}", sql_text));
     //    }
 
-    //    UniquePtr<SessionManager> session_manager = MakeUnique<SessionManager>();
-    SharedPtr<RemoteSession> session_ptr = InfinityContext::instance().session_manager()->CreateRemoteSession();
+    //    std::unique_ptr<SessionManager> session_manager = std::make_unique<SessionManager>();
+    std::shared_ptr<RemoteSession> session_ptr = InfinityContext::instance().session_manager()->CreateRemoteSession();
 
-    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get());
+    std::unique_ptr<QueryContext> query_context_ptr = std::make_unique<QueryContext>(session_ptr.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
@@ -67,8 +57,8 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
                             InfinityContext::instance().persistence_manager());
     query_context_ptr->set_current_schema(session_ptr->current_database());
 
-    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr<ParserResult> parsed_result = MakeShared<ParserResult>();
+    std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
+    std::shared_ptr<ParserResult> parsed_result = std::make_shared<ParserResult>();
     parser->Parse(sql_text, parsed_result.get());
 
     if (parsed_result->IsError()) {
@@ -83,23 +73,23 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
 
     query_context_ptr->BeginTxn(statement);
 
-    SharedPtr<BindContext> bind_context;
+    std::shared_ptr<BindContext> bind_context;
     query_context_ptr->logical_planner()->Build(statement, bind_context);
     query_context_ptr->set_max_node_id(bind_context->GetNewLogicalNodeId());
 
-    SharedPtr<LogicalNode> logical_plan = query_context_ptr->logical_planner()->LogicalPlans()[0];
+    std::shared_ptr<LogicalNode> logical_plan = query_context_ptr->logical_planner()->LogicalPlans()[0];
 
     // Apply optimized rule to the logical plan
     query_context_ptr->optimizer()->optimize(logical_plan, statement->Type());
 
     // Build physical plan
-    SharedPtr<PhysicalOperator> physical_plan = query_context_ptr->physical_planner()->BuildPhysicalOperator(logical_plan);
+    std::shared_ptr<PhysicalOperator> physical_plan = query_context_ptr->physical_planner()->BuildPhysicalOperator(logical_plan);
 
     // Create execution pipeline
     // Fragment Builder, only for test now. plan fragment is same as pipeline.
     auto plan_fragment = query_context_ptr->fragment_builder()->BuildFragment({physical_plan.get()});
 
-    auto notifier = MakeUnique<Notifier>();
+    auto notifier = std::make_unique<Notifier>();
 
     FragmentContext::BuildTask(query_context_ptr.get(), nullptr, plan_fragment.get(), notifier.get());
 

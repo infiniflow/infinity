@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:table_index_meeta;
 
-import :stl;
 import :status;
-import column_def;
 import :meta_info;
 import :new_catalog;
 import :snapshot_info;
+
+import column_def;
 
 namespace infinity {
 
@@ -38,7 +36,7 @@ export enum class SecondaryIndexCardinality : u8 { kHighCardinality = 0, kLowCar
 
 export class TableIndexMeeta {
 public:
-    TableIndexMeeta(String index_id_str, TableMeeta &table_meta);
+    TableIndexMeeta(std::string index_id_str, TableMeeta &table_meta);
 
     ~TableIndexMeeta();
 
@@ -46,21 +44,21 @@ public:
 
     TableMeeta &table_meta() const { return table_meta_; }
 
-    const String &index_id_str() const { return index_id_str_; }
+    const std::string &index_id_str() const { return index_id_str_; }
 
-    Tuple<SharedPtr<IndexBase>, Status> GetIndexBase();
+    std::tuple<std::shared_ptr<IndexBase>, Status> GetIndexBase();
 
-    Status SetIndexBase(const SharedPtr<IndexBase> &index_base);
+    Status SetIndexBase(const std::shared_ptr<IndexBase> &index_base);
 
-    SharedPtr<String> GetTableIndexDir();
+    std::shared_ptr<std::string> GetTableIndexDir();
 
-    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDef();
+    std::tuple<std::shared_ptr<ColumnDef>, Status> GetColumnDef();
 
     Status GetTableIndexInfo(TableIndexInfo &table_index_info);
 
-    Tuple<Vector<SegmentID> *, Status> GetSegmentIndexIDs1();
+    std::tuple<std::vector<SegmentID> *, Status> GetSegmentIndexIDs1();
 
-    Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
+    Status SetSegmentIDs(const std::vector<SegmentID> &segment_ids);
 
     bool HasSegmentIndexID(SegmentID segment_id);
 
@@ -68,42 +66,41 @@ public:
 
     Status AddSegmentIndexID1(SegmentID segment_id, NewTxn *new_txn);
 
-    Status RemoveSegmentIndexIDs(const Vector<SegmentID> &segment_ids);
+    Status RemoveSegmentIndexIDs(const std::vector<SegmentID> &segment_ids);
 
-    Tuple<SharedPtr<TableIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo();
+    std::tuple<std::shared_ptr<TableIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
 private:
-    Status GetSegmentUpdateTS(SharedPtr<SegmentUpdateTS> &segment_update_ts);
+    Status GetSegmentUpdateTS(std::shared_ptr<SegmentUpdateTS> &segment_update_ts);
 
 public:
-
-    Status InitSet1(const SharedPtr<IndexBase> &index_base, NewCatalog *new_catalog);
+    Status InitSet1(const std::shared_ptr<IndexBase> &index_base, NewCatalog *new_catalog);
 
     Status UninitSet1(UsageFlag usage_flag);
 
 private:
     Status LoadSegmentIDs();
 
-    String GetTableIndexTag(const String &tag) const;
+    std::string GetTableIndexTag(const std::string &tag) const;
 
 public:
-    String FtIndexCacheTag() const;
+    std::string FtIndexCacheTag() const;
 
     // Methods for secondary index cardinality
     Status SetSecondaryIndexCardinality(SecondaryIndexCardinality cardinality);
 
-    Tuple<SecondaryIndexCardinality, Status> GetSecondaryIndexCardinality();
+    std::tuple<SecondaryIndexCardinality, Status> GetSecondaryIndexCardinality();
 
 private:
     mutable std::mutex mtx_;
 
     KVInstance &kv_instance_;
     TableMeeta &table_meta_;
-    String index_id_str_;
+    std::string index_id_str_;
 
-    SharedPtr<IndexBase> index_def_;
-    Optional<Vector<SegmentID>> segment_ids_;
-    SharedPtr<SegmentUpdateTS> segment_update_ts_;
+    std::shared_ptr<IndexBase> index_def_;
+    std::optional<std::vector<SegmentID>> segment_ids_;
+    std::shared_ptr<SegmentUpdateTS> segment_update_ts_;
 };
 
 } // namespace infinity

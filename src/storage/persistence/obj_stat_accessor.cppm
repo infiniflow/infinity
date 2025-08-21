@@ -12,55 +12,55 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:obj_stat_accessor;
 
-import :stl;
 import :obj_status;
-import :third_party;
+
+import std;
+import std.compat;
+import third_party;
 
 namespace infinity {
 
 class KVInstance;
 
 struct LRUListEntry {
-    LRUListEntry(String key, ObjStat obj_stat) : key_(std::move(key)), obj_stat_(std::move(obj_stat)) {}
+    LRUListEntry(std::string key, ObjStat obj_stat) : key_(std::move(key)), obj_stat_(std::move(obj_stat)) {}
 
-    String key_{};
+    std::string key_{};
     ObjStat obj_stat_{};
 };
 
 class ObjectStatMap {
-    using LRUList = List<LRUListEntry>;
+    using LRUList = std::list<LRUListEntry>;
     using LRUListIter = LRUList::iterator;
-    using LRUMap = HashMap<String, LRUListIter>;
+    using LRUMap = std::unordered_map<std::string, LRUListIter>;
 
 public:
     ~ObjectStatMap();
 
     // Get stat of object[key], if not in cache, return nullptr
     // called when read object from local cache, ref count by 1, if ref count 0 -> 1, move from lru_list to using_list
-    ObjStat *Get(const String &key);
+    ObjStat *Get(const std::string &key);
 
     // Get stat of object[key], and not update lru and ref count
-    ObjStat *GetNoCount(const String &key);
+    ObjStat *GetNoCount(const std::string &key);
 
     // Release object[key], decrease ref count by 1, if ref count 1 -> 0, move from using_list to lru_list
     // called when object file is closed, return true if object[key] exists and ref count -> 0
-    Pair<bool, ObjStat *> Release(const String &key);
+    std::pair<bool, ObjStat *> Release(const std::string &key);
 
     // Add new object to cache.
     // the object[key] is not in obj_map, add key->obj_stat mapping. called by checkpoint.
-    void PutNew(const String &key, ObjStat obj_stat);
+    void PutNew(const std::string &key, ObjStat obj_stat);
 
     // Recover old object
     // the object[key] must in obj_map, and must in cleanuped_list. called when download cleanuped object from remote storage to local cache
-    void Recover(const String &key);
+    void Recover(const std::string &key);
 
     // Invalidate object[key]
     // called when the object[key] should be cleaned up in remote storage. remove mapping and return the obj_stat if exists
-    Optional<ObjStat> Invalidate(const String &key);
+    std::optional<ObjStat> Invalidate(const std::string &key);
 
     // Envict old object
     // move the last object in lru_list to cleanuped_list. called when disk used over limit, return nullptr if lru_list is empty
@@ -81,19 +81,19 @@ export class ObjectStatAccessorBase {
 public:
     virtual ~ObjectStatAccessorBase() = default;
 
-    virtual Optional<ObjStat> Get(const String &key) = 0;
+    virtual std::optional<ObjStat> Get(const std::string &key) = 0;
 
-    virtual Optional<ObjStat> GetNoCount(const String &key) = 0;
+    virtual std::optional<ObjStat> GetNoCount(const std::string &key) = 0;
 
-    virtual Optional<ObjStat> Release(const String &key, Vector<String> &drop_keys) = 0;
+    virtual std::optional<ObjStat> Release(const std::string &key, std::vector<std::string> &drop_keys) = 0;
 
-    virtual void PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) = 0;
+    virtual void PutNew(const std::string &key, ObjStat obj_stat, std::vector<std::string> &drop_keys) = 0;
 
-    virtual void PutNoCount(const String &key, ObjStat obj_stat) = 0;
+    virtual void PutNoCount(const std::string &key, ObjStat obj_stat) = 0;
 
-    virtual Optional<ObjStat> Invalidate(const String &key) = 0;
+    virtual std::optional<ObjStat> Invalidate(const std::string &key) = 0;
 
-    virtual void CheckValid(SizeT current_object_size) = 0;
+    virtual void CheckValid(size_t current_object_size) = 0;
 
     virtual nlohmann::json Serialize() = 0;
 
@@ -101,31 +101,31 @@ public:
 
     virtual void Deserialize(KVInstance *kv_instance) = 0;
 
-    virtual HashMap<String, ObjStat> GetAllObjects() const = 0;
+    virtual std::unordered_map<std::string, ObjStat> GetAllObjects() const = 0;
 
 protected:
-    void AddObjStatToKVStore(const String &key, const ObjStat &obj_stat);
+    void AddObjStatToKVStore(const std::string &key, const ObjStat &obj_stat);
 
-    void RemoveObjStatFromKVStore(const String &key);
+    void RemoveObjStatFromKVStore(const std::string &key);
 };
 
 export class ObjectStatAccessor_LocalStorage : public ObjectStatAccessorBase {
 public:
     ~ObjectStatAccessor_LocalStorage() override;
 
-    Optional<ObjStat> Get(const String &key) override;
+    std::optional<ObjStat> Get(const std::string &key) override;
 
-    Optional<ObjStat> GetNoCount(const String &key) override;
+    std::optional<ObjStat> GetNoCount(const std::string &key) override;
 
-    Optional<ObjStat> Release(const String &key, Vector<String> &drop_keys) override;
+    std::optional<ObjStat> Release(const std::string &key, std::vector<std::string> &drop_keys) override;
 
-    void PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) override;
+    void PutNew(const std::string &key, ObjStat obj_stat, std::vector<std::string> &drop_keys) override;
 
-    void PutNoCount(const String &key, ObjStat obj_stat) override;
+    void PutNoCount(const std::string &key, ObjStat obj_stat) override;
 
-    Optional<ObjStat> Invalidate(const String &key) override;
+    std::optional<ObjStat> Invalidate(const std::string &key) override;
 
-    void CheckValid(SizeT current_object_size) override;
+    void CheckValid(size_t current_object_size) override;
 
     nlohmann::json Serialize() override;
 
@@ -133,33 +133,33 @@ public:
 
     void Deserialize(KVInstance *kv_instance) override;
 
-    HashMap<String, ObjStat> GetAllObjects() const override;
+    std::unordered_map<std::string, ObjStat> GetAllObjects() const override;
 
 private:
     mutable std::mutex mutex_{}; // protect obj_map_
-    HashMap<String, ObjStat> obj_map_{};
+    std::unordered_map<std::string, ObjStat> obj_map_{};
 };
 
 // envict and recover is encapsulated
 export class ObjectStatAccessor_ObjectStorage : public ObjectStatAccessorBase {
 public:
-    ObjectStatAccessor_ObjectStorage(SizeT disk_capacity_limit);
+    ObjectStatAccessor_ObjectStorage(size_t disk_capacity_limit);
 
     ~ObjectStatAccessor_ObjectStorage() override;
 
-    Optional<ObjStat> Get(const String &key) override;
+    std::optional<ObjStat> Get(const std::string &key) override;
 
-    Optional<ObjStat> GetNoCount(const String &key) override;
+    std::optional<ObjStat> GetNoCount(const std::string &key) override;
 
-    Optional<ObjStat> Release(const String &key, Vector<String> &drop_keys) override;
+    std::optional<ObjStat> Release(const std::string &key, std::vector<std::string> &drop_keys) override;
 
-    void PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) override;
+    void PutNew(const std::string &key, ObjStat obj_stat, std::vector<std::string> &drop_keys) override;
 
-    void PutNoCount(const String &key, ObjStat obj_stat) override;
+    void PutNoCount(const std::string &key, ObjStat obj_stat) override;
 
-    Optional<ObjStat> Invalidate(const String &key) override;
+    std::optional<ObjStat> Invalidate(const std::string &key) override;
 
-    void CheckValid(SizeT current_object_size) override;
+    void CheckValid(size_t current_object_size) override;
 
     nlohmann::json Serialize() override;
 
@@ -167,19 +167,19 @@ public:
 
     void Deserialize(KVInstance *kv_instance) override;
 
-    HashMap<String, ObjStat> GetAllObjects() const override;
+    std::unordered_map<std::string, ObjStat> GetAllObjects() const override;
 
-    SizeT disk_used() const { return disk_used_; }
-
-private:
-    bool EnvictNoLock(Vector<String> &drop_keys);
+    size_t disk_used() const { return disk_used_; }
 
 private:
-    const SizeT disk_capacity_limit_{};
+    bool EnvictNoLock(std::vector<std::string> &drop_keys);
+
+private:
+    const size_t disk_capacity_limit_{};
 
     mutable std::shared_mutex mutex_{}; // protect obj_map_, disk_used_
     ObjectStatMap obj_map_{};
-    SizeT disk_used_{};
+    size_t disk_used_{};
 };
 
 } // namespace infinity

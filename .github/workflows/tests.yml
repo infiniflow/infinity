@@ -58,7 +58,7 @@ jobs:
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
           echo "CPUS=${CPUS}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker rm -f -v ${BUILDER_CONTAINER} && sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity -v /boot:/boot -v /var/run/docker.sock:/var/run/docker.sock --cpus ${CPUS} infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker rm -f -v ${BUILDER_CONTAINER} && sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity -v /var/run/docker.sock:/var/run/docker.sock --cpus ${CPUS} infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Check format of changed C/C++ files
         if: ${{ !cancelled() && !failure() }}
@@ -69,13 +69,13 @@ jobs:
               | grep -v 'third_party/' \
               | grep -v 'build/' \
               | grep -v 'parser/' || true)
-
+          
             if [ -n "$CHANGED_FILES" ]; then
               echo "Check format of changed C/C++ files with clang-format-20"
-
+          
               readarray -t files <<< "$CHANGED_FILES"
               HAS_ERROR=0
-
+          
               for file in "${files[@]}"; do
                 if [ -f "$file" ]; then
                   echo "Checking formatting: $file"
@@ -89,7 +89,7 @@ jobs:
                   rm -f "${file}.formatted"
                 fi
               done
-
+          
               if [ $HAS_ERROR -ne 0 ]; then
                 exit 1
               fi
@@ -98,18 +98,9 @@ jobs:
             fi
           fi
 
-      - name: Start minio container
+      - name: Configure debug version
         if: ${{ !cancelled() && !failure() }}
-        run: |
-          MINIO_CONTAINER=minio_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          MINIO_DIR=~/minio_data_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> $GITHUB_ENV
-          echo "MINIO_DIR=${MINIO_DIR}" >> $GITHUB_ENV
-          sudo docker rm -f -v ${MINIO_CONTAINER} && sudo rm -fr ${MINIO_DIR} && sudo mkdir ${MINIO_DIR} && sudo docker run -d --net=container:${BUILDER_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_DIR}:/data    quay.io/minio/minio server /data --console-address ":9006" --address ":9005" && sleep 5s
-          if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
-              echo "Minio container is not running"
-              exit 1
-          fi
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOLS:STRING=link=8 -DCI=ON -S /infinity -B /infinity/cmake-build-debug"
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -117,7 +108,7 @@ jobs:
 
       - name: Build debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOLS:STRING=link=8 -DCI=ON -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug --target infinity"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && cmake --build /infinity/cmake-build-debug --target infinity"
 
       #      - name: Run cluster test
       #        if: ${{ !cancelled() && !failure() }}
@@ -178,6 +169,22 @@ jobs:
       #          failure="${{ steps.run_tests_debug_minio.outcome == 'failure' || steps.stop_tests_debug_minio.outcome == 'failure' }}"
       #          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=vfs_debug.log --stderror_path=vfs_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
       #
+
+      - name: Build unit test
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake --build /infinity/cmake-build-debug --target test_main"
+
+      - name: Unit test debug version
+        if: ${{ !cancelled() && !failure() }}
+        id: run_unit_test_debug
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main > unittest_debug.log 2> unittest_debug_error.log"
+
+      - name: Collect infinity unit test debug output
+        if: ${{ !cancelled() }}
+        run:
+          failure="${{ steps.run_unit_test_debug.outcome == 'failure' }}"
+          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=unittest_debug.log --stderror_path=unittest_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -208,21 +215,6 @@ jobs:
           failure="${{ steps.run_tests_debug.outcome == 'failure' || steps.stop_tests_debug.outcome == 'failure' }}"
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
           sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=sqllogictest_debug.log --stderror_path=sqllogictest_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-
-      - name: Build unit test
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake --build /infinity/cmake-build-debug --target test_main"
-
-      - name: Unit test debug version
-        if: ${{ !cancelled() && !failure() }}
-        id: run_unit_test_debug
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main > unittest_debug.log 2> unittest_debug_error.log"
-
-      - name: Collect infinity unit test debug output
-        if: ${{ !cancelled() }}
-        run: |
-          failure="${{ steps.run_unit_test_debug.outcome == 'failure' }}"
-          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=unittest_debug.log --stderror_path=unittest_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
@@ -324,17 +316,6 @@ jobs:
             sudo docker rm -f -v ${BUILDER_CONTAINER}
           fi
 
-      - name: Destroy minio container
-        if: always()  # always run this step even if previous steps failed
-        run: |
-          if [ -n "${MINIO_CONTAINER}" ]; then
-            sudo docker rm -f -v ${MINIO_CONTAINER}
-          fi
-
-      - name: Clear minio working dir
-        if: always()  # always run this step even if previous steps failed
-        run: sudo rm -fr ${MINIO_DIR}
-
   release_tests:
     name: release_tests and benchmark
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
@@ -369,19 +350,11 @@ jobs:
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
           echo "CPUS=${CPUS}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker rm -f -v ${BUILDER_CONTAINER} && sudo docker run --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity -v /boot:/boot --cpus ${CPUS} infiniflow/infinity_builder:ubuntu20_clang20
-      - name: Start minio container
+          sudo docker rm -f -v ${BUILDER_CONTAINER} && sudo docker run --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity --cpus ${CPUS} infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Configure release version
         if: ${{ !cancelled() && !failure() }}
-        run: |
-          MINIO_CONTAINER=minio_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          MINIO_DIR=~/minio_data_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> $GITHUB_ENV
-          echo "MINIO_DIR=${MINIO_DIR}" >> $GITHUB_ENV
-          sudo docker rm -f -v ${MINIO_CONTAINER} && sudo rm -fr ${MINIO_DIR} && sudo mkdir ${MINIO_DIR} && sudo docker run -d --net=container:${BUILDER_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_DIR}:/data    quay.io/minio/minio server /data --console-address ":9006" --address ":9005" && sleep 5s
-          if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
-              echo "Minio container is not running"
-              exit 1
-          fi
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_JOB_POOLS:STRING=link=8 -DCI=ON -S /infinity -B /infinity/cmake-build-release"
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -389,7 +362,7 @@ jobs:
 
       - name: Build release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_JOB_POOLS:STRING=link=8 -DCI=ON -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release --target infinity"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && cmake --build /infinity/cmake-build-release --target infinity"
 
       #      - name: Run cluster test
       #        if: ${{ !cancelled() && !failure() }}
@@ -461,6 +434,18 @@ jobs:
       #          failure="${{ steps.run_tests_release_minio.outcome == 'failure' || steps.stop_tests_release_minio.outcome == 'failure' }}"
       #          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stderror_path=vfs_release_error.log --stdout_path=vfs_release.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
+      - name: Build unit test
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake --build /infinity/cmake-build-release --target test_main knn_import_benchmark knn_query_benchmark"
+
+      - name: Unit test release version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main > unittest_release.log 2>&1"
+
+      - name: Collect infinity unit test release output
+        if: ${{ !cancelled() }}
+        run: tail unittest_release.log 2>/dev/null || true
+
       - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -491,18 +476,6 @@ jobs:
           failure="${{ steps.run_tests_release.outcome == 'failure' || steps.stop_tests_release.outcome == 'failure' }}"
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
           sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=sqllogictest_release.log --stderror_path=sqllogictest_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-
-      - name: Build unit test
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake --build /infinity/cmake-build-release --target test_main knn_import_benchmark knn_query_benchmark"
-
-      - name: Unit test release version
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main > unittest_release.log 2>&1"
-
-      - name: Collect infinity unit test release output
-        if: ${{ !cancelled() }}
-        run: tail -n 1000 unittest_release.log 2>/dev/null || true
 
       - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
@@ -597,6 +570,56 @@ jobs:
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
           sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=parallel_test_release.log --stderror_path=parallel_test_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
+      - name: Collect infinity release output
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
+        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
+        run: |
+          failure="${{ steps.run_parallel_test_release.outcome == 'failure' || steps.stop_parallel_test_release.outcome == 'failure' }}"
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
+          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=minio_parallel_test_release.log --stderror_path=minio_parallel_test_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+
+      - name: Prepare sift dataset
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
+          echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
+          sudo chmod +x ./tools/ci_tools/check_benchmark_result.py && sudo mkdir -p test/data/benchmark && sudo ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark/sift1M test/data/benchmark/sift_1m
+
+      - name: Golden benchmark sift
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          if [[ -f "${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log" ]]; then
+              echo "golden benchmark result already exists!"
+              exit 0
+          fi
+          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat ${RUNNER_WORKSPACE_PREFIX}/benchmark/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
+          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=sift --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp && \
+          echo "1 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log && \
+          echo "8 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log
+
+      - name: Latest benchmark sift
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
+          ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=sift --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp --config_path=db_tmp/infinity_conf.toml && \
+          echo "1 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_1_thread.log && \
+          echo "8 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_8_threads.log && \
+          ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log benchmark_sift_1_thread.log && \
+          ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log benchmark_sift_8_threads.log
+
+      - name: Start minio container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          MINIO_CONTAINER=minio_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          MINIO_DIR=~/minio_data_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> $GITHUB_ENV
+          echo "MINIO_DIR=${MINIO_DIR}" >> $GITHUB_ENV
+          sudo docker rm -f -v ${MINIO_CONTAINER} && sudo rm -fr ${MINIO_DIR} && sudo mkdir ${MINIO_DIR} && sudo docker run -d --net=container:${BUILDER_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_DIR}:/data    quay.io/minio/minio server /data --console-address ":9006" --address ":9005" && sleep 5s
+          if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
+              echo "Minio container is not running"
+              exit 1
+          fi
+
       - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -651,43 +674,6 @@ jobs:
             echo "Failed to kill infinity debug version"
             exit 1
           fi
-
-      - name: Collect infinity release output
-        if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
-        run: |
-          failure="${{ steps.run_parallel_test_release.outcome == 'failure' || steps.stop_parallel_test_release.outcome == 'failure' }}"
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
-          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=minio_parallel_test_release.log --stderror_path=minio_parallel_test_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-
-      - name: Prepare sift dataset
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
-          echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
-          sudo chmod +x ./tools/ci_tools/check_benchmark_result.py && sudo mkdir -p test/data/benchmark && sudo ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark/sift1M test/data/benchmark/sift_1m
-
-      - name: Golden benchmark sift
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          if [[ -f "${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log" ]]; then
-              echo "golden benchmark result already exists!"
-              exit 0
-          fi
-          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat ${RUNNER_WORKSPACE_PREFIX}/benchmark/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
-          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=sift --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp && \
-          echo "1 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log && \
-          echo "8 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log
-
-      - name: Latest benchmark sift
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
-          ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=sift --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp --config_path=db_tmp/infinity_conf.toml && \
-          echo "1 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_1_thread.log && \
-          echo "8 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_8_threads.log && \
-          ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log benchmark_sift_1_thread.log && \
-          ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log benchmark_sift_8_threads.log
 
       - name: Destroy builder container
         if: always()  # always run this step even if previous steps failed

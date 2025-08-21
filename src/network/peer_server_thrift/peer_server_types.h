@@ -9,49 +9,32 @@
 
 #include <iosfwd>
 
-#include <thrift/Thrift.h>
 #include <thrift/TApplicationException.h>
 #include <thrift/TBase.h>
+#include <thrift/Thrift.h>
 #include <thrift/protocol/TProtocol.h>
-#include <thrift/transport/TTransport.h>
-
-#include <functional>
-#include <memory>
-
 
 namespace infinity_peer_server {
 
 struct NodeType {
-  enum type {
-    kAdmin = 0,
-    kLeader = 1,
-    kFollower = 2,
-    kLearner = 3,
-    kInvalid = 4
-  };
+    enum type { kAdmin = 0, kLeader = 1, kFollower = 2, kLearner = 3, kInvalid = 4 };
 };
 
-extern const std::map<int, const char*> _NodeType_VALUES_TO_NAMES;
+extern const std::map<int, const char *> _NodeType_VALUES_TO_NAMES;
 
-std::ostream& operator<<(std::ostream& out, const NodeType::type& val);
+std::ostream &operator<<(std::ostream &out, const NodeType::type &val);
 
-std::string to_string(const NodeType::type& val);
+std::string to_string(const NodeType::type &val);
 
 struct NodeStatus {
-  enum type {
-    kInvalid = 0,
-    kAlive = 1,
-    kLostConnection = 2,
-    kRemoved = 3,
-    kTimeout = 4
-  };
+    enum type { kInvalid = 0, kAlive = 1, kLostConnection = 2, kRemoved = 3, kTimeout = 4 };
 };
 
-extern const std::map<int, const char*> _NodeStatus_VALUES_TO_NAMES;
+extern const std::map<int, const char *> _NodeStatus_VALUES_TO_NAMES;
 
-std::ostream& operator<<(std::ostream& out, const NodeStatus::type& val);
+std::ostream &operator<<(std::ostream &out, const NodeStatus::type &val);
 
-std::string to_string(const NodeStatus::type& val);
+std::string to_string(const NodeStatus::type &val);
 
 class NodeInfo;
 
@@ -80,633 +63,595 @@ class NewLeaderRequest;
 class NewLeaderResponse;
 
 typedef struct _NodeInfo__isset {
-  _NodeInfo__isset() : node_name(false), node_type(false), node_ip(false), node_port(false), txn_timestamp(false), node_status(false), hb_count(false) {}
-  bool node_name :1;
-  bool node_type :1;
-  bool node_ip :1;
-  bool node_port :1;
-  bool txn_timestamp :1;
-  bool node_status :1;
-  bool hb_count :1;
+    _NodeInfo__isset()
+        : node_name(false), node_type(false), node_ip(false), node_port(false), txn_timestamp(false), node_status(false), hb_count(false) {}
+    bool node_name : 1;
+    bool node_type : 1;
+    bool node_ip : 1;
+    bool node_port : 1;
+    bool txn_timestamp : 1;
+    bool node_status : 1;
+    bool hb_count : 1;
 } _NodeInfo__isset;
 
 class NodeInfo : public virtual ::apache::thrift::TBase {
- public:
+public:
+    NodeInfo(const NodeInfo &);
+    NodeInfo &operator=(const NodeInfo &);
+    NodeInfo() noexcept;
 
-  NodeInfo(const NodeInfo&);
-  NodeInfo& operator=(const NodeInfo&);
-  NodeInfo() noexcept;
+    virtual ~NodeInfo() noexcept;
+    std::string node_name;
+    /**
+     *
+     * @see NodeType
+     */
+    NodeType::type node_type;
+    std::string node_ip;
+    int64_t node_port;
+    int64_t txn_timestamp;
+    /**
+     *
+     * @see NodeStatus
+     */
+    NodeStatus::type node_status;
+    int64_t hb_count;
 
-  virtual ~NodeInfo() noexcept;
-  std::string node_name;
-  /**
-   * 
-   * @see NodeType
-   */
-  NodeType::type node_type;
-  std::string node_ip;
-  int64_t node_port;
-  int64_t txn_timestamp;
-  /**
-   * 
-   * @see NodeStatus
-   */
-  NodeStatus::type node_status;
-  int64_t hb_count;
+    _NodeInfo__isset __isset;
 
-  _NodeInfo__isset __isset;
+    void __set_node_name(const std::string &val);
 
-  void __set_node_name(const std::string& val);
+    void __set_node_type(const NodeType::type val);
 
-  void __set_node_type(const NodeType::type val);
+    void __set_node_ip(const std::string &val);
 
-  void __set_node_ip(const std::string& val);
+    void __set_node_port(const int64_t val);
 
-  void __set_node_port(const int64_t val);
+    void __set_txn_timestamp(const int64_t val);
 
-  void __set_txn_timestamp(const int64_t val);
+    void __set_node_status(const NodeStatus::type val);
 
-  void __set_node_status(const NodeStatus::type val);
+    void __set_hb_count(const int64_t val);
 
-  void __set_hb_count(const int64_t val);
+    bool operator==(const NodeInfo &rhs) const;
+    bool operator!=(const NodeInfo &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const NodeInfo & rhs) const;
-  bool operator != (const NodeInfo &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const NodeInfo &) const;
 
-  bool operator < (const NodeInfo & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(NodeInfo &a, NodeInfo &b);
 
-std::ostream& operator<<(std::ostream& out, const NodeInfo& obj);
+std::ostream &operator<<(std::ostream &out, const NodeInfo &obj);
 
 typedef struct _RegisterRequest__isset {
-  _RegisterRequest__isset() : node_name(false), node_type(false), node_ip(false), node_port(false), txn_timestamp(false) {}
-  bool node_name :1;
-  bool node_type :1;
-  bool node_ip :1;
-  bool node_port :1;
-  bool txn_timestamp :1;
+    _RegisterRequest__isset() : node_name(false), node_type(false), node_ip(false), node_port(false), txn_timestamp(false) {}
+    bool node_name : 1;
+    bool node_type : 1;
+    bool node_ip : 1;
+    bool node_port : 1;
+    bool txn_timestamp : 1;
 } _RegisterRequest__isset;
 
 class RegisterRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    RegisterRequest(const RegisterRequest &);
+    RegisterRequest &operator=(const RegisterRequest &);
+    RegisterRequest() noexcept;
 
-  RegisterRequest(const RegisterRequest&);
-  RegisterRequest& operator=(const RegisterRequest&);
-  RegisterRequest() noexcept;
+    virtual ~RegisterRequest() noexcept;
+    std::string node_name;
+    /**
+     *
+     * @see NodeType
+     */
+    NodeType::type node_type;
+    std::string node_ip;
+    int64_t node_port;
+    int64_t txn_timestamp;
 
-  virtual ~RegisterRequest() noexcept;
-  std::string node_name;
-  /**
-   * 
-   * @see NodeType
-   */
-  NodeType::type node_type;
-  std::string node_ip;
-  int64_t node_port;
-  int64_t txn_timestamp;
+    _RegisterRequest__isset __isset;
 
-  _RegisterRequest__isset __isset;
+    void __set_node_name(const std::string &val);
 
-  void __set_node_name(const std::string& val);
+    void __set_node_type(const NodeType::type val);
 
-  void __set_node_type(const NodeType::type val);
+    void __set_node_ip(const std::string &val);
 
-  void __set_node_ip(const std::string& val);
+    void __set_node_port(const int64_t val);
 
-  void __set_node_port(const int64_t val);
+    void __set_txn_timestamp(const int64_t val);
 
-  void __set_txn_timestamp(const int64_t val);
+    bool operator==(const RegisterRequest &rhs) const;
+    bool operator!=(const RegisterRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const RegisterRequest & rhs) const;
-  bool operator != (const RegisterRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const RegisterRequest &) const;
 
-  bool operator < (const RegisterRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(RegisterRequest &a, RegisterRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const RegisterRequest& obj);
+std::ostream &operator<<(std::ostream &out, const RegisterRequest &obj);
 
 typedef struct _RegisterResponse__isset {
-  _RegisterResponse__isset() : error_code(false), error_message(false), leader_name(false), leader_term(false), heart_beat_interval(false) {}
-  bool error_code :1;
-  bool error_message :1;
-  bool leader_name :1;
-  bool leader_term :1;
-  bool heart_beat_interval :1;
+    _RegisterResponse__isset() : error_code(false), error_message(false), leader_name(false), leader_term(false), heart_beat_interval(false) {}
+    bool error_code : 1;
+    bool error_message : 1;
+    bool leader_name : 1;
+    bool leader_term : 1;
+    bool heart_beat_interval : 1;
 } _RegisterResponse__isset;
 
 class RegisterResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    RegisterResponse(const RegisterResponse &);
+    RegisterResponse &operator=(const RegisterResponse &);
+    RegisterResponse() noexcept;
 
-  RegisterResponse(const RegisterResponse&);
-  RegisterResponse& operator=(const RegisterResponse&);
-  RegisterResponse() noexcept;
+    virtual ~RegisterResponse() noexcept;
+    int64_t error_code;
+    std::string error_message;
+    std::string leader_name;
+    int64_t leader_term;
+    int64_t heart_beat_interval;
 
-  virtual ~RegisterResponse() noexcept;
-  int64_t error_code;
-  std::string error_message;
-  std::string leader_name;
-  int64_t leader_term;
-  int64_t heart_beat_interval;
+    _RegisterResponse__isset __isset;
 
-  _RegisterResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_message(const std::string &val);
 
-  void __set_error_message(const std::string& val);
+    void __set_leader_name(const std::string &val);
 
-  void __set_leader_name(const std::string& val);
+    void __set_leader_term(const int64_t val);
 
-  void __set_leader_term(const int64_t val);
+    void __set_heart_beat_interval(const int64_t val);
 
-  void __set_heart_beat_interval(const int64_t val);
+    bool operator==(const RegisterResponse &rhs) const;
+    bool operator!=(const RegisterResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const RegisterResponse & rhs) const;
-  bool operator != (const RegisterResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const RegisterResponse &) const;
 
-  bool operator < (const RegisterResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(RegisterResponse &a, RegisterResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const RegisterResponse& obj);
+std::ostream &operator<<(std::ostream &out, const RegisterResponse &obj);
 
 typedef struct _UnregisterRequest__isset {
-  _UnregisterRequest__isset() : node_name(false) {}
-  bool node_name :1;
+    _UnregisterRequest__isset() : node_name(false) {}
+    bool node_name : 1;
 } _UnregisterRequest__isset;
 
 class UnregisterRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    UnregisterRequest(const UnregisterRequest &);
+    UnregisterRequest &operator=(const UnregisterRequest &);
+    UnregisterRequest() noexcept;
 
-  UnregisterRequest(const UnregisterRequest&);
-  UnregisterRequest& operator=(const UnregisterRequest&);
-  UnregisterRequest() noexcept;
+    virtual ~UnregisterRequest() noexcept;
+    std::string node_name;
 
-  virtual ~UnregisterRequest() noexcept;
-  std::string node_name;
+    _UnregisterRequest__isset __isset;
 
-  _UnregisterRequest__isset __isset;
+    void __set_node_name(const std::string &val);
 
-  void __set_node_name(const std::string& val);
+    bool operator==(const UnregisterRequest &rhs) const;
+    bool operator!=(const UnregisterRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const UnregisterRequest & rhs) const;
-  bool operator != (const UnregisterRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const UnregisterRequest &) const;
 
-  bool operator < (const UnregisterRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(UnregisterRequest &a, UnregisterRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const UnregisterRequest& obj);
+std::ostream &operator<<(std::ostream &out, const UnregisterRequest &obj);
 
 typedef struct _UnregisterResponse__isset {
-  _UnregisterResponse__isset() : error_code(false), error_message(false) {}
-  bool error_code :1;
-  bool error_message :1;
+    _UnregisterResponse__isset() : error_code(false), error_message(false) {}
+    bool error_code : 1;
+    bool error_message : 1;
 } _UnregisterResponse__isset;
 
 class UnregisterResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    UnregisterResponse(const UnregisterResponse &);
+    UnregisterResponse &operator=(const UnregisterResponse &);
+    UnregisterResponse() noexcept;
 
-  UnregisterResponse(const UnregisterResponse&);
-  UnregisterResponse& operator=(const UnregisterResponse&);
-  UnregisterResponse() noexcept;
+    virtual ~UnregisterResponse() noexcept;
+    int64_t error_code;
+    std::string error_message;
 
-  virtual ~UnregisterResponse() noexcept;
-  int64_t error_code;
-  std::string error_message;
+    _UnregisterResponse__isset __isset;
 
-  _UnregisterResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_message(const std::string &val);
 
-  void __set_error_message(const std::string& val);
+    bool operator==(const UnregisterResponse &rhs) const;
+    bool operator!=(const UnregisterResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const UnregisterResponse & rhs) const;
-  bool operator != (const UnregisterResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const UnregisterResponse &) const;
 
-  bool operator < (const UnregisterResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(UnregisterResponse &a, UnregisterResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const UnregisterResponse& obj);
+std::ostream &operator<<(std::ostream &out, const UnregisterResponse &obj);
 
 typedef struct _HeartBeatRequest__isset {
-  _HeartBeatRequest__isset() : node_name(false), node_type(false), node_ip(false), node_port(false), txn_timestamp(false) {}
-  bool node_name :1;
-  bool node_type :1;
-  bool node_ip :1;
-  bool node_port :1;
-  bool txn_timestamp :1;
+    _HeartBeatRequest__isset() : node_name(false), node_type(false), node_ip(false), node_port(false), txn_timestamp(false) {}
+    bool node_name : 1;
+    bool node_type : 1;
+    bool node_ip : 1;
+    bool node_port : 1;
+    bool txn_timestamp : 1;
 } _HeartBeatRequest__isset;
 
 class HeartBeatRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    HeartBeatRequest(const HeartBeatRequest &);
+    HeartBeatRequest &operator=(const HeartBeatRequest &);
+    HeartBeatRequest() noexcept;
 
-  HeartBeatRequest(const HeartBeatRequest&);
-  HeartBeatRequest& operator=(const HeartBeatRequest&);
-  HeartBeatRequest() noexcept;
+    virtual ~HeartBeatRequest() noexcept;
+    std::string node_name;
+    /**
+     *
+     * @see NodeType
+     */
+    NodeType::type node_type;
+    std::string node_ip;
+    int64_t node_port;
+    int64_t txn_timestamp;
 
-  virtual ~HeartBeatRequest() noexcept;
-  std::string node_name;
-  /**
-   * 
-   * @see NodeType
-   */
-  NodeType::type node_type;
-  std::string node_ip;
-  int64_t node_port;
-  int64_t txn_timestamp;
+    _HeartBeatRequest__isset __isset;
 
-  _HeartBeatRequest__isset __isset;
+    void __set_node_name(const std::string &val);
 
-  void __set_node_name(const std::string& val);
+    void __set_node_type(const NodeType::type val);
 
-  void __set_node_type(const NodeType::type val);
+    void __set_node_ip(const std::string &val);
 
-  void __set_node_ip(const std::string& val);
+    void __set_node_port(const int64_t val);
 
-  void __set_node_port(const int64_t val);
+    void __set_txn_timestamp(const int64_t val);
 
-  void __set_txn_timestamp(const int64_t val);
+    bool operator==(const HeartBeatRequest &rhs) const;
+    bool operator!=(const HeartBeatRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const HeartBeatRequest & rhs) const;
-  bool operator != (const HeartBeatRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const HeartBeatRequest &) const;
 
-  bool operator < (const HeartBeatRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(HeartBeatRequest &a, HeartBeatRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const HeartBeatRequest& obj);
+std::ostream &operator<<(std::ostream &out, const HeartBeatRequest &obj);
 
 typedef struct _HeartBeatResponse__isset {
-  _HeartBeatResponse__isset() : error_code(false), error_message(false), leader_term(false), other_nodes(false), sender_status(false) {}
-  bool error_code :1;
-  bool error_message :1;
-  bool leader_term :1;
-  bool other_nodes :1;
-  bool sender_status :1;
+    _HeartBeatResponse__isset() : error_code(false), error_message(false), leader_term(false), other_nodes(false), sender_status(false) {}
+    bool error_code : 1;
+    bool error_message : 1;
+    bool leader_term : 1;
+    bool other_nodes : 1;
+    bool sender_status : 1;
 } _HeartBeatResponse__isset;
 
 class HeartBeatResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    HeartBeatResponse(const HeartBeatResponse &);
+    HeartBeatResponse &operator=(const HeartBeatResponse &);
+    HeartBeatResponse() noexcept;
 
-  HeartBeatResponse(const HeartBeatResponse&);
-  HeartBeatResponse& operator=(const HeartBeatResponse&);
-  HeartBeatResponse() noexcept;
+    virtual ~HeartBeatResponse() noexcept;
+    int64_t error_code;
+    std::string error_message;
+    int64_t leader_term;
+    std::vector<NodeInfo> other_nodes;
+    /**
+     *
+     * @see NodeStatus
+     */
+    NodeStatus::type sender_status;
 
-  virtual ~HeartBeatResponse() noexcept;
-  int64_t error_code;
-  std::string error_message;
-  int64_t leader_term;
-  std::vector<NodeInfo>  other_nodes;
-  /**
-   * 
-   * @see NodeStatus
-   */
-  NodeStatus::type sender_status;
+    _HeartBeatResponse__isset __isset;
 
-  _HeartBeatResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_message(const std::string &val);
 
-  void __set_error_message(const std::string& val);
+    void __set_leader_term(const int64_t val);
 
-  void __set_leader_term(const int64_t val);
+    void __set_other_nodes(const std::vector<NodeInfo> &val);
 
-  void __set_other_nodes(const std::vector<NodeInfo> & val);
+    void __set_sender_status(const NodeStatus::type val);
 
-  void __set_sender_status(const NodeStatus::type val);
+    bool operator==(const HeartBeatResponse &rhs) const;
+    bool operator!=(const HeartBeatResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const HeartBeatResponse & rhs) const;
-  bool operator != (const HeartBeatResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const HeartBeatResponse &) const;
 
-  bool operator < (const HeartBeatResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(HeartBeatResponse &a, HeartBeatResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const HeartBeatResponse& obj);
+std::ostream &operator<<(std::ostream &out, const HeartBeatResponse &obj);
 
 typedef struct _SyncLogRequest__isset {
-  _SyncLogRequest__isset() : node_name(false), log_entries(false), on_startup(false) {}
-  bool node_name :1;
-  bool log_entries :1;
-  bool on_startup :1;
+    _SyncLogRequest__isset() : node_name(false), log_entries(false), on_startup(false) {}
+    bool node_name : 1;
+    bool log_entries : 1;
+    bool on_startup : 1;
 } _SyncLogRequest__isset;
 
 class SyncLogRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    SyncLogRequest(const SyncLogRequest &);
+    SyncLogRequest &operator=(const SyncLogRequest &);
+    SyncLogRequest() noexcept;
 
-  SyncLogRequest(const SyncLogRequest&);
-  SyncLogRequest& operator=(const SyncLogRequest&);
-  SyncLogRequest() noexcept;
+    virtual ~SyncLogRequest() noexcept;
+    std::string node_name;
+    std::vector<std::string> log_entries;
+    bool on_startup;
 
-  virtual ~SyncLogRequest() noexcept;
-  std::string node_name;
-  std::vector<std::string>  log_entries;
-  bool on_startup;
+    _SyncLogRequest__isset __isset;
 
-  _SyncLogRequest__isset __isset;
+    void __set_node_name(const std::string &val);
 
-  void __set_node_name(const std::string& val);
+    void __set_log_entries(const std::vector<std::string> &val);
 
-  void __set_log_entries(const std::vector<std::string> & val);
+    void __set_on_startup(const bool val);
 
-  void __set_on_startup(const bool val);
+    bool operator==(const SyncLogRequest &rhs) const;
+    bool operator!=(const SyncLogRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const SyncLogRequest & rhs) const;
-  bool operator != (const SyncLogRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const SyncLogRequest &) const;
 
-  bool operator < (const SyncLogRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(SyncLogRequest &a, SyncLogRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const SyncLogRequest& obj);
+std::ostream &operator<<(std::ostream &out, const SyncLogRequest &obj);
 
 typedef struct _SyncLogResponse__isset {
-  _SyncLogResponse__isset() : error_code(false), error_message(false), txn_timestamp(false) {}
-  bool error_code :1;
-  bool error_message :1;
-  bool txn_timestamp :1;
+    _SyncLogResponse__isset() : error_code(false), error_message(false), txn_timestamp(false) {}
+    bool error_code : 1;
+    bool error_message : 1;
+    bool txn_timestamp : 1;
 } _SyncLogResponse__isset;
 
 class SyncLogResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    SyncLogResponse(const SyncLogResponse &);
+    SyncLogResponse &operator=(const SyncLogResponse &);
+    SyncLogResponse() noexcept;
 
-  SyncLogResponse(const SyncLogResponse&);
-  SyncLogResponse& operator=(const SyncLogResponse&);
-  SyncLogResponse() noexcept;
+    virtual ~SyncLogResponse() noexcept;
+    int64_t error_code;
+    std::string error_message;
+    int64_t txn_timestamp;
 
-  virtual ~SyncLogResponse() noexcept;
-  int64_t error_code;
-  std::string error_message;
-  int64_t txn_timestamp;
+    _SyncLogResponse__isset __isset;
 
-  _SyncLogResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_message(const std::string &val);
 
-  void __set_error_message(const std::string& val);
+    void __set_txn_timestamp(const int64_t val);
 
-  void __set_txn_timestamp(const int64_t val);
+    bool operator==(const SyncLogResponse &rhs) const;
+    bool operator!=(const SyncLogResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const SyncLogResponse & rhs) const;
-  bool operator != (const SyncLogResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const SyncLogResponse &) const;
 
-  bool operator < (const SyncLogResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(SyncLogResponse &a, SyncLogResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const SyncLogResponse& obj);
+std::ostream &operator<<(std::ostream &out, const SyncLogResponse &obj);
 
 typedef struct _ChangeRoleRequest__isset {
-  _ChangeRoleRequest__isset() : node_name(false), node_type(false) {}
-  bool node_name :1;
-  bool node_type :1;
+    _ChangeRoleRequest__isset() : node_name(false), node_type(false) {}
+    bool node_name : 1;
+    bool node_type : 1;
 } _ChangeRoleRequest__isset;
 
 class ChangeRoleRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ChangeRoleRequest(const ChangeRoleRequest &);
+    ChangeRoleRequest &operator=(const ChangeRoleRequest &);
+    ChangeRoleRequest() noexcept;
 
-  ChangeRoleRequest(const ChangeRoleRequest&);
-  ChangeRoleRequest& operator=(const ChangeRoleRequest&);
-  ChangeRoleRequest() noexcept;
+    virtual ~ChangeRoleRequest() noexcept;
+    std::string node_name;
+    /**
+     *
+     * @see NodeType
+     */
+    NodeType::type node_type;
 
-  virtual ~ChangeRoleRequest() noexcept;
-  std::string node_name;
-  /**
-   * 
-   * @see NodeType
-   */
-  NodeType::type node_type;
+    _ChangeRoleRequest__isset __isset;
 
-  _ChangeRoleRequest__isset __isset;
+    void __set_node_name(const std::string &val);
 
-  void __set_node_name(const std::string& val);
+    void __set_node_type(const NodeType::type val);
 
-  void __set_node_type(const NodeType::type val);
+    bool operator==(const ChangeRoleRequest &rhs) const;
+    bool operator!=(const ChangeRoleRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ChangeRoleRequest & rhs) const;
-  bool operator != (const ChangeRoleRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ChangeRoleRequest &) const;
 
-  bool operator < (const ChangeRoleRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ChangeRoleRequest &a, ChangeRoleRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const ChangeRoleRequest& obj);
+std::ostream &operator<<(std::ostream &out, const ChangeRoleRequest &obj);
 
 typedef struct _ChangeRoleResponse__isset {
-  _ChangeRoleResponse__isset() : error_code(false), error_message(false) {}
-  bool error_code :1;
-  bool error_message :1;
+    _ChangeRoleResponse__isset() : error_code(false), error_message(false) {}
+    bool error_code : 1;
+    bool error_message : 1;
 } _ChangeRoleResponse__isset;
 
 class ChangeRoleResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    ChangeRoleResponse(const ChangeRoleResponse &);
+    ChangeRoleResponse &operator=(const ChangeRoleResponse &);
+    ChangeRoleResponse() noexcept;
 
-  ChangeRoleResponse(const ChangeRoleResponse&);
-  ChangeRoleResponse& operator=(const ChangeRoleResponse&);
-  ChangeRoleResponse() noexcept;
+    virtual ~ChangeRoleResponse() noexcept;
+    int64_t error_code;
+    std::string error_message;
 
-  virtual ~ChangeRoleResponse() noexcept;
-  int64_t error_code;
-  std::string error_message;
+    _ChangeRoleResponse__isset __isset;
 
-  _ChangeRoleResponse__isset __isset;
+    void __set_error_code(const int64_t val);
 
-  void __set_error_code(const int64_t val);
+    void __set_error_message(const std::string &val);
 
-  void __set_error_message(const std::string& val);
+    bool operator==(const ChangeRoleResponse &rhs) const;
+    bool operator!=(const ChangeRoleResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const ChangeRoleResponse & rhs) const;
-  bool operator != (const ChangeRoleResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const ChangeRoleResponse &) const;
 
-  bool operator < (const ChangeRoleResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(ChangeRoleResponse &a, ChangeRoleResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const ChangeRoleResponse& obj);
+std::ostream &operator<<(std::ostream &out, const ChangeRoleResponse &obj);
 
 typedef struct _NewLeaderRequest__isset {
-  _NewLeaderRequest__isset() : node_name(false), node_ip(false), node_port(false), new_node_type(false), new_leader_term(false) {}
-  bool node_name :1;
-  bool node_ip :1;
-  bool node_port :1;
-  bool new_node_type :1;
-  bool new_leader_term :1;
+    _NewLeaderRequest__isset() : node_name(false), node_ip(false), node_port(false), new_node_type(false), new_leader_term(false) {}
+    bool node_name : 1;
+    bool node_ip : 1;
+    bool node_port : 1;
+    bool new_node_type : 1;
+    bool new_leader_term : 1;
 } _NewLeaderRequest__isset;
 
 class NewLeaderRequest : public virtual ::apache::thrift::TBase {
- public:
+public:
+    NewLeaderRequest(const NewLeaderRequest &);
+    NewLeaderRequest &operator=(const NewLeaderRequest &);
+    NewLeaderRequest() noexcept;
 
-  NewLeaderRequest(const NewLeaderRequest&);
-  NewLeaderRequest& operator=(const NewLeaderRequest&);
-  NewLeaderRequest() noexcept;
+    virtual ~NewLeaderRequest() noexcept;
+    std::string node_name;
+    std::string node_ip;
+    int64_t node_port;
+    /**
+     *
+     * @see NodeType
+     */
+    NodeType::type new_node_type;
+    int64_t new_leader_term;
 
-  virtual ~NewLeaderRequest() noexcept;
-  std::string node_name;
-  std::string node_ip;
-  int64_t node_port;
-  /**
-   * 
-   * @see NodeType
-   */
-  NodeType::type new_node_type;
-  int64_t new_leader_term;
+    _NewLeaderRequest__isset __isset;
 
-  _NewLeaderRequest__isset __isset;
+    void __set_node_name(const std::string &val);
 
-  void __set_node_name(const std::string& val);
+    void __set_node_ip(const std::string &val);
 
-  void __set_node_ip(const std::string& val);
+    void __set_node_port(const int64_t val);
 
-  void __set_node_port(const int64_t val);
+    void __set_new_node_type(const NodeType::type val);
 
-  void __set_new_node_type(const NodeType::type val);
+    void __set_new_leader_term(const int64_t val);
 
-  void __set_new_leader_term(const int64_t val);
+    bool operator==(const NewLeaderRequest &rhs) const;
+    bool operator!=(const NewLeaderRequest &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const NewLeaderRequest & rhs) const;
-  bool operator != (const NewLeaderRequest &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const NewLeaderRequest &) const;
 
-  bool operator < (const NewLeaderRequest & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(NewLeaderRequest &a, NewLeaderRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const NewLeaderRequest& obj);
+std::ostream &operator<<(std::ostream &out, const NewLeaderRequest &obj);
 
 typedef struct _NewLeaderResponse__isset {
-  _NewLeaderResponse__isset() : node_name(false) {}
-  bool node_name :1;
+    _NewLeaderResponse__isset() : node_name(false) {}
+    bool node_name : 1;
 } _NewLeaderResponse__isset;
 
 class NewLeaderResponse : public virtual ::apache::thrift::TBase {
- public:
+public:
+    NewLeaderResponse(const NewLeaderResponse &);
+    NewLeaderResponse &operator=(const NewLeaderResponse &);
+    NewLeaderResponse() noexcept;
 
-  NewLeaderResponse(const NewLeaderResponse&);
-  NewLeaderResponse& operator=(const NewLeaderResponse&);
-  NewLeaderResponse() noexcept;
+    virtual ~NewLeaderResponse() noexcept;
+    std::string node_name;
 
-  virtual ~NewLeaderResponse() noexcept;
-  std::string node_name;
+    _NewLeaderResponse__isset __isset;
 
-  _NewLeaderResponse__isset __isset;
+    void __set_node_name(const std::string &val);
 
-  void __set_node_name(const std::string& val);
+    bool operator==(const NewLeaderResponse &rhs) const;
+    bool operator!=(const NewLeaderResponse &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const NewLeaderResponse & rhs) const;
-  bool operator != (const NewLeaderResponse &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const NewLeaderResponse &) const;
 
-  bool operator < (const NewLeaderResponse & ) const;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
+    virtual void printTo(std::ostream &out) const;
 };
 
 void swap(NewLeaderResponse &a, NewLeaderResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const NewLeaderResponse& obj);
+std::ostream &operator<<(std::ostream &out, const NewLeaderResponse &obj);
 
-} // namespace
+} // namespace infinity_peer_server
 
 #endif

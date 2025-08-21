@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:emvb_index_in_mem;
-import :stl;
-import internal_types;
+
 import :roaring_bitmap;
+
 import column_def;
+import internal_types;
 
 namespace infinity {
 
@@ -32,7 +31,7 @@ class BufferObj;
 class KVInstance;
 struct ChunkIndexMetaInfo;
 
-using EMVBInMemQueryResultType = Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>>;
+using EMVBInMemQueryResultType = std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>>;
 
 // 1. when data count is not enough for training centroids, just keep a record of the embeddings count
 // 2. when data count is enough, build the emvb index
@@ -41,34 +40,34 @@ export class EMVBIndexInMem {
     const u32 residual_pq_subspace_bits_ = 0;
     const u32 embedding_dimension_ = 0;
     const RowID begin_row_id_ = {};
-    const SharedPtr<ColumnDef> column_def_;
+    const std::shared_ptr<ColumnDef> column_def_;
 
-    String db_id_str_;
-    String table_id_str_;
+    std::string db_id_str_;
+    std::string table_id_str_;
 
     u32 row_count_ = 0;       // row of tensors
     u32 embedding_count_ = 0; // count of total embeddings
-    UniquePtr<EMVBIndex> emvb_index_;
+    std::unique_ptr<EMVBIndex> emvb_index_;
     std::atomic_flag is_built_;
     mutable std::shared_mutex rw_mutex_;
     u32 build_index_threshold_ = 0; // bar for building index
 
 public:
-    String db_name_{};
-    String table_name_{};
-    String index_name_{};
+    std::string db_name_{};
+    std::string table_name_{};
+    std::string index_name_{};
     SegmentID segment_id_ = -1;
 
-    static SharedPtr<EMVBIndexInMem>
-    NewEMVBIndexInMem(const SharedPtr<IndexBase> &index_base, const SharedPtr<ColumnDef> &column_def, RowID begin_row_id);
+    static std::shared_ptr<EMVBIndexInMem>
+    NewEMVBIndexInMem(const std::shared_ptr<IndexBase> &index_base, const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id);
 
     EMVBIndexInMem(u32 residual_pq_subspace_num,
                    u32 residual_pq_subspace_bits,
                    u32 embedding_dimension,
                    RowID begin_row_id,
-                   SharedPtr<ColumnDef> column_def);
+                   std::shared_ptr<ColumnDef> column_def);
 
-    void SetSegmentID(String db_id_str, String table_id_str, SegmentID segment_id) {
+    void SetSegmentID(std::string db_id_str, std::string table_id_str, SegmentID segment_id) {
         db_id_str_ = std::move(db_id_str);
         table_id_str_ = std::move(table_id_str);
         segment_id_ = segment_id;
@@ -83,17 +82,17 @@ public:
     void Dump(BufferObj *buffer_obj);
 
     // return id: offset in the segment
-    std::variant<Pair<u32, u32>, EMVBInMemQueryResultType> SearchWithBitmask(const f32 *query_ptr,
-                                                                             u32 query_embedding_num,
-                                                                             u32 top_n,
-                                                                             Bitmask &bitmask,
-                                                                             const BlockIndex *block_index,
-                                                                             TxnTimeStamp begin_ts,
-                                                                             u32 centroid_nprobe,
-                                                                             f32 threshold_first,
-                                                                             u32 n_doc_to_score,
-                                                                             u32 out_second_stage,
-                                                                             f32 threshold_final) const;
+    std::variant<std::pair<u32, u32>, EMVBInMemQueryResultType> SearchWithBitmask(const f32 *query_ptr,
+                                                                                  u32 query_embedding_num,
+                                                                                  u32 top_n,
+                                                                                  Bitmask &bitmask,
+                                                                                  const BlockIndex *block_index,
+                                                                                  TxnTimeStamp begin_ts,
+                                                                                  u32 centroid_nprobe,
+                                                                                  f32 threshold_first,
+                                                                                  u32 n_doc_to_score,
+                                                                                  u32 out_second_stage,
+                                                                                  f32 threshold_final) const;
 
     const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const;
 };

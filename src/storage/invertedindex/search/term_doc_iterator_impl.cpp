@@ -15,22 +15,25 @@
 module;
 
 #include <cassert>
-#include <iostream>
-#include <cmath>
 
 module infinity_core:term_doc_iterator.impl;
 
 import :term_doc_iterator;
-
-import :stl;
 import :column_length_io;
 import :logger;
 import :infinity_exception;
+
+import std;
+import std.compat;
+
 import row_id;
 
 namespace infinity {
 
-TermDocIterator::TermDocIterator(UniquePtr<PostingIterator> &&iter, const u64 column_id, const float weight, const FulltextSimilarity ft_similarity)
+TermDocIterator::TermDocIterator(std::unique_ptr<PostingIterator> &&iter,
+                                 const u64 column_id,
+                                 const float weight,
+                                 const FulltextSimilarity ft_similarity)
     : column_id_(column_id), iter_(std::move(iter)), weight_(weight), ft_similarity_(ft_similarity) {
     doc_freq_ = iter_->GetDocFreq();
     term_freq_ = 0;
@@ -39,7 +42,7 @@ TermDocIterator::TermDocIterator(UniquePtr<PostingIterator> &&iter, const u64 co
 
 TermDocIterator::~TermDocIterator() {
     if (SHOULD_LOG_TRACE()) {
-        OStringStream oss;
+        std::ostringstream oss;
         oss << "TermDocIterator Debug Info:\n    column name: " << *column_name_ptr_ << ", term: " << *term_ptr_
             << "\n    access_bm_score_cnt: " << access_bm_score_cnt_ << ", calc_bm_score_cnt: " << calc_bm_score_cnt_
             << "\n    access_score_cnt: " << access_score_cnt_ << ", calc_score_cnt: " << calc_score_cnt_ << ", seek_cnt: " << seek_cnt_
@@ -51,7 +54,10 @@ TermDocIterator::~TermDocIterator() {
     }
 }
 
-void TermDocIterator::InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader, const float delta, const float k1, const float b) {
+void TermDocIterator::InitBM25Info(std::unique_ptr<FullTextColumnLengthReader> &&column_length_reader,
+                                   const float delta,
+                                   const float k1,
+                                   const float b) {
     column_length_reader_ = std::move(column_length_reader);
     avg_column_len_ = column_length_reader_->GetAvgColumnLength();
     if (avg_column_len_ <= 1e-6f) {
@@ -66,7 +72,7 @@ void TermDocIterator::InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&colum
     f3 = f2 * std::numeric_limits<u16>::max();
     f4 = delta / (k1 + 1.0F);
     if (SHOULD_LOG_TRACE()) {
-        OStringStream oss;
+        std::ostringstream oss;
         oss << "TermDocIterator: ";
         if (column_name_ptr_ != nullptr && term_ptr_ != nullptr) {
             oss << "column: " << *column_name_ptr_ << ", term: " << *term_ptr_ << ",";
@@ -142,7 +148,7 @@ float TermDocIterator::BM25Score() {
     return bm25_score_cache_;
 }
 
-void TermDocIterator::PrintTree(std::ostream &os, const String &prefix, bool is_final) const {
+void TermDocIterator::PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const {
     os << prefix;
     os << (is_final ? "└──" : "├──");
     os << "TermDocIterator";

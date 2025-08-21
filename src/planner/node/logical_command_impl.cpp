@@ -12,45 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-
 module infinity_core:logical_command.impl;
 
 import :logical_command;
 
-import :stl;
 import :column_binding;
 import :logical_node_type;
+import :infinity_exception;
+import :logical_command;
+
+import std;
 
 import logical_type;
-import :infinity_exception;
 import internal_types;
-import :logger;
-import :logical_command;
 import data_type;
 import command_statement;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalCommand::GetColumnBindings() const { return {}; }
+std::vector<ColumnBinding> LogicalCommand::GetColumnBindings() const { return {}; }
 
-SharedPtr<Vector<String>> LogicalCommand::GetOutputNames() const {
-    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
+std::shared_ptr<std::vector<std::string>> LogicalCommand::GetOutputNames() const {
+    std::shared_ptr<std::vector<std::string>> result = std::make_shared<std::vector<std::string>>();
     result->emplace_back("OK");
     return result;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalCommand::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result_type = MakeShared<Vector<SharedPtr<DataType>>>();
-    result_type->emplace_back(MakeShared<DataType>(LogicalType::kInteger));
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalCommand::GetOutputTypes() const {
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result_type = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+    result_type->emplace_back(std::make_shared<DataType>(LogicalType::kInteger));
     return result_type;
 }
 
-String LogicalCommand::ToString(i64 &space) const {
+std::string LogicalCommand::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
@@ -59,12 +55,12 @@ String LogicalCommand::ToString(i64 &space) const {
     switch (command_info_->type()) {
         case CommandType::kUse: {
             UseCmd *use_cmd_info = (UseCmd *)(command_info_.get());
-            ss << String(space, ' ') << arrow_str << "Use table: " << use_cmd_info->db_name();
+            ss << std::string(space, ' ') << arrow_str << "Use table: " << use_cmd_info->db_name();
             break;
         }
         case CommandType::kExport: {
             ExportCmd *export_cmd_info = (ExportCmd *)(command_info_.get());
-            ss << String(space, ' ') << arrow_str << "Export ";
+            ss << std::string(space, ' ') << arrow_str << "Export ";
             switch (export_cmd_info->export_type()) {
                 case ExportType::kProfileRecord: {
                     ss << "Profile Record: " << export_cmd_info->file_no();
@@ -74,7 +70,7 @@ String LogicalCommand::ToString(i64 &space) const {
         }
         case CommandType::kSet: {
             SetCmd *set_cmd_info = (SetCmd *)(command_info_.get());
-            ss << String(space, ' ') << arrow_str;
+            ss << std::string(space, ' ') << arrow_str;
             if (set_cmd_info->scope() == SetScope::kSession) {
                 ss << "Set session variable: ";
             } else {
@@ -98,36 +94,35 @@ String LogicalCommand::ToString(i64 &space) const {
                     break;
                 }
                 case SetVarType::kInvalid: {
-                    String error_message = "Invalid variable type.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Invalid variable type.");
                 }
             }
             break;
         }
         case CommandType::kCheckTable: {
             CheckTable *check_table_info = (CheckTable *)(command_info_.get());
-            ss << String(space, ' ') << arrow_str << "Check table: " << check_table_info->table_name();
+            ss << std::string(space, ' ') << arrow_str << "Check table: " << check_table_info->table_name();
             break;
         }
         case CommandType::kCleanup: {
-            ss << String(space, ' ') << arrow_str << "Cleanup";
+            ss << std::string(space, ' ') << arrow_str << "Cleanup";
             break;
         }
         case CommandType::kDumpIndex: {
-            ss << String(space, ' ') << arrow_str << "Dump index: ";
+            ss << std::string(space, ' ') << arrow_str << "Dump index: ";
             auto *dump_index_info = static_cast<DumpIndexCmd *>(command_info_.get());
             ss << dump_index_info->db_name() << "." << dump_index_info->table_name() << "." << dump_index_info->index_name();
             break;
         }
         case CommandType::kTestCommand: {
             auto *test_command_info = static_cast<TestCmd *>(command_info_.get());
-            ss << String(space, ' ') << arrow_str << "Test command: " << test_command_info->command_content();
+            ss << std::string(space, ' ') << arrow_str << "Test command: " << test_command_info->command_content();
             break;
         }
         case CommandType::kSnapshot: {
             auto *snapshot_info = static_cast<SnapshotCmd *>(command_info_.get());
-            ss << String(space, ' ') << arrow_str << "Snapshot command: ";
-            switch(snapshot_info->operation()) {
+            ss << std::string(space, ' ') << arrow_str << "Snapshot command: ";
+            switch (snapshot_info->operation()) {
                 case SnapshotOp::kCreate: {
                     ss << "CREATE ";
                     break;
@@ -141,12 +136,11 @@ String LogicalCommand::ToString(i64 &space) const {
                     break;
                 }
                 case SnapshotOp::kInvalid: {
-                    String error_message = "Invalid snapshot operation type.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Invalid snapshot operation type.");
                 }
             }
 
-            switch(snapshot_info->scope()) {
+            switch (snapshot_info->scope()) {
                 case SnapshotScope::kSystem: {
                     ss << "SYSTEM ";
                     break;
@@ -163,8 +157,7 @@ String LogicalCommand::ToString(i64 &space) const {
                     break;
                 }
                 case SnapshotScope::kInvalid: {
-                    String error_message = "Invalid snapshot scope.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Invalid snapshot scope.");
                 }
             }
 
@@ -172,8 +165,7 @@ String LogicalCommand::ToString(i64 &space) const {
             break;
         }
         case CommandType::kInvalid: {
-            String error_message = "Invalid command type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid command type.");
         }
     }
 

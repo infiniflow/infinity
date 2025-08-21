@@ -12,17 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:builtin_functions;
 
-import :stl;
+import std;
 
 namespace infinity {
 
 class NewCatalog;
 
-export class BuiltinFunctions : public EnableSharedFromThis<BuiltinFunctions> {
+export class BuiltinFunctions : public std::enable_shared_from_this<BuiltinFunctions> {
 public:
     explicit BuiltinFunctions(NewCatalog *catalog_ptr);
 

@@ -12,33 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <string>
-
 module infinity_core:physical_sink.impl;
 
 import :physical_sink;
-
-import :stl;
 import :query_context;
-
 import :operator_state;
 import :physical_operator_type;
 import :fragment_context;
-import :third_party;
 import :fragment_data;
 import :data_block;
 import :status;
 import :infinity_exception;
 import :logger;
+
+import std;
+import third_party;
+
 import logical_type;
 import column_def;
 import data_type;
 
 namespace infinity {
 
-String ToString(SinkType sink_type) {
+std::string ToString(SinkType sink_type) {
     switch (sink_type) {
         case SinkType::kInvalid: {
             return "Invalid";
@@ -55,15 +51,14 @@ String ToString(SinkType sink_type) {
     }
 }
 
-void PhysicalSink::Init(QueryContext* query_context) {}
+void PhysicalSink::Init(QueryContext *query_context) {}
 
 bool PhysicalSink::Execute(QueryContext *, OperatorState *) { return true; }
 
 bool PhysicalSink::Execute(QueryContext *, FragmentContext *fragment_context, SinkState *sink_state) {
     switch (sink_state->state_type_) {
         case SinkStateType::kInvalid: {
-            String error_message = "Invalid sinker type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid sinker type");
             break;
         }
         case SinkStateType::kMaterialize: {
@@ -102,8 +97,7 @@ bool PhysicalSink::Execute(QueryContext *, FragmentContext *fragment_context, Si
 void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *materialize_sink_state, OperatorState *task_op_state) {
     switch (task_op_state->operator_type_) {
         case PhysicalOperatorType::kInvalid: {
-            String error_message = "Invalid operator";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid operator");
         }
         case PhysicalOperatorType::kShow: {
             ShowOperatorState *show_output_state = static_cast<ShowOperatorState *>(task_op_state);
@@ -116,8 +110,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
         case PhysicalOperatorType::kExplain: {
             ExplainOperatorState *explain_output_state = static_cast<ExplainOperatorState *>(task_op_state);
             if (explain_output_state->data_block_array_.empty()) {
-                String error_message = "Empty explain output";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Empty explain output");
             }
 
             for (auto &data_block : explain_output_state->data_block_array_) {
@@ -146,8 +139,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                 if (materialize_sink_state->Error()) {
                     materialize_sink_state->empty_result_ = true;
                 } else {
-                    String error_message = "Empty sort output";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Empty sort output");
                 }
             } else {
                 for (auto &data_block : top_output_state->data_block_array_) {
@@ -163,8 +155,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                 if (materialize_sink_state->Error()) {
                     materialize_sink_state->empty_result_ = true;
                 } else {
-                    String error_message = "Empty sort output";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Empty sort output");
                 }
             } else {
                 for (auto &data_block : sort_output_state->data_block_array_) {
@@ -180,8 +171,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                 if (materialize_sink_state->Error()) {
                     materialize_sink_state->empty_result_ = true;
                 } else {
-                    String error_message = "Empty agg output";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Empty agg output");
                 }
             } else {
                 for (auto &data_block : agg_output_state->data_block_array_) {
@@ -197,8 +187,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                 if (materialize_sink_state->Error()) {
                     materialize_sink_state->empty_result_ = true;
                 } else {
-                    String error_message = "Empty read cache output";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Empty read cache output");
                 }
             } else {
                 for (auto &data_block : read_cache_state->data_block_array_) {
@@ -226,8 +215,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
 void PhysicalSink::FillSinkStateFromLastOperatorState(SummarySinkState *summary_sink_state, OperatorState *task_operator_state) {
     switch (task_operator_state->operator_type_) {
         case PhysicalOperatorType::kInvalid: {
-            String error_message = "Invalid operator";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid operator");
             break;
         }
         case PhysicalOperatorType::kDelete: {
@@ -243,8 +231,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(SummarySinkState *summary_
             break;
         }
         default: {
-            String error_message = fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_));
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
         }
     }
 }
@@ -253,8 +240,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
     switch (task_operator_state->operator_type_) {
 
         case PhysicalOperatorType::kInvalid: {
-            String error_message = "Invalid operator";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid operator");
             break;
         }
         case PhysicalOperatorType::kAlter: {
@@ -263,7 +249,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -273,7 +259,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -283,7 +269,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -293,7 +279,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -303,7 +289,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -313,7 +299,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -323,7 +309,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>()),
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>()),
                 };
             }
             break;
@@ -334,7 +320,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -344,7 +330,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -354,7 +340,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -364,7 +350,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -374,7 +360,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -384,7 +370,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+                    std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -395,7 +381,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 break;
             }
             result_sink_state->result_def_ = {
-                MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>()),
+                std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>()),
             };
             break;
         }
@@ -449,7 +435,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_
     // }
     if (queue_sink_state->Error()) {
         LOG_TRACE(fmt::format("Error: {} is sent to notify next fragment", *queue_sink_state->status_.msg_));
-        auto fragment_error = MakeShared<FragmentError>(queue_sink_state->fragment_id_, queue_sink_state->status_.clone());
+        auto fragment_error = std::make_shared<FragmentError>(queue_sink_state->fragment_id_, queue_sink_state->status_.clone());
         for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
             next_fragment_queue->Enqueue(fragment_error);
         }
@@ -460,18 +446,18 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_
         LOG_TRACE("Task not completed");
         return;
     }
-    SizeT output_data_block_count = task_operator_state->data_block_array_.size();
+    size_t output_data_block_count = task_operator_state->data_block_array_.size();
     if (output_data_block_count == 0) {
-        auto fragment_data = MakeShared<FragmentData>(queue_sink_state->fragment_id_,
-                                                      nullptr,
-                                                      queue_sink_state->task_id_,
-                                                      0,
-                                                      1,
-                                                      task_operator_state->Complete(),
-                                                      task_operator_state->total_hits_count_flag_,
-                                                      task_operator_state->total_hits_count_);
+        auto fragment_data = std::make_shared<FragmentData>(queue_sink_state->fragment_id_,
+                                                            nullptr,
+                                                            queue_sink_state->task_id_,
+                                                            0,
+                                                            1,
+                                                            task_operator_state->Complete(),
+                                                            task_operator_state->total_hits_count_flag_,
+                                                            task_operator_state->total_hits_count_);
         if (task_operator_state->Complete() && !fragment_context->IsMaterialize()) {
-            fragment_data->data_idx_ = None;
+            fragment_data->data_idx_ = std::nullopt;
         }
         for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
             // when the Enqueue returns false,
@@ -487,17 +473,17 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_
         std::lock_guard<std::mutex> lock(queue_sink_state->sent_data_mutex_);
         queue_sink_state->sent_data_ = true;
     }
-    for (SizeT idx = 0; idx < output_data_block_count; ++idx) {
-        auto fragment_data = MakeShared<FragmentData>(queue_sink_state->fragment_id_,
-                                                      std::move(task_operator_state->data_block_array_[idx]),
-                                                      queue_sink_state->task_id_,
-                                                      idx,
-                                                      output_data_block_count,
-                                                      task_operator_state->Complete(),
-                                                      task_operator_state->total_hits_count_flag_,
-                                                      task_operator_state->total_hits_count_);
+    for (size_t idx = 0; idx < output_data_block_count; ++idx) {
+        auto fragment_data = std::make_shared<FragmentData>(queue_sink_state->fragment_id_,
+                                                            std::move(task_operator_state->data_block_array_[idx]),
+                                                            queue_sink_state->task_id_,
+                                                            idx,
+                                                            output_data_block_count,
+                                                            task_operator_state->Complete(),
+                                                            task_operator_state->total_hits_count_flag_,
+                                                            task_operator_state->total_hits_count_);
         if (task_operator_state->Complete() && !fragment_context->IsMaterialize()) {
-            fragment_data->data_idx_ = None;
+            fragment_data->data_idx_ = std::nullopt;
         }
         for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
             // when the Enqueue returns false,

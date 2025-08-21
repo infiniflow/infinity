@@ -16,10 +16,11 @@ module;
 
 export module infinity_core:index_ivf;
 
-import :stl;
 import :index_base;
-import :third_party;
 import :base_table_ref;
+
+import third_party;
+
 import statement_common;
 import internal_types;
 
@@ -31,7 +32,7 @@ export struct IndexIVFCentroidOption {
     u32 min_points_per_centroid_ = 32;  // for training centroids
     u32 max_points_per_centroid_ = 256; // for training centroids
     bool operator==(const IndexIVFCentroidOption &other) const = default;
-    String ToString() const;
+    std::string ToString() const;
 };
 
 export struct IndexIVFStorageOption {
@@ -49,7 +50,7 @@ export struct IndexIVFStorageOption {
     u32 product_quantization_subspace_num_ = 0;  // divisor of embedding dimension
     u32 product_quantization_subspace_bits_ = 0; // in range [4, 16]
     bool operator==(const IndexIVFStorageOption &other) const = default;
-    String ToString() const;
+    std::string ToString() const;
 };
 
 export struct IndexIVFOption {
@@ -61,16 +62,16 @@ export struct IndexIVFOption {
 
 export class IndexIVF final : public IndexBase {
 public:
-    static SharedPtr<IndexIVF> Make(SharedPtr<String> index_name,
-                                    SharedPtr<String> index_comment,
-                                    const String &file_name,
-                                    Vector<String> column_names,
-                                    const Vector<InitParameter *> &index_param_list);
+    static std::shared_ptr<IndexIVF> Make(std::shared_ptr<std::string> index_name,
+                                          std::shared_ptr<std::string> index_comment,
+                                          const std::string &file_name,
+                                          std::vector<std::string> column_names,
+                                          const std::vector<InitParameter *> &index_param_list);
 
-    IndexIVF(SharedPtr<String> index_name,
-             SharedPtr<String> index_comment,
-             const String &file_name,
-             Vector<String> column_names,
+    IndexIVF(std::shared_ptr<std::string> index_name,
+             std::shared_ptr<std::string> index_comment,
+             const std::string &file_name,
+             std::vector<std::string> column_names,
              const IndexIVFOption &ivf_option);
 
     ~IndexIVF() override = default;
@@ -83,15 +84,15 @@ public:
 
     void WriteAdv(char *&ptr) const override;
 
-    String ToString() const override;
+    std::string ToString() const override;
 
-    String BuildOtherParamsString() const override;
+    std::string BuildOtherParamsString() const override;
 
     nlohmann::json Serialize() const override;
 
     static IndexIVFOption DeserializeIndexIVFOption(std::string_view ivf_option_str);
 
-    void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name);
+    void ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref, const std::string &column_name);
 
     IndexIVFOption ivf_option_;
 };

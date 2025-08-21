@@ -15,18 +15,14 @@
 module;
 
 #include <cassert>
-#include <set>
-#include <string.h>
 
 export module infinity_core:diskann_index_data;
 
-import :stl;
 import :index_base;
 import :search_top_1;
 import :kmeans_partition;
 import :infinity_exception;
 import :logger;
-import :third_party;
 import :status;
 import :default_values;
 import :diskann_partition_and_pq;
@@ -35,6 +31,10 @@ import :diskann_dist_func;
 import :local_file_handle;
 import :virtual_store;
 
+import std;
+import std.compat;
+import third_party;
+
 namespace infinity {
 export template <typename VectorDataType, typename LabelType, MetricType metric>
 class DiskAnnIndexData {
@@ -42,10 +42,10 @@ class DiskAnnIndexData {
     using This = DiskAnnIndexData<VectorDataType, LabelType, metric>;
 
 private:
-    Atomic<bool> loaded_{false};
+    std::atomic<bool> loaded_{false};
     MetricType metric_{metric};
     u32 dimension_{};
-    SizeT data_num_{};
+    size_t data_num_{};
     u32 R_{};             // max degree
     u32 L_{};             // length of candidates list
     u32 num_pq_chunks_{}; // pq chunks num
@@ -54,24 +54,25 @@ private:
 
     bool use_disk_pq_{false}; // store pq vector on disk
     f64 p_val_{};             // Sampling ratio
-    Vector<LabelType> labels_;
+    std::vector<LabelType> labels_;
     u32 train_size_{}; // size of sample training set
 
-    SharedPtr<f32[]> full_pivot_data_; // pivot data for all chunks, every num_pq_chunks chunks are combined into a dim vector [num_centers * dim]
-    SharedPtr<f32[]> centroid_;        // centroids after zero-mean, used for an option of L2 distance
-    Vector<u32> rearrangement_;        // the dimensions in the order of chunks
-    Vector<u32> chunk_offsets_;        // the starting index of each chunk in rearrangement_
+    std::shared_ptr<f32[]>
+        full_pivot_data_;             // pivot data for all chunks, every num_pq_chunks chunks are combined into a dim vector [num_centers * dim]
+    std::shared_ptr<f32[]> centroid_; // centroids after zero-mean, used for an option of L2 distance
+    std::vector<u32> rearrangement_;  // the dimensions in the order of chunks
+    std::vector<u32> chunk_offsets_;  // the starting index of each chunk in rearrangement_
 
-    Path data_file_path_;
-    Path mem_index_file_path_;
-    Path index_file_path_;
-    Path pqCompressed_data_file_path_;
-    Path sample_data_file_path_;
-    Path pq_pivot_file_path_;
+    std::filesystem::path data_file_path_;
+    std::filesystem::path mem_index_file_path_;
+    std::filesystem::path index_file_path_;
+    std::filesystem::path pqCompressed_data_file_path_;
+    std::filesystem::path sample_data_file_path_;
+    std::filesystem::path pq_pivot_file_path_;
 
 private:
     // build vamana graph and merge graph with num_parts_
-    void BuildMergedVamanaIndex(LocalFileHandle &data_file_handle, LocalFileHandle &mem_index_file_handle, Vector<LabelType> &labels) {
+    void BuildMergedVamanaIndex(LocalFileHandle &data_file_handle, LocalFileHandle &mem_index_file_handle, std::vector<LabelType> &labels) {
         if (num_parts_ == 1) {
             // MemVamana mem_index = MemVamana::Make(L_, R_, dimension_, data_num_);
             MemVamana mem_index(L_, R_, dimension_, data_num_);
@@ -88,35 +89,35 @@ private:
     }
 
     void CreateDiskLayout(LocalFileHandle &data_file_handle, LocalFileHandle &mem_index_file_handle, LocalFileHandle &index_file_handle) {
-        SizeT npts = data_num_;
-        SizeT ndims = dimension_;
-        SizeT actual_file_size = 0;
+        size_t npts = data_num_;
+        size_t ndims = dimension_;
+        size_t actual_file_size = 0;
         u32 width;
-        SizeT medoid, vamana_frozen_num, vamana_frozen_loc = 0;
-        mem_index_file_handle.Read(&actual_file_size, sizeof(SizeT));
+        size_t medoid, vamana_frozen_num, vamana_frozen_loc = 0;
+        mem_index_file_handle.Read(&actual_file_size, sizeof(size_t));
         mem_index_file_handle.Read(&width, sizeof(u32));
-        mem_index_file_handle.Read(&medoid, sizeof(SizeT)); // medoid node id i.e. enter point
-        mem_index_file_handle.Read(&vamana_frozen_num, sizeof(SizeT));
+        mem_index_file_handle.Read(&medoid, sizeof(size_t)); // medoid node id i.e. enter point
+        mem_index_file_handle.Read(&vamana_frozen_num, sizeof(size_t));
 
         if (vamana_frozen_num == 1)
             vamana_frozen_loc = medoid;
-        // node structure: [vector(VectorDataType)*, neighbor_size(u32), neighbor_id(SizeT)*]
-        u64 max_node_len = (width) * sizeof(SizeT) + sizeof(u32) + ndims * sizeof(VectorDataType); // graph node + vector
+        // node structure: [vector(VectorDataType)*, neighbor_size(u32), neighbor_id(size_t)*]
+        u64 max_node_len = (width) * sizeof(size_t) + sizeof(u32) + ndims * sizeof(VectorDataType); // graph node + vector
         u32 nnodes_per_sector = DISKANN_SECTOR_LEN / max_node_len; // 0 if max_node_len > SECTOR_LEN(multi-sector for a node)
 
-        UniquePtr<char[]> sector_buf = MakeUnique<char[]>(DISKANN_SECTOR_LEN);                             // sector buffer
-        UniquePtr<char[]> multisector_buf = MakeUnique<char[]>(RoundUp(max_node_len, DISKANN_SECTOR_LEN)); // multi-sector buffer
-        UniquePtr<char[]> node_buf = MakeUnique<char[]>(max_node_len);                                     // node buffer
-        UniquePtr<VectorDataType[]> cur_node_coord = MakeUnique<VectorDataType[]>(ndims);                  // vector buf
-        u32 &nnbrs = *(u32 *)(node_buf.get() + ndims * sizeof(VectorDataType));                            // neighbor num of node_buf
-        u32 *nhood_buf = (u32 *)(node_buf.get() + ndims * sizeof(VectorDataType) + sizeof(u32));           // neighbor id ptr of node_buf
+        std::unique_ptr<char[]> sector_buf = std::make_unique<char[]>(DISKANN_SECTOR_LEN);                             // sector buffer
+        std::unique_ptr<char[]> multisector_buf = std::make_unique<char[]>(RoundUp(max_node_len, DISKANN_SECTOR_LEN)); // multi-sector buffer
+        std::unique_ptr<char[]> node_buf = std::make_unique<char[]>(max_node_len);                                     // node buffer
+        std::unique_ptr<VectorDataType[]> cur_node_coord = std::make_unique<VectorDataType[]>(ndims);                  // vector buf
+        u32 &nnbrs = *(u32 *)(node_buf.get() + ndims * sizeof(VectorDataType));                                        // neighbor num of node_buf
+        u32 *nhood_buf = (u32 *)(node_buf.get() + ndims * sizeof(VectorDataType) + sizeof(u32));                       // neighbor id ptr of node_buf
 
         u64 n_sectors = nnodes_per_sector > 0 ? RoundUp(npts, nnodes_per_sector) / nnodes_per_sector
                                               : npts * DivRoundUp(max_node_len, DISKANN_SECTOR_LEN); // total sectors num
         u64 disk_index_file_size = (n_sectors + 1) * DISKANN_SECTOR_LEN;                             // disk index file size
 
         // meta data for first sector
-        Vector<u64> output_file_meta(DISKANN_SECTOR_LEN / sizeof(u64), 0);
+        std::vector<u64> output_file_meta(DISKANN_SECTOR_LEN / sizeof(u64), 0);
         output_file_meta[0] = npts;
         output_file_meta[1] = ndims;
         output_file_meta[2] = medoid;
@@ -140,15 +141,15 @@ private:
 
                     mem_index_file_handle.Read(&nnbrs, sizeof(u32)); // read neighbor num
                     assert(nnbrs <= width && nnbrs > 0);
-                    mem_index_file_handle.Read(nhood_buf, nnbrs * sizeof(SizeT));                // read nnbrs * neighbor_id
+                    mem_index_file_handle.Read(nhood_buf, nnbrs * sizeof(size_t));               // read nnbrs * neighbor_id
                     data_file_handle.Read(cur_node_coord.get(), ndims * sizeof(VectorDataType)); // read vector
 
-                    // node_buf: [vector(VectorDataType)*, neighbor_num(u32), neighbor_id(SizeT)*]
+                    // node_buf: [vector(VectorDataType)*, neighbor_num(u32), neighbor_id(size_t)*]
                     memcpy(node_buf.get(), cur_node_coord.get(), ndims * sizeof(VectorDataType)); // copy vector to node_buf
                     memcpy(node_buf.get() + ndims * sizeof(VectorDataType), &nnbrs, sizeof(u32)); // copy neighbor_num to node_buf
                     memcpy(node_buf.get() + ndims * sizeof(VectorDataType) + sizeof(u32),
                            nhood_buf,
-                           nnbrs * sizeof(SizeT)); // copy neighbor_id to node_buf
+                           nnbrs * sizeof(size_t)); // copy neighbor_id to node_buf
 
                     char *sector_node_buf = sector_buf.get() + (sector_node_id * max_node_len); // node offset in sector
                     memcpy(sector_node_buf, node_buf.get(), max_node_len);                      // copy node_buf to sector_buf
@@ -166,14 +167,14 @@ private:
 
                 mem_index_file_handle.Read(&nnbrs, sizeof(u32)); // read neighbor num
                 assert(nnbrs <= width && nnbrs > 0);
-                mem_index_file_handle.Read(nhood_buf, nnbrs * sizeof(SizeT));                // read nnbrs * neighbor_id
+                mem_index_file_handle.Read(nhood_buf, nnbrs * sizeof(size_t));               // read nnbrs * neighbor_id
                 data_file_handle.Read(cur_node_coord.get(), ndims * sizeof(VectorDataType)); // read vector
 
                 memcpy(multisector_buf.get(), cur_node_coord.get(), ndims * sizeof(VectorDataType)); // copy vector to multisector_buf
                 memcpy(multisector_buf.get() + ndims * sizeof(VectorDataType), &nnbrs, sizeof(u32)); // copy neighbor_num to multisector_buf
                 memcpy(multisector_buf.get() + ndims * sizeof(VectorDataType) + sizeof(u32),
                        nhood_buf,
-                       nnbrs * sizeof(SizeT)); // copy neighbor_id to multisector_buf
+                       nnbrs * sizeof(size_t)); // copy neighbor_id to multisector_buf
 
                 index_file_handle.Append(multisector_buf.get(), DISKANN_SECTOR_LEN * nsectors_per_node);
             }
@@ -182,8 +183,8 @@ private:
 
     void SaveSampleData(LocalFileHandle &train_data_handle,
                         LocalFileHandle &train_ids_handle,
-                        SharedPtr<VectorDataType[]> &train_data,
-                        SharedPtr<SizeT[]> &train_data_ids) {
+                        std::shared_ptr<VectorDataType[]> &train_data,
+                        std::shared_ptr<size_t[]> &train_data_ids) {
         train_data_handle.Append(&this->train_size_, sizeof(u32));
         train_data_handle.Append(&this->dimension_, sizeof(u32));
         train_ids_handle.Append(&this->train_size_, sizeof(u32));
@@ -191,45 +192,41 @@ private:
         train_ids_handle.Append(&const_one, sizeof(u32));
         for (u32 i = 0; i < this->train_size_; i++) {
             train_data_handle.Append(train_data.get() + i * this->dimension_, sizeof(VectorDataType) * this->dimension_);
-            train_ids_handle.Append(train_data_ids.get() + i, sizeof(SizeT));
+            train_ids_handle.Append(train_data_ids.get() + i, sizeof(size_t));
         }
     }
 
 public:
     DiskAnnIndexData() = default;
-    DiskAnnIndexData(u32 dimension, SizeT data_num, u32 R, u32 L, u32 num_pq_chunks, u32 num_parts, u32 num_centers = DISKANN_NUM_CENTERS)
+    DiskAnnIndexData(u32 dimension, size_t data_num, u32 R, u32 L, u32 num_pq_chunks, u32 num_parts, u32 num_centers = DISKANN_NUM_CENTERS)
         : dimension_(dimension), data_num_{data_num}, R_(R), L_(L), num_pq_chunks_(num_pq_chunks), num_parts_(num_parts), num_centers_(num_centers) {}
 
-    static UniquePtr<This>
-    Make(u32 dimension, SizeT data_num, u32 R, u32 L, u32 num_pq_chunks, u32 num_parts, u32 num_centers = DISKANN_NUM_CENTERS) {
-        return MakeUnique<This>(dimension, data_num, R, L, num_pq_chunks, num_parts, num_centers);
+    static std::unique_ptr<This>
+    Make(u32 dimension, size_t data_num, u32 R, u32 L, u32 num_pq_chunks, u32 num_parts, u32 num_centers = DISKANN_NUM_CENTERS) {
+        return std::make_unique<This>(dimension, data_num, R, L, num_pq_chunks, num_parts, num_centers);
     }
 
     // build index from data file
     void BuildIndex(const u32 dimension,
                     const u32 data_num,
-                    Vector<LabelType> &labels,
-                    Path data_file_path,
-                    Path mem_index_file_path,
-                    Path index_file_path,
-                    Path pqCompressed_data_file_path,
-                    Path sample_data_file_path,
-                    Path pq_pivot_file_path) {
+                    std::vector<LabelType> &labels,
+                    std::filesystem::path data_file_path,
+                    std::filesystem::path mem_index_file_path,
+                    std::filesystem::path index_file_path,
+                    std::filesystem::path pqCompressed_data_file_path,
+                    std::filesystem::path sample_data_file_path,
+                    std::filesystem::path pq_pivot_file_path) {
         if (loaded_) {
-            String error_message = "DiskAnnIndexData::BuildIndex(): Index data already exists.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("DiskAnnIndexData::BuildIndex(): Index data already exists.");
         }
         if (dimension != dimension_) {
-            String error_message = "DiskAnnIndexData::BuildIndex(): Dimension not match";
-            UnrecoverableError(error_message);
+            UnrecoverableError("DiskAnnIndexData::BuildIndex(): Dimension not match");
         }
         if (metric_ != MetricType::kMetricL2 && metric_ != MetricType::kMetricCosine) {
             if (metric_ != MetricType::kInvalid) {
-                Status status = Status::NotSupport("Metric type not implemented");
-                RecoverableError(status);
+                RecoverableError(Status::NotSupport("Metric type not implemented"));
             } else {
-                Status status = Status::NotSupport("Metric type is invalid");
-                RecoverableError(status);
+                RecoverableError(Status::NotSupport("Metric type is invalid"));
             }
             return;
         }
@@ -255,8 +252,8 @@ public:
             UnrecoverableError(data_file_status.message());
         }
 
-        SharedPtr<VectorDataType[]> train_data;
-        SharedPtr<SizeT[]> train_data_ids;
+        std::shared_ptr<VectorDataType[]> train_data;
+        std::shared_ptr<size_t[]> train_data_ids;
 
         // step 1. generates random sample and sets it to train_data and train_size
         {
@@ -267,10 +264,10 @@ public:
             } else {
                 LOG_TRACE(fmt::format("data num is less than sample_size {}, using all data", DISKANN_TRAINING_SET_SIZE));
                 train_size = data_num;
-                train_data = MakeUnique<VectorDataType[]>(train_size * dimension_);
-                train_data_ids = MakeUnique<SizeT[]>(train_size);
+                train_data = std::make_unique<VectorDataType[]>(train_size * dimension_);
+                train_data_ids = std::make_unique<size_t[]>(train_size);
                 data_file_handle->Read(train_data.get(), train_size * dimension_ * sizeof(VectorDataType));
-                for (SizeT i = 0; i < train_size; i++) {
+                for (size_t i = 0; i < train_size; i++) {
                     train_data_ids[i] = i;
                 }
             }
@@ -360,8 +357,8 @@ public:
         // step 5. save sample data and clean mem vamana
         {
             data_file_handle->Seek(0);
-            Path train_data_path = sample_data_file_path_ / "train_data.bin";
-            Path train_data_ids_path = sample_data_file_path_ / "train_ids.bin";
+            std::filesystem::path train_data_path = sample_data_file_path_ / "train_data.bin";
+            std::filesystem::path train_data_ids_path = sample_data_file_path_ / "train_ids.bin";
             auto [train_data_handle, train_data_status] = VirtualStore::Open(train_data_path, FileAccessMode::kWrite);
             if (!train_data_status.ok()) {
                 UnrecoverableError(train_data_status.message());
@@ -388,8 +385,8 @@ public:
 
         LOG_TRACE("UnitTest(): Test train data and ids");
         {
-            Path train_data_path = sample_data_file_path_ / "train_data.bin";
-            Path train_data_ids_path = sample_data_file_path_ / "train_ids.bin";
+            std::filesystem::path train_data_path = sample_data_file_path_ / "train_data.bin";
+            std::filesystem::path train_data_ids_path = sample_data_file_path_ / "train_ids.bin";
             auto [train_data_handle, train_data_status] = VirtualStore::Open(train_data_path, FileAccessMode::kRead);
             if (!train_data_status.ok()) {
                 UnrecoverableError(train_data_status.message());
@@ -400,11 +397,11 @@ public:
                 UnrecoverableError(train_data_ids_status.message());
             }
 
-            UniquePtr<VectorDataType[]> train_data = MakeUnique<VectorDataType[]>(train_size_ * dimension_);
-            UniquePtr<SizeT[]> train_data_ids = MakeUnique<SizeT[]>(train_size_);
+            std::unique_ptr<VectorDataType[]> train_data = std::make_unique<VectorDataType[]>(train_size_ * dimension_);
+            std::unique_ptr<size_t[]> train_data_ids = std::make_unique<size_t[]>(train_size_);
             fmt::print("train_size: {}, dimension: {}\n", train_size_, dimension_);
             train_data_handle->Read(train_data.get(), train_size_ * dimension_ * sizeof(VectorDataType));
-            train_data_ids_handle->Read(train_data_ids.get(), train_size_ * sizeof(SizeT));
+            train_data_ids_handle->Read(train_data_ids.get(), train_size_ * sizeof(size_t));
             fmt::print("train_data_ids[0] {} :\n", train_data_ids[0]);
             fmt::print("train_data_ids[1] {} :\n", train_data_ids[1]);
             for (u32 j = 0; j < dimension_; j++) {
@@ -437,7 +434,7 @@ public:
                 UnrecoverableError(pq_data_file_status.message());
             }
 
-            UniquePtr<u32[]> pqdata = MakeUniqueForOverwrite<u32[]>(num_pq_chunks_ * data_num_);
+            std::unique_ptr<u32[]> pqdata = std::make_unique_for_overwrite<u32[]>(num_pq_chunks_ * data_num_);
             pqCompressed_data_file_handle->Read(pqdata.get(), num_pq_chunks_ * sizeof(u32) * data_num_);
             fmt::print("pqdata[0]: \n");
             for (u32 j = 0; j < num_pq_chunks_; j++) {

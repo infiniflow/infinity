@@ -12,26 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <charconv>
-#include <ranges>
-#include <sstream>
-
 module infinity_core:value.impl;
 
 import :value;
-import :stl;
-import global_resource_usage;
 import :logger;
-
 import :infinity_exception;
-import :third_party;
 import :bound_cast_func;
 import :cast_function;
 import :column_vector;
 import :default_values;
 import :status;
+
+import std;
+import std.compat;
+import third_party;
+
 import type_info;
 import array_info;
 import internal_types;
@@ -40,6 +35,7 @@ import embedding_info;
 import logical_type;
 import embedding_type;
 import data_type;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -121,7 +117,7 @@ void Embedding2Json(const EmbeddingType &embedding, EmbeddingDataType type, size
     }
 }
 
-void Tensor2Json(Span<char> data_span, const EmbeddingDataType type, const size_t embedding_dimension, nlohmann::json &tensor_json) {
+void Tensor2Json(std::span<char> data_span, const EmbeddingDataType type, const size_t embedding_dimension, nlohmann::json &tensor_json) {
     const size_t data_bytes = data_span.size();
     const size_t basic_embedding_bytes = EmbeddingT::EmbeddingSize(type, embedding_dimension);
     if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
@@ -137,7 +133,7 @@ void Tensor2Json(Span<char> data_span, const EmbeddingDataType type, const size_
     }
 }
 
-void TensorArray2Json(const Vector<Span<char>> &tensor_array,
+void TensorArray2Json(const std::vector<std::span<char>> &tensor_array,
                       const EmbeddingDataType type,
                       const size_t embedding_dimension,
                       nlohmann::json &tensorarray_json) {
@@ -151,7 +147,7 @@ void TensorArray2Json(const Vector<Span<char>> &tensor_array,
 template <typename IndexT, typename DataType>
 void Sparse2JsonInternal1(const SparseValueInfo &sparse_value_info, nlohmann::json &sparse_json) {
     auto [nnz, indice_span, data_span] = sparse_value_info.GetData();
-    for (SizeT i = 0; i < nnz; ++i) {
+    for (size_t i = 0; i < nnz; ++i) {
         auto index = reinterpret_cast<IndexT *>(indice_span.data())[i];
         auto data = reinterpret_cast<DataType *>(data_span.data())[i];
         if constexpr (std::is_same_v<decltype(data), Float16T> || std::is_same_v<decltype(data), BFloat16T>) {
@@ -202,6 +198,7 @@ void Sparse2JsonInternal(const SparseValueInfo &sparse_value_info, const SparseI
             break;
         }
         case EmbeddingDataType::kElemBit:
+            [[fallthrough]];
         case EmbeddingDataType::kElemInvalid: {
             UnrecoverableError("Not implemented.");
         }
@@ -324,7 +321,7 @@ void Embedding2Arrow(const EmbeddingType &embedding, EmbeddingDataType type, siz
     }
 }
 
-void Tensor2Arrow(Span<char> tensor, const EmbeddingInfo *embedding_info, arrow::ArrayBuilder *value_builder) {
+void Tensor2Arrow(std::span<char> tensor, const EmbeddingInfo *embedding_info, arrow::ArrayBuilder *value_builder) {
     const size_t data_bytes = tensor.size();
     const size_t basic_embedding_bytes = embedding_info->Size();
     if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
@@ -335,14 +332,14 @@ void Tensor2Arrow(Span<char> tensor, const EmbeddingInfo *embedding_info, arrow:
     const auto dimension = embedding_info->Dimension();
     auto *tensor_builder = dynamic_cast<arrow::FixedSizeListBuilder *>(value_builder);
     EmbeddingT embedding(nullptr, false);
-    for (SizeT i = 0; i < embedding_num; i++) {
+    for (size_t i = 0; i < embedding_num; i++) {
         embedding.ptr = tensor.data() + i * basic_embedding_bytes;
         auto status = tensor_builder->Append();
         Embedding2Arrow(embedding, type, dimension, tensor_builder->value_builder());
     }
 }
 
-void TensorArray2Arrow(const Vector<Span<char>> &tensor_array, const EmbeddingInfo *embedding_info, arrow::ArrayBuilder *value_builder) {
+void TensorArray2Arrow(const std::vector<std::span<char>> &tensor_array, const EmbeddingInfo *embedding_info, arrow::ArrayBuilder *value_builder) {
     auto *tensor_array_builder = dynamic_cast<arrow::ListBuilder *>(value_builder);
     for (const auto tensor : tensor_array) {
         auto status = tensor_array_builder->Append();
@@ -352,13 +349,14 @@ void TensorArray2Arrow(const Vector<Span<char>> &tensor_array, const EmbeddingIn
 
 } // namespace
 
-EmbeddingValueInfo::EmbeddingValueInfo(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
+EmbeddingValueInfo::EmbeddingValueInfo(const std::vector<std::pair<char *, size_t>> &ptr_bytes)
+    : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
     len_ = 0;
     for (const auto &[ptr, bytes] : ptr_bytes) {
         len_ += bytes;
     }
-    data_ = MakeUnique<char[]>(len_);
-    SizeT offset = 0;
+    data_ = std::make_unique<char[]>(len_);
+    size_t offset = 0;
     for (const auto &[ptr, bytes] : ptr_bytes) {
         std::memcpy(data_.get() + offset, ptr, bytes);
         offset += bytes;
@@ -446,7 +444,7 @@ Value Value::MakeBFloat16(BFloat16T input) {
     return value;
 }
 
-Value Value::MakeDecimal(DecimalT input, SharedPtr<TypeInfo> type_info_ptr) {
+Value Value::MakeDecimal(DecimalT input, std::shared_ptr<TypeInfo> type_info_ptr) {
     Value value(LogicalType::kDecimal, type_info_ptr);
     value.value_.decimal = input;
     return value;
@@ -524,57 +522,57 @@ Value Value::MakeRow(RowID input) {
     return value;
 }
 
-Value Value::MakeVarchar(String str) {
+Value Value::MakeVarchar(std::string str) {
     Value value(LogicalType::kVarchar);
-    value.value_info_ = MakeShared<StringValueInfo>(std::move(str));
+    value.value_info_ = std::make_shared<StringValueInfo>(std::move(str));
     return value;
 }
 
 Value Value::MakeVarchar(std::string_view str_view) {
     Value value(LogicalType::kVarchar);
-    value.value_info_ = MakeShared<StringValueInfo>(str_view);
+    value.value_info_ = std::make_shared<StringValueInfo>(str_view);
     return value;
 }
 
 Value Value::MakeVarchar(const char *ptr) {
     Value value(LogicalType::kVarchar);
-    value.value_info_ = MakeShared<StringValueInfo>(std::string_view{ptr});
+    value.value_info_ = std::make_shared<StringValueInfo>(std::string_view{ptr});
     return value;
 }
 
-Value Value::MakeVarchar(const char *ptr, SizeT len) {
+Value Value::MakeVarchar(const char *ptr, size_t len) {
     Value value(LogicalType::kVarchar);
-    value.value_info_ = MakeShared<StringValueInfo>(std::string_view{ptr, len});
+    value.value_info_ = std::make_shared<StringValueInfo>(std::string_view{ptr, len});
     return value;
 }
 
 Value Value::MakeVarchar(const VarcharT &input) {
     Value value(LogicalType::kVarchar);
     if (input.IsInlined()) {
-        value.value_info_ = MakeShared<StringValueInfo>(std::string_view{input.short_.data_, input.length_});
+        value.value_info_ = std::make_shared<StringValueInfo>(std::string_view{input.short_.data_, input.length_});
     } else {
         UnrecoverableError("Value::MakeVarchar(VectorVarchar) is not supported!");
     }
     return value;
 }
 
-Value Value::MakeEmbedding(const_ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr) {
+Value Value::MakeEmbedding(const char *ptr, std::shared_ptr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
         UnrecoverableError(fmt::format("Value::MakeEmbedding(type_info_ptr={}) is not supported!", type_info_ptr->ToString()));
     }
     const auto embedding_info = static_cast<const EmbeddingInfo *>(type_info_ptr.get());
-    const SizeT len = embedding_info->Size();
+    const size_t len = embedding_info->Size();
     Value value(LogicalType::kEmbedding, std::move(type_info_ptr));
-    value.value_info_ = MakeShared<EmbeddingValueInfo>(ptr, len);
+    value.value_info_ = std::make_shared<EmbeddingValueInfo>(ptr, len);
     return value;
 }
 
-Value Value::MakeMultiVector(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr) {
+Value Value::MakeMultiVector(const char *ptr, size_t bytes, std::shared_ptr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
         UnrecoverableError(fmt::format("Value::MakeMultiVector(type_info_ptr={}) is not supported!", type_info_ptr->ToString()));
     }
     const auto embedding_info = static_cast<const EmbeddingInfo *>(type_info_ptr.get());
-    if (const SizeT len = embedding_info->Size(); len == 0 or bytes % len != 0) {
+    if (const size_t len = embedding_info->Size(); len == 0 or bytes % len != 0) {
         auto status = Status::SyntaxError(fmt::format("Value::MakeMultiVector(bytes={}) is not a multiple of embedding byte size={}", bytes, len));
         RecoverableError(std::move(status));
     }
@@ -583,12 +581,12 @@ Value Value::MakeMultiVector(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> t
     return value;
 }
 
-Value Value::MakeMultiVector(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes, SharedPtr<TypeInfo> type_info_ptr) {
+Value Value::MakeMultiVector(const std::vector<std::pair<char *, size_t>> &ptr_bytes, std::shared_ptr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
         UnrecoverableError(fmt::format("Value::MakeMultiVector(type_info_ptr={}) is not supported!", type_info_ptr->ToString()));
     }
     const auto embedding_info = static_cast<const EmbeddingInfo *>(type_info_ptr.get());
-    const SizeT len = embedding_info->Size();
+    const size_t len = embedding_info->Size();
     for (const auto [_, bytes] : ptr_bytes) {
         if (bytes == 0 || bytes % len != 0) {
             auto status =
@@ -601,12 +599,12 @@ Value Value::MakeMultiVector(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes, Shared
     return value;
 }
 
-Value Value::MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr) {
+Value Value::MakeTensor(const char *ptr, size_t bytes, std::shared_ptr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
         UnrecoverableError(fmt::format("Value::MakeTensor(type_info_ptr={}) is not supported!", type_info_ptr->ToString()));
     }
     const auto embedding_info = static_cast<const EmbeddingInfo *>(type_info_ptr.get());
-    if (const SizeT len = embedding_info->Size(); len == 0 or bytes % len != 0) {
+    if (const size_t len = embedding_info->Size(); len == 0 or bytes % len != 0) {
         auto status = Status::SyntaxError(fmt::format("Value::MakeTensor(bytes={}) is not a multiple of embedding byte size={}", bytes, len));
         RecoverableError(std::move(status));
     }
@@ -615,12 +613,12 @@ Value Value::MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_i
     return value;
 }
 
-Value Value::MakeTensor(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes, SharedPtr<TypeInfo> type_info_ptr) {
+Value Value::MakeTensor(const std::vector<std::pair<char *, size_t>> &ptr_bytes, std::shared_ptr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
         UnrecoverableError(fmt::format("Value::MakeTensor(type_info_ptr={}) is not supported!", type_info_ptr->ToString()));
     }
     const auto embedding_info = static_cast<const EmbeddingInfo *>(type_info_ptr.get());
-    const SizeT len = embedding_info->Size();
+    const size_t len = embedding_info->Size();
     for (const auto [_, bytes] : ptr_bytes) {
         if (bytes == 0 || bytes % len != 0) {
             auto status = Status::SyntaxError(fmt::format("Value::MakeTensor(bytes={}) is not a multiple of embedding byte size={}", bytes, len));
@@ -632,54 +630,54 @@ Value Value::MakeTensor(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes, SharedPtr<T
     return value;
 }
 
-Value Value::MakeTensorArray(SharedPtr<TypeInfo> type_info_ptr) {
+Value Value::MakeTensorArray(std::shared_ptr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
         UnrecoverableError(fmt::format("Value::MakeTensorArray(type_info_ptr={}) is not supported!", type_info_ptr->ToString()));
     }
     const auto embedding_info = static_cast<const EmbeddingInfo *>(type_info_ptr.get());
-    if (const SizeT len = embedding_info->Size(); len == 0) {
+    if (const size_t len = embedding_info->Size(); len == 0) {
         auto status = Status::SyntaxError(fmt::format("Value::MakeTensorArray(unit embedding bytes = {}) is invalid", len));
         RecoverableError(std::move(status));
     }
     Value value(LogicalType::kTensorArray, std::move(type_info_ptr));
-    value.value_info_ = MakeShared<TensorArrayValueInfo>();
+    value.value_info_ = std::make_shared<TensorArrayValueInfo>();
     return value;
 }
 
-Value Value::MakeArray(Vector<Value> array_elements, SharedPtr<TypeInfo> type_info_ptr) {
+Value Value::MakeArray(std::vector<Value> array_elements, std::shared_ptr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kArray) {
         UnrecoverableError(fmt::format("Value::MakeArray(type_info_ptr={}) is not supported!", type_info_ptr->ToString()));
     }
     Value value(LogicalType::kArray, std::move(type_info_ptr));
-    value.value_info_ = MakeShared<ArrayValueInfo>(std::move(array_elements));
+    value.value_info_ = std::make_shared<ArrayValueInfo>(std::move(array_elements));
     return value;
 }
 
-Value Value::MakeSparse(const char *raw_data_ptr, const char *raw_idx_ptr, SizeT nnz, const SharedPtr<TypeInfo> type_info) {
+Value Value::MakeSparse(const char *raw_data_ptr, const char *raw_idx_ptr, size_t nnz, const std::shared_ptr<TypeInfo> type_info) {
     const auto *sparse_info = static_cast<const SparseInfo *>(type_info.get());
 
-    SizeT raw_indice_len = sparse_info->IndiceSize(nnz);
-    SizeT raw_data_len = sparse_info->DataSize(nnz);
+    size_t raw_indice_len = sparse_info->IndiceSize(nnz);
+    size_t raw_data_len = sparse_info->DataSize(nnz);
     Value value(LogicalType::kSparse, type_info);
-    value.value_info_ = MakeShared<SparseValueInfo>(nnz, raw_idx_ptr, raw_indice_len, raw_data_ptr, raw_data_len);
+    value.value_info_ = std::make_shared<SparseValueInfo>(nnz, raw_idx_ptr, raw_indice_len, raw_data_ptr, raw_data_len);
     return value;
 }
 
-Value Value::MakeSparse(SizeT nnz, UniquePtr<char[]> indice_ptr, UniquePtr<char[]> data_ptr, const SharedPtr<TypeInfo> type_info) {
+Value Value::MakeSparse(size_t nnz, std::unique_ptr<char[]> indice_ptr, std::unique_ptr<char[]> data_ptr, const std::shared_ptr<TypeInfo> type_info) {
     Value value(LogicalType::kSparse, type_info);
     const auto *sparse_info = static_cast<const SparseInfo *>(type_info.get());
-    SizeT indice_len = sparse_info->IndiceSize(nnz);
-    SizeT data_len = sparse_info->DataSize(nnz);
-    value.value_info_ = MakeShared<SparseValueInfo>(nnz, std::move(indice_ptr), indice_len, std::move(data_ptr), data_len);
+    size_t indice_len = sparse_info->IndiceSize(nnz);
+    size_t data_len = sparse_info->DataSize(nnz);
+    value.value_info_ = std::make_shared<SparseValueInfo>(nnz, std::move(indice_ptr), indice_len, std::move(data_ptr), data_len);
     return value;
 }
 
-void Value::AppendToTensorArray(const_ptr_t ptr, SizeT bytes) {
+void Value::AppendToTensorArray(const char *ptr, size_t bytes) {
     if (type_.type() != LogicalType::kTensorArray) {
         UnrecoverableError(fmt::format("Value::AppendToTensorArray() is not supported for type {}", type_.ToString()));
     }
     const auto embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
-    if (const SizeT len = embedding_info->Size(); len == 0 or bytes % len != 0) {
+    if (const size_t len = embedding_info->Size(); len == 0 or bytes % len != 0) {
         auto status =
             Status::SyntaxError(fmt::format("Value::AppendToTensorArray(bytes={}) is not a multiple of embedding byte size={}", bytes, len));
         RecoverableError(std::move(status));
@@ -688,7 +686,7 @@ void Value::AppendToTensorArray(const_ptr_t ptr, SizeT bytes) {
     tensor_array_info.AppendTensor(ptr, bytes);
 }
 
-void Value::AppendToTensorArray(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) {
+void Value::AppendToTensorArray(const std::vector<std::pair<char *, size_t>> &ptr_bytes) {
     if (type_.type() != LogicalType::kTensorArray) {
         UnrecoverableError(fmt::format("Value::AppendToTensorArray() is not supported for type {}", type_.ToString()));
     }
@@ -700,8 +698,7 @@ void Value::AppendToTensorArray(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) {
 template <>
 BooleanT Value::GetValue() const {
     if (type_.type() != LogicalType::kBoolean) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.boolean;
 }
@@ -709,8 +706,7 @@ BooleanT Value::GetValue() const {
 template <>
 TinyIntT Value::GetValue() const {
     if (type_.type() != LogicalType::kTinyInt) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.tiny_int;
 }
@@ -718,8 +714,7 @@ TinyIntT Value::GetValue() const {
 template <>
 SmallIntT Value::GetValue() const {
     if (type_.type() != LogicalType::kSmallInt) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.small_int;
 }
@@ -727,8 +722,7 @@ SmallIntT Value::GetValue() const {
 template <>
 IntegerT Value::GetValue() const {
     if (type_.type() != LogicalType::kInteger) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.integer;
 }
@@ -736,8 +730,7 @@ IntegerT Value::GetValue() const {
 template <>
 BigIntT Value::GetValue() const {
     if (type_.type() != LogicalType::kBigInt) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.big_int;
 }
@@ -745,8 +738,7 @@ BigIntT Value::GetValue() const {
 template <>
 HugeIntT Value::GetValue() const {
     if (type_.type() != LogicalType::kHugeInt) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.huge_int;
 }
@@ -754,8 +746,7 @@ HugeIntT Value::GetValue() const {
 template <>
 FloatT Value::GetValue() const {
     if (type_.type() != LogicalType::kFloat) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.float32;
 }
@@ -763,8 +754,7 @@ FloatT Value::GetValue() const {
 template <>
 DoubleT Value::GetValue() const {
     if (type_.type() != LogicalType::kDouble) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.float64;
 }
@@ -772,8 +762,7 @@ DoubleT Value::GetValue() const {
 template <>
 Float16T Value::GetValue() const {
     if (type_.type() != LogicalType::kFloat16) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.float16;
 }
@@ -781,8 +770,7 @@ Float16T Value::GetValue() const {
 template <>
 BFloat16T Value::GetValue() const {
     if (type_.type() != LogicalType::kBFloat16) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.bfloat16;
 }
@@ -790,8 +778,7 @@ BFloat16T Value::GetValue() const {
 template <>
 DecimalT Value::GetValue() const {
     if (type_.type() != LogicalType::kDecimal) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.decimal;
 }
@@ -799,8 +786,7 @@ DecimalT Value::GetValue() const {
 template <>
 DateT Value::GetValue() const {
     if (type_.type() != LogicalType::kDate) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.date;
 }
@@ -808,8 +794,7 @@ DateT Value::GetValue() const {
 template <>
 TimeT Value::GetValue() const {
     if (type_.type() != LogicalType::kTime) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.time;
 }
@@ -817,8 +802,7 @@ TimeT Value::GetValue() const {
 template <>
 DateTimeT Value::GetValue() const {
     if (type_.type() != LogicalType::kDateTime) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.datetime;
 }
@@ -826,8 +810,7 @@ DateTimeT Value::GetValue() const {
 template <>
 TimestampT Value::GetValue() const {
     if (type_.type() != LogicalType::kTimestamp) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.timestamp;
 }
@@ -835,8 +818,7 @@ TimestampT Value::GetValue() const {
 template <>
 IntervalT Value::GetValue() const {
     if (type_.type() != LogicalType::kInterval) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.interval;
 }
@@ -844,8 +826,7 @@ IntervalT Value::GetValue() const {
 template <>
 PointT Value::GetValue() const {
     if (type_.type() != LogicalType::kPoint) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.point;
 }
@@ -853,8 +834,7 @@ PointT Value::GetValue() const {
 template <>
 LineT Value::GetValue() const {
     if (type_.type() != LogicalType::kLine) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.line;
 }
@@ -862,8 +842,7 @@ LineT Value::GetValue() const {
 template <>
 LineSegT Value::GetValue() const {
     if (type_.type() != LogicalType::kLineSeg) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.line_segment;
 }
@@ -871,8 +850,7 @@ LineSegT Value::GetValue() const {
 template <>
 BoxT Value::GetValue() const {
     if (type_.type() != LogicalType::kBox) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.box;
 }
@@ -880,8 +858,7 @@ BoxT Value::GetValue() const {
 template <>
 CircleT Value::GetValue() const {
     if (type_.type() != LogicalType::kCircle) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.circle;
 }
@@ -889,8 +866,7 @@ CircleT Value::GetValue() const {
 template <>
 UuidT Value::GetValue() const {
     if (type_.type() != LogicalType::kUuid) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.uuid;
 }
@@ -898,8 +874,7 @@ UuidT Value::GetValue() const {
 template <>
 RowID Value::GetValue() const {
     if (type_.type() != LogicalType::kRowID) {
-        String error_message = fmt::format("Not matched type: {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
     }
     return value_.row;
 }
@@ -916,7 +891,7 @@ Value::Value(const DataType &data_type) : type_(data_type) {
 #endif
 }
 
-Value::Value(LogicalType type, SharedPtr<TypeInfo> typeinfo_ptr) : type_(type, std::move(typeinfo_ptr)) {
+Value::Value(LogicalType type, std::shared_ptr<TypeInfo> typeinfo_ptr) : type_(type, std::move(typeinfo_ptr)) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("Value");
 #endif
@@ -1023,19 +998,22 @@ bool Value::operator==(const Value &other) const {
             return value_.row == other.value_.row;
         }
         case LogicalType::kEmptyArray:
+            [[fallthrough]];
         case LogicalType::kNull: {
             return true;
         }
         case LogicalType::kVarchar: {
-            const String &s1 = this->value_info_->Get<StringValueInfo>().GetString();
-            const String &s2 = other.value_info_->Get<StringValueInfo>().GetString();
+            const std::string &s1 = this->value_info_->Get<StringValueInfo>().GetString();
+            const std::string &s2 = other.value_info_->Get<StringValueInfo>().GetString();
             return s1 == s2;
         }
         case LogicalType::kEmbedding:
+            [[fallthrough]];
         case LogicalType::kMultiVector:
+            [[fallthrough]];
         case LogicalType::kTensor: {
-            const Span<char> data1 = this->GetEmbedding();
-            const Span<char> data2 = other.GetEmbedding();
+            const std::span<char> data1 = this->GetEmbedding();
+            const std::span<char> data2 = other.GetEmbedding();
             return std::ranges::equal(data1, data2);
         }
         case LogicalType::kTensorArray: {
@@ -1058,12 +1036,15 @@ bool Value::operator==(const Value &other) const {
             return std::ranges::equal(array1, array2);
         }
         case LogicalType::kInterval:
+            [[fallthrough]];
         case LogicalType::kTuple:
+            [[fallthrough]];
         case LogicalType::kMixed:
+            [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
         case LogicalType::kInvalid: {
-            String error_message = "Unhandled cases.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unhandled cases.");
             return false;
         }
     }
@@ -1166,26 +1147,35 @@ void Value::CopyUnionValue(const Value &other) {
             break;
         }
         case LogicalType::kEmptyArray:
+            [[fallthrough]];
         case LogicalType::kNull: {
             // No value for null value.
             break;
         }
         case LogicalType::kArray:
+            [[fallthrough]];
         case LogicalType::kVarchar:
+            [[fallthrough]];
         case LogicalType::kTensor:
+            [[fallthrough]];
         case LogicalType::kTensorArray:
+            [[fallthrough]];
         case LogicalType::kMultiVector:
+            [[fallthrough]];
         case LogicalType::kEmbedding:
+            [[fallthrough]];
         case LogicalType::kSparse: {
             this->value_info_ = other.value_info_;
             break;
         }
         case LogicalType::kTuple:
+            [[fallthrough]];
         case LogicalType::kMixed:
+            [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
         case LogicalType::kInvalid: {
-            String error_message = "Unhandled cases.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unhandled cases.");
             break;
         }
     }
@@ -1287,26 +1277,35 @@ void Value::MoveUnionValue(Value &&other) noexcept {
             break;
         }
         case LogicalType::kEmptyArray:
+            [[fallthrough]];
         case LogicalType::kNull: {
             // No value for null type
             break;
         }
         case LogicalType::kArray:
+            [[fallthrough]];
         case LogicalType::kVarchar:
+            [[fallthrough]];
         case LogicalType::kTensor:
+            [[fallthrough]];
         case LogicalType::kTensorArray:
+            [[fallthrough]];
         case LogicalType::kMultiVector:
+            [[fallthrough]];
         case LogicalType::kEmbedding:
+            [[fallthrough]];
         case LogicalType::kSparse: {
             this->value_info_ = std::move(other.value_info_);
             break;
         }
         case LogicalType::kTuple:
+            [[fallthrough]];
         case LogicalType::kMixed:
+            [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
         case LogicalType::kInvalid: {
-            String error_message = "Unhandled cases.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unhandled cases.");
             break;
         }
     }
@@ -1332,12 +1331,10 @@ i64 Value::ToInteger() const {
             return value_.big_int;
         }
         default: {
-            String error_message = fmt::format("Attempt to output {} as integer", type_.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Attempt to output {} as integer", type_.ToString()));
         }
     }
-    String error_message = "Unreachable code.";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Unreachable code.");
     return -1;
 }
 
@@ -1345,8 +1342,7 @@ f32 Value::ToFloat() const {
     if (type_.type() == LogicalType::kFloat) {
         return static_cast<f32>(value_.float32);
     }
-    String error_message = fmt::format("Attempt to output {} as float", type_.ToString());
-    UnrecoverableError(error_message);
+    UnrecoverableError(fmt::format("Attempt to output {} as float", type_.ToString()));
     return std::numeric_limits<f32>::quiet_NaN();
 }
 
@@ -1354,12 +1350,11 @@ f64 Value::ToDouble() const {
     if (type_.type() == LogicalType::kDouble) {
         return static_cast<f64>(value_.float64);
     }
-    String error_message = fmt::format("Attempt to output {} as double", type_.ToString());
-    UnrecoverableError(error_message);
+    UnrecoverableError(fmt::format("Attempt to output {} as double", type_.ToString()));
     return std::numeric_limits<f64>::quiet_NaN();
 }
 
-String Value::ToString() const {
+std::string Value::ToString() const {
     switch (type_.type()) {
         case LogicalType::kBoolean: {
             return value_.boolean ? "true" : "false";
@@ -1383,40 +1378,36 @@ String Value::ToString() const {
             char buffer[20];
             auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), value_.float32);
             if (ec != std::errc()) {
-                String error_message = "Float to string conversion failed.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Float to string conversion failed.");
             }
-            String result(buffer, ptr);
+            std::string result(buffer, ptr);
             return result;
         }
         case LogicalType::kDouble: {
             char buffer[30];
             auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), value_.float64);
             if (ec != std::errc()) {
-                String error_message = "Double to string conversion failed.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Double to string conversion failed.");
             }
-            String result(buffer, ptr);
+            std::string result(buffer, ptr);
             return result;
         }
         case LogicalType::kFloat16: {
             char buffer[20];
             auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), static_cast<float>(value_.float16));
             if (ec != std::errc()) {
-                String error_message = "Float to string conversion failed.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Float to string conversion failed.");
             }
-            String result(buffer, ptr);
+            std::string result(buffer, ptr);
             return result;
         }
         case LogicalType::kBFloat16: {
             char buffer[20];
             auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), static_cast<float>(value_.bfloat16));
             if (ec != std::errc()) {
-                String error_message = "Float to string conversion failed.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Float to string conversion failed.");
             }
-            String result(buffer, ptr);
+            std::string result(buffer, ptr);
             return result;
         }
         case LogicalType::kDate: {
@@ -1442,19 +1433,19 @@ String Value::ToString() const {
         }
         case LogicalType::kEmbedding: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
-            Span<char> data_span = this->GetEmbedding();
+            std::span<char> data_span = this->GetEmbedding();
             if (data_span.size() != embedding_info->Size()) {
-                String error_message = "Embedding data size mismatch.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Embedding data size mismatch.");
             }
             const EmbeddingT embedding(data_span.data(), false);
             return EmbeddingT::Embedding2String(embedding, embedding_info->Type(), embedding_info->Dimension());
         }
         case LogicalType::kMultiVector:
+            [[fallthrough]];
         case LogicalType::kTensor: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
-            Span<char> data_span = this->GetEmbedding();
-            SizeT data_bytes = data_span.size();
+            std::span<char> data_span = this->GetEmbedding();
+            size_t data_bytes = data_span.size();
             const auto basic_embedding_bytes = embedding_info->Size();
             if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
                 UnrecoverableError("Tensor data size mismatch.");
@@ -1465,13 +1456,13 @@ String Value::ToString() const {
         case LogicalType::kTensorArray: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             const auto &embedding_value_infos = this->GetTensorArray();
-            const SizeT basic_embedding_bytes = embedding_info->Size();
+            const size_t basic_embedding_bytes = embedding_info->Size();
             std::ostringstream oss;
             oss << '[';
-            for (SizeT i = 0; i < embedding_value_infos.size(); ++i) {
+            for (size_t i = 0; i < embedding_value_infos.size(); ++i) {
                 const auto &embedding_value_info = embedding_value_infos[i];
-                Span<char> data_span = embedding_value_info->GetData();
-                const SizeT data_bytes = data_span.size();
+                std::span<char> data_span = embedding_value_info->GetData();
+                const size_t data_bytes = data_span.size();
                 if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
                     UnrecoverableError("TensorArray data size mismatch.");
                 }
@@ -1496,7 +1487,7 @@ String Value::ToString() const {
             const auto &array_elements = this->GetArray();
             std::ostringstream oss;
             oss << '{';
-            for (SizeT i = 0; i < array_elements.size(); ++i) {
+            for (size_t i = 0; i < array_elements.size(); ++i) {
                 oss << array_elements[i].ToString();
                 if (i != array_elements.size() - 1) {
                     oss << ',';
@@ -1527,23 +1518,24 @@ String Value::ToString() const {
             return value_.uuid.ToString();
         }
         case LogicalType::kMixed: {
-            String error_message = fmt::format("Value::ToString() not implemented for type {}", type_.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Value::ToString() not implemented for type {}", type_.ToString()));
             return {};
         }
         case LogicalType::kTuple:
+            [[fallthrough]];
         case LogicalType::kNull:
+            [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
         case LogicalType::kInvalid: {
-            String error_message = fmt::format("Value::ToString() not implemented for type {}", type_.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Value::ToString() not implemented for type {}", type_.ToString()));
             return {};
         }
     }
     return {};
 }
 
-void Value::AppendToJson(const String &name, nlohmann::json &json) const {
+void Value::AppendToJson(const std::string &name, nlohmann::json &json) const {
     switch (type_.type()) {
         case LogicalType::kBoolean: {
             json[name] = value_.boolean;
@@ -1611,7 +1603,7 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) const {
         }
         case LogicalType::kEmbedding: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
-            Span<char> data_span = this->GetEmbedding();
+            std::span<char> data_span = this->GetEmbedding();
             if (data_span.size() != embedding_info->Size()) {
                 UnrecoverableError("Embedding data size mismatch.");
             }
@@ -1620,6 +1612,7 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) const {
             return;
         }
         case LogicalType::kMultiVector:
+            [[fallthrough]];
         case LogicalType::kTensor: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             Tensor2Json(this->GetEmbedding(), embedding_info->Type(), embedding_info->Dimension(), json[name]);
@@ -1628,7 +1621,7 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) const {
         case LogicalType::kTensorArray: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             const auto &embedding_value_infos = this->GetTensorArray();
-            Vector<Span<char>> tensor_array;
+            std::vector<std::span<char>> tensor_array;
             tensor_array.reserve(embedding_value_infos.size());
             for (const auto &embedding_value_info : embedding_value_infos) {
                 tensor_array.emplace_back(embedding_value_info->GetData());
@@ -1660,20 +1653,31 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) const {
             return;
         }
         case LogicalType::kHugeInt:
+            [[fallthrough]];
         case LogicalType::kDecimal:
+            [[fallthrough]];
         case LogicalType::kTuple:
+            [[fallthrough]];
         case LogicalType::kPoint:
+            [[fallthrough]];
         case LogicalType::kLine:
+            [[fallthrough]];
         case LogicalType::kLineSeg:
+            [[fallthrough]];
         case LogicalType::kBox:
+            [[fallthrough]];
         case LogicalType::kCircle:
+            [[fallthrough]];
         case LogicalType::kUuid:
+            [[fallthrough]];
         case LogicalType::kMixed:
+            [[fallthrough]];
         case LogicalType::kNull:
+            [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
         case LogicalType::kInvalid: {
-            String error_message = fmt::format("Value::AppendToJson() not implemented for type {}", type_.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Value::AppendToJson() not implemented for type {}", type_.ToString()));
         }
     }
 }
@@ -1752,10 +1756,9 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
         }
         case LogicalType::kEmbedding: {
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type.type_info().get());
-            Span<char> data_span = this->GetEmbedding();
+            std::span<char> data_span = this->GetEmbedding();
             if (data_span.size() != embedding_info->Size()) {
-                String error_message = "Embedding data size mismatch.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Embedding data size mismatch.");
             }
             const EmbeddingT embedding(const_cast<char *>(data_span.data()), false);
 
@@ -1790,7 +1793,7 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
         case LogicalType::kTensor: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type.type_info().get());
 
-            Span<char> tensor = this->GetEmbedding();
+            std::span<char> tensor = this->GetEmbedding();
 
             auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder);
             auto status = list_builder->Append();
@@ -1800,8 +1803,8 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
         case LogicalType::kTensorArray: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type.type_info().get());
 
-            const Vector<SharedPtr<EmbeddingValueInfo>> &embedding_value_infos = this->GetTensorArray();
-            Vector<Span<char>> tensor_array;
+            const std::vector<std::shared_ptr<EmbeddingValueInfo>> &embedding_value_infos = this->GetTensorArray();
+            std::vector<std::span<char>> tensor_array;
             for (const auto &embedding_value_info : embedding_value_infos) {
                 tensor_array.push_back(embedding_value_info->GetData());
             }
@@ -1838,28 +1841,29 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
         case LogicalType::kInvalid: {
-            String error_message = "Invalid data type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid data type");
         }
     }
 }
 
-const Vector<Value> &Value::GetArray() const { return this->value_info_->Get<ArrayValueInfo>().array_elements_; }
+const std::vector<Value> &Value::GetArray() const { return this->value_info_->Get<ArrayValueInfo>().array_elements_; }
 
-SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const_ptr_t ptr, SizeT bytes) {
+std::shared_ptr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const char *ptr, size_t bytes) {
     if (bytes == 0) {
         UnrecoverableError("EmbeddingValueInfo::MakeTensorValueInfo(bytes=0) is invalid.");
     }
-    return MakeShared<EmbeddingValueInfo>(ptr, bytes);
+    return std::make_shared<EmbeddingValueInfo>(ptr, bytes);
 }
 
-SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) {
-    return MakeShared<EmbeddingValueInfo>(ptr_bytes);
+std::shared_ptr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const std::vector<std::pair<char *, size_t>> &ptr_bytes) {
+    return std::make_shared<EmbeddingValueInfo>(ptr_bytes);
 }
 
-SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeMultiVectorValueInfo(const_ptr_t ptr, SizeT bytes) { return MakeTensorValueInfo(ptr, bytes); }
+std::shared_ptr<EmbeddingValueInfo> EmbeddingValueInfo::MakeMultiVectorValueInfo(const char *ptr, size_t bytes) {
+    return MakeTensorValueInfo(ptr, bytes);
+}
 
-SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeMultiVectorValueInfo(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) {
+std::shared_ptr<EmbeddingValueInfo> EmbeddingValueInfo::MakeMultiVectorValueInfo(const std::vector<std::pair<char *, size_t>> &ptr_bytes) {
     return MakeTensorValueInfo(ptr_bytes);
 }
 

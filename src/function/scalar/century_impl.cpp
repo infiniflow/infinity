@@ -12,24 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <cmath>
-
 module infinity_core:century.impl;
 
 import :century;
-import :stl;
 import :new_catalog;
 import :status;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import :third_party;
+import :column_vector;
+
+import std.compat;
+
 import internal_types;
 import data_type;
-import :column_vector;
+import logical_type;
 
 namespace infinity {
 
@@ -89,9 +86,9 @@ inline bool CenturyFunction::Run(TimestampT left, BigIntT &result) {
 }
 
 void RegisterCenturyFunction(NewCatalog *catalog_ptr) {
-    String func_name = "century";
+    std::string func_name = "century";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction century_date_function(func_name,
                                          {DataType(LogicalType::kDate)},

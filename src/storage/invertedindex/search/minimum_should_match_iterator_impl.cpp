@@ -15,21 +15,22 @@
 module;
 
 #include <cassert>
-#include <iostream>
-#include <vector>
+
 module infinity_core:minimum_should_match_iterator.impl;
 
 import :minimum_should_match_iterator;
-import :stl;
 import :index_defines;
 import :multi_doc_iterator;
-import internal_types;
 import :logger;
 import :infinity_exception;
 
+import std;
+
+import internal_types;
+
 namespace infinity {
 
-MinimumShouldMatchIterator::MinimumShouldMatchIterator(Vector<UniquePtr<DocIterator>> &&iterators, const u32 minimum_should_match)
+MinimumShouldMatchIterator::MinimumShouldMatchIterator(std::vector<std::unique_ptr<DocIterator>> &&iterators, const u32 minimum_should_match)
     : MultiDocIterator(std::move(iterators)), minimum_should_match_(minimum_should_match) {
 #ifndef NDEBUG
     // validate children
@@ -177,7 +178,7 @@ u32 MinimumShouldMatchIterator::PopFromHeadHeap() {
     return idx;
 }
 
-Pair<bool, u32> MinimumShouldMatchIterator::PushToTailHeap(const u32 idx) {
+std::pair<bool, u32> MinimumShouldMatchIterator::PushToTailHeap(const u32 idx) {
     auto comp = [&](const u32 lhs, const u32 rhs) { return children_[lhs]->GetEstimateIterateCost() > children_[rhs]->GetEstimateIterateCost(); };
     if (tail_size_ < tail_heap_.size()) {
         tail_heap_[tail_size_++] = idx;

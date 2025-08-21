@@ -12,19 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:data_block;
 
-import :stl;
 import :default_values;
 import :selection;
-import data_type;
 import :column_vector;
 import :value;
-import internal_types;
 import :infinity_exception;
 import :logger;
+
+import internal_types;
+import data_type;
 
 namespace infinity {
 
@@ -32,27 +30,27 @@ namespace infinity {
 export struct DataBlock {
 
 public:
-    static inline SharedPtr<DataBlock> Make() { return MakeShared<DataBlock>(); }
-    static inline UniquePtr<DataBlock> MakeUniquePtr() { return MakeUnique<DataBlock>(); }
+    static inline std::shared_ptr<DataBlock> Make() { return std::make_shared<DataBlock>(); }
+    static inline std::unique_ptr<DataBlock> MakeUniquePtr() { return std::make_unique<DataBlock>(); }
 
 public:
     DataBlock() = default;
 
-    bool AppendColumns(const DataBlock &other, const Vector<SizeT> &column_idxes);
+    bool AppendColumns(const DataBlock &other, const std::vector<size_t> &column_idxes);
 
-    UniquePtr<DataBlock> Clone() const;
+    std::unique_ptr<DataBlock> Clone() const;
 
-    void Init(const DataBlock *input, const SharedPtr<Selection> &input_select);
+    void Init(const DataBlock *input, const std::shared_ptr<Selection> &input_select);
 
-    void Init(const SharedPtr<DataBlock> &input, const SharedPtr<Selection> &input_select);
+    void Init(const std::shared_ptr<DataBlock> &input, const std::shared_ptr<Selection> &input_select);
 
-    void Init(const SharedPtr<DataBlock> &input, SizeT start_idx, SizeT end_idx);
+    void Init(const std::shared_ptr<DataBlock> &input, size_t start_idx, size_t end_idx);
 
-    static SharedPtr<DataBlock> MoveFrom(SharedPtr<DataBlock> &input);
+    static std::shared_ptr<DataBlock> MoveFrom(std::shared_ptr<DataBlock> &input);
 
-    void Init(const Vector<SharedPtr<DataType>> &types, SizeT capacity = DEFAULT_VECTOR_SIZE);
+    void Init(const std::vector<std::shared_ptr<DataType>> &types, size_t capacity = DEFAULT_VECTOR_SIZE);
 
-    void Init(const Vector<SharedPtr<ColumnVector>> &column_vectors);
+    void Init(const std::vector<std::shared_ptr<ColumnVector>> &column_vectors);
 
     void UnInit();
 
@@ -62,38 +60,38 @@ public:
     void Reset();
 
     // TODO: May cause error when capacity is larger than the originally allocated size
-    void Reset(SizeT capacity);
+    void Reset(size_t capacity);
 
-    [[nodiscard]] Value GetValue(SizeT column_index, SizeT row_index) const;
+    [[nodiscard]] Value GetValue(size_t column_index, size_t row_index) const;
 
-    void SetValue(SizeT column_index, SizeT row_index, const Value &val);
+    void SetValue(size_t column_index, size_t row_index, const Value &val);
 
-    void AppendValue(SizeT column_index, const Value &value);
+    void AppendValue(size_t column_index, const Value &value);
 
-    void AppendValueByPtr(SizeT column_index, const_ptr_t value_ptr);
+    void AppendValueByPtr(size_t column_index, const char *value_ptr);
 
     void Finalize();
 
-    [[nodiscard]] String ToString() const;
+    [[nodiscard]] std::string ToString() const;
 
-    [[nodiscard]] String ToBriefString() const;
+    [[nodiscard]] std::string ToBriefString() const;
 
     [[nodiscard]] bool Finalized() const { return finalized; }
 
-    void FillRowIDVector(SharedPtr<Vector<RowID>> &row_ids, u32 block_id) const;
+    void FillRowIDVector(std::shared_ptr<std::vector<RowID>> &row_ids, u32 block_id) const;
 
-    void UnionWith(const SharedPtr<DataBlock> &other);
+    void UnionWith(const std::shared_ptr<DataBlock> &other);
 
-    void AppendWith(const SharedPtr<DataBlock> &other);
+    void AppendWith(const std::shared_ptr<DataBlock> &other);
 
     void AppendWith(const DataBlock *other);
 
-    void AppendWith(const DataBlock *other, SizeT from, SizeT count);
+    void AppendWith(const DataBlock *other, size_t from, size_t count);
 
-    void InsertVector(const SharedPtr<ColumnVector> &vector, SizeT index);
+    void InsertVector(const std::shared_ptr<ColumnVector> &vector, size_t index);
 
 public:
-    [[nodiscard]] SizeT column_count() const { return column_count_; }
+    [[nodiscard]] size_t column_count() const { return column_count_; }
 
     [[nodiscard]] u16 row_count() const {
         if (!finalized) {
@@ -105,18 +103,18 @@ public:
         return row_count_;
     }
 
-    [[nodiscard]] Vector<SharedPtr<DataType>> types() const {
-        Vector<SharedPtr<DataType>> types;
+    [[nodiscard]] std::vector<std::shared_ptr<DataType>> types() const {
+        std::vector<std::shared_ptr<DataType>> types;
 
         types.reserve(column_count());
-        for (SizeT colum_idx = 0; colum_idx < column_vectors.size(); ++colum_idx) {
+        for (size_t colum_idx = 0; colum_idx < column_vectors.size(); ++colum_idx) {
             types.push_back(column_vectors[colum_idx]->data_type());
         }
         return types;
     }
 
-    [[nodiscard]] SizeT capacity() const { return capacity_; }
-    [[nodiscard]] SizeT available_capacity() const { return capacity_ - row_count_; }
+    [[nodiscard]] size_t capacity() const { return capacity_; }
+    [[nodiscard]] size_t available_capacity() const { return capacity_ - row_count_; }
 
     bool operator==(const DataBlock &other) const;
     bool operator!=(const DataBlock &other) const { return !(*this == other); }
@@ -126,14 +124,14 @@ public:
     // Write to a char buffer
     void WriteAdv(char *&ptr) const;
     // Read from a serialized version
-    static SharedPtr<DataBlock> ReadAdv(const char *&ptr, i32 maxbytes);
+    static std::shared_ptr<DataBlock> ReadAdv(const char *&ptr, i32 maxbytes);
 
-    Vector<SharedPtr<ColumnVector>> column_vectors;
+    std::vector<std::shared_ptr<ColumnVector>> column_vectors;
 
 private:
     u16 row_count_{0};
-    SizeT column_count_{0};
-    SizeT capacity_{0};
+    size_t column_count_{0};
+    size_t capacity_{0};
     bool initialized = false;
     bool finalized = false;
 };

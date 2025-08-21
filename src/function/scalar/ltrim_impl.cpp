@@ -1,24 +1,18 @@
-module;
-
-#include <cctype>
-
 module infinity_core:ltrim.impl;
 
 import :ltrim;
-
-import :stl;
 import :new_catalog;
 import :status;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
+import :column_vector;
 
-import :third_party;
+import std.compat;
+
 import logical_type;
 import internal_types;
 import data_type;
-import :logger;
-import :column_vector;
 
 namespace infinity {
 
@@ -33,23 +27,23 @@ struct LtrimFunction {
 template <>
 inline void LtrimFunction::Run(VarcharT &left, VarcharT &result, ColumnVector *left_ptr, ColumnVector *result_ptr) {
     const char *input = nullptr;
-    SizeT input_len = 0;
-    Span<const char> left_v = left_ptr->GetVarcharInner(left);
+    size_t input_len = 0;
+    std::span<const char> left_v = left_ptr->GetVarcharInner(left);
     input = left_v.data();
     input_len = left_v.size();
-    SizeT pos = 0;
+    size_t pos = 0;
     while (pos < input_len && std::isspace(static_cast<unsigned char>(input[pos]))) {
         pos++;
     }
 
-    Span<const char> res_span = Span<const char>(&input[pos], input_len - pos);
+    std::span<const char> res_span = std::span<const char>(&input[pos], input_len - pos);
     result_ptr->AppendVarcharInner(res_span, result);
 }
 
 void RegisterLtrimFunction(NewCatalog *catalog_ptr) {
-    String func_name = "ltrim";
+    std::string func_name = "ltrim";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction ltrim_function(func_name,
                                   {DataType(LogicalType::kVarchar)},

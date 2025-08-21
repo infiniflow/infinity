@@ -16,7 +16,6 @@ module;
 
 export module infinity_core:japanese_analyzer;
 
-import :stl;
 import :ijma;
 import :term;
 import :common_analyzer;
@@ -26,7 +25,7 @@ namespace infinity {
 
 export class JapaneseAnalyzer : public CommonLanguageAnalyzer {
 public:
-    JapaneseAnalyzer(const String &path);
+    JapaneseAnalyzer(const std::string &path);
 
     JapaneseAnalyzer(const JapaneseAnalyzer &other);
 
@@ -41,7 +40,7 @@ public:
     void SetNBest(u32 num = 2) { analyzer_->setOption(jma::Analyzer::OPTION_TYPE_NBEST, num); }
 
 protected:
-    void Parse(const String &input) override {
+    void Parse(const std::string &input) override {
         sentence_->setString(input.c_str());
         analyzer_->runWithSentence(*sentence_);
 
@@ -93,7 +92,7 @@ private:
     }
 
 private:
-    String knowledge_path_;
+    std::string knowledge_path_;
 
     jma::Knowledge *knowledge_{nullptr};
 
@@ -111,6 +110,6 @@ private:
 
     u32 sc_morp_;
 
-    String segment_;
+    std::string segment_;
 };
 } // namespace infinity

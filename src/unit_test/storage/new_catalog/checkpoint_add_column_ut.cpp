@@ -12,17 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CI
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.checkpoint_add_column;
 
 import :ut.replay_test;
 import :ut.base_test;
-import :stl;
-import :third_party;
+
+import third_party;
 import :status;
 import :new_catalog;
 import :new_txn_manager;
@@ -61,12 +60,6 @@ import :mem_index;
 import :roaring_bitmap;
 import :index_filter_evaluators;
 import :index_emvb;
-#else
-#include "gtest/gtest.h"
-import infinity_core;
-import replay_test;
-import base_test;
-#endif
 
 import extra_ddl_info;
 import column_def;
@@ -85,40 +78,39 @@ protected:
     void SetUp() override {
         NewReplayTest::SetUp();
 
-        db_name = std::make_shared<String>("db1");
+        db_name = std::make_shared<std::string>("db1");
         column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
         column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
         table_name = std::make_shared<std::string>("tb1");
-        table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
     }
 
 protected:
-    SharedPtr<String> db_name;
-    SharedPtr<ColumnDef> column_def1;
-    SharedPtr<ColumnDef> column_def2;
-    SharedPtr<String> table_name;
-    SharedPtr<TableDef> table_def;
+    std::shared_ptr<std::string> db_name;
+    std::shared_ptr<ColumnDef> column_def1;
+    std::shared_ptr<ColumnDef> column_def2;
+    std::shared_ptr<std::string> table_name;
+    std::shared_ptr<TableDef> table_def;
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnCheckpointAddColumnTest,
-                         ::testing::Values(
-                                           TestTxnCheckpointAddColumnTest::NEW_VFS_OFF_BG_OFF_PATH));
+                         ::testing::Values(TestTxnCheckpointAddColumnTest::NEW_VFS_OFF_BG_OFF_PATH));
 
 TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
-    SharedPtr<String> db_name = std::make_shared<String>("default_db");
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
 
-    auto make_input_block = [&](Vector<SharedPtr<ColumnDef>> column_defs, Vector<Value> values, SizeT row_cnt) {
-        auto make_column = [&](SharedPtr<ColumnDef> &column_def, const Value &v) {
+    auto make_input_block = [&](std::vector<std::shared_ptr<ColumnDef>> column_defs, std::vector<Value> values, size_t row_cnt) {
+        auto make_column = [&](std::shared_ptr<ColumnDef> &column_def, const Value &v) {
             auto col = ColumnVector::Make(column_def->type());
             col->Initialize();
-            for (SizeT i = 0; i < row_cnt; ++i) {
+            for (size_t i = 0; i < row_cnt; ++i) {
                 col->AppendValue(v);
             }
             return col;
         };
-        auto input_block = MakeShared<DataBlock>();
-        for (SizeT i = 0; i < column_defs.size(); ++i) {
+        auto input_block = std::make_shared<DataBlock>();
+        for (size_t i = 0; i < column_defs.size(); ++i) {
             auto col = make_column(column_defs[i], values[i]);
             input_block->InsertVector(col, i);
         }
@@ -128,16 +120,16 @@ TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
 
     Status status;
     NewTxn *txn;
-    txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+    txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
     status = txn->CreateTable(*db_name, table_def, ConflictType::kError);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
 
-    SharedPtr<DataBlock> input_block = make_input_block(Vector<SharedPtr<ColumnDef>>{column_def1, column_def2},
-                                                        Vector<Value>{Value::MakeInt(1), Value::MakeVarchar("abcde")},
-                                                        10);
-    txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+    std::shared_ptr<DataBlock> input_block = make_input_block(std::vector<std::shared_ptr<ColumnDef>>{column_def1, column_def2},
+                                                              std::vector<Value>{Value::MakeInt(1), Value::MakeVarchar("abcde")},
+                                                              10);
+    txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
     status = txn->Append(*db_name, *table_name, input_block);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
@@ -145,24 +137,24 @@ TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
 
     std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
     default_varchar->str_value_ = strdup("");
-    SharedPtr<ColumnDef> column_def3 =
+    std::shared_ptr<ColumnDef> column_def3 =
         std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
-    txn = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
-    status = txn->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
+    txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+    status = txn->AddColumns(*db_name, *table_name, std::vector<std::shared_ptr<ColumnDef>>{column_def3});
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
 
-    txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+    txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
     status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
 
-    input_block = make_input_block(Vector<SharedPtr<ColumnDef>>{column_def1, column_def2, column_def3},
-                                   Vector<Value>{Value::MakeInt(1), Value::MakeVarchar("abcde"), Value::MakeVarchar("abcde")},
+    input_block = make_input_block(std::vector<std::shared_ptr<ColumnDef>>{column_def1, column_def2, column_def3},
+                                   std::vector<Value>{Value::MakeInt(1), Value::MakeVarchar("abcde"), Value::MakeVarchar("abcde")},
                                    10);
-    txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+    txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
     status = txn->Append(*db_name, *table_name, input_block);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
@@ -170,15 +162,15 @@ TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
 
     RestartTxnMgr();
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
 
         // Check table row count is 20
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
+        std::optional<DBMeeta> db_meta;
+        std::optional<TableMeeta> table_meta;
         Status status1 = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status1.ok());
 
-        SizeT row_count = 0;
+        size_t row_count = 0;
         auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
 

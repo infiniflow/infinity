@@ -14,8 +14,6 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:cluster_manager_admin.impl;
 
 import :cluster_manager;

@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:bound_cast_func;
 
-import :stl;
+import std;
+import std.compat;
 
 namespace infinity {
 
@@ -26,7 +25,10 @@ export struct CastParameters {
     bool strict{false};
 };
 
-using cast_function_t = bool (*)(const SharedPtr<ColumnVector> &source, SharedPtr<ColumnVector> &result, SizeT count, CastParameters &parameters);
+using cast_function_t = bool (*)(const std::shared_ptr<ColumnVector> &source,
+                                 std::shared_ptr<ColumnVector> &result,
+                                 size_t count,
+                                 CastParameters &parameters);
 
 export struct BoundCastFunc {
     explicit inline BoundCastFunc(cast_function_t func) : function(func) {};

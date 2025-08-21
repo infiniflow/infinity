@@ -12,35 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:index_bmp;
 
-import :stl;
 import :index_base;
-import statement_common;
-import :third_party;
 import :base_table_ref;
-import create_index_info;
 import :bmp_util;
+
+import third_party;
+
+import create_index_info;
+import statement_common;
 
 namespace infinity {
 
 export class IndexBMP final : public IndexBase {
 public:
-    static SharedPtr<IndexBMP> Make(SharedPtr<String> index_name,
-                                    SharedPtr<String> index_comment,
-                                    const String &file_name,
-                                    Vector<String> column_names,
-                                    const Vector<InitParameter *> &index_param_list);
+    static std::shared_ptr<IndexBMP> Make(std::shared_ptr<std::string> index_name,
+                                          std::shared_ptr<std::string> index_comment,
+                                          const std::string &file_name,
+                                          std::vector<std::string> column_names,
+                                          const std::vector<InitParameter *> &index_param_list);
 
-    static void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name);
+    static void ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref, const std::string &column_name);
 
-    IndexBMP(SharedPtr<String> index_name,
-             SharedPtr<String> index_comment,
-             const String &file_name,
-             Vector<String> column_names,
-             SizeT block_size,
+    IndexBMP(std::shared_ptr<std::string> index_name,
+             std::shared_ptr<std::string> index_comment,
+             const std::string &file_name,
+             std::vector<std::string> column_names,
+             size_t block_size,
              BMPCompressType compress_type)
         : IndexBase(IndexType::kBMP, std::move(index_name), index_comment, file_name, column_names), block_size_(block_size),
           compress_type_(compress_type) {}
@@ -50,14 +49,14 @@ public:
 
     virtual void WriteAdv(char *&ptr) const override;
 
-    virtual String ToString() const override;
+    virtual std::string ToString() const override;
 
-    virtual String BuildOtherParamsString() const override;
+    virtual std::string BuildOtherParamsString() const override;
 
     virtual nlohmann::json Serialize() const override;
 
 public:
-    SizeT block_size_{};
+    size_t block_size_{};
     BMPCompressType compress_type_{BMPCompressType::kCompressed};
 };
 

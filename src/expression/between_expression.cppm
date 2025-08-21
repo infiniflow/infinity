@@ -18,21 +18,21 @@ export module infinity_core:between_expression;
 
 import :column_binding;
 import :base_expression;
-import data_type;
-import :stl;
+
 import internal_types;
+import data_type;
 
 namespace infinity {
 
 export class BetweenExpression : public BaseExpression {
 public:
-    BetweenExpression(const SharedPtr<BaseExpression> &value,
-                      const SharedPtr<BaseExpression> &upper_bound,
-                      const SharedPtr<BaseExpression> &lower_bound,
+    BetweenExpression(const std::shared_ptr<BaseExpression> &value,
+                      const std::shared_ptr<BaseExpression> &upper_bound,
+                      const std::shared_ptr<BaseExpression> &lower_bound,
                       bool upper_inclusive,
                       bool lower_inclusive);
 
-    String ToString() const override;
+    std::string ToString() const override;
 
     DataType Type() const override;
 

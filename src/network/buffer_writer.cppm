@@ -20,18 +20,20 @@ import :boost;
 import :pg_message;
 import :ring_buffer_iterator;
 import :default_values;
-import :stl;
+
+import std;
+
 import global_resource_usage;
 
 namespace infinity {
 
 export class BufferWriter {
 public:
-    explicit BufferWriter(const SharedPtr<boost::asio::ip::tcp::socket> &socket) : socket_(socket) {}
+    explicit BufferWriter(const std::shared_ptr<boost::asio::ip::tcp::socket> &socket) : socket_(socket) {}
     ~BufferWriter() = default;
-    [[nodiscard]] SizeT size() const;
+    [[nodiscard]] size_t size() const;
 
-    inline static SizeT max_capacity() { return PG_MSG_BUFFER_SIZE - 1; }
+    inline static size_t max_capacity() { return PG_MSG_BUFFER_SIZE - 1; }
 
     inline bool full() const { return size() == max_capacity(); }
 
@@ -47,18 +49,18 @@ public:
 
     void send_value_u32(u32 host_value);
 
-    void send_string(const String &value, NullTerminator null_terminator = NullTerminator::kYes);
+    void send_string(const std::string &value, NullTerminator null_terminator = NullTerminator::kYes);
 
     // 0 means flush whole buffer.
-    void flush(SizeT bytes = 0);
+    void flush(size_t bytes = 0);
 
 private:
-    void try_flush(SizeT bytes);
+    void try_flush(size_t bytes);
 
-    Array<char, PG_MSG_BUFFER_SIZE> data_{};
+    std::array<char, PG_MSG_BUFFER_SIZE> data_{};
     RingBufferIterator start_pos_{data_};
     RingBufferIterator current_pos_{data_};
-    SharedPtr<boost::asio::ip::tcp::socket> socket_{};
+    std::shared_ptr<boost::asio::ip::tcp::socket> socket_{};
 };
 
 } // namespace infinity

@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:physical_show;
-
-import :stl;
 
 import :query_context;
 import :operator_state;
@@ -26,13 +22,14 @@ import :base_expression;
 import :logical_show;
 import :load_meta;
 import :infinity_exception;
-import internal_types;
-import column_def;
-import data_type;
 import :variables;
 import :data_block;
 import :logger;
+
 import show_statement;
+import internal_types;
+import column_def;
+import data_type;
 
 namespace infinity {
 
@@ -40,19 +37,19 @@ export class PhysicalShow : public PhysicalOperator {
 public:
     explicit PhysicalShow(u64 id,
                           ShowStmtType type,
-                          String db_name,
-                          Optional<String> object_name,
+                          std::string db_name,
+                          std::optional<std::string> object_name,
                           u64 table_index,
-                          Optional<String> file_path,
-                          Optional<SegmentID> segment_id,
-                          Optional<BlockID> block_id,
-                          Optional<ChunkID> chunk_id,
-                          Optional<ColumnID> column_id,
-                          Optional<String> index_name,
-                          Optional<u64> session_id,
-                          Optional<TransactionID> txn_id,
-                          Optional<String> function_name,
-                          SharedPtr<Vector<LoadMeta>> load_metas)
+                          std::optional<std::string> file_path,
+                          std::optional<SegmentID> segment_id,
+                          std::optional<BlockID> block_id,
+                          std::optional<ChunkID> chunk_id,
+                          std::optional<ColumnID> column_id,
+                          std::optional<std::string> index_name,
+                          std::optional<u64> session_id,
+                          std::optional<TransactionID> txn_id,
+                          std::optional<std::string> function_name,
+                          std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kShow, nullptr, nullptr, id, load_metas), show_type_(type), db_name_(std::move(db_name)),
           object_name_(std::move(object_name)), table_index_(table_index), file_path_(std::move(file_path)), segment_id_(segment_id),
           block_id_(block_id), chunk_id_(chunk_id), column_id_(column_id), index_name_(index_name), session_id_(session_id), txn_id_(txn_id),
@@ -64,20 +61,20 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *output_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
+    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
+    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
     inline ShowStmtType show_type() const { return show_type_; }
 
-    inline const String &db_name() const { return db_name_; };
+    inline const std::string &db_name() const { return db_name_; };
 
-    inline const Optional<String> object_name() const { return object_name_; };
+    inline const std::optional<std::string> object_name() const { return object_name_; };
 
 private:
     void ExecuteShowViewDetail(QueryContext *query_context,
-                               const SharedPtr<Vector<SharedPtr<DataType>>> &column_types,
-                               const SharedPtr<Vector<String>> &column_names);
+                               const std::shared_ptr<std::vector<std::shared_ptr<DataType>>> &column_types,
+                               const std::shared_ptr<std::vector<std::string>> &column_names);
 
     void ExecuteShowDatabase(QueryContext *query_context, ShowOperatorState *operator_state);
 
@@ -167,22 +164,22 @@ private:
 
 private:
     ShowStmtType show_type_{ShowStmtType::kInvalid};
-    String db_name_{};
-    Optional<String> object_name_{};
+    std::string db_name_{};
+    std::optional<std::string> object_name_{};
     u64 table_index_{};
 
-    Optional<String> file_path_{};
-    Optional<SegmentID> segment_id_{};
-    Optional<BlockID> block_id_{};
-    Optional<ChunkID> chunk_id_{};
-    Optional<ColumnID> column_id_{};
-    Optional<String> index_name_{};
-    Optional<u64> session_id_{};
-    Optional<TransactionID> txn_id_{};
-    Optional<String> function_name_{};
+    std::optional<std::string> file_path_{};
+    std::optional<SegmentID> segment_id_{};
+    std::optional<BlockID> block_id_{};
+    std::optional<ChunkID> chunk_id_{};
+    std::optional<ColumnID> column_id_{};
+    std::optional<std::string> index_name_{};
+    std::optional<u64> session_id_{};
+    std::optional<TransactionID> txn_id_{};
+    std::optional<std::string> function_name_{};
 
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    std::shared_ptr<std::vector<std::string>> output_names_{};
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
 };
 
 } // namespace infinity

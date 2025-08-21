@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CI
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.alter;
 
 import :ut.base_test;
-import :stl;
-import :third_party;
+
+import third_party;
 import :status;
 import :new_catalog;
 import :new_txn_manager;
@@ -45,11 +44,6 @@ import :segment_index_meta;
 import :chunk_index_meta;
 import :db_meeta;
 import :logger;
-#else
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#endif
 
 import extra_ddl_info;
 import column_def;
@@ -74,14 +68,14 @@ TEST_P(TestTxnAlter, add_column0) {
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    SharedPtr<String> db_name = std::make_shared<String>("default_db");
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
         std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>(), default_varchar);
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1});
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -90,7 +84,7 @@ TEST_P(TestTxnAlter, add_column0) {
 
     u32 block_row_cnt = 8192;
     auto make_input_block = [&] {
-        auto input_block = MakeShared<DataBlock>();
+        auto input_block = std::make_shared<DataBlock>();
         auto append_to_col = [&](ColumnVector &col, Value v) {
             for (u32 i = 0; i < block_row_cnt; ++i) {
                 col.AppendValue(v);
@@ -107,16 +101,16 @@ TEST_P(TestTxnAlter, add_column0) {
         return input_block;
     };
 
-    for (SizeT i = 0; i < 2; ++i) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+    for (size_t i = 0; i < 2; ++i) {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
         Status status = txn->Append(*db_name, *table_name, make_input_block());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
-        auto column_defs = Vector<SharedPtr<ColumnDef>>({column_def2});
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto column_defs = std::vector<std::shared_ptr<ColumnDef>>({column_def2});
         Status status = txn->AddColumns(*db_name, *table_name, column_defs);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -125,22 +119,22 @@ TEST_P(TestTxnAlter, add_column0) {
     {
         new_txn_mgr->PrintAllKeyValue();
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
+        std::optional<DBMeeta> db_meta;
+        std::optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto check_column = [&](ColumnMeta &column_meta, const Value &v, SizeT row_count) {
+        auto check_column = [&](ColumnMeta &column_meta, const Value &v, size_t row_count) {
             ColumnVector col;
 
             Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            for (SizeT i = 0; i < row_count; ++i) {
+            for (size_t i = 0; i < row_count; ++i) {
                 EXPECT_EQ(col.GetValueByIndex(i), v);
             }
         };
@@ -151,7 +145,7 @@ TEST_P(TestTxnAlter, add_column0) {
             EXPECT_TRUE(status.ok());
 
             BlockOffset offset = 0;
-            Pair<BlockOffset, BlockOffset> range;
+            std::pair<BlockOffset, BlockOffset> range;
             bool next = state.Next(offset, range);
             EXPECT_TRUE(next);
             EXPECT_EQ(range.first, 0);
@@ -160,14 +154,14 @@ TEST_P(TestTxnAlter, add_column0) {
             next = state.Next(offset, range);
             EXPECT_FALSE(next);
 
-            SizeT row_count = state.block_offset_end();
+            size_t row_count = state.block_offset_end();
             {
-                SizeT column_idx = 0;
+                size_t column_idx = 0;
                 ColumnMeta column_meta(column_idx, block_meta);
                 check_column(column_meta, Value::MakeInt(1), row_count);
             }
             {
-                SizeT column_idx = 1;
+                size_t column_idx = 1;
                 ColumnMeta column_meta(column_idx, block_meta);
                 check_column(column_meta, Value::MakeVarchar(""), row_count);
             }
@@ -176,7 +170,7 @@ TEST_P(TestTxnAlter, add_column0) {
         auto check_segment = [&](SegmentMeta &segment_meta) {
             auto [block_ids, status] = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
+            EXPECT_EQ(*block_ids, std::vector<BlockID>({0, 1}));
 
             for (auto block_id : *block_ids) {
                 BlockMeta block_meta(block_id, segment_meta);
@@ -186,7 +180,7 @@ TEST_P(TestTxnAlter, add_column0) {
 
         auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        EXPECT_EQ(*segment_ids, std::vector<SegmentID>({0}));
 
         for (auto segment_id : *segment_ids) {
             SegmentMeta segment_meta(segment_id, *table_meta);
@@ -200,13 +194,13 @@ TEST_P(TestTxnAlter, drop_column0) {
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    SharedPtr<String> db_name = std::make_shared<String>("default_db");
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -215,7 +209,7 @@ TEST_P(TestTxnAlter, drop_column0) {
 
     u32 block_row_cnt = 8192;
     auto make_input_block = [&] {
-        auto input_block = MakeShared<DataBlock>();
+        auto input_block = std::make_shared<DataBlock>();
         auto append_to_col = [&](ColumnVector &col, Value v) {
             for (u32 i = 0; i < block_row_cnt; ++i) {
                 col.AppendValue(v);
@@ -238,38 +232,38 @@ TEST_P(TestTxnAlter, drop_column0) {
         return input_block;
     };
 
-    for (SizeT i = 0; i < 2; ++i) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+    for (size_t i = 0; i < 2; ++i) {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
         Status status = txn->Append(*db_name, *table_name, make_input_block());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
-        Vector<String> column_names = {column_def2->name_};
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        std::vector<std::string> column_names = {column_def2->name_};
         Status status = txn->DropColumns(*db_name, *table_name, column_names);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
+        std::optional<DBMeeta> db_meta;
+        std::optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto check_column = [&](ColumnMeta &column_meta, const Value &v, SizeT row_count) {
+        auto check_column = [&](ColumnMeta &column_meta, const Value &v, size_t row_count) {
             ColumnVector col;
 
             Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            for (SizeT i = 0; i < row_count; ++i) {
+            for (size_t i = 0; i < row_count; ++i) {
                 EXPECT_EQ(col.GetValueByIndex(i), v);
             }
         };
@@ -280,7 +274,7 @@ TEST_P(TestTxnAlter, drop_column0) {
             EXPECT_TRUE(status.ok());
 
             BlockOffset offset = 0;
-            Pair<BlockOffset, BlockOffset> range;
+            std::pair<BlockOffset, BlockOffset> range;
             bool next = state.Next(offset, range);
             EXPECT_TRUE(next);
             EXPECT_EQ(range.first, 0);
@@ -289,9 +283,9 @@ TEST_P(TestTxnAlter, drop_column0) {
             next = state.Next(offset, range);
             EXPECT_FALSE(next);
 
-            SizeT row_count = state.block_offset_end();
+            size_t row_count = state.block_offset_end();
             {
-                SizeT column_idx = 0;
+                size_t column_idx = 0;
                 ColumnMeta column_meta(column_idx, block_meta);
                 check_column(column_meta, Value::MakeInt(1), row_count);
             }
@@ -300,7 +294,7 @@ TEST_P(TestTxnAlter, drop_column0) {
         auto check_segment = [&](SegmentMeta &segment_meta) {
             auto [block_ids, status] = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
+            EXPECT_EQ(*block_ids, std::vector<BlockID>({0, 1}));
 
             for (auto block_id : *block_ids) {
                 BlockMeta block_meta(block_id, segment_meta);
@@ -310,7 +304,7 @@ TEST_P(TestTxnAlter, drop_column0) {
 
         auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        EXPECT_EQ(*segment_ids, std::vector<SegmentID>({0}));
 
         for (auto segment_id : *segment_ids) {
             SegmentMeta segment_meta(segment_id, *table_meta);

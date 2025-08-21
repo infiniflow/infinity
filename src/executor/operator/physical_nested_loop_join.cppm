@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:physical_nested_loop_join;
-
-import :stl;
 
 import :query_context;
 import :operator_state;
@@ -26,10 +22,11 @@ import :base_expression;
 import :data_table;
 import :load_meta;
 import :infinity_exception;
+import :logger;
+
 import internal_types;
 import join_reference;
 import data_type;
-import :logger;
 
 namespace infinity {
 
@@ -37,30 +34,30 @@ export class PhysicalNestedLoopJoin : public PhysicalOperator {
 public:
     explicit PhysicalNestedLoopJoin(u64 id,
                                     JoinType join_type,
-                                    Vector<SharedPtr<BaseExpression>> conditions,
-                                    UniquePtr<PhysicalOperator> left,
-                                    UniquePtr<PhysicalOperator> right,
-                                    SharedPtr<Vector<LoadMeta>> load_metas)
+                                    std::vector<std::shared_ptr<BaseExpression>> conditions,
+                                    std::unique_ptr<PhysicalOperator> left,
+                                    std::unique_ptr<PhysicalOperator> right,
+                                    std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kJoinNestedLoop, std::move(left), std::move(right), id, load_metas), join_type_(join_type),
           conditions_(std::move(conditions)) {}
 
     ~PhysicalNestedLoopJoin() override = default;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    SharedPtr<Vector<String>> GetOutputNames() const final;
+    std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    inline const Vector<SharedPtr<BaseExpression>> &conditions() const { return conditions_; }
+    inline const std::vector<std::shared_ptr<BaseExpression>> &conditions() const { return conditions_; }
 
 private:
-    SharedPtr<DataTable> left_table_{};
-    SharedPtr<DataTable> right_table_{};
+    std::shared_ptr<DataTable> left_table_{};
+    std::shared_ptr<DataTable> right_table_{};
     JoinType join_type_{JoinType::kInner};
-    Vector<SharedPtr<BaseExpression>> conditions_{};
+    std::vector<std::shared_ptr<BaseExpression>> conditions_{};
 };
 
 } // namespace infinity

@@ -53,7 +53,7 @@
 extern int expressiondebug;
 #endif
 /* "%code requires" blocks.  */
-#line 12 "expression_parser.y"
+#line 10 "expression_parser.y"
 
 
 #include "expression.h"
@@ -62,7 +62,11 @@ extern int expressiondebug;
 #include "type/info/decimal_info.h"
 #include "type/info/embedding_info.h"
 
-#include <vector>
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 #define YYSTYPE EXPRESSIONSTYPE
 #define YYLTYPE EXPRESSIONLTYPE
@@ -96,7 +100,7 @@ struct EXPRESSION_LTYPE {
         }                                         \
     }
 
-#line 100 "expression_parser.h"
+#line 104 "expression_parser.h"
 
 /* Token kinds.  */
 #ifndef EXPRESSIONTOKENTYPE
@@ -278,7 +282,7 @@ struct EXPRESSION_LTYPE {
 #if ! defined EXPRESSIONSTYPE && ! defined EXPRESSIONSTYPE_IS_DECLARED
 union EXPRESSIONSTYPE
 {
-#line 84 "expression_parser.y"
+#line 86 "expression_parser.y"
 
     bool    bool_value;
     char*   str_value;
@@ -289,7 +293,7 @@ union EXPRESSIONSTYPE
     infinity::ConstantExpr*           const_expr_t;
     std::vector<infinity::ParsedExpr*>*    expr_array_t;
 
-#line 293 "expression_parser.h"
+#line 297 "expression_parser.h"
 
 };
 typedef union EXPRESSIONSTYPE EXPRESSIONSTYPE;

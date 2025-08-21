@@ -1,20 +1,16 @@
-module;
-
-#include <string>
-
 module infinity_core:s3_client_minio.impl;
 
 import :s3_client_minio;
-
-import :stl;
 import :infinity_exception;
-import :third_party;
 import :logger;
+
+import std;
+import third_party;
 
 namespace infinity {
 
 Status S3ClientMinio::Init() {
-    client_ = MakeUnique<minio::s3::Client>(base_url, &provider);
+    client_ = std::make_unique<minio::s3::Client>(base_url, &provider);
     return Status::OK();
 }
 Status S3ClientMinio::UnInit() {
@@ -22,7 +18,7 @@ Status S3ClientMinio::UnInit() {
     return Status::OK();
 }
 
-Status S3ClientMinio::DownloadObject(const String &bucket_name, const String &object_name, const String &file_path) {
+Status S3ClientMinio::DownloadObject(const std::string &bucket_name, const std::string &object_name, const std::string &file_path) {
     // Create download object arguments.
     minio::s3::DownloadObjectArgs args;
     args.bucket = bucket_name;
@@ -34,14 +30,14 @@ Status S3ClientMinio::DownloadObject(const String &bucket_name, const String &ob
     if (auto resp = client_->DownloadObject(args)) {
         LOG_INFO(fmt::format("{}/{} downloaded to {} successfully", bucket_name, object_name, file_path));
     } else {
-        String err_msg = fmt::format("Unable to download object: {}/{}, reason: {}", bucket_name, object_name, resp.Error().String());
+        std::string err_msg = fmt::format("Unable to download object: {}/{}, reason: {}", bucket_name, object_name, resp.Error().String());
         LOG_CRITICAL(err_msg);
         UnrecoverableError(err_msg);
     }
     return Status::OK();
 }
 
-Status S3ClientMinio::UploadObject(const String &bucket_name, const String &object_name, const String &file_path) {
+Status S3ClientMinio::UploadObject(const std::string &bucket_name, const std::string &object_name, const std::string &file_path) {
     // Create upload object arguments.
     minio::s3::UploadObjectArgs args;
     args.bucket = bucket_name;
@@ -53,7 +49,7 @@ Status S3ClientMinio::UploadObject(const String &bucket_name, const String &obje
     if (auto resp = client_->UploadObject(args)) {
         LOG_INFO(fmt::format("{} uploaded to {}/{} successfully", file_path, bucket_name, object_name));
     } else {
-        String err_msg =
+        std::string err_msg =
             fmt::format("Unable to upload object: {}/{}, code: {}, reason: {}", bucket_name, object_name, resp.code, resp.Error().String());
         LOG_CRITICAL(err_msg);
         UnrecoverableError(err_msg);
@@ -61,7 +57,7 @@ Status S3ClientMinio::UploadObject(const String &bucket_name, const String &obje
     return Status::OK();
 }
 
-Status S3ClientMinio::RemoveObject(const String &bucket_name, const String &object_name) {
+Status S3ClientMinio::RemoveObject(const std::string &bucket_name, const std::string &object_name) {
     // Create remove object arguments.
     minio::s3::RemoveObjectArgs args;
     args.bucket = bucket_name;
@@ -72,17 +68,17 @@ Status S3ClientMinio::RemoveObject(const String &bucket_name, const String &obje
     if (auto resp = client_->RemoveObject(args)) {
         LOG_INFO(fmt::format("{} is removed from {} successfully", object_name, bucket_name));
     } else {
-        String err_msg = fmt::format("Unable to remove object: {}/{}, reason: {}", bucket_name, object_name, resp.Error().String());
+        std::string err_msg = fmt::format("Unable to remove object: {}/{}, reason: {}", bucket_name, object_name, resp.Error().String());
         LOG_CRITICAL(err_msg);
         UnrecoverableError(err_msg);
     }
     return Status::OK();
 }
 
-Status S3ClientMinio::CopyObject(const String &src_bucket_name,
-                                 const String &src_object_name,
-                                 const String &dst_bucket_name,
-                                 const String &dst_object_name) {
+Status S3ClientMinio::CopyObject(const std::string &src_bucket_name,
+                                 const std::string &src_object_name,
+                                 const std::string &dst_bucket_name,
+                                 const std::string &dst_object_name) {
     // Create copy object arguments.
     minio::s3::CopyObjectArgs args;
     args.bucket = dst_bucket_name;
@@ -97,14 +93,14 @@ Status S3ClientMinio::CopyObject(const String &src_bucket_name,
     if (auto resp = client_->CopyObject(args)) {
         LOG_TRACE(fmt::format("{} is copied to {} successfully", src_object_name, dst_object_name));
     } else {
-        String err_msg = fmt::format("Unable to do copy object: {}", resp.Error().String());
+        std::string err_msg = fmt::format("Unable to do copy object: {}", resp.Error().String());
         LOG_CRITICAL(err_msg);
         UnrecoverableError(err_msg);
     }
     return Status::OK();
 }
 
-Status S3ClientMinio::BucketExists(const String &bucket_name) {
+Status S3ClientMinio::BucketExists(const std::string &bucket_name) {
     // Create bucket exists arguments.
     minio::s3::BucketExistsArgs args;
     args.bucket = bucket_name;
@@ -122,7 +118,7 @@ Status S3ClientMinio::BucketExists(const String &bucket_name) {
                 return Status::MinioInvalidAccessKey(resp.Error().String());
             }
             default: {
-                String err_msg = fmt::format("Unable to do bucket existence check: {}, Please check if the MINIO connection", resp.Error().String());
+                std::string err_msg = fmt::format("Unable to do bucket existence check: {}, Please check if the MINIO connection", resp.Error().String());
                 LOG_CRITICAL(err_msg);
                 UnrecoverableError(err_msg);
             }
@@ -131,7 +127,7 @@ Status S3ClientMinio::BucketExists(const String &bucket_name) {
     return Status::OK();
 }
 
-Status S3ClientMinio::MakeBucket(const String &bucket_name) {
+Status S3ClientMinio::MakeBucket(const std::string &bucket_name) {
     // Create make bucket arguments.
     minio::s3::MakeBucketArgs args;
     args.bucket = bucket_name;
@@ -140,7 +136,7 @@ Status S3ClientMinio::MakeBucket(const String &bucket_name) {
     if (auto resp = client_->MakeBucket(args)) {
         LOG_TRACE(fmt::format("{} is created successfully", bucket_name));
     } else {
-        String err_msg = fmt::format("Unable to create bucket: {}", resp.Error().String());
+        std::string err_msg = fmt::format("Unable to create bucket: {}", resp.Error().String());
         LOG_CRITICAL(err_msg);
         UnrecoverableError(err_msg);
     }

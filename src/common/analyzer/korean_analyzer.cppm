@@ -16,7 +16,6 @@ module;
 
 export module infinity_core:korean_analyzer;
 
-import :stl;
 import :ijma;
 import :term;
 import :common_analyzer;
@@ -26,7 +25,7 @@ namespace infinity {
 
 export class KoreanAnalyzer : public CommonLanguageAnalyzer {
 public:
-    KoreanAnalyzer(const String &path);
+    KoreanAnalyzer(const std::string &path);
 
     KoreanAnalyzer(const KoreanAnalyzer &other);
 
@@ -35,7 +34,7 @@ public:
     Status Load();
 
 protected:
-    void Parse(const String &input) override {
+    void Parse(const std::string &input) override {
         mecab_->SetSentence(input);
         local_offset_ = -1;
 
@@ -69,12 +68,12 @@ private:
         return false;
     }
 
-    String knowledge_path_;
+    std::string knowledge_path_;
 
     jma::MeCab *mecab_{nullptr};
 
     bool own_mecab_;
 
-    String token_str_;
+    std::string token_str_;
 };
 } // namespace infinity

@@ -10,4 +10,4 @@ export using infinity::InlineVarchar;
 export using infinity::VectorVarchar;
 export using infinity::Varchar;
 
-};
+}; // namespace infinity

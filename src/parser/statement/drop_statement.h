@@ -21,7 +21,11 @@
 #include "statement/extra/drop_table_info.h"
 #include "statement/extra/drop_view_info.h"
 
-#include <memory>
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 namespace infinity {
 

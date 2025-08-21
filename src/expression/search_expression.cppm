@@ -12,17 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:search_expression;
 
-import :stl;
 import :base_expression;
 import :fusion_expression;
 import :match_expression;
 import :knn_expression;
 import :match_tensor_expression;
 import :match_sparse_expression;
+
 import logical_type;
 import internal_types;
 import data_type;
@@ -31,16 +29,16 @@ namespace infinity {
 
 export class SearchExpression final : public BaseExpression {
 public:
-    SearchExpression(Vector<SharedPtr<BaseExpression>> &match_exprs, Vector<SharedPtr<FusionExpression>> &fusion_exprs);
+    SearchExpression(std::vector<std::shared_ptr<BaseExpression>> &match_exprs, std::vector<std::shared_ptr<FusionExpression>> &fusion_exprs);
 
     inline DataType Type() const override { return DataType(LogicalType::kFloat); }
 
-    String ToString() const override;
+    std::string ToString() const override;
 
 public:
     // Eash match_expr shall be one of MatchExpression, KnnExpression, MatchTensorExpression, MatchSparseExpression
-    Vector<SharedPtr<BaseExpression>> match_exprs_{};
-    Vector<SharedPtr<FusionExpression>> fusion_exprs_{};
+    std::vector<std::shared_ptr<BaseExpression>> match_exprs_{};
+    std::vector<std::shared_ptr<FusionExpression>> fusion_exprs_{};
     bool have_filter_in_subsearch_{false};
 };
 

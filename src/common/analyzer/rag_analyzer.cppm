@@ -14,18 +14,18 @@
 
 module;
 
-#include <re2/re2.h>
 #include "opencc/openccxx.h"
 
 export module infinity_core:rag_analyzer;
 
-import :stl;
 import :term;
 import :status;
 import :darts_trie;
 import :lemmatizer;
 import :stemmer;
 import :analyzer;
+
+import third_party;
 
 namespace infinity {
 
@@ -35,7 +35,7 @@ namespace infinity {
 class NLTKWordTokenizer;
 export class RAGAnalyzer : public Analyzer {
 public:
-    RAGAnalyzer(const String &path);
+    RAGAnalyzer(const std::string &path);
 
     RAGAnalyzer(const RAGAnalyzer &other);
 
@@ -47,9 +47,9 @@ public:
 
     void SetFineGrained(bool fine_grained) { fine_grained_ = fine_grained; }
 
-    String Tokenize(const String &line);
+    std::string Tokenize(const std::string &line);
 
-    void FineGrainedTokenize(const String &tokens, Vector<String> &result);
+    void FineGrainedTokenize(const std::string &tokens, std::vector<std::string> &result);
 
 protected:
     int AnalyzeImpl(const Term &input, void *data, HookType func) override;
@@ -57,44 +57,45 @@ protected:
 private:
     static constexpr float DENOMINATOR = 1000000;
 
-    static String StrQ2B(const String &input);
+    static std::string StrQ2B(const std::string &input);
 
     i32 Freq(std::string_view key) const;
 
-    static String Key(std::string_view line);
+    static std::string Key(std::string_view line);
 
-    static String RKey(std::string_view line);
+    static std::string RKey(std::string_view line);
 
-    static Pair<Vector<String>, double> Score(const Vector<Pair<String, int>> &token_freqs);
+    static std::pair<std::vector<std::string>, double> Score(const std::vector<std::pair<std::string, int>> &token_freqs);
 
-    static void SortTokens(const Vector<Vector<Pair<String, int>>> &token_list, Vector<Pair<Vector<String>, double>> &res);
+    static void SortTokens(const std::vector<std::vector<std::pair<std::string, int>>> &token_list,
+                           std::vector<std::pair<std::vector<std::string>, double>> &res);
 
-    Pair<Vector<String>, double> MaxForward(const String &line) const;
+    std::pair<std::vector<std::string>, double> MaxForward(const std::string &line) const;
 
-    Pair<Vector<String>, double> MaxBackward(const String &line) const;
+    std::pair<std::vector<std::string>, double> MaxBackward(const std::string &line) const;
 
-    int DFS(const String &chars,
+    int DFS(const std::string &chars,
             int s,
-            Vector<Pair<String, int>> &pre_tokens,
-            Vector<Vector<Pair<String, int>>> &token_list,
-            Vector<String> &best_tokens,
+            std::vector<std::pair<std::string, int>> &pre_tokens,
+            std::vector<std::vector<std::pair<std::string, int>>> &token_list,
+            std::vector<std::string> &best_tokens,
             double &max_score,
             bool memo_all) const;
 
-    void TokenizeInner(Vector<String> &res, const String &L) const;
+    void TokenizeInner(std::vector<std::string> &res, const std::string &L) const;
 
-    void SplitLongText(const String &L, u32 length, Vector<String> &sublines) const;
+    void SplitLongText(const std::string &L, u32 length, std::vector<std::string> &sublines) const;
 
-    String Merge(const String &tokens) const;
+    std::string Merge(const std::string &tokens) const;
 
-    void EnglishNormalize(const Vector<String> &tokens, Vector<String> &res);
+    void EnglishNormalize(const std::vector<std::string> &tokens, std::vector<std::string> &res);
 
 public:
-    Vector<Pair<Vector<std::string_view>, double>> GetBestTokensTopN(std::string_view chars, u32 n) const;
+    std::vector<std::pair<std::vector<std::string_view>, double>> GetBestTokensTopN(std::string_view chars, u32 n) const;
 
-    static const SizeT term_string_buffer_limit_ = 4096 * 3;
+    static const size_t term_string_buffer_limit_ = 4096 * 3;
 
-    String dict_path_;
+    std::string dict_path_;
 
     bool own_dict_{};
 
@@ -104,30 +105,30 @@ public:
 
     Lemmatizer *lemma_{nullptr};
 
-    UniquePtr<Stemmer> stemmer_;
+    std::unique_ptr<Stemmer> stemmer_;
 
     OpenCC *opencc_{nullptr};
 
-    Vector<char> lowercase_string_buffer_;
+    std::vector<char> lowercase_string_buffer_;
 
     bool fine_grained_{false};
 
-    UniquePtr<NLTKWordTokenizer> nltk_tokenizer_;
+    std::unique_ptr<NLTKWordTokenizer> nltk_tokenizer_;
 
-    RE2 pattern1_{"[a-zA-Z_-]+$"};
+    re2::RE2 pattern1_{"[a-zA-Z_-]+$"};
 
-    RE2 pattern2_{"[a-z\\.-]+$"};
+    re2::RE2 pattern2_{"[a-z\\.-]+$"};
 
-    RE2 pattern3_{"[0-9\\.-]+$"};
+    re2::RE2 pattern3_{"[0-9\\.-]+$"};
 
-    RE2 pattern4_{"[0-9,\\.-]+$"};
+    re2::RE2 pattern4_{"[0-9,\\.-]+$"};
 
-    RE2 pattern5_{"[a-z\\.-]+"};
+    re2::RE2 pattern5_{"[a-z\\.-]+"};
 
-    RE2 regex_split_pattern_{R"#(([ ,\.<>/?;'\[\]\`!@#$%^&*$$\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z\.-]+|[0-9,\.-]+))#"};
+    re2::RE2 regex_split_pattern_{R"#(([ ,\.<>/?;'\[\]\`!@#$%^&*$$\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z\.-]+|[0-9,\.-]+))#"};
 
-    RE2 blank_pattern_{"( )"};
+    re2::RE2 blank_pattern_{"( )"};
 
-    RE2 replace_space_pattern_{R"#(([ ]+))#"};
+    re2::RE2 replace_space_pattern_{R"#(([ ]+))#"};
 };
 } // namespace infinity

@@ -12,26 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:version_file_worker.impl;
 
 import :version_file_worker;
-import :stl;
 import :file_worker;
 import :block_version;
 import :infinity_exception;
 import :logger;
-import :third_party;
 import :persistence_manager;
+
+import third_party;
 
 namespace infinity {
 
-VersionFileWorker::VersionFileWorker(SharedPtr<String> data_dir,
-                                     SharedPtr<String> temp_dir,
-                                     SharedPtr<String> file_dir,
-                                     SharedPtr<String> file_name,
-                                     SizeT capacity,
+VersionFileWorker::VersionFileWorker(std::shared_ptr<std::string> data_dir,
+                                     std::shared_ptr<std::string> temp_dir,
+                                     std::shared_ptr<std::string> file_dir,
+                                     std::shared_ptr<std::string> file_name,
+                                     size_t capacity,
                                      PersistenceManager *persistence_manager)
     : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), capacity_(capacity) {}
 
@@ -44,12 +42,10 @@ VersionFileWorker::~VersionFileWorker() {
 
 void VersionFileWorker::AllocateInMemory() {
     if (data_ != nullptr) {
-        String error_message = "Data is already allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is already allocated.");
     }
     if (capacity_ == 0) {
-        String error_message = "Capacity is 0.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Capacity is 0.");
     }
     auto *data = new BlockVersion(capacity_);
     data_ = static_cast<void *>(data);
@@ -57,8 +53,7 @@ void VersionFileWorker::AllocateInMemory() {
 
 void VersionFileWorker::FreeInMemory() {
     if (data_ == nullptr) {
-        String error_message = "Data is already freed.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is already freed.");
     }
     auto *data = static_cast<BlockVersion *>(data_);
     delete data;
@@ -66,12 +61,11 @@ void VersionFileWorker::FreeInMemory() {
 }
 
 // FIXME
-SizeT VersionFileWorker::GetMemoryCost() const { return capacity_ * sizeof(TxnTimeStamp); }
+size_t VersionFileWorker::GetMemoryCost() const { return capacity_ * sizeof(TxnTimeStamp); }
 
 bool VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &base_ctx) {
     if (data_ == nullptr) {
-        String error_message = "Data is not allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is not allocated.");
     }
     auto *data = static_cast<BlockVersion *>(data_);
 
@@ -91,10 +85,9 @@ bool VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, co
     return false;
 }
 
-void VersionFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
+void VersionFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     if (data_ != nullptr) {
-        String error_message = "Data is already allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is already allocated.");
     }
     auto *data = BlockVersion::LoadFromFile(file_handle_.get()).release();
     data_ = static_cast<void *>(data);

@@ -12,18 +12,17 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-module;
-
 export module infinity_core:fast_rough_filter;
-import :stl;
+
 import :value;
 import :default_values;
 import :probabilistic_data_filter;
 import :min_max_data_filter;
 import :logger;
-import :third_party;
 import :infinity_exception;
 import :filter_expression_push_down_helper;
+
+import third_party;
 
 namespace infinity {
 
@@ -43,11 +42,11 @@ private:
     // in minmax build task, first set build_time_ to be the begin_ts of the task txn
     // if set to valid time, we know one job has started
     mutable std::mutex mutex_check_task_start_;
-    TxnTimeStamp build_time_{UNCOMMIT_TS};          // for minmax filter
+    TxnTimeStamp build_time_{UNCOMMIT_TS};            // for minmax filter
     std::atomic_flag finished_build_minmax_filter_{}; // for minmax filter
-    UniquePtr<MinMaxDataFilter> min_max_data_filter_{};
+    std::unique_ptr<MinMaxDataFilter> min_max_data_filter_{};
 
-    UniquePtr<ProbabilisticDataFilter> probabilistic_data_filter_{};
+    std::unique_ptr<ProbabilisticDataFilter> probabilistic_data_filter_{};
 
 public:
     // bloom filter test
@@ -60,9 +59,9 @@ public:
         return min_max_data_filter_->MayInRange(column_id, value, compare_type);
     }
 
-    String SerializeToString() const;
+    std::string SerializeToString() const;
 
-    void DeserializeFromString(const String &str);
+    void DeserializeFromString(const std::string &str);
 
     bool IsValid() const;
 
@@ -79,8 +78,7 @@ private:
     void SetHaveStartedMinMaxFilterBuildTask(TxnTimeStamp begin_ts) {
         std::lock_guard lock(mutex_check_task_start_);
         if (build_time_ != UNCOMMIT_TS) {
-            String error_message = "FastRoughFilter::SetHaveStartedBuildTask(): Job already started.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("FastRoughFilter::SetHaveStartedBuildTask(): Job already started.");
         }
         build_time_ = begin_ts;
     }
@@ -91,8 +89,8 @@ private:
     }
 
     void BeginBuildMinMaxFilterTask(u32 column_count) {
-        probabilistic_data_filter_ = MakeUnique<ProbabilisticDataFilter>(column_count);
-        min_max_data_filter_ = MakeUnique<MinMaxDataFilter>(column_count);
+        probabilistic_data_filter_ = std::make_unique<ProbabilisticDataFilter>(column_count);
+        min_max_data_filter_ = std::make_unique<MinMaxDataFilter>(column_count);
     }
 
     void FinishBuildMinMaxFilterTask() { finished_build_minmax_filter_.test_and_set(std::memory_order_release); }

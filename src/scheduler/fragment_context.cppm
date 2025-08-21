@@ -12,13 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:fragment_context;
 
-import :stl;
 import :fragment_task;
-// import :query_context;
 import :profiler;
 import :physical_operator;
 import :physical_source;
@@ -27,11 +23,12 @@ import :data_table;
 import :data_block;
 import :knn_scan_data;
 import :create_index_data;
-// import :logger;
-import :third_party;
 import :compact_state_data;
-// import :infinity_context;
 import :query_context;
+
+import std;
+import std.compat;
+import third_party;
 
 namespace infinity {
 
@@ -45,21 +42,21 @@ export enum class FragmentType {
     kParallelStream,
 };
 
-export String FragmentType2String(FragmentType type) {
+export std::string FragmentType2String(FragmentType type) {
     switch (type) {
         case FragmentType::kInvalid:
-            return String("Invalid");
+            return std::string("Invalid");
         case FragmentType::kSerialMaterialize:
-            return String("SerialMaterialize");
+            return std::string("SerialMaterialize");
         case FragmentType::kParallelMaterialize:
-            return String("ParallelMaterialize");
+            return std::string("ParallelMaterialize");
         case FragmentType::kParallelStream:
-            return String("ParallelStream");
+            return std::string("ParallelStream");
     }
 }
 
 export class Notifier {
-    SizeT all_task_n_ = 0;
+    size_t all_task_n_ = 0;
     bool error_ = false;
     FragmentContext *error_fragment_ctx_ = nullptr;
 
@@ -69,7 +66,7 @@ export class Notifier {
     bool Check() const { return all_task_n_ == 0; };
 
 public:
-    void SetTaskN(SizeT all_task_n) { all_task_n_ = all_task_n; }
+    void SetTaskN(size_t all_task_n) { all_task_n_ = all_task_n; }
 
     void Wait() {
         std::unique_lock<std::mutex> lk(locker_);
@@ -119,7 +116,7 @@ public:
 
     bool TryFinishFragment();
 
-    Vector<PhysicalOperator *> &GetOperators();
+    std::vector<PhysicalOperator *> &GetOperators();
 
     [[nodiscard]] PhysicalSink *GetSinkOperator() const;
 
@@ -127,13 +124,13 @@ public:
 
     void CreateTasks(i64 parallel_count, i64 operator_count, FragmentContext *parent_context);
 
-    inline Vector<UniquePtr<FragmentTask>> &Tasks() { return tasks_; }
+    inline std::vector<std::unique_ptr<FragmentTask>> &Tasks() { return tasks_; }
 
     [[nodiscard]] inline bool IsMaterialize() const {
         return fragment_type_ == FragmentType::kSerialMaterialize || fragment_type_ == FragmentType::kParallelMaterialize;
     }
 
-    inline SharedPtr<DataTable> GetResult() {
+    inline std::shared_ptr<DataTable> GetResult() {
         notifier_->Wait();
 
         if (notifier_->error_fragment_ctx() != nullptr) {
@@ -169,7 +166,7 @@ private:
     void MakeSinkState(i64 parallel_count);
 
 protected:
-    virtual SharedPtr<DataTable> GetResultInternal() = 0;
+    virtual std::shared_ptr<DataTable> GetResultInternal() = 0;
 
 protected:
     Notifier *notifier_{};
@@ -178,14 +175,14 @@ protected:
 
     QueryContext *query_context_{};
 
-    Vector<UniquePtr<FragmentTask>> tasks_{};
+    std::vector<std::unique_ptr<FragmentTask>> tasks_{};
 
-    Vector<SharedPtr<DataBlock>> data_array_{};
+    std::vector<std::shared_ptr<DataBlock>> data_array_{};
 
     FragmentType fragment_type_{FragmentType::kInvalid};
 
-    atomic_u64 unfinished_task_n_{0};
-    atomic_u64 unfinished_child_n_{0};
+    std::atomic_uint64_t unfinished_task_n_{0};
+    std::atomic_uint64_t unfinished_child_n_{0};
 };
 
 export class SerialMaterializedFragmentCtx final : public FragmentContext {
@@ -195,12 +192,12 @@ public:
 
     ~SerialMaterializedFragmentCtx() final = default;
 
-    SharedPtr<DataTable> GetResultInternal() final;
+    std::shared_ptr<DataTable> GetResultInternal() final;
 
 public:
-    UniquePtr<KnnScanSharedData> knn_scan_shared_data_{};
+    std::unique_ptr<KnnScanSharedData> knn_scan_shared_data_{};
 
-    SharedPtr<CompactStateData> compact_state_data_{};
+    std::shared_ptr<CompactStateData> compact_state_data_{};
 };
 
 export class ParallelMaterializedFragmentCtx final : public FragmentContext {
@@ -210,15 +207,15 @@ public:
 
     ~ParallelMaterializedFragmentCtx() final = default;
 
-    SharedPtr<DataTable> GetResultInternal() final;
+    std::shared_ptr<DataTable> GetResultInternal() final;
 
 public:
-    UniquePtr<KnnScanSharedData> knn_scan_shared_data_{};
+    std::unique_ptr<KnnScanSharedData> knn_scan_shared_data_{};
 
-    SharedPtr<CompactStateData> compact_state_data_{};
+    std::shared_ptr<CompactStateData> compact_state_data_{};
 
 protected:
-    HashMap<u64, Vector<SharedPtr<DataBlock>>> task_results_{};
+    std::unordered_map<u64, std::vector<std::shared_ptr<DataBlock>>> task_results_{};
 };
 
 export class ParallelStreamFragmentCtx final : public FragmentContext {
@@ -228,10 +225,10 @@ public:
 
     ~ParallelStreamFragmentCtx() final = default;
 
-    SharedPtr<DataTable> GetResultInternal() final;
+    std::shared_ptr<DataTable> GetResultInternal() final;
 
 protected:
-    HashMap<u64, Vector<SharedPtr<DataBlock>>> task_results_{};
+    std::unordered_map<u64, std::vector<std::shared_ptr<DataBlock>>> task_results_{};
 };
 
 } // namespace infinity

@@ -14,15 +14,11 @@
 
 module;
 
-#include <bit>
 #include <cassert>
-#include <memory>
-#include <vector>
 
 module infinity_core:common_query_filter.impl;
 
 import :common_query_filter;
-import :stl;
 import :roaring_bitmap;
 import :base_expression;
 import :base_table_ref;
@@ -35,21 +31,16 @@ import :data_block;
 import :buffer_manager;
 import :expression_evaluator;
 import :default_values;
-import internal_types;
 import :column_vector;
 import :vector_buffer;
-import data_type;
-import logical_type;
 import :expression_state;
 import :expression_type;
 import :reference_expression;
 import :in_expression;
 import :infinity_exception;
-import :third_party;
 import :logger;
 import :index_defines;
 import :logger;
-
 import :new_txn;
 import :status;
 import :table_meeta;
@@ -58,17 +49,24 @@ import :block_meta;
 import :column_meta;
 import :new_catalog;
 
+import std;
+import third_party;
+
+import internal_types;
+import data_type;
+import logical_type;
+
 namespace infinity {
 
 void ReadDataBlock(DataBlock *output,
-                   const SizeT row_count,
+                   const size_t row_count,
                    BlockMeta &block_meta,
-                   const Vector<SizeT> &column_ids,
-                   const Vector<bool> &column_should_load) {
+                   const std::vector<size_t> &column_ids,
+                   const std::vector<bool> &column_should_load) {
     const BlockID block_id = block_meta.block_id();
     const SegmentID segment_id = block_meta.segment_meta().segment_id();
-    for (SizeT i = 0; i < column_ids.size(); ++i) {
-        if (const SizeT column_id = column_ids[i]; column_id == COLUMN_IDENTIFIER_ROW_ID) {
+    for (size_t i = 0; i < column_ids.size(); ++i) {
+        if (const size_t column_id = column_ids[i]; column_id == COLUMN_IDENTIFIER_ROW_ID) {
             const u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
             output->column_vectors[i]->AppendWith(RowID(segment_id, segment_offset), row_count);
         } else if (column_should_load[i]) {
@@ -88,7 +86,7 @@ void ReadDataBlock(DataBlock *output,
     output->Finalize();
 }
 
-void CollectUsedColumnRef(BaseExpression *expr, Vector<bool> &column_should_load) {
+void CollectUsedColumnRef(BaseExpression *expr, std::vector<bool> &column_should_load) {
     switch (expr->type()) {
         case ExpressionType::kColumn: {
             LOG_ERROR(std::format("{}: ColumnExpression should not be in the leftover_filter after optimizer.", __func__));
@@ -114,10 +112,10 @@ void CollectUsedColumnRef(BaseExpression *expr, Vector<bool> &column_should_load
 }
 
 void MergeFalseIntoBitmask(const VectorBuffer *input_bool_column_buffer,
-                           const SharedPtr<Bitmask> &input_null_mask,
-                           const SizeT count,
+                           const std::shared_ptr<Bitmask> &input_null_mask,
+                           const size_t count,
                            Bitmask &bitmask,
-                           const SizeT bitmask_offset) {
+                           const size_t bitmask_offset) {
     input_null_mask->RoaringBitmapApplyFunc([&](const u32 row_offset) -> bool {
         if (row_offset >= count) {
             return false;
@@ -129,7 +127,7 @@ void MergeFalseIntoBitmask(const VectorBuffer *input_bool_column_buffer,
     });
 }
 
-CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, NewTxn *new_txn)
+CommonQueryFilter::CommonQueryFilter(std::shared_ptr<BaseExpression> original_filter, std::shared_ptr<BaseTableRef> base_table_ref, NewTxn *new_txn)
     : new_txn_ptr_(new_txn), original_filter_(std::move(original_filter)), base_table_ref_(std::move(base_table_ref)) {
     const auto &segment_index = base_table_ref_->block_index_->new_segment_block_index_;
     if (segment_index.empty()) {
@@ -161,7 +159,7 @@ void CommonQueryFilter::NewBuildFilter(u32 task_id) {
     TxnTimeStamp begin_ts = new_txn_ptr_->BeginTS();
     TxnTimeStamp commit_ts = new_txn_ptr_->CommitTS();
     {
-        SharedPtr<FastRoughFilter> segment_filter;
+        std::shared_ptr<FastRoughFilter> segment_filter;
         Status status = segment_meta->GetFastRoughFilter(segment_filter);
         if (status.ok()) {
             if (!fast_rough_filter_evaluator_->Evaluate(begin_ts, *segment_filter)) {
@@ -171,7 +169,7 @@ void CommonQueryFilter::NewBuildFilter(u32 task_id) {
         }
     }
 
-    SizeT segment_row_count = segment_index.at(segment_id).segment_offset();
+    size_t segment_row_count = segment_index.at(segment_id).segment_offset();
     Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count);
     if (result_elem.CountTrue() == 0) {
         // empty result
@@ -184,21 +182,21 @@ void CommonQueryFilter::NewBuildFilter(u32 task_id) {
                                        result_elem.count()));
     }
     if (leftover_filter_) {
-        SizeT segment_row_count_read = 0;
+        size_t segment_row_count_read = 0;
         auto filter_state = ExpressionState::CreateState(leftover_filter_);
-        auto db_for_filter_p = MakeUnique<DataBlock>();
+        auto db_for_filter_p = std::make_unique<DataBlock>();
         auto db_for_filter = db_for_filter_p.get();
-        Vector<SharedPtr<DataType>> read_column_types = *(base_table_ref_->column_types_);
-        Vector<SizeT> column_ids = base_table_ref_->column_ids_;
+        std::vector<std::shared_ptr<DataType>> read_column_types = *(base_table_ref_->column_types_);
+        std::vector<size_t> column_ids = base_table_ref_->column_ids_;
         if (read_column_types.empty() || read_column_types.back()->type() != LogicalType::kRowID) {
-            read_column_types.push_back(MakeShared<DataType>(LogicalType::kRowID));
+            read_column_types.push_back(std::make_shared<DataType>(LogicalType::kRowID));
             column_ids.push_back(COLUMN_IDENTIFIER_ROW_ID);
         }
         // collect the base_table_ref columns used in filter
-        Vector<bool> column_should_load(column_ids.size(), false);
+        std::vector<bool> column_should_load(column_ids.size(), false);
         CollectUsedColumnRef(leftover_filter_.get(), column_should_load);
         db_for_filter->Init(read_column_types);
-        auto bool_column = ColumnVector::Make(MakeShared<infinity::DataType>(LogicalType::kBoolean));
+        auto bool_column = ColumnVector::Make(std::make_shared<infinity::DataType>(LogicalType::kBoolean));
         // filter and build bitmask, if filter_expression_ != nullptr
         ExpressionEvaluator expr_evaluator;
 
@@ -213,14 +211,14 @@ void CommonQueryFilter::NewBuildFilter(u32 task_id) {
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            const auto row_count = std::min<SizeT>(segment_row_count - segment_row_count_read, block_row_count);
+            const auto row_count = std::min<size_t>(segment_row_count - segment_row_count_read, block_row_count);
             db_for_filter->Reset(row_count);
             ReadDataBlock(db_for_filter, row_count, block_meta, column_ids, column_should_load);
             bool_column->Initialize(ColumnVectorType::kCompactBit, row_count);
             expr_evaluator.Init(db_for_filter);
             expr_evaluator.Execute(leftover_filter_, filter_state, bool_column);
             const VectorBuffer *bool_column_buffer = bool_column->buffer_.get();
-            SharedPtr<Bitmask> &null_mask = bool_column->nulls_ptr_;
+            std::shared_ptr<Bitmask> &null_mask = bool_column->nulls_ptr_;
             MergeFalseIntoBitmask(bool_column_buffer, null_mask, row_count, result_elem, segment_row_count_read);
             segment_row_count_read += row_count;
             bool_column->Reset();
@@ -306,7 +304,7 @@ RowID CommonQueryFilter::EqualOrLarger(RowID doc_id) {
             }
             current_segment_id_ = doc_id.segment_id_;
             doc_id_bitmask_ = &(it->second);
-            current_roaring_iterator_ = MakeUnique<RoaringForwardIterator>(doc_id_bitmask_->Begin());
+            current_roaring_iterator_ = std::make_unique<RoaringForwardIterator>(doc_id_bitmask_->Begin());
         }
         current_roaring_iterator_->equalorlarger(doc_id.segment_offset_);
         if (*current_roaring_iterator_ != doc_id_bitmask_->End()) [[likely]] {

@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:db_meeta;
 
-import :stl;
 import :status;
 import :new_catalog;
 
@@ -30,52 +27,52 @@ class MetaTableCache;
 
 export class DBMeeta {
 public:
-    DBMeeta(String db_id_str, NewTxn *txn);
-    DBMeeta(String db_id_str, KVInstance *kv_instance, MetaCache *meta_cache);
+    DBMeeta(std::string db_id_str, NewTxn *txn);
+    DBMeeta(std::string db_id_str, KVInstance *kv_instance, MetaCache *meta_cache);
 
-    const String &db_id_str() const;
+    const std::string &db_id_str() const;
 
     KVInstance *kv_instance() const { return kv_instance_; }
 
-    Status InitSet(const String *comment = nullptr);
+    Status InitSet(const std::string *comment = nullptr);
 
     Status UninitSet(UsageFlag usage_flag);
 
-    Status GetTableIDs(Vector<String> *&table_id_strs, Vector<String> **table_names = nullptr);
+    Status GetTableIDs(std::vector<std::string> *&table_id_strs, std::vector<std::string> **table_names = nullptr);
 
-    Status GetTableID(const String &table_name,
-                      String &table_key,
-                      String &table_id_str,
+    Status GetTableID(const std::string &table_name,
+                      std::string &table_key,
+                      std::string &table_id_str,
                       TxnTimeStamp &create_table_ts,
-                      SharedPtr<MetaTableCache> &table_cache);
+                      std::shared_ptr<MetaTableCache> &table_cache);
 
-    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo();
+    std::tuple<std::shared_ptr<DatabaseInfo>, Status> GetDatabaseInfo();
 
-    Tuple<String, Status> GetNextTableID();
+    std::tuple<std::string, Status> GetNextTableID();
 
-    Status SetNextTableID(const String &table_id_str);
+    Status SetNextTableID(const std::string &table_id_str);
 
-    String GetDBName() const { return db_name_; }
-    void SetDBName(const String &db_name) { db_name_ = db_name; }
+    std::string GetDBName() const { return db_name_; }
+    void SetDBName(const std::string &db_name) { db_name_ = db_name; }
 
 private:
-    Status GetComment(String *&comment);
+    Status GetComment(std::string *&comment);
     Status LoadTableIDs();
-    String GetDBTag(const String &tag) const;
+    std::string GetDBTag(const std::string &tag) const;
 
 private:
     mutable std::mutex mtx_;
 
-    String db_id_str_{};
-    String db_name_{};
+    std::string db_id_str_{};
+    std::string db_name_{};
     NewTxn *txn_{};
     TxnTimeStamp txn_begin_ts_{};
     KVInstance *kv_instance_{};
     MetaCache *meta_cache_{};
 
-    Optional<String> comment_;
-    Optional<Vector<String>> table_id_strs_;
-    Optional<Vector<String>> table_names_;
+    std::optional<std::string> comment_;
+    std::optional<std::vector<std::string>> table_id_strs_;
+    std::optional<std::vector<std::string>> table_names_;
 };
 
 } // namespace infinity

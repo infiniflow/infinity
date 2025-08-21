@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:column_pruner;
 
-import :stl;
 import :logical_node_visitor;
 import :optimizer_rule;
 import :logical_node;
@@ -31,23 +28,23 @@ public:
     void VisitNode(LogicalNode &op) final;
 
 private:
-    SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression) final;
+    std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<ColumnExpression> &expression) final;
 
     template <class T>
-    Vector<T> ClearUnusedExpressions(const Vector<T> &list, idx_t table_idx);
+    std::vector<T> ClearUnusedExpressions(const std::vector<T> &list, idx_t table_idx);
 
     template <class T>
-    Vector<T> ClearUnusedBaseTableColumns(const Vector<T> &col_list, idx_t table_idx);
+    std::vector<T> ClearUnusedBaseTableColumns(const std::vector<T> &col_list, idx_t table_idx);
 
     bool all_referenced_;
-    HashSet<ColumnBinding> column_references_;
+    std::unordered_set<ColumnBinding> column_references_;
 };
 
 export class ColumnPruner : public OptimizerRule {
 public:
-    inline void ApplyToPlan(QueryContext *, SharedPtr<LogicalNode> &logical_plan) final { return remove_visitor.VisitNode(*logical_plan); }
+    inline void ApplyToPlan(QueryContext *, std::shared_ptr<LogicalNode> &logical_plan) final { return remove_visitor.VisitNode(*logical_plan); }
 
-    [[nodiscard]] inline String name() const final { return "Column Pruner"; }
+    [[nodiscard]] inline std::string name() const final { return "Column Pruner"; }
 
 private:
     RemoveUnusedColumns remove_visitor{true};

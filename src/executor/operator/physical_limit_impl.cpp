@@ -12,13 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_limit.impl;
 
 import :physical_limit;
-
-import :stl;
 import :base_expression;
 import :default_values;
 import :load_meta;
@@ -26,7 +22,6 @@ import :query_context;
 import :table_def;
 import :data_table;
 import :default_values;
-
 import :physical_operator_type;
 import :operator_state;
 import :data_block;
@@ -40,9 +35,9 @@ namespace infinity {
 
 void LimitCounter::AddHitsCount(u64 row_count) { total_hits_count_ += row_count; }
 
-SizeT AtomicCounter::Offset(SizeT row_count) {
+size_t AtomicCounter::Offset(size_t row_count) {
     auto success = false;
-    SizeT result = 0;
+    size_t result = 0;
 
     while (!success) {
         i64 current_offset = offset_;
@@ -63,9 +58,9 @@ SizeT AtomicCounter::Offset(SizeT row_count) {
     return result;
 }
 
-SizeT AtomicCounter::Limit(SizeT row_count) {
+size_t AtomicCounter::Limit(size_t row_count) {
     auto success = false;
-    SizeT result = 0;
+    size_t result = 0;
 
     while (!success) {
         i64 current_limit = limit_;
@@ -94,8 +89,8 @@ bool AtomicCounter::IsLimitOver() {
     return limit_ == 0;
 }
 
-SizeT UnSyncCounter::Offset(SizeT row_count) {
-    SizeT result = 0;
+size_t UnSyncCounter::Offset(size_t row_count) {
+    size_t result = 0;
 
     if (offset_ <= 0) {
         return 0;
@@ -113,8 +108,8 @@ SizeT UnSyncCounter::Offset(SizeT row_count) {
     return result;
 }
 
-SizeT UnSyncCounter::Limit(SizeT row_count) {
-    SizeT result = 0;
+size_t UnSyncCounter::Limit(size_t row_count) {
+    size_t result = 0;
 
     if (limit_ <= 0) {
         return 0;
@@ -141,10 +136,10 @@ bool UnSyncCounter::IsLimitOver() {
 }
 
 PhysicalLimit::PhysicalLimit(u64 id,
-                             UniquePtr<PhysicalOperator> left,
-                             SharedPtr<BaseExpression> limit_expr,
-                             SharedPtr<BaseExpression> offset_expr,
-                             SharedPtr<Vector<LoadMeta>> load_metas,
+                             std::unique_ptr<PhysicalOperator> left,
+                             std::shared_ptr<BaseExpression> limit_expr,
+                             std::shared_ptr<BaseExpression> offset_expr,
+                             std::shared_ptr<std::vector<LoadMeta>> load_metas,
                              bool total_hits_count_flag)
     : PhysicalOperator(PhysicalOperatorType::kLimit, std::move(left), nullptr, id, load_metas), limit_expr_(std::move(limit_expr)),
       offset_expr_(std::move(offset_expr)), total_hits_count_flag_(total_hits_count_flag) {
@@ -155,35 +150,35 @@ PhysicalLimit::PhysicalLimit(u64 id,
         offset = (static_pointer_cast<ValueExpression>(offset_expr_))->GetValue().value_.big_int;
     }
 
-    counter_ = MakeUnique<AtomicCounter>(offset, limit);
+    counter_ = std::make_unique<AtomicCounter>(offset, limit);
 }
 
-void PhysicalLimit::Init(QueryContext* query_context) {}
+void PhysicalLimit::Init(QueryContext *query_context) {}
 
 //    offset     limit + offset
 //    left       right
 // | a | b | c | d | e | f
 bool PhysicalLimit::Execute(QueryContext *query_context,
-                            const Vector<UniquePtr<DataBlock>> &input_blocks,
-                            Vector<UniquePtr<DataBlock>> &output_blocks,
+                            const std::vector<std::unique_ptr<DataBlock>> &input_blocks,
+                            std::vector<std::unique_ptr<DataBlock>> &output_blocks,
                             LimitCounter *counter,
                             bool total_hits_count_flag) {
-    SizeT input_row_count = 0;
+    size_t input_row_count = 0;
 
-    for (SizeT block_id = 0; block_id < input_blocks.size(); ++block_id) {
+    for (size_t block_id = 0; block_id < input_blocks.size(); ++block_id) {
         input_row_count += input_blocks[block_id]->row_count();
     }
 
-    SizeT offset = counter->Offset(input_row_count);
+    size_t offset = counter->Offset(input_row_count);
     if (offset == input_row_count) {
         return true;
     }
 
-    SizeT limit = counter->Limit(input_row_count - offset);
-    SizeT block_start_idx = input_blocks.size();
+    size_t limit = counter->Limit(input_row_count - offset);
+    size_t block_start_idx = input_blocks.size();
 
-    for (SizeT block_id = 0; block_id < input_blocks.size(); ++block_id) {
-        if (const SizeT row_count = input_blocks[block_id]->row_count(); offset >= row_count) {
+    for (size_t block_id = 0; block_id < input_blocks.size(); ++block_id) {
+        if (const size_t row_count = input_blocks[block_id]->row_count(); offset >= row_count) {
             offset -= row_count;
         } else {
             block_start_idx = block_id;
@@ -192,7 +187,7 @@ bool PhysicalLimit::Execute(QueryContext *query_context,
     }
 
     const auto output_types = input_blocks.front()->types();
-    for (SizeT block_id = block_start_idx; block_id < input_blocks.size(); ++block_id) {
+    for (size_t block_id = block_start_idx; block_id < input_blocks.size(); ++block_id) {
         auto &input_block = input_blocks[block_id];
         auto row_count = input_block->row_count();
         if (row_count == 0) {

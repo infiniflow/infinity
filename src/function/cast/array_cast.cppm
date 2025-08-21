@@ -17,6 +17,7 @@ module;
 export module infinity_core:array_cast;
 
 import :bound_cast_func;
+
 import data_type;
 
 namespace infinity {

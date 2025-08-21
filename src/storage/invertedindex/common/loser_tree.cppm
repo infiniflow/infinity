@@ -1,14 +1,16 @@
 // Refers to
 // https://github.com/tlx/tlx/blob/master/tlx/container/loser_tree.hpp
+
 module;
 
 #include <cassert>
-#include <vector>
 
 export module infinity_core:loser_tree;
 
-import :stl;
-import :third_party;
+import :infinity_type;
+
+import std;
+import third_party;
 
 namespace infinity {
 
@@ -19,7 +21,7 @@ public:
     static constexpr Source invalid_ = Source(-1);
     static inline Source round_up_to_power_of_two(Source n) {
         --n;
-        for (SizeT k = 1; k != 8 * sizeof(n); k <<= 1) {
+        for (size_t k = 1; k != 8 * sizeof(n); k <<= 1) {
             n |= n >> k;
         }
         ++n;
@@ -39,7 +41,7 @@ protected:
     // The next greater power of two of ik_.
     const Source k_;
 
-    Vector<Loser> losers_;
+    std::vector<Loser> losers_;
 
     Comparator cmp_;
 

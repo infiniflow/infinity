@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:catalog_meta;
 
-import :stl;
 import :status;
 
 namespace infinity {
@@ -30,9 +27,9 @@ public:
     CatalogMeta(NewTxn *txn);
     CatalogMeta(KVInstance *kv_instance, MetaCache *meta_cache);
 
-    Status GetDBID(const String &db_name, String &db_key, String &db_id, TxnTimeStamp &create_ts);
+    Status GetDBID(const std::string &db_name, std::string &db_key, std::string &db_id, TxnTimeStamp &create_ts);
 
-    Status GetDBIDs(Vector<String> *&db_id_strs, Vector<String> **db_names = nullptr);
+    Status GetDBIDs(std::vector<std::string> *&db_id_strs, std::vector<std::string> **db_names = nullptr);
 
 private:
     Status LoadDBIDs();
@@ -43,8 +40,8 @@ private:
     KVInstance *kv_instance_{};
     MetaCache *meta_cache_{};
 
-    Optional<Vector<String>> db_id_strs_;
-    Optional<Vector<String>> db_names_;
+    std::optional<std::vector<std::string>> db_id_strs_;
+    std::optional<std::vector<std::string>> db_names_;
 };
 
 } // namespace infinity

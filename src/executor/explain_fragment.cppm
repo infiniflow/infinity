@@ -12,18 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:explain_fragment;
 
-import :stl;
 import :plan_fragment;
 
 namespace infinity {
 
 export class ExplainFragment {
 public:
-    static void Explain(PlanFragment *op, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
+    static void Explain(PlanFragment *op, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 };
 
 } // namespace infinity

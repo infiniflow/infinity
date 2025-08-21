@@ -14,24 +14,22 @@
 
 module;
 
-#include <cctype>
-#include <string>
-
 module infinity_core:reference_expression.impl;
 
 import :reference_expression;
 
-import :stl;
-import :third_party;
 import :reference_expression;
+
+import std;
+import third_party;
 
 namespace infinity {
 
-String ReferenceExpression::ToString() const {
+std::string ReferenceExpression::ToString() const {
     if (alias_.empty()) {
         bool all_digits{true};
-        SizeT name_len = column_name_.size();
-        for (SizeT idx = 0; idx < name_len; ++idx) {
+        size_t name_len = column_name_.size();
+        for (size_t idx = 0; idx < name_len; ++idx) {
             char a = column_name_[idx];
             if (!std::isdigit(a)) {
                 all_digits = false;
@@ -51,9 +49,9 @@ String ReferenceExpression::ToString() const {
 
 u64 ReferenceExpression::Hash() const {
     u64 h = 0;
-    h ^= std::hash<String>{}(table_name_);
-    h ^= std::hash<String>{}(column_name_);
-    h ^= std::hash<SizeT>{}(column_index_);
+    h ^= std::hash<std::string>{}(table_name_);
+    h ^= std::hash<std::string>{}(column_name_);
+    h ^= std::hash<size_t>{}(column_index_);
     return h;
 }
 

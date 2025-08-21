@@ -12,23 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:modulo.impl;
 
 import :modulo;
-
-import :stl;
 import :new_catalog;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
 
-import :third_party;
 import internal_types;
 import data_type;
-import :logger;
+import logical_type;
 
 namespace infinity {
 
@@ -48,8 +42,7 @@ struct ModuloFunction {
 
 template <>
 inline bool ModuloFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
-    String error_message = "Not implement: MinusFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: MinusFunction::Run");
     return false;
 }
 
@@ -94,9 +87,9 @@ inline bool ModuloFunction::Run(BFloat16T left, BFloat16T right, BFloat16T &resu
 }
 
 void RegisterModuloFunction(NewCatalog *catalog_ptr) {
-    String func_name = "%";
+    std::string func_name = "%";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction mod_function_int8(func_name,
                                      {DataType(LogicalType::kTinyInt), DataType(LogicalType::kTinyInt)},

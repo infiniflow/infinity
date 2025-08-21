@@ -616,7 +616,7 @@ static int r_i_plural(struct SN_env *z) {
         if (!(find_among_b(z, a_8, 2))) {
             z->lb = mlimit;
             return 0;
-        }              /* substring, line 154 */
+        } /* substring, line 154 */
         z->bra = z->c; /* ], line 154 */
         z->lb = mlimit;
     }

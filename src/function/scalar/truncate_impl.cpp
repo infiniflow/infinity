@@ -12,22 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-#include <cstdio>
 module infinity_core:truncate.impl;
 
 import :trunc;
-import :stl;
 import :new_catalog;
 import :status;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import :third_party;
+import :column_vector;
+
+import std.compat;
+
 import internal_types;
 import data_type;
-import :column_vector;
+import logical_type;
 
 namespace infinity {
 
@@ -37,24 +36,23 @@ struct TruncFunction {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
     }
-
 };
 
 template <>
 inline void TruncFunction::Run(DoubleT left, BigIntT right, VarcharT &result, ColumnVector *result_ptr) {
     constexpr int MaxRight = 17;
     constexpr int MinBufferSize = 50;
-    
+
     if (right < static_cast<BigIntT>(0) || std::isnan(right) || std::isinf(right)) {
         Status status = Status::InvalidDataType();
         RecoverableError(status);
         return;
     }
-    
-    char buffer[MinBufferSize];  
 
-    right = (right > MaxRight) ? MaxRight : right;  
-    
+    char buffer[MinBufferSize];
+
+    right = (right > MaxRight) ? MaxRight : right;
+
     int len = std::snprintf(buffer, sizeof(buffer) - 1, "%.*f", (int)right, left);
     if (len < 0) {
         Status status = Status::InvalidDataType();
@@ -63,22 +61,21 @@ inline void TruncFunction::Run(DoubleT left, BigIntT right, VarcharT &result, Co
     }
     std::string truncated_str(buffer, len);
     result_ptr->AppendVarcharInner(truncated_str, result);
-
 }
 
 template <>
 inline void TruncFunction::Run(FloatT left, BigIntT right, VarcharT &result, ColumnVector *result_ptr) {
     constexpr int MaxRight = 7;
     constexpr int MinBufferSize = 20;
-    
+
     if (right < static_cast<BigIntT>(0) || std::isnan(right) || std::isinf(right)) {
         Status status = Status::InvalidDataType();
         RecoverableError(status);
         return;
-    } 
-    char buffer[MinBufferSize]; 
+    }
+    char buffer[MinBufferSize];
 
-    right = (right >  MaxRight) ?  MaxRight : right;
+    right = (right > MaxRight) ? MaxRight : right;
     int len = std::snprintf(buffer, sizeof(buffer) - 1, "%.*f", (int)right, left);
     if (len < 0) {
         Status status = Status::InvalidDataType();
@@ -89,24 +86,22 @@ inline void TruncFunction::Run(FloatT left, BigIntT right, VarcharT &result, Col
     result_ptr->AppendVarcharInner(truncated_str, result);
 }
 
-
 void RegisterTruncFunction(NewCatalog *catalog_ptr) {
-    String func_name = "trunc";
+    std::string func_name = "trunc";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction truncate_double_bigint(func_name,
-                              {DataType(LogicalType::kDouble), DataType(LogicalType::kBigInt)},
-                              DataType(LogicalType::kVarchar),
-                              &ScalarFunction::BinaryFunctionToVarlen<DoubleT, BigIntT, VarcharT, TruncFunction>);
+                                          {DataType(LogicalType::kDouble), DataType(LogicalType::kBigInt)},
+                                          DataType(LogicalType::kVarchar),
+                                          &ScalarFunction::BinaryFunctionToVarlen<DoubleT, BigIntT, VarcharT, TruncFunction>);
     function_set_ptr->AddFunction(truncate_double_bigint);
 
     ScalarFunction truncate_float_bigint(func_name,
-                              {DataType(LogicalType::kFloat), DataType(LogicalType::kBigInt)},
-                              DataType(LogicalType::kVarchar),
-                              &ScalarFunction::BinaryFunctionToVarlen<FloatT, BigIntT, VarcharT, TruncFunction>);
+                                         {DataType(LogicalType::kFloat), DataType(LogicalType::kBigInt)},
+                                         DataType(LogicalType::kVarchar),
+                                         &ScalarFunction::BinaryFunctionToVarlen<FloatT, BigIntT, VarcharT, TruncFunction>);
     function_set_ptr->AddFunction(truncate_float_bigint);
-
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }

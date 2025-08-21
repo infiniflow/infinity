@@ -18,36 +18,39 @@ export module infinity_core:index_file_worker;
 
 import :index_base;
 import :file_worker;
-import :stl;
-import column_def;
 import :file_worker_type;
 import :persistence_manager;
+
+import std;
+import std.compat;
+
+import column_def;
 
 namespace infinity {
 
 export class IndexFileWorker : public FileWorker {
 protected:
-    SharedPtr<ColumnDef> column_def_{};
-    SharedPtr<IndexBase> index_base_{};
+    std::shared_ptr<ColumnDef> column_def_{};
+    std::shared_ptr<IndexBase> index_base_{};
 
 public:
-    explicit IndexFileWorker(SharedPtr<String> data_dir,
-                             SharedPtr<String> temp_dir,
-                             SharedPtr<String> file_dir,
-                             SharedPtr<String> file_name,
-                             SharedPtr<IndexBase> index_base,
-                             SharedPtr<ColumnDef> column_def,
+    explicit IndexFileWorker(std::shared_ptr<std::string> data_dir,
+                             std::shared_ptr<std::string> temp_dir,
+                             std::shared_ptr<std::string> file_dir,
+                             std::shared_ptr<std::string> file_name,
+                             std::shared_ptr<IndexBase> index_base,
+                             std::shared_ptr<ColumnDef> column_def,
                              PersistenceManager *persistence_manager)
         : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager),
           column_def_(std::move(column_def)), index_base_(std::move(index_base)) {}
 
-    SizeT GetMemoryCost() const override { return 0; }
+    size_t GetMemoryCost() const override { return 0; }
 
     FileWorkerType Type() const override { return FileWorkerType::kIndexFile; }
 
     ~IndexFileWorker() override = default;
 
-    void SetIndexDef(SharedPtr<IndexBase> index_base) { index_base_ = std::move(index_base); }
+    void SetIndexDef(std::shared_ptr<IndexBase> index_base) { index_base_ = std::move(index_base); }
 };
 
 } // namespace infinity

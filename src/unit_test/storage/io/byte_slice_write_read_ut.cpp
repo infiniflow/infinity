@@ -1,24 +1,16 @@
-
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.byte_slice_write_read;
 
 import :ut.base_test;
-import :stl;
-import :third_party;
+import third_party;
 import :file_writer;
 import :file_reader;
 import :byte_slice;
 import :byte_slice_reader;
 import :byte_slice_writer;
-#endif
 
 import global_resource_usage;
 
@@ -55,7 +47,7 @@ public:
 
     u8 *GetData(const ByteSliceList *list) {
         u8 *buffer = new u8[list->GetTotalSize()];
-        SizeT n = 0;
+        size_t n = 0;
         ByteSlice *slice = list->GetHead();
         while (slice) {
             memcpy(buffer + n, slice->data_, slice->size_);
@@ -122,7 +114,7 @@ TEST_F(ByteSliceReaderWriterTest, test2) {
 TEST_F(ByteSliceReaderWriterTest, test3) {
     using namespace infinity;
     ByteSliceWriter writer;
-    String str(16000, 'x');
+    std::string str(16000, 'x');
     writer.Write(str.c_str(), str.size());
     ASSERT_EQ(str.size(), writer.GetSize());
     CheckList<char>(writer.GetByteSliceList(), 16000, 'x');

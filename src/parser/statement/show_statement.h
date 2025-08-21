@@ -15,7 +15,12 @@
 #pragma once
 
 #include "base_statement.h"
-#include <optional>
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 namespace infinity {
 
@@ -83,9 +88,9 @@ public:
     std::optional<int64_t> segment_id_{};
     std::optional<int64_t> block_id_{};
     std::optional<int64_t> chunk_id_{};
-    std::optional<u_int64_t> column_id_{};
-    std::optional<u_int64_t> session_id_{};
-    std::optional<u_int64_t> txn_id_{};
+    std::optional<uint64_t> column_id_{};
+    std::optional<uint64_t> session_id_{};
+    std::optional<uint64_t> txn_id_{};
     std::string var_name_{};
     std::optional<std::string> snapshot_name_{};
 };

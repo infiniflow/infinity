@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:function;
 
-import :stl;
+import std;
 
 namespace infinity {
 
@@ -31,18 +29,18 @@ export enum class FunctionType {
 
 export class Function {
 public:
-    explicit Function(String name, FunctionType type) : name_(std::move(name)), type_(type) {}
+    explicit Function(std::string name, FunctionType type) : name_(std::move(name)), type_(type) {}
 
     virtual ~Function() = default;
 
     [[nodiscard]] inline FunctionType type() const { return type_; }
 
-    [[nodiscard]] inline const String &name() const { return name_; }
+    [[nodiscard]] inline const std::string &name() const { return name_; }
 
-    [[nodiscard]] virtual String ToString() const = 0;
+    [[nodiscard]] virtual std::string ToString() const = 0;
 
 protected:
-    String name_;
+    std::string name_;
     FunctionType type_{FunctionType::kInvalid};
 };
 

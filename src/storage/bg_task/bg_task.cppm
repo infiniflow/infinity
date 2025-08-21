@@ -16,12 +16,14 @@ module;
 
 export module infinity_core:bg_task;
 
-import :stl;
-import :third_party;
-import global_resource_usage;
 import :status;
 import :bg_task_type;
+
+import std;
+import third_party;
+
 import row_id;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -70,7 +72,7 @@ export struct BGTask {
 
     Status result_status_{};
 
-    virtual String ToString() const = 0;
+    virtual std::string ToString() const = 0;
 };
 
 export struct StopProcessorTask final : public BGTask {
@@ -78,7 +80,7 @@ export struct StopProcessorTask final : public BGTask {
 
     ~StopProcessorTask() = default;
 
-    String ToString() const final { return "Stop Task"; }
+    std::string ToString() const final { return "Stop Task"; }
 };
 
 export struct CheckpointTaskBase : public BGTask {
@@ -88,7 +90,7 @@ export struct CheckpointTaskBase : public BGTask {
 export struct NewCheckpointTask final : public CheckpointTaskBase {
     NewCheckpointTask(i64 wal_size) : CheckpointTaskBase(BGTaskType::kNewCheckpoint, false), wal_size_(wal_size) {}
 
-    String ToString() const final { return "New catalog"; }
+    std::string ToString() const final { return "New catalog"; }
 
     Status ExecuteWithinTxn();
     Status ExecuteWithNewTxn();
@@ -101,7 +103,7 @@ export class NewCleanupTask final : public BGTask {
 public:
     NewCleanupTask() : BGTask(BGTaskType::kNewCleanup, false) {}
 
-    String ToString() const override { return "NewCleanupTask"; }
+    std::string ToString() const override { return "NewCleanupTask"; }
 
     Status Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_cleanup_ts);
 
@@ -114,18 +116,18 @@ public:
 
     ~NotifyCompactTask() override = default;
 
-    String ToString() const override { return "NotifyCompactTask"; }
+    std::string ToString() const override { return "NotifyCompactTask"; }
 };
 
 export class NewCompactTask final : public BGTask {
 public:
-    NewCompactTask(NewTxn *new_txn, String db_name, String table_name);
+    NewCompactTask(NewTxn *new_txn, std::string db_name, std::string table_name);
 
-    String ToString() const override { return "NewCompactTask"; }
+    std::string ToString() const override { return "NewCompactTask"; }
 
     NewTxn *new_txn_ = nullptr;
-    String db_name_;
-    String table_name_;
+    std::string db_name_;
+    std::string table_name_;
 };
 
 export class NotifyOptimizeTask final : public BGTask {
@@ -134,7 +136,7 @@ public:
 
     ~NotifyOptimizeTask() override = default;
 
-    String ToString() const override { return "NotifyOptimizeTask"; }
+    std::string ToString() const override { return "NotifyOptimizeTask"; }
 
 public:
     bool new_optimize_ = false;
@@ -142,11 +144,15 @@ public:
 
 export class DumpMemIndexTask final : public BGTask {
 public:
-    DumpMemIndexTask(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id, RowID begin_row_id = RowID());
+    DumpMemIndexTask(const std::string &db_name,
+                     const std::string &table_name,
+                     const std::string &index_name,
+                     SegmentID segment_id,
+                     RowID begin_row_id = RowID());
 
     ~DumpMemIndexTask() override = default;
 
-    String ToString() const override {
+    std::string ToString() const override {
         return fmt::format("DumpMemIndexTask: db_name={}, table_name={}, index_name={}, segment_id={}, begin_row_id=({},{})",
                            db_name_,
                            table_name_,
@@ -157,24 +163,27 @@ public:
     }
 
 public:
-    String db_name_{};
-    String table_name_{};
-    String index_name_{};
+    std::string db_name_{};
+    std::string table_name_{};
+    std::string index_name_{};
     SegmentID segment_id_{};
     RowID begin_row_id_{};
 };
 
 export class AppendMemIndexTask final : public BGTask {
 public:
-    AppendMemIndexTask(const SharedPtr<MemIndex> &mem_index, const SharedPtr<ColumnVector> &input_column, BlockOffset offset, BlockOffset row_cnt);
+    AppendMemIndexTask(const std::shared_ptr<MemIndex> &mem_index,
+                       const std::shared_ptr<ColumnVector> &input_column,
+                       BlockOffset offset,
+                       BlockOffset row_cnt);
 
     ~AppendMemIndexTask() override = default;
 
-    String ToString() const override { return "AppendMemIndexTask"; }
+    std::string ToString() const override { return "AppendMemIndexTask"; }
 
 public:
-    SharedPtr<MemIndex> mem_index_{};
-    SharedPtr<ColumnVector> input_column_{};
+    std::shared_ptr<MemIndex> mem_index_{};
+    std::shared_ptr<ColumnVector> input_column_{};
     BlockOffset offset_{};
     BlockOffset row_cnt_{};
     u64 seq_inserted_{};
@@ -185,7 +194,7 @@ export struct AppendMemIndexBatch {
     void InsertTask(AppendMemIndexTask *);
     void WaitForCompletion();
 
-    Vector<AppendMemIndexTask *> append_tasks_{};
+    std::vector<AppendMemIndexTask *> append_tasks_{};
     u64 task_count_{};
     mutable std::mutex mtx_{};
     std::condition_variable cv_{};
@@ -193,20 +202,20 @@ export struct AppendMemIndexBatch {
 
 export class TestCommandTask final : public BGTask {
 public:
-    TestCommandTask(String command_content);
+    TestCommandTask(std::string command_content);
 
     ~TestCommandTask() override = default;
 
-    String ToString() const override { return "TestCommandTask"; }
+    std::string ToString() const override { return "TestCommandTask"; }
 
 public:
-    String command_content_{};
+    std::string command_content_{};
 };
 
 export struct BGTaskInfo {
     explicit BGTaskInfo(BGTaskType type);
-    Vector<String> task_info_list_{};
-    Vector<String> status_list_{};
+    std::vector<std::string> task_info_list_{};
+    std::vector<std::string> status_list_{};
     BGTaskType type_{BGTaskType::kInvalid};
     std::chrono::system_clock::time_point task_time_{};
 };

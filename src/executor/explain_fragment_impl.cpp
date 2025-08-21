@@ -14,21 +14,19 @@
 
 module;
 
-#include <string>
-
 module infinity_core:explain_fragment.impl;
 
 import :explain_fragment;
-
-import :stl;
 import :plan_fragment;
 import :explain_physical_plan;
 import :physical_operator;
 import :explain_fragment;
 
+import std;
+
 namespace infinity {
 
-static String FragmentTitle(u64 fragment_id, bool is_head) {
+static std::string FragmentTitle(u64 fragment_id, bool is_head) {
     if (!is_head) {
         return "FRAGMENT #" + std::to_string(fragment_id);
     }
@@ -36,14 +34,14 @@ static String FragmentTitle(u64 fragment_id, bool is_head) {
     return "FRAGMENT (" + std::to_string(fragment_id) + ")";
 }
 
-void ExplainFragment::Explain(PlanFragment *plan_fragment_ptr, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
-    result->emplace_back(MakeShared<String>(FragmentTitle(plan_fragment_ptr->FragmentID(), true)));
+void ExplainFragment::Explain(PlanFragment *plan_fragment_ptr, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
+    result->emplace_back(std::make_shared<std::string>(FragmentTitle(plan_fragment_ptr->FragmentID(), true)));
 
     if (plan_fragment_ptr->GetSinkNode()) {
         ExplainPhysicalPlan::Explain(plan_fragment_ptr->GetSinkNode(), result, false, 2);
     }
 
-    Vector<PhysicalOperator *> &fragment_operators = plan_fragment_ptr->GetOperators();
+    std::vector<PhysicalOperator *> &fragment_operators = plan_fragment_ptr->GetOperators();
     for (auto &fragment_operator : fragment_operators) {
         ExplainPhysicalPlan::Explain(fragment_operator, result, false, 2);
     }
@@ -52,20 +50,20 @@ void ExplainFragment::Explain(PlanFragment *plan_fragment_ptr, SharedPtr<Vector<
         ExplainPhysicalPlan::Explain(plan_fragment_ptr->GetSourceNode(), result, false, 2);
 
         if (!plan_fragment_ptr->Children().empty()) {
-            String fragment_footer = *result->back().get();
+            std::string fragment_footer = *result->back().get();
 
             fragment_footer += ": ";
-            for (SizeT i = 0; i < plan_fragment_ptr->Children().size(); ++i) {
+            for (size_t i = 0; i < plan_fragment_ptr->Children().size(); ++i) {
                 if (i > 0) {
                     fragment_footer += ", ";
                 }
                 fragment_footer += FragmentTitle(plan_fragment_ptr->Children()[i]->FragmentID(), false);
             }
-            result->back() = MakeShared<String>(fragment_footer);
+            result->back() = std::make_shared<std::string>(fragment_footer);
         }
     }
     // NOTE: Insert blank elements after each Fragment for alignment
-    result->emplace_back(MakeShared<String>());
+    result->emplace_back(std::make_shared<std::string>());
 
     // NOTE: recursive call this function to explain child fragment
     if (!plan_fragment_ptr->Children().empty()) {
@@ -73,7 +71,7 @@ void ExplainFragment::Explain(PlanFragment *plan_fragment_ptr, SharedPtr<Vector<
             ExplainFragment::Explain(child.get(), result, 2);
 
             // NOTE: Insert blank elements after each Fragment for alignment
-            result->emplace_back(MakeShared<String>());
+            result->emplace_back(std::make_shared<std::string>());
         }
     }
 }

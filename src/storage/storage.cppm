@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:storage;
 
-import :stl;
 import :wal_manager;
 import :log_file;
 import :status;
@@ -77,7 +74,7 @@ public:
 
     [[nodiscard]] inline MemIndexAppender *mem_index_appender() const noexcept { return mem_index_appender_.get(); }
 
-    UniquePtr<KVInstance> KVInstance();
+    std::unique_ptr<KVInstance> KVInstance();
 
     [[nodiscard]] KVStore *kv_store() const { return kv_store_.get(); }
 
@@ -117,21 +114,21 @@ public:
 
 private:
     Config *config_ptr_{};
-    UniquePtr<WalManager> wal_mgr_{};
-    UniquePtr<ObjectStorageProcess> object_storage_processor_{};
-    UniquePtr<PersistenceManager> persistence_manager_{};
-    UniquePtr<ResultCacheManager> result_cache_manager_{};
-    UniquePtr<BufferManager> buffer_mgr_{};
-    UniquePtr<NewCatalog> new_catalog_{};
-    UniquePtr<BGMemIndexTracer> memory_index_tracer_{};
-    UniquePtr<NewTxnManager> new_txn_mgr_{};
-    UniquePtr<BGTaskProcessor> bg_processor_{};
-    UniquePtr<CompactionProcessor> compact_processor_{};
-    UniquePtr<DumpIndexProcessor> dump_index_processor_{};
-    UniquePtr<MemIndexAppender> mem_index_appender_{};
-    UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
-    UniquePtr<KVStore> kv_store_{};
-    UniquePtr<MetaCache> meta_cache_{};
+    std::unique_ptr<WalManager> wal_mgr_{};
+    std::unique_ptr<ObjectStorageProcess> object_storage_processor_{};
+    std::unique_ptr<PersistenceManager> persistence_manager_{};
+    std::unique_ptr<ResultCacheManager> result_cache_manager_{};
+    std::unique_ptr<BufferManager> buffer_mgr_{};
+    std::unique_ptr<NewCatalog> new_catalog_{};
+    std::unique_ptr<BGMemIndexTracer> memory_index_tracer_{};
+    std::unique_ptr<NewTxnManager> new_txn_mgr_{};
+    std::unique_ptr<BGTaskProcessor> bg_processor_{};
+    std::unique_ptr<CompactionProcessor> compact_processor_{};
+    std::unique_ptr<DumpIndexProcessor> dump_index_processor_{};
+    std::unique_ptr<MemIndexAppender> mem_index_appender_{};
+    std::unique_ptr<PeriodicTriggerThread> periodic_trigger_thread_{};
+    std::unique_ptr<KVStore> kv_store_{};
+    std::unique_ptr<MetaCache> meta_cache_{};
 
     mutable std::mutex mutex_;
     StorageMode current_storage_mode_{StorageMode::kUnInitialized};

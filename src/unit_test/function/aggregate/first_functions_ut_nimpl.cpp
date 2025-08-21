@@ -12,22 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.fisrt_functions;
 
 import :ut.base_test;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
-import :stl;
+
 import :infinity_context;
 import :first;
 import :function_set;
@@ -41,7 +36,6 @@ import :data_block;
 import :config;
 import :status;
 import :kv_store;
-#endif
 
 import global_resource_usage;
 import internal_types;
@@ -59,36 +53,36 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 TEST_F(FirstFunctionTest, first_func) {
     using namespace infinity;
 
-    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    std::unique_ptr<Config> config_ptr = std::make_unique<Config>();
     Status status = config_ptr->Init(nullptr, nullptr);
     EXPECT_TRUE(status.ok());
-    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    std::unique_ptr<KVStore> kv_store_ptr = std::make_unique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
     EXPECT_TRUE(status.ok());
-    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+    std::unique_ptr<NewCatalog> catalog_ptr = std::make_unique<NewCatalog>(kv_store_ptr.get());
 
     RegisterFirstFunction(catalog_ptr.get());
 
     String op = "first";
-    SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
+    std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kAggregate);
-    SharedPtr<AggregateFunctionSet> aggregate_function_set = std::static_pointer_cast<AggregateFunctionSet>(function_set);
+    std::shared_ptr<AggregateFunctionSet> aggregate_function_set = std::static_pointer_cast<AggregateFunctionSet>(function_set);
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBoolean);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(Boolean)->Boolean", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
         }
         data_block.Finalize();
@@ -102,21 +96,21 @@ TEST_F(FirstFunctionTest, first_func) {
     }
 
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTinyInt);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(TinyInt)->TinyInt", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeTinyInt(static_cast<TinyIntT>(i)));
         }
         data_block.Finalize();
@@ -130,21 +124,21 @@ TEST_F(FirstFunctionTest, first_func) {
     }
 
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kSmallInt);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(SmallInt)->SmallInt", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeSmallInt(static_cast<SmallIntT>(i)));
         }
         data_block.Finalize();
@@ -158,21 +152,21 @@ TEST_F(FirstFunctionTest, first_func) {
     }
 
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kInteger);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(Integer)->Integer", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeInt(static_cast<IntegerT>(i)));
         }
         data_block.Finalize();
@@ -186,21 +180,21 @@ TEST_F(FirstFunctionTest, first_func) {
     }
 
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBigInt);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(BigInt)->BigInt", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBigInt(static_cast<BigIntT>(i)));
         }
         data_block.Finalize();
@@ -214,21 +208,21 @@ TEST_F(FirstFunctionTest, first_func) {
     }
 
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kHugeInt);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(HugeInt)->HugeInt", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeHugeInt(HugeIntT(i, i)));
         }
         data_block.Finalize();
@@ -243,21 +237,21 @@ TEST_F(FirstFunctionTest, first_func) {
     }
 
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kFloat);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(Float)->Float", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeFloat(static_cast<FloatT>(2 * i)));
         }
         data_block.Finalize();
@@ -271,21 +265,21 @@ TEST_F(FirstFunctionTest, first_func) {
     }
 
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDouble);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDouble);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(Double)->Double", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeDouble(static_cast<DoubleT>(2 * i)));
         }
         data_block.Finalize();
@@ -299,21 +293,21 @@ TEST_F(FirstFunctionTest, first_func) {
     }
 
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(Varchar)->Varchar", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT idx = 0; idx < row_count; ++idx) {
+        for (size_t idx = 0; idx < row_count; ++idx) {
             String s = "hello" + std::to_string(idx);
             VarcharT varchar_value;
             varchar_value.InitAsValue(s);
@@ -331,21 +325,21 @@ TEST_F(FirstFunctionTest, first_func) {
     }
 
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDate);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(Date)->Date", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeDate(static_cast<DateT>(2 * i)));
         }
         data_block.Finalize();
@@ -359,21 +353,21 @@ TEST_F(FirstFunctionTest, first_func) {
     }
 
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTime);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(Time)->Time", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeTime(static_cast<TimeT>(2 * i)));
         }
         data_block.Finalize();
@@ -387,21 +381,21 @@ TEST_F(FirstFunctionTest, first_func) {
     }
 
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kDateTime);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(DateTime)->DateTime", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeDateTime(DateTimeT(i, i)));
         }
         data_block.Finalize();
@@ -416,21 +410,21 @@ TEST_F(FirstFunctionTest, first_func) {
     }
 
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kTimestamp);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(Timestamp)->Timestamp", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeTimestamp(TimestampT(i, i)));
         }
         data_block.Finalize();
@@ -445,21 +439,21 @@ TEST_F(FirstFunctionTest, first_func) {
     }
 
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kInterval);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(Interval)->Interval", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             IntervalT interval(i);
             interval.unit = TimeUnit::kDay;
             data_block.AppendValue(0, Value::MakeInterval(interval));
@@ -476,21 +470,21 @@ TEST_F(FirstFunctionTest, first_func) {
     }
 
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPoint);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kPoint);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(Point)->Point", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakePoint(PointT(static_cast<float>(i), static_cast<float>(i))));
         }
         data_block.Finalize();
@@ -505,21 +499,21 @@ TEST_F(FirstFunctionTest, first_func) {
     }
 
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLine);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kLine);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(Line)->Line", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeLine(LineT(static_cast<float>(i), static_cast<float>(i + 1), static_cast<float>(i + 2))));
         }
         data_block.Finalize();
@@ -534,21 +528,21 @@ TEST_F(FirstFunctionTest, first_func) {
     }
 
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLineSeg);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kLineSeg);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(LineSegment)->LineSegment", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             PointT p1(static_cast<f64>(i), static_cast<f64>(i));
             PointT p2(static_cast<f64>(i + 1), static_cast<f64>(i + 1));
             data_block.AppendValue(0, Value::MakeLineSegment(LineSegT(p1, p2)));
@@ -566,21 +560,21 @@ TEST_F(FirstFunctionTest, first_func) {
     }
 
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBox);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kBox);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(Box)->Box", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             PointT p1(static_cast<f64>(i), static_cast<f64>(i));
             PointT p2(static_cast<f64>(i + 1), static_cast<f64>(i + 1));
             data_block.AppendValue(0, Value::MakeBox(BoxT(p1, p2)));
@@ -598,21 +592,21 @@ TEST_F(FirstFunctionTest, first_func) {
     }
 
     {
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kCircle);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kCircle);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(Circle)->Circle", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             PointT p1(static_cast<f64>(i), static_cast<f64>(i));
             f64 d1 = static_cast<f64>(i);
             data_block.AppendValue(0, Value::MakeCircle(CircleT(p1, d1)));

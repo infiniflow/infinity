@@ -12,23 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_low_cardinality;
 
 import :ut.base_test;
-import :stl;
-import :third_party;
+
+import third_party;
 import :secondary_index_data;
 import :roaring_bitmap;
-#endif
 
 import data_type;
 import logical_type;
@@ -43,8 +37,8 @@ public:
 protected:
     // Helper function to create test data with low cardinality
     template <typename T>
-    MultiMap<T, u32> CreateLowCardinalityData(u32 chunk_row_count, u32 unique_values = 5) {
-        MultiMap<T, u32> test_data;
+    std::multimap<T, u32> CreateLowCardinalityData(u32 chunk_row_count, u32 unique_values = 5) {
+        std::multimap<T, u32> test_data;
 
         // Create low cardinality data - many rows with same key values
         for (u32 i = 0; i < chunk_row_count; ++i) {
@@ -64,7 +58,7 @@ TEST_F(LowCardinalitySecondaryIndexTest, TestIntegerLowCardinality) {
     auto test_data = CreateLowCardinalityData<i32>(chunk_row_count, unique_values);
 
     // Create low cardinality secondary index
-    auto data_type = MakeShared<DataType>(LogicalType::kInteger);
+    auto data_type = std::make_shared<DataType>(LogicalType::kInteger);
     auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
     ASSERT_NE(index, nullptr);
 
@@ -115,8 +109,8 @@ TEST_F(LowCardinalitySecondaryIndexTest, TestFloatLowCardinality) {
     const u32 unique_values = 4;
 
     // Create test data with float keys
-    MultiMap<float, u32> test_data;
-    Vector<float> unique_float_keys = {1.5f, 2.5f, 3.5f, 4.5f};
+    std::multimap<float, u32> test_data;
+    std::vector<float> unique_float_keys = {1.5f, 2.5f, 3.5f, 4.5f};
 
     for (u32 i = 0; i < chunk_row_count; ++i) {
         float key = unique_float_keys[i % unique_values];
@@ -124,7 +118,7 @@ TEST_F(LowCardinalitySecondaryIndexTest, TestFloatLowCardinality) {
     }
 
     // Create low cardinality secondary index
-    auto data_type = MakeShared<DataType>(LogicalType::kFloat);
+    auto data_type = std::make_shared<DataType>(LogicalType::kFloat);
     auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
 
     // Insert data
@@ -140,14 +134,14 @@ TEST_F(LowCardinalitySecondaryIndexTest, TestFloatLowCardinality) {
         ASSERT_NE(bitmap, nullptr);
 
         // Verify offsets for this key
-        Vector<u32> actual_offsets;
+        std::vector<u32> actual_offsets;
         bitmap->RoaringBitmapApplyFunc([&actual_offsets](u32 offset) -> bool {
             actual_offsets.push_back(offset);
             return true;
         });
 
         // Expected offsets for this key
-        Vector<u32> expected_offsets;
+        std::vector<u32> expected_offsets;
         for (const auto &[data_key, offset] : test_data) {
             if (data_key == key) {
                 expected_offsets.push_back(offset);
@@ -166,10 +160,10 @@ TEST_F(LowCardinalitySecondaryIndexTest, TestEmptyIndex) {
     const u32 chunk_row_count = 0;
 
     // Create empty test data
-    MultiMap<i32, u32> test_data;
+    std::multimap<i32, u32> test_data;
 
     // Create low cardinality secondary index
-    auto data_type = MakeShared<DataType>(LogicalType::kInteger);
+    auto data_type = std::make_shared<DataType>(LogicalType::kInteger);
     auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
 
     // Insert empty data
@@ -190,7 +184,7 @@ TEST_F(LowCardinalitySecondaryIndexTest, TestSingleValueCardinality) {
     auto test_data = CreateLowCardinalityData<i16>(chunk_row_count, unique_values);
 
     // Create low cardinality secondary index
-    auto data_type = MakeShared<DataType>(LogicalType::kSmallInt);
+    auto data_type = std::make_shared<DataType>(LogicalType::kSmallInt);
     auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
 
     // Insert data
@@ -224,7 +218,7 @@ TEST_F(LowCardinalitySecondaryIndexTest, TestComparisonWithHighCardinality) {
     auto test_data = CreateLowCardinalityData<i32>(chunk_row_count, unique_values);
 
     // Create both high and low cardinality indexes
-    auto data_type = MakeShared<DataType>(LogicalType::kInteger);
+    auto data_type = std::make_shared<DataType>(LogicalType::kInteger);
     auto *high_card_index = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(data_type, chunk_row_count, true);
     auto *low_card_index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
 

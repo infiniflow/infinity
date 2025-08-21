@@ -12,13 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-// #include "storage/invertedindex/search/query_node.h"
-
 export module infinity_core:physical_match;
 
-import :stl;
 import :physical_operator;
 import :parse_fulltext_options;
 import :doc_iterator;
@@ -39,72 +34,72 @@ struct DataBlock;
 export class PhysicalMatch final : public PhysicalOperator {
 public:
     explicit PhysicalMatch(u64 id,
-                           SharedPtr<BaseTableRef> base_table_ref,
-                           SharedPtr<MatchExpression> match_expr,
-                           SharedPtr<IndexReader> index_reader,
-                           UniquePtr<QueryNode> &&query_tree,
+                           std::shared_ptr<BaseTableRef> base_table_ref,
+                           std::shared_ptr<MatchExpression> match_expr,
+                           std::shared_ptr<IndexReader> index_reader,
+                           std::unique_ptr<QueryNode> &&query_tree,
                            float begin_threshold,
                            EarlyTermAlgo early_term_algo,
                            u32 top_n,
-                           const SharedPtr<CommonQueryFilter> &common_query_filter,
+                           const std::shared_ptr<CommonQueryFilter> &common_query_filter,
                            MinimumShouldMatchOption &&minimum_should_match_option,
                            RankFeaturesOption &&rank_features_option,
                            f32 score_threshold,
                            FulltextSimilarity ft_similarity,
                            const BM25Params &bm25_params,
                            u64 match_table_index,
-                           SharedPtr<Vector<LoadMeta>> load_metas,
+                           std::shared_ptr<std::vector<LoadMeta>> load_metas,
                            bool cache_result);
 
     ~PhysicalMatch() override;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
-    SharedPtr<Vector<String>> GetOutputNames() const override;
+    std::shared_ptr<std::vector<std::string>> GetOutputNames() const override;
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override;
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const override;
 
-    SizeT TaskletCount() override { return 1; }
+    size_t TaskletCount() override { return 1; }
 
-    void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
+    void FillingTableRefs(std::unordered_map<size_t, std::shared_ptr<BaseTableRef>> &table_refs) override {
         table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
     }
 
-    String ToString(i64 &space) const;
+    std::string ToString(i64 &space) const;
 
-    [[nodiscard]] inline String TableAlias() const { return base_table_ref_->alias_; }
+    [[nodiscard]] inline std::string TableAlias() const { return base_table_ref_->alias_; }
 
     [[nodiscard]] inline TableInfo *table_info() const { return base_table_ref_->table_info_.get(); }
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
 
-    [[nodiscard]] inline const SharedPtr<MatchExpression> &match_expr() const { return match_expr_; }
+    [[nodiscard]] inline const std::shared_ptr<MatchExpression> &match_expr() const { return match_expr_; }
 
-    SharedPtr<BaseExpression> filter_expression() const { return common_query_filter_->original_filter_; }
+    std::shared_ptr<BaseExpression> filter_expression() const { return common_query_filter_->original_filter_; }
 
     [[nodiscard]] inline const CommonQueryFilter *common_query_filter() const { return common_query_filter_.get(); }
 
-    const SharedPtr<BaseTableRef> &base_table_ref() const { return base_table_ref_; }
+    const std::shared_ptr<BaseTableRef> &base_table_ref() const { return base_table_ref_; }
 
-    SizeT top_n() const { return top_n_; }
+    size_t top_n() const { return top_n_; }
 
 private:
-    void AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const Vector<UniquePtr<DataBlock>> &output_data_blocks);
+    void AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const std::vector<std::unique_ptr<DataBlock>> &output_data_blocks);
 
 private:
     u64 table_index_ = 0;
-    SharedPtr<BaseTableRef> base_table_ref_;
-    SharedPtr<MatchExpression> match_expr_;
-    SharedPtr<IndexReader> index_reader_;
-    UniquePtr<QueryNode> query_tree_;
+    std::shared_ptr<BaseTableRef> base_table_ref_;
+    std::shared_ptr<MatchExpression> match_expr_;
+    std::shared_ptr<IndexReader> index_reader_;
+    std::unique_ptr<QueryNode> query_tree_;
     float begin_threshold_;
     EarlyTermAlgo early_term_algo_{EarlyTermAlgo::kAuto};
     u32 top_n_{1};
 
     // for filter
-    SharedPtr<CommonQueryFilter> common_query_filter_;
+    std::shared_ptr<CommonQueryFilter> common_query_filter_;
     // for minimum_should_match
     MinimumShouldMatchOption minimum_should_match_option_{};
     // for rank features

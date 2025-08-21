@@ -12,24 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.interval_cast;
 
 import :ut.base_test;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
-import :stl;
 import :infinity_context;
 import :function_set;
 import :aggregate_function_set;
@@ -44,7 +36,6 @@ import :column_vector;
 import :interval_cast;
 import :bound_cast_func;
 import :time_cast;
-#endif
 
 import global_resource_usage;
 import internal_types;
@@ -68,8 +59,8 @@ TEST_F(IntervalCastTest, date_cast0) {
         IntervalT source;
         VarcharT target;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnVector> col_varchar_ptr = std::make_shared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 
         EXPECT_THROW_WITHOUT_STACKTRACE(IntervalTryCastToVarlen::Run(source, target, col_varchar_ptr.get()), UnrecoverableException);
@@ -85,8 +76,8 @@ TEST_F(IntervalCastTest, date_cast1) {
         EXPECT_THROW_WITHOUT_STACKTRACE(BindTimeCast(target_type), UnrecoverableException);
     }
 
-    SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kInterval);
-    SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);
+    std::shared_ptr<DataType> source_type = std::make_shared<DataType>(LogicalType::kInterval);
+    std::shared_ptr<ColumnVector> col_source = std::make_shared<ColumnVector>(source_type);
     col_source->Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeInterval(IntervalT(static_cast<i32>(i)));
@@ -100,11 +91,11 @@ TEST_F(IntervalCastTest, date_cast1) {
     }
     // cast interval column vector to varchar column vector
     {
-        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<DataType> target_type = std::make_shared<DataType>(LogicalType::kVarchar);
         auto source2target_ptr = BindTimeCast(*target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
-        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        std::shared_ptr<ColumnVector> col_target = std::make_shared<ColumnVector>(target_type);
         col_target->Initialize();
 
         CastParameters cast_parameters;

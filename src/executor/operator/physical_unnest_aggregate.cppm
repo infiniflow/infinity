@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:physical_unnest_aggregate;
-
-import :stl;
 
 import :query_context;
 import :operator_state;
@@ -26,6 +22,7 @@ import :base_expression;
 import :data_table;
 import :load_meta;
 import :infinity_exception;
+
 import internal_types;
 import data_type;
 
@@ -34,41 +31,45 @@ namespace infinity {
 export class PhysicalUnnestAggregate : public PhysicalOperator {
 public:
     explicit PhysicalUnnestAggregate(u64 id,
-                                     UniquePtr<PhysicalOperator> left,
-                                     Vector<SharedPtr<BaseExpression>> groups,
+                                     std::unique_ptr<PhysicalOperator> left,
+                                     std::vector<std::shared_ptr<BaseExpression>> groups,
                                      u64 groupby_index,
-                                     Vector<SharedPtr<BaseExpression>> aggregates,
+                                     std::vector<std::shared_ptr<BaseExpression>> aggregates,
                                      u64 aggregate_index,
-                                     Vector<SharedPtr<BaseExpression>> unnest_expression_list,
-                                     SharedPtr<Vector<LoadMeta>> load_metas)
+                                     std::vector<std::shared_ptr<BaseExpression>> unnest_expression_list,
+                                     std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kUnnestAggregate, std::move(left), nullptr, id, load_metas), groups_(std::move(groups)),
           aggregates_(std::move(aggregates)), groupby_index_(groupby_index), aggregate_index_(aggregate_index),
           unnest_expression_list_(std::move(unnest_expression_list)) {}
 
     ~PhysicalUnnestAggregate() override = default;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
+    inline std::shared_ptr<std::vector<std::string>> GetOutputNames() const final {
+        return PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this);
+    }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
+    inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final {
+        return PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this);
+    }
 
-    SizeT TaskletCount() override { return left_->TaskletCount(); }
+    size_t TaskletCount() override { return left_->TaskletCount(); }
 
-    Vector<SharedPtr<BaseExpression>> expression_list() const { return unnest_expression_list_; }
+    std::vector<std::shared_ptr<BaseExpression>> expression_list() const { return unnest_expression_list_; }
     u64 group_by_index() { return groupby_index_; }
     u64 aggregate_index() { return aggregate_index_; }
 
-    Vector<SharedPtr<BaseExpression>> groups_{};
-    Vector<SharedPtr<BaseExpression>> aggregates_{};
+    std::vector<std::shared_ptr<BaseExpression>> groups_{};
+    std::vector<std::shared_ptr<BaseExpression>> aggregates_{};
 
 private:
     u64 groupby_index_{};
     u64 aggregate_index_{};
-    Vector<SharedPtr<BaseExpression>> unnest_expression_list_;
-    SharedPtr<DataTable> input_table_{};
+    std::vector<std::shared_ptr<BaseExpression>> unnest_expression_list_;
+    std::shared_ptr<DataTable> input_table_{};
 };
 
 } // namespace infinity

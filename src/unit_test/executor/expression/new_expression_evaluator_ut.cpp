@@ -12,22 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.new_expression_evaluator;
 
 import :ut.base_test;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
-import :stl;
 import :infinity_context;
 import :new_catalog;
 import :scalar_function;
@@ -51,7 +45,6 @@ import :default_values;
 import :config;
 import :status;
 import :kv_store;
-#endif
 
 import global_resource_usage;
 import logical_type;
@@ -64,28 +57,27 @@ using namespace infinity;
 class ExpressionEvaluatorTest : public BaseTest {};
 
 TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
-    using namespace infinity;
-    UniquePtr<Config> config_ptr = MakeUnique<Config>();
-    Status status = config_ptr->Init(nullptr, nullptr);
+    auto config_ptr = std::make_unique<Config>();
+    auto status = config_ptr->Init(nullptr, nullptr);
     EXPECT_TRUE(status.ok());
-    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    auto kv_store_ptr = std::make_unique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
     EXPECT_TRUE(status.ok());
-    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+    auto catalog_ptr = std::make_unique<NewCatalog>(kv_store_ptr.get());
     RegisterAddFunction(catalog_ptr.get());
 
-    String op = "+";
-    SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
+    std::string op = "+";
+    auto function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
-    SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
+    auto scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
     // Input expressions
-    Vector<SharedPtr<BaseExpression>> exprs;
+    std::vector<std::shared_ptr<BaseExpression>> exprs;
     // Column expression
-    SharedPtr<ReferenceExpression> col_expr = ReferenceExpression::Make(DataType(LogicalType::kBigInt), "t1", "c1", String(), 0);
+    auto col_expr = ReferenceExpression::Make(DataType(LogicalType::kBigInt), "t1", "c1", std::string(), 0);
     // Value expression
     Value v = Value::MakeBigInt(1);
-    SharedPtr<ValueExpression> value_expr = MakeShared<ValueExpression>(v);
+    auto value_expr = std::make_shared<ValueExpression>(v);
 
     exprs.emplace_back(col_expr);
     exprs.emplace_back(value_expr);
@@ -94,33 +86,34 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
     EXPECT_STREQ("+(BigInt, BigInt)->BigInt", func.ToString().c_str());
 
     // Initialize result column vector
-    ColumnVector result(MakeShared<DataType>(func.return_type()));
+    ColumnVector result(std::make_shared<DataType>(func.return_type()));
     result.Initialize();
 
-    SharedPtr<FunctionExpression> func_expr = MakeShared<FunctionExpression>(func, exprs);
-    SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(func_expr);
+    auto func_expr = std::make_shared<FunctionExpression>(func, exprs);
+    auto expr_state = ExpressionState::CreateState(func_expr);
 
     EXPECT_EQ(func_expr->Type(), DataType(LogicalType::kBigInt));
     EXPECT_STREQ(func_expr->ToString().c_str(), "(c1 + 1)");
 
     ExpressionEvaluator expr_evaluator;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
-    SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(0, data_type, "c1", std::set<ConstraintType>());
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("t1"), MakeShared<String>(), {col_def});
-    SharedPtr<DataTable> input_table = DataTable::Make(table_def, TableType::kDataTable);
+    auto data_type = std::make_shared<DataType>(LogicalType::kBigInt);
+    auto col_def = std::make_shared<ColumnDef>(0, data_type, "c1", std::set<ConstraintType>());
+    auto table_def =
+        TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("t1"), std::make_shared<std::string>(), {col_def});
+    auto input_table = DataTable::Make(table_def, TableType::kDataTable);
 
     {
-        SharedPtr<DataBlock> input_data_block = DataBlock::Make();
+        auto input_data_block = DataBlock::Make();
 
         input_data_block->Init({data_type});
-        //        Vector<SharedPtr<DataBlock>> input_blocks;
+        //        Vector<std::shared_ptr<DataBlock>> input_blocks;
         //        input_blocks.emplace_back(data_block);
 
-        SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(MakeShared<DataType>(func_expr->Type()));
+        auto output_column_vector = ColumnVector::Make(std::make_shared<DataType>(func_expr->Type()));
 
         output_column_vector->Initialize();
-        //        Vector<SharedPtr<ColumnVector>> blocks_column;
+        //        Vector<std::shared_ptr<ColumnVector>> blocks_column;
         //        blocks_column.emplace_back(output_column_vector);
 
         expr_evaluator.Init(input_data_block.get());
@@ -130,30 +123,30 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
     }
 
     {
-        SharedPtr<DataBlock> input_data_block = DataBlock::Make();
+        auto input_data_block = DataBlock::Make();
         input_data_block->Init({data_type});
 
-        SharedPtr<ColumnVector> column_ptr = MakeShared<ColumnVector>(data_type);
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        auto column_ptr = std::make_shared<ColumnVector>(data_type);
+        size_t row_count = DEFAULT_VECTOR_SIZE;
         column_ptr->Initialize(ColumnVectorType::kFlat, row_count);
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value value = Value::MakeBigInt(static_cast<BigIntT>(i));
             column_ptr->AppendValue(value);
         }
         input_data_block->Init({column_ptr});
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value value = input_data_block->GetValue(0, i);
             EXPECT_EQ(value.type().type(), LogicalType::kBigInt);
             EXPECT_EQ(value.value_.big_int, i64(i));
         }
 
-        //        Vector<SharedPtr<DataBlock>> input_blocks;
+        //        Vector<std::shared_ptr<DataBlock>> input_blocks;
         //        input_blocks.emplace_back(data_block);
 
-        SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(MakeShared<DataType>(func_expr->Type()));
+        auto output_column_vector = ColumnVector::Make(std::make_shared<DataType>(func_expr->Type()));
         output_column_vector->Initialize();
 
-        //        Vector<SharedPtr<ColumnVector>> blocks_column;
+        //        Vector<std::shared_ptr<ColumnVector>> blocks_column;
         //        blocks_column.emplace_back(output_column_vector);
 
         expr_evaluator.Init(input_data_block.get());
@@ -162,7 +155,7 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
         // blocks_column[0] == output_column_vector
         EXPECT_EQ(output_column_vector->Size(), row_count);
 
-        for (SizeT row_id = 0; row_id < row_count; ++row_id) {
+        for (size_t row_id = 0; row_id < row_count; ++row_id) {
             Value value = output_column_vector->GetValueByIndex(row_id);
             EXPECT_EQ(value.value_.big_int, (i64)(row_id + 1));
         }
@@ -170,63 +163,63 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
 }
 
 TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
-    using namespace infinity;
-    UniquePtr<Config> config_ptr = MakeUnique<Config>();
-    Status status = config_ptr->Init(nullptr, nullptr);
+    auto config_ptr = std::make_unique<Config>();
+    auto status = config_ptr->Init(nullptr, nullptr);
     EXPECT_TRUE(status.ok());
-    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    auto kv_store_ptr = std::make_unique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
     EXPECT_TRUE(status.ok());
-    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+    auto catalog_ptr = std::make_unique<NewCatalog>(kv_store_ptr.get());
     RegisterSubtractFunction(catalog_ptr.get());
 
-    String op = "-";
-    SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
+    std::string op = "-";
+    auto function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
-    SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
+    auto scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
     // Input expressions
-    Vector<SharedPtr<BaseExpression>> exprs;
+    std::vector<std::shared_ptr<BaseExpression>> exprs;
     // Column expression
-    SharedPtr<ReferenceExpression> col_expr = MakeShared<ReferenceExpression>(DataType(LogicalType::kBigInt), "t1", "c1", String(), 0);
+    auto col_expr = std::make_shared<ReferenceExpression>(DataType(LogicalType::kBigInt), "t1", "c1", std::string(), 0);
     // Value expression
     Value v = Value::MakeBigInt(8192);
-    SharedPtr<ValueExpression> value_expr = MakeShared<ValueExpression>(v);
+    auto value_expr = std::make_shared<ValueExpression>(v);
 
     exprs.emplace_back(value_expr);
     exprs.emplace_back(col_expr);
 
-    ScalarFunction func = scalar_function_set->GetMostMatchFunction(exprs);
+    auto func = scalar_function_set->GetMostMatchFunction(exprs);
     EXPECT_STREQ("-(BigInt, BigInt)->BigInt", func.ToString().c_str());
 
     // Initialize result column vector
-    ColumnVector result(MakeShared<DataType>(func.return_type()));
+    ColumnVector result(std::make_shared<DataType>(func.return_type()));
     result.Initialize();
 
-    SharedPtr<FunctionExpression> func_expr = MakeShared<FunctionExpression>(func, exprs);
-    SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(func_expr);
+    auto func_expr = std::make_shared<FunctionExpression>(func, exprs);
+    auto expr_state = ExpressionState::CreateState(func_expr);
 
     EXPECT_EQ(func_expr->Type(), DataType(LogicalType::kBigInt));
     EXPECT_STREQ(func_expr->ToString().c_str(), "(8192 - c1)");
 
     ExpressionEvaluator expr_evaluator;
 
-    SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(0, MakeShared<DataType>(DataType(LogicalType::kBigInt)), "c1", std::set<ConstraintType>());
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("t1"), MakeShared<String>(), {col_def});
-    SharedPtr<DataTable> input_table = DataTable::Make(table_def, TableType::kDataTable);
+    auto col_def = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(DataType(LogicalType::kBigInt)), "c1", std::set<ConstraintType>());
+    auto table_def =
+        TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("t1"), std::make_shared<std::string>(), {col_def});
+    auto input_table = DataTable::Make(table_def, TableType::kDataTable);
 
     {
-        SharedPtr<DataBlock> input_data_block = DataBlock::Make();
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
+        auto input_data_block = DataBlock::Make();
+        auto data_type = std::make_shared<DataType>(LogicalType::kBigInt);
         input_data_block->Init({data_type});
 
-        //        Vector<SharedPtr<DataBlock>> input_blocks;
+        //        Vector<std::shared_ptr<DataBlock>> input_blocks;
         //        input_blocks.emplace_back(data_block);
 
-        SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(MakeShared<DataType>(func_expr->Type()));
+        auto output_column_vector = ColumnVector::Make(std::make_shared<DataType>(func_expr->Type()));
         output_column_vector->Initialize();
 
-        //        Vector<SharedPtr<ColumnVector>> blocks_column;
+        //        Vector<std::shared_ptr<ColumnVector>> blocks_column;
         //        blocks_column.emplace_back(output_column_vector);
 
         expr_evaluator.Init(input_data_block.get());
@@ -236,31 +229,31 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
     }
 
     {
-        SharedPtr<DataBlock> input_data_block = DataBlock::Make();
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
+        auto input_data_block = DataBlock::Make();
+        auto data_type = std::make_shared<DataType>(LogicalType::kBigInt);
         input_data_block->Init({data_type});
 
-        SharedPtr<ColumnVector> column_ptr = MakeShared<ColumnVector>(data_type);
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        auto column_ptr = std::make_shared<ColumnVector>(data_type);
+        size_t row_count = DEFAULT_VECTOR_SIZE;
         column_ptr->Initialize(ColumnVectorType::kFlat, row_count);
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value value = Value::MakeBigInt(static_cast<BigIntT>(i));
             column_ptr->AppendValue(value);
         }
         input_data_block->Init({column_ptr});
-        //        Vector<SharedPtr<DataBlock>> input_blocks;
+        //        Vector<std::shared_ptr<DataBlock>> input_blocks;
         //        input_blocks.emplace_back(data_block);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             Value value = input_data_block->GetValue(0, i);
             EXPECT_EQ(value.type().type(), LogicalType::kBigInt);
-            EXPECT_EQ(value.value_.big_int, i64(i));
+            EXPECT_EQ(value.value_.big_int, static_cast<i64>(i));
         }
 
-        SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(MakeShared<DataType>(func_expr->Type()));
+        auto output_column_vector = ColumnVector::Make(std::make_shared<DataType>(func_expr->Type()));
         output_column_vector->Initialize();
 
-        //        Vector<SharedPtr<ColumnVector>> blocks_column;
+        //        Vector<std::shared_ptr<ColumnVector>> blocks_column;
         //        blocks_column.emplace_back(output_column_vector);
 
         expr_evaluator.Init(input_data_block.get());
@@ -268,9 +261,9 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
         // blocks_column[0] == output_column_vector
         EXPECT_EQ(output_column_vector->Size(), row_count);
 
-        for (SizeT row_id = 0; row_id < row_count; ++row_id) {
+        for (size_t row_id = 0; row_id < row_count; ++row_id) {
             Value value = output_column_vector->GetValueByIndex(row_id);
-            EXPECT_EQ((u64)value.value_.big_int, row_count - row_id);
+            EXPECT_EQ(static_cast<u64>(value.value_.big_int), row_count - row_id);
         }
     }
 }

@@ -12,14 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cassert>
-#include <cstring>
-#include <functional>
-#include <iostream>
-#include <set>
-#include <thread>
-#include <memory>
-
+import std;
+import std.compat;
 import infinity_core;
 import compilation_config;
 import internal_types;
@@ -47,8 +41,8 @@ enum class EncodeType : i8 {
 
 struct BenchmarkArgs {
 public:
-    const static Map<String, BuildType> build_type_map;
-    const static Map<String, EncodeType> encode_type_map;
+    const static std::map<std::string, BuildType> build_type_map;
+    const static std::map<std::string, EncodeType> encode_type_map;
 
 public:
     BenchmarkArgs() : app_("knn_import_benchmark") {
@@ -86,28 +80,28 @@ public:
     }
 
 public:
-    String dataset_ = "invalid";
+    std::string dataset_ = "invalid";
     BuildType build_type_ = BuildType::PLAIN;
     EncodeType encode_type_ = EncodeType::LVQ;
-    SizeT ef_construction_ = 200;
-    SizeT M_ = 16;
+    size_t ef_construction_ = 200;
+    size_t M_ = 16;
 
-    String dataset_dir_ = String(test_data_path());
-    String infinity_dir_ = "/var/infinity";
-    String config_path_;
+    std::string dataset_dir_ = std::string(test_data_path());
+    std::string infinity_dir_ = "/var/infinity";
+    std::string config_path_;
 
-    String data_path_;
-    String table_name_;
+    std::string data_path_;
+    std::string table_name_;
 
 private:
     CLI::App app_;
 };
 
-const Map<String, BuildType> BenchmarkArgs::build_type_map = {
+const std::map<std::string, BuildType> BenchmarkArgs::build_type_map = {
     {"plain", BuildType::PLAIN},
     {"lsg", BuildType::LSG},
 };
-const Map<String, EncodeType> BenchmarkArgs::encode_type_map = {
+const std::map<std::string, EncodeType> BenchmarkArgs::encode_type_map = {
     {"plain", EncodeType::PLAIN},
     {"lvq", EncodeType::LVQ},
     {"compress_to_lvq", EncodeType::CompressToLVQ},
@@ -194,7 +188,7 @@ int main(int argc, char *argv[]) {
             index_info->index_param_list_ = index_param_list;
         }
 
-        String index_comment = "";
+        std::string index_comment = "";
         query_result = infinity->CreateIndex(db_name, table_name, index_name, index_comment, index_info, CreateIndexOptions());
 
         if (!query_result.IsOk()) {

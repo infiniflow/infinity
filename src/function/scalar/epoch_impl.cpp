@@ -11,21 +11,22 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 module;
+
 module infinity_core:epoch.impl;
 
 import :epoch;
-import :stl;
 import :new_catalog;
 import :status;
-import logical_type;
+import :column_vector;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import :third_party;
+
 import internal_types;
 import data_type;
-import :column_vector;
+import logical_type;
 
 namespace infinity {
 
@@ -36,7 +37,6 @@ struct EpochFunction {
         RecoverableError(status);
         return false;
     }
-
 };
 
 template <>
@@ -58,26 +58,26 @@ inline bool EpochFunction::Run(TimestampT left, BigIntT &result) {
 }
 
 void RegisterEpochFunction(NewCatalog *catalog_ptr) {
-    String func_name = "epoch";
+    std::string func_name = "epoch";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction epoch_date_function(func_name,
-                                  {DataType(LogicalType::kDate)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, EpochFunction>);
+                                       {DataType(LogicalType::kDate)},
+                                       {DataType(LogicalType::kBigInt)},
+                                       &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, EpochFunction>);
     function_set_ptr->AddFunction(epoch_date_function);
 
     ScalarFunction epoch_datetime_function(func_name,
-                                  {DataType(LogicalType::kDateTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, EpochFunction>);
+                                           {DataType(LogicalType::kDateTime)},
+                                           {DataType(LogicalType::kBigInt)},
+                                           &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, EpochFunction>);
     function_set_ptr->AddFunction(epoch_datetime_function);
 
     ScalarFunction epoch_timestamp_function(func_name,
-                                  {DataType(LogicalType::kTimestamp)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, EpochFunction>);
+                                            {DataType(LogicalType::kTimestamp)},
+                                            {DataType(LogicalType::kBigInt)},
+                                            &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, EpochFunction>);
     function_set_ptr->AddFunction(epoch_timestamp_function);
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);

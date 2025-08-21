@@ -19,7 +19,6 @@ module;
 module infinity_core:ngram_analyzer.impl;
 
 import :ngram_analyzer;
-import :stl;
 import :term;
 import :stemmer;
 import :analyzer;
@@ -28,13 +27,13 @@ import :tokenizer;
 namespace infinity {
 
 bool NGramAnalyzer::NextInString(const char *data,
-                                 SizeT length,
-                                 SizeT *__restrict pos,
-                                 SizeT *__restrict token_start,
-                                 SizeT *__restrict token_length) {
+                                 size_t length,
+                                 size_t *__restrict pos,
+                                 size_t *__restrict token_start,
+                                 size_t *__restrict token_length) {
     *token_start = *pos;
     *token_length = 0;
-    SizeT code_points = 0;
+    size_t code_points = 0;
     for (; code_points < ngram_ && *token_start + *token_length < length; ++code_points) {
         if (std::isspace(data[*token_start + *token_length])) {
             *pos += UTF8SeqLength(static_cast<u8>(data[*pos]));
@@ -42,7 +41,7 @@ bool NGramAnalyzer::NextInString(const char *data,
             *token_length = 0;
             return true;
         }
-        SizeT sz = UTF8SeqLength(static_cast<u8>(data[*token_start + *token_length]));
+        size_t sz = UTF8SeqLength(static_cast<u8>(data[*token_start + *token_length]));
         *token_length += sz;
     }
     *pos += UTF8SeqLength(static_cast<u8>(data[*pos]));
@@ -50,14 +49,14 @@ bool NGramAnalyzer::NextInString(const char *data,
 }
 
 int NGramAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
-    SizeT len = input.text_.length();
+    size_t len = input.text_.length();
     if (len == 0)
         return 0;
 
-    SizeT cur = 0;
-    SizeT token_start = 0;
-    SizeT token_length = 0;
-    SizeT offset = input.word_offset_;
+    size_t cur = 0;
+    size_t token_start = 0;
+    size_t token_length = 0;
+    size_t offset = input.word_offset_;
     while (cur < len && NextInString(input.text_.c_str(), len, &cur, &token_start, &token_length)) {
         if (token_length == 0)
             continue;

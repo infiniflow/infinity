@@ -12,21 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.fixed_dimensional_encoding;
 
 import :ut.base_test;
-import :stl;
 import :fixed_dimensional_encoding;
-#endif
 
 using namespace infinity;
 
@@ -53,7 +46,7 @@ TEST_F(FixedDimensionalEncodingTest, config_test) {
 
 TEST_F(FixedDimensionalEncodingTest, tensor_test) {
     // Test Tensor basic operations
-    Vector<float> data = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
+    std::vector<float> data = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
     Tensor tensor(data, 3); // 2 points of dimension 3
 
     EXPECT_EQ(tensor.GetPointCount(), 2);
@@ -61,13 +54,13 @@ TEST_F(FixedDimensionalEncodingTest, tensor_test) {
     EXPECT_EQ(tensor.GetTotalSize(), 6u);
 
     // Test point extraction
-    Vector<float> point0 = tensor.GetPoint(0);
+    std::vector<float> point0 = tensor.GetPoint(0);
     EXPECT_EQ(point0.size(), 3u);
     EXPECT_FLOAT_EQ(point0[0], 1.0f);
     EXPECT_FLOAT_EQ(point0[1], 2.0f);
     EXPECT_FLOAT_EQ(point0[2], 3.0f);
 
-    Vector<float> point1 = tensor.GetPoint(1);
+    std::vector<float> point1 = tensor.GetPoint(1);
     EXPECT_EQ(point1.size(), 3u);
     EXPECT_FLOAT_EQ(point1[0], 4.0f);
     EXPECT_FLOAT_EQ(point1[1], 5.0f);
@@ -92,8 +85,8 @@ TEST_F(FixedDimensionalEncodingTest, hash_partitioner_test) {
     RandomGenerator rng(123);
     HashPartitioner partitioner(3, 2, rng); // 3D points, 2 bits = 4 partitions
 
-    Vector<float> point1 = {1.0f, 2.0f, 3.0f};
-    Vector<float> point2 = {-1.0f, -2.0f, -3.0f};
+    std::vector<float> point1 = {1.0f, 2.0f, 3.0f};
+    std::vector<float> point2 = {-1.0f, -2.0f, -3.0f};
 
     u32 partition1 = partitioner.ComputePartition(point1);
     u32 partition2 = partitioner.ComputePartition(point2);
@@ -113,13 +106,13 @@ TEST_F(FixedDimensionalEncodingTest, sparse_projector_test) {
     RandomGenerator rng(456);
     SparseProjector projector(5, 3, rng); // 5D -> 3D
 
-    Vector<float> input = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
-    Vector<float> output = projector.Project(input);
+    std::vector<float> input = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    std::vector<float> output = projector.Project(input);
 
     EXPECT_EQ(output.size(), 3u);
 
     // Test deterministic behavior
-    Vector<float> output2 = projector.Project(input);
+    std::vector<float> output2 = projector.Project(input);
     EXPECT_EQ(output.size(), output2.size());
     for (size_t i = 0; i < output.size(); ++i) {
         EXPECT_FLOAT_EQ(output[i], output2[i]);
@@ -128,7 +121,7 @@ TEST_F(FixedDimensionalEncodingTest, sparse_projector_test) {
 
 TEST_F(FixedDimensionalEncodingTest, internal_functions_test) {
     // Test SimHashPartitionIndex
-    Vector<float> vec = {1.0f, -2.0f, 3.0f, -4.0f}; // positive, negative, positive, negative
+    std::vector<float> vec = {1.0f, -2.0f, 3.0f, -4.0f}; // positive, negative, positive, negative
 
     u32 partition_index = internal::SimHashPartitionIndex(vec);
     EXPECT_GE(partition_index, 0u);
@@ -139,8 +132,8 @@ TEST_F(FixedDimensionalEncodingTest, internal_functions_test) {
     EXPECT_EQ(distance, 0u); // Distance to its own partition should be 0
 
     // Test ApplyCountSketchToVector
-    Vector<float> input = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
-    Vector<float> result = internal::ApplyCountSketchToVector(Span<const float>(input), 10, 42);
+    std::vector<float> input = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    std::vector<float> result = internal::ApplyCountSketchToVector(std::span<const float>(input), 10, 42);
     EXPECT_EQ(result.size(), 10u);
 
     // Count-Sketch should produce a non-zero result for non-zero input
@@ -154,7 +147,7 @@ TEST_F(FixedDimensionalEncodingTest, internal_functions_test) {
     EXPECT_TRUE(has_non_zero);
 
     // Test deterministic behavior - same input and seed should produce same output
-    Vector<float> result2 = internal::ApplyCountSketchToVector(Span<const float>(input), 10, 42);
+    std::vector<float> result2 = internal::ApplyCountSketchToVector(std::span<const float>(input), 10, 42);
     EXPECT_EQ(result.size(), result2.size());
     for (size_t i = 0; i < result.size(); ++i) {
         EXPECT_FLOAT_EQ(result[i], result2[i]);
@@ -170,12 +163,12 @@ TEST_F(FixedDimensionalEncodingTest, simple_encoding_test) {
     config.projection_type = FixedDimensionalEncodingConfig::ProjectionType::DEFAULT_IDENTITY;
     config.encoding_type = FixedDimensionalEncodingConfig::EncodingType::DEFAULT_SUM;
 
-    Vector<float> tensor_data = {1.0f, 2.0f, 3.0f, 4.0f};
+    std::vector<float> tensor_data = {1.0f, 2.0f, 3.0f, 4.0f};
 
     auto result = GenerateFixedDimensionalEncoding(tensor_data, config);
     EXPECT_TRUE(result.has_value());
 
-    Vector<float> encoding = result.value();
+    std::vector<float> encoding = result.value();
     EXPECT_EQ(encoding.size(), 2u); // dimension * num_partitions * num_repetitions = 2 * 1 * 1
 
     // Should be sum of the two points: [1+3, 2+4] = [4, 6]
@@ -188,13 +181,13 @@ TEST_F(FixedDimensionalEncodingTest, invalid_input_test) {
     config.dimension = 3;
 
     // Test mismatched tensor data size
-    Vector<float> invalid_point_cloud = {1.0f, 2.0f}; // Size 2, but dimension is 3
+    std::vector<float> invalid_point_cloud = {1.0f, 2.0f}; // Size 2, but dimension is 3
     auto result = GenerateFixedDimensionalEncoding(invalid_point_cloud, config);
     EXPECT_FALSE(result.has_value());
 
     // Test too many simhash projections
     config.num_simhash_projections = 31;
-    Vector<float> valid_point_cloud = {1.0f, 2.0f, 3.0f};
+    std::vector<float> valid_point_cloud = {1.0f, 2.0f, 3.0f};
     result = GenerateFixedDimensionalEncoding(valid_point_cloud, config);
     EXPECT_FALSE(result.has_value());
 
@@ -214,12 +207,12 @@ TEST_F(FixedDimensionalEncodingTest, document_encoding_test) {
     config.num_simhash_projections = 0;
     config.encoding_type = FixedDimensionalEncodingConfig::EncodingType::AVERAGE;
 
-    Vector<float> tensor_data = {2.0f, 4.0f, 6.0f, 8.0f}; // Two points: [2,4] and [6,8]
+    std::vector<float> tensor_data = {2.0f, 4.0f, 6.0f, 8.0f}; // Two points: [2,4] and [6,8]
 
     auto result = GenerateDocumentFixedDimensionalEncoding(tensor_data, config);
     EXPECT_TRUE(result.has_value());
 
-    Vector<float> encoding = result.value();
+    std::vector<float> encoding = result.value();
     EXPECT_EQ(encoding.size(), 2u);
 
     // Should be average of the two points: [(2+6)/2, (4+8)/2] = [4, 6]
@@ -235,12 +228,12 @@ TEST_F(FixedDimensionalEncodingTest, simhash_partitioning_test) {
     config.num_simhash_projections = 2; // 2^2 = 4 partitions
     config.encoding_type = FixedDimensionalEncodingConfig::EncodingType::DEFAULT_SUM;
 
-    Vector<float> tensor_data = {1.0f, 1.0f, -1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f}; // 4 points
+    std::vector<float> tensor_data = {1.0f, 1.0f, -1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f}; // 4 points
 
     auto result = GenerateFixedDimensionalEncoding(tensor_data, config);
     EXPECT_TRUE(result.has_value());
 
-    Vector<float> encoding = result.value();
+    std::vector<float> encoding = result.value();
     EXPECT_EQ(encoding.size(), 8u); // dimension * num_partitions = 2 * 4 = 8
 
     bool has_non_zero = false;
@@ -263,12 +256,12 @@ TEST_F(FixedDimensionalEncodingTest, ams_projection_test) {
     config.projection_dimension = 2; // Project from 4D to 2D
     config.encoding_type = FixedDimensionalEncodingConfig::EncodingType::DEFAULT_SUM;
 
-    Vector<float> tensor_data = {1.0f, 2.0f, 3.0f, 4.0f};
+    std::vector<float> tensor_data = {1.0f, 2.0f, 3.0f, 4.0f};
 
     auto result = GenerateFixedDimensionalEncoding(tensor_data, config);
     EXPECT_TRUE(result.has_value());
 
-    Vector<float> encoding = result.value();
+    std::vector<float> encoding = result.value();
     EXPECT_EQ(encoding.size(), 2u); // projection_dimension
 
     // The result should be non-zero (random projection of non-zero input)
@@ -291,12 +284,12 @@ TEST_F(FixedDimensionalEncodingTest, final_projection_test) {
     config.encoding_type = FixedDimensionalEncodingConfig::EncodingType::DEFAULT_SUM;
     config.final_projection_dimension = 5;
 
-    Vector<float> tensor_data = {1.0f, 2.0f, 3.0f, 4.0f}; // Two 2D points
+    std::vector<float> tensor_data = {1.0f, 2.0f, 3.0f, 4.0f}; // Two 2D points
 
     auto result = GenerateFixedDimensionalEncoding(tensor_data, config);
     EXPECT_TRUE(result.has_value());
 
-    Vector<float> encoding = result.value();
+    std::vector<float> encoding = result.value();
     EXPECT_EQ(encoding.size(), 5u); // final_projection_dimension
 
     // The result should be non-zero for non-zero input
@@ -318,12 +311,12 @@ TEST_F(FixedDimensionalEncodingTest, multiple_repetitions_test) {
     config.num_simhash_projections = 1; // 2 partitions
     config.encoding_type = FixedDimensionalEncodingConfig::EncodingType::DEFAULT_SUM;
 
-    Vector<float> tensor_data = {1.0f, 2.0f};
+    std::vector<float> tensor_data = {1.0f, 2.0f};
 
     auto result = GenerateFixedDimensionalEncoding(tensor_data, config);
     EXPECT_TRUE(result.has_value());
 
-    Vector<float> encoding = result.value();
+    std::vector<float> encoding = result.value();
     EXPECT_EQ(encoding.size(), 12u); // dimension * num_partitions * num_repetitions = 2 * 2 * 3 = 12
 
     // Each repetition should have some non-zero values
@@ -348,12 +341,12 @@ TEST_F(FixedDimensionalEncodingTest, fill_empty_partitions_test) {
     config.encoding_type = FixedDimensionalEncodingConfig::EncodingType::AVERAGE;
     config.fill_empty_partitions = true;
 
-    Vector<float> tensor_data = {1.0f, 1.0f, 1.1f, 1.1f}; // Two very similar points
+    std::vector<float> tensor_data = {1.0f, 1.0f, 1.1f, 1.1f}; // Two very similar points
 
     auto result = GenerateDocumentFixedDimensionalEncoding(tensor_data, config);
     EXPECT_TRUE(result.has_value());
 
-    Vector<float> encoding = result.value();
+    std::vector<float> encoding = result.value();
     EXPECT_EQ(encoding.size(), 16u); // dimension * num_partitions = 2 * 8 = 16
 
     // With fill_empty_partitions, there should be no zero partitions

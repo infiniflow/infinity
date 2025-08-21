@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:physical_filter_scan_base;
 
-import :stl;
 import :physical_scan_base;
 import :common_query_filter;
 import :physical_operator_type;
@@ -30,12 +27,12 @@ export class PhysicalFilterScanBase : public PhysicalScanBase {
 public:
     PhysicalFilterScanBase(const u64 id,
                            const PhysicalOperatorType type,
-                           UniquePtr<PhysicalOperator> left,
-                           UniquePtr<PhysicalOperator> right,
+                           std::unique_ptr<PhysicalOperator> left,
+                           std::unique_ptr<PhysicalOperator> right,
                            const u64 table_index,
-                           SharedPtr<BaseTableRef> base_table_ref,
-                           SharedPtr<CommonQueryFilter> common_query_filter,
-                           SharedPtr<Vector<LoadMeta>> load_metas)
+                           std::shared_ptr<BaseTableRef> base_table_ref,
+                           std::shared_ptr<CommonQueryFilter> common_query_filter,
+                           std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalScanBase(id, type, std::move(left), std::move(right), table_index, std::move(base_table_ref), std::move(load_metas)),
           common_query_filter_(std::move(common_query_filter)) {}
 
@@ -43,7 +40,7 @@ public:
 
 public:
     // for filter
-    SharedPtr<CommonQueryFilter> common_query_filter_;
+    std::shared_ptr<CommonQueryFilter> common_query_filter_;
 };
 
 } // namespace infinity

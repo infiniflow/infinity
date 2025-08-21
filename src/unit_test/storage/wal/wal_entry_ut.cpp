@@ -12,22 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.wal_entry;
 
 import :ut.base_test;
 import :infinity_context;
 import :infinity_exception;
-import :stl;
-import :third_party;
+
+import third_party;
 import :logger;
 import :table_def;
 import :wal_entry;
@@ -39,7 +34,6 @@ import :index_ivf;
 import :persistence_manager;
 import :kv_store;
 import :status;
-#endif
 
 import global_resource_usage;
 import logical_type;
@@ -53,9 +47,9 @@ using namespace infinity;
 
 class WalEntryTest : public BaseTest {};
 
-SharedPtr<TableDef> MockTableDesc2() {
+std::shared_ptr<TableDef> MockTableDesc2() {
     // Define columns
-    Vector<SharedPtr<ColumnDef>> columns;
+    std::vector<std::shared_ptr<ColumnDef>> columns;
     {
         i64 column_id = 0;
         {
@@ -63,40 +57,44 @@ SharedPtr<TableDef> MockTableDesc2() {
             constraints.insert(ConstraintType::kUnique);
             constraints.insert(ConstraintType::kNotNull);
             auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
+                std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
         {
             std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kPrimaryKey);
             auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), "big_int_col", constraints);
+                std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kBigInt)), "big_int_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
         {
             std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
-            auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kDouble)), "double_col", constraints);
+            auto column_def_ptr =
+                std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kDouble)), "double_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
     }
 
-    return MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
+    return std::make_shared<TableDef>(std::make_shared<std::string>("default_db"),
+                                      std::make_shared<std::string>("tbl1"),
+                                      std::make_shared<std::string>(),
+                                      columns);
 }
 
-WalSegmentInfo MakeSegmentInfo(SizeT row_count, TxnTimeStamp commit_ts, SizeT column_count) {
+WalSegmentInfo MakeSegmentInfo(size_t row_count, TxnTimeStamp commit_ts, size_t column_count) {
     WalSegmentInfo segment_info;
     segment_info.segment_id_ = 0;
     segment_info.column_count_ = column_count;
     segment_info.actual_row_count_ = segment_info.row_count_ = row_count;
     segment_info.row_capacity_ = row_count * 2;
-    Vector<WalBlockInfo> block_infos_;
+    std::vector<WalBlockInfo> block_infos_;
     {
         WalBlockInfo block_info;
         block_info.block_id_ = 0;
         block_info.row_count_ = row_count;
         block_info.row_capacity_ = row_count;
-        Vector<Pair<u32, u64>> outline_info;
+        std::vector<std::pair<u32, u64>> outline_info;
         outline_info.resize(column_count);
         block_info.outline_infos_ = std::move(outline_info);
     }
@@ -104,34 +102,38 @@ WalSegmentInfo MakeSegmentInfo(SizeT row_count, TxnTimeStamp commit_ts, SizeT co
     return segment_info;
 }
 
-void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const String &ckp_file_name) {
+void MockWalFile(const std::string &wal_file_path, const std::string &ckp_file_path, const std::string &ckp_file_name) {
     for (int commit_ts = 0; commit_ts < 3; ++commit_ts) {
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
-        auto entry = MakeShared<WalEntry>();
-        entry->cmds_.push_back(MakeShared<WalCmdCreateDatabaseV2>("default2", "1", "default2_comment"));
-        entry->cmds_.push_back(MakeShared<WalCmdCreateTableV2>("default_db", "0", "1", MockTableDesc2()));
+        auto entry = std::make_shared<WalEntry>();
+        entry->cmds_.push_back(std::make_shared<WalCmdCreateDatabaseV2>("default2", "1", "default2_comment"));
+        entry->cmds_.push_back(std::make_shared<WalCmdCreateTableV2>("default_db", "0", "1", MockTableDesc2()));
         WalSegmentInfo segment_info = MakeSegmentInfo(row_count, commit_ts, 2);
-        entry->cmds_.push_back(MakeShared<WalCmdImportV2>("default_db", "0", "tbl1", "1", std::move(segment_info)));
+        entry->cmds_.push_back(std::make_shared<WalCmdImportV2>("default_db", "0", "tbl1", "1", std::move(segment_info)));
 
         auto data_block = DataBlock::Make();
-        Vector<SharedPtr<DataType>> column_types;
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kBoolean));
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kTinyInt));
+        std::vector<std::shared_ptr<DataType>> column_types;
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBoolean));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kTinyInt));
         data_block->Init(column_types);
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block->AppendValue(0, Value::MakeBool(i % 2 == 0));
             data_block->AppendValue(1, Value::MakeTinyInt(static_cast<i8>(i)));
         }
         data_block->Finalize();
 
         RowID start_row(0, 0);
-        entry->cmds_.push_back(
-            MakeShared<WalCmdAppendV2>("db1", "2", "tbl1", "1", Vector<Pair<RowID, u64>>{Pair<RowID, u64>{start_row, 8192}}, data_block));
+        entry->cmds_.push_back(std::make_shared<WalCmdAppendV2>("db1",
+                                                                "2",
+                                                                "tbl1",
+                                                                "1",
+                                                                std::vector<std::pair<RowID, u64>>{std::pair<RowID, u64>{start_row, 8192}},
+                                                                data_block));
         entry->commit_ts_ = commit_ts;
 
         i32 expect_size = entry->GetSizeInBytes();
-        Vector<char> buf(expect_size);
+        std::vector<char> buf(expect_size);
         char *ptr = buf.data();
         entry->WriteAdv(ptr);
         i32 actual_size = ptr - buf.data();
@@ -139,24 +141,23 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
 
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            String error_message = fmt::format("Failed to open wal file: {}", wal_file_path);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_file_path));
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();
         ofs.close();
     }
     {
-        auto entry = MakeShared<WalEntry>();
-        Vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
-        Vector<SegmentID> deprecated_segment_ids{0, 1, 2};
-        Vector<String> names;
-        Vector<String> ids;
+        auto entry = std::make_shared<WalEntry>();
+        std::vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
+        std::vector<SegmentID> deprecated_segment_ids{0, 1, 2};
+        std::vector<std::string> names;
+        std::vector<std::string> ids;
         entry->cmds_.push_back(
-            MakeShared<WalCmdCompactV2>("db1", "2", "tbl1", "1", names, ids, std::move(new_segment_infos), std::move(deprecated_segment_ids)));
+            std::make_shared<WalCmdCompactV2>("db1", "2", "tbl1", "1", names, ids, std::move(new_segment_infos), std::move(deprecated_segment_ids)));
         entry->commit_ts_ = 5;
         i32 expect_size = entry->GetSizeInBytes();
-        Vector<char> buf(expect_size);
+        std::vector<char> buf(expect_size);
         char *ptr = buf.data();
         entry->WriteAdv(ptr);
         i32 actual_size = ptr - buf.data();
@@ -164,19 +165,18 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
 
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            String error_message = fmt::format("Failed to open wal file: {}", wal_file_path);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_file_path));
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();
         ofs.close();
     }
     {
-        auto entry = MakeShared<WalEntry>();
-        entry->cmds_.push_back(MakeShared<WalCmdCheckpointV2>(int64_t(123)));
+        auto entry = std::make_shared<WalEntry>();
+        entry->cmds_.push_back(std::make_shared<WalCmdCheckpointV2>(int64_t(123)));
         entry->commit_ts_ = 3;
         i32 expect_size = entry->GetSizeInBytes();
-        Vector<char> buf(expect_size);
+        std::vector<char> buf(expect_size);
         char *ptr = buf.data();
         entry->WriteAdv(ptr);
         i32 actual_size = ptr - buf.data();
@@ -184,19 +184,18 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
 
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            String error_message = fmt::format("Failed to open wal file: {}", wal_file_path);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_file_path));
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();
         ofs.close();
     }
     {
-        auto entry = MakeShared<WalEntry>();
-        entry->cmds_.push_back(MakeShared<WalCmdDropTableV2>("db1", "2", "tbl1", "1", 1, "table_key"));
+        auto entry = std::make_shared<WalEntry>();
+        entry->cmds_.push_back(std::make_shared<WalCmdDropTableV2>("db1", "2", "tbl1", "1", 1, "table_key"));
         entry->commit_ts_ = 4;
         i32 expect_size = entry->GetSizeInBytes();
-        Vector<char> buf(expect_size);
+        std::vector<char> buf(expect_size);
         char *ptr = buf.data();
         entry->WriteAdv(ptr);
         i32 actual_size = ptr - buf.data();
@@ -204,8 +203,7 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
 
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            String error_message = fmt::format("Failed to open wal file: {}", wal_file_path);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_file_path));
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();
@@ -219,48 +217,52 @@ TEST_F(WalEntryTest, ReadWrite) {
     RemoveDbDirs();
     infinity::InfinityContext::instance().InitPhase1(nullptr);
     infinity::InfinityContext::instance().InitPhase2();
-    SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
-    entry->cmds_.push_back(MakeShared<WalCmdCreateDatabase>("db1", "default2_comment", "AAA_db1"));
-    entry->cmds_.push_back(MakeShared<WalCmdDropDatabase>("db1"));
-    entry->cmds_.push_back(MakeShared<WalCmdCreateTable>("db1", "BBB_tb1", MockTableDesc2()));
-    entry->cmds_.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
+    std::shared_ptr<WalEntry> entry = std::make_shared<WalEntry>();
+    entry->cmds_.push_back(std::make_shared<WalCmdCreateDatabase>("db1", "default2_comment", "AAA_db1"));
+    entry->cmds_.push_back(std::make_shared<WalCmdDropDatabase>("db1"));
+    entry->cmds_.push_back(std::make_shared<WalCmdCreateTable>("db1", "BBB_tb1", MockTableDesc2()));
+    entry->cmds_.push_back(std::make_shared<WalCmdDropTable>("db1", "tbl1"));
     {
         WalSegmentInfo segment_info = MakeSegmentInfo(100, 8, 2);
-        entry->cmds_.push_back(MakeShared<WalCmdImport>("db1", "tbl1", std::move(segment_info)));
+        entry->cmds_.push_back(std::make_shared<WalCmdImport>("db1", "tbl1", std::move(segment_info)));
     }
     {
-        Vector<InitParameter *> parameters = {new InitParameter("metric", "ip")};
-        SharedPtr<String> index_name = MakeShared<String>("idx1");
-        auto index_base = IndexIVF::Make(index_name, MakeShared<String>("test comment"), "idx1_tbl1", Vector<String>{"col1", "col2"}, parameters);
+        std::vector<InitParameter *> parameters = {new InitParameter("metric", "ip")};
+        std::shared_ptr<std::string> index_name = std::make_shared<std::string>("idx1");
+        auto index_base = IndexIVF::Make(index_name,
+                                         std::make_shared<std::string>("test comment"),
+                                         "idx1_tbl1",
+                                         std::vector<std::string>{"col1", "col2"},
+                                         parameters);
         for (auto parameter : parameters) {
             delete parameter;
         }
-        entry->cmds_.push_back(MakeShared<WalCmdCreateIndex>("db1", "tbl1", "CCC_idx1", index_base));
+        entry->cmds_.push_back(std::make_shared<WalCmdCreateIndex>("db1", "tbl1", "CCC_idx1", index_base));
     }
-    entry->cmds_.push_back(MakeShared<WalCmdDropIndex>("db1", "tbl1", "idx1"));
+    entry->cmds_.push_back(std::make_shared<WalCmdDropIndex>("db1", "tbl1", "idx1"));
     {
-        SharedPtr<DataBlock> data_block = DataBlock::Make();
-        Vector<SharedPtr<DataType>> column_types;
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kBoolean));
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kTinyInt));
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        std::shared_ptr<DataBlock> data_block = DataBlock::Make();
+        std::vector<std::shared_ptr<DataType>> column_types;
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBoolean));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kTinyInt));
+        size_t row_count = DEFAULT_VECTOR_SIZE;
         data_block->Init(column_types);
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block->AppendValue(0, Value::MakeBool(i % 2 == 0));
             data_block->AppendValue(1, Value::MakeTinyInt(static_cast<i8>(i)));
         }
         data_block->Finalize();
 
-        entry->cmds_.push_back(MakeShared<WalCmdAppend>("db1", "tbl1", data_block));
+        entry->cmds_.push_back(std::make_shared<WalCmdAppend>("db1", "tbl1", data_block));
     }
     {
-        Vector<RowID> row_ids = {RowID(1, 3)};
-        entry->cmds_.push_back(MakeShared<WalCmdDelete>("db1", "tbl1", row_ids));
+        std::vector<RowID> row_ids = {RowID(1, 3)};
+        entry->cmds_.push_back(std::make_shared<WalCmdDelete>("db1", "tbl1", row_ids));
     }
-    entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), "catalog", String("META_123.full.json")));
+    entry->cmds_.push_back(std::make_shared<WalCmdCheckpoint>(int64_t(123), "catalog", std::string("META_123.full.json")));
     {
-        Vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
-        entry->cmds_.push_back(MakeShared<WalCmdCompact>("db1", "tbl1", std::move(new_segment_infos), Vector<SegmentID>{0, 1, 2}));
+        std::vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
+        entry->cmds_.push_back(std::make_shared<WalCmdCompact>("db1", "tbl1", std::move(new_segment_infos), std::vector<SegmentID>{0, 1, 2}));
     }
     {
         WalChunkIndexInfo info;
@@ -269,42 +271,45 @@ TEST_F(WalEntryTest, ReadWrite) {
         info.base_rowid_ = RowID(0, 0);
         info.row_count_ = 4;
         info.deprecate_ts_ = 0;
-        Vector<WalChunkIndexInfo> chunk_infos{info};
-        Vector<ChunkID> deprecate_ids{0, 1};
-        entry->cmds_.push_back(MakeShared<WalCmdDumpIndex>("db1", "tbl1", "idx1", 0 /*segment_id*/, chunk_infos, deprecate_ids));
+        std::vector<WalChunkIndexInfo> chunk_infos{info};
+        std::vector<ChunkID> deprecate_ids{0, 1};
+        entry->cmds_.push_back(std::make_shared<WalCmdDumpIndex>("db1", "tbl1", "idx1", 0 /*segment_id*/, chunk_infos, deprecate_ids));
     }
     {
-        entry->cmds_.push_back(MakeShared<WalCmdRenameTable>("db1", "tbl1", "tbl2"));
+        entry->cmds_.push_back(std::make_shared<WalCmdRenameTable>("db1", "tbl1", "tbl2"));
     }
     {
-        Vector<SharedPtr<ColumnDef>> column_defs;
+        std::vector<std::shared_ptr<ColumnDef>> column_defs;
         std::set<ConstraintType> constraints;
 
-        auto column_def3 = MakeShared<ColumnDef>(3 /*column_id*/, MakeShared<DataType>(LogicalType::kBoolean), "boolean_col", constraints);
+        auto column_def3 =
+            std::make_shared<ColumnDef>(3 /*column_id*/, std::make_shared<DataType>(LogicalType::kBoolean), "boolean_col", constraints);
         auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
-        auto column_def4 =
-            MakeShared<ColumnDef>(4 /*column id*/, MakeShared<DataType>(LogicalType::kEmbedding, embedding_info), "embedding_col", constraints);
+        auto column_def4 = std::make_shared<ColumnDef>(4 /*column id*/,
+                                                       std::make_shared<DataType>(LogicalType::kEmbedding, embedding_info),
+                                                       "embedding_col",
+                                                       constraints);
 
         column_defs.push_back(column_def3);
         column_defs.push_back(column_def4);
-        entry->cmds_.push_back(MakeShared<WalCmdAddColumns>("db1", "tbl1", std::move(column_defs)));
+        entry->cmds_.push_back(std::make_shared<WalCmdAddColumns>("db1", "tbl1", std::move(column_defs)));
     }
     {
-        Vector<String> column_names;
+        std::vector<std::string> column_names;
         column_names.push_back("boolean_col");
         column_names.push_back("embedding_col");
-        entry->cmds_.push_back(MakeShared<WalCmdDropColumns>("db1", "tbl1", std::move(column_names)));
+        entry->cmds_.push_back(std::make_shared<WalCmdDropColumns>("db1", "tbl1", std::move(column_names)));
     }
 
     i32 exp_size = entry->GetSizeInBytes();
-    Vector<char> buf(exp_size, char(0));
+    std::vector<char> buf(exp_size, char(0));
     char *buf_beg = buf.data();
     char *ptr = buf_beg;
     entry->WriteAdv(ptr);
     EXPECT_EQ(ptr - buf_beg, exp_size);
 
     const char *ptr_r = buf_beg;
-    SharedPtr<WalEntry> entry2 = WalEntry::ReadAdv(ptr_r, exp_size);
+    std::shared_ptr<WalEntry> entry2 = WalEntry::ReadAdv(ptr_r, exp_size);
     EXPECT_NE(entry2, nullptr);
     EXPECT_EQ(*entry == *entry2, true);
     EXPECT_EQ(ptr_r - buf_beg, exp_size);
@@ -318,51 +323,55 @@ TEST_F(WalEntryTest, ReadWriteV2) {
     auto config_path = std::make_shared<std::string>(BaseTestNoParam::NEW_CONFIG_PATH);
     infinity::InfinityContext::instance().InitPhase1(config_path);
     infinity::InfinityContext::instance().InitPhase2();
-    SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
-    entry->cmds_.push_back(MakeShared<WalCmdCreateDatabaseV2>("db1", "1", "default2_comment"));
-    entry->cmds_.push_back(MakeShared<WalCmdDropDatabaseV2>("db1", "1", 1));
-    entry->cmds_.push_back(MakeShared<WalCmdCreateTableV2>("db1", "1", "2", MockTableDesc2()));
-    entry->cmds_.push_back(MakeShared<WalCmdDropTableV2>("db1", "1", "tbl1", "2", 1, "table_key"));
+    std::shared_ptr<WalEntry> entry = std::make_shared<WalEntry>();
+    entry->cmds_.push_back(std::make_shared<WalCmdCreateDatabaseV2>("db1", "1", "default2_comment"));
+    entry->cmds_.push_back(std::make_shared<WalCmdDropDatabaseV2>("db1", "1", 1));
+    entry->cmds_.push_back(std::make_shared<WalCmdCreateTableV2>("db1", "1", "2", MockTableDesc2()));
+    entry->cmds_.push_back(std::make_shared<WalCmdDropTableV2>("db1", "1", "tbl1", "2", 1, "table_key"));
     {
         WalSegmentInfo segment_info = MakeSegmentInfo(100, 8, 2);
-        entry->cmds_.push_back(MakeShared<WalCmdImportV2>("db1", "1", "tbl1", "2", std::move(segment_info)));
+        entry->cmds_.push_back(std::make_shared<WalCmdImportV2>("db1", "1", "tbl1", "2", std::move(segment_info)));
     }
     {
-        Vector<InitParameter *> parameters = {new InitParameter("metric", "ip")};
-        SharedPtr<String> index_name = MakeShared<String>("idx1");
-        auto index_base = IndexIVF::Make(index_name, MakeShared<String>("test comment"), "idx1_tbl1", Vector<String>{"col1", "col2"}, parameters);
+        std::vector<InitParameter *> parameters = {new InitParameter("metric", "ip")};
+        std::shared_ptr<std::string> index_name = std::make_shared<std::string>("idx1");
+        auto index_base = IndexIVF::Make(index_name,
+                                         std::make_shared<std::string>("test comment"),
+                                         "idx1_tbl1",
+                                         std::vector<std::string>{"col1", "col2"},
+                                         parameters);
         for (auto parameter : parameters) {
             delete parameter;
         }
-        entry->cmds_.push_back(MakeShared<WalCmdCreateIndexV2>("db1", "1", "tbl1", "2", "3", index_base, "table_key"));
+        entry->cmds_.push_back(std::make_shared<WalCmdCreateIndexV2>("db1", "1", "tbl1", "2", "3", index_base, "table_key"));
     }
-    entry->cmds_.push_back(MakeShared<WalCmdDropIndexV2>("db1", "1", "tbl1", "2", "idx1", "3", 1, "index_key"));
+    entry->cmds_.push_back(std::make_shared<WalCmdDropIndexV2>("db1", "1", "tbl1", "2", "idx1", "3", 1, "index_key"));
     {
-        SharedPtr<DataBlock> data_block = DataBlock::Make();
-        Vector<SharedPtr<DataType>> column_types;
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kBoolean));
-        column_types.emplace_back(MakeShared<DataType>(LogicalType::kTinyInt));
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        std::shared_ptr<DataBlock> data_block = DataBlock::Make();
+        std::vector<std::shared_ptr<DataType>> column_types;
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kBoolean));
+        column_types.emplace_back(std::make_shared<DataType>(LogicalType::kTinyInt));
+        size_t row_count = DEFAULT_VECTOR_SIZE;
         data_block->Init(column_types);
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (size_t i = 0; i < row_count; ++i) {
             data_block->AppendValue(0, Value::MakeBool(i % 2 == 0));
             data_block->AppendValue(1, Value::MakeTinyInt(static_cast<i8>(i)));
         }
         data_block->Finalize();
-        Vector<Pair<RowID, u64>> row_ranges = {{RowID(0, 0), row_count}};
-        entry->cmds_.push_back(MakeShared<WalCmdAppendV2>("db1", "1", "tbl1", "2", row_ranges, data_block));
+        std::vector<std::pair<RowID, u64>> row_ranges = {{RowID(0, 0), row_count}};
+        entry->cmds_.push_back(std::make_shared<WalCmdAppendV2>("db1", "1", "tbl1", "2", row_ranges, data_block));
     }
     {
-        Vector<RowID> row_ids = {RowID(1, 3)};
-        entry->cmds_.push_back(MakeShared<WalCmdDeleteV2>("db1", "1", "tbl1", "2", row_ids));
+        std::vector<RowID> row_ids = {RowID(1, 3)};
+        entry->cmds_.push_back(std::make_shared<WalCmdDeleteV2>("db1", "1", "tbl1", "2", row_ids));
     }
-    entry->cmds_.push_back(MakeShared<WalCmdCheckpointV2>(int64_t(123)));
+    entry->cmds_.push_back(std::make_shared<WalCmdCheckpointV2>(int64_t(123)));
     {
-        Vector<String> names;
-        Vector<String> ids;
-        Vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
+        std::vector<std::string> names;
+        std::vector<std::string> ids;
+        std::vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
         entry->cmds_.push_back(
-            MakeShared<WalCmdCompactV2>("db1", "1", "tbl1", "2", names, ids, std::move(new_segment_infos), Vector<SegmentID>{0, 1, 2}));
+            std::make_shared<WalCmdCompactV2>("db1", "1", "tbl1", "2", names, ids, std::move(new_segment_infos), std::vector<SegmentID>{0, 1, 2}));
     }
     {
         WalChunkIndexInfo info;
@@ -371,23 +380,26 @@ TEST_F(WalEntryTest, ReadWriteV2) {
         info.base_rowid_ = RowID(0, 0);
         info.row_count_ = 4;
         info.deprecate_ts_ = 0;
-        Vector<WalChunkIndexInfo> chunk_infos{info};
-        Vector<ChunkID> deprecate_ids{0, 1};
+        std::vector<WalChunkIndexInfo> chunk_infos{info};
+        std::vector<ChunkID> deprecate_ids{0, 1};
         entry->cmds_.push_back(
-            MakeShared<WalCmdDumpIndexV2>("db1", "1", "tbl1", "2", "idx1", "3", 0 /*segment_id*/, chunk_infos, deprecate_ids, "table_key"));
+            std::make_shared<WalCmdDumpIndexV2>("db1", "1", "tbl1", "2", "idx1", "3", 0 /*segment_id*/, chunk_infos, deprecate_ids, "table_key"));
     }
     {
-        entry->cmds_.push_back(MakeShared<WalCmdRenameTableV2>("db1", "1", "tbl1", "2", "tbl2", "old_table_key"));
+        entry->cmds_.push_back(std::make_shared<WalCmdRenameTableV2>("db1", "1", "tbl1", "2", "tbl2", "old_table_key"));
     }
     {
-        Vector<u32> column_idx_list;
-        Vector<SharedPtr<ColumnDef>> column_defs;
+        std::vector<u32> column_idx_list;
+        std::vector<std::shared_ptr<ColumnDef>> column_defs;
         std::set<ConstraintType> constraints;
 
-        auto column_def3 = MakeShared<ColumnDef>(3 /*column_id*/, MakeShared<DataType>(LogicalType::kBoolean), "boolean_col", constraints);
+        auto column_def3 =
+            std::make_shared<ColumnDef>(3 /*column_id*/, std::make_shared<DataType>(LogicalType::kBoolean), "boolean_col", constraints);
         auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
-        auto column_def4 =
-            MakeShared<ColumnDef>(4 /*column id*/, MakeShared<DataType>(LogicalType::kEmbedding, embedding_info), "embedding_col", constraints);
+        auto column_def4 = std::make_shared<ColumnDef>(4 /*column id*/,
+                                                       std::make_shared<DataType>(LogicalType::kEmbedding, embedding_info),
+                                                       "embedding_col",
+                                                       constraints);
 
         column_defs.push_back(column_def3);
         column_defs.push_back(column_def4);
@@ -395,34 +407,34 @@ TEST_F(WalEntryTest, ReadWriteV2) {
         column_idx_list.push_back(3);
         column_idx_list.push_back(4);
         entry->cmds_.push_back(
-            MakeShared<WalCmdAddColumnsV2>("db1", "1", "tbl1", "2", std::move(column_idx_list), std::move(column_defs), "table_key"));
+            std::make_shared<WalCmdAddColumnsV2>("db1", "1", "tbl1", "2", std::move(column_idx_list), std::move(column_defs), "table_key"));
     }
     {
-        Vector<String> column_names;
+        std::vector<std::string> column_names;
         column_names.push_back("boolean_col");
         column_names.push_back("embedding_col");
-        Vector<String> column_keys;
+        std::vector<std::string> column_keys;
         column_keys.push_back("column_key1");
         column_keys.push_back("column_key2");
-        entry->cmds_.push_back(MakeShared<WalCmdDropColumnsV2>("db1",
-                                                               "1",
-                                                               "tbl1",
-                                                               "2",
-                                                               std::move(column_names),
-                                                               Vector<ColumnID>{3, 4},
-                                                               "table_key",
-                                                               std::move(column_keys)));
+        entry->cmds_.push_back(std::make_shared<WalCmdDropColumnsV2>("db1",
+                                                                     "1",
+                                                                     "tbl1",
+                                                                     "2",
+                                                                     std::move(column_names),
+                                                                     std::vector<ColumnID>{3, 4},
+                                                                     "table_key",
+                                                                     std::move(column_keys)));
     }
 
     i32 exp_size = entry->GetSizeInBytes();
-    Vector<char> buf(exp_size, char(0));
+    std::vector<char> buf(exp_size, char(0));
     char *buf_beg = buf.data();
     char *ptr = buf_beg;
     entry->WriteAdv(ptr);
     EXPECT_EQ(ptr - buf_beg, exp_size);
 
     const char *ptr_r = buf_beg;
-    SharedPtr<WalEntry> entry2 = WalEntry::ReadAdv(ptr_r, exp_size);
+    std::shared_ptr<WalEntry> entry2 = WalEntry::ReadAdv(ptr_r, exp_size);
     EXPECT_NE(entry2, nullptr);
     EXPECT_EQ(*entry == *entry2, true);
     EXPECT_EQ(ptr_r - buf_beg, exp_size);
@@ -431,13 +443,13 @@ TEST_F(WalEntryTest, ReadWriteV2) {
 
 TEST_F(WalEntryTest, ReadWriteVFS) {
     RemoveDbDirs();
-    SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
+    std::shared_ptr<WalEntry> entry = std::make_shared<WalEntry>();
 
-    Vector<String> paths = {"path1", "path2"};
-    String workspace = GetFullPersistDir();
-    String data_dir = GetFullDataDir();
-    SizeT object_size_limit = 100;
-    auto kv_store = MakeUnique<KVStore>();
+    std::vector<std::string> paths = {"path1", "path2"};
+    std::string workspace = GetFullPersistDir();
+    std::string data_dir = GetFullDataDir();
+    size_t object_size_limit = 100;
+    auto kv_store = std::make_unique<KVStore>();
     Status status = kv_store->Init(GetCatalogDir());
     EXPECT_TRUE(status.ok());
     PersistenceManager pm(workspace, data_dir, object_size_limit);
@@ -450,30 +462,30 @@ TEST_F(WalEntryTest, ReadWriteVFS) {
 
     AddrSerializer addr_serializer;
     addr_serializer.Initialize(&pm, paths);
-    SizeT size = addr_serializer.GetSizeInBytes();
-    auto buffer = MakeUnique<char[]>(size);
+    size_t size = addr_serializer.GetSizeInBytes();
+    auto buffer = std::make_unique<char[]>(size);
     char *ptr = buffer.get();
     addr_serializer.WriteBufAdv(ptr);
-    SizeT write_size = ptr - buffer.get();
+    size_t write_size = ptr - buffer.get();
     ASSERT_EQ(write_size, size);
 
     AddrSerializer addr_serializer1;
     const char *ptr1 = buffer.get();
-    Vector<String> paths1 = addr_serializer1.ReadBufAdv(ptr1);
-    SizeT read_size = ptr1 - buffer.get();
+    std::vector<std::string> paths1 = addr_serializer1.ReadBufAdv(ptr1);
+    size_t read_size = ptr1 - buffer.get();
     ASSERT_EQ(read_size, size);
     ASSERT_EQ(paths1, paths);
 }
 
-void Println(const String &message1, const String &message2) { std::cout << message1 << message2 << std::endl; }
+void Println(const std::string &message1, const std::string &message2) { std::cout << message1 << message2 << std::endl; }
 
 TEST_F(WalEntryTest, WalEntryIterator) {
     using namespace infinity;
     RemoveDbDirs();
     std::filesystem::create_directories(GetFullWalDir());
-    String wal_file_path = String(GetFullWalDir()) + "/wal.log";
-    String ckp_file_path = "catalog";
-    String ckp_file_name = String("META_123.full.json");
+    std::string wal_file_path = std::string(GetFullWalDir()) + "/wal.log";
+    std::string ckp_file_path = "catalog";
+    std::string ckp_file_name = std::string("META_123.full.json");
     MockWalFile(wal_file_path, ckp_file_path, ckp_file_name);
     {
         auto iterator1 = WalEntryIterator::Make(wal_file_path, true);
@@ -490,7 +502,7 @@ TEST_F(WalEntryTest, WalEntryIterator) {
         }
     }
 
-    Vector<SharedPtr<WalEntry>> replay_entries;
+    std::vector<std::shared_ptr<WalEntry>> replay_entries;
     TxnTimeStamp max_commit_ts = 0;
     {
         auto iterator = WalEntryIterator::Make(wal_file_path, true);
@@ -541,10 +553,10 @@ TEST_F(WalEntryTest, WalListIterator) {
     using namespace infinity;
     RemoveDbDirs();
     std::filesystem::create_directories(GetFullWalDir());
-    String wal_file_path1 = String(GetFullWalDir()) + "/wal.log";
-    String wal_file_path2 = String(GetFullWalDir()) + "/wal2.log";
-    String ckp_file_path = "catalog";
-    String ckp_file_name = String("META_123.full.json");
+    std::string wal_file_path1 = std::string(GetFullWalDir()) + "/wal.log";
+    std::string wal_file_path2 = std::string(GetFullWalDir()) + "/wal2.log";
+    std::string ckp_file_path = "catalog";
+    std::string ckp_file_name = std::string("META_123.full.json");
     MockWalFile(wal_file_path1, ckp_file_path, ckp_file_name);
     MockWalFile(wal_file_path2, ckp_file_path, ckp_file_name);
 
@@ -561,7 +573,7 @@ TEST_F(WalEntryTest, WalListIterator) {
         //        }
     }
 
-    Vector<SharedPtr<WalEntry>> replay_entries;
+    std::vector<std::shared_ptr<WalEntry>> replay_entries;
     TxnTimeStamp max_commit_ts = 0;
     {
         WalListIterator iterator({wal_file_path1, wal_file_path2});

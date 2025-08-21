@@ -11,21 +11,20 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module;
+
 module infinity_core:day.impl;
 
 import :day;
-import :stl;
 import :new_catalog;
 import :status;
-import logical_type;
+import :column_vector;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import :third_party;
+
 import internal_types;
 import data_type;
-import :column_vector;
+import logical_type;
 
 namespace infinity {
 
@@ -36,7 +35,6 @@ struct DayFunction {
         RecoverableError(status);
         return false;
     }
-
 };
 
 template <>
@@ -58,26 +56,26 @@ inline bool DayFunction::Run(TimestampT left, BigIntT &result) {
 }
 
 void RegisterDayFunction(NewCatalog *catalog_ptr) {
-    String func_name = "day";
+    std::string func_name = "day";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction day_date_function(func_name,
-                                  {DataType(LogicalType::kDate)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, DayFunction>);
+                                     {DataType(LogicalType::kDate)},
+                                     {DataType(LogicalType::kBigInt)},
+                                     &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, DayFunction>);
     function_set_ptr->AddFunction(day_date_function);
 
     ScalarFunction day_datetime_function(func_name,
-                                  {DataType(LogicalType::kDateTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, DayFunction>);
+                                         {DataType(LogicalType::kDateTime)},
+                                         {DataType(LogicalType::kBigInt)},
+                                         &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, DayFunction>);
     function_set_ptr->AddFunction(day_datetime_function);
 
     ScalarFunction day_timestamp_function(func_name,
-                                  {DataType(LogicalType::kTimestamp)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, DayFunction>);
+                                          {DataType(LogicalType::kTimestamp)},
+                                          {DataType(LogicalType::kBigInt)},
+                                          &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, DayFunction>);
     function_set_ptr->AddFunction(day_timestamp_function);
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
