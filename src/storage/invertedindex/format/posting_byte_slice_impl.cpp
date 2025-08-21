@@ -23,7 +23,7 @@ size_t PostingByteSlice::DoFlush() {
     for (size_t field_index = 0; field_index < field_definitions->GetSize(); ++field_index) {
         PostingField *current_field = field_definitions->GetValue(field_index);
         u8 *row_buffer = data_buffer_.GetRow(current_field->location_);
-        SizeT encoded_size = current_field->Encode(slice_writer_, row_buffer, data_buffer_.Size() * current_field->GetSize());
+        size_t encoded_size = current_field->Encode(slice_writer_, row_buffer, data_buffer_.Size() * current_field->GetSize());
         total_flush_size += encoded_size;
     }
     return total_flush_size;

@@ -46,7 +46,7 @@ public:
 
 private:
     // Optimized pivot calculation using prefix sums
-    SizeT FindPivotOptimized(float threshold);
+    size_t FindPivotOptimized(float threshold);
     void UpdateScoreUpperBoundPrefixSums();
     bool ShouldSkipSort() const;
 
@@ -61,7 +61,7 @@ private:
     // Optimization for many keywords
     static constexpr u32 SORT_SKIP_THRESHOLD = 20; // Skip sorting when keyword count > threshold
     static constexpr u32 LAZY_SORT_INTERVAL = 5;   // Sort every N iterations for large keyword sets
-    Vector<f32> score_ub_prefix_sums_;             // Prefix sums for fast pivot calculation
+    std::vector<f32> score_ub_prefix_sums_;        // Prefix sums for fast pivot calculation
     bool prefix_sums_valid_ = false;
     u32 iterations_since_sort_ = 0;
 

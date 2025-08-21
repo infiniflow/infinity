@@ -23,6 +23,7 @@ module;
 #pragma clang diagnostic pop
 
 #include <cassert>
+#include <cerrno>
 #include <cstdio>
 
 module infinity_core:memory_indexer.impl;
@@ -729,7 +730,7 @@ void MemoryIndexer::FinalSpillFile() {
 void MemoryIndexer::PrepareSpillFile() {
     spill_file_handle_ = fopen(spill_full_path_.c_str(), "w");
     if (spill_file_handle_ == nullptr) {
-        String error_message = fmt::format("Failed to open spill file: {}, error: {}", spill_full_path_, strerror(errno));
+        std::string error_message = fmt::format("Failed to open spill file: {}, error: {}", spill_full_path_, strerror(errno));
         UnrecoverableError(error_message);
     }
 
@@ -737,7 +738,7 @@ void MemoryIndexer::PrepareSpillFile() {
     if (written != 1) {
         fclose(spill_file_handle_);
         spill_file_handle_ = nullptr;
-        String error_message = fmt::format("Failed to write to spill file: {}, error: {}", spill_full_path_, strerror(errno));
+        std::string error_message = fmt::format("Failed to write to spill file: {}, error: {}", spill_full_path_, strerror(errno));
         UnrecoverableError(error_message);
     }
 

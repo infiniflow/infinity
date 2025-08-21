@@ -75,15 +75,15 @@ BlockMaxWandIterator::BlockMaxWandIterator(std::vector<std::unique_ptr<DocIterat
 }
 
 // Optimized pivot calculation using prefix sums for fast binary search
-SizeT BlockMaxWandIterator::FindPivotOptimized(float threshold) {
+size_t BlockMaxWandIterator::FindPivotOptimized(float threshold) {
     if (!prefix_sums_valid_) {
         UpdateScoreUpperBoundPrefixSums();
     }
 
     // Binary search for pivot using prefix sums
-    SizeT left = 0, right = sorted_iterators_.size();
+    size_t left = 0, right = sorted_iterators_.size();
     while (left < right) {
-        SizeT mid = (left + right) / 2;
+        size_t mid = (left + right) / 2;
         if (score_ub_prefix_sums_[mid + 1] > threshold) {
             right = mid;
         } else {
@@ -94,18 +94,18 @@ SizeT BlockMaxWandIterator::FindPivotOptimized(float threshold) {
 }
 
 void BlockMaxWandIterator::UpdateScoreUpperBoundPrefixSums() {
-    const SizeT num_iterators = sorted_iterators_.size();
+    const size_t num_iterators = sorted_iterators_.size();
     score_ub_prefix_sums_.clear();
     score_ub_prefix_sums_.resize(num_iterators + 1, 0.0f);
 
-    for (SizeT i = 0; i < num_iterators; i++) {
+    for (size_t i = 0; i < num_iterators; i++) {
         score_ub_prefix_sums_[i + 1] = score_ub_prefix_sums_[i] + sorted_iterators_[i]->BM25ScoreUpperBound();
     }
     prefix_sums_valid_ = true;
 }
 
 bool BlockMaxWandIterator::ShouldSkipSort() const {
-    const SizeT num_iterators = sorted_iterators_.size();
+    const size_t num_iterators = sorted_iterators_.size();
 
     // For small keyword sets, always sort for optimal performance
     if (num_iterators <= SORT_SKIP_THRESHOLD) {
@@ -158,7 +158,7 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
             if (num_iterators > SORT_SKIP_THRESHOLD) {
                 // For large keyword sets, use partial sort when possible
                 // Only sort the first half if pivot is likely to be in the first half
-                SizeT sort_limit = std::min(num_iterators, num_iterators / 2 + 10);
+                size_t sort_limit = std::min(num_iterators, num_iterators / 2 + 10);
                 std::partial_sort(sorted_iterators_.begin(),
                                   sorted_iterators_.begin() + sort_limit,
                                   sorted_iterators_.end(),

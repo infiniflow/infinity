@@ -22,7 +22,7 @@ protected:
 
 protected:
     // Internal flush operation implementation
-    SizeT DoFlush();
+    size_t DoFlush();
 
 public:
     // Constructor initializes empty state

@@ -87,8 +87,8 @@ public:
     static u8 AllocatePlan(u8 current_capacity);
 
     // Persistence operations
-    void Dump(const SharedPtr<FileWriter> &output_file);
-    void Load(const SharedPtr<FileReader> &input_file);
+    void Dump(const std::shared_ptr<FileWriter> &output_file);
+    void Load(const std::shared_ptr<FileReader> &input_file);
 };
 
 //////////////////////////////////////////////////////////
