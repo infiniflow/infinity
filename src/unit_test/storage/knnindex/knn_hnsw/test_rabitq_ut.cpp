@@ -64,6 +64,7 @@ public:
 public:
     using DataType = f32;
     using LabelType = i64;
+    using AlignType = u8;
 
     static constexpr size_t dim_ = 128;
     static constexpr size_t vec_n_ = 8192;
@@ -203,6 +204,85 @@ TEST_F(RabitqTest, test_base) {
         const DataType *centroid = meta.centroid();
         for (int d = 0; d < dim_; ++d) {
             ASSERT_LT(std::fabs(centroid[d] - truth_centroid[d]), truth_centroid[d] * 0.05);
+        }
+    }
+}
+
+TEST_F(RabitqTest, test_compress) {
+    using namespace infinity;
+    using RabitqVecStoreMeta = RabitqVecStoreMeta<DataType, true>;
+    using RabitqVecStoreInner = RabitqVecStoreInner<DataType, true>;
+
+    // test meta.CompressToCode
+    {
+        using StoreData = RabitqVecStoreMeta::StoreData;
+        size_t dim = 6;
+        RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim);
+        std::cout << "compress_data_size = " << meta.compress_data_size() << std::endl;
+
+        DataType src[] = {1, 2, 3, 4, 5, 6};
+        auto dest = std::make_unique<char[]>(meta.compress_data_size());
+        auto dest_store_ptr = reinterpret_cast<StoreData *>(dest.get());
+        meta.CompressToCode(src, dest_store_ptr);
+
+        std::cout << fmt::format("norm = {}, sum = {}, error = {}, raw_norm = {}",
+                                 dest_store_ptr->norm_,
+                                 dest_store_ptr->sum_,
+                                 dest_store_ptr->error_,
+                                 dest_store_ptr->raw_norm_);
+        std::cout << ", compress_vec_ = ";
+        auto code = dest_store_ptr->compress_vec_;
+        for (size_t d = 0; d < meta.align_dim(); ++d) {
+            std::cout << (code[d / meta.align_size_] >> (meta.align_size_ - 1 - d) & 1);
+        }
+        std::cout << std::endl;
+    }
+
+    auto data = std::make_unique<float[]>(dim_ * vec_n_);
+    std::default_random_engine rng;
+    std::uniform_real_distribution<float> distrib_real(100, 200);
+    for (size_t i = 0; i < dim_ * vec_n_; ++i) {
+        data[i] = distrib_real(rng);
+    }
+    auto iter = DenseVectorIter<DataType, LabelType>(data.get(), dim_, vec_n_);
+
+    // test inner SetVec & GetVec
+    {
+        RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
+        {
+            auto iter_copy = iter;
+            meta.Optimize(iter_copy, 0);
+        }
+        std::cout << "compress_data_size = " << meta.compress_data_size() << std::endl;
+
+        size_t mem_usage = 0;
+        RabitqVecStoreInner inner = RabitqVecStoreInner::Make(vec_n_, meta, mem_usage);
+        {
+            auto iter_copy = iter;
+            size_t insert_n = 0;
+            for (auto val = iter_copy.Next(); val; val = iter_copy.Next()) {
+                const auto &[embedding, offset] = val.value();
+                inner.SetVec(insert_n++, embedding, meta, mem_usage);
+            }
+            ASSERT_EQ(insert_n, vec_n_);
+        }
+
+        for (size_t i = 0; i < vec_n_; ++i) {
+            auto vec = inner.GetVec(i, meta);
+            std::cout << fmt::format("norm = {}, sum = {}, error = {}, raw_norm = {}", vec->norm_, vec->sum_, vec->error_, vec->raw_norm_);
+            std::cout << ", compress_vec_ =";
+            auto code = vec->compress_vec_;
+            size_t sum = 0;
+            for (size_t d = 0; d < meta.align_dim(); ++d) {
+                if (d % meta.align_size_ == 0) {
+                    std::cout << " ";
+                }
+                bool c_i = code[d / meta.align_size_] >> (meta.align_size_ - 1 - d % meta.align_size_) & 1;
+                std::cout << c_i;
+                sum += c_i;
+            }
+            std::cout << std::endl;
+            ASSERT_EQ(sum, vec->sum_);
         }
     }
 }
