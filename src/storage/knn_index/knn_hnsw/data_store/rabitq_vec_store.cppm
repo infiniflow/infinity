@@ -158,7 +158,58 @@ public:
         return query;
     }
 
-    void CompressToCode(const DataType *src, StoreData *dest) const { UnrecoverableError("Not implemented"); }
+    void CompressToCode(const DataType *src, StoreData *dest) const {
+        // 1.Init
+        memset(dest, 0, compress_data_size_);
+        std::vector<DataType> align_src(align_dim_, 0);
+        std::copy(src, src + dim_, align_src.begin());
+        std::vector<DataType> rot_src(align_dim_, 0);
+        auto u8_bin_src = std::make_unique<AlignType[]>(align_dim_ / align_size_);
+        memset(u8_bin_src.get(), 0, align_dim_ / align_size_); // 1 dim -> 1 bit
+
+        // 2.Compute raw vector Norm for IP or Cos distance
+        DataType raw_norm = 0;
+        for (size_t d = 0; d < this->dim_; ++d) {
+            raw_norm += src[d] * src[d];
+        }
+
+        // 3.Rotation align_src by rom
+        matrixA_multiply_matrixB_output_to_C(align_src.data(), rom_.get(), 1, align_dim_, align_dim_, rot_src.data());
+
+        // 4.normalize rot_src
+        DataType norm = 0;
+        for (size_t d = 0; d < align_dim_; ++d) {
+            norm += (rot_src[d] - centroid_[d]) * (rot_src[d] - centroid_[d]);
+        }
+        norm = norm < 1e-5 ? 1 : std::sqrt(norm);
+        for (size_t d = 0; d < align_dim_; d++) {
+            rot_src[d] = (rot_src[d] - centroid_[d]) / norm;
+        }
+
+        // 5.encode rot_src (has normalized) to u8
+        DataType sum = 0;
+        for (size_t d = 0; d < align_dim_; ++d) {
+            if (rot_src[d] >= 0.0F) {
+                sum += 1;
+                u8_bin_src[d / align_size_] |= (1 << (d % align_size_));
+            }
+        }
+
+        // 6.compute encode error
+        float error = 0.0f;
+        float inv_sqrt_d = 1.0f / std::sqrt(align_dim_);
+        for (size_t d = 0; d < align_dim_; ++d) {
+            float x_i = ((u8_bin_src[d / align_size_] >> (d % align_size_)) & 1) ? inv_sqrt_d : -inv_sqrt_d;
+            error += x_i * rot_src[d];
+        }
+
+        // 7.store data in dest
+        dest->raw_norm_ = raw_norm;
+        dest->norm_ = norm;
+        dest->sum_ = sum;
+        dest->error_ = error;
+        std::copy(u8_bin_src.get(), u8_bin_src.get() + align_dim_ / align_size_, dest->compress_vec_);
+    }
 
     void CompressToQuery(const DataType *src, QueryData *dest) const { UnrecoverableError("Not implemented"); }
 
@@ -213,7 +264,7 @@ private:
         this->dim_ = dim;
         size_t align_dim = AlignUp(dim, Base::align_size_);
         this->align_dim_ = align_dim;
-        this->compress_data_size_ = sizeof(StoreData) + align_dim / 8;
+        this->compress_data_size_ = sizeof(StoreData) + align_dim / Base::align_size_;
         this->rom_ = std::make_unique<DataType[]>(align_dim * align_dim);
         this->centroid_ = std::make_unique<DataType[]>(align_dim);
         GenerateRandomOrthogonalMatrix<DataType>(this->rom_.get(), this->align_dim_);
