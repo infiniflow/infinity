@@ -46,6 +46,11 @@ import :segment_meta;
 import :block_meta;
 import :column_meta;
 import :mem_index;
+import :expression_evaluator;
+import :expression_state;
+import :value;
+import :fixed_dimensional_encoding;
+import :function_expression;
 
 import std;
 import std.compat;
@@ -170,16 +175,54 @@ void PhysicalKnnScan::Init(QueryContext *query_context) {
     const auto *embedding_type_info = static_cast<const EmbeddingInfo *>(column_data_type.type_info().get());
     const auto column_elem_type = embedding_type_info->Type();
     column_elem_type_ = column_elem_type;
-    if (auto [new_query_embedding_ptr, new_query_embedding_type] = GetKnnExprForCalculation(*knn_expr, column_elem_type);
-        new_query_embedding_type != EmbeddingDataType::kElemInvalid) {
+    // Check if we need to evaluate a function expression (e.g., FDE) to generate query embedding
+    if (knn_expr->arguments().size() > 1) {
+        // Function expression case - evaluate the function to get query embedding
+        auto function_expr = knn_expr->arguments()[1]; // The FDE function expression
+
+        // Create expression evaluator without input data block (for constant expressions)
+        ExpressionEvaluator evaluator;
+        evaluator.Init(nullptr);
+
+        // Create expression state for the function
+        std::shared_ptr<ExpressionState> expr_state = ExpressionState::CreateState(function_expr);
+
+        // Create output column vector for function result
+        std::shared_ptr<ColumnVector> output_column = ColumnVector::Make(std::make_shared<DataType>(function_expr->Type()));
+        output_column->Initialize();
+
+        // Evaluate the function expression
+        evaluator.Execute(function_expr, expr_state, output_column);
+
+        // Extract the embedding result
+        if (output_column->Size() > 0) {
+            Value embedding_value = output_column->GetValueByIndex(0);
+            if (embedding_value.type().type() == LogicalType::kEmbedding) {
+                auto embedding_info = static_cast<const EmbeddingInfo *>(embedding_value.type().type_info().get());
+                std::span<char> embedding_data = embedding_value.GetEmbedding();
+                real_knn_query_embedding_ptr_ = embedding_data.data();
+                real_knn_query_elem_type_ = embedding_info->Type();
+                real_query_embedding_dimension_ = embedding_info->Dimension(); // Store actual dimension
+                // Store the embedding data to prevent deallocation
+                function_query_embedding_holder_ = embedding_value;
+            } else {
+                RecoverableError(Status::SyntaxError("Function must return embedding type"));
+            }
+        } else {
+            RecoverableError(Status::SyntaxError("Function returned no results"));
+        }
+    } else if (auto [new_query_embedding_ptr, new_query_embedding_type] = GetKnnExprForCalculation(*knn_expr, column_elem_type);
+               new_query_embedding_type != EmbeddingDataType::kElemInvalid) {
         // have new query ptr
         const auto new_query_embedding_ptr_ = new_query_embedding_ptr.release();
         real_knn_query_embedding_holder_ = std::shared_ptr<void>(new_query_embedding_ptr_, std::free);
         real_knn_query_embedding_ptr_ = new_query_embedding_ptr_;
         real_knn_query_elem_type_ = new_query_embedding_type;
+        real_query_embedding_dimension_ = knn_expr->dimension_; // Use KnnExpression dimension
     } else {
         real_knn_query_embedding_ptr_ = knn_expr->query_embedding_.ptr;
         real_knn_query_elem_type_ = knn_expr->embedding_data_type_;
+        real_query_embedding_dimension_ = knn_expr->dimension_; // Use KnnExpression dimension
     }
 }
 

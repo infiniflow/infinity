@@ -228,6 +228,42 @@ def get_search_optional_filter_from_opt_params(opt_params: dict):
     return optional_filter
 
 
+def get_local_function_expr_from_fde(fde_obj) -> WrapParsedExpr:
+    """Create a FunctionExpr for FDE function call."""
+    from infinity_embedded.common import FDE
+
+    if not isinstance(fde_obj, FDE):
+        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Expected FDE object, got {type(fde_obj)}")
+
+    # Create tensor data constant expression (2D array)
+    tensor_const_expr = WrapConstantExpr()
+    tensor_const_expr.literal_type = LiteralType.kSubArrayArray
+    tensor_const_expr.f64_tensor_value = fde_obj.tensor_data
+
+    # Create target dimension constant expression
+    dim_const_expr = WrapConstantExpr()
+    dim_const_expr.literal_type = LiteralType.kInteger
+    dim_const_expr.i64_value = fde_obj.target_dimension
+
+    # Create parsed expressions for arguments
+    tensor_parsed_expr = WrapParsedExpr(ParsedExprType.kConstant)
+    tensor_parsed_expr.constant_expr = tensor_const_expr
+
+    dim_parsed_expr = WrapParsedExpr(ParsedExprType.kConstant)
+    dim_parsed_expr.constant_expr = dim_const_expr
+
+    # Create FDE function expression
+    function_expr = WrapFunctionExpr()
+    function_expr.func_name = "fde"
+    function_expr.arguments = [tensor_parsed_expr, dim_parsed_expr]
+
+    # Create parsed expression for the function
+    parsed_expr = WrapParsedExpr(ParsedExprType.kFunction)
+    parsed_expr.function_expr = function_expr
+
+    return parsed_expr
+
+
 def get_local_constant_expr_from_python_value(value) -> WrapConstantExpr:
     # convert numpy types
     if isinstance(value, np.integer):
