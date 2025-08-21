@@ -26,37 +26,39 @@ module;
 
 export module infinity_core:rabitq_vec_store;
 
-import :stl;
 import :local_file_handle;
 import :data_store_util;
 import :infinity_exception;
 import :hnsw_common;
+import :mlas_matrix_multiply;
+
+import std;
+import std.compat;
 import serialize;
 
 namespace infinity {
 
-SizeT AlignUp(SizeT num, SizeT align_size) { return (num + align_size - 1) & ~(align_size - 1); }
+size_t AlignUp(size_t num, size_t align_size) { return (num + align_size - 1) & ~(align_size - 1); }
 
 template <typename DataType>
-void GenerateRandomOrthogonalMatrix(DataType *rom, SizeT dim) {
-    // TODO: Speeding up through QR decomposition
+void GenerateRandomOrthogonalMatrix(DataType *rom, size_t dim) {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<DataType> dist(-1.0, 1.0);
 
     // Initialize the identity matrix
     std::memset(rom, 0, dim * dim * sizeof(DataType));
-    for (SizeT i = 0; i < dim; ++i) {
+    for (size_t i = 0; i < dim; ++i) {
         rom[i * dim + i] = 1.0;
     }
 
     // Random Givens Rotation
-    for (SizeT i = 0; i < dim; ++i) {
-        for (SizeT j = i + 1; j < dim; ++j) {
+    for (size_t i = 0; i < dim; ++i) {
+        for (size_t j = i + 1; j < dim; ++j) {
             DataType angle = 2 * M_PI * dist(gen);
             DataType c = std::cos(angle);
             DataType s = std::sin(angle);
-            for (SizeT k = 0; k < dim; ++k) {
+            for (size_t k = 0; k < dim; ++k) {
                 DataType q_ik = rom[k * dim + i] * c - rom[k * dim + j] * s;
                 DataType q_jk = rom[k * dim + i] * s + rom[k * dim + j] * c;
                 rom[k * dim + i] = q_ik;
@@ -70,18 +72,18 @@ void GenerateRandomOrthogonalMatrix(DataType *rom, SizeT dim) {
 
 export template <typename DataType, typename AlignType>
 struct RabitqStoreData {
-    DataType norm_{0};
-    DataType sum_{0};
-    DataType raw_norm_{0};
-    DataType error_{0};
+    DataType raw_norm_{0}; // Norm of raw vector: ||q||
+    DataType norm_{0};     // Norm of normalize vector: ||o_r - c||
+    DataType sum_{0};      // sum of bin code: x_b
+    DataType error_{0};    // error of inner: <q, o>
     AlignType compress_vec_[];
 };
 
 export template <typename DataType, typename AlignType>
 struct RabitqQueryData {
+    DataType raw_norm_{0};
     DataType query_norm_{0};
     DataType query_sum_{0};
-    DataType query_raw_norm_{0};
     DataType query_lower_bound_{0};
     DataType query_delta_{0};
     AlignType compress_vec_[];
@@ -95,16 +97,16 @@ class RabitqVecStoreInner;
 export template <typename DataType>
 class RabitqVecStoreMetaType {
 public:
-    using AlignType = i8;
+    using AlignType = u8;
     using DistanceType = f32;
     using StoreData = RabitqStoreData<DataType, AlignType>;
     using QueryData = RabitqQueryData<DataType, AlignType>;
     using StoreType = const StoreData *;
     struct QueryType {
-        UniquePtr<QueryData> inner_;
+        std::unique_ptr<QueryData> inner_;
         operator const QueryData *() const { return inner_.get(); }
 
-        QueryType(SizeT compress_data_size) : inner_(new(new char[compress_data_size]) QueryData) {}
+        QueryType(size_t compress_data_size) : inner_(new(new char[compress_data_size]) QueryData) {}
         QueryType(QueryType &&other) = default;
         ~QueryType() { delete[] reinterpret_cast<char *>(inner_.release()); }
     };
@@ -126,8 +128,8 @@ public:
     using AlignType = typename MetaType::AlignType;
     using DistanceType = typename MetaType::DistanceType;
 
-    constexpr static SizeT align_size_ = sizeof(AlignType) * 8;                                                             // 8 for i8
-    constexpr static SizeT max_bucket_idx_ = std::numeric_limits<AlignType>::max() - std::numeric_limits<AlignType>::min(); // 255 for i8
+    constexpr static size_t align_size_ = sizeof(AlignType) * 8;                                                             // 8 for i8
+    constexpr static size_t max_bucket_idx_ = std::numeric_limits<AlignType>::max() - std::numeric_limits<AlignType>::min(); // 255 for i8
 
 public:
     RabitqVecStoreMetaBase() : dim_(0), align_dim_(0), compress_data_size_(0) {}
@@ -147,6 +149,7 @@ public:
     void Save(LocalFileHandle &file_handle) const {
         file_handle.Append(&dim_, sizeof(dim_));
         file_handle.Append(rom_.get(), sizeof(DataType) * align_dim_ * align_dim_);
+        file_handle.Append(centroid_.get(), sizeof(DataType) * align_dim_);
     }
 
     QueryType MakeQuery(const DataType *vec) const {
@@ -160,28 +163,40 @@ public:
     void CompressToQuery(const DataType *src, QueryData *dest) const { UnrecoverableError("Not implemented"); }
 
     void Dump(std::ostream &os) const {
-        os << fmt::format("[CONST] dim: {}, align_dim: {}, compress_data_size: {}, rom: ({}, {})",
-                          dim_,
-                          align_dim_,
-                          compress_data_size_,
-                          align_dim_,
-                          align_dim_)
+        os << fmt::format("[CONST] dim: {}, align_dim: {}, compress_data_size: {}", dim_, align_dim_, compress_data_size_, align_dim_, align_dim_)
            << std::endl;
+
+        os << "rom: " << std::endl;
+        for (size_t i = 0; i < dim_; ++i) {
+            os << "\t";
+            for (size_t j = 0; j < dim_; ++j) {
+                os << rom_[i * dim_ + j] << " ";
+            }
+            os << std::endl;
+        }
+
+        os << "centroid: ";
+        for (size_t i = 0; i < dim_; ++i) {
+            os << centroid_[i] << " ";
+        }
+        os << std::endl;
     }
 
 public:
-    SizeT GetSizeInBytes() const { return sizeof(dim_) + align_dim_ * align_dim_ * sizeof(DataType); }
-    SizeT GetVecSizeInBytes() const { return compress_data_size_; }
-    SizeT dim() const { return dim_; }
-    SizeT align_dim() const { return align_dim_; }
-    SizeT compress_data_size() const { return compress_data_size_; }
-    DataType *rom() const { return rom_.get(); }
+    size_t GetSizeInBytes() const { return sizeof(dim_) + align_dim_ * align_dim_ * sizeof(DataType) + align_dim_ * sizeof(DataType); }
+    size_t GetVecSizeInBytes() const { return compress_data_size_; }
+    size_t dim() const { return dim_; }
+    size_t align_dim() const { return align_dim_; }
+    size_t compress_data_size() const { return compress_data_size_; }
+    const DataType *rom() const { return rom_.get(); }
+    const DataType *centroid() const { return centroid_.get(); }
 
 protected:
-    SizeT dim_;
-    SizeT align_dim_;
-    SizeT compress_data_size_;
-    ArrayPtr<DataType, OwnMem> rom_; // Random orthogonal matrix
+    size_t dim_;
+    size_t align_dim_;
+    size_t compress_data_size_;
+    ArrayPtr<DataType, OwnMem> rom_;      // Random orthogonal matrix
+    ArrayPtr<DataType, OwnMem> centroid_; // Centroid of all vector in DataStore
 };
 
 export template <typename DataType, bool OwnMem>
@@ -194,40 +209,61 @@ public:
     using AlignType = typename Base::AlignType;
 
 private:
-    RabitqVecStoreMeta(SizeT dim) {
+    RabitqVecStoreMeta(size_t dim) {
         this->dim_ = dim;
-        SizeT align_dim = AlignUp(dim, Base::align_size_);
+        size_t align_dim = AlignUp(dim, Base::align_size_);
         this->align_dim_ = align_dim;
         this->compress_data_size_ = sizeof(StoreData) + align_dim / 8;
-        this->rom_ = MakeUnique<DataType[]>(align_dim * align_dim);
-        GenerateRandomOrthogonalMatrix<DataType>(this->rom_.get(), align_dim);
+        this->rom_ = std::make_unique<DataType[]>(align_dim * align_dim);
+        this->centroid_ = std::make_unique<DataType[]>(align_dim);
+        GenerateRandomOrthogonalMatrix<DataType>(this->rom_.get(), this->align_dim_);
     }
 
 public:
     RabitqVecStoreMeta() = delete;
-    static This Make(SizeT dim) { return This(dim); }
+    static This Make(size_t dim) { return This(dim); }
 
     static This Load(LocalFileHandle &file_handle) {
-        SizeT dim;
+        size_t dim;
         file_handle.Read(&dim, sizeof(dim));
         This meta(dim);
-        SizeT align_dim = meta.align_dim();
-        file_handle.Read(meta.rom(), align_dim * align_dim * sizeof(DataType));
+        size_t align_dim = meta.align_dim_;
+        file_handle.Read(meta.rom_.get(), align_dim * align_dim * sizeof(DataType));
+        file_handle.Read(meta.centroid_.get(), align_dim * sizeof(DataType));
         return meta;
     }
 
     static This LoadFromPtr(const char *&ptr) {
-        SizeT dim = ReadBufAdv<SizeT>(ptr);
+        size_t dim = ReadBufAdv<size_t>(ptr);
         This meta(dim);
-        SizeT align_dim = meta.align_dim();
-        std::memcpy(meta.rom(), ptr, align_dim * align_dim * sizeof(DataType));
+        size_t align_dim = meta.align_dim_;
+        std::memcpy(meta.rom_.get(), ptr, align_dim * align_dim * sizeof(DataType));
         ptr += align_dim * align_dim * sizeof(DataType);
+        std::memcpy(meta.centroid_.get(), ptr, align_dim * sizeof(DataType));
+        ptr += align_dim * sizeof(DataType);
         return meta;
     }
 
-    template <typename LabelType, DataIteratorConcept<const DataType *, LabelType> Iterator>
-    void Optimize(Iterator &&query_iter, const Vector<Pair<Inner *, SizeT>> &inners, SizeT &mem_usage) {
-        UnrecoverableError("Not implemented");
+    template <typename Iterator>
+    void Optimize(Iterator &&query_iter, size_t cur_vec_num) {
+        DataType *centroid = this->centroid_.get();
+        for (size_t i = 0; i < this->dim_; ++i) {
+            centroid[i] *= cur_vec_num;
+        }
+        while (true) {
+            if (auto ret = query_iter.Next(); ret) {
+                auto &[vec, _] = *ret;
+                for (size_t i = 0; i < this->dim_; ++i) {
+                    centroid[i] += vec[i];
+                }
+                ++cur_vec_num;
+            } else {
+                break;
+            }
+        }
+        for (size_t i = 0; i < this->dim_; ++i) {
+            centroid[i] /= cur_vec_num;
+        }
     }
 };
 
@@ -240,23 +276,26 @@ public:
     using AlignType = typename Base::AlignType;
 
 private:
-    RabitqVecStoreMeta(SizeT dim, DataType *rom) {
+    RabitqVecStoreMeta(size_t dim, DataType *rom, DataType *centroid) {
         this->dim_ = dim;
-        SizeT align_dim = AlignUp(dim, Base::align_size_);
+        size_t align_dim = AlignUp(dim, Base::align_size_);
         this->align_dim_ = align_dim;
         this->compress_data_size_ = sizeof(StoreData) + align_dim / 8;
         this->rom_ = rom;
+        this->centroid_ = centroid;
     }
 
 public:
     RabitqVecStoreMeta() = delete;
 
     static This LoadFromPtr(const char *&ptr) {
-        SizeT dim = ReadBufAdv<SizeT>(ptr);
-        SizeT align_dim = AlignUp(dim, Base::align_size_);
+        size_t dim = ReadBufAdv<size_t>(ptr);
+        size_t align_dim = AlignUp(dim, Base::align_size_);
         auto *rom = reinterpret_cast<DataType *>(const_cast<char *>(ptr));
         ptr += align_dim * align_dim * sizeof(DataType);
-        return This(dim, rom);
+        auto *centroid = reinterpret_cast<DataType *>(const_cast<char *>(ptr));
+        ptr += align_dim * sizeof(DataType);
+        return This(dim, rom, centroid);
     }
 };
 
@@ -272,25 +311,25 @@ public:
 public:
     RabitqVecStoreInnerBase() = default;
 
-    SizeT GetSizeInBytes(SizeT cur_vec_num, const Meta &meta) const { return cur_vec_num * meta.compress_data_size(); }
+    size_t GetSizeInBytes(size_t cur_vec_num, const Meta &meta) const { return cur_vec_num * meta.compress_data_size(); }
 
-    void Save(LocalFileHandle &file_handle, SizeT cur_vec_num, const Meta &meta) const {
+    void Save(LocalFileHandle &file_handle, size_t cur_vec_num, const Meta &meta) const {
         file_handle.Append(ptr_.get(), cur_vec_num * meta.compress_data_size());
     }
 
     static void SaveToPtr(LocalFileHandle &file_handle,
-                          const Vector<const This *> &inners,
+                          const std::vector<const This *> &inners,
                           const Meta &meta,
-                          SizeT ck_size,
-                          SizeT chunk_num,
-                          SizeT last_chunk_size) {
-        for (SizeT i = 0; i < chunk_num; ++i) {
-            SizeT chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
+                          size_t ck_size,
+                          size_t chunk_num,
+                          size_t last_chunk_size) {
+        for (size_t i = 0; i < chunk_num; ++i) {
+            size_t chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
             file_handle.Append(inners[i]->ptr_.get(), chunk_size * meta.compress_data_size());
         }
     }
 
-    StoreType GetVec(SizeT idx, const Meta &meta) const { return reinterpret_cast<StoreType>(ptr_.get() + idx * meta.compress_data_size()); }
+    StoreType GetVec(size_t idx, const Meta &meta) const { return reinterpret_cast<StoreType>(ptr_.get() + idx * meta.compress_data_size()); }
 
     void Prefetch(VertexType vec_i, const Meta &meta) const { _mm_prefetch(reinterpret_cast<const char *>(GetVec(vec_i, meta)), _MM_HINT_T0); }
 
@@ -306,18 +345,18 @@ public:
     using StoreData = typename Meta::StoreData;
 
 private:
-    RabitqVecStoreInner(SizeT max_vec_num, const Meta &meta) { this->ptr_ = MakeUnique<char[]>(max_vec_num * meta.compress_data_size()); }
+    RabitqVecStoreInner(size_t max_vec_num, const Meta &meta) { this->ptr_ = std::make_unique<char[]>(max_vec_num * meta.compress_data_size()); }
 
 public:
     RabitqVecStoreInner() = delete;
 
-    static This Make(SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
+    static This Make(size_t max_vec_num, const Meta &meta, size_t &mem_usage) {
         auto ret = This(max_vec_num, meta);
         mem_usage += max_vec_num * meta.compress_data_size();
         return ret;
     }
 
-    static This Load(LocalFileHandle &file_handle, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
+    static This Load(LocalFileHandle &file_handle, size_t cur_vec_num, size_t max_vec_num, const Meta &meta, size_t &mem_usage) {
         assert(cur_vec_num <= max_vec_num);
         This ret(max_vec_num, meta);
         file_handle.Read(ret.ptr_.get(), cur_vec_num * meta.compress_data_size());
@@ -325,7 +364,7 @@ public:
         return ret;
     }
 
-    static This LoadFromPtr(const char *&ptr, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
+    static This LoadFromPtr(const char *&ptr, size_t cur_vec_num, size_t max_vec_num, const Meta &meta, size_t &mem_usage) {
         This ret(max_vec_num, meta);
         std::memcpy(ret.ptr_.get(), ptr, cur_vec_num * meta.compress_data_size());
         ptr += cur_vec_num * meta.compress_data_size();
@@ -333,10 +372,10 @@ public:
         return ret;
     }
 
-    void SetVec(SizeT idx, const DataType *vec, const Meta &meta, SizeT &mem_usage) { meta.CompressToCode(vec, GetVecMut(idx, meta)); }
+    void SetVec(size_t idx, const DataType *vec, const Meta &meta, size_t &mem_usage) { meta.CompressToCode(vec, GetVecMut(idx, meta)); }
 
 private:
-    StoreData *GetVecMut(SizeT idx, const Meta &meta) { return reinterpret_cast<StoreData *>(this->ptr_.get() + idx * meta.compress_data_size()); }
+    StoreData *GetVecMut(size_t idx, const Meta &meta) { return reinterpret_cast<StoreData *>(this->ptr_.get() + idx * meta.compress_data_size()); }
 };
 
 export template <typename DataType>
@@ -351,7 +390,7 @@ private:
 public:
     RabitqVecStoreInner() = delete;
 
-    static This LoadFromPtr(const char *&ptr, SizeT cur_vec_num, const Meta &meta) {
+    static This LoadFromPtr(const char *&ptr, size_t cur_vec_num, const Meta &meta) {
         const char *p = ptr;
         This ret(p);
         ptr += cur_vec_num * meta.compress_data_size();

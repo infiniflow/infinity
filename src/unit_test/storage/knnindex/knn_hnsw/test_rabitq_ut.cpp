@@ -12,24 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-#include <random>
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
-#include <random>
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.test_rabitq;
 
-import :stl;
 import :ut.base_test;
 import :rabitq_vec_store;
-
-#endif
 
 using namespace infinity;
 
@@ -75,25 +65,34 @@ public:
     using DataType = f32;
     using LabelType = i64;
 
-    static constexpr size_t dim_ = 100;
-    static constexpr size_t vec_n_ = 32;
+    static constexpr size_t dim_ = 128;
+    static constexpr size_t vec_n_ = 8192;
     const std::string file_dir_ = GetFullTmpDir();
 };
 
 TEST_F(RabitqTest, test_base) {
     using namespace infinity;
 
-    String filepath = file_dir_ + "/test_rabitq.bin";
+    size_t write_mem = 0;
+    std::unique_ptr<DataType[]> write_rom;
+    auto truth_centroid = std::make_unique<DataType[]>(dim_);
+
+    std::string filepath = file_dir_ + "/test_rabitq.bin";
     auto data = std::make_unique<float[]>(dim_ * vec_n_);
     std::default_random_engine rng;
     std::uniform_real_distribution<float> distrib_real(100, 200);
     for (size_t i = 0; i < dim_ * vec_n_; ++i) {
         data[i] = distrib_real(rng);
     }
-    LOG_INFO(fmt::format("vec: {:.2f}, {:.2f}, {:.2f}, ...", data[0], data[1], data[2]));
+    auto iter = DenseVectorIter<DataType, LabelType>(data.get(), dim_, vec_n_);
+    for (size_t j = 0; j < dim_; ++j) {
+        for (size_t i = 0; i < vec_n_; ++i) {
+            truth_centroid[j] += data[i * dim_ + j];
+        }
+        truth_centroid[j] /= vec_n_;
+    }
 
-    // test rom
-    SizeT write_mem = 0;
+    // test function
     {
         using RabitqVecStoreMeta = RabitqVecStoreMeta<DataType, true>;
         using RabitqVecStoreInner = RabitqVecStoreInner<DataType, true>;
@@ -102,11 +101,20 @@ TEST_F(RabitqTest, test_base) {
             RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
             bool is_rom = CheckOrthogonalMatrix(meta.rom(), meta.align_dim());
             ASSERT_EQ(is_rom, true);
-            LOG_INFO(fmt::format("check rom: i {}", i));
         }
 
         RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
+        auto iter_copy = iter;
+        meta.Optimize(iter_copy, 0);
         meta.Dump(std::cout);
+        const DataType *rom = meta.rom();
+        const DataType *centroid = meta.centroid();
+        write_rom = std::make_unique<DataType[]>(dim_ * dim_);
+        std::copy(rom, rom + dim_ * dim_, write_rom.get());
+        for (int d = 0; d < dim_; ++d) {
+            ASSERT_EQ(centroid[d], truth_centroid[d]);
+        }
+
         RabitqVecStoreInner inner = RabitqVecStoreInner::Make(vec_n_, meta, write_mem);
         LOG_INFO(fmt::format("inner: mem_usage {}", write_mem));
 
@@ -129,8 +137,18 @@ TEST_F(RabitqTest, test_base) {
         }
 
         RabitqVecStoreMeta meta = RabitqVecStoreMeta::Load(*file_handle);
-        meta.Dump(std::cout);
-        SizeT mem_usage = 0;
+        const DataType *rom = meta.rom();
+        const DataType *centroid = meta.centroid();
+        for (int i = 0; i < dim_; ++i) {
+            for (int j = 0; j < dim_; ++j) {
+                ASSERT_EQ(rom[i * dim_ + j], write_rom[i * dim_ + j]);
+            }
+        }
+        for (int d = 0; d < dim_; ++d) {
+            ASSERT_EQ(centroid[d], truth_centroid[d]);
+        }
+
+        size_t mem_usage = 0;
         RabitqVecStoreInner inner = RabitqVecStoreInner::Load(*file_handle, 0, vec_n_, meta, mem_usage);
         ASSERT_EQ(mem_usage, write_mem);
     }
@@ -141,7 +159,7 @@ TEST_F(RabitqTest, test_base) {
         using RabitqVecStoreInner = RabitqVecStoreInner<DataType, false>;
 
         unsigned char *data_ptr = nullptr;
-        SizeT file_size = VirtualStore::GetFileSize(filepath);
+        size_t file_size = VirtualStore::GetFileSize(filepath);
         int ret = VirtualStore::MmapFile(filepath, data_ptr, file_size);
         if (ret < 0) {
             UnrecoverableError("mmap failed");
@@ -149,8 +167,42 @@ TEST_F(RabitqTest, test_base) {
         const char *ptr = reinterpret_cast<const char *>(data_ptr);
 
         RabitqVecStoreMeta meta = RabitqVecStoreMeta::LoadFromPtr(ptr);
-        meta.Dump(std::cout);
+        const DataType *rom = meta.rom();
+        const DataType *centroid = meta.centroid();
+        for (int i = 0; i < dim_; ++i) {
+            for (int j = 0; j < dim_; ++j) {
+                ASSERT_EQ(rom[i * dim_ + j], write_rom[i * dim_ + j]);
+            }
+        }
+        for (int d = 0; d < dim_; ++d) {
+            ASSERT_EQ(centroid[d], truth_centroid[d]);
+        }
+
         RabitqVecStoreInner inner = RabitqVecStoreInner::LoadFromPtr(ptr, 0, meta);
         ASSERT_EQ(inner.GetSizeInBytes(vec_n_, meta), write_mem);
+    }
+
+    // test multiple iter
+    {
+        using RabitqVecStoreMeta = RabitqVecStoreMeta<DataType, true>;
+        using RabitqVecStoreInner = RabitqVecStoreInner<DataType, true>;
+
+        auto iter_copy = iter;
+        auto iters = std::move(iter_copy).split();
+
+        size_t inner_size = 0;
+        RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
+        for (auto split_iter : iters) {
+            size_t row_count = split_iter.GetRowCount();
+            meta.Optimize(split_iter, 0);
+            RabitqVecStoreInner inner = RabitqVecStoreInner::Make(row_count, meta, inner_size);
+            LOG_INFO(fmt::format("split_iter: mem_usage {}", inner_size));
+        }
+        ASSERT_EQ(inner_size, write_mem);
+
+        const DataType *centroid = meta.centroid();
+        for (int d = 0; d < dim_; ++d) {
+            ASSERT_LT(std::fabs(centroid[d] - truth_centroid[d]), truth_centroid[d] * 0.05);
+        }
     }
 }
