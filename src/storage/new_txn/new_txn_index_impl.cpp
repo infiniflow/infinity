@@ -75,6 +75,7 @@ import statement_common;
 import column_def;
 import internal_types;
 import create_index_info;
+import embedding_info;
 
 namespace infinity {
 
@@ -849,7 +850,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 if (!status.ok()) {
                     return status;
                 }
-                memory_hnsw_index = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def.get(), true /*trace*/);
+                memory_hnsw_index = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def, true /*trace*/);
                 mem_index->SetHnswIndex(memory_hnsw_index);
             } else {
                 memory_hnsw_index = mem_index->GetHnswIndex();
@@ -1202,7 +1203,109 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
 
 Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
 
+Status NewTxn::InitSegmentIndex(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta) {
+    Status status;
+    std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+    std::shared_ptr<IndexBase> index_base;
+    std::tie(index_base, status) = segment_index_meta.table_index_meta().GetIndexBase();
+    if (!status.ok()) {
+        return status;
+    }
+
+    if (index_base->index_type_ == IndexType::kHnsw) {
+        const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base.get());
+        if (index_hnsw->build_type_ == HnswBuildType::kLSG) {
+            size_t segment_row_cnt = 0;
+            std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+            if (!status.ok()) {
+                return status;
+            }
+            std::shared_ptr<ColumnDef> column_def;
+            std::tie(column_def, status) = segment_index_meta.table_index_meta().GetColumnDef();
+            if (!status.ok()) {
+                return status;
+            }
+            ColumnID column_id = column_def->id();
+            std::vector<BlockID> *block_ids_ptr = nullptr;
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+            size_t block_capacity = DEFAULT_BLOCK_CAPACITY;
+
+            // Get random vector for sampling
+            {
+                float sample_radio = index_hnsw->lsg_config_->sample_ratio_;
+                size_t max_sample_num = segment_row_cnt * sample_radio;
+                if (max_sample_num <= 0) {
+                    return Status::OK();
+                }
+                for (BlockID block_id : *block_ids_ptr) {
+                    if (max_sample_num <= 0) {
+                        break;
+                    }
+                    size_t row_cnt =
+                        block_id == block_ids_ptr->back() ? segment_row_cnt - block_capacity * (block_ids_ptr->size() - 1) : block_capacity;
+                    BlockMeta block_meta(block_id, segment_meta);
+                    ColumnMeta column_meta(column_id, block_meta);
+                    ColumnVector col;
+                    status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, col);
+                    if (!status.ok()) {
+                        return status;
+                    }
+                    BlockOffset offset = 0;
+                    SegmentOffset block_offset = block_id * DEFAULT_BLOCK_CAPACITY;
+                    RowID base_row_id = RowID(segment_index_meta.segment_id(), block_offset + offset);
+
+                    // Make memory index
+                    std::shared_ptr<HnswIndexInMem> memory_hnsw_index;
+                    if (mem_index->IsNull()) {
+                        memory_hnsw_index = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def, true /*trace*/);
+                        mem_index->SetHnswIndex(memory_hnsw_index);
+                    } else {
+                        memory_hnsw_index = mem_index->GetHnswIndex();
+                    }
+
+                    // Sampling
+                    size_t block_sample_num = memory_hnsw_index->InsertSampleVecs(max_sample_num, block_offset, offset, col, row_cnt);
+                    max_sample_num -= block_sample_num;
+                }
+            }
+
+            // Get memory index
+            std::shared_ptr<HnswIndexInMem> memory_hnsw_index;
+            if (mem_index->IsNull()) {
+                UnrecoverableError("memory index is null, not init in InsertSampleVecs");
+            } else {
+                memory_hnsw_index = mem_index->GetHnswIndex();
+            }
+
+            // Compute neighborhood radius by HnswLSGBuilder
+            {
+                for (BlockID block_id : *block_ids_ptr) {
+                    size_t row_cnt =
+                        block_id == block_ids_ptr->back() ? segment_row_cnt - block_capacity * (block_ids_ptr->size() - 1) : block_capacity;
+                    BlockMeta block_meta(block_id, segment_meta);
+                    ColumnMeta column_meta(column_id, block_meta);
+                    ColumnVector col;
+                    status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, col);
+                    if (!status.ok()) {
+                        return status;
+                    }
+                    BlockOffset offset = 0;
+                    SegmentOffset block_offset = block_id * DEFAULT_BLOCK_CAPACITY;
+
+                    // Sampling
+                    memory_hnsw_index->InsertLSAvg(block_offset, offset, col, row_cnt);
+                }
+            }
+
+            memory_hnsw_index->SetLSGParam();
+        }
+    }
+    return Status::OK();
+}
+
 Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id, size_t segment_row_cnt) {
+    InitSegmentIndex(segment_index_meta, segment_meta);
+
     auto [block_ids, status] = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
         return status;
@@ -1485,7 +1588,7 @@ Status NewTxn::OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
             UnrecoverableError("Not implemented yet");
         }
 
-        std::unique_ptr<HnswIndexInMem> memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_base.get(), column_def.get());
+        std::unique_ptr<HnswIndexInMem> memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_base.get(), column_def);
         for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
             size_t block_row_cnt = 0;

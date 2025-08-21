@@ -33,6 +33,7 @@ import internal_types;
 import statement_common;
 
 namespace infinity {
+
 class KVInstance;
 class NewCatalog;
 class NewTxnManager;
@@ -515,6 +516,8 @@ private:
                          WalCmdCreateIndexV2 *create_index_cmd_ptr = nullptr);
 
     Status ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd);
+
+    Status InitSegmentIndex(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta);
 
     Status PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id, size_t segment_row_cnt);
 

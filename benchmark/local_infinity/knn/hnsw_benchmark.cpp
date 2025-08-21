@@ -165,27 +165,6 @@ using HnswLSG = KnnHnsw<PlainL2VecStoreType<float, true>, LabelT>;
 using HnswLVQ = KnnHnsw<LVQL2VecStoreType<float, i8>, LabelT>;
 using HnswLVQLSG = KnnHnsw<LVQL2VecStoreType<float, i8, true>, LabelT>;
 
-// std::shared_ptr<std::string> index_name = std::make_shared<std::string>("index_name");
-// std::string filename = "filename";
-// std::vector<std::string> column_names = {"col_name"};
-
-// std::unique_ptr<IndexHnsw> MakeLSGIndexHnsw(const BenchmarkOption &option) {
-//     MetricType metric_type = MetricType::kMetricL2;
-//     HnswEncodeType encode_type = HnswEncodeType::kPlain;
-//     HnswBuildType build_type = HnswBuildType::kLSG;
-//     size_t M = option.M_;
-//     size_t ef_construction = option.ef_construction_;
-//     size_t block_size = option.chunk_size_;
-//     return std::make_unique<IndexHnsw>(index_name, nullptr, filename, column_names, metric_type, encode_type, build_type, M, ef_construction,
-//     block_size);
-// }
-
-// std::unique_ptr<ColumnDef> MakeColumnDef(size_t dim) {
-//     auto embeddingInfo = std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, dim);
-//     auto data_type = std::make_shared<DataType>(LogicalType::kEmbedding, embeddingInfo);
-//     return std::make_unique<ColumnDef>(0, data_type, column_names[0], std::set<ConstraintType>());
-// }
-
 std::unique_ptr<float[]> GetAvgBF(size_t vec_num, size_t dim, const float *data, size_t ls_k, size_t sample_num) {
     auto avg = std::make_unique<float[]>(vec_num);
     std::vector<size_t> sample_idx(sample_num);
@@ -195,6 +174,9 @@ std::unique_ptr<float[]> GetAvgBF(size_t vec_num, size_t dim, const float *data,
     auto task = [&](size_t start_i, size_t end_i) {
         std::vector<float> distances(sample_num);
         for (size_t i = start_i; i < end_i; ++i) {
+            if (i % 1000 == 0) {
+                std::cout << fmt::format("Sample {} / {}", i, vec_num) << std::endl;
+            }
             const float *v = data + i * dim;
             for (size_t j = 0; j < sample_num; ++j) {
                 const float *v2 = data + sample_idx[j] * dim;
@@ -239,21 +221,14 @@ void Build(const BenchmarkOption &option) {
     profiler.Begin();
     auto hnsw = HnswT::Make(option.chunk_size_, option.max_chunk_num_, dim, option.M_, option.ef_construction_);
 
+    std::unique_ptr<float[]> avg;
     if constexpr (std::is_same_v<HnswT, HnswLSG> || std::is_same_v<HnswT, HnswLVQLSG>) {
-        // auto column_def = MakeColumnDef(dim);
-        // auto index_hnsw = MakeLSGIndexHnsw(option);
-        // LSGConfig lsg_config;
-        // lsg_config.ls_k_ = 10;
-        // HnswLSGBuilder lsg_builder(index_hnsw.get(), std::move(column_def), lsg_config);
-        // DenseVectorIter<float, LabelT> iter(data.get(), dim, vec_num);
-        // std::unique_ptr<float[]> avg = lsg_builder.GetLSAvg<decltype(iter), float, float>(std::move(iter), vec_num, RowID(0, 0));
-
-        size_t sample_num = 10000;
+        size_t sample_num = vec_num * 0.01;
         size_t ls_k = 10;
-        auto avg = GetAvgBF(vec_num, dim, data.get(), ls_k, sample_num);
+        avg = GetAvgBF(vec_num, dim, data.get(), ls_k, sample_num);
 
         float alpha = 1.0;
-        hnsw->distance().SetLSGParam(alpha, std::move(avg));
+        hnsw->distance().SetLSGParam(alpha, avg.get());
     }
 
     DenseVectorIter<float, LabelT> iter(data.get(), dim, vec_num);

@@ -24,12 +24,15 @@ import :dist_func_lsg_wrapper;
 import :plain_vec_store;
 import :default_values;
 import :utility;
+import :hnsw_lsg_builder;
+import :index_hnsw;
 
 import std;
 import third_party;
 
 import logical_type;
 import serialize;
+import column_def;
 
 // Fixme: some variable has implicit type conversion.
 // Fixme: some variable has confusing name.
@@ -326,6 +329,46 @@ protected:
     }
 
 public:
+    void InitLSGBuilder(const IndexHnsw *index_hnsw, std::shared_ptr<ColumnDef> column_def) {
+        if (!LSG) {
+            UnrecoverableError("InsertSampleVecs when LSG not use!");
+        }
+        lsg_builder_ = HnswLSGBuilder<DataType, DistanceType>(index_hnsw, column_def);
+    }
+
+    template <typename Iter>
+    size_t InsertSampleVecs(Iter iter, size_t sample_num = std::numeric_limits<size_t>::max()) {
+        if (!LSG) {
+            UnrecoverableError("InsertSampleVecs when LSG not use!");
+        }
+        if (!lsg_builder_.has_value()) {
+            UnrecoverableError("lsg_builder_ not exist, maybe not Init!");
+        }
+        return lsg_builder_->InsertSampleVec(std::move(iter), sample_num);
+    }
+
+    template <typename Iter>
+    void InsertLSAvg(Iter iter, size_t row_count) {
+        if (!LSG) {
+            UnrecoverableError("InsertLSAvg when LSG not use!");
+        }
+        if (!lsg_builder_.has_value()) {
+            UnrecoverableError("lsg_builder_ not exist, maybe not Init!");
+        }
+        lsg_builder_->InsertLSAvg(std::move(iter), row_count);
+    }
+
+    void SetLSGParam() {
+        if (!LSG) {
+            UnrecoverableError("InsertSampleVecs when LSG not use!");
+        }
+        if (!lsg_builder_.has_value()) {
+            UnrecoverableError("lsg_builder_ not exist, maybe not Init!");
+        }
+        distance_.SetLSGParam(lsg_builder_->alpha(), lsg_builder_->avg());
+    }
+
+public:
     template <DataIteratorConcept<QueryVecType, LabelType> Iterator>
     std::pair<size_t, size_t> InsertVecs(Iterator &&iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
         auto [start_i, end_i] = StoreData(std::move(iter), config);
@@ -435,6 +478,8 @@ protected:
     Distance distance_;
 
     size_t prefetch_step_;
+
+    std::optional<HnswLSGBuilder<DataType, DistanceType>> lsg_builder_{};
 
     // //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
 public:

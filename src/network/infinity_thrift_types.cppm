@@ -14,6 +14,25 @@
 
 module;
 
+import std.compat;
+
+#define _SHARED_PTR_H 1
+#define _SHARED_PTR_ATOMIC_H 1
+#define _BACKWARD_AUTO_PTR_H 1
+#define _GLIBCXX_OUT_PTR_H 1
+#define _GLIBCXX_STRING 1
+#define _GLIBCXX_MAP 1
+#define _GLIBCXX_LIST 1
+#define _GLIBCXX_SET 1
+#define _GLIBCXX_VECTOR 1
+#define _GLIBCXX_FUNCTIONAL 1
+#define _GLIBCXX_CMATH 1
+#define _GLIBCXX_UTILITY 1
+#define _GLIBCXX_MEMORY 1
+#define _GLIBCXX_ALGORITHM 1
+#define _GLIBCXX_SSTREAM 1
+#define _GLIBCXX_CHRONO 1
+
 #include "infinity_thrift/InfinityService.h"
 
 export module infinity_core:infinity_thrift_types;

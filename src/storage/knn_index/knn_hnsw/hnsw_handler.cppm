@@ -94,11 +94,11 @@ public:
     HnswHandler(const HnswHandler &) = delete;
     HnswHandler &operator=(const HnswHandler &) = delete;
 
-    static AbstractHnsw InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem = true);
+    static AbstractHnsw InitAbstractIndex(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem = true);
 
-    HnswHandler(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem = true);
+    HnswHandler(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem = true);
 
-    static std::unique_ptr<HnswHandler> Make(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem = true);
+    static std::unique_ptr<HnswHandler> Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem = true);
 
     template <typename DistanceT, typename LabelT, typename Filter = std::nullopt_t, bool WithLock = true>
     std::tuple<size_t, std::unique_ptr<DistanceT[]>, std::unique_ptr<LabelT[]>>
@@ -242,6 +242,39 @@ public:
         return res;
     }
 
+public:
+    // LSG setting
+    template <typename Iter>
+    size_t InsertSampleVecs(Iter iter, size_t sample_num = std::numeric_limits<size_t>::max()) {
+        size_t insert_num = 0;
+        std::visit(
+            [&](auto &&index) {
+                using T = std::decay_t<decltype(index)>;
+                if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                    insert_num = index->InsertSampleVecs(std::move(iter), sample_num);
+                }
+            },
+            hnsw_);
+        return insert_num;
+    }
+    size_t InsertSampleVecs(size_t sample_num, SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count);
+
+    template <typename Iter>
+    void InsertLSAvg(Iter iter, size_t row_count) {
+        std::visit(
+            [&](auto &&index) {
+                using T = std::decay_t<decltype(index)>;
+                if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                    index->InsertLSAvg(std::move(iter), row_count);
+                }
+            },
+            hnsw_);
+    }
+    void InsertLSAvg(SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count);
+
+    void SetLSGParam();
+
+public:
     // get infomation from hnsw_ (hnsw_ create in compile)
     size_t MemUsage() const;
     size_t GetRowCount() const;
@@ -249,8 +282,8 @@ public:
     std::pair<size_t, size_t> GetInfo() const;
     void Check() const;
 
+public:
     // hnsw_ data operator
-    void SetLSGParam(float alpha, std::unique_ptr<float[]> avg);
     void SaveToPtr(LocalFileHandle &file_handle) const;
     void Load(LocalFileHandle &file_handle);
     void LoadFromPtr(LocalFileHandle &file_handle, size_t file_size);
@@ -268,16 +301,19 @@ export using HnswHandlerPtr = HnswHandler *;
 export struct HnswIndexInMem : public BaseMemIndex {
 public:
     HnswIndexInMem() : hnsw_handler_(nullptr) {}
-    HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, bool trace)
+    HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool trace)
         : begin_row_id_(begin_row_id), hnsw_handler_(HnswHandler::Make(index_base, column_def).release()), trace_(trace), own_memory_(true) {}
     HnswIndexInMem(const HnswIndexInMem &) = delete;
     HnswIndexInMem &operator=(const HnswIndexInMem &) = delete;
     virtual ~HnswIndexInMem();
 
-    static std::unique_ptr<HnswIndexInMem> Make(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, bool trace = false);
+public:
+    static std::unique_ptr<HnswIndexInMem>
+    Make(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool trace = false);
 
-    static std::unique_ptr<HnswIndexInMem> Make(const IndexBase *index_base, const ColumnDef *column_def, bool trace = false);
+    static std::unique_ptr<HnswIndexInMem> Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool trace = false);
 
+public:
     void InsertVecs(SegmentOffset block_offset,
                     const ColumnVector &col,
                     BlockOffset offset,
@@ -295,10 +331,26 @@ public:
 
     void Dump(BufferObj *buffer_obj, size_t *dump_size_ptr = nullptr);
 
+public:
+    // LSG setting
+    template <typename Iter>
+    size_t InsertSampleVecs(Iter iter, size_t sample_num = std::numeric_limits<size_t>::max()) {
+        return hnsw_handler_->InsertSampleVecs(std::move(iter), sample_num);
+    }
+    size_t InsertSampleVecs(size_t sample_num, SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count);
+    template <typename Iter>
+
+    void InsertLSAvg(Iter iter, size_t row_count) {
+        hnsw_handler_->InsertLSAvg(std::move(iter), row_count);
+    }
+    void InsertLSAvg(SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count);
+
+    void SetLSGParam();
+
+public:
     RowID GetBeginRowID() const override { return begin_row_id_; }
     const HnswHandlerPtr &get() const { return hnsw_handler_; }
     HnswHandlerPtr *get_ptr() { return &hnsw_handler_; }
-    void SetLSGParam(float alpha, std::unique_ptr<float[]> avg);
     size_t GetRowCount() const;
     size_t GetSizeInBytes() const;
 

@@ -49,6 +49,7 @@ public:
 
     [[nodiscard]] inline ctpl::thread_pool &GetFulltextInvertingThreadPool() { return inverting_thread_pool_; }
     [[nodiscard]] inline ctpl::thread_pool &GetFulltextCommitingThreadPool() { return commiting_thread_pool_; }
+    [[nodiscard]] inline ctpl::thread_pool &GetLsgBuildThreadPool() { return lsg_build_thread_pool_; }
     [[nodiscard]] inline ctpl::thread_pool &GetHnswBuildThreadPool() { return hnsw_build_thread_pool_; }
 
     NodeRole GetServerRole() const;
@@ -99,6 +100,7 @@ private:
     ctpl::thread_pool commiting_thread_pool_{2};
 
     // For hnsw index
+    ctpl::thread_pool lsg_build_thread_pool_{8};
     ctpl::thread_pool hnsw_build_thread_pool_{2};
 
     std::function<void()> start_servers_func_{};
