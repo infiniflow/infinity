@@ -331,12 +331,22 @@ void InfinityThriftService::Insert(infinity_thrift_rpc::CommonResponse &response
         insert_row->columns_ = std::move(field.column_names);
         insert_row->values_.reserve(field.parse_exprs.size());
         for (auto &expr : field.parse_exprs) {
-            auto parsed_expr = std::unique_ptr<ConstantExpr>(GetConstantFromProto(constant_status, *expr.type.constant_expr));
+            ParsedExpr *parsed_expr = nullptr;
+
+            // Handle different expression types
+            if (expr.type.__isset.constant_expr) {
+                parsed_expr = GetConstantFromProto(constant_status, *expr.type.constant_expr);
+            } else if (expr.type.__isset.function_expr) {
+                parsed_expr = GetFunctionExprFromProto(constant_status, *expr.type.function_expr);
+            } else {
+                constant_status = Status::InvalidParsedExprType();
+            }
+
             if (!constant_status.ok()) {
                 ProcessStatus(response, constant_status);
                 return;
             }
-            insert_row->values_.emplace_back(parsed_expr.release());
+            insert_row->values_.emplace_back(parsed_expr);
         }
         insert_rows->emplace_back(insert_row.release());
     }
@@ -2284,16 +2294,31 @@ KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infini
         return nullptr;
     }
 
-    auto [embedding_data_ptr, dimension, status2] = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
-    knn_expr->embedding_data_ptr_ = embedding_data_ptr;
-    if (knn_expr->embedding_data_type_ == EmbeddingDataType::kElemBit) {
-        knn_expr->dimension_ = dimension * 8;
-    } else {
-        knn_expr->dimension_ = dimension;
-    }
-    if (!status2.ok()) {
-        status = status2;
+    // Validate that either embedding_data or query_embedding_expr is provided, but not both
+    bool has_embedding_data = expr.__isset.embedding_data;
+    bool has_query_embedding_expr = expr.__isset.query_embedding_expr;
+
+    if (has_embedding_data && has_query_embedding_expr) {
+        status = Status::InvalidParameterValue("KnnExpr", "both embedding_data and query_embedding_expr", "only one should be provided");
         return nullptr;
+    }
+    if (!has_embedding_data && !has_query_embedding_expr) {
+        status = Status::InvalidParameterValue("KnnExpr", "neither embedding_data nor query_embedding_expr", "one must be provided");
+        return nullptr;
+    }
+
+    if (has_embedding_data) {
+        auto [embedding_data_ptr, dimension, status2] = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
+        knn_expr->embedding_data_ptr_ = embedding_data_ptr;
+        if (knn_expr->embedding_data_type_ == EmbeddingDataType::kElemBit) {
+            knn_expr->dimension_ = dimension * 8;
+        } else {
+            knn_expr->dimension_ = dimension;
+        }
+        if (!status2.ok()) {
+            status = status2;
+            return nullptr;
+        }
     }
 
     knn_expr->topn_ = expr.topn;
@@ -2324,6 +2349,20 @@ KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infini
             return nullptr;
         }
     }
+
+    // Handle FDE function expression for query embedding
+    if (expr.__isset.query_embedding_expr) {
+        knn_expr->query_embedding_expr_.reset(GetFunctionExprFromProto(status, expr.query_embedding_expr));
+        if (!status.ok()) {
+            return nullptr;
+        }
+        knn_expr->embedding_data_type_str_ = EmbeddingT::EmbeddingDataType2String(knn_expr->embedding_data_type_);
+        // Dimension will be determined at runtime by the FDE function
+        knn_expr->dimension_ = -1; // Placeholder for runtime determination
+        // Clear the direct embedding data since we're using function expression
+        knn_expr->embedding_data_ptr_ = nullptr;
+    }
+
     status = Status::OK();
     return knn_expr.release();
 }

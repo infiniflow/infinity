@@ -244,6 +244,9 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
         evaluator.Init(nullptr);
         // Each cell's expression of a column may differ. So we have to evaluate each cell instead of column here.
         for (size_t row_idx = 0; row_idx < row_count; ++row_idx) {
+            // Reset the temporary block for each row
+            output_block_tmp->Reset();
+
             for (size_t expr_idx = 0; expr_idx < column_count; ++expr_idx) {
                 const std::shared_ptr<BaseExpression> &expr = value_list_[row_idx][expr_idx];
                 std::shared_ptr<ExpressionState> expr_state = ExpressionState::CreateState(expr);

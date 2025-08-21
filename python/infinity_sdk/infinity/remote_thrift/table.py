@@ -31,6 +31,7 @@ from infinity.remote_thrift.utils import (
     select_res_to_polars,
     check_valid_name,
     get_remote_constant_expr_from_python_value,
+    get_remote_function_expr_from_fde,
     get_ordinary_info,
     parsed_expression_to_string,
     search_to_string
@@ -191,9 +192,20 @@ class RemoteTable():
             parse_exprs = []
             for column_name, value in row.items():
                 column_names.append(column_name)
-                constant_expression = get_remote_constant_expr_from_python_value(value)
-                expr_type = ttypes.ParsedExprType(constant_expr=constant_expression)
-                paser_expr = ttypes.ParsedExpr(type=expr_type)
+
+                # Check if value is FDE object
+                from infinity.common import FDE
+                if isinstance(value, FDE):
+                    # Create function expression for FDE
+                    function_expr = get_remote_function_expr_from_fde(value)
+                    expr_type = ttypes.ParsedExprType(function_expr=function_expr)
+                    paser_expr = ttypes.ParsedExpr(type=expr_type)
+                else:
+                    # Create constant expression for regular values
+                    constant_expression = get_remote_constant_expr_from_python_value(value)
+                    expr_type = ttypes.ParsedExprType(constant_expr=constant_expression)
+                    paser_expr = ttypes.ParsedExpr(type=expr_type)
+
                 parse_exprs.append(paser_expr)
 
             field = ttypes.Field(column_names=column_names, parse_exprs=parse_exprs)
