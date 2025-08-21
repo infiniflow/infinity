@@ -82,6 +82,7 @@ public:
     void *real_knn_query_embedding_ptr_ = nullptr;
     EmbeddingDataType real_knn_query_elem_type_ = EmbeddingDataType::kElemInvalid;
     EmbeddingDataType column_elem_type_ = EmbeddingDataType::kElemInvalid;
+    size_t column_embedding_dimension_ = 0; // dimension of a single vector for kEmbedding and kMultiVector
     LogicalType column_logical_type_ = LogicalType::kInvalid;
     i64 real_query_embedding_dimension_ = 0; // Actual dimension of query embedding (for FDE functions)
 
