@@ -67,7 +67,6 @@ import :kv_utility;
 import :dump_index_process;
 import :persistence_manager;
 import :persist_result_handler;
-import embedding_info;
 
 import std;
 import third_party;
@@ -76,6 +75,7 @@ import statement_common;
 import column_def;
 import internal_types;
 import create_index_info;
+import embedding_info;
 
 namespace infinity {
 
