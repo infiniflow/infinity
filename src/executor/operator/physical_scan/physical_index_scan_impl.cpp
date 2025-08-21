@@ -14,22 +14,16 @@
 
 module;
 
-#include <algorithm>
-#include <vector>
-
 module infinity_core:physical_index_scan.impl;
 
 import :physical_index_scan;
-
 import :query_context;
 import :operator_state;
 import :default_values;
 import :buffer_handle;
 import :infinity_exception;
 import :logger;
-import :third_party;
 import :data_block;
-import logical_type;
 import :secondary_index_in_mem;
 import :fast_rough_filter;
 import :roaring_bitmap;
@@ -37,24 +31,28 @@ import :filter_value_type_classification;
 import :physical_scan_base;
 import :result_cache_manager;
 import :block_index;
-
 import :status;
 import :new_catalog;
 import :new_txn;
 import :segment_meta;
+
+import std;
+import third_party;
+
+import logical_type;
 import data_type;
 import row_id;
 
 namespace infinity {
 
 PhysicalIndexScan::PhysicalIndexScan(const u64 id,
-                                     SharedPtr<BaseTableRef> base_table_ref,
-                                     SharedPtr<BaseExpression> index_filter,
-                                     UniquePtr<IndexFilterEvaluator> &&index_filter_evaluator,
-                                     UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
-                                     SharedPtr<Vector<LoadMeta>> load_metas,
-                                     SharedPtr<Vector<String>> output_names,
-                                     SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                                     std::shared_ptr<BaseTableRef> base_table_ref,
+                                     std::shared_ptr<BaseExpression> index_filter,
+                                     std::unique_ptr<IndexFilterEvaluator> &&index_filter_evaluator,
+                                     std::unique_ptr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
+                                     std::shared_ptr<std::vector<LoadMeta>> load_metas,
+                                     std::shared_ptr<std::vector<std::string>> output_names,
+                                     std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
                                      const bool add_row_id,
                                      bool cache_result)
     : PhysicalScanBase(id, PhysicalOperatorType::kIndexScan, nullptr, nullptr, 0, std::move(base_table_ref), std::move(load_metas), cache_result),
@@ -70,20 +68,20 @@ PhysicalIndexScan::PhysicalIndexScan(const u64 id,
     }
 }
 
-Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalIndexScan::PlanBlockEntries(i64) const {
+std::vector<std::shared_ptr<std::vector<GlobalBlockID>>> PhysicalIndexScan::PlanBlockEntries(i64) const {
     UnrecoverableError("PhysicalIndexScan::PlanBlockEntries(): should not be called.");
     return {};
 }
 
-Vector<UniquePtr<Vector<SegmentID>>> PhysicalIndexScan::PlanSegments(u32 parallel_count) const {
+std::vector<std::unique_ptr<std::vector<SegmentID>>> PhysicalIndexScan::PlanSegments(u32 parallel_count) const {
     const u32 total_segment_num = base_table_ref_->block_index_->SegmentCount();
     const u32 segment_num_per_tasklet = total_segment_num / parallel_count;
     const u32 segment_num_remainder = total_segment_num % parallel_count;
     SegmentID next_segment_id = 0;
-    Vector<UniquePtr<Vector<SegmentID>>> result;
+    std::vector<std::unique_ptr<std::vector<SegmentID>>> result;
     result.reserve(parallel_count);
     for (u32 i = 0; i < parallel_count; ++i) {
-        auto segment_ids = MakeUnique<Vector<SegmentID>>();
+        auto segment_ids = std::make_unique<std::vector<SegmentID>>();
         u32 segment_num = segment_num_per_tasklet + (i < segment_num_remainder ? 1 : 0);
         segment_ids->reserve(segment_num);
         for (u32 j = 0; j < segment_num; ++j) {
@@ -92,8 +90,7 @@ Vector<UniquePtr<Vector<SegmentID>>> PhysicalIndexScan::PlanSegments(u32 paralle
         result.emplace_back(std::move(segment_ids));
     }
     if (next_segment_id != total_segment_num) {
-        String error_message = "PhysicalIndexScan::PlanSegments(): segment number error.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("PhysicalIndexScan::PlanSegments(): segment number error.");
     }
     return result;
 }
@@ -101,8 +98,7 @@ Vector<UniquePtr<Vector<SegmentID>>> PhysicalIndexScan::PlanSegments(u32 paralle
 void PhysicalIndexScan::Init(QueryContext *query_context) {
     // check add_row_id_
     if (!add_row_id_) {
-        String error_message = "ExecuteInternal(): add_row_id_ should be true.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("ExecuteInternal(): add_row_id_ should be true.");
     }
 }
 
@@ -113,7 +109,7 @@ bool PhysicalIndexScan::Execute(QueryContext *query_context, OperatorState *oper
     return true;
 }
 
-SizeT PhysicalIndexScan::TaskletCount() { return base_table_ref_->block_index_->SegmentCount(); }
+size_t PhysicalIndexScan::TaskletCount() { return base_table_ref_->block_index_->SegmentCount(); }
 
 void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOperatorState *index_scan_operator_state) const {
     NewTxn *new_txn = query_context->GetNewTxn();
@@ -137,8 +133,8 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
 
     // output result
     auto OutputBitmaskResult = [&](const Bitmask &result, SegmentOffset segment_row_count) {
-        Vector<SharedPtr<DataType>> output_types;
-        output_types.emplace_back(MakeShared<DataType>(LogicalType::kRowID));
+        std::vector<std::shared_ptr<DataType>> output_types;
+        output_types.emplace_back(std::make_shared<DataType>(LogicalType::kRowID));
         constexpr u32 block_capacity = DEFAULT_BLOCK_CAPACITY;
         const u32 selected_row_num = result.CountTrue();
         // 1. prepare first output_data_block
@@ -166,7 +162,7 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
                     output_block_row_id = 0;
                 }
                 RowID row_id(segment_id, segment_offset);
-                output_block_ptr->AppendValueByPtr(0, reinterpret_cast<ptr_t>(&row_id));
+                output_block_ptr->AppendValueByPtr(0, reinterpret_cast<char *>(&row_id));
                 ++output_block_row_id;
                 ++output_rows;
                 return true;
@@ -201,13 +197,12 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     }
 
     // check FastRoughFilter
-    SharedPtr<FastRoughFilter> segment_filter;
+    std::shared_ptr<FastRoughFilter> segment_filter;
     Status status = segment_meta->GetFastRoughFilter(segment_filter);
     if (status.ok()) {
         if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, *segment_filter)) {
             // skip this segment
-            LOG_TRACE(
-                fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, skipped after FastRoughFilter", next_idx, segment_ids.size()));
+            LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, skipped after FastRoughFilter", next_idx, segment_ids.size()));
             Bitmask result_empty(segment_row_count);
             result_empty.SetAllFalse();
             OutputBitmaskResult(result_empty, segment_row_count);

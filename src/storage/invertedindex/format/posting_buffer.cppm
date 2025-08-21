@@ -4,7 +4,6 @@ module;
 
 export module infinity_core:posting_buffer;
 
-import :stl;
 import :posting_field;
 import :file_writer;
 import :file_reader;
@@ -24,7 +23,7 @@ public:
 public:
     void Init(const PostingFields *values) {
         posting_fields_ = values;
-        for (SizeT i = 0; i < values->GetSize(); ++i) {
+        for (size_t i = 0; i < values->GetSize(); ++i) {
             offset_[i] = values->GetValue(i)->offset_;
         }
     }
@@ -38,7 +37,7 @@ public:
 
     u8 Size() const { return size_; }
 
-    inline SizeT GetSizeInBytes() const { return capacity_ * posting_fields_->GetTotalSize(); }
+    inline size_t GetSizeInBytes() const { return capacity_ * posting_fields_->GetTotalSize(); }
 
     u8 GetRowCount() const { return posting_fields_->GetSize(); }
 
@@ -63,9 +62,9 @@ public:
 
     static u8 AllocatePlan(u8 curCapacity);
 
-    void Dump(const SharedPtr<FileWriter> &file);
+    void Dump(const std::shared_ptr<FileWriter> &file);
 
-    void Load(const SharedPtr<FileReader> &file);
+    void Load(const std::shared_ptr<FileReader> &file);
 
 private:
     bool Reallocate();

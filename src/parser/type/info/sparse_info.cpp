@@ -13,9 +13,17 @@
 // limitations under the License.
 
 #include "sparse_info.h"
-#include <arrow/type.h>
-#include "simdjson.h"
-#include <limits>
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
+
+#ifndef PARESER_USE_THIRD_PARTY_MODULE
+#define PARESER_USE_THIRD_PARTY_MODULE 1
+import third_party;
+#endif
 
 namespace infinity {
 
@@ -103,9 +111,9 @@ nlohmann::json SparseInfo::Serialize() const {
 }
 
 std::unique_ptr<SparseInfo> SparseInfo::Deserialize(std::string_view json_str) {
-    simdjson::ondemand::parser parser;
+    simdjson::parser parser;
     simdjson::padded_string json(json_str);
-    simdjson::ondemand::document doc = parser.iterate(json);
+    simdjson::document doc = parser.iterate(json);
     return std::make_unique<SparseInfo>((EmbeddingDataType)(int8_t)doc["data_type"].get<int8_t>(),
                                         (EmbeddingDataType)(int8_t)doc["index_type"].get<int8_t>(),
                                         (size_t)doc["dimension"].get<size_t>(),

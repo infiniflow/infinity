@@ -15,8 +15,9 @@
 module;
 
 #include "simd_common_intrin_include.h"
+
 export module infinity_core:search_top_k_sgemm;
-import :stl;
+
 import :knn_result_handler;
 import :mlas_matrix_multiply;
 import :vector_distance;
@@ -39,16 +40,16 @@ void inner_search_top_k_with_sgemm_avx2(u32 k,
                                         u32 block_size_y = 1024) {
     if (nx == 0 || ny == 0)
         return;
-    UniquePtr<f32[]> distances_holder;
+    std::unique_ptr<f32[]> distances_holder;
     if (distances == nullptr) {
-        distances_holder = MakeUniqueForOverwrite<f32[]>(nx * k);
+        distances_holder = std::make_unique_for_overwrite<f32[]>(nx * k);
         distances = distances_holder.get();
     }
     heap_twin_multiple<CompareMax<f32, ID>> heap(nx, k, distances, labels);
     heap.initialize();
-    auto square_x = MakeUniqueForOverwrite<f32[]>(nx);
-    auto square_y = MakeUniqueForOverwrite<f32[]>(ny);
-    auto x_y_inner_product_buffer = MakeUniqueForOverwrite<f32[]>(block_size_x * block_size_y);
+    auto square_x = std::make_unique_for_overwrite<f32[]>(nx);
+    auto square_y = std::make_unique_for_overwrite<f32[]>(ny);
+    auto x_y_inner_product_buffer = std::make_unique_for_overwrite<f32[]>(block_size_x * block_size_y);
     L2NormsSquares(square_x.get(), x, dimension, nx);
     L2NormsSquares(square_y.get(), y, dimension, ny);
     for (u32 x_part_begin = 0; x_part_begin < nx; x_part_begin += block_size_x) {
@@ -148,16 +149,16 @@ void inner_search_top_k_with_sgemm_sse2(u32 k,
                                         u32 block_size_y = 1024) {
     if (nx == 0 || ny == 0)
         return;
-    UniquePtr<f32[]> distances_holder;
+    std::unique_ptr<f32[]> distances_holder;
     if (distances == nullptr) {
-        distances_holder = MakeUniqueForOverwrite<f32[]>(nx * k);
+        distances_holder = std::make_unique_for_overwrite<f32[]>(nx * k);
         distances = distances_holder.get();
     }
     heap_twin_multiple<CompareMax<f32, ID>> heap(nx, k, distances, labels);
     heap.initialize();
-    auto square_x = MakeUniqueForOverwrite<f32[]>(nx);
-    auto square_y = MakeUniqueForOverwrite<f32[]>(ny);
-    auto x_y_inner_product_buffer = MakeUniqueForOverwrite<f32[]>(block_size_x * block_size_y);
+    auto square_x = std::make_unique_for_overwrite<f32[]>(nx);
+    auto square_y = std::make_unique_for_overwrite<f32[]>(ny);
+    auto x_y_inner_product_buffer = std::make_unique_for_overwrite<f32[]>(block_size_x * block_size_y);
     L2NormsSquares(square_x.get(), x, dimension, nx);
     L2NormsSquares(square_y.get(), y, dimension, ny);
     for (u32 x_part_begin = 0; x_part_begin < nx; x_part_begin += block_size_x) {

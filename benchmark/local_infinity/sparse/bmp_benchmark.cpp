@@ -38,17 +38,17 @@ int main(int argc, char *argv[]) {
     switch (opt.mode_type_) {
         case ModeType::kShuffle: {
             SparseMatrix<f32, i32> data_mat = DecodeSparseDataset(opt.data_path_);
-            Vector<SizeT> idx = ShuffleSparseMatrix(data_mat);
-            Vector<SizeT> inv_idx(data_mat.nrow_);
+            std::vector<size_t> idx = ShuffleSparseMatrix(data_mat);
+            std::vector<size_t> inv_idx(data_mat.nrow_);
             for (i64 i = 0; i < data_mat.nrow_; i++) {
                 inv_idx[idx[i]] = i;
             }
             SaveSparseMatrix(data_mat, opt.data_save_path_);
 
             auto [topk, query_n, indices, scores] = DecodeGroundtruth(opt.groundtruth_path_, false);
-            auto new_indices = MakeUniqueForOverwrite<i32[]>(query_n * topk);
-            for (SizeT i = 0; i < query_n; i++) {
-                for (SizeT j = 0; j < topk; j++) {
+            auto new_indices = std::make_unique_for_overwrite<i32[]>(query_n * topk);
+            for (size_t i = 0; i < query_n; i++) {
+                for (size_t j = 0; j < topk; j++) {
                     new_indices.get()[i * topk + j] = inv_idx[indices.get()[i * topk + j]];
                 }
             }
@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
                 for (SparseMatrixIter<f32, i32> iter(data_mat); iter.HasNext(); iter.Next()) {
                     SparseVecRef vec = iter.val();
                     u32 doc_id = iter.row_id();
-                    Vector<i16> indices(vec.nnz_);
+                    std::vector<i16> indices(vec.nnz_);
                     for (i32 i = 0; i < vec.nnz_; i++) {
                         indices[i] = static_cast<i16>(vec.indices_[i]);
                     }
@@ -118,8 +118,7 @@ int main(int argc, char *argv[]) {
                 profiler.End();
 
                 std::cout << fmt::format("Import data time: {}\n", profiler.ElapsedToString(1000));
-                auto [file_handler, status] =
-                    VirtualStore::Open(opt.index_save_path_.string(), FileAccessMode::kWrite);
+                auto [file_handler, status] = VirtualStore::Open(opt.index_save_path_.string(), FileAccessMode::kWrite);
                 if (!status.ok()) {
                     UnrecoverableError(fmt::format("Failed to open file: {}", opt.index_save_path_.string()));
                 }
@@ -157,7 +156,7 @@ int main(int argc, char *argv[]) {
                 if ((int)top_k != opt.topk_) {
                     std::cout << fmt::format("Topk mismatch: {} vs {}", top_k, opt.topk_) << std::endl;
                 }
-                Vector<Pair<Vector<u32>, Vector<f32>>> query_result;
+                std::vector<Pair<std::vector<u32>, std::vector<f32>>> query_result;
                 {
                     SparseMatrix<f32, i32> query_mat = DecodeSparseDataset(opt.query_path_);
                     if (all_query_n != query_mat.nrow_) {
@@ -175,7 +174,7 @@ int main(int argc, char *argv[]) {
                                           query_mat,
                                           opt.topk_,
                                           query_n,
-                                          [&](const SparseVecRef<f32, i32> &query, u32 topk) -> Pair<Vector<u32>, Vector<f32>> {
+                                          [&](const SparseVecRef<f32, i32> &query, u32 topk) -> Pair<std::vector<u32>, std::vector<f32>> {
                                               Vector<i16> indices(query.nnz_);
                                               for (i32 i = 0; i < query.nnz_; i++) {
                                                   indices[i] = static_cast<i16>(query.indices_[i]);

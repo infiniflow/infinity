@@ -12,21 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <vector>
-
 module infinity_core:bound_update_statement.impl;
 
 import :bound_update_statement;
-
 import :bound_statement;
 import :table_ref;
 import :base_expression;
 import :bind_context;
 import :logical_node;
 import :query_context;
-import :stl;
 import :infinity_exception;
 import :status;
 import :base_table_ref;
@@ -39,22 +33,24 @@ import :logical_table_scan;
 import :logical_filter;
 import :logical_update;
 import :subquery_unnest;
-import :logger;
 import :conjunction_expression;
+
+import std;
+
 import table_reference;
 
 namespace infinity {
 
-SharedPtr<LogicalNode> BoundUpdateStatement::BuildPlan(QueryContext *query_context) {
-    const SharedPtr<BindContext> &bind_context = this->bind_context_;
-    SharedPtr<LogicalNode> current_node;
+std::shared_ptr<LogicalNode> BoundUpdateStatement::BuildPlan(QueryContext *query_context) {
+    const std::shared_ptr<BindContext> &bind_context = this->bind_context_;
+    std::shared_ptr<LogicalNode> current_node;
     if (where_conditions_.empty()) {
         Status status = Status::SyntaxError("where_conditions_ shall not be empty");
         RecoverableError(status);
     }
-    SharedPtr<LogicalNode> table_scan_node = BuildFrom(table_ref_ptr_, query_context, bind_context);
+    std::shared_ptr<LogicalNode> table_scan_node = BuildFrom(table_ref_ptr_, query_context, bind_context);
     if (!where_conditions_.empty()) {
-        SharedPtr<LogicalNode> filter_node = BuildFilter(table_scan_node, where_conditions_, query_context, bind_context);
+        std::shared_ptr<LogicalNode> filter_node = BuildFilter(table_scan_node, where_conditions_, query_context, bind_context);
         filter_node->set_left_node(table_scan_node);
         current_node = filter_node;
     } else {
@@ -62,64 +58,63 @@ SharedPtr<LogicalNode> BoundUpdateStatement::BuildPlan(QueryContext *query_conte
     }
 
     auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
-    auto update_node = MakeShared<LogicalUpdate>(bind_context->GetNewLogicalNodeId(),
-                                                 base_table_ref->table_info_,
-                                                 update_columns_,
-                                                 all_columns_in_table_,
-                                                 final_result_columns_);
+    auto update_node = std::make_shared<LogicalUpdate>(bind_context->GetNewLogicalNodeId(),
+                                                       base_table_ref->table_info_,
+                                                       update_columns_,
+                                                       all_columns_in_table_,
+                                                       final_result_columns_);
     update_node->set_left_node(current_node);
     return update_node;
 }
 
-SharedPtr<LogicalNode>
-BoundUpdateStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
+std::shared_ptr<LogicalNode>
+BoundUpdateStatement::BuildFrom(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context) {
     if (table_ref.get() == nullptr || table_ref->type_ != TableRefType::kTable) {
-        String error_message = "Unsupported";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Unsupported");
     }
     return BuildBaseTable(table_ref, query_context, bind_context);
 }
 
-SharedPtr<LogicalNode>
-BoundUpdateStatement::BuildBaseTable(SharedPtr<TableRef> &table_ref, QueryContext *, const SharedPtr<BindContext> &bind_context) {
-    // SharedPtr<BaseTableRef> base_table_ref
+std::shared_ptr<LogicalNode>
+BoundUpdateStatement::BuildBaseTable(std::shared_ptr<TableRef> &table_ref, QueryContext *, const std::shared_ptr<BindContext> &bind_context) {
+    // std::shared_ptr<BaseTableRef> base_table_ref
     auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref);
 
-    SharedPtr<LogicalTableScan> table_scan_node = MakeShared<LogicalTableScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, true);
+    std::shared_ptr<LogicalTableScan> table_scan_node = std::make_shared<LogicalTableScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, true);
     return table_scan_node;
 }
 
-SharedPtr<LogicalNode> BoundUpdateStatement::BuildFilter(SharedPtr<LogicalNode> &root,
-                                                         Vector<SharedPtr<BaseExpression>> &conditions,
-                                                         QueryContext *query_context,
-                                                         const SharedPtr<BindContext> &bind_context) {
+std::shared_ptr<LogicalNode> BoundUpdateStatement::BuildFilter(std::shared_ptr<LogicalNode> &root,
+                                                               std::vector<std::shared_ptr<BaseExpression>> &conditions,
+                                                               QueryContext *query_context,
+                                                               const std::shared_ptr<BindContext> &bind_context) {
     for (auto &cond : conditions) {
         // 1. Go through all the expression to find subquery
         //        VisitExpression(cond,
-        //                        [&](SharedPtr<BaseExpression> &expr) {
+        //                        [&](std::shared_ptr<BaseExpression> &expr) {
         //                            SubqueryUnnest::UnnestSubqueries(expr, root, bind_context);
         //                        });
         BuildSubquery(root, cond, query_context, bind_context);
     }
 
-    // SharedPtr<BaseExpression> filter_expr
+    // std::shared_ptr<BaseExpression> filter_expr
     auto filter_expr = ComposeExpressionWithDelimiter(conditions, ConjunctionType::kAnd);
 
-    // SharedPtr<LogicalFilter> filter
-    auto filter = MakeShared<LogicalFilter>(bind_context->GetNewLogicalNodeId(), filter_expr);
+    // std::shared_ptr<LogicalFilter> filter
+    auto filter = std::make_shared<LogicalFilter>(bind_context->GetNewLogicalNodeId(), filter_expr);
 
     return filter;
 }
 
-void BoundUpdateStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
-                                         SharedPtr<BaseExpression> &condition,
+void BoundUpdateStatement::BuildSubquery(std::shared_ptr<LogicalNode> &root,
+                                         std::shared_ptr<BaseExpression> &condition,
                                          QueryContext *query_context,
-                                         const SharedPtr<BindContext> &bind_context) {
+                                         const std::shared_ptr<BindContext> &bind_context) {
     if (condition.get() == nullptr) {
         return;
     }
 
-    VisitExpression(condition, [&](SharedPtr<BaseExpression> &expr) { BuildSubquery(root, expr, query_context, bind_context); });
+    VisitExpression(condition, [&](std::shared_ptr<BaseExpression> &expr) { BuildSubquery(root, expr, query_context, bind_context); });
 
     if (condition->type() == ExpressionType::kSubQuery) {
         if (building_subquery_) {
@@ -131,16 +126,16 @@ void BoundUpdateStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
     }
 }
 
-SharedPtr<BaseExpression> BoundUpdateStatement::UnnestSubquery(SharedPtr<LogicalNode> &root,
-                                                               SharedPtr<BaseExpression> &condition,
-                                                               QueryContext *query_context,
-                                                               const SharedPtr<BindContext> &) {
+std::shared_ptr<BaseExpression> BoundUpdateStatement::UnnestSubquery(std::shared_ptr<LogicalNode> &root,
+                                                                     std::shared_ptr<BaseExpression> &condition,
+                                                                     QueryContext *query_context,
+                                                                     const std::shared_ptr<BindContext> &) {
     building_subquery_ = true;
-    //    UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(query_context,
+    //    std::unique_ptr<QueryBinder> query_binder_ptr = std::make_unique<QueryBinder>(query_context,
     //                                                                      bind_context);
     SubqueryExpression *subquery_expr_ptr = (SubqueryExpression *)condition.get();
-    SharedPtr<LogicalNode> subquery_plan = subquery_expr_ptr->bound_select_statement_ptr_->BuildPlan(query_context);
-    SharedPtr<BaseExpression> return_expr = nullptr;
+    std::shared_ptr<LogicalNode> subquery_plan = subquery_expr_ptr->bound_select_statement_ptr_->BuildPlan(query_context);
+    std::shared_ptr<BaseExpression> return_expr = nullptr;
     if (subquery_expr_ptr->bound_select_statement_ptr_->bind_context_->HasCorrelatedColumn()) {
         // If correlated subquery
         return_expr = SubqueryUnnest::UnnestCorrelated(subquery_expr_ptr,

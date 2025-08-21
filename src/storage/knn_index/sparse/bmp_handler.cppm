@@ -12,15 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-// namespace infinity {
-// struct ChunkIndexMetaInfo;
-// }
-
 export module infinity_core:bmp_handler;
 
-import :stl;
 import :bmp_alg;
 import :bmp_util;
 import :index_base;
@@ -42,35 +35,34 @@ namespace infinity {
 
 struct ChunkIndexMetaInfo;
 class BufferManager;
-// class ColumnVector;
 class BufferObj;
 class LocalFileHandle;
 
-using AbstractBMP = std::variant<UniquePtr<BMPAlg<f32, i32, BMPCompressType::kCompressed>>,
-                                 UniquePtr<BMPAlg<f32, i32, BMPCompressType::kRaw>>,
-                                 UniquePtr<BMPAlg<f32, i16, BMPCompressType::kCompressed>>,
-                                 UniquePtr<BMPAlg<f32, i16, BMPCompressType::kRaw>>,
-                                 UniquePtr<BMPAlg<f32, i8, BMPCompressType::kCompressed>>,
-                                 UniquePtr<BMPAlg<f32, i8, BMPCompressType::kRaw>>,
-                                 UniquePtr<BMPAlg<f64, i32, BMPCompressType::kCompressed>>,
-                                 UniquePtr<BMPAlg<f64, i32, BMPCompressType::kRaw>>,
-                                 UniquePtr<BMPAlg<f64, i16, BMPCompressType::kCompressed>>,
-                                 UniquePtr<BMPAlg<f64, i16, BMPCompressType::kRaw>>,
-                                 UniquePtr<BMPAlg<f64, i8, BMPCompressType::kCompressed>>,
-                                 UniquePtr<BMPAlg<f64, i8, BMPCompressType::kRaw>>,
+using AbstractBMP = std::variant<std::unique_ptr<BMPAlg<f32, i32, BMPCompressType::kCompressed>>,
+                                 std::unique_ptr<BMPAlg<f32, i32, BMPCompressType::kRaw>>,
+                                 std::unique_ptr<BMPAlg<f32, i16, BMPCompressType::kCompressed>>,
+                                 std::unique_ptr<BMPAlg<f32, i16, BMPCompressType::kRaw>>,
+                                 std::unique_ptr<BMPAlg<f32, i8, BMPCompressType::kCompressed>>,
+                                 std::unique_ptr<BMPAlg<f32, i8, BMPCompressType::kRaw>>,
+                                 std::unique_ptr<BMPAlg<f64, i32, BMPCompressType::kCompressed>>,
+                                 std::unique_ptr<BMPAlg<f64, i32, BMPCompressType::kRaw>>,
+                                 std::unique_ptr<BMPAlg<f64, i16, BMPCompressType::kCompressed>>,
+                                 std::unique_ptr<BMPAlg<f64, i16, BMPCompressType::kRaw>>,
+                                 std::unique_ptr<BMPAlg<f64, i8, BMPCompressType::kCompressed>>,
+                                 std::unique_ptr<BMPAlg<f64, i8, BMPCompressType::kRaw>>,
 
-                                 UniquePtr<BMPAlg<f32, i32, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
-                                 UniquePtr<BMPAlg<f32, i32, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
-                                 UniquePtr<BMPAlg<f32, i16, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
-                                 UniquePtr<BMPAlg<f32, i16, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
-                                 UniquePtr<BMPAlg<f32, i8, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
-                                 UniquePtr<BMPAlg<f32, i8, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
-                                 UniquePtr<BMPAlg<f64, i32, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
-                                 UniquePtr<BMPAlg<f64, i32, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
-                                 UniquePtr<BMPAlg<f64, i16, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
-                                 UniquePtr<BMPAlg<f64, i16, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
-                                 UniquePtr<BMPAlg<f64, i8, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
-                                 UniquePtr<BMPAlg<f64, i8, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
+                                 std::unique_ptr<BMPAlg<f32, i32, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
+                                 std::unique_ptr<BMPAlg<f32, i32, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
+                                 std::unique_ptr<BMPAlg<f32, i16, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
+                                 std::unique_ptr<BMPAlg<f32, i16, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
+                                 std::unique_ptr<BMPAlg<f32, i8, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
+                                 std::unique_ptr<BMPAlg<f32, i8, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
+                                 std::unique_ptr<BMPAlg<f64, i32, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
+                                 std::unique_ptr<BMPAlg<f64, i32, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
+                                 std::unique_ptr<BMPAlg<f64, i16, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
+                                 std::unique_ptr<BMPAlg<f64, i16, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
+                                 std::unique_ptr<BMPAlg<f64, i8, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
+                                 std::unique_ptr<BMPAlg<f64, i8, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
 
                                  std::nullptr_t>;
 
@@ -83,16 +75,16 @@ public:
 
     BMPHandler(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem = true);
 
-    static UniquePtr<BMPHandler> Make(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem = true);
+    static std::unique_ptr<BMPHandler> Make(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem = true);
 
-    SizeT AddDocs(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count);
+    size_t AddDocs(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count);
 
-    template <typename ResultType, typename DistFunc, typename Filter = NoneType, typename MergeHeap = NoneType>
+    template <typename ResultType, typename DistFunc, typename Filter = std::nullopt_t, typename MergeHeap = std::nullopt_t>
     void SearchIndex(const auto &query,
                      i32 topn,
                      const BmpSearchOptions &options,
                      const Filter &filter,
-                     SizeT query_id,
+                     size_t query_id,
                      SegmentID segment_id,
                      MergeHeap *merge_heap) const {
         std::visit(
@@ -105,8 +97,8 @@ public:
                     if constexpr (std::is_same_v<typename IndexT::DataT, typename DistFunc::DataT> &&
                                   std::is_same_v<typename IndexT::IdxT, typename DistFunc::IndexT>) {
                         auto [doc_ids, scores] = index->SearchKnn(query, topn, options, filter);
-                        SizeT res_n = doc_ids.size();
-                        for (SizeT i = 0; i < res_n; ++i) {
+                        size_t res_n = doc_ids.size();
+                        for (size_t i = 0; i < res_n; ++i) {
                             RowID row_id(segment_id, doc_ids[i]);
                             ResultType d = scores[i];
                             merge_heap->Search(query_id, &d, &row_id, 1);
@@ -119,15 +111,15 @@ public:
             bmp_);
     }
 
-    SizeT MemUsage() const;
-    SizeT DocNum() const;
-    SizeT GetSizeInBytes() const;
+    size_t MemUsage() const;
+    size_t DocNum() const;
+    size_t GetSizeInBytes() const;
 
     void Save(LocalFileHandle &file_handle) const;
     void SaveToPtr(LocalFileHandle &file_handle) const;
     void Load(LocalFileHandle &file_handle);
-    void LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size);
-    void LoadFromPtr(const char *ptr, SizeT file_size);
+    void LoadFromPtr(LocalFileHandle &file_handle, size_t file_size);
+    void LoadFromPtr(const char *ptr, size_t file_size);
     void Optimize(const BMPOptimizeOptions &options);
 
 private:
@@ -147,12 +139,12 @@ public:
 
     void AddDocs(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count);
 
-    void Dump(BufferObj *buffer_obj, SizeT *dump_size = nullptr);
+    void Dump(BufferObj *buffer_obj, size_t *dump_size = nullptr);
 
     const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 
-    SizeT GetRowCount() const;
-    SizeT GetSizeInBytes() const;
+    size_t GetRowCount() const;
+    size_t GetSizeInBytes() const;
     MemIndexTracerInfo GetInfo() const override;
     RowID GetBeginRowID() const override { return begin_row_id_; }
     const BMPHandlerPtr &get() const { return bmp_handler_; }

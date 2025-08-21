@@ -15,7 +15,12 @@
 #pragma once
 
 #include "base_statement.h"
-#include <optional>
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 namespace infinity {
 
@@ -88,5 +93,5 @@ public:
     std::optional<std::string> export_path_{};
 };
 
-}
+} // namespace infinity
 // namespace infinity

@@ -12,22 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.uuid_cast;
 
 import :ut.base_test;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
-import :stl;
 import :infinity_context;
 import :function_set;
 import :aggregate_function_set;
@@ -40,7 +34,6 @@ import :data_block;
 import :uuid_cast;
 import :column_vector;
 import :bound_cast_func;
-#endif
 
 import global_resource_usage;
 import internal_types;
@@ -68,8 +61,8 @@ TEST_F(UuidCastTest, uuid_cast0) {
         source.Set(uuid_str);
         VarcharT target;
 
-        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnVector> col_varchar_ptr = std::make_shared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 
         EXPECT_TRUE(UuidTryCastToVarlen::Run(source, target, col_varchar_ptr.get()));
@@ -87,8 +80,8 @@ TEST_F(UuidCastTest, uuid_cast1) {
         EXPECT_THROW_WITHOUT_STACKTRACE(BindUuidCast(target_type), UnrecoverableException);
     }
 
-    SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kUuid);
-    SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);
+    std::shared_ptr<DataType> source_type = std::make_shared<DataType>(LogicalType::kUuid);
+    std::shared_ptr<ColumnVector> col_source = std::make_shared<ColumnVector>(source_type);
     col_source->Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s('a' + i % 26, 16);
@@ -106,11 +99,11 @@ TEST_F(UuidCastTest, uuid_cast1) {
     }
     // cast uuid column vector to varchar column vector
     {
-        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<DataType> target_type = std::make_shared<DataType>(LogicalType::kVarchar);
         auto source2target_ptr = BindUuidCast(*target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
-        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        std::shared_ptr<ColumnVector> col_target = std::make_shared<ColumnVector>(target_type);
         col_target->Initialize();
 
         CastParameters cast_parameters;

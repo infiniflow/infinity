@@ -12,17 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_drop_view.impl;
 
 import :physical_drop_view;
-
-import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
-
 import :wal_manager;
 import :infinity_context;
 import :status;
@@ -30,7 +25,7 @@ import :operator_state;
 
 namespace infinity {
 
-void PhysicalDropView::Init(QueryContext* query_context) {}
+void PhysicalDropView::Init(QueryContext *query_context) {}
 
 bool PhysicalDropView::Execute(QueryContext *, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

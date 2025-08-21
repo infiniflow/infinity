@@ -12,23 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:minus.impl;
 
 import :minus;
-
-import :stl;
 import :new_catalog;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
+import :logger;
 
-import :third_party;
+import third_party;
+
+import logical_type;
 import internal_types;
 import data_type;
-import :logger;
 
 namespace infinity {
 
@@ -44,15 +41,13 @@ struct MinusFunction {
 
 template <>
 inline bool MinusFunction::Run(HugeIntT, HugeIntT &) {
-    String error_message = "Not implement: MinusFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: MinusFunction::Run");
     return false;
 }
 
 template <>
 inline bool MinusFunction::Run(DecimalT, DecimalT &) {
-    String error_message = "Not implement: MinusFunction::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: MinusFunction::Run");
     return false;
 }
 
@@ -112,10 +107,10 @@ inline bool MinusFunction::Run(MixedT value, MixedT &result) {
     return false;
 }
 
-SharedPtr<ScalarFunctionSet> GetMinusFunctionSet() {
-    String func_name = "-";
+std::shared_ptr<ScalarFunctionSet> GetMinusFunctionSet() {
+    std::string func_name = "-";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     // Minus operator
     ScalarFunction minus_int8(func_name,

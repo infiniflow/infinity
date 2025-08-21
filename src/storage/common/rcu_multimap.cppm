@@ -1,12 +1,11 @@
 module;
 
-#include <cassert>
-#include <cstdio>
-#include <iterator>
-
 export module infinity_core:rcu_multimap;
 
-import :stl;
+import :infinity_type;
+
+import std;
+import std.compat;
 
 namespace infinity {
 
@@ -17,7 +16,7 @@ private:
         Value value_;
         volatile u64 used_time_;
 
-        // Comparison operators needed for Set storage
+        // Comparison operators needed for std::set storage
         bool operator<(const MapValue &other) const {
             if (value_ != other.value_) {
                 return value_ < other.value_;
@@ -30,13 +29,13 @@ private:
         bool operator!=(const MapValue &other) const { return !(*this == other); }
     };
 
-    typedef MultiMap<Key, MapValue> InnerMultiMap;
+    typedef std::multimap<Key, MapValue> InnerMultiMap;
 
     typedef void (*ValueOp)(const Value &value);
 
     struct DeletedMap {
         InnerMultiMap *map_;
-        Set<Pair<Key, MapValue>> *deleted_entries_;
+        std::set<std::pair<Key, MapValue>> *deleted_entries_;
         u64 delete_time_;
     };
 
@@ -45,12 +44,12 @@ public:
 
     ~RcuMultiMap();
 
-    Vector<Value> Get(const Key &key, bool update_access_time = true);
+    std::vector<Value> Get(const Key &key, bool update_access_time = true);
 
     // Add lowercase alias for compatibility
-    Vector<Value> get(const Key &key, bool update_access_time = true) { return Get(key, update_access_time); }
+    std::vector<Value> get(const Key &key, bool update_access_time = true) { return Get(key, update_access_time); }
 
-    Vector<Value> GetWithRcuTime(const Key &key);
+    std::vector<Value> GetWithRcuTime(const Key &key);
 
     void Insert(const Key &key, const Value &value);
 
@@ -69,22 +68,22 @@ public:
     // Add lowercase alias for compatibility
     void checkGc(u64 min_delete_time) { CheckGc(min_delete_time); }
 
-    void CheckExpired(u64 min_access_time, Vector<Key> &keys_need_expired);
+    void CheckExpired(u64 min_access_time, std::vector<Key> &keys_need_expired);
 
-    void GetAllValuesWithRef(Vector<Value> &values);
+    void GetAllValuesWithRef(std::vector<Value> &values);
 
-    void GetAllKeyValuePairs(Vector<Pair<Key, Value>> &pairs) const;
+    void GetAllKeyValuePairs(std::vector<std::pair<Key, Value>> &pairs) const;
 
-    // Efficiently merge all data into a MultiMap for dumping purposes
+    // Efficiently merge all data into a std::multimap for dumping purposes
     // This avoids the intermediate vector allocation in GetAllKeyValuePairs
-    void GetMergedMultiMap(MultiMap<Key, Value> &result_map) const;
+    void GetMergedMultiMap(std::multimap<Key, Value> &result_map) const;
 
     size_t size() const;
 
     template <typename... Args>
     void emplace(const Key &key, Args &&...args);
 
-    u32 range(const Key &key_min, const Key &key_max, Vector<Value> &result) const;
+    u32 range(const Key &key_min, const Key &key_max, std::vector<Value> &result) const;
 
 private:
     void CheckSwapInLock();
@@ -102,10 +101,10 @@ private:
     mutable std::mutex dirty_lock_;
     InnerMultiMap *dirty_map_;
 
-    Set<Pair<Key, MapValue>> deleted_entries_;
+    std::set<std::pair<Key, MapValue>> deleted_entries_;
 
-    List<MapValue> deleted_value_list_;
-    List<DeletedMap> deleted_map_list_;
+    std::list<MapValue> deleted_value_list_;
+    std::list<DeletedMap> deleted_map_list_;
 };
 
 template <typename Key, typename Value>
@@ -141,8 +140,8 @@ typename RcuMultiMap<Key, Value>::MapValue RcuMultiMap<Key, Value>::CreateMapVal
 }
 
 template <typename Key, typename Value>
-Vector<Value> RcuMultiMap<Key, Value>::Get(const Key &key, bool update_access_time) {
-    Vector<Value> results;
+std::vector<Value> RcuMultiMap<Key, Value>::Get(const Key &key, bool update_access_time) {
+    std::vector<Value> results;
 
     InnerMultiMap *current_read = read_map_;
     auto range = current_read->equal_range(key);
@@ -175,7 +174,7 @@ Vector<Value> RcuMultiMap<Key, Value>::Get(const Key &key, bool update_access_ti
 }
 
 template <typename Key, typename Value>
-Vector<Value> RcuMultiMap<Key, Value>::GetWithRcuTime(const Key &key) {
+std::vector<Value> RcuMultiMap<Key, Value>::GetWithRcuTime(const Key &key) {
     return Get(key, false);
 }
 
@@ -190,7 +189,7 @@ void RcuMultiMap<Key, Value>::CheckSwapInLock() {
     deleted_map.map_ = read_map_;
     read_map_ = dirty_map_;
     deleted_map.delete_time_ = GetCurrentTimeMs();
-    deleted_map.deleted_entries_ = new Set<Pair<Key, MapValue>>();
+    deleted_map.deleted_entries_ = new std::set<std::pair<Key, MapValue>>();
     deleted_map.deleted_entries_->swap(deleted_entries_);
     dirty_map_ = new_dirty_map;
     deleted_map_list_.push_back(deleted_map);
@@ -202,11 +201,11 @@ void RcuMultiMap<Key, Value>::Insert(const Key &key, const Value &value) {
     MapValue new_value = CreateMapValue(value);
 
     std::lock_guard<std::mutex> lock(dirty_lock_);
-    dirty_map_->insert(MakePair(key, new_value));
+    dirty_map_->insert(std::make_pair(key, new_value));
 }
 
 template <typename Key, typename Value>
-void RcuMultiMap<Key, Value>::Delete(const Key& key) {
+void RcuMultiMap<Key, Value>::Delete(const Key &key) {
     std::lock_guard<std::mutex> lock(dirty_lock_);
 
     auto range = dirty_map_->equal_range(key);
@@ -221,7 +220,7 @@ void RcuMultiMap<Key, Value>::Delete(const Key& key) {
         auto read_range = read_map_->equal_range(key);
         for (auto rit = read_range.first; rit != read_range.second; ++rit) {
             if (rit->second.value_ == map_value.value_) {
-                deleted_entries_.insert(MakePair(key, map_value));
+                deleted_entries_.insert(std::make_pair(key, map_value));
                 break;
             }
         }
@@ -245,7 +244,7 @@ void RcuMultiMap<Key, Value>::Delete(const Key &key, const Value &value) {
             auto read_range = read_map_->equal_range(key);
             for (auto rit = read_range.first; rit != read_range.second; ++rit) {
                 if (rit->second.value_ == map_value.value_) {
-                    deleted_entries_.insert(MakePair(key, map_value));
+                    deleted_entries_.insert(std::make_pair(key, map_value));
                     break;
                 }
             }
@@ -257,7 +256,7 @@ void RcuMultiMap<Key, Value>::Delete(const Key &key, const Value &value) {
 
 template <typename Key, typename Value>
 void RcuMultiMap<Key, Value>::CheckGc(u64 min_delete_time) {
-    Vector<Value> values_need_delete;
+    std::vector<Value> values_need_delete;
     {
         std::lock_guard<std::mutex> lock(dirty_lock_);
         while (!deleted_value_list_.empty()) {
@@ -270,7 +269,7 @@ void RcuMultiMap<Key, Value>::CheckGc(u64 min_delete_time) {
         }
     }
 
-    Vector<DeletedMap> map_need_delete;
+    std::vector<DeletedMap> map_need_delete;
     {
         std::lock_guard<std::mutex> lock(dirty_lock_);
         while (!deleted_map_list_.empty()) {
@@ -290,9 +289,9 @@ void RcuMultiMap<Key, Value>::CheckGc(u64 min_delete_time) {
 }
 
 template <typename Key, typename Value>
-void RcuMultiMap<Key, Value>::CheckExpired(u64 min_access_time, Vector<Key> &keys_need_expired) {
+void RcuMultiMap<Key, Value>::CheckExpired(u64 min_access_time, std::vector<Key> &keys_need_expired) {
     std::lock_guard<std::mutex> lock(dirty_lock_);
-    Set<Key> expired_keys;
+    std::set<Key> expired_keys;
 
     for (auto it = dirty_map_->begin(); it != dirty_map_->end(); ++it) {
         if (it->second.used_time_ <= min_access_time) {
@@ -304,7 +303,7 @@ void RcuMultiMap<Key, Value>::CheckExpired(u64 min_access_time, Vector<Key> &key
 }
 
 template <typename Key, typename Value>
-void RcuMultiMap<Key, Value>::GetAllValuesWithRef(Vector<Value> &values) {
+void RcuMultiMap<Key, Value>::GetAllValuesWithRef(std::vector<Value> &values) {
     std::lock_guard<std::mutex> lock(dirty_lock_);
     for (auto it = dirty_map_->begin(); it != dirty_map_->end(); ++it) {
         values.push_back(it->second.value_);
@@ -312,7 +311,7 @@ void RcuMultiMap<Key, Value>::GetAllValuesWithRef(Vector<Value> &values) {
 }
 
 template <typename Key, typename Value>
-void RcuMultiMap<Key, Value>::GetAllKeyValuePairs(Vector<Pair<Key, Value>> &pairs) const {
+void RcuMultiMap<Key, Value>::GetAllKeyValuePairs(std::vector<std::pair<Key, Value>> &pairs) const {
     std::lock_guard<std::mutex> lock(dirty_lock_);
 
     // Get pairs from dirty_map
@@ -329,7 +328,7 @@ void RcuMultiMap<Key, Value>::GetAllKeyValuePairs(Vector<Pair<Key, Value>> &pair
 }
 
 template <typename Key, typename Value>
-void RcuMultiMap<Key, Value>::GetMergedMultiMap(MultiMap<Key, Value> &result_map) const {
+void RcuMultiMap<Key, Value>::GetMergedMultiMap(std::multimap<Key, Value> &result_map) const {
     std::lock_guard<std::mutex> lock(dirty_lock_);
 
     // Clear the result map first
@@ -366,13 +365,13 @@ size_t RcuMultiMap<Key, Value>::size() const {
 
 template <typename Key, typename Value>
 template <typename... Args>
-void RcuMultiMap<Key, Value>::emplace(const Key& key, Args&&... args) {
+void RcuMultiMap<Key, Value>::emplace(const Key &key, Args &&...args) {
     Value value(std::forward<Args>(args)...);
     Insert(key, value);
 }
 
 template <typename Key, typename Value>
-u32 RcuMultiMap<Key, Value>::range(const Key &key_min, const Key &key_max, Vector<Value> &result) const {
+u32 RcuMultiMap<Key, Value>::range(const Key &key_min, const Key &key_max, std::vector<Value> &result) const {
 
     InnerMultiMap *current_read = read_map_;
     auto read_begin = current_read->lower_bound(key_min);
@@ -423,7 +422,7 @@ u32 RcuMultiMap<Key, Value>::range(const Key &key_min, const Key &key_max, Vecto
     return count;
 }
 
-// RcuMap implementation using Map (std::map) as inner map
+// RcuMap implementation using std::map (std::map) as inner map
 //
 // DESIGN CONSIDERATIONS FOR CONCURRENT ACCESS:
 //
@@ -435,7 +434,7 @@ u32 RcuMultiMap<Key, Value>::range(const Key &key_min, const Key &key_max, Vecto
 //
 // 2. Memory Ordering and Consistency:
 //    - read_map_ is marked volatile to prevent compiler optimizations
-//    - Atomic pointer reads ensure readers see consistent map state
+//    - std::atomic pointer reads ensure readers see consistent map state
 //    - Writers use mutex to serialize modifications to dirty_map_
 //    - Swap operation is atomic from reader's perspective
 //
@@ -475,7 +474,7 @@ private:
         Value value_;
         volatile u64 used_time_;
 
-        // Comparison operators needed for Set storage
+        // Comparison operators needed for std::set storage
         bool operator<(const MapValue &other) const {
             if (value_ != other.value_) {
                 return value_ < other.value_;
@@ -488,11 +487,11 @@ private:
         bool operator!=(const MapValue &other) const { return !(*this == other); }
     };
 
-    typedef Map<Key, MapValue> InnerMap;
+    typedef std::map<Key, MapValue> InnerMap;
 
     struct DeletedMap {
         InnerMap *map_;
-        Set<Pair<Key, MapValue>> *deleted_entries_;
+        std::set<std::pair<Key, MapValue>> *deleted_entries_;
         u64 delete_time_;
     };
 
@@ -504,8 +503,8 @@ public:
     // Get single value for key (returns nullptr if not found)
     Value *Get(const Key &key, bool update_access_time = true);
 
-    // Get single value for key (returns Optional)
-    Optional<Value> GetValue(const Key &key, bool update_access_time = true);
+    // Get single value for key (returns std::optional)
+    std::optional<Value> GetValue(const Key &key, bool update_access_time = true);
 
     // Add lowercase alias for compatibility
     Value *get(const Key &key, bool update_access_time = true) { return Get(key, update_access_time); }
@@ -530,24 +529,24 @@ public:
     // Add lowercase alias for compatibility
     void checkGc(u64 min_delete_time) { CheckGc(min_delete_time); }
 
-    void CheckExpired(u64 min_access_time, Vector<Key> &keys_need_expired);
+    void CheckExpired(u64 min_access_time, std::vector<Key> &keys_need_expired);
 
-    void GetAllValuesWithRef(Vector<Value> &values);
+    void GetAllValuesWithRef(std::vector<Value> &values);
 
-    void GetAllKeyValuePairs(Vector<Pair<Key, Value>> &pairs) const;
+    void GetAllKeyValuePairs(std::vector<std::pair<Key, Value>> &pairs) const;
 
     size_t size() const;
 
     template <typename... Args>
     void emplace(const Key &key, Args &&...args);
 
-    u32 range(const Key &key_min, const Key &key_max, Vector<Value> &result) const;
+    u32 range(const Key &key_min, const Key &key_max, std::vector<Value> &result) const;
 
     // MapWithLock compatibility methods
     bool Get(const Key &key, Value &value);
     bool GetOrAdd(const Key &key, Value &value, const Value &new_value);
     void Clear();
-    void Range(const Key &key_min, const Key &key_max, Vector<Pair<Key, Value>> &items);
+    void Range(const Key &key_min, const Key &key_max, std::vector<std::pair<Key, Value>> &items);
 
     // Unsafe iterator methods (for single-threaded access)
     // This iterator provides the same interface as std::map<Key, Value>::iterator
@@ -557,7 +556,7 @@ public:
 
         // Iterator traits
         using iterator_category = std::bidirectional_iterator_tag;
-        using value_type = Pair<const Key, Value>;
+        using value_type = std::pair<const Key, Value>;
         using difference_type = std::ptrdiff_t;
         using pointer = value_type *;
         using reference = value_type &;
@@ -584,7 +583,7 @@ public:
             return &proxy;
         }
 
-        value_type operator*() const { return MakePair(it_->first, it_->second.value_); }
+        value_type operator*() const { return std::make_pair(it_->first, it_->second.value_); }
 
         UnsafeIterator &operator++() {
             ++it_;
@@ -623,10 +622,10 @@ private:
     mutable std::mutex dirty_lock_;
     InnerMap *dirty_map_;
 
-    Set<Pair<Key, MapValue>> deleted_entries_;
+    std::set<std::pair<Key, MapValue>> deleted_entries_;
 
-    List<MapValue> deleted_value_list_;
-    List<DeletedMap> deleted_map_list_;
+    std::list<MapValue> deleted_value_list_;
+    std::list<DeletedMap> deleted_map_list_;
 };
 
 // RcuMap implementation
@@ -732,12 +731,12 @@ Value *RcuMap<Key, Value>::Get(const Key &key, bool update_access_time) {
 }
 
 template <typename Key, typename Value>
-Optional<Value> RcuMap<Key, Value>::GetValue(const Key &key, bool update_access_time) {
+std::optional<Value> RcuMap<Key, Value>::GetValue(const Key &key, bool update_access_time) {
     Value *result = Get(key, update_access_time);
     if (result != nullptr) {
-        return Optional<Value>(*result);
+        return std::optional<Value>(*result);
     }
-    return Optional<Value>();
+    return std::optional<Value>();
 }
 
 template <typename Key, typename Value>
@@ -817,7 +816,7 @@ void RcuMap<Key, Value>::CheckSwapInLock() {
     DeletedMap deleted_map;
     deleted_map.map_ = read_map_;
     deleted_map.delete_time_ = GetCurrentTimeMs();
-    deleted_map.deleted_entries_ = new Set<Pair<Key, MapValue>>();
+    deleted_map.deleted_entries_ = new std::set<std::pair<Key, MapValue>>();
     deleted_map.deleted_entries_->swap(deleted_entries_);
 
     // ATOMIC SWAP: This is the critical RCU operation
@@ -825,7 +824,7 @@ void RcuMap<Key, Value>::CheckSwapInLock() {
     // After this line, new readers see the updated map
     read_map_ = dirty_map_;
 
-    // Set up new dirty_map for future writes
+    // std::set up new dirty_map for future writes
     dirty_map_ = new_dirty_map;
 
     // Schedule old read_map for garbage collection
@@ -848,7 +847,7 @@ void RcuMap<Key, Value>::Insert(const Key &key, const Value &value) {
     // Design tradeoff: Simplicity vs. write scalability
 
     // MAP SEMANTICS: Replace existing value if key exists
-    // This differs from MultiMap which accumulates values
+    // This differs from std::multimap which accumulates values
     auto it = dirty_map_->find(key);
     if (it != dirty_map_->end()) {
         // Handle replacement: mark old value for garbage collection
@@ -860,7 +859,7 @@ void RcuMap<Key, Value>::Insert(const Key &key, const Value &value) {
         // This ensures readers don't see stale values after next swap
         auto read_it = read_map_->find(key);
         if (read_it != read_map_->end()) {
-            deleted_entries_.insert(MakePair(key, old_value));
+            deleted_entries_.insert(std::make_pair(key, old_value));
         }
     }
 
@@ -887,7 +886,7 @@ void RcuMap<Key, Value>::Delete(const Key &key) {
         // Also mark for deletion in read_map if it exists there
         auto read_it = read_map_->find(key);
         if (read_it != read_map_->end()) {
-            deleted_entries_.insert(MakePair(key, map_value));
+            deleted_entries_.insert(std::make_pair(key, map_value));
         }
     } else {
         // If not in dirty_map, check if it exists in read_map
@@ -896,7 +895,7 @@ void RcuMap<Key, Value>::Delete(const Key &key) {
             // Mark the entry from read_map for deletion
             MapValue map_value = read_it->second;
             map_value.used_time_ = GetCurrentTimeMs();
-            deleted_entries_.insert(MakePair(key, map_value));
+            deleted_entries_.insert(std::make_pair(key, map_value));
             deleted_value_list_.push_back(map_value);
         }
     }
@@ -904,7 +903,7 @@ void RcuMap<Key, Value>::Delete(const Key &key) {
 
 template <typename Key, typename Value>
 void RcuMap<Key, Value>::CheckGc(u64 min_delete_time) {
-    Vector<Value> values_need_delete;
+    std::vector<Value> values_need_delete;
     {
         std::lock_guard<std::mutex> lock(dirty_lock_);
         while (!deleted_value_list_.empty()) {
@@ -917,7 +916,7 @@ void RcuMap<Key, Value>::CheckGc(u64 min_delete_time) {
         }
     }
 
-    Vector<DeletedMap> map_need_delete;
+    std::vector<DeletedMap> map_need_delete;
     {
         std::lock_guard<std::mutex> lock(dirty_lock_);
         while (!deleted_map_list_.empty()) {
@@ -937,9 +936,9 @@ void RcuMap<Key, Value>::CheckGc(u64 min_delete_time) {
 }
 
 template <typename Key, typename Value>
-void RcuMap<Key, Value>::CheckExpired(u64 min_access_time, Vector<Key> &keys_need_expired) {
+void RcuMap<Key, Value>::CheckExpired(u64 min_access_time, std::vector<Key> &keys_need_expired) {
     std::lock_guard<std::mutex> lock(dirty_lock_);
-    Set<Key> expired_keys;
+    std::set<Key> expired_keys;
 
     for (auto it = dirty_map_->begin(); it != dirty_map_->end(); ++it) {
         if (it->second.used_time_ <= min_access_time) {
@@ -951,7 +950,7 @@ void RcuMap<Key, Value>::CheckExpired(u64 min_access_time, Vector<Key> &keys_nee
 }
 
 template <typename Key, typename Value>
-void RcuMap<Key, Value>::GetAllValuesWithRef(Vector<Value> &values) {
+void RcuMap<Key, Value>::GetAllValuesWithRef(std::vector<Value> &values) {
     std::lock_guard<std::mutex> lock(dirty_lock_);
     for (auto it = dirty_map_->begin(); it != dirty_map_->end(); ++it) {
         values.push_back(it->second.value_);
@@ -959,7 +958,7 @@ void RcuMap<Key, Value>::GetAllValuesWithRef(Vector<Value> &values) {
 }
 
 template <typename Key, typename Value>
-void RcuMap<Key, Value>::GetAllKeyValuePairs(Vector<Pair<Key, Value>> &pairs) const {
+void RcuMap<Key, Value>::GetAllKeyValuePairs(std::vector<std::pair<Key, Value>> &pairs) const {
     std::lock_guard<std::mutex> lock(dirty_lock_);
 
     // Get pairs from dirty_map
@@ -992,7 +991,7 @@ void RcuMap<Key, Value>::emplace(const Key &key, Args &&...args) {
 }
 
 template <typename Key, typename Value>
-u32 RcuMap<Key, Value>::range(const Key &key_min, const Key &key_max, Vector<Value> &result) const {
+u32 RcuMap<Key, Value>::range(const Key &key_min, const Key &key_max, std::vector<Value> &result) const {
     InnerMap *current_read = read_map_;
     auto read_begin = current_read->lower_bound(key_min);
     auto read_end = current_read->upper_bound(key_max);
@@ -1006,11 +1005,11 @@ u32 RcuMap<Key, Value>::range(const Key &key_min, const Key &key_max, Vector<Val
     auto dirty_begin = dirty_snapshot->lower_bound(key_min);
     auto dirty_end = dirty_snapshot->upper_bound(key_max);
 
-    // merge - for Map, we prioritize dirty_map values over read_map
+    // merge - for std::map, we prioritize dirty_map values over read_map
     u32 count = 0;
     auto read_it = read_begin;
     auto dirty_it = dirty_begin;
-    Set<Key> processed_keys;
+    std::set<Key> processed_keys;
 
     // First, add all values from dirty_map
     while (dirty_it != dirty_end) {
@@ -1074,13 +1073,13 @@ void RcuMap<Key, Value>::Clear() {
     for (auto it = read_map_->begin(); it != read_map_->end(); ++it) {
         MapValue map_value = it->second;
         map_value.used_time_ = GetCurrentTimeMs();
-        deleted_entries_.insert(MakePair(it->first, map_value));
+        deleted_entries_.insert(std::make_pair(it->first, map_value));
         deleted_value_list_.push_back(map_value);
     }
 }
 
 template <typename Key, typename Value>
-void RcuMap<Key, Value>::Range(const Key &key_min, const Key &key_max, Vector<Pair<Key, Value>> &items) {
+void RcuMap<Key, Value>::Range(const Key &key_min, const Key &key_max, std::vector<std::pair<Key, Value>> &items) {
     items.clear();
 
     InnerMap *current_read = read_map_;
@@ -1097,7 +1096,7 @@ void RcuMap<Key, Value>::Range(const Key &key_min, const Key &key_max, Vector<Pa
     auto dirty_end = dirty_snapshot->upper_bound(key_max);
 
     // Merge results, prioritizing dirty_map values
-    Set<Key> processed_keys;
+    std::set<Key> processed_keys;
 
     // First, add all values from dirty_map
     for (auto it = dirty_begin; it != dirty_end; ++it) {
@@ -1129,7 +1128,7 @@ typename RcuMap<Key, Value>::UnsafeIterator RcuMap<Key, Value>::UnsafeEnd() {
  * OVERALL PERFORMANCE AND CORRECTNESS ANALYSIS:
  *
  * CORRECTNESS GUARANTEES:
- * ✓ Thread-safe: No data races between readers and writers
+ * ✓ std::thread-safe: No data races between readers and writers
  * ✓ Consistency: Readers see consistent snapshots of data
  * ✓ Progress: Writers never block readers, readers never block writers
  * ✓ Memory safety: Garbage collection prevents use-after-free

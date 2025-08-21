@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:peer_server_thrift_service;
 
 import :peer_server_thrift_types;
-import :stl;
+
 import global_resource_usage;
 
 namespace infinity {

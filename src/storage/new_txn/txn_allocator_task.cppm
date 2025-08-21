@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:txn_allocator_task;
 
-import :stl;
 import :status;
 import :new_txn;
 
@@ -41,10 +38,10 @@ public:
     }
 
     Status status_{};
+
 private:
     NewTxn *new_txn_{};
     bool stop_task_{false};
-
 
     bool complete_{false};
     std::mutex mutex_{};

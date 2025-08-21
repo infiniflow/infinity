@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:dist_func_lsg_wrapper;
 
-import :stl;
 import :plain_vec_store;
 import :dist_func_l2;
 import :dist_func_ip;
@@ -45,7 +42,7 @@ public:
     }
     ~LSGDistWrapper() = default;
 
-    LSGDistWrapper(SizeT dim) : dist_(dim) {}
+    LSGDistWrapper(size_t dim) : dist_(dim) {}
 
     template <typename DataStore>
     DistanceType operator()(VertexType v1_i, VertexType v2_i, const DataStore &data_store) const {
@@ -62,12 +59,12 @@ public:
         return Inner(d, avg_[v1_i], avg_[v2_i]);
     }
 
-    void SetLSGParam(float alpha, UniquePtr<float[]> avg) {
+    void SetLSGParam(float alpha, std::unique_ptr<float[]> avg) {
         alpha_ = alpha;
         avg_ = std::move(avg);
     }
 
-    LVQDist ToLVQDistance(SizeT dim) && {
+    LVQDist ToLVQDistance(size_t dim) && {
         if constexpr (std::is_same_v<typename Dist::This, typename Dist::LVQDist>) {
             return std::move(dist_);
         } else {
@@ -85,7 +82,7 @@ private:
     }
 
 private:
-    UniquePtr<float[]> avg_;
+    std::unique_ptr<float[]> avg_;
     float alpha_ = 1.0;
     Dist dist_;
 };

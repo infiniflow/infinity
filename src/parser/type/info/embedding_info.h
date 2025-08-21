@@ -18,7 +18,11 @@
 #include "type/complex/embedding_type.h"
 #include "type/type_info.h"
 
-#include <memory>
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 namespace arrow {
 class FixedSizeListType;
@@ -30,7 +34,8 @@ namespace infinity {
 class EmbeddingInfo : public TypeInfo {
 public:
     inline static std::shared_ptr<EmbeddingInfo> Make(EmbeddingDataType embedding_data_type, size_t dimension) {
-        ParserAssert(dimension <= PARSER_EMBEDDING_LIMIT_INTERNAL, "Embedding dimension should less than " + std::to_string(PARSER_EMBEDDING_LIMIT_INTERNAL));
+        ParserAssert(dimension <= PARSER_EMBEDDING_LIMIT_INTERNAL,
+                     "Embedding dimension should less than " + std::to_string(PARSER_EMBEDDING_LIMIT_INTERNAL));
         return std::make_shared<EmbeddingInfo>(embedding_data_type, dimension);
     }
 

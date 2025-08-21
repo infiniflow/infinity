@@ -15,27 +15,25 @@
 module;
 
 #include <cassert>
-#include <set>
 #include <unistd.h>
 
 module infinity_core:file_reader.impl;
 
 import :file_reader;
-
-import :stl;
 import :status;
 import :infinity_exception;
-import :third_party;
-import :logger;
 import :virtual_store;
+
+import std;
+import third_party;
 
 namespace infinity {
 
-FileReader::FileReader(const String &path, SizeT buffer_size)
+FileReader::FileReader(const std::string &path, size_t buffer_size)
     : path_(path), data_{nullptr}, buffer_offset_(0), buffer_start_(0), buffer_size_(buffer_size) {
     // Fixme: These two functions might throw exception
     if (buffer_size != 0) {
-        data_ = MakeUnique<char_t[]>(buffer_size);
+        data_ = std::make_unique<char[]>(buffer_size);
     }
     auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kRead);
     if (!status.ok()) {
@@ -56,7 +54,7 @@ void FileReader::ReFill() {
         buffer_length_ = buffer_size_;
 #ifndef NDEBUG
     auto current_offset = lseek(file_handle_->FileDescriptor(), 0, SEEK_CUR);
-    assert(buffer_start_ == static_cast<SizeT>(current_offset));
+    assert(buffer_start_ == static_cast<size_t>(current_offset));
 #endif
     auto [tmp_read_size, status] = file_handle_->Read(data_.get(), buffer_length_);
     if (!status.ok()) {
@@ -68,7 +66,7 @@ void FileReader::ReFill() {
     }
 }
 
-void FileReader::Read(char_t *buffer, SizeT read_size) {
+void FileReader::Read(char *buffer, size_t read_size) {
     if (buffer_size_ == 0) {
         auto [tmp_read_size, status] = file_handle_->Read(buffer, read_size);
         if (!status.ok()) {

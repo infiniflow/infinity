@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:logical_match_tensor_scan;
 
-import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
@@ -24,11 +21,12 @@ import :logical_match_scan_base;
 import :base_expression;
 import :match_tensor_expression;
 import :base_table_ref;
-import internal_types;
-import data_type;
 import :fast_rough_filter;
 import :common_query_filter;
 import :default_values;
+
+import internal_types;
+import data_type;
 
 namespace infinity {
 
@@ -51,10 +49,12 @@ export struct MatchTensorScanIndexOptions {
 
 export class LogicalMatchTensorScan final : public LogicalMatchScanBase {
 public:
-    explicit LogicalMatchTensorScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<MatchTensorExpression> match_tensor_expr)
+    explicit LogicalMatchTensorScan(u64 node_id,
+                                    std::shared_ptr<BaseTableRef> base_table_ref,
+                                    std::shared_ptr<MatchTensorExpression> match_tensor_expr)
         : LogicalMatchScanBase(node_id, LogicalNodeType::kMatchTensorScan, base_table_ref, match_tensor_expr) {}
 
-    String name() override { return "LogicalMatchTensorScan"; }
+    std::string name() override { return "LogicalMatchTensorScan"; }
 
     void InitExtraOptions();
 
@@ -62,8 +62,8 @@ public:
     // extra options
     // will be parsed in InitExtraOptions()
     u32 topn_ = 0;
-    Optional<f32> knn_threshold_;
-    SharedPtr<MatchTensorScanIndexOptions> index_options_;
+    std::optional<f32> knn_threshold_;
+    std::shared_ptr<MatchTensorScanIndexOptions> index_options_;
 };
 
 } // namespace infinity

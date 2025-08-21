@@ -12,24 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <string>
-
 module infinity_core:physical_insert.impl;
 
 import :physical_insert;
-
-import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
-
 import :physical_operator_type;
 import :operator_state;
 import :expression_state;
 import :data_block;
-import :third_party;
 import :expression_evaluator;
 import :base_expression;
 import :default_values;
@@ -38,28 +30,30 @@ import :infinity_exception;
 import :logger;
 import :meta_info;
 import :txn_state;
-
 import :wal_manager;
 import :infinity_context;
-
-import column_def;
 import :new_txn;
-import data_type;
 import :cast_function;
 import :bound_cast_func;
 import :column_vector;
 import :value;
+
+import std;
+import third_party;
+
 import embedding_info;
 import logical_type;
+import data_type;
+import column_def;
 
 namespace infinity {
 
 // Helper function to handle embedding dimension conversion
-void HandleEmbeddingDimensionConversion(SharedPtr<ColumnVector> source_column,
-                                        SharedPtr<ColumnVector> target_column,
+void HandleEmbeddingDimensionConversion(std::shared_ptr<ColumnVector> source_column,
+                                        std::shared_ptr<ColumnVector> target_column,
                                         const EmbeddingInfo *source_info,
                                         const EmbeddingInfo *target_info) {
-    SizeT row_count = source_column->Size();
+    size_t row_count = source_column->Size();
     i32 source_dim = source_info->Dimension();
     i32 target_dim = target_info->Dimension();
 
@@ -70,13 +64,13 @@ void HandleEmbeddingDimensionConversion(SharedPtr<ColumnVector> source_column,
     }
 
     // Handle dimension conversion
-    for (SizeT row_idx = 0; row_idx < row_count; ++row_idx) {
+    for (size_t row_idx = 0; row_idx < row_count; ++row_idx) {
         Value source_value = source_column->GetValueByIndex(row_idx);
-        Span<char> source_data = source_value.GetEmbedding();
+        std::span<char> source_data = source_value.GetEmbedding();
 
         if (source_info->Type() == EmbeddingDataType::kElemFloat) {
             const float *source_ptr = reinterpret_cast<const float *>(source_data.data());
-            Vector<float> target_vector(target_dim);
+            std::vector<float> target_vector(target_dim);
 
             if (source_dim <= target_dim) {
                 // Pad with zeros if target dimension is larger
@@ -93,7 +87,7 @@ void HandleEmbeddingDimensionConversion(SharedPtr<ColumnVector> source_column,
             target_column->AppendValue(target_value);
         } else if (source_info->Type() == EmbeddingDataType::kElemDouble) {
             const double *source_ptr = reinterpret_cast<const double *>(source_data.data());
-            Vector<double> target_vector(target_dim);
+            std::vector<double> target_vector(target_dim);
 
             if (source_dim <= target_dim) {
                 // Pad with zeros if target dimension is larger
@@ -109,8 +103,7 @@ void HandleEmbeddingDimensionConversion(SharedPtr<ColumnVector> source_column,
             Value target_value = Value::MakeEmbedding(reinterpret_cast<const char *>(target_vector.data()), target_embedding_info);
             target_column->AppendValue(target_value);
         } else {
-            String error_message = fmt::format("Unsupported embedding data type for dimension conversion");
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Unsupported embedding data type for dimension conversion"));
         }
     }
 }
@@ -129,22 +122,22 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
         return true;
     }
 
-    SharedPtr<DataBlock> output_block;
+    std::shared_ptr<DataBlock> output_block;
 
     // Check if we have a child operator (INSERT SELECT) or direct values (INSERT VALUES)
     if (operator_state->prev_op_state_ != nullptr) {
         // INSERT SELECT case: get data from child operator
         OperatorState *prev_op_state = operator_state->prev_op_state_;
-        SizeT data_block_count = prev_op_state->data_block_array_.size();
+        size_t data_block_count = prev_op_state->data_block_array_.size();
 
         if (data_block_count == 0) {
             // No data to insert
-            UniquePtr<String> result_msg = MakeUnique<String>("INSERTED 0 Rows");
+            std::unique_ptr<std::string> result_msg = std::make_unique<std::string>("INSERTED 0 Rows");
             if (operator_state == nullptr) {
-                Vector<SharedPtr<ColumnDef>> column_defs;
-                SharedPtr<TableDef> result_table_def_ptr =
-                    TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("Tables"), nullptr, column_defs);
-                output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
+                std::vector<std::shared_ptr<ColumnDef>> column_defs;
+                std::shared_ptr<TableDef> result_table_def_ptr =
+                    TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("Tables"), nullptr, column_defs);
+                output_ = std::make_shared<DataTable>(result_table_def_ptr, TableType::kDataTable);
                 output_->SetResultMsg(std::move(result_msg));
             } else {
                 InsertOperatorState *insert_operator_state = static_cast<InsertOperatorState *>(operator_state);
@@ -157,8 +150,8 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
         // Merge all data blocks from child operator
         output_block = DataBlock::Make();
         // Use target table column types for the output block
-        Vector<SharedPtr<DataType>> target_types;
-        for (SizeT i = 0; i < static_cast<SizeT>(table_info_->column_count_); ++i) {
+        std::vector<std::shared_ptr<DataType>> target_types;
+        for (size_t i = 0; i < static_cast<size_t>(table_info_->column_count_); ++i) {
             target_types.emplace_back(table_info_->column_defs_[i]->type());
         }
         output_block->Init(target_types);
@@ -166,7 +159,7 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
         // Check if we need to apply type casting for INSERT SELECT
         DataBlock *first_block = prev_op_state->data_block_array_[0].get();
         bool needs_casting = false;
-        for (SizeT i = 0; i < first_block->column_count() && i < target_types.size(); ++i) {
+        for (size_t i = 0; i < first_block->column_count() && i < target_types.size(); ++i) {
             if (*target_types[i] != *first_block->column_vectors[i]->data_type()) {
                 needs_casting = true;
                 break;
@@ -175,11 +168,11 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
 
         if (needs_casting) {
             // Apply type casting for each block
-            for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
+            for (size_t block_idx = 0; block_idx < data_block_count; ++block_idx) {
                 DataBlock *input_data_block_ptr = prev_op_state->data_block_array_[block_idx].get();
 
                 // Cast each column if needed
-                for (SizeT col_idx = 0; col_idx < input_data_block_ptr->column_count() && col_idx < target_types.size(); ++col_idx) {
+                for (size_t col_idx = 0; col_idx < input_data_block_ptr->column_count() && col_idx < target_types.size(); ++col_idx) {
                     auto source_column = input_data_block_ptr->column_vectors[col_idx];
                     auto target_column = output_block->column_vectors[col_idx];
                     auto target_type = target_types[col_idx];
@@ -211,7 +204,7 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
             }
         } else {
             // No casting needed, append directly
-            for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
+            for (size_t block_idx = 0; block_idx < data_block_count; ++block_idx) {
                 DataBlock *input_data_block_ptr = prev_op_state->data_block_array_[block_idx].get();
                 output_block->AppendWith(input_data_block_ptr);
             }
@@ -220,45 +213,43 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
 
     } else {
         // INSERT VALUES case: evaluate expressions to create data block
-        SizeT row_count = value_list_.size();
+        size_t row_count = value_list_.size();
         if (row_count == 0) {
-            String error_message = "No values to insert";
-            UnrecoverableError(error_message);
+            UnrecoverableError("No values to insert");
         }
 
-        SizeT column_count = value_list_[0].size();
-        SizeT table_collection_column_count = table_info_->column_count_;
+        size_t column_count = value_list_[0].size();
+        size_t table_collection_column_count = table_info_->column_count_;
         if (column_count != table_collection_column_count) {
-            String error_message =
-                fmt::format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count);
-            UnrecoverableError(error_message);
+            UnrecoverableError(
+                fmt::format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count));
         }
 
         // Prepare the output block
-        Vector<SharedPtr<DataType>> output_types;
+        std::vector<std::shared_ptr<DataType>> output_types;
         output_types.reserve(column_count);
         auto field_list = value_list_[0];
-        SizeT field_count = field_list.size();
-        for (SizeT i = 0; i < field_count; ++i) {
+        size_t field_count = field_list.size();
+        for (size_t i = 0; i < field_count; ++i) {
             auto data_type = field_list[i]->Type();
-            output_types.emplace_back(MakeShared<DataType>(data_type));
+            output_types.emplace_back(std::make_shared<DataType>(data_type));
         }
 
         output_block = DataBlock::Make();
         output_block->Init(output_types);
-        SharedPtr<DataBlock> output_block_tmp = DataBlock::Make();
+        std::shared_ptr<DataBlock> output_block_tmp = DataBlock::Make();
         output_block_tmp->Init(output_types);
 
         ExpressionEvaluator evaluator;
         evaluator.Init(nullptr);
         // Each cell's expression of a column may differ. So we have to evaluate each cell instead of column here.
-        for (SizeT row_idx = 0; row_idx < row_count; ++row_idx) {
+        for (size_t row_idx = 0; row_idx < row_count; ++row_idx) {
             // Reset the temporary block for each row
             output_block_tmp->Reset();
 
-            for (SizeT expr_idx = 0; expr_idx < column_count; ++expr_idx) {
-                const SharedPtr<BaseExpression> &expr = value_list_[row_idx][expr_idx];
-                SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(expr);
+            for (size_t expr_idx = 0; expr_idx < column_count; ++expr_idx) {
+                const std::shared_ptr<BaseExpression> &expr = value_list_[row_idx][expr_idx];
+                std::shared_ptr<ExpressionState> expr_state = ExpressionState::CreateState(expr);
                 evaluator.Execute(expr, expr_state, output_block_tmp->column_vectors[expr_idx]);
             }
             output_block->AppendWith(output_block_tmp);
@@ -273,13 +264,13 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
         operator_state->status_ = status;
     }
 
-    UniquePtr<String> result_msg = MakeUnique<String>(fmt::format("INSERTED {} Rows", output_block->row_count()));
+    std::unique_ptr<std::string> result_msg = std::make_unique<std::string>(fmt::format("INSERTED {} Rows", output_block->row_count()));
     if (operator_state == nullptr) {
         // Generate the result table
-        Vector<SharedPtr<ColumnDef>> column_defs;
-        SharedPtr<TableDef> result_table_def_ptr =
-            TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("Tables"), nullptr, column_defs);
-        output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
+        std::vector<std::shared_ptr<ColumnDef>> column_defs;
+        std::shared_ptr<TableDef> result_table_def_ptr =
+            TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("Tables"), nullptr, column_defs);
+        output_ = std::make_shared<DataTable>(result_table_def_ptr, TableType::kDataTable);
         output_->SetResultMsg(std::move(result_msg));
     } else {
         InsertOperatorState *insert_operator_state = static_cast<InsertOperatorState *>(operator_state);

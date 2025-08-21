@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:rewrite_correlated_expression;
 
-import :stl;
 import :logical_node_visitor;
 import :logical_node;
 import :column_binding;
@@ -30,17 +27,17 @@ class BindContext;
 
 export class RewriteCorrelatedExpressions : public LogicalNodeVisitor {
 public:
-    explicit RewriteCorrelatedExpressions(const SharedPtr<BindContext> &bind_context_ptr, ColumnBinding base_binding)
+    explicit RewriteCorrelatedExpressions(const std::shared_ptr<BindContext> &bind_context_ptr, ColumnBinding base_binding)
         : bind_context_ptr_(bind_context_ptr), base_binding_(base_binding) {}
 
     void VisitNode(LogicalNode &op) final;
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression) override;
+    virtual std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<ColumnExpression> &expression) override;
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<SubqueryExpression> &expression) override;
+    virtual std::shared_ptr<BaseExpression> VisitReplace(const std::shared_ptr<SubqueryExpression> &expression) override;
 
 private:
-    const SharedPtr<BindContext> &bind_context_ptr_;
+    const std::shared_ptr<BindContext> &bind_context_ptr_;
     ColumnBinding base_binding_{};
 };
 

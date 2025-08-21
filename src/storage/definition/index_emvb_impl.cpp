@@ -12,23 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <algorithm>
-#include <array>
-#include <sstream>
-#include <string>
-
 module infinity_core:index_emvb.impl;
 
 import :index_emvb;
-
-import :stl;
 import :status;
 import :base_table_ref;
 import :infinity_exception;
-import :third_party;
-import :logger;
+
+import std;
+import third_party;
+
 import logical_type;
 import type_info;
 import embedding_info;
@@ -40,10 +33,10 @@ namespace infinity {
 
 // TODO: now only support tensor column
 // TODO: now only support float element type
-void IndexEMVB::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name) {
+void IndexEMVB::ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref, const std::string &column_name) {
     auto &column_names_vector = *(base_table_ref->column_names_);
     auto &column_types_vector = *(base_table_ref->column_types_);
-    SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
+    size_t column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
         Status status = Status::ColumnNotExist(column_name);
         RecoverableError(status);
@@ -61,18 +54,18 @@ void IndexEMVB::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table
     }
 }
 
-String IndexEMVB::BuildOtherParamsString() const {
+std::string IndexEMVB::BuildOtherParamsString() const {
     return fmt::format("pq_subspace_num = {}, pq_subspace_bits = {}.", residual_pq_subspace_num_, residual_pq_subspace_bits_);
 }
 
 constexpr std::array<u32, 8> accepable_residual_pq_subspace_num = {1, 2, 4, 8, 16, 32, 64, 128};
 constexpr std::array<u32, 2> accepable_residual_pq_subspace_bits = {8, 16};
 
-SharedPtr<IndexBase> IndexEMVB::Make(SharedPtr<String> index_name,
-                                     SharedPtr<String> index_comment,
-                                     const String &file_name,
-                                     Vector<String> column_names,
-                                     const Vector<InitParameter *> &index_param_list) {
+std::shared_ptr<IndexBase> IndexEMVB::Make(std::shared_ptr<std::string> index_name,
+                                           std::shared_ptr<std::string> index_comment,
+                                           const std::string &file_name,
+                                           std::vector<std::string> column_names,
+                                           const std::vector<InitParameter *> &index_param_list) {
     u32 residual_pq_subspace_num = 0;
     u32 residual_pq_subspace_bits = 0;
     for (auto para : index_param_list) {
@@ -105,11 +98,16 @@ SharedPtr<IndexBase> IndexEMVB::Make(SharedPtr<String> index_name,
         Status status = Status::InvalidIndexParam("pq_subspace_bits");
         RecoverableError(status);
     }
-    return MakeShared<IndexEMVB>(index_name, index_comment, file_name, std::move(column_names), residual_pq_subspace_num, residual_pq_subspace_bits);
+    return std::make_shared<IndexEMVB>(index_name,
+                                       index_comment,
+                                       file_name,
+                                       std::move(column_names),
+                                       residual_pq_subspace_num,
+                                       residual_pq_subspace_bits);
 }
 
 i32 IndexEMVB::GetSizeInBytes() const {
-    SizeT size = IndexBase::GetSizeInBytes();
+    size_t size = IndexBase::GetSizeInBytes();
     size += sizeof(residual_pq_subspace_num_);
     size += sizeof(residual_pq_subspace_bits_);
     return size;
@@ -121,7 +119,7 @@ void IndexEMVB::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, residual_pq_subspace_bits_);
 }
 
-String IndexEMVB::ToString() const {
+std::string IndexEMVB::ToString() const {
     std::stringstream ss;
     ss << IndexBase::ToString() << ", " << BuildOtherParamsString();
     return std::move(ss).str();

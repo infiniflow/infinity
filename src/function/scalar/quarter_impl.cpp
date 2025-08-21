@@ -11,21 +11,20 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module;
+
 module infinity_core:quarter.impl;
 
 import :quarter;
-import :stl;
 import :new_catalog;
 import :status;
-import logical_type;
+import :column_vector;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import :third_party;
+
 import internal_types;
 import data_type;
-import :column_vector;
+import logical_type;
 
 namespace infinity {
 
@@ -36,7 +35,6 @@ struct QuarterFunction {
         RecoverableError(status);
         return false;
     }
-
 };
 
 template <>
@@ -73,7 +71,7 @@ inline bool QuarterFunction::Run(DateT left, BigIntT &result) {
 
 template <>
 inline bool QuarterFunction::Run(DateTimeT left, BigIntT &result) {
-    auto month  = DateTimeT::GetDateTimePart(left, TimeUnit::kMonth);
+    auto month = DateTimeT::GetDateTimePart(left, TimeUnit::kMonth);
     switch (month) {
         case 1:
         case 2:
@@ -136,26 +134,26 @@ inline bool QuarterFunction::Run(TimestampT left, BigIntT &result) {
 }
 
 void RegisterQuarterFunction(NewCatalog *catalog_ptr) {
-    String func_name = "quarter";
+    std::string func_name = "quarter";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction quarter_date_function(func_name,
-                                  {DataType(LogicalType::kDate)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, QuarterFunction>);
+                                         {DataType(LogicalType::kDate)},
+                                         {DataType(LogicalType::kBigInt)},
+                                         &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, QuarterFunction>);
     function_set_ptr->AddFunction(quarter_date_function);
 
     ScalarFunction quarter_datetime_function(func_name,
-                                  {DataType(LogicalType::kDateTime)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, QuarterFunction>);
+                                             {DataType(LogicalType::kDateTime)},
+                                             {DataType(LogicalType::kBigInt)},
+                                             &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, QuarterFunction>);
     function_set_ptr->AddFunction(quarter_datetime_function);
 
     ScalarFunction quarter_timestamp_function(func_name,
-                                  {DataType(LogicalType::kTimestamp)},
-                                  {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, QuarterFunction>);
+                                              {DataType(LogicalType::kTimestamp)},
+                                              {DataType(LogicalType::kBigInt)},
+                                              &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, QuarterFunction>);
     function_set_ptr->AddFunction(quarter_timestamp_function);
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);

@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:bound_statement;
 
-import :stl;
 import :logical_node;
+
 import internal_types;
 import data_type;
 
@@ -26,10 +24,10 @@ class QueryContext;
 
 export struct BoundStatement {
 public:
-    SharedPtr<Vector<String>> names_ptr_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> types_ptr_{};
+    std::shared_ptr<std::vector<std::string>> names_ptr_{};
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> types_ptr_{};
 
-    virtual SharedPtr<LogicalNode> BuildPlan(QueryContext *query_context) = 0;
+    virtual std::shared_ptr<LogicalNode> BuildPlan(QueryContext *query_context) = 0;
     virtual ~BoundStatement() = default;
 };
 

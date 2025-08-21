@@ -12,35 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-#include <string>
-#include <vector>
-
 module infinity_core:index_hnsw.impl;
 
 import :index_hnsw;
-
-import :stl;
 import :status;
 import :index_base;
-import :third_party;
 import :infinity_exception;
-import serialize;
 import :default_values;
 import :index_base;
-import logical_type;
-import statement_common;
-import :logger;
+import :hnsw_lsg_builder;
+
+import std;
+import third_party;
+
 import data_type;
 import embedding_info;
 import internal_types;
-import :hnsw_lsg_builder;
+import logical_type;
+import statement_common;
+import serialize;
 
 namespace infinity {
 
-HnswEncodeType StringToHnswEncodeType(const String &str) {
+HnswEncodeType StringToHnswEncodeType(const std::string &str) {
     if (str == "plain") {
         return HnswEncodeType::kPlain;
     } else if (str == "lvq") {
@@ -50,7 +44,7 @@ HnswEncodeType StringToHnswEncodeType(const String &str) {
     }
 }
 
-String HnswEncodeTypeToString(HnswEncodeType encode_type) {
+std::string HnswEncodeTypeToString(HnswEncodeType encode_type) {
     switch (encode_type) {
         case HnswEncodeType::kPlain:
             return "plain";
@@ -61,7 +55,7 @@ String HnswEncodeTypeToString(HnswEncodeType encode_type) {
     }
 }
 
-String HnswBuildTypeToString(HnswBuildType build_type) {
+std::string HnswBuildTypeToString(HnswBuildType build_type) {
     switch (build_type) {
         case HnswBuildType::kPlain:
             return "plain";
@@ -72,7 +66,7 @@ String HnswBuildTypeToString(HnswBuildType build_type) {
     }
 }
 
-HnswBuildType StringToHnswBuildType(const String &str) {
+HnswBuildType StringToHnswBuildType(const std::string &str) {
     if (str == "plain") {
         return HnswBuildType::kPlain;
     } else if (str == "lsg") {
@@ -90,7 +84,7 @@ void TrimSpace(std::string_view &str) {
     str.remove_suffix(str.size() - str.find_last_not_of(' ') - 1);
 }
 
-LSGConfig LSGConfig::FromString(const String &str) {
+LSGConfig LSGConfig::FromString(const std::string &str) {
     // example: "sample_raito=0.01,ls_k=10,alpha=1.0"
     LSGConfig lsg_config;
     std::string_view sv(str);
@@ -107,7 +101,7 @@ LSGConfig LSGConfig::FromString(const String &str) {
         }
         auto pos = kv.find('=');
         if (pos == std::string_view::npos) {
-            Status status = Status::InvalidIndexParam(String(kv));
+            Status status = Status::InvalidIndexParam(std::string(kv));
             RecoverableError(status);
         }
         auto key = kv.substr(0, pos);
@@ -115,21 +109,21 @@ LSGConfig LSGConfig::FromString(const String &str) {
         TrimSpace(key);
         TrimSpace(value);
         if (key == "sample_raito") {
-            lsg_config.sample_ratio_ = std::stof(String(value));
+            lsg_config.sample_ratio_ = std::stof(std::string(value));
         } else if (key == "ls_k") {
-            lsg_config.ls_k_ = std::stoi(String(value));
+            lsg_config.ls_k_ = std::stoi(std::string(value));
         } else if (key == "alpha") {
-            lsg_config.alpha_ = std::stof(String(value));
+            lsg_config.alpha_ = std::stof(std::string(value));
         } else {
-            Status status = Status::InvalidIndexParam(String(key));
+            Status status = Status::InvalidIndexParam(std::string(key));
             RecoverableError(status);
         }
     } while (!end);
     return lsg_config;
 }
 
-SizeT LSGConfig::GetSizeInBytes() const {
-    SizeT size = 0;
+size_t LSGConfig::GetSizeInBytes() const {
+    size_t size = 0;
     size += sizeof(sample_ratio_);
     size += sizeof(ls_k_);
     size += sizeof(alpha_);
@@ -138,36 +132,36 @@ SizeT LSGConfig::GetSizeInBytes() const {
 
 void LSGConfig::WriteAdv(char *&ptr) const {
     WriteBufAdv<float>(ptr, sample_ratio_);
-    WriteBufAdv<SizeT>(ptr, ls_k_);
+    WriteBufAdv<size_t>(ptr, ls_k_);
     WriteBufAdv<float>(ptr, alpha_);
 }
 
 LSGConfig LSGConfig::ReadAdv(const char *&ptr) {
     LSGConfig lsg_config;
     lsg_config.sample_ratio_ = ReadBufAdv<float>(ptr);
-    lsg_config.ls_k_ = ReadBufAdv<SizeT>(ptr);
+    lsg_config.ls_k_ = ReadBufAdv<size_t>(ptr);
     lsg_config.alpha_ = ReadBufAdv<float>(ptr);
     return lsg_config;
 }
 
-String LSGConfig::ToString() const {
+std::string LSGConfig::ToString() const {
     std::stringstream ss;
     ss << "sample_raito = " << sample_ratio_ << ", ls_k = " << ls_k_ << ", alpha = " << alpha_;
     return ss.str();
 }
 
-SharedPtr<IndexBase> IndexHnsw::Make(SharedPtr<String> index_name,
-                                     SharedPtr<String> index_comment,
-                                     const String &file_name,
-                                     Vector<String> column_names,
-                                     const Vector<InitParameter *> &index_param_list) {
-    SizeT M = HNSW_M;
-    SizeT ef_construction = HNSW_EF_CONSTRUCTION;
-    SizeT block_size = HNSW_BLOCK_SIZE;
+std::shared_ptr<IndexBase> IndexHnsw::Make(std::shared_ptr<std::string> index_name,
+                                           std::shared_ptr<std::string> index_comment,
+                                           const std::string &file_name,
+                                           std::vector<std::string> column_names,
+                                           const std::vector<InitParameter *> &index_param_list) {
+    size_t M = HNSW_M;
+    size_t ef_construction = HNSW_EF_CONSTRUCTION;
+    size_t block_size = HNSW_BLOCK_SIZE;
     MetricType metric_type = MetricType::kInvalid;
     HnswEncodeType encode_type = HnswEncodeType::kPlain;
     HnswBuildType build_type = HnswBuildType::kPlain;
-    Optional<LSGConfig> lsg_config = None;
+    std::optional<LSGConfig> lsg_config = std::nullopt;
     for (const auto *param : index_param_list) {
         if (param->param_name_ == "m") {
             M = std::stoi(param->param_value_);
@@ -189,7 +183,7 @@ SharedPtr<IndexBase> IndexHnsw::Make(SharedPtr<String> index_name,
         }
     }
     if (build_type != HnswBuildType::kLSG && lsg_config) {
-        lsg_config = None;
+        lsg_config = std::nullopt;
     }
     if (build_type == HnswBuildType::kLSG && !lsg_config) {
         lsg_config = LSGConfig();
@@ -205,17 +199,17 @@ SharedPtr<IndexBase> IndexHnsw::Make(SharedPtr<String> index_name,
         RecoverableError(status);
     }
 
-    return MakeShared<IndexHnsw>(index_name,
-                                 index_comment,
-                                 file_name,
-                                 std::move(column_names),
-                                 metric_type,
-                                 encode_type,
-                                 build_type,
-                                 M,
-                                 ef_construction,
-                                 block_size,
-                                 lsg_config);
+    return std::make_shared<IndexHnsw>(index_name,
+                                       index_comment,
+                                       file_name,
+                                       std::move(column_names),
+                                       metric_type,
+                                       encode_type,
+                                       build_type,
+                                       M,
+                                       ef_construction,
+                                       block_size,
+                                       lsg_config);
 }
 
 bool IndexHnsw::operator==(const IndexHnsw &other) const {
@@ -229,7 +223,7 @@ bool IndexHnsw::operator==(const IndexHnsw &other) const {
 bool IndexHnsw::operator!=(const IndexHnsw &other) const { return !(*this == other); }
 
 i32 IndexHnsw::GetSizeInBytes() const {
-    SizeT size = IndexBase::GetSizeInBytes();
+    size_t size = IndexBase::GetSizeInBytes();
     size += sizeof(metric_type_);
     size += sizeof(encode_type_);
     size += sizeof(build_type_);
@@ -257,7 +251,7 @@ void IndexHnsw::WriteAdv(char *&ptr) const {
     }
 }
 
-String IndexHnsw::ToString() const {
+std::string IndexHnsw::ToString() const {
     std::stringstream ss;
     ss << IndexBase::ToString() << ", " << MetricTypeToString(metric_type_) << HnswBuildTypeToString(build_type_) << ", " << M_ << ", "
        << ef_construction_ << ", " << block_size_;
@@ -267,7 +261,7 @@ String IndexHnsw::ToString() const {
     return ss.str();
 }
 
-String IndexHnsw::BuildOtherParamsString() const {
+std::string IndexHnsw::BuildOtherParamsString() const {
     std::stringstream ss;
     ss << "metric = " << MetricTypeToString(metric_type_) << ", encode_type = " << HnswEncodeTypeToString(encode_type_) << ", M = " << M_
        << ", ef_construction = " << ef_construction_;
@@ -291,12 +285,12 @@ nlohmann::json IndexHnsw::Serialize() const {
     return res;
 }
 
-void IndexHnsw::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref,
-                                       const String &column_name,
-                                       const Vector<InitParameter *> &index_param_list) {
+void IndexHnsw::ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref,
+                                       const std::string &column_name,
+                                       const std::vector<InitParameter *> &index_param_list) {
     const auto &column_names_vector = *(base_table_ref->column_names_);
     const auto &column_types_vector = *(base_table_ref->column_types_);
-    const SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
+    const size_t column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
         RecoverableError(Status::ColumnNotExist(column_name));
     }

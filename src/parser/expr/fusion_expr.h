@@ -13,10 +13,12 @@
 #include "match_tensor_expr.h"
 #include "parsed_expr.h"
 #include "search_options.h"
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 namespace infinity {
 

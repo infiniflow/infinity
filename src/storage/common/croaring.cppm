@@ -16,6 +16,7 @@ module;
 
 #include "roaring/roaring.hh"
 #include "roaring/roaring64map.hh"
+
 export module infinity_core:croaring;
 
 namespace roaring {

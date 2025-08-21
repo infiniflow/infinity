@@ -14,8 +14,17 @@
 
 #include "date_type.h"
 #include "parser_assert.h"
-#include <format>
-#include "spdlog/fmt/fmt.h"
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
+
+#ifndef PARESER_USE_THIRD_PARTY_MODULE
+#define PARESER_USE_THIRD_PARTY_MODULE 1
+import third_party;
+#endif
 
 namespace infinity {
 
@@ -415,9 +424,7 @@ int64_t DateType::GetDatePart(DateType input, TimeUnit unit) {
     }
     return -1;
 }
-bool DateType::OuterDate2YMD(DateType input, int32_t &year, int32_t &month, int32_t &day) {
-    return Date2YMD(input, year, month, day);
-}
+bool DateType::OuterDate2YMD(DateType input, int32_t &year, int32_t &month, int32_t &day) { return Date2YMD(input, year, month, day); }
 
 int64_t DateType::GetEpochTime() const {
     constexpr int64_t TotalSecondsInDay = 24 * 60 * 60;

@@ -17,8 +17,6 @@ module infinity_core:doc_iterator.impl;
 
 import :doc_iterator;
 
-import :doc_iterator;
-
 namespace infinity {
 
 DocIterator::~DocIterator() {}

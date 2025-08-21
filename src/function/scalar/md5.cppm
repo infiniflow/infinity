@@ -2,8 +2,6 @@ module;
 
 export module infinity_core:md5;
 
-import :stl;
-
 namespace infinity {
 
 class NewCatalog;

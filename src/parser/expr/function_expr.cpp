@@ -14,7 +14,12 @@
 
 #include "function_expr.h"
 #include "expr/column_expr.h"
-#include <sstream>
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 namespace infinity {
 

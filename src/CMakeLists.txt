@@ -265,11 +265,11 @@ file(GLOB_RECURSE
         parser/*.cppm
 )
 
-file(GLOB_RECURSE
-        third_party_cpp
-        CONFIGURE_DEPENDS
-        ${CMAKE_SOURCE_DIR}/third_party/simdjson/*.cpp
-)
+#file(GLOB_RECURSE
+#        parser_impl_cpp
+#        CONFIGURE_DEPENDS
+#        parser/*_impl.cpp
+#)
 
 file(GLOB_RECURSE
         admin_cpp
@@ -302,7 +302,6 @@ add_library(infinity_core
         ${common_cpp}
         ${admin_cpp}
         ${network_cpp}
-        ${third_party_cpp}
 )
 
 target_sources(infinity_core
@@ -334,6 +333,7 @@ target_sources(infinity_core
         ${common_impl_cpp}
         ${admin_impl_cpp}
         ${network_impl_cpp}
+        #        ${parser_impl_cpp}
 )
 
 #if (ARCH_AARCH64)
@@ -346,8 +346,6 @@ target_sources(infinity_core
 #    )
 #endif ()
 
-target_include_directories(infinity_core PUBLIC ${PARALLEL_HASHMAP_INCLUDE_DIRS})
-target_include_directories(infinity_core PUBLIC ${VIT_VIT_CTPL_INCLUDE_DIRS})
 target_include_directories(infinity_core PUBLIC ${Python3_INCLUDE_DIRS})
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
@@ -416,7 +414,7 @@ target_link_libraries(infinity
         fastpfor
         jma
         opencc
-#        $<IF:$<BOOL:${ARM64}>,opencc,>
+        #        $<IF:$<BOOL:${ARM64}>,opencc,>
         dl
         thrift::thrift
         # thriftnb::thriftnb
@@ -536,57 +534,9 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
-        common_ut
+        ut_ut
         CONFIGURE_DEPENDS
-        unit_test/common/*_ut.cpp
-)
-
-file(GLOB_RECURSE
-        parser_ut
-        CONFIGURE_DEPENDS
-        unit_test/parser/*_ut.cpp
-)
-
-file(GLOB_RECURSE
-        storage_ut
-        CONFIGURE_DEPENDS
-        unit_test/storage/*_ut.cpp
-)
-
-file(GLOB_RECURSE
-        executor_ut
-        CONFIGURE_DEPENDS
-        unit_test/executor/*_ut.cpp
-)
-
-file(GLOB_RECURSE
-        main_ut
-        CONFIGURE_DEPENDS
-        unit_test/main/*_ut.cpp
-)
-
-file(GLOB_RECURSE
-        planner_ut
-        CONFIGURE_DEPENDS
-        unit_test/planner/*_ut.cpp
-)
-
-file(GLOB_RECURSE
-        function_ut
-        CONFIGURE_DEPENDS
-        unit_test/function/*_ut.cpp
-)
-
-file(GLOB_RECURSE
-        parallel_ut
-        CONFIGURE_DEPENDS
-        unit_test/parallel/*_ut.cpp
-)
-
-file(GLOB_RECURSE
-        thirdparty_ut
-        CONFIGURE_DEPENDS
-        unit_test/third_party/*_ut.cpp
+        unit_test/*_ut.cpp
 )
 
 file(GLOB_RECURSE
@@ -595,80 +545,29 @@ file(GLOB_RECURSE
         unit_test/*_impl.cpp
 )
 
-if (CI)
-    file(GLOB_RECURSE
-            ut_mod
-            CONFIGURE_DEPENDS
-            unit_test/*.cppm
-    )
-    add_executable(unit_test
-            ${test_main_cpp}
+file(GLOB_RECURSE
+        ut_mod
+        CONFIGURE_DEPENDS
+        unit_test/*.cppm
+        unit_test/*_impl.cpp
+)
+add_executable(unit_test
+        ${test_main_cpp}
+)
+target_sources(unit_test
+        PRIVATE
+        FILE_SET ut_cxx_modules TYPE CXX_MODULES FILES
+        ${ut_mod}
 
-            ${common_ut}
-            ${storage_ut}
-            ${main_ut}
-            ${parser_ut}
-            ${function_ut}
-            ${thirdparty_ut}
-            ${executor_ut}
-            ${test_helper_ut}
-            ${planner_ut}
-            ${function_ut}
-            ${parallel_ut}
-
-            ${ut_impl}
-    )
-    target_sources(unit_test
-            PRIVATE
-            FILE_SET ut_cxx_modules TYPE CXX_MODULES FILES
-            ${ut_mod}
-    )
-else ()
-    file(GLOB_RECURSE
-            ut_mod
-            CONFIGURE_DEPENDS
-            unit_test/*.cppm
-            unit_test/*_impl.cpp
-    )
-    add_executable(unit_test
-            ${test_main_cpp}
-
-            ${ut_test_main_cpp}
-            ${ut_common_cpp}
-            ${ut_storage_cpp}
-            ${ut_main_cpp}
-            ${ut_parser_cpp}
-            ${ut_function_cpp}
-            ${ut_thirdparty_cpp}
-            ${ut_executor_cpp}
-            ${ut_test_helper_cpp}
-            ${ut_planner_cpp}
-            ${ut_function_cpp}
-            ${ut_parallel_cpp}
-    )
-    target_sources(unit_test
-            PRIVATE
-            FILE_SET ut_cxx_modules TYPE CXX_MODULES FILES
-            ${ut_mod}
-
-            ${common_ut}
-            ${parser_ut}
-            ${storage_ut}
-            ${executor_ut}
-            ${planner_ut}
-            ${function_ut}
-            ${parralel_ut}
-            ${thirdparty_ut}
-            ${main_ut}
-    )
-endif ()
+        ${ut_ut}
+)
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
-add_dependencies(unit_test miniocpp curlpp_static libcurl_static infinity_core)
+add_dependencies(unit_test miniocpp curlpp_static libcurl_static)
 
 target_link_libraries(unit_test
         infinity_core
-        GTest::gtest GTest::gtest_main GTest::gmock GTest::gmock_main
+        GTest::gtest GTest::gtest_main
         sql_parser
         onnxruntime_mlas
         zsv_parser
@@ -719,12 +618,6 @@ target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
-
-target_sources(unit_test
-        PRIVATE
-        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
-        ${ut_dependent_cppm}
-)
 
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
 

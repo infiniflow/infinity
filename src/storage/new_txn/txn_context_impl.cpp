@@ -12,19 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <memory>
-#include <sstream>
-
 module infinity_core:txn_context.impl;
 
 import :txn_context;
-import :stl;
+
+import std;
 
 namespace infinity {
 
-String TxnContext::ToString() {
+std::string TxnContext::ToString() {
     std::stringstream ss;
     ss << "Txn ID: " << txn_id_;
     if (text_ != nullptr) {

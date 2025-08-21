@@ -12,45 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-
 module infinity_core:logical_create_table.impl;
 
 import :logical_create_table;
-
-import :stl;
 import :column_binding;
+import :logical_create_table;
+
+import std;
+
 import logical_type;
 import internal_types;
-import :logical_create_table;
 import data_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalCreateTable::GetColumnBindings() const { return {}; }
+std::vector<ColumnBinding> LogicalCreateTable::GetColumnBindings() const { return {}; }
 
-SharedPtr<Vector<String>> LogicalCreateTable::GetOutputNames() const {
-    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
+std::shared_ptr<std::vector<std::string>> LogicalCreateTable::GetOutputNames() const {
+    std::shared_ptr<std::vector<std::string>> result = std::make_shared<std::vector<std::string>>();
     result->emplace_back("OK");
     return result;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalCreateTable::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result_type = MakeShared<Vector<SharedPtr<DataType>>>();
-    result_type->emplace_back(MakeShared<DataType>(LogicalType::kInteger));
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalCreateTable::GetOutputTypes() const {
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result_type = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+    result_type->emplace_back(std::make_shared<DataType>(LogicalType::kInteger));
     return result_type;
 }
 
-String LogicalCreateTable::ToString(i64 &space) const {
+std::string LogicalCreateTable::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "Create Table: " << *schema_name_ << "." << table_definition_->ToString();
+    ss << std::string(space, ' ') << arrow_str << "Create Table: " << *schema_name_ << "." << table_definition_->ToString();
     space += arrow_str.size();
 
     return ss.str();

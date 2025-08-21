@@ -2,8 +2,6 @@ module;
 
 export module infinity_core:sqrt;
 
-import :stl;
-
 namespace infinity {
 
 class NewCatalog;

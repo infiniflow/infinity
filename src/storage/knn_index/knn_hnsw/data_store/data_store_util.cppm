@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:data_store_util;
 
-import :stl;
+import std;
+import std.compat;
 
 namespace infinity {
 
@@ -24,17 +23,17 @@ export template <typename T, bool OwnMem>
 class ArrayPtr {
 public:
     ArrayPtr() = default;
-    ArrayPtr(UniquePtr<T[]> ptr) : ptr_(std::move(ptr)) {}
+    ArrayPtr(std::unique_ptr<T[]> ptr) : ptr_(std::move(ptr)) {}
 
-    T &operator[](SizeT idx) { return ptr_[idx]; }
-    const T &operator[](SizeT idx) const { return ptr_[idx]; }
+    T &operator[](size_t idx) { return ptr_[idx]; }
+    const T &operator[](size_t idx) const { return ptr_[idx]; }
 
     T *get() const { return ptr_.get(); }
 
-    UniquePtr<T[]> exchange(UniquePtr<T[]> ptr) { return std::exchange(ptr_, std::move(ptr)); }
+    std::unique_ptr<T[]> exchange(std::unique_ptr<T[]> ptr) { return std::exchange(ptr_, std::move(ptr)); }
 
 private:
-    UniquePtr<T[]> ptr_;
+    std::unique_ptr<T[]> ptr_;
 };
 
 export template <typename T>
@@ -43,7 +42,7 @@ public:
     ArrayPtr() = default;
     ArrayPtr(const T *ptr) : ptr_(ptr) {}
 
-    const T &operator[](SizeT idx) const { return ptr_[idx]; }
+    const T &operator[](size_t idx) const { return ptr_[idx]; }
 
     const T *get() const { return ptr_; }
 

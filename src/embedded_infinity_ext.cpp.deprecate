@@ -12,7 +12,6 @@
 #include "parser/statement/statement_common.h"
 
 import :infinity;
-import :stl;
 import :query_options;
 import :query_result;
 import :logical_node_type;

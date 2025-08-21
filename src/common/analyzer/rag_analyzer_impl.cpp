@@ -17,23 +17,14 @@ module;
 #define PCRE2_CODE_UNIT_WIDTH 8
 
 #include <cassert>
-#include <chrono>
-#include <cmath>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
 #include <openccxx.h>
 #include <pcre2.h>
-#include <re2/re2.h>
-#include <sstream>
-#include "spdlog/fmt/fmt.h"
 
 #include "string_utils.h"
 
 module infinity_core:rag_analyzer.impl;
 
 import :rag_analyzer;
-import :stl;
 import :term;
 import :stemmer;
 import :analyzer;
@@ -42,20 +33,24 @@ import :lemmatizer;
 import :stemmer;
 import :term;
 
+import std;
+import std.compat;
+
 namespace fs = std::filesystem;
 
 namespace infinity {
 
-static const String DICT_PATH = "rag/huqie.txt";
-static const String POS_DEF_PATH = "rag/pos-id.def";
-static const String TRIE_PATH = "rag/huqie.trie";
-static const String WORDNET_PATH = "wordnet";
+static const std::string DICT_PATH = "rag/huqie.txt";
+static const std::string POS_DEF_PATH = "rag/pos-id.def";
+static const std::string TRIE_PATH = "rag/huqie.trie";
+static const std::string WORDNET_PATH = "wordnet";
 
-static const String OPENCC_PATH = "opencc";
+static const std::string OPENCC_PATH = "opencc";
 
-static const String REGEX_SPLIT_CHAR = R"#(([ ,\.<>/?;'\[\]\`!@#$%^&*$$\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z\.-]+|[0-9,\.-]+))#";
+static const std::string REGEX_SPLIT_CHAR =
+    R"#(([ ,\.<>/?;'\[\]\`!@#$%^&*$$\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z\.-]+|[0-9,\.-]+))#";
 
-static const String NLTK_TOKENIZE_PATTERN =
+static const std::string NLTK_TOKENIZE_PATTERN =
     R"((?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|(?=[^\(\"\`{\[:;&\#\*@\)}\]\-,])\S+?(?=\s|$|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|,(?=$|\s|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)))|\S)";
 
 static constexpr std::size_t MAX_SENTENCE_LEN = 100;
@@ -63,76 +58,76 @@ static constexpr std::size_t MAX_SENTENCE_LEN = 100;
 static inline i32 Encode(i32 freq, i32 idx) {
     u32 encoded_value = 0;
     if (freq < 0) {
-        encoded_value |= (u32)(-freq);
+        encoded_value |= static_cast<u32>(-freq);
         encoded_value |= (1U << 23);
     } else {
-        encoded_value = (u32)(freq & 0x7FFFFF);
+        encoded_value = static_cast<u32>(freq & 0x7FFFFF);
     }
 
-    encoded_value |= (u32)idx << 24;
-    return (i32)encoded_value;
+    encoded_value |= static_cast<u32>(idx) << 24;
+    return static_cast<i32>(encoded_value);
 }
 
 static inline i32 DecodeFreq(i32 value) {
-    u32 v1 = (u32)(value) & 0xFFFFFF;
+    u32 v1 = static_cast<u32>(value) & 0xFFFFFF;
     if (v1 & (1 << 23)) {
         v1 &= 0x7FFFFF;
-        return -(i32)v1;
+        return -static_cast<i32>(v1);
     } else {
-        v1 = (i32)v1;
+        v1 = static_cast<i32>(v1);
     }
     return v1;
 }
 
-void Split(const String &input, const String &split_pattern, Vector<String> &result, bool keep_delim = false) {
+void Split(const std::string &input, const std::string &split_pattern, std::vector<std::string> &result, bool keep_delim = false) {
     re2::RE2 pattern(split_pattern);
-    re2::StringPiece leftover(input.data());
-    re2::StringPiece last_end = leftover;
-    re2::StringPiece extracted_delim_token;
+    std::string_view leftover(input.data());
+    std::string_view last_end = leftover;
+    std::string_view extracted_delim_token;
 
-    while (RE2::FindAndConsume(&leftover, pattern, &extracted_delim_token)) {
+    while (re2::RE2::FindAndConsume(&leftover, pattern, &extracted_delim_token)) {
         std::string_view token(last_end.data(), extracted_delim_token.data() - last_end.data());
         if (!token.empty()) {
-            result.push_back(String(token.data(), token.size()));
+            result.push_back(std::string(token.data(), token.size()));
         }
         if (keep_delim)
-            result.push_back(String(extracted_delim_token.data(), extracted_delim_token.size()));
+            result.push_back(std::string(extracted_delim_token.data(), extracted_delim_token.size()));
         last_end = leftover;
     }
 
     if (!leftover.empty()) {
-        result.push_back(String(leftover.data(), leftover.size()));
+        result.push_back(std::string(leftover.data(), leftover.size()));
     }
 }
 
-void Split(const String &input, const RE2 &pattern, Vector<String> &result, bool keep_delim = false) {
-    re2::StringPiece leftover(input.data());
-    re2::StringPiece last_end = leftover;
-    re2::StringPiece extracted_delim_token;
+void Split(const std::string &input, const re2::RE2 &pattern, std::vector<std::string> &result, bool keep_delim = false) {
+    std::string_view leftover(input.data());
+    std::string_view last_end = leftover;
+    std::string_view extracted_delim_token;
 
-    while (RE2::FindAndConsume(&leftover, pattern, &extracted_delim_token)) {
+    while (re2::RE2::FindAndConsume(&leftover, pattern, &extracted_delim_token)) {
         std::string_view token(last_end.data(), extracted_delim_token.data() - last_end.data());
         if (!token.empty()) {
-            result.push_back(String(token.data(), token.size()));
+            result.push_back(std::string(token.data(), token.size()));
         }
         if (keep_delim)
-            result.push_back(String(extracted_delim_token.data(), extracted_delim_token.size()));
+            result.push_back(std::string(extracted_delim_token.data(), extracted_delim_token.size()));
         last_end = leftover;
     }
 
     if (!leftover.empty()) {
-        result.push_back(String(leftover.data(), leftover.size()));
+        result.push_back(std::string(leftover.data(), leftover.size()));
     }
 }
 
-String Replace(const RE2 &re, const String &replacement, const String &input) {
-    String output = input;
-    RE2::GlobalReplace(&output, re, replacement);
+std::string Replace(const re2::RE2 &re, const std::string &replacement, const std::string &input) {
+    std::string output = input;
+    re2::RE2::GlobalReplace(&output, re, replacement);
     return output;
 }
 
 template <typename T>
-String Join(const Vector<T> &tokens, int start, int end, const String &delim = " ") {
+std::string Join(const std::vector<T> &tokens, int start, int end, const std::string &delim = " ") {
     std::ostringstream oss;
     for (int i = start; i < end; ++i) {
         if (i > start)
@@ -143,11 +138,11 @@ String Join(const Vector<T> &tokens, int start, int end, const String &delim = "
 }
 
 template <typename T>
-String Join(const Vector<T> &tokens, int start, const String &delim = " ") {
+std::string Join(const std::vector<T> &tokens, int start, const std::string &delim = " ") {
     return Join(tokens, start, tokens.size(), delim);
 }
 
-String Join(const TermList &tokens, int start, int end, const String &delim = " ") {
+std::string Join(const TermList &tokens, int start, int end, const std::string &delim = " ") {
     std::ostringstream oss;
     for (int i = start; i < end; ++i) {
         if (i > start)
@@ -157,7 +152,7 @@ String Join(const TermList &tokens, int start, int end, const String &delim = " 
     return std::move(oss).str();
 }
 
-bool IsChinese(const String &str) {
+bool IsChinese(const std::string &str) {
     for (std::size_t i = 0; i < str.length(); ++i) {
         unsigned char c = str[i];
         if (c >= 0xE4 && c <= 0xE9) {
@@ -173,7 +168,7 @@ bool IsChinese(const String &str) {
     return false;
 }
 
-bool IsAlphabet(const String &str) {
+bool IsAlphabet(const std::string &str) {
     for (std::size_t i = 0; i < str.length(); ++i) {
         unsigned char c = str[i];
         if (c > 0x7F) {
@@ -183,7 +178,7 @@ bool IsAlphabet(const String &str) {
     return true;
 }
 
-bool IsKorean(const String &str) {
+bool IsKorean(const std::string &str) {
     for (std::size_t i = 0; i < str.length(); ++i) {
         unsigned char c = str[i];
         if (c == 0xE1) {
@@ -199,7 +194,7 @@ bool IsKorean(const String &str) {
     return false;
 }
 
-bool IsJapanese(const String &str) {
+bool IsJapanese(const std::string &str) {
     for (std::size_t i = 0; i < str.length(); ++i) {
         unsigned char c = str[i];
         if (c == 0xE3) {
@@ -215,7 +210,7 @@ bool IsJapanese(const String &str) {
     return false;
 }
 
-bool IsCJK(const String &str) {
+bool IsCJK(const std::string &str) {
     for (std::size_t i = 0; i < str.length(); ++i) {
         unsigned char c = str[i];
 
@@ -271,7 +266,7 @@ public:
 
     ~RegexTokenizer() { pcre2_code_free(re_); }
 
-    void RegexTokenize(const String &input, TermList &tokens) {
+    void RegexTokenize(const std::string &input, TermList &tokens) {
         PCRE2_SPTR subject = (PCRE2_SPTR)input.c_str();
         PCRE2_SIZE subject_length = input.length();
 
@@ -314,16 +309,16 @@ private:
 class MacIntyreContractions {
 public:
     // List of contractions adapted from Robert MacIntyre's tokenizer.
-    Vector<String> CONTRACTIONS2 = {R"((?i)\b(can)(?#X)(not)\b)",
-                                    R"((?i)\b(d)(?#X)('ye)\b)",
-                                    R"((?i)\b(gim)(?#X)(me)\b)",
-                                    R"((?i)\b(gon)(?#X)(na)\b)",
-                                    R"((?i)\b(got)(?#X)(ta)\b)",
-                                    R"((?i)\b(lem)(?#X)(me)\b)",
-                                    R"((?i)\b(more)(?#X)('n)\b)",
-                                    R"((?i)\b(wan)(?#X)(na)(?=\s))"};
-    Vector<String> CONTRACTIONS3 = {R"((?i) ('t)(?#X)(is)\b)", R"((?i) ('t)(?#X)(was)\b)"};
-    Vector<String> CONTRACTIONS4 = {R"((?i)\b(whad)(dd)(ya)\b)", R"((?i)\b(wha)(t)(cha)\b)"};
+    std::vector<std::string> CONTRACTIONS2 = {R"((?i)\b(can)(?#X)(not)\b)",
+                                              R"((?i)\b(d)(?#X)('ye)\b)",
+                                              R"((?i)\b(gim)(?#X)(me)\b)",
+                                              R"((?i)\b(gon)(?#X)(na)\b)",
+                                              R"((?i)\b(got)(?#X)(ta)\b)",
+                                              R"((?i)\b(lem)(?#X)(me)\b)",
+                                              R"((?i)\b(more)(?#X)('n)\b)",
+                                              R"((?i)\b(wan)(?#X)(na)(?=\s))"};
+    std::vector<std::string> CONTRACTIONS3 = {R"((?i) ('t)(?#X)(is)\b)", R"((?i) ('t)(?#X)(was)\b)"};
+    std::vector<std::string> CONTRACTIONS4 = {R"((?i)\b(whad)(dd)(ya)\b)", R"((?i)\b(wha)(t)(cha)\b)"};
 };
 
 class NLTKWordTokenizer {
@@ -331,45 +326,48 @@ class NLTKWordTokenizer {
 
 public:
     // Starting quotes.
-    Vector<Pair<String, String>> STARTING_QUOTES = {{String(R"(([«“‘„]|[`]+))"), String(R"( $1 )")},
-                                                    {String(R"(^\")"), String(R"(``)")},
-                                                    {String(R"((``))"), String(R"( $1 )")},
-                                                    {String(R"(([ \(\[{<])(\"|\'{2}))"), String(R"($1 `` )")},
-                                                    {String(R"((?i)(\')(?!re|ve|ll|m|t|s|d|n)(\w)\b)"), String(R"($1 $2)")}};
+    std::vector<std::pair<std::string, std::string>> STARTING_QUOTES = {
+        {std::string(R"(([«“‘„]|[`]+))"), std::string(R"( $1 )")},
+        {std::string(R"(^\")"), std::string(R"(``)")},
+        {std::string(R"((``))"), std::string(R"( $1 )")},
+        {std::string(R"(([ \(\[{<])(\"|\'{2}))"), std::string(R"($1 `` )")},
+        {std::string(R"((?i)(\')(?!re|ve|ll|m|t|s|d|n)(\w)\b)"), std::string(R"($1 $2)")}};
 
     // Ending quotes.
-    Vector<Pair<String, String>> ENDING_QUOTES = {{String(R"(([»”’]))"), String(R"( $1 )")},
-                                                  {String(R"('')"), String(R"( '' )")},
-                                                  {String(R"(")"), String(R"( '' )")},
-                                                  {String(R"(\s+)"), String(R"( )")},
-                                                  {String(R"(([^' ])('[sS]|'[mM]|'[dD]|') )"), String(R"($1 $2 )")},
-                                                  {String(R"(([^' ])('ll|'LL|'re|'RE|'ve|'VE|n't|N'T) )"), String(R"($1 $2 )")}};
+    std::vector<std::pair<std::string, std::string>> ENDING_QUOTES = {
+        {std::string(R"(([»”’]))"), std::string(R"( $1 )")},
+        {std::string(R"('')"), std::string(R"( '' )")},
+        {std::string(R"(")"), std::string(R"( '' )")},
+        {std::string(R"(\s+)"), std::string(R"( )")},
+        {std::string(R"(([^' ])('[sS]|'[mM]|'[dD]|') )"), std::string(R"($1 $2 )")},
+        {std::string(R"(([^' ])('ll|'LL|'re|'RE|'ve|'VE|n't|N'T) )"), std::string(R"($1 $2 )")}};
 
     // Punctuation.
-    Vector<Pair<String, String>> PUNCTUATION = {{String(R"(([^\.])(\.)([\]\)}>"\'»”’ ]*)\s*$)"), String(R"($1 $2 $3 )")},
-                                                {String(R"(([:,])([^\d]))"), String(R"( $1 $2)")},
-                                                {String(R"(([:,])$)"), String(R"($1 )")},
-                                                {String(R"(\.{2,})"), String(R"($0 )")},
-                                                {String(R"([;@#$%&])"), String(R"($0 )")},
-                                                {String(R"(([^\.])(\.)([\]\)}>"\']*)\s*$)"), String(R"($1 $2 $3 )")},
-                                                {String(R"([?!])"), String(R"($0 )")},
-                                                {String(R"(([^'])' )"), String(R"($1 ' )")},
-                                                {String(R"([*])"), String(R"($0 )")}};
+    std::vector<std::pair<std::string, std::string>> PUNCTUATION = {
+        {std::string(R"(([^\.])(\.)([\]\)}>"\'»”’ ]*)\s*$)"), std::string(R"($1 $2 $3 )")},
+        {std::string(R"(([:,])([^\d]))"), std::string(R"( $1 $2)")},
+        {std::string(R"(([:,])$)"), std::string(R"($1 )")},
+        {std::string(R"(\.{2,})"), std::string(R"($0 )")},
+        {std::string(R"([;@#$%&])"), std::string(R"($0 )")},
+        {std::string(R"(([^\.])(\.)([\]\)}>"\']*)\s*$)"), std::string(R"($1 $2 $3 )")},
+        {std::string(R"([?!])"), std::string(R"($0 )")},
+        {std::string(R"(([^'])' )"), std::string(R"($1 ' )")},
+        {std::string(R"([*])"), std::string(R"($0 )")}};
 
     // Pads parentheses
-    Pair<String, String> PARENS_BRACKETS = {String(R"([\]\[\(\)\{\}\<\>])"), String(R"( $0 )")};
+    std::pair<std::string, std::string> PARENS_BRACKETS = {std::string(R"([\]\[\(\)\{\}\<\>])"), std::string(R"( $0 )")};
 
-    Vector<Pair<String, String>> CONVERT_PARENTHESES = {{String(R"(\()"), String("-LRB-")},
-                                                        {String(R"(\))"), String("-RRB-")},
-                                                        {String(R"(\[)"), String("-LSB-")},
-                                                        {String(R"(\])"), String("-RSB-")},
-                                                        {String(R"(\{)"), String("-LCB-")},
-                                                        {String(R"(\})"), String("-RCB-")}};
+    std::vector<std::pair<std::string, std::string>> CONVERT_PARENTHESES = {{std::string(R"(\()"), std::string("-LRB-")},
+                                                                            {std::string(R"(\))"), std::string("-RRB-")},
+                                                                            {std::string(R"(\[)"), std::string("-LSB-")},
+                                                                            {std::string(R"(\])"), std::string("-RSB-")},
+                                                                            {std::string(R"(\{)"), std::string("-LCB-")},
+                                                                            {std::string(R"(\})"), std::string("-RCB-")}};
 
-    Pair<String, String> DOUBLE_DASHES = {String(R"(--)"), String(R"( -- )")};
+    std::pair<std::string, std::string> DOUBLE_DASHES = {std::string(R"(--)"), std::string(R"( -- )")};
 
-    void Tokenize(const String &text, Vector<String> &tokens, bool convert_parentheses = false) {
-        String result = text;
+    void Tokenize(const std::string &text, std::vector<std::string> &tokens, bool convert_parentheses = false) {
+        std::string result = text;
 
         for (const auto &[pattern, substitution] : STARTING_QUOTES) {
             result = ApplyRegex(result, pattern, substitution);
@@ -409,7 +407,7 @@ public:
         // Split the result into tokens
         size_t start = 0;
         size_t end = result.find(' ');
-        while (end != String::npos) {
+        while (end != std::string::npos) {
             if (end != start) {
                 tokens.push_back(result.substr(start, end - start));
             }
@@ -422,7 +420,7 @@ public:
     }
 
 private:
-    String ApplyRegex(const String &text, const String &pattern, const String &substitution) {
+    std::string ApplyRegex(const std::string &text, const std::string &pattern, const std::string &substitution) {
         pcre2_code *re;
         PCRE2_SPTR pcre2_pattern = reinterpret_cast<PCRE2_SPTR>(pattern.c_str());
         PCRE2_SPTR pcre2_subject = reinterpret_cast<PCRE2_SPTR>(text.c_str());
@@ -443,7 +441,7 @@ private:
         }
 
         size_t outlength = text.length() * 2 < 1024 ? 1024 : text.length() * 2;
-        auto buffer = MakeUnique<PCRE2_UCHAR[]>(outlength);
+        auto buffer = std::make_unique<PCRE2_UCHAR[]>(outlength);
         pcre2_substitute(re,
                          pcre2_subject,
                          text.length(),
@@ -458,11 +456,11 @@ private:
         pcre2_match_data_free(match_data);
         pcre2_code_free(re);
 
-        return String(reinterpret_cast<char *>(buffer.get()), outlength);
+        return std::string(reinterpret_cast<char *>(buffer.get()), outlength);
     }
 };
 
-void SentenceSplitter(const String &text, Vector<String> &result) {
+void SentenceSplitter(const std::string &text, std::vector<std::string> &result) {
     int error_code;
     PCRE2_SIZE error_offset;
     const char *pattern = R"( *[\.\?!]['"\)\]]* *)";
@@ -502,16 +500,16 @@ void SentenceSplitter(const String &text, Vector<String> &result) {
     pcre2_code_free(re);
 }
 
-RAGAnalyzer::RAGAnalyzer(const String &path)
-    : dict_path_(path), stemmer_(MakeUnique<Stemmer>()), lowercase_string_buffer_(term_string_buffer_limit_),
-      nltk_tokenizer_(MakeUnique<NLTKWordTokenizer>()) {
+RAGAnalyzer::RAGAnalyzer(const std::string &path)
+    : dict_path_(path), stemmer_(std::make_unique<Stemmer>()), lowercase_string_buffer_(term_string_buffer_limit_),
+      nltk_tokenizer_(std::make_unique<NLTKWordTokenizer>()) {
     InitStemmer(STEM_LANG_ENGLISH);
 }
 
 RAGAnalyzer::RAGAnalyzer(const RAGAnalyzer &other)
-    : own_dict_(false), trie_(other.trie_), pos_table_(other.pos_table_), lemma_(other.lemma_), stemmer_(MakeUnique<Stemmer>()),
+    : own_dict_(false), trie_(other.trie_), pos_table_(other.pos_table_), lemma_(other.lemma_), stemmer_(std::make_unique<Stemmer>()),
       opencc_(other.opencc_), lowercase_string_buffer_(term_string_buffer_limit_), fine_grained_(other.fine_grained_),
-      nltk_tokenizer_(MakeUnique<NLTKWordTokenizer>()) {
+      nltk_tokenizer_(std::make_unique<NLTKWordTokenizer>()) {
     InitStemmer(STEM_LANG_ENGLISH);
 }
 
@@ -550,16 +548,16 @@ Status RAGAnalyzer::Load() {
         // Build trie
         try {
             std::ifstream from(dict_path.string());
-            String line;
-            RE2 re_pattern(R"([\r\n]+)");
-            String split_pattern("([ \t])");
+            std::string line;
+            re2::RE2 re_pattern(R"([\r\n]+)");
+            std::string split_pattern("([ \t])");
 
             while (getline(from, line)) {
                 line = line.substr(0, line.find('\r'));
                 if (line.empty())
                     continue;
                 line = Replace(re_pattern, "", line);
-                Vector<String> results;
+                std::vector<std::string> results;
                 Split(line, split_pattern, results);
                 if (results.size() != 3)
                     throw std::runtime_error("Invalid dictionary format");
@@ -568,7 +566,7 @@ Status RAGAnalyzer::Load() {
                 i32 pos_idx = pos_table_->GetPOSIndex(results[2]);
                 int value = Encode(freq, pos_idx);
                 trie_->Add(results[0], value);
-                String rkey = RKey(results[0]);
+                std::string rkey = RKey(results[0]);
                 trie_->Add(rkey, Encode(1, 0));
             }
             trie_->Build();
@@ -598,8 +596,8 @@ Status RAGAnalyzer::Load() {
     return Status::OK();
 }
 
-String RAGAnalyzer::StrQ2B(const String &input) {
-    String output;
+std::string RAGAnalyzer::StrQ2B(const std::string &input) {
+    std::string output;
     size_t i = 0;
 
     while (i < input.size()) {
@@ -651,10 +649,10 @@ i32 RAGAnalyzer::Freq(const std::string_view key) const {
     return static_cast<i32>(std::exp(v) * DENOMINATOR + 0.5);
 }
 
-String RAGAnalyzer::Key(const std::string_view line) { return ToLowerString(line); }
+std::string RAGAnalyzer::Key(const std::string_view line) { return ToLowerString(line); }
 
-String RAGAnalyzer::RKey(const std::string_view line) {
-    String reversed;
+std::string RAGAnalyzer::RKey(const std::string_view line) {
+    std::string reversed;
     reversed.reserve(line.size() + 2);
     reversed += "DD";
     for (size_t i = line.size(); i > 0;) {
@@ -671,10 +669,10 @@ String RAGAnalyzer::RKey(const std::string_view line) {
 
 #define DIVIDE_F_BY_N 1
 
-Pair<Vector<String>, double> RAGAnalyzer::Score(const Vector<Pair<String, int>> &token_freqs) {
+std::pair<std::vector<std::string>, double> RAGAnalyzer::Score(const std::vector<std::pair<std::string, int>> &token_freqs) {
     constexpr i64 B = 30;
     i64 F = 0, L = 0;
-    Vector<String> tokens;
+    std::vector<std::string> tokens;
     tokens.reserve(token_freqs.size());
     for (const auto &[token, freq_tag] : token_freqs) {
         F += DecodeFreq(freq_tag);
@@ -689,21 +687,22 @@ Pair<Vector<String>, double> RAGAnalyzer::Score(const Vector<Pair<String, int>> 
     return {std::move(tokens), score};
 }
 
-void RAGAnalyzer::SortTokens(const Vector<Vector<Pair<String, int>>> &token_list, Vector<Pair<Vector<String>, double>> &res) {
+void RAGAnalyzer::SortTokens(const std::vector<std::vector<std::pair<std::string, int>>> &token_list,
+                             std::vector<std::pair<std::vector<std::string>, double>> &res) {
     for (const auto &tfts : token_list) {
         res.push_back(Score(tfts));
     }
     std::sort(res.begin(), res.end(), [](const auto &a, const auto &b) { return a.second > b.second; });
 }
 
-Pair<Vector<String>, double> RAGAnalyzer::MaxForward(const String &line) const {
-    Vector<Pair<String, int>> res;
+std::pair<std::vector<std::string>, double> RAGAnalyzer::MaxForward(const std::string &line) const {
+    std::vector<std::pair<std::string, int>> res;
     std::size_t s = 0;
     std::size_t len = UTF8Length(line);
 
     while (s < len) {
         std::size_t e = s + 1;
-        String t = UTF8Substr(line, s, e - s);
+        std::string t = UTF8Substr(line, s, e - s);
 
         while (e < len && trie_->HasKeysWithPrefix(Key(t))) {
             e += 1;
@@ -728,13 +727,13 @@ Pair<Vector<String>, double> RAGAnalyzer::MaxForward(const String &line) const {
     return Score(res);
 }
 
-Pair<Vector<String>, double> RAGAnalyzer::MaxBackward(const String &line) const {
-    Vector<Pair<String, int>> res;
+std::pair<std::vector<std::string>, double> RAGAnalyzer::MaxBackward(const std::string &line) const {
+    std::vector<std::pair<std::string, int>> res;
     int s = UTF8Length(line) - 1;
 
     while (s >= 0) {
         const int e = s + 1;
-        String t = UTF8Substr(line, s, e - s);
+        std::string t = UTF8Substr(line, s, e - s);
         while (s > 0 && trie_->HasKeysWithPrefix(RKey(t))) {
             s -= 1;
             t = UTF8Substr(line, s, e - s);
@@ -758,11 +757,11 @@ Pair<Vector<String>, double> RAGAnalyzer::MaxBackward(const String &line) const 
     return Score(res);
 }
 
-int RAGAnalyzer::DFS(const String &chars,
+int RAGAnalyzer::DFS(const std::string &chars,
                      const int s,
-                     Vector<Pair<String, int>> &pre_tokens,
-                     Vector<Vector<Pair<String, int>>> &token_list,
-                     Vector<String> &best_tokens,
+                     std::vector<std::pair<std::string, int>> &pre_tokens,
+                     std::vector<std::vector<std::pair<std::string, int>>> &token_list,
+                     std::vector<std::string> &best_tokens,
                      double &max_score,
                      const bool memo_all) const {
     int res = s;
@@ -779,8 +778,8 @@ int RAGAnalyzer::DFS(const String &chars,
     // pruning
     int S = s + 1;
     if (s + 2 <= len) {
-        String t1 = UTF8Substr(chars, s, 1);
-        String t2 = UTF8Substr(chars, s, 2);
+        std::string t1 = UTF8Substr(chars, s, 1);
+        std::string t2 = UTF8Substr(chars, s, 2);
         if (trie_->HasKeysWithPrefix(Key(t1)) && !trie_->HasKeysWithPrefix(Key(t2))) {
             S = s + 2;
         }
@@ -788,15 +787,15 @@ int RAGAnalyzer::DFS(const String &chars,
 
     if (pre_tokens.size() > 2 && UTF8Length(pre_tokens[pre_tokens.size() - 1].first) == 1 &&
         UTF8Length(pre_tokens[pre_tokens.size() - 2].first) == 1 && UTF8Length(pre_tokens[pre_tokens.size() - 3].first) == 1) {
-        String t1 = pre_tokens[pre_tokens.size() - 1].first + UTF8Substr(chars, s, 1);
+        std::string t1 = pre_tokens[pre_tokens.size() - 1].first + UTF8Substr(chars, s, 1);
         if (trie_->HasKeysWithPrefix(Key(t1))) {
             S = s + 2;
         }
     }
 
     for (int e = S; e <= len; ++e) {
-        String t = UTF8Substr(chars, s, e - s);
-        String k = Key(t);
+        std::string t = UTF8Substr(chars, s, e - s);
+        std::string k = Key(t);
 
         if (e > s + 1 && !trie_->HasKeysWithPrefix(k)) {
             break;
@@ -813,7 +812,7 @@ int RAGAnalyzer::DFS(const String &chars,
         return res;
     }
 
-    String t = UTF8Substr(chars, s, 1);
+    std::string t = UTF8Substr(chars, s, 1);
     if (const int v = trie_->Get(Key(t)); v != -1) {
         pre_tokens.emplace_back(std::move(t), v);
     } else {
@@ -859,7 +858,7 @@ struct BestTokenCandidate {
 
 struct GrowingBestTokenCandidatesTopN {
     i32 top_n{};
-    Vector<BestTokenCandidate> candidates{};
+    std::vector<BestTokenCandidate> candidates{};
 
     explicit GrowingBestTokenCandidatesTopN(const i32 top_n) : top_n(top_n) {}
 
@@ -885,13 +884,13 @@ struct GrowingBestTokenCandidatesTopN {
     }
 };
 
-Vector<Pair<Vector<std::string_view>, double>> RAGAnalyzer::GetBestTokensTopN(const std::string_view chars, const u32 n) const {
+std::vector<std::pair<std::vector<std::string_view>, double>> RAGAnalyzer::GetBestTokensTopN(const std::string_view chars, const u32 n) const {
     const auto utf8_len = UTF8Length(chars);
-    Vector<GrowingBestTokenCandidatesTopN> dp_vec(utf8_len + 1, GrowingBestTokenCandidatesTopN(n));
+    std::vector<GrowingBestTokenCandidatesTopN> dp_vec(utf8_len + 1, GrowingBestTokenCandidatesTopN(n));
     dp_vec[0].candidates.resize(1);
     const char *current_utf8_ptr = chars.data();
     u32 current_left_chars = chars.size();
-    String growing_key; // in lower case
+    std::string growing_key; // in lower case
     for (u32 i = 0; i < utf8_len; ++i) {
         const std::string_view current_chars{current_utf8_ptr, current_left_chars};
         const u32 left_utf8_cnt = utf8_len - i;
@@ -940,7 +939,7 @@ Vector<Pair<Vector<std::string_view>, double>> RAGAnalyzer::GetBestTokensTopN(co
         current_utf8_ptr += forward_cnt;
         current_left_chars -= forward_cnt;
     }
-    Vector<Pair<const TokensList *, double>> mid_result;
+    std::vector<std::pair<const TokensList *, double>> mid_result;
     mid_result.reserve(n);
     for (const auto &c : dp_vec.back().candidates) {
         const auto new_pair = std::make_pair(&(c.tl), c.score());
@@ -959,7 +958,7 @@ Vector<Pair<Vector<std::string_view>, double>> RAGAnalyzer::GetBestTokensTopN(co
     }
     class HelperFunc {
         u32 cnt = 0;
-        Vector<std::string_view> result{};
+        std::vector<std::string_view> result{};
         void GetTokensInner(const TokensList *tl) {
             if (!tl->prev) {
                 result.reserve(cnt);
@@ -971,12 +970,12 @@ Vector<Pair<Vector<std::string_view>, double>> RAGAnalyzer::GetBestTokensTopN(co
         }
 
     public:
-        Vector<std::string_view> GetTokens(const TokensList *tl) {
+        std::vector<std::string_view> GetTokens(const TokensList *tl) {
             GetTokensInner(tl);
             return std::move(result);
         }
     };
-    Vector<Pair<Vector<std::string_view>, double>> result;
+    std::vector<std::pair<std::vector<std::string_view>, double>> result;
     result.reserve(mid_result.size());
     for (const auto [tl, score] : mid_result) {
         result.emplace_back(HelperFunc{}.GetTokens(tl), score);
@@ -992,7 +991,7 @@ Vector<Pair<Vector<std::string_view>, double>> RAGAnalyzer::GetBestTokensTopN(co
 #ifdef INFINITY_DEBUG
 namespace dp_debug {
 template <typename T>
-String TestPrintTokens(const Vector<T> &tokens) {
+std::string TestPrintTokens(const std::vector<T> &tokens) {
     std::ostringstream oss;
     for (std::size_t i = 0; i < tokens.size(); ++i) {
         oss << (i ? " #" : "#") << tokens[i] << "#";
@@ -1003,11 +1002,11 @@ String TestPrintTokens(const Vector<T> &tokens) {
 auto print_1 = [](const bool b) { return b ? "✅" : "❌"; };
 auto print_2 = [](const bool b) { return b ? "equal" : "not equal"; };
 
-void compare_score_and_tokens(const Vector<String> &dfs_tokens,
+void compare_score_and_tokens(const std::vector<std::string> &dfs_tokens,
                               const double dfs_score,
-                              const Vector<std::string_view> &dp_tokens,
+                              const std::vector<std::string_view> &dp_tokens,
                               const double dp_score,
-                              const String &prefix) {
+                              const std::string &prefix) {
     std::ostringstream oss;
     const auto b_score_eq = dp_score == dfs_score;
     oss << fmt::format("\n{} {} DFS and DP score {}:\nDFS: {}\nDP : {}\n", print_1(b_score_eq), prefix, print_2(b_score_eq), dfs_score, dp_score);
@@ -1033,7 +1032,7 @@ void compare_score_and_tokens(const Vector<String> &dfs_tokens,
 
 inline void CheckDP(const RAGAnalyzer *this_ptr,
                     const std::string_view input_str,
-                    const Vector<String> &dfs_tokens,
+                    const std::vector<std::string> &dfs_tokens,
                     const double dfs_score,
                     const auto t0,
                     const auto t1) {
@@ -1067,14 +1066,14 @@ inline void CheckDP2(const RAGAnalyzer *this_ptr, const std::string_view input_s
 } // namespace dp_debug
 #endif
 
-String RAGAnalyzer::Merge(const String &tks_str) const {
-    String tks = tks_str;
+std::string RAGAnalyzer::Merge(const std::string &tks_str) const {
+    std::string tks = tks_str;
 
     tks = Replace(replace_space_pattern_, " ", tks);
 
-    Vector<String> tokens;
+    std::vector<std::string> tokens;
     Split(tks, blank_pattern_, tokens);
-    Vector<String> res;
+    std::vector<std::string> res;
     std::size_t s = 0;
     while (true) {
         if (s >= tokens.size())
@@ -1082,8 +1081,8 @@ String RAGAnalyzer::Merge(const String &tks_str) const {
 
         std::size_t E = s + 1;
         for (std::size_t e = s + 2; e < std::min(tokens.size() + 1, s + 6); ++e) {
-            String tk = Join(tokens, s, e, "");
-            if (RE2::PartialMatch(tk, regex_split_pattern_)) {
+            std::string tk = Join(tokens, s, e, "");
+            if (re2::RE2::PartialMatch(tk, regex_split_pattern_)) {
                 if (Freq(tk) > 0) {
                     E = e;
                 }
@@ -1096,13 +1095,13 @@ String RAGAnalyzer::Merge(const String &tks_str) const {
     return Join(res, 0, res.size());
 }
 
-void RAGAnalyzer::EnglishNormalize(const Vector<String> &tokens, Vector<String> &res) {
+void RAGAnalyzer::EnglishNormalize(const std::vector<std::string> &tokens, std::vector<std::string> &res) {
     for (auto &t : tokens) {
-        if (RE2::PartialMatch(t, pattern1_)) { //"[a-zA-Z_-]+$"
-            String lemma_term = lemma_->Lemmatize(t);
+        if (re2::RE2::PartialMatch(t, pattern1_)) { //"[a-zA-Z_-]+$"
+            std::string lemma_term = lemma_->Lemmatize(t);
             char *lowercase_term = lowercase_string_buffer_.data();
             ToLower(lemma_term.c_str(), lemma_term.size(), lowercase_term, term_string_buffer_limit_);
-            String stem_term;
+            std::string stem_term;
             stemmer_->Stem(lowercase_term, stem_term);
             res.push_back(stem_term);
         } else {
@@ -1111,7 +1110,7 @@ void RAGAnalyzer::EnglishNormalize(const Vector<String> &tokens, Vector<String> 
     }
 }
 
-void RAGAnalyzer::TokenizeInner(Vector<String> &res, const String &L) const {
+void RAGAnalyzer::TokenizeInner(std::vector<std::string> &res, const std::string &L) const {
     auto [tks, s] = MaxForward(L);
     auto [tks1, s1] = MaxBackward(L);
 #if 0
@@ -1127,8 +1126,8 @@ void RAGAnalyzer::TokenizeInner(Vector<String> &res, const String &L) const {
     j = _j + 1;
     i = _i + 1;
     while (i < tks1.size() && j < tks.size()) {
-        String tk1 = Join(tks1, _i, i, "");
-        String tk = Join(tks, _j, j, "");
+        std::string tk1 = Join(tks1, _i, i, "");
+        std::string tk = Join(tks, _j, j, "");
         if (tk1 != tk) {
             if (tk1.length() > tk.length()) {
                 j++;
@@ -1142,9 +1141,9 @@ void RAGAnalyzer::TokenizeInner(Vector<String> &res, const String &L) const {
             j++;
             continue;
         }
-        Vector<Pair<String, int>> pre_tokens;
-        Vector<Vector<Pair<String, int>>> token_list;
-        Vector<String> best_tokens;
+        std::vector<std::pair<std::string, int>> pre_tokens;
+        std::vector<std::vector<std::pair<std::string, int>>> token_list;
+        std::vector<std::string> best_tokens;
         double max_score = std::numeric_limits<double>::lowest();
         const auto str_for_dfs = Join(tks, _j, j, "");
 #ifdef INFINITY_DEBUG
@@ -1167,9 +1166,9 @@ void RAGAnalyzer::TokenizeInner(Vector<String> &res, const String &L) const {
         i = _i + 1;
     }
     if (_i < tks1.size()) {
-        Vector<Pair<String, int>> pre_tokens;
-        Vector<Vector<Pair<String, int>>> token_list;
-        Vector<String> best_tokens;
+        std::vector<std::pair<std::string, int>> pre_tokens;
+        std::vector<std::vector<std::pair<std::string, int>>> token_list;
+        std::vector<std::string> best_tokens;
         double max_score = std::numeric_limits<double>::lowest();
         const auto str_for_dfs = Join(tks, _j, tks.size(), "");
 #ifdef INFINITY_DEBUG
@@ -1184,7 +1183,7 @@ void RAGAnalyzer::TokenizeInner(Vector<String> &res, const String &L) const {
     }
 
 #else
-    Vector<int> diff(std::max(tks.size(), tks1.size()), 0);
+    std::vector<int> diff(std::max(tks.size(), tks1.size()), 0);
     for (std::size_t i = 0; i < std::min(tks.size(), tks1.size()); ++i) {
         if (tks[i] != tks1[i]) {
             diff[i] = 1;
@@ -1214,9 +1213,9 @@ void RAGAnalyzer::TokenizeInner(Vector<String> &res, const String &L) const {
             e++;
         }
 
-        Vector<Pair<String, int>> pre_tokens;
-        Vector<Vector<Pair<String, int>>> token_list;
-        Vector<String> best_tokens;
+        std::vector<std::pair<std::string, int>> pre_tokens;
+        std::vector<std::vector<std::pair<std::string, int>>> token_list;
+        std::vector<std::string> best_tokens;
         double max_score = std::numeric_limits<double>::lowest();
         const auto str_for_dfs = Join(tks, s, e < tks.size() ? e + 1 : e, "");
 #ifdef INFINITY_DEBUG
@@ -1227,7 +1226,7 @@ void RAGAnalyzer::TokenizeInner(Vector<String> &res, const String &L) const {
         const auto t1 = std::chrono::high_resolution_clock::now();
         dp_debug::CheckDP(this, str_for_dfs, best_tokens, max_score, t0, t1);
 #endif
-        // Vector<Pair<Vector<String>, double>> sorted_tokens;
+        // std::vector<std::pair<std::vector<std::string>, double>> sorted_tokens;
         // SortTokens(token_list, sorted_tokens);
         // res.push_back(Join(sorted_tokens[0].first, 0));
         res.push_back(Join(best_tokens, 0));
@@ -1236,7 +1235,7 @@ void RAGAnalyzer::TokenizeInner(Vector<String> &res, const String &L) const {
 #endif
 }
 
-void RAGAnalyzer::SplitLongText(const String &L, u32 length, Vector<String> &sublines) const {
+void RAGAnalyzer::SplitLongText(const std::string &L, u32 length, std::vector<std::string> &sublines) const {
     u32 slice_count = length / MAX_SENTENCE_LEN + 1;
     sublines.reserve(slice_count);
     std::size_t last_sentence_start = 0;
@@ -1245,10 +1244,10 @@ void RAGAnalyzer::SplitLongText(const String &L, u32 length, Vector<String> &sub
         next_sentence_start = MAX_SENTENCE_LEN * (i + 1) - 5;
         if (next_sentence_start + 5 < length) {
             std::size_t sentence_length = MAX_SENTENCE_LEN * (i + 1) + 5 > length ? length - next_sentence_start : 10;
-            String substr = UTF8Substr(L, next_sentence_start, sentence_length);
+            std::string substr = UTF8Substr(L, next_sentence_start, sentence_length);
             auto [tks, s] = MaxForward(substr);
             auto [tks1, s1] = MaxBackward(substr);
-            Vector<int> diff(std::max(tks.size(), tks1.size()), 0);
+            std::vector<int> diff(std::max(tks.size(), tks1.size()), 0);
             for (std::size_t j = 0; j < std::min(tks.size(), tks1.size()); ++j) {
                 if (tks[j] != tks1[j]) {
                     diff[j] = 1;
@@ -1278,55 +1277,55 @@ void RAGAnalyzer::SplitLongText(const String &L, u32 length, Vector<String> &sub
             next_sentence_start = length;
         if (next_sentence_start == last_sentence_start)
             continue;
-        String str = UTF8Substr(L, last_sentence_start, next_sentence_start - last_sentence_start);
+        std::string str = UTF8Substr(L, last_sentence_start, next_sentence_start - last_sentence_start);
         sublines.push_back(str);
         last_sentence_start = next_sentence_start;
     }
 }
 
-String RAGAnalyzer::Tokenize(const String &line) {
-    String str1 = StrQ2B(line);
-    String strline;
+std::string RAGAnalyzer::Tokenize(const std::string &line) {
+    std::string str1 = StrQ2B(line);
+    std::string strline;
     opencc_->convert(str1, strline);
-    Vector<String> res;
+    std::vector<std::string> res;
     std::size_t alpha_num = 0;
     int len = UTF8Length(strline);
     for (int i = 0; i < len; ++i) {
-        String t = UTF8Substr(strline, i, 1);
+        std::string t = UTF8Substr(strline, i, 1);
         if (IsAlphabet(t)) {
             alpha_num++;
         }
     }
     if (alpha_num > (std::size_t)(len * 0.9)) {
-        Vector<String> term_list;
-        Vector<String> sentences;
+        std::vector<std::string> term_list;
+        std::vector<std::string> sentences;
         SentenceSplitter(line, sentences);
         for (auto &sentence : sentences) {
             nltk_tokenizer_->Tokenize(sentence, term_list);
         }
         for (unsigned i = 0; i < term_list.size(); ++i) {
-            String t = lemma_->Lemmatize(term_list[i]);
+            std::string t = lemma_->Lemmatize(term_list[i]);
             char *lowercase_term = lowercase_string_buffer_.data();
             ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
-            String stem_term;
+            std::string stem_term;
             stemmer_->Stem(lowercase_term, stem_term);
             res.push_back(stem_term);
         }
-        String ret = Join(res, 0);
+        std::string ret = Join(res, 0);
         return ret;
     }
 
-    Vector<String> arr;
+    std::vector<std::string> arr;
     Split(strline, regex_split_pattern_, arr, true);
     for (const auto &L : arr) {
         auto length = UTF8Length(L);
-        if (length < 2 || RE2::PartialMatch(L, pattern2_) || RE2::PartialMatch(L, pattern3_)) { //[a-z\\.-]+$  [0-9\\.-]+$
+        if (length < 2 || re2::RE2::PartialMatch(L, pattern2_) || re2::RE2::PartialMatch(L, pattern3_)) { //[a-z\\.-]+$  [0-9\\.-]+$
             res.push_back(L);
             continue;
         }
 #if 1
         if (length > MAX_SENTENCE_LEN) {
-            Vector<String> sublines;
+            std::vector<std::string> sublines;
             SplitLongText(L, length, sublines);
             for (auto &l : sublines) {
                 TokenizeInner(res, l);
@@ -1335,22 +1334,22 @@ String RAGAnalyzer::Tokenize(const String &line) {
 #endif
             TokenizeInner(res, L);
     }
-    Vector<String> normalize_res;
+    std::vector<std::string> normalize_res;
     EnglishNormalize(res, normalize_res);
-    String r = Join(normalize_res, 0);
-    String ret = Merge(r);
+    std::string r = Join(normalize_res, 0);
+    std::string ret = Merge(r);
     return ret;
 }
 
-void RAGAnalyzer::FineGrainedTokenize(const String &tokens, Vector<String> &result) {
-    Vector<String> tks;
+void RAGAnalyzer::FineGrainedTokenize(const std::string &tokens, std::vector<std::string> &result) {
+    std::vector<std::string> tks;
     Split(tokens, blank_pattern_, tks);
-    Vector<String> res;
+    std::vector<std::string> res;
     std::size_t zh_num = 0;
     for (auto &token : tks) {
         int len = UTF8Length(token);
         for (int i = 0; i < len; ++i) {
-            String t = UTF8Substr(token, i, 1);
+            std::string t = UTF8Substr(token, i, 1);
             if (IsChinese(t)) {
                 zh_num++;
             }
@@ -1359,29 +1358,29 @@ void RAGAnalyzer::FineGrainedTokenize(const String &tokens, Vector<String> &resu
     if (zh_num < tks.size() * 0.2) {
         for (auto &token : tks) {
             std::istringstream iss(token);
-            String sub_token;
+            std::string sub_token;
             while (std::getline(iss, sub_token, '/')) {
                 result.push_back(sub_token);
             }
         }
-        // String ret = Join(res, 0);
+        // std::string ret = Join(res, 0);
         return;
     }
 
     for (auto &token : tks) {
         const auto token_len = UTF8Length(token);
-        if (token_len < 3 || RE2::PartialMatch(token, pattern4_)) { //[0-9,\\.-]+$
+        if (token_len < 3 || re2::RE2::PartialMatch(token, pattern4_)) { //[0-9,\\.-]+$
             res.push_back(token);
             continue;
         }
-        Vector<Vector<Pair<String, int>>> token_list;
+        std::vector<std::vector<std::pair<std::string, int>>> token_list;
         if (token_len > 10) {
-            Vector<Pair<String, int>> tk;
+            std::vector<std::pair<std::string, int>> tk;
             tk.emplace_back(token, Encode(-1, 0));
             token_list.push_back(tk);
         } else {
-            Vector<Pair<String, int>> pre_tokens;
-            Vector<String> best_tokens;
+            std::vector<std::pair<std::string, int>> pre_tokens;
+            std::vector<std::string> best_tokens;
             double max_score = 0.0F;
 #ifdef INFINITY_DEBUG
             const auto t0 = std::chrono::high_resolution_clock::now();
@@ -1390,7 +1389,7 @@ void RAGAnalyzer::FineGrainedTokenize(const String &tokens, Vector<String> &resu
 #ifdef INFINITY_DEBUG
             const auto t1 = std::chrono::high_resolution_clock::now();
             auto get_dfs_sorted_tokens = [&]() {
-                Vector<Pair<Vector<String>, double>> sorted_tokens;
+                std::vector<std::pair<std::vector<std::string>, double>> sorted_tokens;
                 SortTokens(token_list, sorted_tokens);
                 return sorted_tokens;
             };
@@ -1401,12 +1400,12 @@ void RAGAnalyzer::FineGrainedTokenize(const String &tokens, Vector<String> &resu
             res.push_back(token);
             continue;
         }
-        Vector<Pair<Vector<String>, double>> sorted_tokens;
+        std::vector<std::pair<std::vector<std::string>, double>> sorted_tokens;
         SortTokens(token_list, sorted_tokens);
         const auto &stk = sorted_tokens[1].first;
         if (stk.size() == token_len) {
             res.push_back(token);
-        } else if (RE2::PartialMatch(token, pattern5_)) { // [a-z\\.-]+
+        } else if (re2::RE2::PartialMatch(token, pattern5_)) { // [a-z\\.-]+
             bool need_append_stk = true;
             for (auto &t : stk) {
                 if (UTF8Length(t) < 3) {
@@ -1427,13 +1426,13 @@ void RAGAnalyzer::FineGrainedTokenize(const String &tokens, Vector<String> &resu
         }
     }
     EnglishNormalize(res, result);
-    // String ret = Join(normalize_res, 0);
+    // std::string ret = Join(normalize_res, 0);
     // return ret;
 }
 
 int RAGAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
-    Vector<String> tokens;
-    String output = Tokenize(input.text_);
+    std::vector<std::string> tokens;
+    std::string output = Tokenize(input.text_);
     if (fine_grained_) {
         FineGrainedTokenize(output, tokens);
     } else

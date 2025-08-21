@@ -12,18 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:bitmap_cast;
 
-import :stl;
-
 import :column_vector_cast;
-
 import :infinity_exception;
 import :bound_cast_func;
 import :column_vector;
-import :third_party;
 
 #if 0
 namespace infinity {
@@ -36,8 +30,7 @@ export inline BoundCastFunc BindBitmapCast(DataType &target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<BitmapT, VarcharT, BitmapTryCastToVarlen>);
         }
         default: {
-            String error_message = fmt::format("Can't cast from Time type to {}", target.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Can't cast from Time type to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -45,15 +38,14 @@ export inline BoundCastFunc BindBitmapCast(DataType &target) {
 
 struct BitmapTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(const SourceType &source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
-        String error_message = "Not support to cast from " + DataType::TypeToString<SourceType>() + " to " + DataType::TypeToString<TargetType>();
-        UnrecoverableError(error_message);
+    static inline bool Run(const SourceType &source, TargetType &target, const std::shared_ptr<ColumnVector> &vector_ptr) {
+        UnrecoverableError("Not support to cast from " + DataType::TypeToString<SourceType>() + " to " + DataType::TypeToString<TargetType>());
         return false;
     }
 };
 
 template <>
-inline bool BitmapTryCastToVarlen::Run(const BitmapT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+inline bool BitmapTryCastToVarlen::Run(const BitmapT &source, VarcharT &target, const std::shared_ptr<ColumnVector> &vector_ptr) {
     RecoverableError(Status::NotSupport("Not implemented"));
     return false;
 }

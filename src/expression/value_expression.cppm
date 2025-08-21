@@ -12,17 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:value_expression;
 
 import :base_expression;
 import :bound_select_statement;
-
 import :column_vector;
 import :expression_type;
 import :value;
-import :stl;
+
 import internal_types;
 import data_type;
 
@@ -32,11 +29,11 @@ export class ValueExpression : public BaseExpression {
 public:
     explicit ValueExpression(Value value) : BaseExpression(ExpressionType::kValue, {}), value_(std::move(value)) {}
 
-    String ToString() const override;
+    std::string ToString() const override;
 
     inline DataType Type() const override { return value_.type(); }
 
-    inline void AppendToChunk(SharedPtr<ColumnVector> &column_vector) { column_vector->AppendValue(value_); }
+    inline void AppendToChunk(std::shared_ptr<ColumnVector> &column_vector) { column_vector->AppendValue(value_); }
 
     const Value &GetValue() const { return value_; }
 

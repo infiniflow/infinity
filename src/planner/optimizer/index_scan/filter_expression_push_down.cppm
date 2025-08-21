@@ -12,12 +12,8 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-module;
-
 export module infinity_core:filter_expression_push_down;
 
-import :stl;
-// import :query_context;
 import :base_expression;
 import :base_table_ref;
 import :index_base;
@@ -56,22 +52,22 @@ protected:
 };
 
 export struct IndexScanFilterExpressionPushDownResult {
-    SharedPtr<BaseExpression> index_filter_;
-    SharedPtr<BaseExpression> leftover_filter_;
+    std::shared_ptr<BaseExpression> index_filter_;
+    std::shared_ptr<BaseExpression> leftover_filter_;
 
-    UniquePtr<IndexFilterEvaluator> index_filter_evaluator_;
+    std::unique_ptr<IndexFilterEvaluator> index_filter_evaluator_;
 };
 
 export class FilterExpressionPushDown {
 public:
     static IndexScanFilterExpressionPushDownResult
-    PushDownToIndexScan(QueryContext *query_context, const BaseTableRef *base_table_ref_ptr, const SharedPtr<BaseExpression> &expression);
+    PushDownToIndexScan(QueryContext *query_context, const BaseTableRef *base_table_ref_ptr, const std::shared_ptr<BaseExpression> &expression);
 
     static void BuildFilterFulltextExpression(QueryContext *query_context,
                                               const BaseTableRef *base_table_ref_ptr,
-                                              const Vector<SharedPtr<BaseExpression>> &expressions);
+                                              const std::vector<std::shared_ptr<BaseExpression>> &expressions);
 
-    static UniquePtr<FastRoughFilterEvaluator> PushDownToFastRoughFilter(SharedPtr<BaseExpression> &expression);
+    static std::unique_ptr<FastRoughFilterEvaluator> PushDownToFastRoughFilter(std::shared_ptr<BaseExpression> &expression);
 };
 
 } // namespace infinity

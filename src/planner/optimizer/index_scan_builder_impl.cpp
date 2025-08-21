@@ -12,14 +12,9 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-module;
-
-#include <vector>
 module infinity_core:index_scan_builder.impl;
 
 import :index_scan_builder;
-
-import :stl;
 import :logical_node;
 import :logical_node_type;
 import :logical_filter;
@@ -34,11 +29,12 @@ import :logical_fusion;
 import :query_context;
 import :logical_node_visitor;
 import :infinity_exception;
-import :logger;
-import :third_party;
 import :filter_expression_push_down;
 import :base_table_ref;
 import :lazy_load;
+
+import std;
+import third_party;
 
 namespace infinity {
 
@@ -47,15 +43,14 @@ class BuildIndexScan {
 public:
     explicit BuildIndexScan(QueryContext *query_context_ptr) : query_context_(query_context_ptr) {}
 
-    void VisitNode(SharedPtr<LogicalNode> &op) {
+    void VisitNode(std::shared_ptr<LogicalNode> &op) {
         if (!op) {
             return;
         }
         switch (op->operator_type()) {
             case LogicalNodeType::kFilter: {
                 if (op->right_node().get() != nullptr) {
-                    String error_message = "BuildSecondaryIndexScan: Logical filter node shouldn't have right child.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("BuildSecondaryIndexScan: Logical filter node shouldn't have right child.");
                 } else if (op->left_node()->operator_type() != LogicalNodeType::kTableScan) {
                     LOG_INFO("BuildSecondaryIndexScan: The left child of Logical filter is not table scan. Cannot push down filter. Need to fix.");
                 } else {
@@ -74,12 +69,12 @@ public:
                     } else {
                         // try to push down the qualified index filter condition to the scan
                         // replace logical table scan with logical index scan
-                        auto index_scan = MakeShared<LogicalIndexScan>(query_context_->GetNextNodeID(),
-                                                                       std::move(base_table_ref_ptr),
-                                                                       std::move(index_filter),
-                                                                       std::move(index_filter_evaluator),
-                                                                       std::move(fast_rough_filter_evaluator),
-                                                                       true);
+                        auto index_scan = std::make_shared<LogicalIndexScan>(query_context_->GetNextNodeID(),
+                                                                             std::move(base_table_ref_ptr),
+                                                                             std::move(index_filter),
+                                                                             std::move(index_filter_evaluator),
+                                                                             std::move(fast_rough_filter_evaluator),
+                                                                             true);
                         op->set_left_node(std::move(index_scan));
                         LOG_TRACE("BuildSecondaryIndexScan: Push down the qualified index scan filter. Replace table scan with index scan.");
                     }
@@ -89,7 +84,7 @@ public:
                         filter_expression = std::move(leftover_filter);
                     } else {
                         // Remove the filter node. Need to get parent node
-                        SharedPtr<LogicalNode> scan = std::move(op->left_node());
+                        std::shared_ptr<LogicalNode> scan = std::move(op->left_node());
                         op = std::move(scan);
                     }
                 }
@@ -134,7 +129,7 @@ private:
     const BaseTableRef *scan_table_ref_ptr_ = nullptr;
 };
 
-void IndexScanBuilder::ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<LogicalNode> &logical_plan) {
+void IndexScanBuilder::ApplyToPlan(QueryContext *query_context_ptr, std::shared_ptr<LogicalNode> &logical_plan) {
     BuildIndexScan visitor(query_context_ptr);
     visitor.VisitNode(logical_plan);
 }

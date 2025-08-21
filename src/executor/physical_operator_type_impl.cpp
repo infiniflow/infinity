@@ -12,20 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_operator_type.impl;
 
 import :physical_operator_type;
-
-import :stl;
 import :status;
 import :infinity_exception;
 import :logger;
 import :physical_operator_type;
 
 namespace infinity {
-String PhysicalOperatorToString(PhysicalOperatorType type) {
+std::string PhysicalOperatorToString(PhysicalOperatorType type) {
     switch (type) {
 
         case PhysicalOperatorType::kInvalid:

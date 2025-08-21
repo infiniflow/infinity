@@ -16,10 +16,12 @@ module;
 
 export module infinity_core:bg_task_type;
 
-import :stl;
-import :third_party;
-import global_resource_usage;
 import :status;
+
+import std;
+import third_party;
+
+import global_resource_usage;
 
 namespace infinity {
 
@@ -37,6 +39,6 @@ export enum class BGTaskType {
     kInvalid
 };
 
-export String ToString(BGTaskType type);
+export std::string ToString(BGTaskType type);
 
 } // namespace infinity

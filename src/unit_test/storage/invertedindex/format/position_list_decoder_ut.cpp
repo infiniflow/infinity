@@ -1,17 +1,11 @@
-
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.position_list_decoder;
 
 import :ut.base_test;
-import :stl;
+
 import :file_reader;
 import :file_writer;
 import :index_defines;
@@ -22,7 +16,6 @@ import :posting_byte_slice_reader;
 import :in_doc_pos_state;
 import :posting_byte_slice;
 import :byte_slice_reader;
-#endif
 
 using namespace infinity;
 
@@ -33,7 +26,7 @@ public:
     ~PositionListDecoderTest() {}
 
 protected:
-    static constexpr SizeT BUFFER_SIZE_ = 10240;
+    static constexpr size_t BUFFER_SIZE_ = 10240;
 };
 
 TEST_F(PositionListDecoderTest, test1) {
@@ -58,7 +51,7 @@ TEST_F(PositionListDecoderTest, test1) {
     ASSERT_EQ(pos_count2, static_cast<u32>(2));
     ASSERT_EQ(pos_count1 + pos_count2, MAX_POS_PER_RECORD + 2);
 
-    for (SizeT i = 0; i < MAX_DOC_PER_RECORD + 2; ++i) {
+    for (size_t i = 0; i < MAX_DOC_PER_RECORD + 2; ++i) {
         pos_t expected_delta = (i > 0);
         ASSERT_EQ(pos_buffer[i], expected_delta);
     }

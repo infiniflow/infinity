@@ -1,26 +1,18 @@
-
-#ifdef CI
-#include <gtest/gtest.h>
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include <gtest/gtest.h>
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.stream_reader;
 
 import :ut.base_test;
 import :infinity_exception;
-import :stl;
-import :third_party;
+import third_party;
 import :logger;
 import :file_writer;
 import :file_reader;
 import :infinity_context;
 import :stream_reader;
 import :virtual_store;
-#endif
 
 import global_resource_usage;
 
@@ -29,10 +21,10 @@ using namespace infinity;
 class StreamReaderTest : public BaseTest {};
 
 TEST_F(StreamReaderTest, TestBasicStreamIO) {
-    String path = String(GetFullTmpDir()) + "/test_streamio.abc";
+    std::string path = std::string(GetFullTmpDir()) + "/test_streamio.abc";
     FileWriter file_writer(path, 128);
 
-    String lines[5];
+    std::string lines[5];
     lines[0] = "hahahahha";
     lines[1] = "xixixixiix";
     lines[2] = "huhuhuhu";
@@ -45,9 +37,9 @@ TEST_F(StreamReaderTest, TestBasicStreamIO) {
     }
     file_writer.Sync();
 
-    UniquePtr<StreamReader> stream = VirtualStore::OpenStreamReader(path);
+    std::unique_ptr<StreamReader> stream = VirtualStore::OpenStreamReader(path);
     i32 i = 0;
-    String line;
+    std::string line;
     while (stream->ReadLine(line)) {
         EXPECT_STREQ(line.c_str(), lines[i].c_str());
         i++;

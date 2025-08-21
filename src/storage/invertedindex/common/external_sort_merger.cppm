@@ -14,25 +14,22 @@
 
 module;
 
-#include <concepts>
 #include <cstdio>
-#include <stdexcept>
-#include <unistd.h>
-#include <vector>
-#include <type_traits>
 
 export module infinity_core:external_sort_merger;
 
-import :stl;
 import :loser_tree;
 import :infinity_exception;
-import :third_party;
 import :blocking_queue;
+
+import std;
+import std.compat;
+import third_party;
 
 namespace infinity {
 
 export struct DirectIO {
-    DirectIO(FILE *fd, const String &mode = "r") : fd_(fd), length_(0) {
+    DirectIO(FILE *fd, const std::string &mode = "r") : fd_(fd), length_(0) {
         if (mode.compare("r") == 0) {
             fseek(fd_, 0, SEEK_END);
             fseek(fd_, 0, SEEK_END);
@@ -41,19 +38,19 @@ export struct DirectIO {
         }
     }
 
-    SizeT Write(char *const data, SizeT length) { return fwrite(data, length, 1, fd_); }
+    size_t Write(char *const data, size_t length) { return fwrite(data, length, 1, fd_); }
 
-    SizeT Read(char *data, SizeT length) { return fread(data, 1, length, fd_); }
+    size_t Read(char *data, size_t length) { return fread(data, 1, length, fd_); }
 
-    SizeT Tell() { return ftell(fd_); }
+    size_t Tell() { return ftell(fd_); }
 
-    void Seek(SizeT pos, int origin = SEEK_SET) { fseek(fd_, pos, origin); }
+    void Seek(size_t pos, int origin = SEEK_SET) { fseek(fd_, pos, origin); }
 
-    SizeT Length() { return length_; }
+    size_t Length() { return length_; }
 
     FILE *fd_;
 
-    SizeT length_;
+    size_t length_;
 };
 
 export struct TermTuple {
@@ -107,11 +104,11 @@ export struct TermTupleList {
 
     void Add(u32 doc_id, u32 term_pos, u16 doc_payload) { doc_pos_list_.emplace_back(doc_id, term_pos, doc_payload); }
 
-    SizeT Size() const { return doc_pos_list_.size(); }
+    size_t Size() const { return doc_pos_list_.size(); }
 
-    String term_;
+    std::string term_;
     // <doc_id, term_pos, doc_payload>
-    Vector<Tuple<u32, u32, u16>> doc_pos_list_;
+    std::vector<std::tuple<u32, u32, u16>> doc_pos_list_;
     u32 max_tuple_num_{0};
 };
 
@@ -237,16 +234,17 @@ struct KeyAddress<TermTuple, LenType> {
 
 class CycleBuffer {
 public:
-    CycleBuffer(SizeT total_buffers, SizeT buffer_size) : total_buffers_(total_buffers), buffer_size_(buffer_size), head_(0), tail_(0), full_(false) {
+    CycleBuffer(size_t total_buffers, size_t buffer_size)
+        : total_buffers_(total_buffers), buffer_size_(buffer_size), head_(0), tail_(0), full_(false) {
         buffer_array_.resize(total_buffers);
         buffer_real_size_.resize(total_buffers);
         buffer_real_num_.resize(total_buffers);
         for (auto &buf : buffer_array_) {
-            buf = MakeUnique<char[]>(buffer_size);
+            buf = std::make_unique<char[]>(buffer_size);
         }
     }
 
-    void Put(const char *data, SizeT length) {
+    void Put(const char *data, size_t length) {
         if (length > buffer_size_) {
             throw std::runtime_error("Data length exceeds buffer capacity");
         }
@@ -263,7 +261,7 @@ public:
         }
     }
 
-    void PutReal(UniquePtr<char[]> &data_buf, const u32 &real_size, const u32 &real_num) {
+    void PutReal(std::unique_ptr<char[]> &data_buf, const u32 &real_size, const u32 &real_num) {
         buffer_real_size_[head_] = real_size;
         buffer_real_num_[head_] = real_num;
         std::swap(data_buf, buffer_array_[head_]);
@@ -275,7 +273,7 @@ public:
         }
     }
 
-    Tuple<const char *, u32, u32> GetTuple() {
+    std::tuple<const char *, u32, u32> GetTuple() {
         if (IsEmpty()) {
             throw std::runtime_error("Buffer is empty");
         }
@@ -310,7 +308,7 @@ public:
 
     bool IsFull() const { return full_; }
 
-    SizeT Size() const {
+    size_t Size() const {
         if (full_) {
             return total_buffers_;
         }
@@ -321,13 +319,13 @@ public:
     }
 
 private:
-    Vector<UniquePtr<char[]>> buffer_array_;
-    Vector<u32> buffer_real_size_;
-    Vector<u32> buffer_real_num_;
-    SizeT total_buffers_;
-    SizeT buffer_size_;
-    SizeT head_;
-    SizeT tail_;
+    std::vector<std::unique_ptr<char[]>> buffer_array_;
+    std::vector<u32> buffer_real_size_;
+    std::vector<u32> buffer_real_num_;
+    size_t total_buffers_;
+    size_t buffer_size_;
+    size_t head_;
+    size_t tail_;
     bool full_;
 };
 
@@ -336,8 +334,8 @@ class SortMerger {
 protected:
     typedef SortMerger<KeyType, LenType> self_t;
     typedef KeyAddress<KeyType, LenType> KeyAddr;
-    static constexpr SizeT MAX_TUPLE_LENGTH = 1024;
-    String filenm_;
+    static constexpr size_t MAX_TUPLE_LENGTH = 1024;
+    std::string filenm_;
     const u32 MAX_GROUP_SIZE_; //!< max group size
     const u32 BS_SIZE_;        //!< in fact it equals to memory size
     u32 PRE_BUF_SIZE_;         //!< max predict buffer size
@@ -346,8 +344,8 @@ protected:
     const u32 OUT_BUF_NUM_;    //!< output threads number
 
     // both pre_heap_ and merge_losser_tree are defined as small root heaps
-    Heap<KeyAddr, std::greater<KeyAddr>> pre_heap_;
-    SharedPtr<LoserTree<KeyAddr, std::less<KeyAddr>>> merge_loser_tree_;
+    std::priority_queue<KeyAddr, std::vector<KeyAddr>, std::greater<KeyAddr>> pre_heap_;
+    std::shared_ptr<LoserTree<KeyAddr, std::less<KeyAddr>>> merge_loser_tree_;
 
     u32 *micro_run_idx_{nullptr};  //!< the access index of each microruns
     u32 *micro_run_pos_{nullptr};  //!< the access position within each microruns
@@ -376,12 +374,12 @@ protected:
     u32 *out_buf_size_{nullptr};  //!< data size of each output buffer
     bool *out_buf_full_{nullptr}; //!< a flag to ensure if the output buffer is full or not
 
-    UniquePtr<CycleBuffer> cycle_buffer_;
+    std::unique_ptr<CycleBuffer> cycle_buffer_;
     std::mutex cycle_buf_mtx_;
     std::condition_variable cycle_buf_con_;
 
-    SizeT OUT_BATCH_SIZE_;
-    BlockingQueue<SharedPtr<TermTupleList>> term_tuple_list_queue_;
+    size_t OUT_BATCH_SIZE_;
+    BlockingQueue<std::shared_ptr<TermTupleList>> term_tuple_list_queue_;
 
     bool read_finish_{false};
     u32 CYCLE_BUF_SIZE_;
@@ -401,7 +399,7 @@ protected:
 
     void Output(FILE *f, u32 idx);
 
-    void Unpin(Vector<UniquePtr<Thread>> &threads);
+    void Unpin(std::vector<std::unique_ptr<std::thread>> &threads);
 
 public:
     SortMerger(const char *filenm, u32 group_size = 4, u32 bs = 100000000, u32 output_num = 2);
@@ -419,7 +417,7 @@ protected:
     using Super = SortMerger<KeyType, LenType>;
     using typename Super::KeyAddr;
     FILE *run_file_{nullptr};
-    UniquePtr<DirectIO> io_stream_;
+    std::unique_ptr<DirectIO> io_stream_;
 
     void PredictImpl(DirectIO &io_stream);
 
@@ -428,15 +426,15 @@ protected:
 public:
     SortMergerTermTuple(const char *filenm, u32 group_size = 4, u32 bs = 100000000, u32 output_num = 2);
 
-    void Run(Vector<UniquePtr<Thread>> &threads);
+    void Run(std::vector<std::unique_ptr<std::thread>> &threads);
 
     u64 &Count() { return this->count_; }
 
-    BlockingQueue<SharedPtr<TermTupleList>> &TermTupleListQueue() { return this->term_tuple_list_queue_; }
+    BlockingQueue<std::shared_ptr<TermTupleList>> &TermTupleListQueue() { return this->term_tuple_list_queue_; }
 
     void InitRunFile();
 
-    void JoinThreads(Vector<UniquePtr<Thread>> &threads);
+    void JoinThreads(std::vector<std::unique_ptr<std::thread>> &threads);
 
     void UnInitRunFile();
 };

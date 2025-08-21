@@ -12,22 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.substr_function;
 
 import :ut.base_test;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
-import :stl;
+
 import :infinity_context;
 import :scalar_function;
 import :scalar_function_set;
@@ -44,7 +39,6 @@ import :substring;
 import :config;
 import :status;
 import :kv_store;
-#endif
 
 import global_resource_usage;
 import logical_type;
@@ -59,32 +53,32 @@ class SubstrFunctionTest : public BaseTest {};
 TEST_F(SubstrFunctionTest, varchar_substr) {
     using namespace infinity;
 
-UniquePtr<Config> config_ptr = MakeUnique<Config>();
+std::unique_ptr<Config> config_ptr = std::make_unique<Config>();
 Status status = config_ptr->Init(nullptr, nullptr);
 EXPECT_TRUE(status.ok());
-UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+std::unique_ptr<KVStore> kv_store_ptr = std::make_unique<KVStore>();
 status = kv_store_ptr->Init(config_ptr->CatalogDir());
 EXPECT_TRUE(status.ok());
-UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+std::unique_ptr<NewCatalog> catalog_ptr = std::make_unique<NewCatalog>(kv_store_ptr.get());
 
     RegisterSubstringFunction(catalog_ptr.get());
 
     {
         String op = "substring";
-        SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
+        std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
         EXPECT_EQ(function_set->type_, FunctionType::kScalar);
-        SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
+        std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
-        Vector<SharedPtr<BaseExpression>> inputs;
+        Vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type0 = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<ColumnExpression> col0_expr_ptr = MakeShared<ColumnExpression>(*data_type0, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type0 = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnExpression> col0_expr_ptr = std::make_shared<ColumnExpression>(*data_type0, "t1", 1, "c1", 0, 0);
 
         Value v1 = Value::MakeBigInt(1);
-        SharedPtr<ValueExpression> pos_value_expr = MakeShared<ValueExpression>(v1);
+        std::shared_ptr<ValueExpression> pos_value_expr = std::make_shared<ValueExpression>(v1);
 
         Value v2 = Value::MakeBigInt(3);
-        SharedPtr<ValueExpression> len_value_expr = MakeShared<ValueExpression>(v2);
+        std::shared_ptr<ValueExpression> len_value_expr = std::make_shared<ValueExpression>(v2);
 
         inputs.emplace_back(col0_expr_ptr);
         inputs.emplace_back(pos_value_expr);
@@ -92,25 +86,25 @@ UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("substring(Varchar, BigInt, BigInt)->Varchar", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type0);
-        column_types.emplace_back(MakeShared<DataType>(pos_value_expr->Type()));
-        column_types.emplace_back(MakeShared<DataType>(len_value_expr->Type()));
+        column_types.emplace_back(std::make_shared<DataType>(pos_value_expr->Type()));
+        column_types.emplace_back(std::make_shared<DataType>(len_value_expr->Type()));
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
-        SharedPtr<ColumnVector> col0 = ColumnVector::Make(data_type0);
+        std::shared_ptr<ColumnVector> col0 = ColumnVector::Make(data_type0);
         col0->Initialize(ColumnVectorType::kFlat);
 
-        SharedPtr<DataType> bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-        SharedPtr<ColumnVector> col1 = ColumnVector::Make(bigint_type);
+        std::shared_ptr<DataType> bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
+        std::shared_ptr<ColumnVector> col1 = ColumnVector::Make(bigint_type);
         col1->Initialize(ColumnVectorType::kConstant);
         pos_value_expr->AppendToChunk(col1);
-        SharedPtr<ColumnVector> col2 = ColumnVector::Make(bigint_type);
+        std::shared_ptr<ColumnVector> col2 = ColumnVector::Make(bigint_type);
         col2->Initialize(ColumnVectorType::kConstant);
         len_value_expr->AppendToChunk(col2);
 
-        for (SizeT idx = 0; idx < row_count; ++idx) {
+        for (size_t idx = 0; idx < row_count; ++idx) {
             String s = "hello" + std::to_string(idx);
             VarcharT varchar_value;
             varchar_value.InitAsValue(s);
@@ -131,12 +125,12 @@ UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
         DataBlock data_block;
         data_block.Init({col0, col1, col2});
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT idx = 0; idx < row_count; ++idx) {
+        for (size_t idx = 0; idx < row_count; ++idx) {
             Value vx = result->GetValue(idx);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             EXPECT_TRUE(vx.value_.varchar.IsInlined());
@@ -147,20 +141,20 @@ UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
     {
         String op = "substring";
-        SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
+        std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
         EXPECT_EQ(function_set->type_, FunctionType::kScalar);
-        SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
+        std::shared_ptr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
-        Vector<SharedPtr<BaseExpression>> inputs;
+        Vector<std::shared_ptr<BaseExpression>> inputs;
 
-        SharedPtr<DataType> data_type0 = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<ColumnExpression> col0_expr_ptr = MakeShared<ColumnExpression>(*data_type0, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type0 = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnExpression> col0_expr_ptr = std::make_shared<ColumnExpression>(*data_type0, "t1", 1, "c1", 0, 0);
 
         Value v1 = Value::MakeBigInt(15);
-        SharedPtr<ValueExpression> pos_value_expr = MakeShared<ValueExpression>(v1);
+        std::shared_ptr<ValueExpression> pos_value_expr = std::make_shared<ValueExpression>(v1);
 
         Value v2 = Value::MakeBigInt(4);
-        SharedPtr<ValueExpression> len_value_expr = MakeShared<ValueExpression>(v2);
+        std::shared_ptr<ValueExpression> len_value_expr = std::make_shared<ValueExpression>(v2);
 
         inputs.emplace_back(col0_expr_ptr);
         inputs.emplace_back(pos_value_expr);
@@ -168,25 +162,25 @@ UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("substring(Varchar, BigInt, BigInt)->Varchar", func.ToString().c_str());
 
-        Vector<SharedPtr<DataType>> column_types;
+        Vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type0);
-        column_types.emplace_back(MakeShared<DataType>(pos_value_expr->Type()));
-        column_types.emplace_back(MakeShared<DataType>(len_value_expr->Type()));
+        column_types.emplace_back(std::make_shared<DataType>(pos_value_expr->Type()));
+        column_types.emplace_back(std::make_shared<DataType>(len_value_expr->Type()));
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        size_t row_count = DEFAULT_VECTOR_SIZE;
 
-        SharedPtr<ColumnVector> col0 = ColumnVector::Make(data_type0);
+        std::shared_ptr<ColumnVector> col0 = ColumnVector::Make(data_type0);
         col0->Initialize(ColumnVectorType::kFlat);
 
-        SharedPtr<DataType> bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-        SharedPtr<ColumnVector> col1 = ColumnVector::Make(bigint_type);
+        std::shared_ptr<DataType> bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
+        std::shared_ptr<ColumnVector> col1 = ColumnVector::Make(bigint_type);
         col1->Initialize(ColumnVectorType::kConstant);
         pos_value_expr->AppendToChunk(col1);
-        SharedPtr<ColumnVector> col2 = ColumnVector::Make(bigint_type);
+        std::shared_ptr<ColumnVector> col2 = ColumnVector::Make(bigint_type);
         col2->Initialize(ColumnVectorType::kConstant);
         len_value_expr->AppendToChunk(col2);
 
-        for (SizeT idx = 0; idx < row_count; ++idx) {
+        for (size_t idx = 0; idx < row_count; ++idx) {
             String s = "hellohellohellohello" + std::to_string(idx);
             VarcharT varchar_value;
             varchar_value.InitAsValue(s);
@@ -207,12 +201,12 @@ UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
         DataBlock data_block;
         data_block.Init({col0, col1, col2});
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        std::shared_ptr<DataType> result_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnVector> result = std::make_shared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT idx = 0; idx < row_count; ++idx) {
+        for (size_t idx = 0; idx < row_count; ++idx) {
             Value vx = result->GetValue(idx);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             EXPECT_TRUE(vx.value_.varchar.IsInlined());

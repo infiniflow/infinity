@@ -16,8 +16,8 @@ module;
 
 export module infinity_core:correlated_column_expression;
 
-import :stl;
 import :base_expression;
+
 import internal_types;
 import data_type;
 
@@ -25,15 +25,15 @@ namespace infinity {
 
 class CorrelatedColumnExpression : public BaseExpression {
 public:
-    CorrelatedColumnExpression(DataType data_type, String column_name);
+    CorrelatedColumnExpression(DataType data_type, std::string column_name);
 
     inline DataType Type() const override { return data_type_; }
 
-    String ToString() const override;
+    std::string ToString() const override;
 
 private:
     DataType data_type_;
-    String column_name_;
+    std::string column_name_;
 };
 
 } // namespace infinity

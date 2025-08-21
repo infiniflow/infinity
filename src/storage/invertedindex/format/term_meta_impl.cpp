@@ -1,10 +1,6 @@
-module;
-
 module infinity_core:term_meta.impl;
 
 import :term_meta;
-
-import :stl;
 import :byte_slice;
 import :byte_slice_reader;
 import :file_reader;
@@ -36,7 +32,7 @@ void TermMetaLoader::Load(ByteSliceReader *byte_slice_reader, TermMeta &term_met
     term_meta.pos_end_ = byte_slice_reader->ReadVUInt64();
 }
 
-void TermMetaLoader::Load(const SharedPtr<FileReader> &reader, TermMeta &term_meta) const {
+void TermMetaLoader::Load(const std::shared_ptr<FileReader> &reader, TermMeta &term_meta) const {
     df_t df = (df_t)reader->ReadVInt();
     term_meta.SetDocFreq(df);
     if (option_.HasTermFrequency()) {
@@ -56,7 +52,7 @@ void TermMetaLoader::Load(const SharedPtr<FileReader> &reader, TermMeta &term_me
     term_meta.pos_end_ = reader->ReadVLong();
 }
 
-void TermMetaLoader::Load(u8 *&data_cursor, SizeT &left_size, TermMeta &term_meta) const {
+void TermMetaLoader::Load(u8 *&data_cursor, size_t &left_size, TermMeta &term_meta) const {
     auto df = VByteCompressor::DecodeVInt32(data_cursor, (u32 &)left_size);
     term_meta.SetDocFreq(df);
     if (option_.HasTermFrequency()) {
@@ -93,7 +89,7 @@ u32 TermMetaDumper::CalculateStoreSize(const TermMeta &term_meta) const {
     return len;
 }
 
-void TermMetaDumper::Dump(const SharedPtr<FileWriter> &file, const TermMeta &term_meta) const {
+void TermMetaDumper::Dump(const std::shared_ptr<FileWriter> &file, const TermMeta &term_meta) const {
     file->WriteVInt(term_meta.GetDocFreq());
     if (option_.HasTermFrequency()) {
         file->WriteVInt(term_meta.GetTotalTermFreq());

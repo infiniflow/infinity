@@ -12,14 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.block_version;
 
@@ -27,8 +22,7 @@ import :ut.base_test;
 import :infinity;
 import :infinity_exception;
 import :status;
-import :stl;
-import :third_party;
+import third_party;
 import :infinity_context;
 import :block_version;
 import :virtual_store;
@@ -38,7 +32,6 @@ import :column_vector;
 import :persistence_manager;
 import :default_values;
 import :local_file_handle;
-#endif
 
 import global_resource_usage;
 import data_type;
@@ -58,7 +51,7 @@ TEST_P(BlockVersionTest, SaveAndLoad) {
     block_version.Append(20, 6);
     block_version.Delete(2, 30);
     block_version.Delete(5, 40);
-    String version_path = String(GetFullDataDir()) + "/block_version_test";
+    std::string version_path = std::string(GetFullDataDir()) + "/block_version_test";
 
     {
         auto [local_file_handle, status] = VirtualStore::Open(version_path, FileAccessMode::kWrite);
@@ -75,21 +68,21 @@ TEST_P(BlockVersionTest, SaveAndLoad) {
 }
 
 TEST_P(BlockVersionTest, SaveAndLoad2) {
-    auto data_dir = MakeShared<String>(String(GetFullDataDir()) + "/block_version_test");
-    auto temp_dir = MakeShared<String>(String(GetFullTmpDir()) + "/temp/block_version_test");
-    auto persistence_dir = MakeShared<String>(String(GetFullTmpDir()) + "/persistence/block_version_test");
-    auto block_dir = MakeShared<String>("block_version_test/block");
-    auto version_file_name = MakeShared<String>("block_version_test");
+    auto data_dir = std::make_shared<std::string>(std::string(GetFullDataDir()) + "/block_version_test");
+    auto temp_dir = std::make_shared<std::string>(std::string(GetFullTmpDir()) + "/temp/block_version_test");
+    auto persistence_dir = std::make_shared<std::string>(std::string(GetFullTmpDir()) + "/persistence/block_version_test");
+    auto block_dir = std::make_shared<std::string>("block_version_test/block");
+    auto version_file_name = std::make_shared<std::string>("block_version_test");
 
     {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir, nullptr);
 
-        auto file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(String(GetFullDataDir())),
-                                                         MakeShared<String>(String(GetFullTmpDir())),
-                                                         block_dir,
-                                                         version_file_name,
-                                                         8192,
-                                                         nullptr);
+        auto file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(std::string(GetFullDataDir())),
+                                                               std::make_shared<std::string>(std::string(GetFullTmpDir())),
+                                                               block_dir,
+                                                               version_file_name,
+                                                               8192,
+                                                               nullptr);
         auto *buffer_obj = buffer_mgr.AllocateBufferObject(std::move(file_worker));
 
         {
@@ -108,12 +101,12 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
     {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir, nullptr);
 
-        auto file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(String(GetFullDataDir())),
-                                                         MakeShared<String>(String(GetFullTmpDir())),
-                                                         block_dir,
-                                                         version_file_name,
-                                                         8192,
-                                                         nullptr);
+        auto file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(std::string(GetFullDataDir())),
+                                                               std::make_shared<std::string>(std::string(GetFullTmpDir())),
+                                                               block_dir,
+                                                               version_file_name,
+                                                               8192,
+                                                               nullptr);
         auto *buffer_obj = buffer_mgr.GetBufferObject(std::move(file_worker));
 
         {
@@ -137,12 +130,12 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
     {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir, nullptr);
 
-        auto file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(String(GetFullDataDir())),
-                                                         MakeShared<String>(String(GetFullTmpDir())),
-                                                         block_dir,
-                                                         version_file_name,
-                                                         8192,
-                                                         nullptr);
+        auto file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(std::string(GetFullDataDir())),
+                                                               std::make_shared<std::string>(std::string(GetFullTmpDir())),
+                                                               block_dir,
+                                                               version_file_name,
+                                                               8192,
+                                                               nullptr);
         auto *buffer_obj = buffer_mgr.GetBufferObject(std::move(file_worker));
 
         {
@@ -179,7 +172,7 @@ TEST_P(BlockVersionTest, get_delete_ts_test) {
     BlockVersion block_version(8192);
     block_version.Delete(2, 30);
     block_version.Delete(5, 40);
-    auto res = MakeShared<ColumnVector>(MakeShared<DataType>(LogicalType::kTinyInt));
+    auto res = std::make_shared<ColumnVector>(std::make_shared<DataType>(LogicalType::kTinyInt));
     res->Initialize();
     block_version.GetDeleteTS(2, 4, *res);
     EXPECT_EQ(res->ToString(0), "30");

@@ -12,17 +12,9 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-module;
-
-#include <cmath>
-#include <tuple>
-#include <concepts>
-
 module infinity_core:filter_expression_push_down_helper.impl;
 
 import :filter_expression_push_down_helper;
-
-import :stl;
 import :base_expression;
 import :expression_type;
 import :expression_state;
@@ -33,12 +25,15 @@ import :column_vector;
 import :function_expression;
 import :infinity_exception;
 import :value;
-import :third_party;
+import :secondary_index_data;
+
+import std;
+import std.compat;
+import third_party;
+
 import internal_types;
 import data_type;
 import logical_type;
-import :secondary_index_data;
-import :logger;
 
 namespace infinity {
 
@@ -101,8 +96,7 @@ inline bool IntegralContinueUnwind(BigIntT right_val_bigint, FilterCompareType &
             }
         }
         default: {
-            String error_message = "IntegralContinueUnwind(): compare type error.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("IntegralContinueUnwind(): compare type error.");
             compare_type = FilterCompareType::kInvalid;
             return false;
         }
@@ -152,8 +146,7 @@ inline bool IntegralContinueUnwind(DoubleT right_val_double, FilterCompareType &
             return false;
         }
         default: {
-            String error_message = "IntegralContinueUnwind(): compare type error.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("IntegralContinueUnwind(): compare type error.");
             compare_type = FilterCompareType::kInvalid;
             return false;
         }
@@ -184,8 +177,7 @@ inline void RewriteCompareT(T &right_val, FilterCompareType &compare_type) {
             break;
         }
         default: {
-            String error_message = "RewriteCompareT(): compare type error.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("RewriteCompareT(): compare type error.");
         }
     }
 }
@@ -216,8 +208,7 @@ inline void RewriteCompareT(TIME &right_val_time, FilterCompareType &compare_typ
             break;
         }
         default: {
-            String error_message = "RewriteCompareT(): compare type error.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("RewriteCompareT(): compare type error.");
         }
     }
     // recover original TIME type
@@ -226,7 +217,7 @@ inline void RewriteCompareT(TIME &right_val_time, FilterCompareType &compare_typ
 }
 
 template <typename Varchar>
-    requires IsAnyOf<Varchar, String>
+    requires IsAnyOf<Varchar, std::string>
 inline void RewriteCompareT(Varchar &right_val, FilterCompareType &compare_type) {
     // used when try to convert "<" into "<=", or ">" into ">="
     switch (compare_type) {
@@ -239,7 +230,7 @@ inline void RewriteCompareT(Varchar &right_val, FilterCompareType &compare_type)
                     right_val.pop_back();
                 } else {
                     --right_val.back();
-                    right_val += String(16, std::numeric_limits<char>::max());
+                    right_val += std::string(16, std::numeric_limits<char>::max());
                 }
                 compare_type = FilterCompareType::kLessEqual;
             }
@@ -251,8 +242,7 @@ inline void RewriteCompareT(Varchar &right_val, FilterCompareType &compare_type)
             break;
         }
         default: {
-            String error_message = "RewriteCompareT(): compare type error.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("RewriteCompareT(): compare type error.");
         }
     }
 }
@@ -320,14 +310,13 @@ inline void RewriteCompare(Value &right_val, FilterCompareType &compare_type) {
             break;
         }
         case LogicalType::kVarchar: {
-            String right_val_varchar = right_val.GetVarchar();
+            std::string right_val_varchar = right_val.GetVarchar();
             RewriteCompareT(right_val_varchar, compare_type);
             right_val = Value::MakeVarchar(right_val_varchar);
             break;
         }
         default: {
-            String error_message = fmt::format("FindPrev(): type error: {}.", right_val.type().ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("FindPrev(): type error: {}.", right_val.type().ToString()));
         }
     }
 }
@@ -351,14 +340,13 @@ inline void SimplifyCompareTypeAndValue(Value &right_val, FilterCompareType &com
             break;
         }
         case FilterCompareType::kInvalid: {
-            String error_message = "SimplifyCompareTypeAndValue(): compare type error.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("SimplifyCompareTypeAndValue(): compare type error.");
         }
     }
 }
 
-Tuple<ColumnID, Value, FilterCompareType>
-FilterExpressionPushDownHelper::UnwindCast(const SharedPtr<BaseExpression> &cast_expr, Value &&right_val, FilterCompareType compare_type) {
+std::tuple<ColumnID, Value, FilterCompareType>
+FilterExpressionPushDownHelper::UnwindCast(const std::shared_ptr<BaseExpression> &cast_expr, Value &&right_val, FilterCompareType compare_type) {
     SimplifyCompareTypeAndValue(right_val, compare_type);
     if (compare_type == FilterCompareType::kAlwaysFalse or compare_type == FilterCompareType::kAlwaysTrue) {
         return {0, Value::MakeNull(), compare_type};
@@ -375,8 +363,7 @@ FilterExpressionPushDownHelper::UnwindCast(const SharedPtr<BaseExpression> &cast
         auto target_type = cast_expr->Type();
         auto target_logical_type = target_type.type();
         if (target_logical_type != right_val.type().type()) {
-            String error_message = fmt::format("UnwindCast(): type mismatch: {} vs {}.", target_type.ToString(), right_val.type().ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("UnwindCast(): type mismatch: {} vs {}.", target_type.ToString(), right_val.type().ToString()));
             return {0, Value::MakeNull(), FilterCompareType::kInvalid};
         }
         // case 0. keep the original type?
@@ -474,20 +461,19 @@ FilterExpressionPushDownHelper::UnwindCast(const SharedPtr<BaseExpression> &cast
         // UnrecoverableError(fmt::format("UnwindCast(): error in: {}.", cast_expr->Name()));
         return {0, Value::MakeNull(), FilterCompareType::kInvalid};
     } else {
-        String error_message = fmt::format("UnwindCast(): expression type error: {}.", cast_expr->Name());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("UnwindCast(): expression type error: {}.", cast_expr->Name()));
         return {0, Value::MakeNull(), FilterCompareType::kInvalid};
     }
 }
 
-Value FilterExpressionPushDownHelper::CalcValueResult(const SharedPtr<BaseExpression> &expression) {
+Value FilterExpressionPushDownHelper::CalcValueResult(const std::shared_ptr<BaseExpression> &expression) {
     if (expression->type() == ExpressionType::kValue) {
         // does not need ExpressionEvaluator
         auto *value_expression = static_cast<const ValueExpression *>(expression.get());
         return value_expression->GetValue();
     } else {
         auto expression_state = ExpressionState::CreateState(expression);
-        auto result_vector = MakeShared<ColumnVector>(MakeShared<DataType>(expression->Type()));
+        auto result_vector = std::make_shared<ColumnVector>(std::make_shared<DataType>(expression->Type()));
         result_vector->Initialize();
         ExpressionEvaluator expr_evaluator; // does not need input_data_block_
         expr_evaluator.Execute(expression, expression_state, result_vector);

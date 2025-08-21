@@ -12,21 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:interval_cast;
 
-import :stl;
 import :column_vector;
 import :vector_buffer;
 import :bound_cast_func;
 import :column_vector_cast;
-import logical_type;
 import :infinity_exception;
-import :third_party;
-import :logger;
+
 import internal_types;
 import data_type;
+import logical_type;
 
 namespace infinity {
 
@@ -38,8 +34,7 @@ export struct IntervalTryCastToVarlen;
 //             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<IntervalT, VarcharT, IntervalTryCastToVarlen>);
 //         }
 //         default: {
-//             String error_message = fmt::format("Can't cast from Interval type to {}", target.ToString());
-//             UnrecoverableError(error_message);
+//             UnrecoverableError(fmt::format("Can't cast from Interval type to {}", target.ToString()));
 //         }
 //     }
 //     return BoundCastFunc(nullptr);
@@ -48,17 +43,15 @@ export struct IntervalTryCastToVarlen;
 struct IntervalTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &, ColumnVector *) {
-        String error_message =
-            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
-        UnrecoverableError(error_message);
+        UnrecoverableError(
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };
 
 template <>
 inline bool IntervalTryCastToVarlen::Run(IntervalT, VarcharT &, ColumnVector *) {
-    String error_message = "Not implement: IntegerTryCastToFixlen::Run";
-    UnrecoverableError(error_message);
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 

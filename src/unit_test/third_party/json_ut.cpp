@@ -12,19 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
+
+// import <gtest/gtest.h>;
 
 module infinity_core:ut.json;
 
 import :ut.base_test;
-#endif
 
 import global_resource_usage;
 import compilation_config;
@@ -40,7 +36,7 @@ class JsonTest : public BaseTest {
 TEST_F(JsonTest, nlohmann_test) {
     using namespace infinity;
 
-    String json_path = String(test_data_path()) + "/json/twitter.json";
+    std::string json_path = std::string(test_data_path()) + "/json/twitter.json";
     std::ifstream f(json_path);
 
     nlohmann::json data = nlohmann::json::parse(f);
@@ -50,7 +46,7 @@ TEST_F(JsonTest, nlohmann_test) {
 TEST_F(JsonTest, simdjson_test) {
     using namespace infinity;
     {
-        String json_path = String(test_data_path()) + "/json/twitter.json";
+        std::string json_path = std::string(test_data_path()) + "/json/twitter.json";
         //    LOG_TRACE("JSON Path: {}", json_path);
         simdjson::parser parser;
         simdjson::padded_string json = simdjson::padded_string::load(json_path);
@@ -69,7 +65,7 @@ TEST_F(JsonTest, simdjson_test) {
                     break;
                 }
                 case simdjson::json_type::string: {
-                    String res = doc.get<std::string>();
+                    std::string res = doc.get<std::string>();
                     std::cout << res << std::endl;
                     break;
                 }
@@ -108,7 +104,7 @@ TEST_F(JsonTest, simdjson_test) {
                 }
                 case simdjson::json_type::object: {
                     for (auto field : doc.get_object()) {
-                        String field_key = String((std::string_view)field.unescaped_key());
+                        std::string field_key = std::string(static_cast<std::string_view>(field.unescaped_key()));
                         std::cout << field_key << ": ";
                         PrintDocument(field.value().raw_json());
                     }
@@ -120,8 +116,8 @@ TEST_F(JsonTest, simdjson_test) {
             }
         };
 
-        String text = "{\"hello\":\"world\",\"t\":true,\"f\":false,\"n\":null,\"i\":123,\"pi\":3.1416,\"a\":[0,1,2],"
-                      "\"o\":{\"v0\":\"v0\",\"v1\":\"v1\",\"v2\":\"v2\"}}";
+        std::string text = "{\"hello\":\"world\",\"t\":true,\"f\":false,\"n\":null,\"i\":123,\"pi\":3.1416,\"a\":[0,1,2],"
+                           "\"o\":{\"v0\":\"v0\",\"v1\":\"v1\",\"v2\":\"v2\"}}";
         PrintDocument(text);
     }
 }

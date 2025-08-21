@@ -14,33 +14,33 @@
 
 module;
 
-#include <sstream>
-
 module infinity_core:aggregate_expression.impl;
 
 import :aggregate_expression;
 
-import :stl;
 import :expression_type;
 import :aggregate_function;
 import :aggregate_expression;
+
+import std;
+
 import data_type;
 
 namespace infinity {
 
-AggregateExpression::AggregateExpression(AggregateFunction aggregate_function, Vector<SharedPtr<BaseExpression>> arguments)
+AggregateExpression::AggregateExpression(AggregateFunction aggregate_function, std::vector<std::shared_ptr<BaseExpression>> arguments)
     : BaseExpression(ExpressionType::kAggregate, std::move(arguments)), aggregate_function_(std::move(aggregate_function)) {}
 
 bool AggregateExpression::IsCountStar() const { return false; }
 
-String AggregateExpression::ToString() const {
+std::string AggregateExpression::ToString() const {
     std::stringstream ss;
     ss << aggregate_function_.name() << "(";
     if (arguments_.empty()) {
         ss << ")";
     } else {
-        SizeT arguments_count = arguments_.size();
-        for (SizeT i = 0; i < arguments_count - 1; ++i) {
+        size_t arguments_count = arguments_.size();
+        for (size_t i = 0; i < arguments_count - 1; ++i) {
             ss << arguments_[i]->Name() << ", ";
         }
         ss << arguments_.back()->Name() << ")";

@@ -18,17 +18,17 @@ module;
 
 export module infinity_core:fst.node;
 
-import :stl;
-import :third_party;
 import :fst.common_inputs;
 import :fst.writer;
 import :fst.bytes;
+
+import third_party;
 
 namespace infinity {
 
 /// CompiledAddr is the type used to address nodes in a finite state
 /// transducer.
-using CompiledAddr = SizeT;
+using CompiledAddr = size_t;
 
 /// FstType is a convention used to indicate the type of the underlying
 /// transducer.
@@ -49,7 +49,7 @@ const CompiledAddr NONE_ADDRESS = 1;
 /// The threshold (in number of transitions) at which an index is created for
 /// a node's transitions. This speeds up lookup time at the expense of FST
 /// size.
-const SizeT TRANS_INDEX_THRESHOLD = 32;
+const size_t TRANS_INDEX_THRESHOLD = 32;
 
 /// An output is a value that is associated with a key in a finite state
 /// transducer.
@@ -132,22 +132,22 @@ struct PackSizes {
         assert(size <= 8);
         val_ = (val_ & 0b00001111) | (size << 4);
     }
-    SizeT TransitionPackSize() const { return SizeT(val_ >> 4); }
+    size_t TransitionPackSize() const { return size_t(val_ >> 4); }
     void SetOutputPackSize(u8 size) {
         assert(size <= 8);
         val_ = (val_ & 0b11110000) | size;
     }
-    SizeT OutputPackSize() const { return SizeT(val_ & 0b00001111); }
+    size_t OutputPackSize() const { return size_t(val_ & 0b00001111); }
 };
 
 struct BuilderNode {
     bool is_final_;
     Output final_output_;
-    Vector<Transition> trans_;
+    std::vector<Transition> trans_;
 
     BuilderNode() : is_final_(0), final_output_(0) {}
 
-    BuilderNode(bool is_final, Output final_output, Vector<Transition> &&trans)
+    BuilderNode(bool is_final, Output final_output, std::vector<Transition> &&trans)
         : is_final_(is_final), final_output_(final_output), trans_(std::move(trans)) {}
 
     BuilderNode(const BuilderNode &source) : is_final_(source.is_final_), final_output_(source.final_output_), trans_(source.trans_) {}
@@ -162,7 +162,7 @@ struct BuilderNode {
     }
 
     // Need to provide a hash function and operator== for BuilderNode so that it can be used as a key in a std::unordered_map.
-    SizeT Hash() const {
+    size_t Hash() const {
         // Basic FNV-1a hash as described:
         // https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
         //
@@ -172,8 +172,8 @@ struct BuilderNode {
         u64 h = 14695981039346656037ULL;
         h = (h ^ (u64)is_final_) * FNV_PRIME;
         h = (h ^ final_output_.Value()) * FNV_PRIME;
-        SizeT ntrans = trans_.size();
-        for (SizeT i = 0; i < ntrans; i++) {
+        size_t ntrans = trans_.size();
+        for (size_t i = 0; i < ntrans; i++) {
             const Transition &t = trans_[i];
             h = (h ^ (u64)t.inp_) * FNV_PRIME;
             h = (h ^ t.out_.Value()) * FNV_PRIME;
@@ -185,8 +185,8 @@ struct BuilderNode {
     bool operator==(const BuilderNode &other) const {
         if (is_final_ != other.is_final_ || final_output_ != other.final_output_ || trans_.size() != other.trans_.size())
             return false;
-        SizeT ntrans = trans_.size();
-        for (SizeT i = 0; i < ntrans; i++) {
+        size_t ntrans = trans_.size();
+        for (size_t i = 0; i < ntrans; i++) {
             const Transition &t1 = trans_[i];
             const Transition &t2 = other.trans_[i];
             if (t1.inp_ != t2.inp_ || t1.out_ != t2.out_ || t1.addr_ != t2.addr_)
@@ -207,9 +207,9 @@ struct Node {
     bool is_final_;
     u8 ntrans_;
     u8 *data_ptr_;
-    SizeT data_len_;
+    size_t data_len_;
     CompiledAddr start_;
-    SizeT end_;
+    size_t end_;
     PackSizes sizes_;
     Output final_output_;
 
@@ -224,13 +224,13 @@ struct Node {
     static void Compile(Writer &wtr, CompiledAddr last_addr, CompiledAddr addr, BuilderNode &node);
 
     /// Returns the transition at index `i`.
-    Transition TransAt(SizeT i);
+    Transition TransAt(size_t i);
 
     /// Returns the transition address of the `i`th transition.
-    CompiledAddr TransAddr(SizeT i);
+    CompiledAddr TransAddr(size_t i);
 
     /// Finds the `i`th transition corresponding to the given input byte.
-    bool FindInput(u8 b, SizeT &ti);
+    bool FindInput(u8 b, size_t &ti);
 
     /// If this node is final and has a terminal output value, then it is
     /// returned. Otherwise, a zero output is returned.
@@ -243,7 +243,7 @@ struct Node {
     /// Returns the number of transitions in this node.
     ///
     /// The maximum number of transitions is 256.
-    SizeT Len() { return ntrans_; }
+    size_t Len() { return ntrans_; }
 
     /// Returns true if and only if this node has zero transitions.
     bool IsEmpty() { return ntrans_ == 0; }
@@ -263,7 +263,7 @@ private:
 public:
     State() = delete;
     State(u8 val) : val_(val) {}
-    State(u8 *data_ptr, SizeT addr) : val_(data_ptr[addr]) { assert(addr != EMPTY_ADDRESS); }
+    State(u8 *data_ptr, size_t addr) : val_(data_ptr[addr]) { assert(addr != EMPTY_ADDRESS); }
     State(const State &source) : val_(source.val_) {}
     State &operator=(const State &source) {
         val_ = source.val_;
@@ -271,17 +271,17 @@ public:
     }
 
     /// Returns the transition at index `i`.
-    struct Transition TransAt(const Node &node, SizeT i) const;
+    struct Transition TransAt(const Node &node, size_t i) const;
 
     /// Returns the transition address of the `i`th transition.
-    CompiledAddr TransAddr(const Node &node, SizeT i) const;
+    CompiledAddr TransAddr(const Node &node, size_t i) const;
 
     /// FindInput returns the index of the transition with the given input.
-    bool FindInput(const Node &node, u8 b, SizeT &ti) const;
+    bool FindInput(const Node &node, u8 b, size_t &ti) const;
 
     /// CommonIdx translate a byte to an index in the COMMON_INPUTS_INV array.
     static u8 CommonIdx(u8 input, u8 max) {
-        u8 val = u8((u32(COMMON_INPUTS[SizeT(input)]) + 1) % 256);
+        u8 val = u8((u32(COMMON_INPUTS[size_t(input)]) + 1) % 256);
         if (val > max) {
             return 0;
         } else {
@@ -295,7 +295,7 @@ public:
         if (idx == 0) {
             return false;
         } else {
-            common_input = COMMON_INPUTS_INV[SizeT(idx - 1)];
+            common_input = COMMON_INPUTS_INV[size_t(idx - 1)];
             return true;
         }
     }
@@ -307,7 +307,7 @@ public:
     }
 
     static void PackDeltaIn(Writer &wtr, CompiledAddr node_addr, CompiledAddr trans_addr, u8 nbytes) {
-        SizeT delta_addr;
+        size_t delta_addr;
         if (trans_addr == EMPTY_ADDRESS) {
             delta_addr = EMPTY_ADDRESS;
         } else {
@@ -317,7 +317,7 @@ public:
     }
 
     static u8 PackDeltaSize(CompiledAddr node_addr, CompiledAddr trans_addr) {
-        SizeT delta_addr;
+        size_t delta_addr;
         if (trans_addr == EMPTY_ADDRESS) {
             delta_addr = EMPTY_ADDRESS;
         } else {
@@ -326,9 +326,9 @@ public:
         return PackSize(delta_addr);
     }
 
-    static CompiledAddr UnpackDelta(u8 *slice_ptr, SizeT trans_pack_size, SizeT node_addr) {
+    static CompiledAddr UnpackDelta(u8 *slice_ptr, size_t trans_pack_size, size_t node_addr) {
         u64 delta = UnpackUint(slice_ptr, trans_pack_size);
-        SizeT delta_addr = SizeT(delta);
+        size_t delta_addr = size_t(delta);
         if (delta_addr == EMPTY_ADDRESS) {
             return EMPTY_ADDRESS;
         } else {
@@ -358,14 +358,14 @@ public:
 
     bool CommonInput(u8 &common_input) const { return State::CommonInput(val_ & 0b00111111, common_input); }
 
-    SizeT InputLen() const {
+    size_t InputLen() const {
         if ((val_ & 0b00111111) != 0)
             return 0;
         else
             return 1;
     }
 
-    SizeT EndAddr(SizeT data_len) const { return data_len - 1 - InputLen(); }
+    size_t EndAddr(size_t data_len) const { return data_len - 1 - InputLen(); }
 
     u8 Input(const Node &node) const {
         u8 inp;
@@ -380,19 +380,19 @@ public:
     CompiledAddr TransAddr(const Node &node) const { return CompiledAddr(node.end_) - 1; }
 
     /// Returns the transition at index `i`.
-    Transition TransAt(const Node &node, SizeT i) const {
+    Transition TransAt(const Node &node, size_t i) const {
         assert(i == 0);
         return Transition(Input(node), Output::Zero(), TransAddr(node));
     }
 
     /// Returns the transition address of the `i`th transition.
-    CompiledAddr TransAddr(const Node &node, SizeT i) const {
+    CompiledAddr TransAddr(const Node &node, size_t i) const {
         assert(i == 0);
         return TransAddr(node);
     }
 
     /// FindInput returns the index of the transition with the given input.
-    bool FindInput(const Node &node, u8 b, SizeT &ti) const {
+    bool FindInput(const Node &node, u8 b, size_t &ti) const {
         if (Input(node) == b) {
             ti = 0;
             return true;
@@ -435,20 +435,20 @@ public:
 
     bool CommonInput(u8 &common_input) const { return State::CommonInput(val_ & 0b00111111, common_input); }
 
-    SizeT InputLen() const {
+    size_t InputLen() const {
         if ((val_ & 0b00111111) != 0)
             return 0;
         else
             return 1;
     }
 
-    PackSizes Sizes(u8 *data_ptr, SizeT data_len) const {
+    PackSizes Sizes(u8 *data_ptr, size_t data_len) const {
         PackSizes pack_sizes;
         pack_sizes.val_ = data_ptr[data_len - 1 - InputLen() - 1];
         return pack_sizes;
     }
 
-    SizeT EndAddr(SizeT data_len, PackSizes sizes) const {
+    size_t EndAddr(size_t data_len, PackSizes sizes) const {
         return data_len - 1 - InputLen() - 1 - sizes.TransitionPackSize() - sizes.OutputPackSize();
     }
 
@@ -463,34 +463,34 @@ public:
     }
 
     Output OutputOf(const Node &node) const {
-        SizeT osize = node.sizes_.OutputPackSize();
+        size_t osize = node.sizes_.OutputPackSize();
         if (osize == 0)
             return Output::Zero();
-        SizeT tsize = node.sizes_.TransitionPackSize();
-        SizeT i = node.start_ - InputLen() - 1 - tsize - osize;
+        size_t tsize = node.sizes_.TransitionPackSize();
+        size_t i = node.start_ - InputLen() - 1 - tsize - osize;
         return Output(UnpackUint(node.data_ptr_ + i, osize));
     }
 
     CompiledAddr TransAddr(const Node &node) const {
-        SizeT tsize = node.sizes_.TransitionPackSize();
-        SizeT i = node.start_ - InputLen() - 1 - tsize;
+        size_t tsize = node.sizes_.TransitionPackSize();
+        size_t i = node.start_ - InputLen() - 1 - tsize;
         return State::UnpackDelta(node.data_ptr_ + i, tsize, node.end_);
     }
 
     /// Returns the transition at index `i`.
-    Transition TransAt(const Node &node, SizeT i) const {
+    Transition TransAt(const Node &node, size_t i) const {
         assert(i == 0);
         return Transition(Input(node), OutputOf(node), TransAddr(node));
     }
 
     /// Returns the transition address of the `i`th transition.
-    CompiledAddr TransAddr(const Node &node, SizeT i) const {
+    CompiledAddr TransAddr(const Node &node, size_t i) const {
         assert(i == 0);
         return TransAddr(node);
     }
 
     /// FindInput returns the index of the transition with the given input.
-    bool FindInput(const Node &node, u8 b, SizeT &ti) const {
+    bool FindInput(const Node &node, u8 b, size_t &ti) const {
         if (Input(node) == b) {
             ti = 0;
             return true;
@@ -509,12 +509,12 @@ public:
     StateAnyTrans(u8 val) : val_(val) {}
 
     static void Compile(Writer &wtr, CompiledAddr addr, const BuilderNode &node) {
-        SizeT ntrans = node.trans_.size();
+        size_t ntrans = node.trans_.size();
         assert(ntrans <= 256);
         u8 tsize = 0;
         u8 osize = PackSize(node.final_output_.Value());
         bool any_outs = !node.final_output_.IsZero();
-        for (SizeT i = 0; i < ntrans; i++) {
+        for (size_t i = 0; i < ntrans; i++) {
             const Transition &t = node.trans_[i];
             tsize = std::max(tsize, State::PackDeltaSize(addr, t.addr_));
             osize = std::max(osize, PackSize(t.out_.Value()));
@@ -555,8 +555,8 @@ public:
             // this node indicates an absent transition.
             u8 index[256];
             std::memset(index, 255, 256);
-            for (SizeT i = 0; i < ntrans; i++) {
-                index[SizeT(node.trans_[i].inp_)] = u8(i);
+            for (size_t i = 0; i < ntrans; i++) {
+                index[size_t(node.trans_[i].inp_)] = u8(i);
             }
             wtr.Write(index, 256);
         }
@@ -591,20 +591,20 @@ public:
         }
     }
 
-    SizeT StateNtrans() const { return val_ & 0b00111111; }
+    size_t StateNtrans() const { return val_ & 0b00111111; }
 
-    PackSizes Sizes(u8 *data_ptr, SizeT data_len) const {
+    PackSizes Sizes(u8 *data_ptr, size_t data_len) const {
         PackSizes pack_sizes;
         pack_sizes.val_ = data_ptr[data_len - 1 - NtransLen() - 1];
         return pack_sizes;
     }
 
-    SizeT TotalTransSize(PackSizes sizes, SizeT ntrans) const {
-        SizeT index_size = TransIndexSize(ntrans);
+    size_t TotalTransSize(PackSizes sizes, size_t ntrans) const {
+        size_t index_size = TransIndexSize(ntrans);
         return ntrans + (ntrans * sizes.TransitionPackSize()) + index_size;
     }
 
-    SizeT TransIndexSize(SizeT ntrans) const {
+    size_t TransIndexSize(size_t ntrans) const {
         if (ntrans > TRANS_INDEX_THRESHOLD) {
             return 256;
         } else {
@@ -612,7 +612,7 @@ public:
         }
     }
 
-    SizeT NtransLen() const {
+    size_t NtransLen() const {
         if (this->StateNtrans() == 0) {
             return 1;
         } else {
@@ -620,8 +620,8 @@ public:
         }
     }
 
-    SizeT Ntrans(u8 *data_ptr, SizeT data_len) const {
-        SizeT ntrans = this->StateNtrans();
+    size_t Ntrans(u8 *data_ptr, size_t data_len) const {
+        size_t ntrans = this->StateNtrans();
         if (ntrans != 0) {
             return ntrans;
         } else {
@@ -635,20 +635,20 @@ public:
         }
     }
 
-    Output FinalOutput(u8 *data_ptr, SizeT data_len, PackSizes sizes, SizeT ntrans) const {
-        SizeT osize = sizes.OutputPackSize();
+    Output FinalOutput(u8 *data_ptr, size_t data_len, PackSizes sizes, size_t ntrans) const {
+        size_t osize = sizes.OutputPackSize();
         if (osize == 0 || !this->IsFinalState()) {
             return Output::Zero();
         }
-        SizeT at = data_len - 1 - NtransLen() - 1                     // pack size
-                   - TotalTransSize(sizes, ntrans) - (ntrans * osize) // output values
-                   - osize;                                           // the desired output value
+        size_t at = data_len - 1 - NtransLen() - 1                     // pack size
+                    - TotalTransSize(sizes, ntrans) - (ntrans * osize) // output values
+                    - osize;                                           // the desired output value
         return Output(UnpackUint(data_ptr + at, u8(osize)));
     }
 
-    SizeT EndAddr(SizeT data_len, PackSizes sizes, SizeT ntrans) const {
-        SizeT osize = sizes.OutputPackSize();
-        SizeT final_osize = 0;
+    size_t EndAddr(size_t data_len, PackSizes sizes, size_t ntrans) const {
+        size_t osize = sizes.OutputPackSize();
+        size_t final_osize = 0;
         if (IsFinalState()) {
             final_osize = osize;
         }
@@ -658,28 +658,28 @@ public:
     }
 
     /// Returns the transition address of the `i`th transition.
-    CompiledAddr TransAddr(const Node &node, SizeT i) const {
+    CompiledAddr TransAddr(const Node &node, size_t i) const {
         assert(i < node.ntrans_);
-        SizeT tsize = node.sizes_.TransitionPackSize();
-        SizeT at = node.start_ - NtransLen() - 1                 // pack size
-                   - TransIndexSize(node.ntrans_) - node.ntrans_ // inputs
-                   - (i * tsize)                                 // the previous transition addresses
-                   - tsize;                                      // the desired transition address
+        size_t tsize = node.sizes_.TransitionPackSize();
+        size_t at = node.start_ - NtransLen() - 1                 // pack size
+                    - TransIndexSize(node.ntrans_) - node.ntrans_ // inputs
+                    - (i * tsize)                                 // the previous transition addresses
+                    - tsize;                                      // the desired transition address
         return State::UnpackDelta(node.data_ptr_ + at, tsize, node.end_);
     }
 
     /// InputAt returns the input byte for the transition at the given index.
-    u8 InputAt(const Node &node, SizeT i) const {
-        SizeT at = node.start_ - NtransLen() - 1           // pack size
-                   - TransIndexSize(node.ntrans_) - i - 1; // the input byte
+    u8 InputAt(const Node &node, size_t i) const {
+        size_t at = node.start_ - NtransLen() - 1           // pack size
+                    - TransIndexSize(node.ntrans_) - i - 1; // the input byte
         return node.data_ptr_[at];
     }
 
     /// FindInput returns the index of the transition with the given input.
-    bool FindInput(const Node &node, u8 b, SizeT &ti) const {
+    bool FindInput(const Node &node, u8 b, size_t &ti) const {
         if (node.ntrans_ > TRANS_INDEX_THRESHOLD) {
-            SizeT start = node.start_ - NtransLen() - 1 - 256;
-            SizeT i = node.data_ptr_[start + SizeT(b)];
+            size_t start = node.start_ - NtransLen() - 1 - 256;
+            size_t i = node.data_ptr_[start + size_t(b)];
             if (i > node.ntrans_) {
                 return false;
             } else {
@@ -687,10 +687,10 @@ public:
                 return true;
             }
         } else {
-            SizeT start = node.start_ - NtransLen() - 1 // pack size
-                          - node.ntrans_;               // inputs
-            SizeT end = start + node.ntrans_;
-            for (SizeT i = start; i < end; i++) {
+            size_t start = node.start_ - NtransLen() - 1 // pack size
+                           - node.ntrans_;               // inputs
+            size_t end = start + node.ntrans_;
+            for (size_t i = start; i < end; i++) {
                 if (node.data_ptr_[i] == b) {
                     ti = node.ntrans_ - (i - start) - 1;
                     return true;
@@ -701,23 +701,23 @@ public:
     }
 
     /// OutputAt returns the output for the transition at the given index.
-    Output OutputAt(const Node &node, SizeT i) const {
-        SizeT osize = node.sizes_.OutputPackSize();
+    Output OutputAt(const Node &node, size_t i) const {
+        size_t osize = node.sizes_.OutputPackSize();
         if (osize == 0) {
             return Output::Zero();
         }
-        SizeT at = node.start_ - NtransLen() - 1                             // pack size
-                   - TotalTransSize(node.sizes_, node.ntrans_) - (i * osize) // the previous output values
-                   - osize;                                                  // the desired output value
+        size_t at = node.start_ - NtransLen() - 1                             // pack size
+                    - TotalTransSize(node.sizes_, node.ntrans_) - (i * osize) // the previous output values
+                    - osize;                                                  // the desired output value
         return Output(UnpackUint(node.data_ptr_ + at, osize));
     }
 
     /// Returns the transition at index `i`.
-    Transition TransAt(const Node &node, SizeT i) const { return Transition(InputAt(node, i), OutputAt(node, i), TransAddr(node, i)); }
+    Transition TransAt(const Node &node, size_t i) const { return Transition(InputAt(node, i), OutputAt(node, i), TransAddr(node, i)); }
 };
 
 /// Returns the transition at index `i`.
-struct Transition State::TransAt(const Node &node, SizeT i) const {
+struct Transition State::TransAt(const Node &node, size_t i) const {
     switch (val_ & 0b11000000) {
         case 0b11000000:
             return StateOneTransNext(val_).TransAt(node, i);
@@ -729,7 +729,7 @@ struct Transition State::TransAt(const Node &node, SizeT i) const {
 }
 
 /// Returns the transition address of the `i`th transition.
-CompiledAddr State::TransAddr(const Node &node, SizeT i) const {
+CompiledAddr State::TransAddr(const Node &node, size_t i) const {
     switch (val_ & 0b11000000) {
         case 0b11000000:
             return StateOneTransNext(val_).TransAddr(node, i);
@@ -741,7 +741,7 @@ CompiledAddr State::TransAddr(const Node &node, SizeT i) const {
 }
 
 /// FindInput returns the index of the transition with the given input.
-bool State::FindInput(const Node &node, u8 b, SizeT &ti) const {
+bool State::FindInput(const Node &node, u8 b, size_t &ti) const {
     switch (val_ & 0b11000000) {
         case 0b11000000:
             return StateOneTransNext(val_).FindInput(node, b, ti);
@@ -784,7 +784,7 @@ Node::Node(CompiledAddr addr, u8 *data_ptr) : data_ptr_(data_ptr), data_len_(add
         }
         default: {
             StateAnyTrans state(state_);
-            SizeT ntrans = state.Ntrans(data_ptr, data_len_);
+            size_t ntrans = state.Ntrans(data_ptr, data_len_);
             sizes_ = state.Sizes(data_ptr, data_len_);
             end_ = state.EndAddr(data_len_, sizes_, ntrans);
             is_final_ = state.IsFinalState();
@@ -809,10 +809,10 @@ void Node::Compile(Writer &wtr, CompiledAddr last_addr, CompiledAddr addr, Build
     }
 }
 
-Transition Node::TransAt(SizeT i) { return State(state_).TransAt(*this, i); }
+Transition Node::TransAt(size_t i) { return State(state_).TransAt(*this, i); }
 
-CompiledAddr Node::TransAddr(SizeT i) { return State(state_).TransAddr(*this, i); }
+CompiledAddr Node::TransAddr(size_t i) { return State(state_).TransAddr(*this, i); }
 
-bool Node::FindInput(u8 b, SizeT &ti) { return State(state_).FindInput(*this, b, ti); }
+bool Node::FindInput(u8 b, size_t &ti) { return State(state_).FindInput(*this, b, ti); }
 
 } // namespace infinity

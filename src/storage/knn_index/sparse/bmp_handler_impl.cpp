@@ -12,13 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:bmp_handler.impl;
 
 import :bmp_handler;
-
-import :stl;
 import :buffer_manager;
 import :buffer_handle;
 import :block_column_iter;
@@ -40,11 +36,11 @@ static AbstractBMP InitAbstractIndex(const IndexBMP *index_bmp) {
     switch (index_bmp->compress_type_) {
         case BMPCompressType::kCompressed: {
             using BMPIndex = BMPAlg<DataType, IndexType, BMPCompressType::kCompressed, OwnMem>;
-            return UniquePtr<BMPIndex>();
+            return std::unique_ptr<BMPIndex>();
         }
         case BMPCompressType::kRaw: {
             using BMPIndex = BMPAlg<DataType, IndexType, BMPCompressType::kRaw, OwnMem>;
-            return UniquePtr<BMPIndex>();
+            return std::unique_ptr<BMPIndex>();
         }
         default: {
             return nullptr;
@@ -103,15 +99,15 @@ BMPHandler::BMPHandler(const IndexBase *index_base, const ColumnDef *column_def,
     if (!own_mem) {
         return;
     }
-    SizeT term_num = sparse_info->Dimension();
-    SizeT block_size = index_bmp->block_size_;
+    size_t term_num = sparse_info->Dimension();
+    size_t block_size = index_bmp->block_size_;
     std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    index = MakeUnique<IndexT>(term_num, block_size);
+                    index = std::make_unique<IndexT>(term_num, block_size);
                 } else {
                     UnrecoverableError("BMPHandler::BMPHandler: index does not own memory");
                 }
@@ -120,12 +116,12 @@ BMPHandler::BMPHandler(const IndexBase *index_base, const ColumnDef *column_def,
         bmp_);
 }
 
-UniquePtr<BMPHandler> BMPHandler::Make(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem) {
-    return MakeUnique<BMPHandler>(index_base, column_def, own_mem);
+std::unique_ptr<BMPHandler> BMPHandler::Make(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem) {
+    return std::make_unique<BMPHandler>(index_base, column_def, own_mem);
 }
 
-SizeT BMPHandler::AddDocs(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count) {
-    SizeT mem_usage{};
+size_t BMPHandler::AddDocs(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count) {
+    size_t mem_usage{};
     std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
@@ -133,10 +129,10 @@ SizeT BMPHandler::AddDocs(SegmentOffset block_offset, const ColumnVector &col, B
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
                     using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
-                    SizeT mem_before = index->MemoryUsage();
+                    size_t mem_before = index->MemoryUsage();
                     MemIndexInserterIter1<SparseRefT> iter(block_offset, col, offset, row_count);
                     index->AddDocs(std::move(iter));
-                    SizeT mem_after = index->MemoryUsage();
+                    size_t mem_after = index->MemoryUsage();
                     mem_usage = mem_after - mem_before;
                     LOG_INFO(fmt::format("before : {} -> after : {}, add mem_used : {}", mem_before, mem_after, mem_after - mem_before));
                 } else {
@@ -148,57 +144,57 @@ SizeT BMPHandler::AddDocs(SegmentOffset block_offset, const ColumnVector &col, B
     return mem_usage;
 }
 
-SizeT BMPHandler::MemUsage() const {
+size_t BMPHandler::MemUsage() const {
     return std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                return SizeT(0);
+                return size_t(0);
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
                     return index->MemoryUsage();
                 } else {
                     UnrecoverableError("BMPHandler::MemUsage: index does not own memory");
-                    return SizeT(0);
+                    return size_t(0);
                 }
             }
         },
         bmp_);
 }
 
-SizeT BMPHandler::DocNum() const {
+size_t BMPHandler::DocNum() const {
     return std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                return SizeT(0);
+                return size_t(0);
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
                     return index->DocNum();
                 } else {
                     UnrecoverableError("BMPHandler::DocNum: index does not own memory");
-                    return SizeT(0);
+                    return size_t(0);
                 }
             }
         },
         bmp_);
 }
 
-SizeT BMPHandler::GetSizeInBytes() const {
+size_t BMPHandler::GetSizeInBytes() const {
     return std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                return SizeT(0);
+                return size_t(0);
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
                     return index->GetSizeInBytes();
                 } else {
                     UnrecoverableError("BMPHandler::GetSizeInBytes: index does not own memory");
-                    return SizeT(0);
+                    return size_t(0);
                 }
             }
         },
@@ -251,7 +247,7 @@ void BMPHandler::Load(LocalFileHandle &file_handle) {
         bmp_);
 }
 
-void BMPHandler::LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {
+void BMPHandler::LoadFromPtr(LocalFileHandle &file_handle, size_t file_size) {
     std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
@@ -267,7 +263,7 @@ void BMPHandler::LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {
         bmp_);
 }
 
-void BMPHandler::LoadFromPtr(const char *ptr, SizeT file_size) {
+void BMPHandler::LoadFromPtr(const char *ptr, size_t file_size) {
     std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
@@ -305,7 +301,7 @@ BMPIndexInMem::~BMPIndexInMem() {
     if (!own_memory_) {
         return;
     }
-    SizeT mem_used = bmp_handler_->MemUsage();
+    size_t mem_used = bmp_handler_->MemUsage();
     if (bmp_handler_ != nullptr) {
         delete bmp_handler_;
     }
@@ -313,11 +309,11 @@ BMPIndexInMem::~BMPIndexInMem() {
 }
 
 void BMPIndexInMem::AddDocs(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count) {
-    SizeT mem_used = bmp_handler_->AddDocs(block_offset, col, offset, row_count);
+    size_t mem_used = bmp_handler_->AddDocs(block_offset, col, offset, row_count);
     IncreaseMemoryUsageBase(mem_used);
 }
 
-void BMPIndexInMem::Dump(BufferObj *buffer_obj, SizeT *dump_size_ptr) {
+void BMPIndexInMem::Dump(BufferObj *buffer_obj, size_t *dump_size_ptr) {
     if (!own_memory_) {
         UnrecoverableError("BMPIndexInMem::Dump() called with own_memory_ = false.");
     }
@@ -332,14 +328,18 @@ void BMPIndexInMem::Dump(BufferObj *buffer_obj, SizeT *dump_size_ptr) {
     chunk_handle_ = std::move(handle);
 }
 
-SizeT BMPIndexInMem::GetRowCount() const { return bmp_handler_->DocNum(); }
+size_t BMPIndexInMem::GetRowCount() const { return bmp_handler_->DocNum(); }
 
-SizeT BMPIndexInMem::GetSizeInBytes() const { return bmp_handler_->GetSizeInBytes(); }
+size_t BMPIndexInMem::GetSizeInBytes() const { return bmp_handler_->GetSizeInBytes(); }
 
 MemIndexTracerInfo BMPIndexInMem::GetInfo() const {
-    SizeT mem_used = bmp_handler_->MemUsage();
-    SizeT row_cnt = bmp_handler_->DocNum();
-    return MemIndexTracerInfo(MakeShared<String>(index_name_), MakeShared<String>(table_name_), MakeShared<String>(db_name_), mem_used, row_cnt);
+    size_t mem_used = bmp_handler_->MemUsage();
+    size_t row_cnt = bmp_handler_->DocNum();
+    return MemIndexTracerInfo(std::make_shared<std::string>(index_name_),
+                              std::make_shared<std::string>(table_name_),
+                              std::make_shared<std::string>(db_name_),
+                              mem_used,
+                              row_cnt);
 }
 
 const ChunkIndexMetaInfo BMPIndexInMem::GetChunkIndexMetaInfo() const {

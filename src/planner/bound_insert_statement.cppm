@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:bound_insert_statement;
 
 import :bound_statement;
@@ -22,39 +20,40 @@ import :base_expression;
 import :bind_context;
 import :logical_node;
 import :query_context;
-import :stl;
 
 namespace infinity {
 
 export struct BoundInsertStatement final : public BoundStatement {
 public:
-    static inline UniquePtr<BoundInsertStatement> Make(SharedPtr<BindContext> bind_context) {
-        return MakeUnique<BoundInsertStatement>(std::move(bind_context));
+    static inline std::unique_ptr<BoundInsertStatement> Make(std::shared_ptr<BindContext> bind_context) {
+        return std::make_unique<BoundInsertStatement>(std::move(bind_context));
     }
 
 public:
-    inline explicit BoundInsertStatement(SharedPtr<BindContext> bind_context) : bind_context_(std::move(bind_context)) {}
+    inline explicit BoundInsertStatement(std::shared_ptr<BindContext> bind_context) : bind_context_(std::move(bind_context)) {}
 
-    SharedPtr<LogicalNode> BuildPlan(QueryContext *query_context) final;
+    std::shared_ptr<LogicalNode> BuildPlan(QueryContext *query_context) final;
 
-    SharedPtr<LogicalNode> BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context);
+    std::shared_ptr<LogicalNode>
+    BuildFrom(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
 
-    SharedPtr<LogicalNode> BuildBaseTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context);
+    std::shared_ptr<LogicalNode>
+    BuildBaseTable(std::shared_ptr<TableRef> &table_ref, QueryContext *query_context, const std::shared_ptr<BindContext> &bind_context);
 
 public:
-    SharedPtr<BindContext> bind_context_{};
+    std::shared_ptr<BindContext> bind_context_{};
 
     // Target table for insertion
-    SharedPtr<TableRef> table_ref_ptr_{};
+    std::shared_ptr<TableRef> table_ref_ptr_{};
 
     // Column names for insertion (if specified)
-    Vector<String> columns_for_select_{};
+    std::vector<std::string> columns_for_select_{};
 
     // SELECT statement to get data from
-    SharedPtr<LogicalNode> select_plan_{};
+    std::shared_ptr<LogicalNode> select_plan_{};
 
     // Value lists for direct value insertion (alternative to select_plan_)
-    Vector<Vector<SharedPtr<BaseExpression>>> value_list_{};
+    std::vector<std::vector<std::shared_ptr<BaseExpression>>> value_list_{};
 };
 
 } // namespace infinity

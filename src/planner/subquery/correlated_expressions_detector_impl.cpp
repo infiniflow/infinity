@@ -12,48 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:correlated_expressions_detector.impl;
 
 import :corrlated_expr_detector;
-
-import :stl;
 import :logical_node;
 import :base_expression;
 import :column_expression;
 import :subquery_expression;
 import :status;
 import :infinity_exception;
-import :logger;
 
 namespace infinity {
 
 void CorrelatedExpressionsDetector::VisitNode(LogicalNode &op) { VisitNodeExpression(op); }
 
-SharedPtr<BaseExpression> CorrelatedExpressionsDetector::VisitReplace(const SharedPtr<ColumnExpression> &expression) {
+std::shared_ptr<BaseExpression> CorrelatedExpressionsDetector::VisitReplace(const std::shared_ptr<ColumnExpression> &expression) {
 
     if (expression->depth() == 0) {
         return expression;
     }
 
     if (expression->depth() > 1) {
-        Status status = Status::SyntaxError("Column expression with depth > 1 is detected");
-        RecoverableError(status);
+        RecoverableError(Status::SyntaxError("Column expression with depth > 1 is detected"));
     }
 
     is_correlated_ = true;
     return expression;
 }
 
-SharedPtr<BaseExpression> CorrelatedExpressionsDetector::VisitReplace(const SharedPtr<SubqueryExpression> &expression) {
+std::shared_ptr<BaseExpression> CorrelatedExpressionsDetector::VisitReplace(const std::shared_ptr<SubqueryExpression> &expression) {
     if (expression->correlated_columns.empty()) {
         // Uncorrelated subquery
         return nullptr;
     }
 
-    Status status = Status::SyntaxError("Not support nested correlated subquery in the subquery plan");
-    RecoverableError(status);
+    RecoverableError(Status::SyntaxError("Not support nested correlated subquery in the subquery plan"));
     return nullptr;
 }
 

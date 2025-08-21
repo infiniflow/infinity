@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <fstream>
-
 export module infinity_core:stream_reader;
 
-import :stl;
 import :status;
+
+import std;
 
 namespace infinity {
 
@@ -29,8 +26,8 @@ public:
     StreamReader() = default;
     ~StreamReader();
 
-    Status Init(const String &file_name);
-    bool ReadLine(String &line);
+    Status Init(const std::string &file_name);
+    bool ReadLine(std::string &line);
     void Close();
 
 private:

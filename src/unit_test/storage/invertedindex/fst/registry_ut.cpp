@@ -12,21 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.registry;
 
 import :ut.base_test;
-import :stl;
+
 import :fst.registry;
-#endif
 
 using namespace infinity;
 
@@ -35,17 +29,17 @@ struct Key {
     Key() = default;
     Key(int k) : k_(k) {}
     bool operator==(const Key &rhs) const { return k_ == rhs.k_; }
-    SizeT Hash() const { return SizeT(k_); }
+    size_t Hash() const { return size_t(k_); }
 };
 
 class RegistryTest : public ::testing::Test {
 protected:
-    Registry<Key, SizeT> registry{3};
+    Registry<Key, size_t> registry{3};
 };
 
 TEST_F(RegistryTest, InsertAndFind) {
     Key key;
-    RegistryEntry<SizeT> ent;
+    RegistryEntry<size_t> ent;
 
     key.k_ = 1;
     ent = registry.Find(key);

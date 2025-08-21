@@ -12,19 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:ring_buffer_iterator;
 
-import :stl;
 import :default_values;
+
+import std;
+import std.compat;
+
 import global_resource_usage;
 
 namespace infinity {
 
 export class RingBufferIterator {
 public:
-    explicit RingBufferIterator(Array<char, PG_MSG_BUFFER_SIZE> &data, SizeT position = 0) : data_(data), position_(position) {
+    explicit RingBufferIterator(std::array<char, PG_MSG_BUFFER_SIZE> &data, size_t position = 0) : data_(data), position_(position) {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("RingBufferIterator");
 #endif
@@ -53,14 +54,14 @@ public:
 
     inline void increment() { position_ = (position_ + 1) % PG_MSG_BUFFER_SIZE; }
 
-    inline void increment(SizeT n) { position_ = (position_ + n) % PG_MSG_BUFFER_SIZE; }
+    inline void increment(size_t n) { position_ = (position_ + n) % PG_MSG_BUFFER_SIZE; }
 
     [[nodiscard]] inline char dereference() const { return data_[position_]; }
 
     inline char *position_addr() const { return &data_[position_]; }
 
     static inline i64 Distance(const RingBufferIterator &begin_iter, const RingBufferIterator &end_iter) {
-        return (i64)end_iter.position_ - (i64)begin_iter.position_;
+        return static_cast<i64>(end_iter.position_) - static_cast<i64>(begin_iter.position_);
     }
 
     static inline RingBufferIterator Find(const RingBufferIterator &begin_iter, const RingBufferIterator &end_iter, char finding) {
@@ -75,8 +76,8 @@ public:
         return iter;
     }
 
-    static inline void Copy(const RingBufferIterator &begin_iter, const RingBufferIterator &end_iter, String &output) {
-        SizeT size = Distance(begin_iter, end_iter);
+    static inline void Copy(const RingBufferIterator &begin_iter, const RingBufferIterator &end_iter, std::string &output) {
+        size_t size = Distance(begin_iter, end_iter);
         output.reserve(size);
         RingBufferIterator iter = begin_iter;
         while (!iter.equal(end_iter)) {
@@ -85,29 +86,29 @@ public:
         }
     }
 
-    static inline void CopyN(const RingBufferIterator &begin_iter, SizeT len, char *output) {
+    static inline void CopyN(const RingBufferIterator &begin_iter, size_t len, char *output) {
         RingBufferIterator iter = begin_iter;
-        for (SizeT idx = 0; idx < len; ++idx) {
+        for (size_t idx = 0; idx < len; ++idx) {
             output[idx] = iter.dereference();
             iter.increment();
         }
     }
 
-    static inline void CopyN(const RingBufferIterator &begin_iter, SizeT len, String &result) {
+    static inline void CopyN(const RingBufferIterator &begin_iter, size_t len, std::string &result) {
         RingBufferIterator iter = begin_iter;
-        for (SizeT idx = 0; idx < len; ++idx) {
+        for (size_t idx = 0; idx < len; ++idx) {
             result.push_back(iter.dereference());
             iter.increment();
         }
     }
 
-    static inline void CopyN(const char *src, SizeT len, RingBufferIterator &result_iter) {
-        for (SizeT str_idx = 0, array_idx = result_iter.position_; str_idx < len; ++str_idx, array_idx = (array_idx + 1) % PG_MSG_BUFFER_SIZE) {
+    static inline void CopyN(const char *src, size_t len, RingBufferIterator &result_iter) {
+        for (size_t str_idx = 0, array_idx = result_iter.position_; str_idx < len; ++str_idx, array_idx = (array_idx + 1) % PG_MSG_BUFFER_SIZE) {
             result_iter.data_[array_idx] = src[str_idx];
         }
     }
 
-    Array<char, PG_MSG_BUFFER_SIZE> &data_;
+    std::array<char, PG_MSG_BUFFER_SIZE> &data_;
     u32 position_;
 };
 

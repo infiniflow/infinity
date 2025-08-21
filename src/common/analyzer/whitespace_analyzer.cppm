@@ -12,18 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:whitespace_analyzer;
 
-import :stl;
 import :term;
 import :analyzer;
 
 namespace infinity {
 
 export class WhitespaceAnalyzer : public Analyzer {
-    String delimiters_{};
+    std::string delimiters_{};
 
 public:
     WhitespaceAnalyzer() = default;

@@ -12,53 +12,50 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-
 module infinity_core:logical_check.impl;
 
 import :logical_check;
-
-import :stl;
-import internal_types;
 import :infinity_exception;
 import :column_binding;
-import :logger;
-import check_statement;
 import :logical_check;
+
+import std;
+
 import data_type;
+import check_statement;
+import internal_types;
 
 namespace infinity {
 
-String ToString(CheckStmtType type) {
+std::string ToString(CheckStmtType type) {
     switch (type) {
         case CheckStmtType::kSystem:
             return "Check system";
         case CheckStmtType::kTable:
             return "Check table";
         case CheckStmtType::kInvalid: {
-            String error_message = "Invalid chunk scan type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid chunk scan type");
         }
     }
     return {};
 }
 
-Vector<ColumnBinding> LogicalCheck::GetColumnBindings() const { return {}; }
+std::vector<ColumnBinding> LogicalCheck::GetColumnBindings() const { return {}; }
 
-SharedPtr<Vector<String>> LogicalCheck::GetOutputNames() const { return MakeShared<Vector<String>>(); }
+std::shared_ptr<std::vector<std::string>> LogicalCheck::GetOutputNames() const { return std::make_shared<std::vector<std::string>>(); }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalCheck::GetOutputTypes() const { return MakeShared<Vector<SharedPtr<DataType>>>(); }
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalCheck::GetOutputTypes() const {
+    return std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+}
 
-String LogicalCheck::ToString(i64 &space) const {
+std::string LogicalCheck::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << "-> "
+    ss << std::string(space, ' ') << "-> "
        << "Check: ";
     space += arrow_str.size();
 

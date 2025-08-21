@@ -12,23 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.utility;
 
 import :ut.base_test;
 import :infinity_exception;
-import :stl;
 import :utility;
 import :infinity_context;
-#endif
 
 using namespace infinity;
 class UtilityTest : public BaseTest {};
@@ -38,8 +31,8 @@ TEST_F(UtilityTest, test1) {
     std::string trimed_path = infinity::TrimPath(path);
     ASSERT_EQ(trimed_path, "src/storage/db");
 
-    String key = "idx_seg|1|45|3|10";
-    String prefix = "idx_seg|1|45|3|";
+    std::string key = "idx_seg|1|45|3|10";
+    std::string prefix = "idx_seg|1|45|3|";
     auto [segment_id, is_segment_id] = infinity::ExtractU64FromStringSuffix(key, prefix.size());
     EXPECT_EQ(segment_id, 10);
     EXPECT_EQ(is_segment_id, true);

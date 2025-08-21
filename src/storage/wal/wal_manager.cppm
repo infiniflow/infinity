@@ -12,12 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:wal_manager;
 
-import :stl;
-// import :options;
 import :blocking_queue;
 import :log_file;
 import :options;
@@ -41,7 +37,7 @@ export enum class StorageMode {
     kWritable,
 };
 
-export String ToString(StorageMode storage_mode) {
+export std::string ToString(StorageMode storage_mode) {
     switch (storage_mode) {
         case StorageMode::kUnInitialized: {
             return "Uninitialized";
@@ -66,8 +62,8 @@ export struct ReplayWalOptions {
 
 export class WalManager {
 public:
-    WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, FlushOptionType flush_option);
-    WalManager(Storage *storage, String wal_dir, String data_dir, u64 wal_size_threshold, FlushOptionType flush_option);
+    WalManager(Storage *storage, std::string wal_dir, u64 wal_size_threshold, FlushOptionType flush_option);
+    WalManager(Storage *storage, std::string wal_dir, std::string data_dir, u64 wal_size_threshold, FlushOptionType flush_option);
 
     ~WalManager();
 
@@ -75,7 +71,7 @@ public:
 
     void Stop();
 
-    void SubmitTxn(Vector<NewTxn *> &txn_batch);
+    void SubmitTxn(std::vector<NewTxn *> &txn_batch);
 
     // Flush is scheduled regularly. It collects a batch of transactions, sync
     // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
@@ -83,7 +79,7 @@ public:
     // checkpoint for a batch of sync.
     void NewFlush();
 
-    void FlushLogByReplication(const Vector<String> &synced_logs, bool on_startup);
+    void FlushLogByReplication(const std::vector<std::string> &synced_logs, bool on_startup);
 
     bool SetCheckpointing();
     bool UnsetCheckpoint();
@@ -91,23 +87,23 @@ public:
 
     void SwapWalFile(TxnTimeStamp max_commit_ts, bool error_if_duplicate);
 
-    String GetWalFilename() const;
+    std::string GetWalFilename() const;
 
-    Tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> GetReplayEntries(StorageMode targe_storage_mode, Vector<SharedPtr<WalEntry>> &replay_entries);
+    std::tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> GetReplayEntries(StorageMode targe_storage_mode,
+                                                                           std::vector<std::shared_ptr<WalEntry>> &replay_entries);
 
-    Tuple<TransactionID, TxnTimeStamp> ReplayWalEntries(const Vector<SharedPtr<WalEntry>> &replay_entries);
+    std::tuple<TransactionID, TxnTimeStamp> ReplayWalEntries(const std::vector<std::shared_ptr<WalEntry>> &replay_entries);
 
-    Vector<SharedPtr<WalEntry>> CollectWalEntries() const;
+    std::vector<std::shared_ptr<WalEntry>> CollectWalEntries() const;
 
     TxnTimeStamp LastCheckpointTS() const;
     void SetLastCheckpointTS(TxnTimeStamp new_last_ckp_ts);
 
-    Vector<SharedPtr<String>> GetDiffWalEntryString(TxnTimeStamp timestamp) const;
+    std::vector<std::shared_ptr<std::string>> GetDiffWalEntryString(TxnTimeStamp timestamp) const;
     void UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size);
 
 public:
-
-    Tuple<TxnTimeStamp, i64> GetCommitState();
+    std::tuple<TxnTimeStamp, i64> GetCommitState();
     void SetLastCkpWalSize(i64 wal_size);
 
 private:
@@ -116,21 +112,21 @@ private:
 public:
     u64 cfg_wal_size_threshold_{};
 
-    const String &wal_dir() const { return wal_dir_; }
-    const String &data_path() const { return data_path_; }
+    const std::string &wal_dir() const { return wal_dir_; }
+    const std::string &data_path() const { return data_path_; }
 
 private:
     // Concurrent writing WAL is disallowed. So put all WAL writing into a queue
     // and do serial writing.
-    String wal_dir_{};
-    String wal_path_{};
-    String data_path_{};
+    std::string wal_dir_{};
+    std::string wal_path_{};
+    std::string data_path_{};
 
     Storage *storage_{};
 
     // WalManager state
-    Atomic<bool> running_{};
-    Thread new_flush_thread_{};
+    std::atomic<bool> running_{};
+    std::thread new_flush_thread_{};
 
     // TxnManager and Flush thread access following members
     BlockingQueue<NewTxn *> new_wait_flush_{"WalManager"};
@@ -138,7 +134,7 @@ private:
     // Only Flush thread access following members
     std::ofstream ofs_{};
     FlushOptionType flush_option_{FlushOptionType::kOnlyWrite};
-    UniquePtr<BottomExecutor> bottom_executor_{nullptr};
+    std::unique_ptr<BottomExecutor> bottom_executor_{nullptr};
 
     // Flush and Checkpoint threads access following members
     mutable std::mutex mutex2_{};
@@ -146,7 +142,7 @@ private:
     TxnTimeStamp last_swap_wal_ts_{};
     i64 wal_size_{};
     i64 last_ckp_wal_size_{};
-    Atomic<bool> checkpoint_in_progress_{false};
+    std::atomic<bool> checkpoint_in_progress_{false};
 
     // Only Checkpoint/Cleanup thread access following members
     mutable std::mutex last_ckp_ts_mutex_{};

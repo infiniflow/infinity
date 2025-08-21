@@ -13,15 +13,15 @@
 // limitations under the License.
 
 #include <csignal>
-#include <cstdio>
-#include <cstdlib>
-#include <exception>
+
 #ifdef ENABLE_JEMALLOC_PROF
 #include <jemalloc/jemalloc.h>
 #endif
 
 import compilation_config;
 import infinity_core;
+import std;
+import std.compat;
 
 namespace {
 
@@ -29,28 +29,28 @@ namespace {
 
 #if THRIFT_SERVER_TYPE == 0
 
-infinity::Thread pool_thrift_thread;
+std::thread pool_thrift_thread;
 infinity::PoolThriftServer pool_thrift_server;
 
 #elif THRIFT_SERVER_TYPE == 1
 
-infinity::Thread non_block_pool_thrift_thread;
+std::thread non_block_pool_thrift_thread;
 infinity::NonBlockPoolThriftServer non_block_pool_thrift_server;
 
 #else
 
-infinity::Thread threaded_thrift_thread;
+std::thread threaded_thrift_thread;
 infinity::ThreadedThriftServer threaded_thrift_server;
 
 #endif
 
-infinity::Thread pool_peer_thrift_thread;
+std::thread pool_peer_thrift_thread;
 infinity::PoolPeerThriftServer pool_peer_thrift_server;
 
-infinity::Thread http_server_thread;
+std::thread http_server_thread;
 infinity::HTTPServer http_server;
 
-infinity::Thread pg_thread;
+std::thread pg_thread;
 infinity::PGServer pg_server;
 
 // Used for server shutdown
@@ -59,15 +59,15 @@ std::condition_variable server_cv;
 
 bool server_running = false;
 
-infinity::Thread shutdown_thread;
+std::thread shutdown_thread;
 
 void StartThriftServer() {
     using namespace infinity;
-    u32 thrift_server_port = InfinityContext::instance().config()->ClientPort();
+    uint32_t thrift_server_port = InfinityContext::instance().config()->ClientPort();
 
 #if THRIFT_SERVER_TYPE == 0
 
-    i32 thrift_server_pool_size = InfinityContext::instance().config()->ConnectionPoolSize();
+    int32_t thrift_server_pool_size = InfinityContext::instance().config()->ConnectionPoolSize();
     pool_thrift_server.Init(InfinityContext::instance().config()->ServerAddress(), thrift_server_port, thrift_server_pool_size);
     pool_thrift_thread = pool_thrift_server.Start();
 
@@ -75,12 +75,12 @@ void StartThriftServer() {
 
     i32 thrift_server_pool_size = InfinityContext::instance().config()->ConnectionPoolSize();
     non_block_pool_thrift_server.Init(InfinityContext::instance().config()->ServerAddress(), thrift_server_port, thrift_server_pool_size);
-    non_block_pool_thrift_thread = infinity::Thread([&]() { non_block_pool_thrift_server.Start(); });
+    non_block_pool_thrift_thread = infinity::std::thread([&]() { non_block_pool_thrift_server.Start(); });
 
 #else
 
     threaded_thrift_server.Init(InfinityContext::instance().config()->ServerAddress(), thrift_server_port);
-    threaded_thrift_thread = infinity::Thread([&]() { threaded_thrift_server.Start(); });
+    threaded_thrift_thread = infinity::std::thread([&]() { threaded_thrift_server.Start(); });
 
 #endif
     LOG_INFO("Thrift server is started.");
@@ -103,8 +103,8 @@ void StopThriftServer() {
 
 void StartPeerServer() {
     using namespace infinity;
-    u32 peer_server_port = InfinityContext::instance().config()->PeerServerPort();
-    i32 peer_server_connection_pool_size = InfinityContext::instance().config()->PeerServerConnectionPoolSize();
+    uint32_t peer_server_port = InfinityContext::instance().config()->PeerServerPort();
+    int32_t peer_server_connection_pool_size = InfinityContext::instance().config()->PeerServerConnectionPoolSize();
     pool_peer_thrift_server.Init(InfinityContext::instance().config()->PeerServerIP(), peer_server_port, peer_server_connection_pool_size);
     pool_peer_thrift_thread = pool_peer_thrift_server.Start();
     infinity::LOG_INFO("Peer server is started.");
@@ -171,7 +171,7 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
         case SIGUSR2: {
             // http://jemalloc.net/jemalloc.3.html
             malloc_stats_print(nullptr, nullptr, "admp");
-            int rc = mallctl("prof.dump", NULL, NULL, NULL, 0);
+            int rc = mallctl("prof.dump", nullptr, nullptr, nullptr, 0);
             printf("Dump memory profile %d\n", rc);
             break;
         }
@@ -189,19 +189,19 @@ void RegisterSignal() {
     sig_action.sa_flags = SA_SIGINFO;
     sig_action.sa_sigaction = SignalHandler;
     sigemptyset(&sig_action.sa_mask);
-    sigaction(SIGUSR1, &sig_action, NULL);
+    sigaction(SIGUSR1, &sig_action, nullptr);
 #ifdef ENABLE_JEMALLOC_PROF
-    sigaction(SIGUSR2, &sig_action, NULL);
+    sigaction(SIGUSR2, &sig_action, nullptr);
 #endif
-    sigaction(SIGINT, &sig_action, NULL);
-    sigaction(SIGQUIT, &sig_action, NULL);
-    sigaction(SIGTERM, &sig_action, NULL);
-    sigaction(SIGSEGV, &sig_action, NULL);
-    sigaction(SIGABRT, &sig_action, NULL);
+    sigaction(SIGINT, &sig_action, nullptr);
+    sigaction(SIGQUIT, &sig_action, nullptr);
+    sigaction(SIGTERM, &sig_action, nullptr);
+    sigaction(SIGSEGV, &sig_action, nullptr);
+    sigaction(SIGABRT, &sig_action, nullptr);
 }
 
 void TerminateHandler() {
-    infinity::String message = "TerminateHandler: ";
+    std::string message = "TerminateHandler: ";
     try {
         std::exception_ptr eptr{std::current_exception()};
         if (eptr) {
@@ -245,7 +245,7 @@ auto main(int argc, char **argv) -> int {
 
     CLI::App app{"infinity_main"};
 
-    SharedPtr<String> config_path = MakeShared<String>();
+    auto config_path = std::make_shared<std::string>();
     bool m_flag{false};
     app.add_option("-f,--config", *config_path, "Specify the config file path. No default config file");
     app.add_flag("-m,--maintenance", m_flag, "Start Infinity in maintenance mode");
@@ -274,7 +274,7 @@ auto main(int argc, char **argv) -> int {
 
     http_server_thread = http_server.Start(InfinityContext::instance().config()->ServerAddress(), InfinityContext::instance().config()->HTTPPort());
 
-    shutdown_thread = infinity::Thread([&]() { ShutdownServer(); });
+    shutdown_thread = std::thread([&]() { ShutdownServer(); });
 
     RegisterSignal();
 

@@ -16,8 +16,6 @@ module;
 
 export module infinity_core:greater_equals;
 
-import :stl;
-
 namespace infinity {
 
 class NewCatalog;

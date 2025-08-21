@@ -1,17 +1,11 @@
-
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.inmem_position_list_decoder;
 
 import :ut.base_test;
-import :stl;
+
 import :index_defines;
 import :posting_byte_slice;
 import :inmem_position_list_decoder;
@@ -21,7 +15,6 @@ import :skiplist_reader;
 import :position_list_encoder;
 import :in_doc_pos_state;
 import :position_list_format_option;
-#endif
 
 using namespace infinity;
 
@@ -34,7 +27,7 @@ protected:
         PostingFormatOption option(flag);
 
         PositionListEncoder position_list_encoder(option);
-        for (SizeT i = 0; i < (SizeT)tf; ++i) {
+        for (size_t i = 0; i < (size_t)tf; ++i) {
             position_list_encoder.AddPosition(pos_list[i]);
         }
         position_list_encoder.EndDocument();
@@ -46,7 +39,7 @@ protected:
         ASSERT_TRUE(position_list_decoder);
 
         // compress mode is useless in decoder
-        InDocPositionState state(option.GetPosListFormatOption());
+        infinity::InDocPositionState state(option.GetPosListFormatOption());
         ASSERT_TRUE(position_list_decoder->SkipTo(0, &state));
 
         u32 temp_tf = 0;
@@ -56,12 +49,12 @@ protected:
 
         pos_t pos_buffer[MAX_POS_PER_RECORD];
 
-        SizeT pos_idx = 0;
+        size_t pos_idx = 0;
         pos_t last_pos = 0;
-        for (SizeT i = 0; i < tf / MAX_POS_PER_RECORD; ++i) {
+        for (size_t i = 0; i < tf / MAX_POS_PER_RECORD; ++i) {
             u32 decode_count = position_list_decoder->DecodeRecord(pos_buffer, MAX_POS_PER_RECORD);
             ASSERT_EQ((u32)MAX_POS_PER_RECORD, decode_count);
-            for (SizeT j = 0; j < MAX_POS_PER_RECORD; ++j) {
+            for (size_t j = 0; j < MAX_POS_PER_RECORD; ++j) {
                 ASSERT_EQ(pos_list[pos_idx], last_pos + pos_buffer[j]);
                 last_pos = last_pos + pos_buffer[j];
                 pos_idx++;
@@ -70,7 +63,7 @@ protected:
         if (tf % MAX_POS_PER_RECORD != 0) {
             u32 decode_count = position_list_decoder->DecodeRecord(pos_buffer, MAX_POS_PER_RECORD);
             ASSERT_EQ((u32)(tf % MAX_POS_PER_RECORD), decode_count);
-            for (SizeT j = 0; j < decode_count; ++j) {
+            for (size_t j = 0; j < decode_count; ++j) {
                 ASSERT_EQ(pos_list[pos_idx], last_pos + pos_buffer[j]);
                 last_pos = last_pos + pos_buffer[j];
                 pos_idx++;
@@ -97,7 +90,7 @@ protected:
 
         PositionListEncoder position_list_encoder(option);
         pos_t sum = 0;
-        for (SizeT i = 0; i < (SizeT)ttf; ++i) {
+        for (size_t i = 0; i < (size_t)ttf; ++i) {
             sum += i;
             position_list_encoder.AddPosition(sum);
         }
@@ -114,7 +107,7 @@ protected:
         i32 record_offset = 0;
         u32 temp_tf = 0;
         pos_t pos_buffer[MAX_POS_PER_RECORD];
-        for (SizeT i = 0; i < (SizeT)ttf; ++i) {
+        for (size_t i = 0; i < (size_t)ttf; ++i) {
             ASSERT_TRUE(position_list_decoder->SkipTo(i, &state));
             if (i % MAX_POS_PER_RECORD == 0) {
                 ASSERT_TRUE(position_list_decoder->LocateRecord(&state, temp_tf));
@@ -123,7 +116,7 @@ protected:
                 u32 decode_count = position_list_decoder->DecodeRecord(pos_buffer, MAX_POS_PER_RECORD);
                 u32 expectDecodeCount = std::min(u32(ttf - i), MAX_POS_PER_RECORD);
                 ASSERT_EQ(expectDecodeCount, decode_count);
-                for (SizeT j = 0; j < (SizeT)decode_count; ++j) {
+                for (size_t j = 0; j < (size_t)decode_count; ++j) {
                     ASSERT_EQ(i + j, pos_buffer[j]);
                 }
             } else {

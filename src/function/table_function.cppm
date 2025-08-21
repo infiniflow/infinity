@@ -12,16 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:table_function;
 
-import :stl;
 import :function;
 import :function_data;
-
-// import :query_context;
 import :data_block;
+
 import logical_type;
 
 namespace infinity {
@@ -37,13 +33,13 @@ export using TableFunctionType = std::function<void(QueryContext *query_context,
 
 export class TableFunction : public Function {
 public:
-    explicit TableFunction(String name, Vector<LogicalType> argument_types, TableFunctionType function);
+    explicit TableFunction(std::string name, std::vector<LogicalType> argument_types, TableFunctionType function);
 
-    [[nodiscard]] String ToString() const override;
+    [[nodiscard]] std::string ToString() const override;
 
     TableFunctionType main_function_;
 
 private:
-    Vector<LogicalType> parameter_types_;
+    std::vector<LogicalType> parameter_types_;
 };
 } // namespace infinity

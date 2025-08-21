@@ -12,28 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.virtual_store;
 
 import :ut.base_test;
 import :infinity_exception;
-import :stl;
-import :third_party;
+import third_party;
 import :logger;
 import :file_writer;
 import :file_reader;
 import :infinity_context;
 import :virtual_store;
 import :local_file_handle;
-#endif
 
 import global_resource_usage;
 import compilation_config;
@@ -44,16 +37,16 @@ class VirtualStoreTest : public BaseTest {};
 
 TEST_F(VirtualStoreTest, TestAppend) {
     using namespace infinity;
-    String path = String(GetFullTmpDir()) + "/test_file2.abc";
+    std::string path = std::string(GetFullTmpDir()) + "/test_file2.abc";
 
     auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 
-    SizeT len = 10;
-    UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
-    for (SizeT i = 0; i < len; ++i) {
+    size_t len = 10;
+    std::unique_ptr<char[]> data_array = std::make_unique<char[]>(len);
+    for (size_t i = 0; i < len; ++i) {
         data_array[i] = i + 1;
     }
     file_handle->Append(data_array.get(), len);
@@ -64,8 +57,8 @@ TEST_F(VirtualStoreTest, TestAppend) {
 
 TEST_F(VirtualStoreTest, TestDir) {
     using namespace infinity;
-    String dir = String(GetFullTmpDir()) + "/unit_test";
-    String path = dir + "/test_file.test";
+    std::string dir = std::string(GetFullTmpDir()) + "/unit_test";
+    std::string path = dir + "/test_file.test";
 
     VirtualStore::MakeDirectory(dir);
 
@@ -74,9 +67,9 @@ TEST_F(VirtualStoreTest, TestDir) {
         UnrecoverableError(status.message());
     }
 
-    SizeT len = 10;
-    UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
-    for (SizeT i = 0; i < len; ++i) {
+    size_t len = 10;
+    std::unique_ptr<char[]> data_array = std::make_unique<char[]>(len);
+    for (size_t i = 0; i < len; ++i) {
         data_array[i] = i + 1;
     }
     file_handle->Append(data_array.get(), len);
@@ -92,16 +85,16 @@ TEST_F(VirtualStoreTest, TestDir) {
 
 TEST_F(VirtualStoreTest, TestRead) {
     using namespace infinity;
-    String path = String(GetFullTmpDir()) + "/test_file_read.abc";
+    std::string path = std::string(GetFullTmpDir()) + "/test_file_read.abc";
 
     auto [file_handle, open_write_status] = VirtualStore::Open(path, FileAccessMode::kWrite);
     if (!open_write_status.ok()) {
         UnrecoverableError(open_write_status.message());
     }
 
-    SizeT len = 10;
-    UniquePtr<char[]> write_data = MakeUnique<char[]>(len);
-    for (SizeT i = 0; i < len; ++i) {
+    size_t len = 10;
+    std::unique_ptr<char[]> write_data = std::make_unique<char[]>(len);
+    for (size_t i = 0; i < len; ++i) {
         write_data[i] = i + 1;
     }
     file_handle->Append(write_data.get(), len);
@@ -112,12 +105,12 @@ TEST_F(VirtualStoreTest, TestRead) {
         UnrecoverableError(open_read_status.message());
     }
 
-    UniquePtr<char[]> read_data = MakeUnique<char[]>(len);
+    std::unique_ptr<char[]> read_data = std::make_unique<char[]>(len);
     auto [read_len, read_status] = read_handle->Read(read_data.get(), len);
     EXPECT_TRUE(read_status.ok());
 
     EXPECT_EQ(read_len, len);
-    for (SizeT i = 0; i < len; ++i) {
+    for (size_t i = 0; i < len; ++i) {
         EXPECT_EQ(read_data[i], i + 1);
     }
     VirtualStore::DeleteFile(path);
@@ -126,17 +119,17 @@ TEST_F(VirtualStoreTest, TestRead) {
 
 TEST_F(VirtualStoreTest, TestRename) {
     using namespace infinity;
-    String old_path = String(GetFullTmpDir()) + "/test_file_old.abc";
-    String new_path = String(GetFullTmpDir()) + "/test_file_new.abc";
+    std::string old_path = std::string(GetFullTmpDir()) + "/test_file_old.abc";
+    std::string new_path = std::string(GetFullTmpDir()) + "/test_file_new.abc";
 
     auto [file_handle, status] = VirtualStore::Open(old_path, FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 
-    SizeT len = 10;
-    UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
-    for (SizeT i = 0; i < len; ++i) {
+    size_t len = 10;
+    std::unique_ptr<char[]> data_array = std::make_unique<char[]>(len);
+    for (size_t i = 0; i < len; ++i) {
         data_array[i] = i + 1;
     }
     file_handle->Append(data_array.get(), len);
@@ -154,16 +147,16 @@ TEST_F(VirtualStoreTest, TestRename) {
 
 TEST_F(VirtualStoreTest, TestTruncate) {
     using namespace infinity;
-    String path = String(GetFullTmpDir()) + "/test_file_truncate.abc";
+    std::string path = std::string(GetFullTmpDir()) + "/test_file_truncate.abc";
 
     auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 
-    SizeT initial_len = 20;
-    UniquePtr<char[]> data_array = MakeUnique<char[]>(initial_len);
-    for (SizeT i = 0; i < initial_len; ++i) {
+    size_t initial_len = 20;
+    std::unique_ptr<char[]> data_array = std::make_unique<char[]>(initial_len);
+    for (size_t i = 0; i < initial_len; ++i) {
         data_array[i] = i + 1;
     }
     file_handle->Append(data_array.get(), initial_len);
@@ -176,12 +169,12 @@ TEST_F(VirtualStoreTest, TestTruncate) {
         UnrecoverableError(truncate_status.message());
     }
 
-    UniquePtr<char[]> truncated_data = MakeUnique<char[]>(10);
+    std::unique_ptr<char[]> truncated_data = std::make_unique<char[]>(10);
     auto [read_len, read_status] = truncated_handle->Read(truncated_data.get(), 10);
     EXPECT_TRUE(read_status.ok());
 
     EXPECT_EQ(read_len, 10);
-    for (SizeT i = 0; i < 10; ++i) {
+    for (size_t i = 0; i < 10; ++i) {
         EXPECT_EQ(truncated_data[i], i + 1);
     }
 
@@ -191,17 +184,17 @@ TEST_F(VirtualStoreTest, TestTruncate) {
 
 TEST_F(VirtualStoreTest, TestMerge) {
     using namespace infinity;
-    String dst_path = String(GetFullTmpDir()) + "/test_file_append_dst.abc";
-    String src_path = String(GetFullTmpDir()) + "/test_file_append_src.abc";
+    std::string dst_path = std::string(GetFullTmpDir()) + "/test_file_append_dst.abc";
+    std::string src_path = std::string(GetFullTmpDir()) + "/test_file_append_src.abc";
 
     auto [src_handler, src_status] = VirtualStore::Open(src_path, FileAccessMode::kWrite);
     if (!src_status.ok()) {
         UnrecoverableError(src_status.message());
     }
 
-    SizeT src_len = 10;
-    UniquePtr<char[]> src_data = MakeUnique<char[]>(src_len);
-    for (SizeT i = 0; i < src_len; ++i) {
+    size_t src_len = 10;
+    std::unique_ptr<char[]> src_data = std::make_unique<char[]>(src_len);
+    for (size_t i = 0; i < src_len; ++i) {
         src_data[i] = i + 1;
     }
     src_handler->Append(src_data.get(), src_len);
@@ -212,9 +205,9 @@ TEST_F(VirtualStoreTest, TestMerge) {
         UnrecoverableError(dst_status.message());
     }
 
-    SizeT dst_len = 5;
-    UniquePtr<char[]> dst_data = MakeUnique<char[]>(dst_len);
-    for (SizeT i = 0; i < dst_len; ++i) {
+    size_t dst_len = 5;
+    std::unique_ptr<char[]> dst_data = std::make_unique<char[]>(dst_len);
+    for (size_t i = 0; i < dst_len; ++i) {
         dst_data[i] = i + 10;
     }
     dst_handler->Append(dst_data.get(), dst_len);
@@ -227,15 +220,15 @@ TEST_F(VirtualStoreTest, TestMerge) {
         UnrecoverableError(append_status.message());
     }
 
-    UniquePtr<char[]> combined_data = MakeUnique<char[]>(src_len + dst_len);
+    std::unique_ptr<char[]> combined_data = std::make_unique<char[]>(src_len + dst_len);
     auto [read_len, read_status] = appended_handle->Read(combined_data.get(), src_len + dst_len);
     EXPECT_TRUE(read_status.ok());
 
     EXPECT_EQ(read_len, (i64)(src_len + dst_len));
-    for (SizeT i = 0; i < dst_len; ++i) {
+    for (size_t i = 0; i < dst_len; ++i) {
         EXPECT_EQ(combined_data[i], i + 10);
     }
-    for (SizeT i = dst_len; i < src_len + dst_len; ++i) {
+    for (size_t i = dst_len; i < src_len + dst_len; ++i) {
         EXPECT_EQ(combined_data[i], i - dst_len + 1);
     }
 
@@ -247,9 +240,9 @@ TEST_F(VirtualStoreTest, TestMerge) {
 
 TEST_F(VirtualStoreTest, TestCleanDir) {
     using namespace infinity;
-    String dir = String(GetFullTmpDir()) + "/cleanup_test_dir";
-    String file_path1 = dir + "/file1.txt";
-    String file_path2 = dir + "/file2.txt";
+    std::string dir = std::string(GetFullTmpDir()) + "/cleanup_test_dir";
+    std::string file_path1 = dir + "/file1.txt";
+    std::string file_path2 = dir + "/file2.txt";
 
     VirtualStore::MakeDirectory(dir);
 
@@ -257,9 +250,9 @@ TEST_F(VirtualStoreTest, TestCleanDir) {
     if (!status1.ok()) {
         UnrecoverableError(status1.message());
     }
-    SizeT len1 = 10;
-    UniquePtr<char[]> data_array1 = MakeUnique<char[]>(len1);
-    for (SizeT i = 0; i < len1; ++i) {
+    size_t len1 = 10;
+    std::unique_ptr<char[]> data_array1 = std::make_unique<char[]>(len1);
+    for (size_t i = 0; i < len1; ++i) {
         data_array1[i] = i + 1;
     }
     file_handler1->Append(data_array1.get(), len1);
@@ -269,9 +262,9 @@ TEST_F(VirtualStoreTest, TestCleanDir) {
     if (!status2.ok()) {
         UnrecoverableError(status2.message());
     }
-    SizeT len2 = 20;
-    UniquePtr<char[]> data_array2 = MakeUnique<char[]>(len2);
-    for (SizeT i = 0; i < len2; ++i) {
+    size_t len2 = 20;
+    std::unique_ptr<char[]> data_array2 = std::make_unique<char[]>(len2);
+    for (size_t i = 0; i < len2; ++i) {
         data_array2[i] = i + 11;
     }
     file_handler2->Append(data_array2.get(), len2);
@@ -290,20 +283,20 @@ TEST_F(VirtualStoreTest, TestCleanDir) {
 /*
 TEST_F(VirtualStoreTest, minio_upload) {
     using namespace infinity;
-    auto config_path = MakeShared<String>(std::string(test_data_path())+"/config/test_minio_s3_storage.toml");
+    auto config_path = std::make_shared<std::string>(std::string(test_data_path())+"/config/test_minio_s3_storage.toml");
     infinity::InfinityContext::instance().InitPhase1(config_path);
     infinity::InfinityContext::instance().InitPhase2();
     VirtualStore::InitRemoteStore(StorageType::kMinio, "192.168.200.165:9000", false, "minioadmin", "minioadmin", "infinity");
 
     if(VirtualStore::BucketExists()){
-        String path = String(GetFullTmpDir()) + "/test_minio_upload.abc";
+        std::string path = std::string(GetFullTmpDir()) + "/test_minio_upload.abc";
         auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        SizeT len = 10;
-        UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
-        for (SizeT i = 0; i < len; ++i) {
+        size_t len = 10;
+        std::unique_ptr<char[]> data_array = std::make_unique<char[]>(len);
+        for (size_t i = 0; i < len; ++i) {
             data_array[i] = i + 1;
         }
         file_handle->Append(data_array.get(), len);
@@ -327,20 +320,20 @@ TEST_F(VirtualStoreTest, minio_upload) {
 
 TEST_F(VirtualStoreTest, minio_download) {
     using namespace infinity;
-    auto config_path = MakeShared<String>(std::string(test_data_path())+"/config/test_minio_s3_storage.toml");
+    auto config_path = std::make_shared<std::string>(std::string(test_data_path())+"/config/test_minio_s3_storage.toml");
     infinity::InfinityContext::instance().InitPhase1(config_path);
     infinity::InfinityContext::instance().InitPhase2();
     VirtualStore::InitRemoteStore(StorageType::kMinio, "192.168.200.165:9000", false, "minioadmin", "minioadmin", "infinity");
 
     if(VirtualStore::BucketExists()){
-        String path = String(GetFullTmpDir()) + "/test_minio_download.abc";
+        std::string path = std::string(GetFullTmpDir()) + "/test_minio_download.abc";
         auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        SizeT len = 10;
-        UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
-        for (SizeT i = 0; i < len; ++i) {
+        size_t len = 10;
+        std::unique_ptr<char[]> data_array = std::make_unique<char[]>(len);
+        for (size_t i = 0; i < len; ++i) {
             data_array[i] = i + 1;
         }
         file_handle->Append(data_array.get(), len);

@@ -20,41 +20,39 @@ import :user_defined_term_weight;
 
 #if 0
 #include "Python.h"
-#include <vector>
 
-import :stl;
 import :term;
 import :stemmer;
 import :analyzer;
 import :tokenizer;
 import :status;
-import :third_party;
+import third_party;
 import :defer_op;
 
 namespace infinity {
 
-Tuple<HashMap<String, double>, Status> UserDefinedTermWeight::Run(const Vector<String> &text_array) {
-    HashMap<String, double> return_map;
+std::tuple<std::unordered_map<std::string, double>, Status> UserDefinedTermWeight::Run(const std::vector<std::string> &text_array) {
+    std::unordered_map<std::string, double> return_map;
     std::filesystem::path path = tw_path_;
 
     if (!std::filesystem::exists(path)) {
         return {return_map, Status::FailToRunPython(fmt::format("{} doesn't exist!", tw_path_))};
     }
 
-    String file_dir = path.parent_path();
-    String file_name = path.filename();
+    std::string file_dir = path.parent_path();
+    std::string file_name = path.filename();
 
     PyGILState_STATE gil_state = PyGILState_Ensure();
     DeferFn defer_fn1([&]() { PyGILState_Release(gil_state); });
 
     // Set module directory
     PyRun_SimpleString("import sys");
-    String import_str = fmt::format("sys.path.append('{}')", file_dir);
+    std::string import_str = fmt::format("sys.path.append('{}')", file_dir);
     PyRun_SimpleString(import_str.c_str());
 
     // Import the module
     std::filesystem::path filePath(file_name);
-    String main_filename = filePath.stem().string();
+    std::string main_filename = filePath.stem().string();
 
     PyObject *module = PyImport_ImportModule(main_filename.c_str());
     DeferFn defer_fn2([&]() { Py_XDECREF(module); });
@@ -74,7 +72,7 @@ Tuple<HashMap<String, double>, Status> UserDefinedTermWeight::Run(const Vector<S
     PyObject* pyParams = PyList_New(0);
     DeferFn defer_fn4([&]() { Py_XDECREF(pyParams); });
 
-    for(const String& text: text_array) {
+    for(const std::string& text: text_array) {
         PyList_Append(pyParams, Py_BuildValue("s", text.c_str()));
     }
 

@@ -12,13 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_drop_table.impl;
 
 import :physical_drop_table;
-
-import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
@@ -27,11 +23,12 @@ import :physical_operator_type;
 import :operator_state;
 import :status;
 import :infinity_exception;
-import logical_type;
-import column_def;
 import :wal_manager;
 import :infinity_context;
 import :new_txn;
+
+import logical_type;
+import column_def;
 import data_type;
 
 namespace infinity {
@@ -61,11 +58,12 @@ bool PhysicalDropTable::Execute(QueryContext *query_context, OperatorState *oper
     }
 
     // Generate the result
-    Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
 
-    auto result_table_def_ptr = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("Tables"), nullptr, column_defs);
-    output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
+    auto result_table_def_ptr =
+        TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("Tables"), nullptr, column_defs);
+    output_ = std::make_shared<DataTable>(result_table_def_ptr, TableType::kDataTable);
     operator_state->SetComplete();
     return true;
 }

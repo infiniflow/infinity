@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:subquery_unnest;
 
-import :stl;
 import :column_binding;
 import :logical_node;
 import :base_expression;
@@ -30,34 +27,34 @@ class BindContext;
 
 export class SubqueryUnnest {
 public:
-    static void UnnestSubqueries(SharedPtr<BaseExpression> &expr_ptr,
-                                 SharedPtr<LogicalNode> &root,
+    static void UnnestSubqueries(std::shared_ptr<BaseExpression> &expr_ptr,
+                                 std::shared_ptr<LogicalNode> &root,
                                  QueryContext *query_context,
-                                 const SharedPtr<BindContext> &bind_context);
+                                 const std::shared_ptr<BindContext> &bind_context);
 
-    static SharedPtr<BaseExpression> UnnestSubquery(SharedPtr<BaseExpression> &expr_ptr,
-                                                    SharedPtr<LogicalNode> &root,
-                                                    QueryContext *query_context,
-                                                    const SharedPtr<BindContext> &bind_context);
+    static std::shared_ptr<BaseExpression> UnnestSubquery(std::shared_ptr<BaseExpression> &expr_ptr,
+                                                          std::shared_ptr<LogicalNode> &root,
+                                                          QueryContext *query_context,
+                                                          const std::shared_ptr<BindContext> &bind_context);
 
-    static SharedPtr<BaseExpression> UnnestUncorrelated(SubqueryExpression *expr_ptr,
-                                                        SharedPtr<LogicalNode> &root,
-                                                        SharedPtr<LogicalNode> &subquery_plan,
-                                                        QueryContext *query_context,
-                                                        const SharedPtr<BindContext> &bind_context);
+    static std::shared_ptr<BaseExpression> UnnestUncorrelated(SubqueryExpression *expr_ptr,
+                                                              std::shared_ptr<LogicalNode> &root,
+                                                              std::shared_ptr<LogicalNode> &subquery_plan,
+                                                              QueryContext *query_context,
+                                                              const std::shared_ptr<BindContext> &bind_context);
 
-    static SharedPtr<BaseExpression> UnnestCorrelated(SubqueryExpression *expr_ptr,
-                                                      SharedPtr<LogicalNode> &root,
-                                                      SharedPtr<LogicalNode> &subquery_plan,
-                                                      QueryContext *query_context,
-                                                      const SharedPtr<BindContext> &bind_context);
+    static std::shared_ptr<BaseExpression> UnnestCorrelated(SubqueryExpression *expr_ptr,
+                                                            std::shared_ptr<LogicalNode> &root,
+                                                            std::shared_ptr<LogicalNode> &subquery_plan,
+                                                            QueryContext *query_context,
+                                                            const std::shared_ptr<BindContext> &bind_context);
 
 private:
     static void GenerateJoinConditions(QueryContext *query_context,
-                                       Vector<SharedPtr<BaseExpression>> &conditions,
-                                       const Vector<SharedPtr<ColumnExpression>> &correlated_columns,
-                                       const Vector<ColumnBinding> &subplan_column_bindings,
-                                       SizeT correlated_base_index);
+                                       std::vector<std::shared_ptr<BaseExpression>> &conditions,
+                                       const std::vector<std::shared_ptr<ColumnExpression>> &correlated_columns,
+                                       const std::vector<ColumnBinding> &subplan_column_bindings,
+                                       size_t correlated_base_index);
 };
 
 } // namespace infinity

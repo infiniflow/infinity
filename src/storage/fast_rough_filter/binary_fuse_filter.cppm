@@ -13,12 +13,15 @@
 //  limitations under the License.
 
 module;
+
 #include "binaryfusefilter.h"
+
 export module infinity_core:binary_fuse_filter;
-import :stl;
+
 import :default_values;
 import :infinity_exception;
-import :third_party;
+
+import third_party;
 
 namespace infinity {
 
@@ -52,30 +55,25 @@ public:
         {
             std::lock_guard<std::mutex> lock(mutex_check_task_start_);
             if (build_time_ != UNCOMMIT_TS) {
-                String error_message = "Already have data, cannot allocate.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Already have data, cannot allocate.");
             }
             build_time_ = begin_ts;
         }
         // check old data
         if (filter.Fingerprints) {
-            String error_message = "Already have data, cannot allocate.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Already have data, cannot allocate.");
         }
         bool alloc_ret = binary_fuse8_allocate(size, &filter);
         if (!alloc_ret) {
-            String error_message = "Out of memory.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Out of memory.");
         }
         // check data
         if (!filter.Fingerprints) {
-            String error_message = "Need to allocate first.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Need to allocate first.");
         }
         bool populate_ret = binary_fuse8_populate(data, size, &filter);
         if (!populate_ret) {
-            String error_message = "Failed to populate data.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Failed to populate data.");
         }
         // set finished_build_filter_ to true
         finished_build_filter_.test_and_set(std::memory_order_release);
@@ -103,7 +101,7 @@ public:
         }
     }
 
-    void SaveToOStringStream(OStringStream &os) const {
+    void SaveToOStringStream(std::ostringstream &os) const {
         u8 finished_build_filter = HaveFilter() ? 1 : 0;
         os.write(reinterpret_cast<const char *>(&finished_build_filter), sizeof(finished_build_filter));
         if (!finished_build_filter) {
@@ -118,7 +116,7 @@ public:
         os.write(reinterpret_cast<const char *>(filter.Fingerprints), filter.ArrayLength * sizeof(uint8_t));
     }
 
-    bool LoadFromIStringStream(IStringStream &is) {
+    bool LoadFromIStringStream(std::istringstream &is) {
         u8 finished_build_filter = 0;
         is.read(reinterpret_cast<char *>(&finished_build_filter), sizeof(finished_build_filter));
         if (!finished_build_filter) {
@@ -133,8 +131,7 @@ public:
         is.read(reinterpret_cast<char *>(&filter.ArrayLength), sizeof(filter.ArrayLength));
         filter.Fingerprints = (uint8_t *)malloc(filter.ArrayLength * sizeof(uint8_t));
         if (!filter.Fingerprints) {
-            String error_message = "Out of memory.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Out of memory.");
             return false;
         }
         is.read(reinterpret_cast<char *>(filter.Fingerprints), filter.ArrayLength * sizeof(uint8_t));

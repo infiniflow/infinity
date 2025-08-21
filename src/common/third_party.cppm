@@ -15,11 +15,60 @@
 module;
 
 #pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-variable"
-#pragma clang diagnostic ignored "-Wunused-but-set-variable"
-#pragma clang diagnostic ignored "-Wmissing-field-initializers"
 #pragma clang diagnostic ignored "-W#pragma-messages"
-#pragma clang diagnostic ignored "-Wpessimizing-move"
+#pragma clang diagnostic ignored "-Wall"
+
+// wait for clang fix
+import std;
+import std.compat;
+
+#define _GLIBCXX_FILESYSTEM 1
+#define _GLIBCXX_CODECVT 1
+#define _GLIBCXX_STRING 1
+#define _GLIBCXX_STRING_VIEW 1
+#define _GLIBCXX_VECTOR 1
+#define _GLIBCXX_ALGORITHM 1
+#define _GLIBCXX_IOMANIP 1
+#define _GLIBCXX_LOCALE 1
+#define _GLIBCXX_SSTREAM 1
+#define _GLIBCXX_UTILITY 1
+#define _GLIBCXX_CMATH 1
+#define _GLIBCXX_MEMORY 1
+#define _GLIBCXX_TUPLE 1
+#define _GLIBCXX_FSTREAM 1
+#define _GLIBCXX_IOSTREAM 1
+#define _GLIBCXX_FUNCTIONAL 1
+#define _GLIBCXX_MAP 1
+#define _GLIBCXX_SET 1
+#define _GLIBCXX_ITERATOR 1
+#define _GLIBCXX_NUMERIC 1
+#define _GLIBCXX_ATOMIC 1
+#define _GLIBCXX_CHRONO 1
+#define _GLIBCXX_CONDITION_VARIABLE 1
+#define _GLIBCXX_MUTEX 1
+#define _GLIBCXX_THREAD 1
+#define _GLIBCXX_UNORDERED_MAP 1
+#define _GLIBCXX_ARRAY 1
+#define _GLIBCXX_FORWARD_LIST 1
+#define _GLIBCXX_OPTIONAL 1
+#define _GLIBCXX_RANGES 1
+#define _GLIBCXX_ISTREAM 1
+#define _GLIBCXX_IOS 1
+#define _GLIBCXX_OSTREAM 1
+#define _GLIBCXX_CHARCONV 1
+#define _GLIBCXX_SHARED_MUTEX 1
+#define _GLIBCXX_LIST 1
+#define _GLIBCXX_UNORDERED_SET 1
+#define _GLIBCXX_VARIANT 1
+#define _GLIBXX_STREAMBUF 1
+#define _GLIBCXX_BITSET 1
+#define _GLIBCXX_DEQUE 1
+#define _GLIBCXX_SPAN 1
+#define _EXT_NUMERIC_TRAITS 1
+#define _GLIBCXX_FUTURE 1
+#define _GLIBCXX_QUEUE 1
+
+#include <cerrno>
 
 #include <CLI/CLI.hpp>
 
@@ -37,18 +86,21 @@ module;
 
 #include <magic_enum/magic_enum.hpp>
 
-#include <parallel_hashmap/phmap.h>
 #include "pgm/pgm_index.hpp"
+#include <parallel_hashmap/phmap.h>
 
 #include <oatpp/network/Server.hpp>
 #include <oatpp/network/tcp/server/ConnectionProvider.hpp>
 #include <oatpp/web/server/HttpConnectionHandler.hpp>
 
 #include "Python.h"
-#include <arrow/api.h>
 #include "miniocpp/client.h"
-#include <parquet/arrow/reader.h>
+#include <arrow/api.h>
+#include <arrow/io/file.h>
 #include <parquet/arrow/writer.h>
+#include <parquet/properties.h>
+
+#include <parquet/arrow/reader.h>
 
 #include <rocksdb/db.h>
 #include <rocksdb/env.h>
@@ -60,9 +112,34 @@ module;
 #include <rocksdb/utilities/transaction.h>
 #include <rocksdb/utilities/transaction_db.h>
 
+#include <re2/re2.h>
+
+#include <thrift/TApplicationException.h>
+#include <thrift/TBase.h>
+#include <thrift/TDispatchProcessor.h>
+#include <thrift/Thrift.h>
+#include <thrift/async/TConcurrentClientSyncInfo.h>
+#include <thrift/concurrency/ThreadFactory.h>
+#include <thrift/concurrency/ThreadManager.h>
+#include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/protocol/TProtocol.h>
+#include <thrift/server/TThreadPoolServer.h>
+#include <thrift/server/TThreadedServer.h>
+#include <thrift/transport/TBufferTransports.h>
+#include <thrift/transport/TServerSocket.h>
+#include <thrift/transport/TSocket.h>
+
+// #include "inc/mlas.h"
+
+#include "new_pfordelta_compressor.h"
+
+#include <ctpl_stl.h>
+
 #pragma clang diagnostic pop
 
-export module infinity_core:third_party;
+export module third_party;
+
+import std;
 
 namespace minio {
 namespace s3 {
@@ -144,15 +221,20 @@ export using toml::parse_file;
 } // namespace toml
 
 namespace nlohmann {
-export using nlohmann::json;
-}
+export using ::nlohmann::json;
+namespace detail {
+export using ::nlohmann::detail::enable_if_t;
+export using ::nlohmann::detail::is_basic_json;
+export using ::nlohmann::detail::value_t;
+} // namespace detail
+} // namespace nlohmann
 
 namespace simdjson {
-export using simdjson::padded_string;
-export using simdjson::simdjson_result;
-export using simdjson::deserialize_tag;
-export using simdjson::error_code;
-export using simdjson::simdjson_error;
+export using ::simdjson::padded_string;
+export using ::simdjson::simdjson_result;
+export using ::simdjson::deserialize_tag;
+export using ::simdjson::error_code;
+export using ::simdjson::simdjson_error;
 export using ondemand::parser;
 export using ondemand::document;
 export using ondemand::object;
@@ -162,7 +244,7 @@ export using ondemand::value;
 export using ondemand::number;
 export using ondemand::json_type;
 export using ondemand::number_type;
-}
+} // namespace simdjson
 
 namespace magic_enum {
 export using magic_enum::underlying_type_t;
@@ -233,7 +315,37 @@ export using ParquetFileReaderBuilder = parquet::arrow::FileReaderBuilder;
 export using ArrowWriterProperties = parquet::ArrowWriterProperties;
 export using ParquetReaderProperties = parquet::ReaderProperties;
 export using ParquetArrowReaderProperties = parquet::ArrowReaderProperties;
+export using ::arrow::field;
+export using ::arrow::schema;
+export using ::arrow::boolean;
+export using ::arrow::uint8;
+export using ::arrow::int8;
+export using ::arrow::int16;
+export using ::arrow::int32;
+export using ::arrow::int64;
+export using ::arrow::float16;
+export using ::arrow::float32;
+export using ::arrow::float64;
+export using ::arrow::date32;
+export using ::arrow::time32;
+export using ::arrow::timestamp;
+export using ::arrow::utf8;
+export using ::arrow::TimeUnit;
+export using ::arrow::list;
+export using ::arrow::fixed_size_list;
+export using ::arrow::struct_;
+export using ::arrow::Type;
+namespace io {
+export using ::arrow::io::FileOutputStream;
+}
 } // namespace arrow
+
+namespace parquet {
+export using ::parquet::default_writer_properties;
+namespace arrow {
+export using ::parquet::arrow::FileWriter;
+}
+}; // namespace parquet
 
 namespace infinity {
 
@@ -355,5 +467,54 @@ using MergeOperator = ::ROCKSDB_NAMESPACE::MergeOperator;
 // using MergeOperators = ::ROCKSDB_NAMESPACE::MergeOperators;
 using Logger = ::ROCKSDB_NAMESPACE::Logger;
 } // namespace rocksdb
+
+namespace rocksdb {
+export using ::rocksdb::DestroyDB;
+}
+
+namespace re2 {
+export using ::re2::RE2;
+};
+
+namespace apache {
+namespace thrift {
+export using ::apache::thrift::TConnectionInfo;
+export using ::apache::thrift::TDispatchProcessor;
+export using ::apache::thrift::TProcessorContextFreer;
+export using ::apache::thrift::TBase;
+export using ::apache::thrift::TApplicationException;
+namespace protocol {
+export using ::apache::thrift::protocol::TProtocol;
+export using ::apache::thrift::protocol::TOutputRecursionTracker;
+export using ::apache::thrift::protocol::TTransport;
+export using ::apache::thrift::protocol::TBinaryProtocolFactory;
+export using ::apache::thrift::protocol::TBinaryProtocol;
+} // namespace protocol
+namespace server {
+export using ::apache::thrift::server::TServer;
+export using ::apache::thrift::server::TThreadPoolServer;
+} // namespace server
+namespace transport {
+export using ::apache::thrift::transport::TServerSocket;
+export using ::apache::thrift::transport::TBufferedTransportFactory;
+export using ::apache::thrift::transport::TSocket;
+export using ::apache::thrift::transport::TBufferedTransport;
+export using ::apache::thrift::transport::TTransportException;
+} // namespace transport
+namespace concurrency {
+export using ::apache::thrift::concurrency::ThreadFactory;
+export using ::apache::thrift::concurrency::ThreadManager;
+} // namespace concurrency
+} // namespace thrift
+} // namespace apache
+
+export using NewPForDeltaCompressor = indexlib::NewPForDeltaCompressor;
+
+// mlas
+// export using CBLAS_TRANSPOSE
+
+namespace ctpl {
+export using ::ctpl::thread_pool;
+}
 
 } // namespace infinity

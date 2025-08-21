@@ -13,14 +13,15 @@
 // limitations under the License.
 
 export module infinity_core:database_detail;
-import :stl;
+
+import std;
 
 namespace infinity {
 
 export struct DatabaseDetail {
-    SharedPtr<String> db_name_{};
-    SharedPtr<String> db_entry_dir_{};
-    SharedPtr<String> db_comment_{};
+    std::shared_ptr<std::string> db_name_{};
+    std::shared_ptr<std::string> db_entry_dir_{};
+    std::shared_ptr<std::string> db_comment_{};
 };
 
 } // namespace infinity

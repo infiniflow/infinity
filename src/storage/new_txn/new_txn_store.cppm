@@ -12,19 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:new_txn_store;
 
-import :stl;
-
 import :status;
-import internal_types;
 import :index_base;
-import extra_ddl_info;
-import :third_party;
 import :meta_key;
+
+import std;
+import third_party;
+
 import command_statement;
+import extra_ddl_info;
+import internal_types;
 
 namespace infinity {
 
@@ -46,16 +45,16 @@ public:
 
     ~NewTxnTableStore1();
 
-    Status Delete(const Vector<RowID> &row_ids);
+    Status Delete(const std::vector<RowID> &row_ids);
 
-    void GetAccessState(const Vector<RowID> &row_ids, AccessState &access_state);
+    void GetAccessState(const std::vector<RowID> &row_ids, AccessState &access_state);
 
     DeleteState &delete_state() const { return *delete_state_; }
     DeleteState &undo_delete_state();
 
 private:
-    UniquePtr<DeleteState> delete_state_{};      // Used for commit delete operation
-    UniquePtr<DeleteState> undo_delete_state_{}; // Used for rollback delete operation
+    std::unique_ptr<DeleteState> delete_state_{};      // Used for commit delete operation
+    std::unique_ptr<DeleteState> undo_delete_state_{}; // Used for rollback delete operation
 };
 
 export class NewTxnStore {
@@ -63,10 +62,10 @@ public:
     NewTxnStore();
 
 public:
-    NewTxnTableStore1 *GetNewTxnTableStore1(const String &db_id_str, const String &table_id_str);
+    NewTxnTableStore1 *GetNewTxnTableStore1(const std::string &db_id_str, const std::string &table_id_str);
 
 private:
-    HashMap<String, UniquePtr<NewTxnTableStore1>> txn_tables_store1_{};
+    std::unordered_map<std::string, std::unique_ptr<NewTxnTableStore1>> txn_tables_store1_{};
 };
 
 } // namespace infinity

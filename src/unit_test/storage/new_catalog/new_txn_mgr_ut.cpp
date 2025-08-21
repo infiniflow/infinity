@@ -12,31 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CI
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.new_txn_mgr;
 
 import :ut.base_test;
-import :stl;
+
 import :status;
 import :new_txn_manager;
 import :infinity_context;
 import :new_txn;
 import :txn_state;
-import :third_party;
+import third_party;
 import :logger;
 import :table_def;
 import :data_block;
 import :column_vector;
 import :value;
-#else
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#endif
 
 import extra_ddl_info;
 import column_def;
@@ -51,17 +45,17 @@ public:
 
 TEST_F(TestTxnManagerTest, test_ts) {
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
 
-    Vector<TxnTimeStamp> begin_tss;
-    Vector<TxnTimeStamp> commit_tss;
+    std::vector<TxnTimeStamp> begin_tss;
+    std::vector<TxnTimeStamp> commit_tss;
     {
         TxnTimeStamp txn1_begin_ts = 0;
         TxnTimeStamp txn1_commit_ts = 0;
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
 
-        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
 
         txn1_begin_ts = txn->BeginTS();
@@ -76,7 +70,7 @@ TEST_F(TestTxnManagerTest, test_ts) {
     {
         TxnTimeStamp txn2_begin_ts = 0;
         TxnTimeStamp txn2_commit_ts = 0;
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("read txn"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("read txn"), TransactionType::kNormal);
 
         txn2_begin_ts = txn->BeginTS();
         Status status = new_txn_mgr->CommitTxn(txn, &txn2_commit_ts);
@@ -93,7 +87,7 @@ TEST_F(TestTxnManagerTest, test_ts) {
         TxnTimeStamp txn3_begin_ts = 0;
         // TxnTimeStamp txn3_commit_ts = 0;
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("rollback txn"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rollback txn"), TransactionType::kNormal);
         Status status = txn->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
@@ -111,12 +105,12 @@ TEST_F(TestTxnManagerTest, test_ts) {
         TxnTimeStamp txn4_begin_ts = 0;
         TxnTimeStamp txn4_commit_ts = 0;
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
         Status status = txn->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
         {
-            auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db2"), TransactionType::kNormal);
+            auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db2"), TransactionType::kNormal);
             status = txn2->DropDatabase(*db_name, ConflictType::kError);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn2);
@@ -138,9 +132,9 @@ TEST_F(TestTxnManagerTest, test_ts) {
         TxnTimeStamp txn1_begin_ts = 0;
         TxnTimeStamp txn1_commit_ts = 0;
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
 
-        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
 
         txn1_begin_ts = txn->BeginTS();
@@ -159,57 +153,59 @@ TEST_F(TestTxnManagerTest, test_ts) {
 
 TEST_F(TestTxnManagerTest, test_parallel_ts) {
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
 
-    SizeT thread_num = 2;
-    SizeT loop_num = 1280;
-    Vector<std::thread> worker_threads;
+    size_t thread_num = 2;
+    size_t loop_num = 1280;
+    std::vector<std::thread> worker_threads;
 
-    for (SizeT thread_i = 0; thread_i < thread_num; ++thread_i) {
+    for (size_t thread_i = 0; thread_i < thread_num; ++thread_i) {
         worker_threads.push_back(std::thread([&, thread_i] {
-            std::cout << "Thread " << thread_i << " start" << std::endl;
-            for (SizeT loop_i = 0; loop_i < loop_num; ++loop_i) {
+            std::cout << "std::thread " << thread_i << " start" << std::endl;
+            for (size_t loop_i = 0; loop_i < loop_num; ++loop_i) {
                 Status status;
                 {
-                    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+                    auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
                     TransactionID txn_id = txn->TxnID();
-                    LOG_TRACE(fmt::format("Thread: {}, txn_id: {} CreateDatabase", thread_i, txn_id));
-                    status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+                    LOG_TRACE(fmt::format("std::thread: {}, txn_id: {} CreateDatabase", thread_i, txn_id));
+                    status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
                     if (status.ok()) {
                         status = new_txn_mgr->CommitTxn(txn);
                         if (!status.ok()) {
-                            LOG_WARN(fmt::format("Thread: {}, txn_id: {}, CreateDatabase CommitTxn failed: {}", thread_i, txn_id, status.message()));
+                            LOG_WARN(
+                                fmt::format("std::thread: {}, txn_id: {}, CreateDatabase CommitTxn failed: {}", thread_i, txn_id, status.message()));
                         } else {
-                            LOG_TRACE(fmt::format("Thread: {}, txn_id: {}, CreateDatabase CommitTxn success", thread_i, txn_id));
+                            LOG_TRACE(fmt::format("std::thread: {}, txn_id: {}, CreateDatabase CommitTxn success", thread_i, txn_id));
                         }
                     } else {
-                        LOG_WARN(fmt::format("Thread: {}, txn_id: {}, CreateDatabase failed: {}", thread_i, txn_id, status.message()));
+                        LOG_WARN(fmt::format("std::thread: {}, txn_id: {}, CreateDatabase failed: {}", thread_i, txn_id, status.message()));
                         status = new_txn_mgr->RollBackTxn(txn);
                     }
-                    LOG_TRACE(fmt::format("Thread: {}, txn_id: {} Done", thread_i, txn_id));
+                    LOG_TRACE(fmt::format("std::thread: {}, txn_id: {} Done", thread_i, txn_id));
                 }
                 {
-                    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop"), TransactionType::kNormal);
+                    auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop"), TransactionType::kNormal);
                     TransactionID txn_id = txn->TxnID();
-                    LOG_TRACE(fmt::format("Thread: {}, txn_id: {} DropDatabase", thread_i, txn->TxnID()));
+                    LOG_TRACE(fmt::format("std::thread: {}, txn_id: {} DropDatabase", thread_i, txn->TxnID()));
                     status = txn->DropDatabase(*db_name, ConflictType::kError);
                     if (status.ok()) {
                         status = new_txn_mgr->CommitTxn(txn);
                         if (!status.ok()) {
-                            LOG_WARN(fmt::format("Thread: {}, txn_id: {}, DropDatabase CommitTxn failed: {}", thread_i, txn_id, status.message()));
+                            LOG_WARN(
+                                fmt::format("std::thread: {}, txn_id: {}, DropDatabase CommitTxn failed: {}", thread_i, txn_id, status.message()));
                         } else {
-                            LOG_TRACE(fmt::format("Thread: {}, txn_id: {}, DropDatabase CommitTxn success", thread_i, txn_id));
+                            LOG_TRACE(fmt::format("std::thread: {}, txn_id: {}, DropDatabase CommitTxn success", thread_i, txn_id));
                         }
                     } else {
-                        LOG_ERROR(fmt::format("Thread: {}, DropDatabase failed: {}", thread_i, status.message()));
+                        LOG_ERROR(fmt::format("std::thread: {}, DropDatabase failed: {}", thread_i, status.message()));
                         status = new_txn_mgr->RollBackTxn(txn);
                     }
-                    LOG_TRACE(fmt::format("Thread: {}, txn_id: {} Done", thread_i, txn_id));
+                    LOG_TRACE(fmt::format("std::thread: {}, txn_id: {} Done", thread_i, txn_id));
                 }
             }
         }));
     }
-    for (SizeT thread_i = 0; thread_i < thread_num; ++thread_i) {
+    for (size_t thread_i = 0; thread_i < thread_num; ++thread_i) {
         worker_threads[thread_i].join();
     }
 
@@ -219,12 +215,12 @@ TEST_F(TestTxnManagerTest, test_parallel_ts) {
 TEST_F(TestTxnManagerTest, test_check_txns) {
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
     Status status;
-    Vector<NewTxn *> check_txns;
+    std::vector<NewTxn *> check_txns;
 
     auto get_check_txns = [&](NewTxn *txn) {
         //        TxnTimeStamp fake_commit_ts = new_txn_mgr->CurrentTS() + 1;
-        Vector<SharedPtr<NewTxn>> check_txn_ptrs = new_txn_mgr->GetCheckCandidateTxns(txn);
-        Vector<NewTxn *> check_txns;
+        std::vector<std::shared_ptr<NewTxn>> check_txn_ptrs = new_txn_mgr->GetCheckCandidateTxns(txn);
+        std::vector<NewTxn *> check_txns;
         for (auto &check_txn : check_txn_ptrs) {
             check_txns.push_back(check_txn.get());
         }
@@ -232,40 +228,40 @@ TEST_F(TestTxnManagerTest, test_check_txns) {
     };
 
     auto check_empty = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check empty"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check empty"), TransactionType::kNormal);
         check_txns = get_check_txns(txn);
-        EXPECT_EQ(check_txns, Vector<NewTxn *>({}));
+        EXPECT_EQ(check_txns, std::vector<NewTxn *>({}));
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
 
     {
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("txn1"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("txn1"), TransactionType::kNormal);
         status = txn1->Dummy();
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("txn2"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("txn2"), TransactionType::kNormal);
         status = txn2->Dummy();
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("txn3"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("txn3"), TransactionType::kNormal);
         status = txn3->Dummy();
         EXPECT_TRUE(status.ok());
 
         check_txns = get_check_txns(txn1);
-        EXPECT_EQ(check_txns, Vector<NewTxn *>({}));
+        EXPECT_EQ(check_txns, std::vector<NewTxn *>({}));
 
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
         check_txns = get_check_txns(txn2);
-        EXPECT_EQ(check_txns, Vector<NewTxn *>({txn1}));
+        EXPECT_EQ(check_txns, std::vector<NewTxn *>({txn1}));
 
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
         check_txns = get_check_txns(txn3);
-        EXPECT_EQ(check_txns, Vector<NewTxn *>({txn1, txn2}));
+        EXPECT_EQ(check_txns, std::vector<NewTxn *>({txn1, txn2}));
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -274,31 +270,31 @@ TEST_F(TestTxnManagerTest, test_check_txns) {
     }
 
     {
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("txn1"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("txn1"), TransactionType::kNormal);
         status = txn1->Dummy();
         EXPECT_TRUE(status.ok());
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("txn2"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("txn2"), TransactionType::kNormal);
         status = txn2->Dummy();
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("txn3"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("txn3"), TransactionType::kNormal);
         status = txn3->Dummy();
         EXPECT_TRUE(status.ok());
 
         check_txns = get_check_txns(txn1);
-        EXPECT_EQ(check_txns, Vector<NewTxn *>({txn2}));
+        EXPECT_EQ(check_txns, std::vector<NewTxn *>({txn2}));
 
         check_txns = get_check_txns(txn3);
-        EXPECT_EQ(check_txns, Vector<NewTxn *>({}));
+        EXPECT_EQ(check_txns, std::vector<NewTxn *>({}));
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
         check_txns = get_check_txns(txn1);
-        EXPECT_EQ(check_txns, Vector<NewTxn *>({txn2, txn3}));
+        EXPECT_EQ(check_txns, std::vector<NewTxn *>({txn2, txn3}));
 
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
@@ -311,43 +307,43 @@ TEST_F(TestTxnManagerTest, test_parallel_insert_table) {
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     // Create db
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
-    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-    Status status1 = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+    Status status1 = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
     EXPECT_TRUE(status1.ok());
     status1 = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status1.ok());
 
-    SizeT loop_num = 1200;
-    Vector<std::thread> worker_threads;
+    size_t loop_num = 1200;
+    std::vector<std::thread> worker_threads;
 
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
 
     worker_threads.push_back(std::thread([&] {
-        std::cout << "Thread create / drop table start" << std::endl;
+        std::cout << "std::thread create / drop table start" << std::endl;
 
-        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
 
-        for (SizeT loop_i = 0; loop_i < loop_num; ++loop_i) {
+        for (size_t loop_i = 0; loop_i < loop_num; ++loop_i) {
             {
-                auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+                auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
                 Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
                 EXPECT_TRUE(status.ok());
                 status = new_txn_mgr->CommitTxn(txn);
                 EXPECT_TRUE(status.ok());
-                //                LOG_INFO("Thread: create table success");
+                //                LOG_INFO("std::thread: create table success");
             }
             {
-                auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+                auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
                 Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
                 if (status.ok()) {
                     status = new_txn_mgr->CommitTxn(txn);
                     EXPECT_TRUE(status.ok());
-                    //                    LOG_INFO("Thread: drop table success");
+                    //                    LOG_INFO("std::thread: drop table success");
                 } else {
-                    // LOG_WARN(fmt::format("Thread: drop table failed, rollback: {}", status.message()));
+                    // LOG_WARN(fmt::format("std::thread: drop table failed, rollback: {}", status.message()));
                     status = new_txn_mgr->RollBackTxn(txn);
                     EXPECT_TRUE(status.ok());
                 }
@@ -358,9 +354,9 @@ TEST_F(TestTxnManagerTest, test_parallel_insert_table) {
     }));
 
     worker_threads.push_back(std::thread([&] {
-        std::cout << "Thread 1 insert table start" << std::endl;
+        std::cout << "std::thread 1 insert table start" << std::endl;
 
-        auto input_block = MakeShared<DataBlock>();
+        auto input_block = std::make_shared<DataBlock>();
         {
             // Initialize input block
             {
@@ -380,20 +376,20 @@ TEST_F(TestTxnManagerTest, test_parallel_insert_table) {
             input_block->Finalize();
         }
 
-        for (SizeT loop_i = 0; loop_i < loop_num; ++loop_i) {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        for (size_t loop_i = 0; loop_i < loop_num; ++loop_i) {
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
             Status status = txn->Append(*db_name, *table_name, input_block);
             if (status.ok()) {
                 status = new_txn_mgr->CommitTxn(txn);
                 if (!status.ok()) {
-                    // LOG_WARN(fmt::format("Thread 1: insert commit failed: {}", status.message()));
+                    // LOG_WARN(fmt::format("std::thread 1: insert commit failed: {}", status.message()));
                 } else {
-                    // LOG_INFO("Thread 1: insert commit success");
+                    // LOG_INFO("std::thread 1: insert commit success");
                 }
             } else {
                 status = new_txn_mgr->RollBackTxn(txn);
                 EXPECT_TRUE(status.ok());
-                // LOG_INFO(fmt::format("Thread 1: insert rolled back"));
+                // LOG_INFO(fmt::format("std::thread 1: insert rolled back"));
             }
         }
 
@@ -401,9 +397,9 @@ TEST_F(TestTxnManagerTest, test_parallel_insert_table) {
     }));
 
     worker_threads.push_back(std::thread([&] {
-        std::cout << "Thread 2 insert table start" << std::endl;
+        std::cout << "std::thread 2 insert table start" << std::endl;
 
-        auto input_block = MakeShared<DataBlock>();
+        auto input_block = std::make_shared<DataBlock>();
         {
             // Initialize input block
             {
@@ -423,18 +419,18 @@ TEST_F(TestTxnManagerTest, test_parallel_insert_table) {
             input_block->Finalize();
         }
 
-        for (SizeT loop_i = 0; loop_i < loop_num; ++loop_i) {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        for (size_t loop_i = 0; loop_i < loop_num; ++loop_i) {
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
             Status status = txn->Append(*db_name, *table_name, input_block);
             if (status.ok()) {
                 status = new_txn_mgr->CommitTxn(txn);
                 if (!status.ok()) {
-                    // LOG_WARN(fmt::format("Thread 2: insert commit failed: {}", status.message()));
+                    // LOG_WARN(fmt::format("std::thread 2: insert commit failed: {}", status.message()));
                 } else {
-                    // LOG_INFO("Thread 2: insert commit success");
+                    // LOG_INFO("std::thread 2: insert commit success");
                 }
             } else {
-                // LOG_INFO("Thread 2: start to insert, before rollback");
+                // LOG_INFO("std::thread 2: start to insert, before rollback");
                 status = new_txn_mgr->RollBackTxn(txn);
                 EXPECT_TRUE(status.ok());
             }
@@ -443,7 +439,7 @@ TEST_F(TestTxnManagerTest, test_parallel_insert_table) {
         LOG_INFO("Finish thread 2");
     }));
 
-    for (SizeT thread_i = 0; thread_i < worker_threads.size(); ++thread_i) {
+    for (size_t thread_i = 0; thread_i < worker_threads.size(); ++thread_i) {
         worker_threads[thread_i].join();
     }
 

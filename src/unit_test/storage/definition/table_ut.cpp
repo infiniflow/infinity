@@ -12,21 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.definition_table;
 
 import :ut.base_test;
 import :infinity_exception;
-import :stl;
-import :third_party;
+import third_party;
 import :logger;
 import :data_table;
 import :table_def;
@@ -35,7 +29,6 @@ import :data_block;
 import :default_values;
 import :column_vector;
 import :infinity_context;
-#endif
 
 import global_resource_usage;
 import internal_types;
@@ -49,34 +42,36 @@ class TableTest : public BaseTest {};
 TEST_F(TableTest, test1) {
     using namespace infinity;
 
-    SizeT column_count = 2;
-    SizeT block_count = 3;
+    size_t column_count = 2;
+    size_t block_count = 3;
     i64 row_count = DEFAULT_VECTOR_SIZE;
-    Vector<SharedPtr<ColumnDef>> columns;
-    Vector<SharedPtr<DataType>> column_types;
+    std::vector<std::shared_ptr<ColumnDef>> columns;
+    std::vector<std::shared_ptr<DataType>> column_types;
     columns.reserve(column_count);
     column_types.reserve(column_count);
 
-    SharedPtr<DataType> col_type = MakeShared<DataType>(LogicalType::kBoolean);
+    std::shared_ptr<DataType> col_type = std::make_shared<DataType>(LogicalType::kBoolean);
     column_types.emplace_back(col_type);
-    String col_name = "col1";
-    auto col_def = MakeShared<ColumnDef>(0, col_type, col_name, std::set<ConstraintType>());
+    std::string col_name = "col1";
+    auto col_def = std::make_shared<ColumnDef>(0, col_type, col_name, std::set<ConstraintType>());
 
     columns.emplace_back(col_def);
 
-    col_type = MakeShared<DataType>(LogicalType::kBigInt);
+    col_type = std::make_shared<DataType>(LogicalType::kBigInt);
     column_types.emplace_back(col_type);
     col_name = "col2";
-    col_def = MakeShared<ColumnDef>(1, col_type, col_name, std::set<ConstraintType>());
+    col_def = std::make_shared<ColumnDef>(1, col_type, col_name, std::set<ConstraintType>());
     columns.emplace_back(col_def);
 
-    SharedPtr<TableDef> table_def =
-        TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("order_by_table"), MakeShared<String>("comment"), columns);
+    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"),
+                                                         std::make_shared<std::string>("order_by_table"),
+                                                         std::make_shared<std::string>("comment"),
+                                                         columns);
 
-    SharedPtr<DataTable> order_by_table = DataTable::Make(table_def, TableType::kOrderBy);
+    std::shared_ptr<DataTable> order_by_table = DataTable::Make(table_def, TableType::kOrderBy);
 
-    for (SizeT block_id = 0; block_id < block_count; ++block_id) {
-        SharedPtr<DataBlock> data_block = DataBlock::Make();
+    for (size_t block_id = 0; block_id < block_count; ++block_id) {
+        std::shared_ptr<DataBlock> data_block = DataBlock::Make();
         data_block->Init(column_types);
 
         // Column 1 & 2
@@ -90,18 +85,18 @@ TEST_F(TableTest, test1) {
         order_by_table->Append(data_block);
     }
 
-    SharedPtr<Vector<RowID>> offset_column_vector = order_by_table->GetRowIDVector();
+    std::shared_ptr<std::vector<RowID>> offset_column_vector = order_by_table->GetRowIDVector();
     EXPECT_EQ(offset_column_vector->size(), block_count * DEFAULT_VECTOR_SIZE);
-    for (SizeT block_id = 0; block_id < block_count; ++block_id) {
+    for (size_t block_id = 0; block_id < block_count; ++block_id) {
         // Check Column1 data
-        SharedPtr<ColumnVector> column1 = order_by_table->GetDataBlockById(block_id)->column_vectors[0];
+        std::shared_ptr<ColumnVector> column1 = order_by_table->GetDataBlockById(block_id)->column_vectors[0];
         EXPECT_EQ(column1->data_type()->type(), LogicalType::kBoolean);
         for (i64 row_id = 0; row_id < row_count; ++row_id) {
             EXPECT_EQ(column1->buffer_->GetCompactBit(row_id), row_id % 2 == 0);
         }
 
         // Check Column2 data
-        SharedPtr<ColumnVector> column2 = order_by_table->GetDataBlockById(block_id)->column_vectors[1];
+        std::shared_ptr<ColumnVector> column2 = order_by_table->GetDataBlockById(block_id)->column_vectors[1];
         EXPECT_EQ(column2->data_type()->type(), LogicalType::kBigInt);
         for (i64 row_id = 0; row_id < row_count; ++row_id) {
             EXPECT_EQ(((BigIntT *)column2->data())[row_id], row_id);

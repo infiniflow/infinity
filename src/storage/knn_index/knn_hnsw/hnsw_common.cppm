@@ -12,24 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <limits>
-#include <utility>
-
 export module infinity_core:hnsw_common;
 
-import :stl;
 import :infinity_exception;
 import :sparse_util;
 
 namespace infinity {
 
 export struct HnswConfig {
-    SizeT lvq_buffer_size_;
+    size_t lvq_buffer_size_;
 };
 
-export constexpr SizeT AlignTo(SizeT a, SizeT b) { return (a + b - 1) / b * b; }
+export constexpr size_t AlignTo(size_t a, size_t b) { return (a + b - 1) / b * b; }
 
 export using MeanType = double;
 export using VertexType = i32;
@@ -41,35 +35,35 @@ export constexpr VertexType kInvalidVertex = -1;
 export template <typename Iterator, typename RtnType, typename LabelType>
 concept DataIteratorConcept = requires(Iterator iter) {
     typename std::decay_t<Iterator>::ValueType;
-    { iter.Next() } -> std::same_as<Optional<Pair<RtnType, LabelType>>>;
+    { iter.Next() } -> std::same_as<std::optional<std::pair<RtnType, LabelType>>>;
     // HnswIndexInMem::InsertVecs<Iter> needs row count which might be different with the vector count,
     // for example MemIndexInserterIter1<MultiVectorRef<ElementT>>.
-    { iter.GetRowCount() } -> std::same_as<SizeT>;
+    { iter.GetRowCount() } -> std::same_as<size_t>;
 };
 
 export template <typename DataType, typename LabelType>
 class DenseVectorIter {
     const DataType *ptr_;
-    const SizeT dim_;
+    const size_t dim_;
     const DataType *const ptr_end_;
     LabelType label_;
 
 public:
     using ValueType = const DataType *;
 
-    DenseVectorIter(const DataType *ptr, SizeT dim, SizeT vec_num, LabelType offset = 0)
+    DenseVectorIter(const DataType *ptr, size_t dim, size_t vec_num, LabelType offset = 0)
         : ptr_(ptr), dim_(dim), ptr_end_(ptr_ + dim * vec_num), label_(offset) {}
 
-    Optional<Pair<const DataType *, LabelType>> Next() {
+    std::optional<std::pair<const DataType *, LabelType>> Next() {
         auto ret = ptr_;
         if (ret == ptr_end_) {
-            return None;
+            return std::nullopt;
         }
         ptr_ += dim_;
         return std::make_pair(ret, label_++);
     }
 
-    SizeT GetRowCount() const { return (ptr_end_ - ptr_) / dim_; }
+    size_t GetRowCount() const { return (ptr_end_ - ptr_) / dim_; }
 };
 
 export template <typename DataType, typename IdxType, typename LabelType>
@@ -86,9 +80,9 @@ public:
     SparseVectorIter(const i64 *indptr, const IdxType *indice, const DataType *data, i32 vec_num, LabelType offset = 0)
         : indptr_(indptr), indice_(indice), data_(data), indptr_end_(indptr_ + vec_num + 1), label_(offset) {}
 
-    Optional<Pair<SparseVecRef<DataType, IdxType>, LabelType>> Next() {
+    std::optional<std::pair<SparseVecRef<DataType, IdxType>, LabelType>> Next() {
         if (indptr_ + 1 == indptr_end_) {
-            return None;
+            return std::nullopt;
         }
         i64 nnz = indptr_[1] - indptr_[0];
         const IdxType *indice = indice_ + indptr_[0];
@@ -97,7 +91,7 @@ public:
         return std::make_pair(SparseVecRef<DataType, IdxType>(nnz, indice, data), label_++);
     }
 
-    SizeT GetRowCount() const { return indptr_end_ - indptr_ - 1; }
+    size_t GetRowCount() const { return indptr_end_ - indptr_ - 1; }
 };
 
 export template <typename LabelType>
@@ -107,7 +101,7 @@ public:
 };
 
 export template <typename Filter, typename LabelType>
-concept FilterConcept = requires(LabelType label) { std::is_same_v<Filter, NoneType> || std::is_base_of_v<FilterBase<LabelType>, Filter>; };
+concept FilterConcept = requires(LabelType label) { std::is_same_v<Filter, std::nullopt_t> || std::is_base_of_v<FilterBase<LabelType>, Filter>; };
 
 export struct HnswInsertConfig {
     bool optimize_;

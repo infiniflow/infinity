@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:pg_server;
 
-import :stl;
 import :singleton;
 import :boost;
 import :connection;
@@ -32,19 +29,19 @@ enum struct PGServerStatus : u8 {
 
 export class PGServer {
 public:
-    Thread Run();
+    std::thread Run();
 
     void Shutdown();
 
 private:
     void CreateConnection();
 
-    void StartConnection(SharedPtr<Connection> &connection);
+    void StartConnection(std::shared_ptr<Connection> &connection);
 
-    Atomic<PGServerStatus> status_{PGServerStatus::kStopped};
-    atomic_u64 running_connection_count_{0};
-    UniquePtr<boost::asio::io_context> io_context_ptr_{};
-    UniquePtr<boost::asio::ip::tcp::acceptor> acceptor_ptr_{};
+    std::atomic<PGServerStatus> status_{PGServerStatus::kStopped};
+    std::atomic_uint64_t running_connection_count_{0};
+    std::unique_ptr<boost::asio::io_context> io_context_ptr_{};
+    std::unique_ptr<boost::asio::ip::tcp::acceptor> acceptor_ptr_{};
 };
 
 } // namespace infinity

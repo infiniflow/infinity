@@ -14,50 +14,52 @@
 
 module;
 
-#include <sstream>
-#include <string>
-#include <vector>
-
 module infinity_core:index_full_text.impl;
 
 import :index_full_text;
-
-import :stl;
 import :index_base;
-import :third_party;
 import :status;
-import serialize;
 import :infinity_exception;
-import statement_common;
 import :base_table_ref;
-import logical_type;
 import :index_defines;
 import :analyzer_pool;
 import :analyzer;
 import :logger;
 
+import std;
+import std.compat;
+import third_party;
+
+import logical_type;
+import statement_common;
+import serialize;
+
 namespace infinity {
 
-void ToLowerString(String &lower) { std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower); }
+void ToLowerString(std::string &lower) {
+    for (auto &c : lower) {
+        c = tolower(c);
+    }
+}
 
-SharedPtr<IndexBase> IndexFullText::Make(SharedPtr<String> index_name,
-                                         SharedPtr<String> index_comment,
-                                         const String &file_name,
-                                         Vector<String> column_names,
-                                         const Vector<InitParameter *> &index_param_list) {
-    String analyzer_name{};
+std::shared_ptr<IndexBase> IndexFullText::Make(std::shared_ptr<std::string> index_name,
+                                               std::shared_ptr<std::string> index_comment,
+                                               const std::string &file_name,
+                                               std::vector<std::string> column_names,
+                                               const std::vector<InitParameter *> &index_param_list) {
+    std::string analyzer_name{};
     optionflag_t flag = OPTION_FLAG_ALL;
-    SizeT param_count = index_param_list.size();
-    for (SizeT param_idx = 0; param_idx < param_count; ++param_idx) {
+    size_t param_count = index_param_list.size();
+    for (size_t param_idx = 0; param_idx < param_count; ++param_idx) {
         InitParameter *parameter = index_param_list[param_idx];
-        String para_name = parameter->param_name_;
+        std::string para_name = parameter->param_name_;
         ToLowerString(para_name);
         if (para_name == "analyzer") {
             analyzer_name = parameter->param_value_;
         } else if (para_name == "flag") {
             flag = std::strtoul(parameter->param_value_.c_str(), nullptr, 10);
         } else if (para_name == "realtime") {
-            String realtime_str = parameter->param_value_;
+            std::string realtime_str = parameter->param_value_;
             ToLowerString(realtime_str);
             if (realtime_str == "true") {
                 FlagAddRealtime(flag);
@@ -75,7 +77,7 @@ SharedPtr<IndexBase> IndexFullText::Make(SharedPtr<String> index_name,
     if (!status.ok()) {
         RecoverableError(status);
     }
-    return MakeShared<IndexFullText>(index_name, index_comment, file_name, std::move(column_names), analyzer_name, (optionflag_t)flag);
+    return std::make_shared<IndexFullText>(index_name, index_comment, file_name, std::move(column_names), analyzer_name, (optionflag_t)flag);
 }
 
 bool IndexFullText::operator==(const IndexFullText &other) const {
@@ -88,7 +90,7 @@ bool IndexFullText::operator==(const IndexFullText &other) const {
 bool IndexFullText::operator!=(const IndexFullText &other) const { return !(*this == other); }
 
 i32 IndexFullText::GetSizeInBytes() const {
-    SizeT size = IndexBase::GetSizeInBytes();
+    size_t size = IndexBase::GetSizeInBytes();
     size += sizeof(int32_t) + analyzer_.length();
     size += sizeof(optionflag_t); // for flag_
     return size;
@@ -100,16 +102,16 @@ void IndexFullText::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, u8(flag_));
 }
 
-String IndexFullText::ToString() const {
+std::string IndexFullText::ToString() const {
     std::stringstream ss;
-    String output_str = IndexBase::ToString();
+    std::string output_str = IndexBase::ToString();
     if (!analyzer_.empty()) {
         output_str += ", " + analyzer_;
     }
     return output_str;
 }
 
-String IndexFullText::BuildOtherParamsString() const {
+std::string IndexFullText::BuildOtherParamsString() const {
     std::stringstream ss;
     ss << "analyzer = " << analyzer_;
     return ss.str();
@@ -122,16 +124,16 @@ nlohmann::json IndexFullText::Serialize() const {
     return res;
 }
 
-SharedPtr<IndexFullText> IndexFullText::Deserialize(std::string_view index_def_str) {
+std::shared_ptr<IndexFullText> IndexFullText::Deserialize(std::string_view index_def_str) {
     Status status = Status::NotSupport("Not implemented");
     RecoverableError(status);
     return nullptr;
 }
 
-void IndexFullText::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name) {
+void IndexFullText::ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref, const std::string &column_name) {
     auto &column_names_vector = *(base_table_ref->column_names_);
     auto &column_types_vector = *(base_table_ref->column_types_);
-    SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
+    size_t column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
         Status status = Status::ColumnNotExist(column_name);
         RecoverableError(status);

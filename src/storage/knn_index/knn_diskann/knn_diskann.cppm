@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:knn_diskann;
 
-import :stl;
 import :deprecated_knn_distance;
 import :infinity_exception;
 import :index_base;
@@ -24,11 +21,12 @@ import :kmeans_partition;
 import :search_top_1;
 import :search_top_k;
 import :knn_result_handler;
-import knn_expr;
-import internal_types;
 import :logger;
 import :diskann_index_data;
 import :diskann_dist_func;
+
+import knn_expr;
+import internal_types;
 
 namespace infinity {
 export template <typename Compare, MetricType metric, KnnDistanceAlgoType algo>
@@ -39,9 +37,9 @@ class KnnDiskAnn {
 public:
     explicit KnnDiskAnn(const DistType *queries, u64 query_count, u32 top_k, u32 dimension, EmbeddingDataType elem_data_type)
         : KnnDistance<DistType>(algo, elem_data_type, query_count, dimension, top_k), queries_(queries) {
-        id_array_ = MakeUniqueForOverwrite<RowID[]>(top_k * query_count);
-        distance_array_ = MakeUniqueForOverwrite<DistType[]>(top_k * query_count);
-        result_handler_ = MakeUnique<ResultHandler>(query_count, top_k, distance_array_.get(), id_array_.get());
+        id_array_ = std::make_unique_for_overwrite<RowID[]>(top_k * query_count);
+        distance_array_ = std::make_unique_for_overwrite<DistType[]>(top_k * query_count);
+        result_handler_ = std::make_unique<ResultHandler>(query_count, top_k, distance_array_.get(), id_array_.get());
     }
 
     void CreateIndex() {
@@ -90,16 +88,14 @@ public:
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const {
         if (idx >= this->query_count_) {
-            String error_message = "Query index exceeds the limit";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Query index exceeds the limit");
         }
         return distance_array_.get() + idx * this->top_k_;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const {
         if (idx >= this->query_count_) {
-            String error_message = "Query index exceeds the limit";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Query index exceeds the limit");
         }
         return id_array_.get() + idx * this->top_k_;
     }
@@ -109,15 +105,15 @@ public:
     [[nodiscard]] static bool CompareDist(const DistType &a, const DistType &b) { return Compare::Compare(b, a); }
 
 private:
-    UniquePtr<RowID[]> id_array_{};
-    UniquePtr<DistType[]> distance_array_{};
+    std::unique_ptr<RowID[]> id_array_{};
+    std::unique_ptr<DistType[]> distance_array_{};
 
-    UniquePtr<ResultHandler> result_handler_{};
+    std::unique_ptr<ResultHandler> result_handler_{};
 
     const DistType *queries_{};
 
-    SizeT query_count_{}; // maybe unused
-    SizeT top_k_{}; // maybe unused
+    size_t query_count_{}; // maybe unused
+    size_t top_k_{};       // maybe unused
 
     bool begin_{false};
 };

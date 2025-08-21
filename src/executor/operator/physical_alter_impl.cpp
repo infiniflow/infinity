@@ -14,15 +14,11 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:physical_alter.impl;
 
 import :physical_alter;
-
 import :query_context;
 import :operator_state;
-import :third_party;
 import :status;
 import :infinity_exception;
 import :value;
@@ -30,6 +26,9 @@ import :defer_op;
 import :wal_manager;
 import :infinity_context;
 import :new_txn;
+
+import std;
+import third_party;
 
 namespace infinity {
 

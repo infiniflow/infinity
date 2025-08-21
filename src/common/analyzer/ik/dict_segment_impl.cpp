@@ -1,22 +1,20 @@
 module;
 
-#include <algorithm>
-
 module infinity_core:ik_dict_segment.impl;
 
 import :ik_dict_segment;
-import :stl;
 import :hit;
 import :character_util;
-import :third_party;
+
+import std;
 
 namespace infinity {
 
-HashMap<wchar_t, wchar_t> DictSegment::char_map_;
+std::unordered_map<wchar_t, wchar_t> DictSegment::char_map_;
 
 DictSegment::DictSegment(wchar_t node_char) : node_char_(node_char) {}
 
-Hit *DictSegment::Match(const Vector<wchar_t> &char_array, int begin, int length, Hit *search_hit) {
+Hit *DictSegment::Match(const std::vector<wchar_t> &char_array, int begin, int length, Hit *search_hit) {
     if (search_hit == nullptr) {
         search_hit = new Hit();
         search_hit->SetBegin(begin);
@@ -29,11 +27,12 @@ Hit *DictSegment::Match(const Vector<wchar_t> &char_array, int begin, int length
     DictSegment *ds = nullptr;
 
     if (!children_array_.empty()) {
-        UniquePtr<DictSegment> key_segment = MakeUnique<DictSegment>(key_char);
-        auto it = std::lower_bound(children_array_.begin(),
-                                   children_array_.begin() + store_size_,
-                                   key_segment,
-                                   [](const UniquePtr<DictSegment> &a, const UniquePtr<DictSegment> &b) { return a->node_char_ < b->node_char_; });
+        std::unique_ptr<DictSegment> key_segment = std::make_unique<DictSegment>(key_char);
+        auto it = std::lower_bound(
+            children_array_.begin(),
+            children_array_.begin() + store_size_,
+            key_segment,
+            [](const std::unique_ptr<DictSegment> &a, const std::unique_ptr<DictSegment> &b) { return a->node_char_ < b->node_char_; });
         if (it != children_array_.begin() + store_size_ && (*it)->node_char_ == key_char) {
             ds = (*it).get();
         }
@@ -60,10 +59,10 @@ Hit *DictSegment::Match(const Vector<wchar_t> &char_array, int begin, int length
     return search_hit;
 }
 
-void DictSegment::FillSegment(const Vector<wchar_t> &char_array, int begin, int length, int enabled) {
+void DictSegment::FillSegment(const std::vector<wchar_t> &char_array, int begin, int length, int enabled) {
     wchar_t begin_char = char_array[begin];
     wchar_t key_char;
-    HashMap<wchar_t, wchar_t>::iterator it = char_map_.find(begin_char);
+    std::unordered_map<wchar_t, wchar_t>::iterator it = char_map_.find(begin_char);
     if (it == char_map_.end()) {
         char_map_[begin_char] = begin_char;
         key_char = begin_char;
@@ -84,25 +83,26 @@ DictSegment *DictSegment::LookforSegment(wchar_t key_char, int create) {
     DictSegment *ds = nullptr;
 
     if (store_size_ <= ARRAY_LENGTH_LIMIT) {
-        Vector<UniquePtr<DictSegment>> &children_array_ = GetChildrenArray();
-        UniquePtr<DictSegment> key_segment = MakeUnique<DictSegment>(key_char);
-        auto it = std::lower_bound(children_array_.begin(),
-                                   children_array_.begin() + store_size_,
-                                   key_segment,
-                                   [](const UniquePtr<DictSegment> &a, const UniquePtr<DictSegment> &b) { return a->node_char_ < b->node_char_; });
+        std::vector<std::unique_ptr<DictSegment>> &children_array_ = GetChildrenArray();
+        std::unique_ptr<DictSegment> key_segment = std::make_unique<DictSegment>(key_char);
+        auto it = std::lower_bound(
+            children_array_.begin(),
+            children_array_.begin() + store_size_,
+            key_segment,
+            [](const std::unique_ptr<DictSegment> &a, const std::unique_ptr<DictSegment> &b) { return a->node_char_ < b->node_char_; });
         if (it != children_array_.begin() + store_size_ && (*it)->node_char_ == key_char) {
             ds = (*it).get();
         }
 
         if (ds == nullptr && create == 1) {
-            UniquePtr<DictSegment> ds_ptr = MakeUnique<DictSegment>(key_char);
+            std::unique_ptr<DictSegment> ds_ptr = std::make_unique<DictSegment>(key_char);
             ds = ds_ptr.get();
             if (store_size_ < ARRAY_LENGTH_LIMIT) {
                 children_array_[store_size_] = std::move(ds_ptr);
                 store_size_++;
                 std::sort(children_array_.begin(),
                           children_array_.begin() + store_size_,
-                          [](const UniquePtr<DictSegment> &a, const UniquePtr<DictSegment> &b) { return a->node_char_ < b->node_char_; });
+                          [](const std::unique_ptr<DictSegment> &a, const std::unique_ptr<DictSegment> &b) { return a->node_char_ < b->node_char_; });
             } else {
                 for (auto &segment : children_array_) {
                     if (segment.get() != nullptr) {
@@ -117,7 +117,7 @@ DictSegment *DictSegment::LookforSegment(wchar_t key_char, int create) {
     } else {
         ds = children_map_[key_char].get();
         if (ds == nullptr && create == 1) {
-            UniquePtr<DictSegment> ds_ptr = MakeUnique<DictSegment>(key_char);
+            std::unique_ptr<DictSegment> ds_ptr = std::make_unique<DictSegment>(key_char);
             ds = ds_ptr.get();
             children_map_[key_char] = std::move(ds_ptr);
             store_size_++;

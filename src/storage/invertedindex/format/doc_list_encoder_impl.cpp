@@ -1,11 +1,10 @@
 module;
+
 #include <cassert>
 
 module infinity_core:doc_list_encoder.impl;
 
 import :doc_list_encoder;
-import :stl;
-
 import :file_writer;
 import :file_reader;
 import :posting_byte_slice;
@@ -23,7 +22,7 @@ DocListEncoder::DocListEncoder(const DocListFormat *doc_list_format)
     : doc_list_buffer_(), doc_list_format_(doc_list_format), last_doc_id_(0), current_tf_(0), total_tf_(0), df_(0), doc_skiplist_writer_(nullptr) {
     assert(doc_list_format != nullptr);
     doc_list_buffer_.Init(doc_list_format_);
-    doc_skiplist_writer_ = MakeShared<SkipListWriter>();
+    doc_skiplist_writer_ = std::make_shared<SkipListWriter>();
     doc_skiplist_writer_->Init(doc_list_format_->GetDocSkipListFormat());
 }
 
@@ -45,7 +44,7 @@ void DocListEncoder::EndDocument(docid_t doc_id, u32 doc_len, docpayload_t doc_p
 
 void DocListEncoder::Flush() {
     FlushDocListBuffer();
-    SharedPtr<SkipListWriter> doc_skiplist_writer;
+    std::shared_ptr<SkipListWriter> doc_skiplist_writer;
     {
         std::shared_lock<std::shared_mutex> lock(rw_mutex_);
         doc_skiplist_writer = doc_skiplist_writer_;
@@ -75,9 +74,9 @@ void DocListEncoder::AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t 
     }
 }
 
-void DocListEncoder::Dump(const SharedPtr<FileWriter> &file, bool spill) {
+void DocListEncoder::Dump(const std::shared_ptr<FileWriter> &file, bool spill) {
     df_t df;
-    SharedPtr<SkipListWriter> doc_skiplist_writer;
+    std::shared_ptr<SkipListWriter> doc_skiplist_writer;
     {
         std::shared_lock<std::shared_mutex> lock(rw_mutex_);
         df = df_;
@@ -113,7 +112,7 @@ void DocListEncoder::Dump(const SharedPtr<FileWriter> &file, bool spill) {
     doc_list_buffer_.Dump(file, spill);
 }
 
-void DocListEncoder::Load(const SharedPtr<FileReader> &file) {
+void DocListEncoder::Load(const std::shared_ptr<FileReader> &file) {
     last_doc_id_ = file->ReadVInt();
     last_doc_payload_ = file->ReadVInt();
     current_tf_ = file->ReadVInt();
@@ -128,7 +127,7 @@ void DocListEncoder::Load(const SharedPtr<FileReader> &file) {
 }
 
 u32 DocListEncoder::GetDumpLength() {
-    SharedPtr<SkipListWriter> doc_skiplist_writer;
+    std::shared_ptr<SkipListWriter> doc_skiplist_writer;
     {
         std::shared_lock<std::shared_mutex> lock(rw_mutex_);
         doc_skiplist_writer = doc_skiplist_writer_;
@@ -150,17 +149,17 @@ void DocListEncoder::FlushDocListBuffer() {
     block_max_percentage_ = 0.0f;
 }
 
-SharedPtr<SkipListWriter> DocListEncoder::GetDocSkipListWriter() {
+std::shared_ptr<SkipListWriter> DocListEncoder::GetDocSkipListWriter() {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     if (!doc_skiplist_writer_.get()) {
-        doc_skiplist_writer_ = MakeShared<SkipListWriter>();
+        doc_skiplist_writer_ = std::make_shared<SkipListWriter>();
         doc_skiplist_writer_->Init(doc_list_format_->GetDocSkipListFormat());
     }
     return doc_skiplist_writer_;
 }
 
 void DocListEncoder::AddSkipListItem(u32 item_size) {
-    SharedPtr<SkipListWriter> doc_skiplist_writer = GetDocSkipListWriter();
+    std::shared_ptr<SkipListWriter> doc_skiplist_writer = GetDocSkipListWriter();
     const DocSkipListFormat *skiplist_format = doc_list_format_->GetDocSkipListFormat();
     if (skiplist_format->HasBlockMax()) {
         assert((block_max_percentage_ > 0 and block_max_percentage_ <= 1.0f));
@@ -176,7 +175,7 @@ void DocListEncoder::AddSkipListItem(u32 item_size) {
 
 InMemDocListDecoder *DocListEncoder::GetInMemDocListDecoder() const {
     df_t df;
-    SharedPtr<SkipListWriter> doc_skiplist_writer;
+    std::shared_ptr<SkipListWriter> doc_skiplist_writer;
     {
         std::shared_lock<std::shared_mutex> lock(rw_mutex_);
         df = df_;

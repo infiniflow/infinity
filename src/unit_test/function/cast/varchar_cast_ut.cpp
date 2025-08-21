@@ -12,22 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.varchar_cast;
 
 import :ut.base_test;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
-import :stl;
 import :infinity_context;
 import :infinity_exception;
 import :column_vector;
@@ -40,7 +34,6 @@ import :value;
 import :default_values;
 import :data_block;
 import :varchar_cast;
-#endif
 
 import global_resource_usage;
 import internal_types;
@@ -58,8 +51,7 @@ void InitVarcharAsInline(VarcharT &varchar, const std::string_view sv) {
     if (sv.size() <= VARCHAR_INLINE_LEN) {
         std::memcpy(varchar.short_.data_, sv.data(), sv.size());
     } else {
-        String error_message = "Varchar length is too long";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Varchar length is too long");
     }
 }
 
@@ -67,7 +59,7 @@ TEST_F(VarcharCastTest, varchar_cast0) {
     {
 
         DataType source_type(LogicalType::kVarchar);
-        String s1 = "true";
+        std::string s1 = "true";
 
         {
             VarcharT v1;
@@ -110,7 +102,7 @@ TEST_F(VarcharCastTest, varchar_cast0) {
     {
 
         DataType source_type(LogicalType::kVarchar);
-        String s1 = "-128";
+        std::string s1 = "-128";
 
         {
             VarcharT v1;
@@ -168,12 +160,12 @@ TEST_F(VarcharCastTest, varchar_cast1) {
     using namespace infinity;
 
     {
-        SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<ColumnVector> input_column_vector = MakeShared<ColumnVector>(source_type);
+        std::shared_ptr<DataType> source_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnVector> input_column_vector = std::make_shared<ColumnVector>(source_type);
         input_column_vector->Initialize();
 
         // Case 1
-        String s1 = "100";
+        std::string s1 = "100";
         Value v = Value::MakeVarchar(s1);
         input_column_vector->AppendValue(v);
 
@@ -216,12 +208,12 @@ TEST_F(VarcharCastTest, varchar_cast1) {
     }
 
     {
-        SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<ColumnVector> input_column_vector = MakeShared<ColumnVector>(source_type);
+        std::shared_ptr<DataType> source_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnVector> input_column_vector = std::make_shared<ColumnVector>(source_type);
         input_column_vector->Initialize();
 
         // Case 1
-        String s1 = "100.01";
+        std::string s1 = "100.01";
         Value v = Value::MakeVarchar(s1);
         input_column_vector->AppendValue(v);
 
@@ -264,12 +256,12 @@ TEST_F(VarcharCastTest, varchar_cast1) {
     }
 
     {
-        SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<ColumnVector> input_column_vector = MakeShared<ColumnVector>(source_type);
+        std::shared_ptr<DataType> source_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnVector> input_column_vector = std::make_shared<ColumnVector>(source_type);
         input_column_vector->Initialize();
 
         // Case 1
-        String s1 = "100100100.01";
+        std::string s1 = "100100100.01";
         Value v = Value::MakeVarchar(s1);
         input_column_vector->AppendValue(v);
 

@@ -12,25 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.table_def;
 
 import :ut.base_test;
 import :infinity_exception;
-import :stl;
-import :third_party;
+import third_party;
 import :logger;
 import :table_def;
 import :infinity_context;
-#endif
 
 import global_resource_usage;
 import internal_types;
@@ -44,24 +37,29 @@ class TableDefTest : public BaseTest {};
 TEST_F(TableDefTest, test1) {
     using namespace infinity;
 
-    Vector<SharedPtr<ColumnDef>> columns;
+    std::vector<std::shared_ptr<ColumnDef>> columns;
 
     i64 column_id = 0;
     {
         std::set<ConstraintType> constraints;
         constraints.insert(ConstraintType::kUnique);
         constraints.insert(ConstraintType::kNotNull);
-        auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
+        auto column_def_ptr =
+            std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
         columns.emplace_back(column_def_ptr);
     }
     {
         std::set<ConstraintType> constraints;
         constraints.insert(ConstraintType::kPrimaryKey);
-        auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kVarchar)), "c2", constraints);
+        auto column_def_ptr =
+            std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kVarchar)), "c2", constraints);
         columns.emplace_back(column_def_ptr);
     }
 
-    TableDef table_def(MakeShared<String>("default_db"), MakeShared<String>("t1"), MakeShared<String>("t1_comment"), columns);
+    TableDef table_def(std::make_shared<std::string>("default_db"),
+                       std::make_shared<std::string>("t1"),
+                       std::make_shared<std::string>("t1_comment"),
+                       columns);
 
     EXPECT_EQ(*table_def.table_name(), "t1");
     EXPECT_EQ(*table_def.schema_name(), "default_db");
@@ -74,28 +72,32 @@ TEST_F(TableDefTest, test1) {
 TEST_F(TableDefTest, ReadWrite) {
     using namespace infinity;
 
-    Vector<SharedPtr<ColumnDef>> columns;
+    std::vector<std::shared_ptr<ColumnDef>> columns;
 
     i64 column_id = 0;
     {
         std::set<ConstraintType> constraints;
         constraints.insert(ConstraintType::kUnique);
         constraints.insert(ConstraintType::kNotNull);
-        auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
+        auto column_def_ptr =
+            std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
         columns.emplace_back(column_def_ptr);
     }
     {
         std::set<ConstraintType> constraints;
         constraints.insert(ConstraintType::kPrimaryKey);
-        auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(LogicalType::kVarchar), "c2", constraints);
+        auto column_def_ptr = std::make_shared<ColumnDef>(column_id++, std::make_shared<DataType>(LogicalType::kVarchar), "c2", constraints);
         columns.emplace_back(column_def_ptr);
     }
 
     {
-        TableDef table_def(MakeShared<String>("default_db"), MakeShared<String>("t1"), MakeShared<String>(), columns);
+        TableDef table_def(std::make_shared<std::string>("default_db"),
+                           std::make_shared<std::string>("t1"),
+                           std::make_shared<std::string>(),
+                           columns);
 
         int32_t exp_size = table_def.GetSizeInBytes();
-        Vector<char> buf(exp_size, char(0));
+        std::vector<char> buf(exp_size, char(0));
         char *buf_beg = buf.data();
         char *ptr = buf_beg;
         table_def.WriteAdv(ptr);
@@ -103,17 +105,20 @@ TEST_F(TableDefTest, ReadWrite) {
 
         const char *ptr_r = buf_beg;
         int32_t maxbytes = exp_size;
-        SharedPtr<TableDef> table_def2 = table_def.ReadAdv(ptr_r, maxbytes);
+        std::shared_ptr<TableDef> table_def2 = table_def.ReadAdv(ptr_r, maxbytes);
         EXPECT_EQ(ptr_r - buf_beg, exp_size);
         EXPECT_NE(table_def2, nullptr);
         EXPECT_EQ(*table_def2, table_def);
     }
 
     {
-        TableDef table_def(MakeShared<String>("default_db"), MakeShared<String>("t1"), MakeShared<String>("t1_comment"), columns);
+        TableDef table_def(std::make_shared<std::string>("default_db"),
+                           std::make_shared<std::string>("t1"),
+                           std::make_shared<std::string>("t1_comment"),
+                           columns);
 
         int32_t exp_size = table_def.GetSizeInBytes();
-        Vector<char> buf(exp_size, char(0));
+        std::vector<char> buf(exp_size, char(0));
         char *buf_beg = buf.data();
         char *ptr = buf_beg;
         table_def.WriteAdv(ptr);
@@ -121,7 +126,7 @@ TEST_F(TableDefTest, ReadWrite) {
 
         const char *ptr_r = buf_beg;
         int32_t maxbytes = exp_size;
-        SharedPtr<TableDef> table_def2 = table_def.ReadAdv(ptr_r, maxbytes);
+        std::shared_ptr<TableDef> table_def2 = table_def.ReadAdv(ptr_r, maxbytes);
         EXPECT_EQ(ptr_r - buf_beg, exp_size);
         EXPECT_NE(table_def2, nullptr);
         EXPECT_EQ(*table_def2, table_def);

@@ -12,43 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <set>
-
 module infinity_core:hnsw_file_worker.impl;
 
 import :hnsw_file_worker;
 import :infinity_exception;
-import :stl;
 import :index_file_worker;
 import :hnsw_alg;
 import :hnsw_common;
 import :index_hnsw;
-
 import :index_base;
-import :third_party;
-import :logger;
-import logical_type;
-import embedding_info;
-import create_index_info;
-import internal_types;
 import :hnsw_handler;
 import :virtual_store;
 import :persistence_manager;
 import :local_file_handle;
+
+import std;
+import third_party;
+
 import column_def;
+import logical_type;
+import embedding_info;
+import create_index_info;
+import internal_types;
 
 namespace infinity {
 
-HnswFileWorker::HnswFileWorker(SharedPtr<String> data_dir,
-                               SharedPtr<String> temp_dir,
-                               SharedPtr<String> file_dir,
-                               SharedPtr<String> file_name,
-                               SharedPtr<IndexBase> index_base,
-                               SharedPtr<ColumnDef> column_def,
+HnswFileWorker::HnswFileWorker(std::shared_ptr<std::string> data_dir,
+                               std::shared_ptr<std::string> temp_dir,
+                               std::shared_ptr<std::string> file_dir,
+                               std::shared_ptr<std::string> file_name,
+                               std::shared_ptr<IndexBase> index_base,
+                               std::shared_ptr<ColumnDef> column_def,
                                PersistenceManager *persistence_manager,
-                               SizeT index_size)
+                               size_t index_size)
     : IndexFileWorker(std::move(data_dir),
                       std::move(temp_dir),
                       std::move(file_dir),
@@ -58,7 +54,7 @@ HnswFileWorker::HnswFileWorker(SharedPtr<String> data_dir,
                       persistence_manager) {
     if (index_size == 0) {
 
-        String index_path = GetFilePath();
+        std::string index_path = GetFilePath();
         auto [file_handle, status] = VirtualStore::Open(index_path, FileAccessMode::kRead);
         if (status.ok()) {
             // When replay by checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
@@ -81,16 +77,14 @@ HnswFileWorker::~HnswFileWorker() {
 
 void HnswFileWorker::AllocateInMemory() {
     if (data_) {
-        String error_message = "Data is already allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Data is already allocated.");
     }
     data_ = static_cast<void *>(new HnswHandlerPtr());
 }
 
 void HnswFileWorker::FreeInMemory() {
     if (!data_) {
-        String error_message = "FreeInMemory: Data is not allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("FreeInMemory: Data is not allocated.");
     }
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
     delete *hnsw_handler;
@@ -100,8 +94,7 @@ void HnswFileWorker::FreeInMemory() {
 
 bool HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (!data_) {
-        String error_message = "WriteToFileImpl: Data is not allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("WriteToFileImpl: Data is not allocated.");
     }
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
     (*hnsw_handler)->SaveToPtr(*file_handle_);
@@ -109,7 +102,7 @@ bool HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
     return true;
 }
 
-void HnswFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
+void HnswFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     if (data_ != nullptr) {
         UnrecoverableError("Data is already allocated.");
     }
@@ -122,7 +115,7 @@ void HnswFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
     }
 }
 
-bool HnswFileWorker::ReadFromMmapImpl(const void *ptr, SizeT size) {
+bool HnswFileWorker::ReadFromMmapImpl(const void *ptr, size_t size) {
     if (mmap_data_ != nullptr) {
         UnrecoverableError("Mmap data is already allocated.");
     }

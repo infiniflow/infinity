@@ -12,16 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.column_vector_row;
 
@@ -31,12 +24,11 @@ import :logger;
 import :column_vector;
 import :value;
 import :default_values;
-import :third_party;
-import :stl;
 import :selection;
 import :vector_buffer;
 import :infinity_context;
-#endif
+
+import third_party;
 
 import global_resource_usage;
 import internal_types;
@@ -65,7 +57,7 @@ class ColumnVectorRowTest : public BaseTest {
 TEST_F(ColumnVectorRowTest, flat_row) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kRowID);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kRowID);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -151,7 +143,7 @@ TEST_F(ColumnVectorRowTest, flat_row) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         RowID row_id{static_cast<u32>(i), static_cast<u32>(i)};
-        column_vector.AppendByPtr((ptr_t)(&row_id));
+        column_vector.AppendByPtr((char *)(&row_id));
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
         EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
@@ -176,7 +168,7 @@ TEST_F(ColumnVectorRowTest, contant_row) {
 
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kRowID);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kRowID);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -258,7 +250,7 @@ TEST_F(ColumnVectorRowTest, contant_row) {
 TEST_F(ColumnVectorRowTest, row_column_vector_select) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kRowID);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kRowID);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -277,7 +269,7 @@ TEST_F(ColumnVectorRowTest, row_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (size_t idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -296,7 +288,7 @@ TEST_F(ColumnVectorRowTest, row_column_vector_select) {
 TEST_F(ColumnVectorRowTest, row_column_slice_init) {
     using namespace infinity;
 
-    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kRowID);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kRowID);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 

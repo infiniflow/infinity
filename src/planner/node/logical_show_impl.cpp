@@ -12,25 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-
 module infinity_core:logical_show.impl;
 
 import :logical_show;
-
-import :stl;
-import internal_types;
 import :infinity_exception;
 import :column_binding;
-import :logger;
+
+import std;
+
 import show_statement;
 import data_type;
+import internal_types;
 
 namespace infinity {
 
-String ToString(ShowStmtType type) {
+std::string ToString(ShowStmtType type) {
     switch (type) {
         case ShowStmtType::kDatabase:
             return "Show database";
@@ -117,27 +113,28 @@ String ToString(ShowStmtType type) {
         case ShowStmtType::kShowSnapshot:
             return "Show snapshot";
         case ShowStmtType::kInvalid: {
-            String error_message = "Invalid chunk scan type";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid chunk scan type");
         }
     }
     return {};
 }
 
-Vector<ColumnBinding> LogicalShow::GetColumnBindings() const { return {}; }
+std::vector<ColumnBinding> LogicalShow::GetColumnBindings() const { return {}; }
 
-SharedPtr<Vector<String>> LogicalShow::GetOutputNames() const { return MakeShared<Vector<String>>(); }
+std::shared_ptr<std::vector<std::string>> LogicalShow::GetOutputNames() const { return std::make_shared<std::vector<std::string>>(); }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalShow::GetOutputTypes() const { return MakeShared<Vector<SharedPtr<DataType>>>(); }
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalShow::GetOutputTypes() const {
+    return std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+}
 
-String LogicalShow::ToString(i64 &space) const {
+std::string LogicalShow::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << "-> "
+    ss << std::string(space, ' ') << "-> "
        << "Show: ";
     space += arrow_str.size();
 

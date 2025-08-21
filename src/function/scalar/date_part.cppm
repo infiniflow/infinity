@@ -14,8 +14,6 @@ module;
 
 export module infinity_core:date_part;
 
-import :stl;
-
 namespace infinity {
 
 class NewCatalog;

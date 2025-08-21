@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:table_function_set;
 
 import :function_set;
-import :stl;
 import :table_function;
 import :function;
 
@@ -25,14 +22,14 @@ namespace infinity {
 
 class TableFunctionSet final : public FunctionSet {
 public:
-    explicit TableFunctionSet(String name) : FunctionSet(std::move(name), FunctionType::kTable) {}
+    explicit TableFunctionSet(std::string name) : FunctionSet(std::move(name), FunctionType::kTable) {}
 
     ~TableFunctionSet() final;
 
     void AddFunction(TableFunction func);
 
 private:
-    Vector<TableFunction> functions_;
+    std::vector<TableFunction> functions_;
 };
 
 } // namespace infinity

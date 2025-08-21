@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:fragment_task;
 
-import :stl;
 import :profiler;
 import :operator_state;
+
 import global_resource_usage;
 
 namespace infinity {
@@ -32,16 +30,16 @@ export enum class FragmentTaskStatus : i8 {
     kError,
 };
 
-export String FragmentTaskStatus2String(FragmentTaskStatus status) {
+export std::string FragmentTaskStatus2String(FragmentTaskStatus status) {
     switch (status) {
         case FragmentTaskStatus::kPending:
-            return String("Pending");
+            return "Pending";
         case FragmentTaskStatus::kRunning:
-            return String("Running");
+            return "Running";
         case FragmentTaskStatus::kFinished:
-            return String("Finished");
+            return "Finished";
         case FragmentTaskStatus::kError:
-            return String("Error");
+            return "Error";
     }
 }
 
@@ -92,7 +90,7 @@ public:
 
     bool CompleteTask();
 
-    String PhysOpsToString();
+    std::string PhysOpsToString();
 
     // for test.
     [[nodiscard]] inline FragmentTaskStatus status() const { return status_; }
@@ -100,11 +98,11 @@ public:
     FragmentContext *fragment_context() const;
 
 public:
-    UniquePtr<SourceState> source_state_{};
+    std::unique_ptr<SourceState> source_state_{};
 
-    Vector<UniquePtr<OperatorState>> operator_states_{};
+    std::vector<std::unique_ptr<OperatorState>> operator_states_{};
 
-    UniquePtr<SinkState> sink_state_{};
+    std::unique_ptr<SinkState> sink_state_{};
 
 private:
     std::mutex mutex_;

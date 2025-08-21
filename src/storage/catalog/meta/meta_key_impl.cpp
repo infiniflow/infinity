@@ -15,62 +15,68 @@
 module;
 
 #include "base64.hpp"
-#include <string>
 
 module infinity_core:meta_key.impl;
 
 import :meta_key;
-import column_def;
 import :utility;
-import :third_party;
 import :kv_code;
 import :infinity_exception;
 import :meta_type;
 import :default_values;
 
+import std;
+import third_party;
+
+import column_def;
+
 namespace infinity {
 
-ColumnMetaKey::ColumnMetaKey(String db_id_str, String table_id_str, SegmentID segment_id, BlockID block_id, SharedPtr<ColumnDef> column_def)
+ColumnMetaKey::ColumnMetaKey(std::string db_id_str,
+                             std::string table_id_str,
+                             SegmentID segment_id,
+                             BlockID block_id,
+                             std::shared_ptr<ColumnDef> column_def)
     : MetaKey(MetaType::kBlockColumn), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id),
       block_id_(block_id), column_def_(std::move(column_def)) {}
 
 ColumnMetaKey::~ColumnMetaKey() = default;
 
-String DBMetaKey::ToString() const { return fmt::format("db: {}:{}", KeyEncode::CatalogDbKey(db_name_, commit_ts_), db_id_str_); }
+std::string DBMetaKey::ToString() const { return fmt::format("db: {}:{}", KeyEncode::CatalogDbKey(db_name_, commit_ts_), db_id_str_); }
 
-String DBTagMetaKey::ToString() const { return fmt::format("db_tag: {}:{}", KeyEncode::CatalogDbTagKey(db_id_str_, tag_name_), value_); }
+std::string DBTagMetaKey::ToString() const { return fmt::format("db_tag: {}:{}", KeyEncode::CatalogDbTagKey(db_id_str_, tag_name_), value_); }
 
-String TableMetaKey::ToString() const {
+std::string TableMetaKey::ToString() const {
     return fmt::format("table: {}:{}", KeyEncode::CatalogTableKey(db_id_str_, table_name_, commit_ts_), table_id_str_);
 }
 
-String TableNameMetaKey::ToString() const {
+std::string TableNameMetaKey::ToString() const {
     return fmt::format("table name: {}:{}", KeyEncode::CatalogTableKey(db_id_str_, table_name_, commit_ts_), table_id_str_);
 }
 
-String TableColumnMetaKey::ToString() const {
+std::string TableColumnMetaKey::ToString() const {
     return fmt::format("table_column: {}:{}", KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name_, commit_ts_), value_);
 }
-String TableTagMetaKey::ToString() const {
+std::string TableTagMetaKey::ToString() const {
     return fmt::format("table_tag: {}:{}", KeyEncode::CatalogTableTagKey(db_id_str_, table_id_str_, tag_name_), value_);
 }
 
-String SegmentMetaKey::ToString() const {
+std::string SegmentMetaKey::ToString() const {
     return fmt::format("segment: {}:{}", KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id_), commit_ts_);
 }
 
-String SegmentTagMetaKey::ToString() const {
+std::string SegmentTagMetaKey::ToString() const {
     if (tag_name_ == "fast_rough_filter") {
         return fmt::format("segment_tag: {}", KeyEncode::CatalogTableSegmentTagKey(db_id_str_, table_id_str_, segment_id_, tag_name_));
     }
     return fmt::format("segment_tag: {}:{}", KeyEncode::CatalogTableSegmentTagKey(db_id_str_, table_id_str_, segment_id_, tag_name_), value_);
 }
 
-String BlockMetaKey::ToString() const {
+std::string BlockMetaKey::ToString() const {
     return fmt::format("block: {}:{}", KeyEncode::CatalogTableSegmentBlockKey(db_id_str_, table_id_str_, segment_id_, block_id_), commit_ts_);
 }
 
-String BlockTagMetaKey::ToString() const {
+std::string BlockTagMetaKey::ToString() const {
     if (tag_name_ == "fast_rough_filter") {
         return fmt::format("block_tag: {}", KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str_, table_id_str_, segment_id_, block_id_, tag_name_));
     }
@@ -79,45 +85,45 @@ String BlockTagMetaKey::ToString() const {
                        value_);
 }
 
-String ColumnMetaKey::ToString() const { return fmt::format("block column: not implemented"); }
+std::string ColumnMetaKey::ToString() const { return fmt::format("block column: not implemented"); }
 
-String TableIndexMetaKey::ToString() const {
+std::string TableIndexMetaKey::ToString() const {
     return fmt::format("table_index: {}:{}", KeyEncode::CatalogIndexKey(db_id_str_, table_id_str_, index_name_, commit_ts_), index_id_str_);
 }
 
-String TableIndexTagMetaKey::ToString() const {
+std::string TableIndexTagMetaKey::ToString() const {
     return fmt::format("table_index_tag: {}:{}", KeyEncode::CatalogIndexTagKey(db_id_str_, table_id_str_, index_id_str_, tag_name_), value_);
 }
 
-String SegmentIndexMetaKey::ToString() const {
+std::string SegmentIndexMetaKey::ToString() const {
     return fmt::format("segment_index: {}:{}", KeyEncode::CatalogIdxSegmentKey(db_id_str_, table_id_str_, index_id_str_, segment_id_), commit_ts_);
 }
 
-String SegmentIndexTagMetaKey::ToString() const {
+std::string SegmentIndexTagMetaKey::ToString() const {
     return fmt::format("segment_index_tag: {}:{}",
                        KeyEncode::CatalogIdxSegmentTagKey(db_id_str_, table_id_str_, index_id_str_, segment_id_, tag_name_),
                        value_);
 }
 
-String ChunkIndexMetaKey::ToString() const {
+std::string ChunkIndexMetaKey::ToString() const {
     return fmt::format("chunk_index: {}:{}",
                        KeyEncode::CatalogIdxChunkKey(db_id_str_, table_id_str_, index_id_str_, segment_id_, chunk_id_),
                        commit_ts_);
 }
 
-String ChunkIndexTagMetaKey::ToString() const {
+std::string ChunkIndexTagMetaKey::ToString() const {
     return fmt::format("chunk_index_tag: {}:{}",
                        KeyEncode::CatalogIdxChunkTagKey(db_id_str_, table_id_str_, index_id_str_, segment_id_, chunk_id_, tag_name_),
                        value_);
 }
 
-String SystemTagMetaKey::ToString() const { return fmt::format("system_tag: {}:{}", tag_name_, value_); }
+std::string SystemTagMetaKey::ToString() const { return fmt::format("system_tag: {}:{}", tag_name_, value_); }
 
-String PmObjectMetaKey::ToString() const { return fmt::format("pm_path: {}:{}", KeyEncode::PMObjectKey(path_key_), value_); }
+std::string PmObjectMetaKey::ToString() const { return fmt::format("pm_path: {}:{}", KeyEncode::PMObjectKey(path_key_), value_); }
 
-String PmStatMetaKey::ToString() const { return fmt::format("pm_object: {}:{}", KeyEncode::PMObjectStatKey(object_key_), value_); }
+std::string PmStatMetaKey::ToString() const { return fmt::format("pm_object: {}:{}", KeyEncode::PMObjectStatKey(object_key_), value_); }
 
-String DropMetaKey::ToString() const { return fmt::format("drop_key: drop|{}|{}:{}", scope_, object_key_, value_); }
+std::string DropMetaKey::ToString() const { return fmt::format("drop_key: drop|{}|{}:{}", scope_, object_key_, value_); }
 
 nlohmann::json DBMetaKey::ToJson() const {
     nlohmann::json json_res;
@@ -279,186 +285,186 @@ nlohmann::json DropMetaKey::ToJson() const {
     return json_res;
 }
 
-SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
-    Vector<String> fields = infinity::Partition(key, '|');
+std::shared_ptr<MetaKey> MetaParse(const std::string &key, const std::string &value) {
+    std::vector<std::string> fields = infinity::Partition(key, '|');
 
     auto fields_size = fields.size();
 
     if (fields[0] == "catalog" && fields[1] == "db") {
-        const String &db_name_str = fields[2];
-        const String &commit_ts_str = fields[3];
-        const String &db_id_str = value;
-        SharedPtr<DBMetaKey> db_meta_key = MakeShared<DBMetaKey>(db_id_str, db_name_str);
+        const std::string &db_name_str = fields[2];
+        const std::string &commit_ts_str = fields[3];
+        const std::string &db_id_str = value;
+        auto db_meta_key = std::make_shared<DBMetaKey>(db_id_str, db_name_str);
         db_meta_key->commit_ts_ = std::stoull(commit_ts_str);
         return db_meta_key;
     }
 
     if (fields[0] == "catalog" && fields[1] == "tbl") {
-        const String &db_id_str = fields[2];
-        const String &table_name_str = fields[3];
-        const String &commit_ts_str = fields[4];
-        const String &table_id_str = value;
+        const std::string &db_id_str = fields[2];
+        const std::string &table_name_str = fields[3];
+        const std::string &commit_ts_str = fields[4];
+        const std::string &table_id_str = value;
 
-        SharedPtr<TableMetaKey> table_meta_key = MakeShared<TableMetaKey>(db_id_str, table_id_str, table_name_str);
+        auto table_meta_key = std::make_shared<TableMetaKey>(db_id_str, table_id_str, table_name_str);
         table_meta_key->commit_ts_ = std::stoull(commit_ts_str);
         return table_meta_key;
     }
 
     if (fields[0] == "catalog" && fields[1] == "tbl_name") {
-        const String &db_id_str = fields[2];
-        const String &table_name_str = fields[3];
-        const String &commit_ts_str = fields[4];
-        const String &table_id_str = value;
+        const std::string &db_id_str = fields[2];
+        const std::string &table_name_str = fields[3];
+        const std::string &commit_ts_str = fields[4];
+        const std::string &table_id_str = value;
 
-        SharedPtr<TableNameMetaKey> table_name_meta_key = MakeShared<TableNameMetaKey>(db_id_str, table_id_str, table_name_str);
+        auto table_name_meta_key = std::make_shared<TableNameMetaKey>(db_id_str, table_id_str, table_name_str);
         table_name_meta_key->commit_ts_ = std::stoull(commit_ts_str);
         return table_name_meta_key;
     }
 
     if (fields[0] == "catalog" && fields[1] == "seg") {
-        const String &db_id_str = fields[2];
-        const String &table_id_str = fields[3];
-        const String &segment_id_str = fields[4];
-        const String &commit_ts_str = value;
+        const std::string &db_id_str = fields[2];
+        const std::string &table_id_str = fields[3];
+        const std::string &segment_id_str = fields[4];
+        const std::string &commit_ts_str = value;
         SegmentID segment_id = std::stoul(segment_id_str);
-        auto segment_meta_key = MakeShared<SegmentMetaKey>(db_id_str, table_id_str, segment_id);
+        auto segment_meta_key = std::make_shared<SegmentMetaKey>(db_id_str, table_id_str, segment_id);
         segment_meta_key->commit_ts_ = std::stoull(commit_ts_str);
         return segment_meta_key;
     }
 
     // construct segment tag meta key
     if (fields[0] == "seg") {
-        const String &db_id_str = fields[1];
-        const String &table_id_str = fields[2];
-        const String &segment_id_str = fields[3];
-        const String &tag_name_str = fields[4];
+        const std::string &db_id_str = fields[1];
+        const std::string &table_id_str = fields[2];
+        const std::string &segment_id_str = fields[3];
+        const std::string &tag_name_str = fields[4];
         SegmentID segment_id = std::stoul(segment_id_str);
-        auto segment_tag_meta_key = MakeShared<SegmentTagMetaKey>(db_id_str, table_id_str, segment_id, tag_name_str);
+        auto segment_tag_meta_key = std::make_shared<SegmentTagMetaKey>(db_id_str, table_id_str, segment_id, tag_name_str);
         segment_tag_meta_key->value_ = value;
         return segment_tag_meta_key;
     }
 
     // construct blk tag meta key
     if (fields[0] == "blk") {
-        const String &db_id_str = fields[1];
-        const String &table_id_str = fields[2];
-        const String &segment_id_str = fields[3];
-        const String &block_id_str = fields[4];
-        const String &tag_name_str = fields[5];
+        const std::string &db_id_str = fields[1];
+        const std::string &table_id_str = fields[2];
+        const std::string &segment_id_str = fields[3];
+        const std::string &block_id_str = fields[4];
+        const std::string &tag_name_str = fields[5];
         SegmentID segment_id = std::stoul(segment_id_str);
         BlockID block_id = std::stoul(block_id_str);
-        auto block_tag_meta_key = MakeShared<BlockTagMetaKey>(db_id_str, table_id_str, segment_id, block_id, tag_name_str);
+        auto block_tag_meta_key = std::make_shared<BlockTagMetaKey>(db_id_str, table_id_str, segment_id, block_id, tag_name_str);
         block_tag_meta_key->value_ = value;
         return block_tag_meta_key;
     }
 
     if (fields[0] == "catalog" && fields[1] == "blk") {
-        const String &db_id_str = fields[2];
-        const String &table_id_str = fields[3];
-        const String &segment_id_str = fields[4];
-        const String &block_id_str = fields[5];
-        const String &commit_ts_str = value;
+        const std::string &db_id_str = fields[2];
+        const std::string &table_id_str = fields[3];
+        const std::string &segment_id_str = fields[4];
+        const std::string &block_id_str = fields[5];
+        const std::string &commit_ts_str = value;
         SegmentID segment_id = std::stoul(segment_id_str);
         BlockID block_id = std::stoul(block_id_str);
-        auto block_meta_key = MakeShared<BlockMetaKey>(db_id_str, table_id_str, segment_id, block_id);
+        auto block_meta_key = std::make_shared<BlockMetaKey>(db_id_str, table_id_str, segment_id, block_id);
         block_meta_key->commit_ts_ = std::stoull(commit_ts_str);
         return block_meta_key;
     }
 
     if (fields[0] == "db") {
-        const String &db_id_str = fields[1];
-        const String &tag_name_str = fields[2];
-        SharedPtr<DBTagMetaKey> db_tag_meta_key = MakeShared<DBTagMetaKey>(db_id_str, tag_name_str);
+        const std::string &db_id_str = fields[1];
+        const std::string &tag_name_str = fields[2];
+        auto db_tag_meta_key = std::make_shared<DBTagMetaKey>(db_id_str, tag_name_str);
         db_tag_meta_key->value_ = value;
         return db_tag_meta_key;
     }
 
     if (fields[0] == "tbl") {
         if (fields[1] == "col") {
-            const String &db_id_str = fields[2];
-            const String &table_id_str = fields[3];
-            const String &column_name_str = fields[4];
-            const String &commit_ts_str = fields[5];
-            SharedPtr<TableColumnMetaKey> table_column_meta_key = MakeShared<TableColumnMetaKey>(db_id_str, table_id_str, column_name_str);
+            const std::string &db_id_str = fields[2];
+            const std::string &table_id_str = fields[3];
+            const std::string &column_name_str = fields[4];
+            const std::string &commit_ts_str = fields[5];
+            auto table_column_meta_key = std::make_shared<TableColumnMetaKey>(db_id_str, table_id_str, column_name_str);
             table_column_meta_key->commit_ts_ = std::stoull(commit_ts_str);
             table_column_meta_key->value_ = value;
             return table_column_meta_key;
         }
-        const String &db_id_str = fields[1];
-        const String &table_id_str = fields[2];
-        const String &tag_name_str = fields[3];
-        SharedPtr<TableTagMetaKey> table_tag_meta_key = MakeShared<TableTagMetaKey>(db_id_str, table_id_str, tag_name_str);
+        const std::string &db_id_str = fields[1];
+        const std::string &table_id_str = fields[2];
+        const std::string &tag_name_str = fields[3];
+        auto table_tag_meta_key = std::make_shared<TableTagMetaKey>(db_id_str, table_id_str, tag_name_str);
         table_tag_meta_key->value_ = value;
         return table_tag_meta_key;
     }
 
     if (fields[0] == "catalog" && fields[1] == "idx") {
-        const String &db_id_str = fields[2];
-        const String &table_id_str = fields[3];
-        const String &index_name_str = fields[4];
-        const String &commit_ts_str = fields[5];
-        const String &index_id_str = value;
+        const std::string &db_id_str = fields[2];
+        const std::string &table_id_str = fields[3];
+        const std::string &index_name_str = fields[4];
+        const std::string &commit_ts_str = fields[5];
+        const std::string &index_id_str = value;
 
-        SharedPtr<TableIndexMetaKey> table_index_meta_key = MakeShared<TableIndexMetaKey>(db_id_str, table_id_str, index_id_str, index_name_str);
+        auto table_index_meta_key = std::make_shared<TableIndexMetaKey>(db_id_str, table_id_str, index_id_str, index_name_str);
         table_index_meta_key->commit_ts_ = std::stoull(commit_ts_str);
         return table_index_meta_key;
     }
 
     if (fields[0] == "idx") {
-        const String &db_id_str = fields[1];
-        const String &table_id_str = fields[2];
-        const String &index_id_str = fields[3];
-        const String &tag_name_str = fields[4];
-        SharedPtr<TableIndexTagMetaKey> table_index_tag_meta_key =
-            MakeShared<TableIndexTagMetaKey>(db_id_str, table_id_str, index_id_str, tag_name_str);
+        const std::string &db_id_str = fields[1];
+        const std::string &table_id_str = fields[2];
+        const std::string &index_id_str = fields[3];
+        const std::string &tag_name_str = fields[4];
+        auto table_index_tag_meta_key = std::make_shared<TableIndexTagMetaKey>(db_id_str, table_id_str, index_id_str, tag_name_str);
         table_index_tag_meta_key->value_ = value;
         return table_index_tag_meta_key;
     }
 
     if (fields[0] == "idx_seg") {
-        const String &db_id_str = fields[1];
-        const String &table_id_str = fields[2];
-        const String &index_id_str = fields[3];
+        const std::string &db_id_str = fields[1];
+        const std::string &table_id_str = fields[2];
+        const std::string &index_id_str = fields[3];
         SegmentID segment_id = std::stoull(fields[4]);
         if (fields_size == 6) {
-            const String &tag_name_str = fields[5];
-            auto segment_index_tag_meta_key = MakeShared<SegmentIndexTagMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, tag_name_str);
+            const std::string &tag_name_str = fields[5];
+            auto segment_index_tag_meta_key =
+                std::make_shared<SegmentIndexTagMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, tag_name_str);
             segment_index_tag_meta_key->value_ = value;
             return segment_index_tag_meta_key;
         }
-        auto segment_index_meta_key = MakeShared<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id);
+        auto segment_index_meta_key = std::make_shared<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id);
         segment_index_meta_key->commit_ts_ = std::stoull(value);
         return segment_index_meta_key;
     }
 
     if (fields[0] == "idx_chunk") {
-        const String &db_id_str = fields[1];
-        const String &table_id_str = fields[2];
-        const String &index_id_str = fields[3];
+        const std::string &db_id_str = fields[1];
+        const std::string &table_id_str = fields[2];
+        const std::string &index_id_str = fields[3];
         SegmentID segment_id = std::stoull(fields[4]);
         ChunkID chunk_id = std::stoull(fields[5]);
         if (fields_size == 7) {
-            const String &tag_name_str = fields[6];
+            const std::string &tag_name_str = fields[6];
             auto chunk_index_tag_meta_key =
-                MakeShared<ChunkIndexTagMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, chunk_id, tag_name_str);
+                std::make_shared<ChunkIndexTagMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, chunk_id, tag_name_str);
             chunk_index_tag_meta_key->value_ = value;
             return chunk_index_tag_meta_key;
         }
-        auto chunk_index_meta_key = MakeShared<ChunkIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, chunk_id);
+        auto chunk_index_meta_key = std::make_shared<ChunkIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, chunk_id);
         chunk_index_meta_key->commit_ts_ = std::stoull(value);
         return chunk_index_meta_key;
     }
 
     if (fields[0] == "pm") {
         if (fields[1] == "object") {
-            const String &path_key = fields[2];
-            SharedPtr<PmObjectMetaKey> pm_path_meta_key = MakeShared<PmObjectMetaKey>(path_key);
+            const std::string &path_key = fields[2];
+            std::shared_ptr<PmObjectMetaKey> pm_path_meta_key = std::make_shared<PmObjectMetaKey>(path_key);
             pm_path_meta_key->value_ = value; //
             return pm_path_meta_key;
         }
         if (fields[1] == "object_stat") {
-            const String &object_key = fields[2];
-            SharedPtr<PmStatMetaKey> pm_object_meta_key = MakeShared<PmStatMetaKey>(object_key);
+            const std::string &object_key = fields[2];
+            auto pm_object_meta_key = std::make_shared<PmStatMetaKey>(object_key);
             pm_object_meta_key->value_ = value;
             return pm_object_meta_key;
         }
@@ -466,15 +472,15 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
     }
 
     if (fields[0] == "drop") {
-        const String &scope = fields[1];
-        const String &object_key = fields[2];
-        SharedPtr<DropMetaKey> drop_meta_key = MakeShared<DropMetaKey>(scope, object_key);
+        const std::string &scope = fields[1];
+        const std::string &object_key = fields[2];
+        auto drop_meta_key = std::make_shared<DropMetaKey>(scope, object_key);
         drop_meta_key->value_ = value;
         return drop_meta_key;
     }
 
-    const String &tag_name_str = fields[0];
-    SharedPtr<SystemTagMetaKey> system_tag_meta_key = MakeShared<SystemTagMetaKey>(tag_name_str);
+    const std::string &tag_name_str = fields[0];
+    auto system_tag_meta_key = std::make_shared<SystemTagMetaKey>(tag_name_str);
     system_tag_meta_key->value_ = value;
     return system_tag_meta_key;
 }
