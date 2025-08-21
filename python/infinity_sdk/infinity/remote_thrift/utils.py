@@ -425,6 +425,48 @@ def get_search_optional_filter_from_opt_params(opt_params: dict):
     return optional_filter
 
 
+def get_remote_function_expr_from_fde(fde_obj) -> ttypes.FunctionExpr:
+    """Create a FunctionExpr for FDE function call."""
+    from infinity.common import FDE
+
+    if not isinstance(fde_obj, FDE):
+        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Expected FDE object, got {type(fde_obj)}")
+
+    # Create tensor data constant expression (2D array)
+    # Convert 2D array to flat list for tensor representation
+    flat_tensor_data = []
+    for row in fde_obj.tensor_data:
+        flat_tensor_data.extend(row)
+
+    tensor_const_expr = ttypes.ConstantExpr(
+        literal_type=ttypes.LiteralType.DoubleArray,
+        f64_array_value=flat_tensor_data
+    )
+
+    # Create target dimension constant expression
+    dim_const_expr = ttypes.ConstantExpr(
+        literal_type=ttypes.LiteralType.Int64,
+        i64_value=fde_obj.target_dimension
+    )
+
+    # Create parsed expressions for arguments
+    tensor_parsed_expr = ttypes.ParsedExpr(
+        type=ttypes.ParsedExprType(constant_expr=tensor_const_expr)
+    )
+
+    dim_parsed_expr = ttypes.ParsedExpr(
+        type=ttypes.ParsedExprType(constant_expr=dim_const_expr)
+    )
+
+    # Create FDE function expression
+    function_expr = ttypes.FunctionExpr(
+        function_name="fde",
+        arguments=[tensor_parsed_expr, dim_parsed_expr]
+    )
+
+    return function_expr
+
+
 def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
     # convert numpy types
     if isinstance(value, np.integer):
