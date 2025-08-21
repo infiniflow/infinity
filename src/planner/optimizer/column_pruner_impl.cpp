@@ -17,7 +17,6 @@ module;
 module infinity_core:column_pruner.impl;
 
 import :column_pruner;
-
 import :logical_aggregate;
 import :logical_project;
 import :logical_table_scan;
@@ -95,7 +94,7 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
                     // in this case we only need to project a single constant
                     // TODO: EXISTS is not supported yet
                     //                    ValueExpression value_expr(Value::MakeInt(0));
-                    //                    proj.expressions_.push_back(MakeShared<ValueExpression>(value_expr));
+                    //                    proj.expressions_.push_back(std::make_shared<ValueExpression>(value_expr));
                 }
             }
             RemoveUnusedColumns remove;
@@ -118,7 +117,7 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             if (all_referenced_) {
                 return;
             }
-            Vector<SizeT> project_indices = ClearUnusedBaseTableColumns(scan.base_table_ref_->column_ids_, scan.TableIndex());
+            std::vector<size_t> project_indices = ClearUnusedBaseTableColumns(scan.base_table_ref_->column_ids_, scan.TableIndex());
 
             // TODO: Scan does not currently support Filter Pushdown
             // remove the original columns of scan with the filtered columns
@@ -135,7 +134,7 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             if (all_referenced_) {
                 return;
             }
-            Vector<SizeT> project_indices = ClearUnusedBaseTableColumns(scan.base_table_ref_->column_ids_, scan.TableIndex());
+            std::vector<size_t> project_indices = ClearUnusedBaseTableColumns(scan.base_table_ref_->column_ids_, scan.TableIndex());
             scan.base_table_ref_->RetainColumnByIndices(project_indices);
             return;
         }
@@ -147,7 +146,7 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             if (all_referenced_) {
                 return;
             }
-            Vector<SizeT> project_indices = ClearUnusedBaseTableColumns(match_base.base_table_ref_->column_ids_, match_base.TableIndex());
+            std::vector<size_t> project_indices = ClearUnusedBaseTableColumns(match_base.base_table_ref_->column_ids_, match_base.TableIndex());
             match_base.base_table_ref_->RetainColumnByIndices(project_indices);
             return;
         }
@@ -159,7 +158,7 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
         case LogicalNodeType::kIndexScan: {
             // do not visit node expression
             auto &scan = op.Cast<LogicalIndexScan>();
-            Vector<SizeT> project_indices = ClearUnusedBaseTableColumns(scan.base_table_ref_->column_ids_, scan.TableIndex());
+            std::vector<size_t> project_indices = ClearUnusedBaseTableColumns(scan.base_table_ref_->column_ids_, scan.TableIndex());
             scan.base_table_ref_->RetainColumnByIndices(project_indices);
             return;
         }
@@ -180,14 +179,14 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
     LogicalNodeVisitor::VisitNodeChildren(op);
 }
 
-SharedPtr<BaseExpression> RemoveUnusedColumns::VisitReplace(const SharedPtr<ColumnExpression> &expression) {
+std::shared_ptr<BaseExpression> RemoveUnusedColumns::VisitReplace(const std::shared_ptr<ColumnExpression> &expression) {
     column_references_.insert(expression->binding());
     return expression;
 }
 
 template <class T>
-Vector<T> RemoveUnusedColumns::ClearUnusedExpressions(const Vector<T> &list, idx_t table_idx) {
-    Vector<T> items;
+std::vector<T> RemoveUnusedColumns::ClearUnusedExpressions(const std::vector<T> &list, idx_t table_idx) {
+    std::vector<T> items;
     items.reserve(list.size());
     for (idx_t col_idx = 0; col_idx < list.size(); col_idx++) {
         auto current_binding = ColumnBinding(table_idx, col_idx);
@@ -200,8 +199,8 @@ Vector<T> RemoveUnusedColumns::ClearUnusedExpressions(const Vector<T> &list, idx
 }
 
 template <class T>
-Vector<T> RemoveUnusedColumns::ClearUnusedBaseTableColumns(const Vector<T> &col_list, const idx_t table_idx) {
-    Vector<T> items;
+std::vector<T> RemoveUnusedColumns::ClearUnusedBaseTableColumns(const std::vector<T> &col_list, const idx_t table_idx) {
+    std::vector<T> items;
     items.reserve(col_list.size());
     for (idx_t idx = 0; idx < col_list.size(); ++idx) {
         if (const auto current_binding = ColumnBinding(table_idx, col_list[idx]); column_references_.contains(current_binding)) {

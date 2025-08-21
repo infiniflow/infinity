@@ -12,26 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include <cassert>
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
+#include "unit_test/gtest_expand.h"
 #include <cassert>
-#include "gtest/gtest.h"
 
 module infinity_core:ut.test_linscan;
 
 import :ut.base_test;
-import :stl;
 import :linscan_alg;
 import :sparse_util;
-import :third_party;
+import third_party;
 import :sparse_test_util;
-#endif
 
 using namespace infinity;
 

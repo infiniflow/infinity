@@ -14,12 +14,11 @@
 
 #pragma once
 
-#include <concepts>
-#include <cstdint>
-#include <cstring>
-#include <string>
-#include <type_traits>
-#include <vector>
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 namespace infinity {
 // using String = std::string;
@@ -70,13 +69,13 @@ inline std::tuple<> ReadBufAdv<std::tuple<>>(const char *&buf) {
 template <>
 inline std::string ReadBufAdv<std::string>(const char *&buf) {
     int32_t size = ReadBufAdv<int32_t>(buf);
-    
+
     // Add bounds checking to prevent heap buffer overflow
     if (size < 0 || size > 1024 * 1024 * 1024) { // Max 1GB string size
         // Return empty string for corrupted data
         return std::string();
     }
-    
+
     std::string str(buf, size);
     buf += size;
     return str;

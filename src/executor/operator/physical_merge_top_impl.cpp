@@ -12,17 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <memory>
-#include <numeric>
-#include <iterator>
-
 module infinity_core:physical_merge_top.impl;
 
 import :physical_merge_top;
-
-import :stl;
 import :query_context;
 import :operator_state;
 import :base_expression;
@@ -35,6 +27,8 @@ import :column_vector;
 import :default_values;
 import :physical_top;
 import :logger;
+
+import std;
 
 namespace infinity {
 
@@ -58,13 +52,12 @@ struct VectorBlockRawIndex1 {
     explicit operator bool() const { return left_row_cnt_ > 0; }
 };
 
-void PhysicalMergeTop::Init(QueryContext* query_context) {
+void PhysicalMergeTop::Init(QueryContext *query_context) {
     left()->Init(query_context);
     // Initialize sort parameters
     sort_expr_count_ = order_by_types_.size();
     if (sort_expr_count_ != sort_expressions_.size()) {
-        String error_message = "order_by_types_.size() != sort_expressions_.size()";
-        UnrecoverableError(error_message);
+        UnrecoverableError("order_by_types_.size() != sort_expressions_.size()");
     }
     // copy compare function from PhysicalTop
     prefer_left_function_ = (reinterpret_cast<PhysicalTop *>(left()))->GetInnerCompareFunction();
@@ -73,8 +66,7 @@ void PhysicalMergeTop::Init(QueryContext* query_context) {
 bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *operator_state) {
     auto &output_data_block_array = operator_state->data_block_array_;
     if (!output_data_block_array.empty()) {
-        String error_message = "output data_block_array_ is not empty";
-        UnrecoverableError(error_message);
+        UnrecoverableError("output data_block_array_ is not empty");
     }
     auto merge_top_op_state = static_cast<MergeTopOperatorState *>(operator_state);
     auto &middle_data_block_array = merge_top_op_state->middle_sorted_data_blocks_;
@@ -124,7 +116,7 @@ bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *operator_state) {
             }
         };
         // 1. get merged top ids
-        auto result_ids = MakeUniqueForOverwrite<VectorBlockRawIndex1[]>(result_cnt);
+        auto result_ids = std::make_unique_for_overwrite<VectorBlockRawIndex1[]>(result_cnt);
         {
             VectorBlockRawIndex1 middle_id(middle_result_count, 0, 0), input_id(input_result_count, middle_block_cnt, 0);
             for (u32 total_i = 0; total_i < result_cnt; ++total_i) {

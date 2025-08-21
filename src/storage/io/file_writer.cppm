@@ -12,25 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:file_writer;
 
-import :stl;
 import :local_file_handle;
 
 namespace infinity {
 
 export class FileWriter {
 public:
-    explicit FileWriter(const String &path, SizeT buffer_size);
+    explicit FileWriter(const std::string &path, size_t buffer_size);
 
-    String path_{};
-    UniquePtr<char_t[]> data_{};
-    SizeT offset_{};
-    SizeT total_written_{};
-    SizeT buffer_size_{};
-    UniquePtr<LocalFileHandle> file_handle_{};
+    std::string path_{};
+    std::unique_ptr<char[]> data_{};
+    size_t offset_{};
+    size_t total_written_{};
+    size_t buffer_size_{};
+    std::unique_ptr<LocalFileHandle> file_handle_{};
 
 public:
     void WriteByte(const u8 b);
@@ -45,7 +42,7 @@ public:
 
     void WriteVLong(const i64 i);
 
-    void Write(const char_t *buffer, SizeT bytes_count);
+    void Write(const char *buffer, size_t bytes_count);
 
     void Sync();
 
@@ -53,7 +50,7 @@ public:
 
     i64 GetFileSize();
 
-    SizeT TotalWrittenBytes() const;
+    size_t TotalWrittenBytes() const;
 };
 
 } // namespace infinity

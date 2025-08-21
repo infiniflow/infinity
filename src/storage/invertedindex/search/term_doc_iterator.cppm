@@ -12,28 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:term_doc_iterator;
-
-import :stl;
 
 import :posting_iterator;
 import :index_defines;
 import :term_meta;
 import :doc_iterator;
-import internal_types;
 import :doc_iterator;
 import :column_length_io;
-import :third_party;
 import :parse_fulltext_options;
 import :blockmax_leaf_iterator;
+
+import third_party;
+
+import internal_types;
 
 namespace infinity {
 
 export class TermDocIterator final : public BlockMaxLeafIterator {
 public:
-    TermDocIterator(UniquePtr<PostingIterator> &&iter, u64 column_id, float weight, FulltextSimilarity ft_similarity);
+    TermDocIterator(std::unique_ptr<PostingIterator> &&iter, u64 column_id, float weight, FulltextSimilarity ft_similarity);
 
     ~TermDocIterator() override;
 
@@ -47,7 +45,7 @@ public:
 
     u64 GetTermFreq() const { return term_freq_; }
 
-    void InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader, float delta, float k1, float b) override;
+    void InitBM25Info(std::unique_ptr<FullTextColumnLengthReader> &&column_length_reader, float delta, float k1, float b) override;
     RowID BlockMinPossibleDocID() const override { return iter_->BlockLowestPossibleDocID(); }
     RowID BlockLastDocID() const override { return iter_->BlockLastDocID(); }
     float BlockMaxBM25Score() override;
@@ -61,7 +59,7 @@ public:
     // Overriden methods
     DocIteratorType GetType() const override { return DocIteratorType::kTermDocIterator; }
 
-    String Name() const override { return "TermDocIterator"; }
+    std::string Name() const override { return "TermDocIterator"; }
 
     bool Next(RowID doc_id) override;
 
@@ -85,22 +83,22 @@ public:
 
     u32 MatchCount() const override { return DocID() != INVALID_ROWID; }
 
-    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
+    void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override;
 
-    [[nodiscard]] Tuple<float, float, float> Get_f1_f2_bm25_common_score() const { return {f1, f2, bm25_common_score_}; }
+    [[nodiscard]] std::tuple<float, float, float> Get_f1_f2_bm25_common_score() const { return {f1, f2, bm25_common_score_}; }
 
     void BatchDecodeTo(RowID buffer_start_doc_id, RowID buffer_end_doc_id, u32 *tf_ptr, u32 *doc_len_ptr);
 
     // debug info
-    const String *term_ptr_ = nullptr;
-    const String *column_name_ptr_ = nullptr;
+    const std::string *term_ptr_ = nullptr;
+    const std::string *column_name_ptr_ = nullptr;
 
 private:
     u32 doc_freq_ = 0;
     u64 total_df_ = 0;
 
     u64 column_id_;
-    UniquePtr<PostingIterator> iter_;
+    std::unique_ptr<PostingIterator> iter_;
     float weight_ = 1.0f; // changed in MultiplyWeight()
     u64 term_freq_;
     const FulltextSimilarity ft_similarity_ = FulltextSimilarity::kBM25;
@@ -113,7 +111,7 @@ private:
     float f3 = 0.0f;
     float f4 = 0.0f;
     float avg_column_len_ = 0;
-    UniquePtr<FullTextColumnLengthReader> column_length_reader_ = nullptr;
+    std::unique_ptr<FullTextColumnLengthReader> column_length_reader_ = nullptr;
     float bm25_common_score_ = 0; // include: weight * smooth_idf * (k1 + 1.0F)
     float block_max_bm25_score_cache_ = 0.0f;
     RowID block_max_bm25_score_cache_end_id_ = INVALID_ROWID;

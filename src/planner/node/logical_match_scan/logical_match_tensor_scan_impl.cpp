@@ -12,39 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-
 module infinity_core:logical_match_tensor_scan.impl;
 
 import :logical_match_tensor_scan;
-
-import :stl;
 import :base_table_ref;
 import :column_binding;
 import :logical_node_type;
 import :match_tensor_expression;
 import :default_values;
-import logical_type;
-import internal_types;
-import :third_party;
 import :explain_logical_plan;
-import search_options;
 import :infinity_exception;
 import :status;
-import :logger;
+
+import std;
+import third_party;
+
+import search_options;
+import logical_type;
+import internal_types;
 
 namespace infinity {
 
 void LogicalMatchTensorScan::InitExtraOptions() {
-    static const std::set<String> valid_options = {"topn",
-                                                   "threshold",
-                                                   "emvb_centroid_nprobe",
-                                                   "emvb_threshold_first",
-                                                   "emvb_n_doc_to_score",
-                                                   "emvb_n_doc_out_second_stage",
-                                                   "emvb_threshold_final"};
+    static const std::set<std::string> valid_options = {"topn",
+                                                        "threshold",
+                                                        "emvb_centroid_nprobe",
+                                                        "emvb_threshold_first",
+                                                        "emvb_n_doc_to_score",
+                                                        "emvb_n_doc_out_second_stage",
+                                                        "emvb_threshold_final"};
     auto match_tensor_expr = static_cast<MatchTensorExpression *>(query_expression_.get());
     SearchOptions options(match_tensor_expr->options_text_);
     for (const auto &[x, _] : options.options_) {
@@ -67,7 +63,7 @@ void LogicalMatchTensorScan::InitExtraOptions() {
     } else {
         topn_ = DEFAULT_MATCH_TENSOR_OPTION_TOP_N;
     }
-    index_options_ = MakeUnique<MatchTensorScanIndexOptions>(topn_);
+    index_options_ = std::make_unique<MatchTensorScanIndexOptions>(topn_);
     if (const auto emvb_centroid_nprobe_it = options.options_.find("emvb_centroid_nprobe"); emvb_centroid_nprobe_it != options.options_.end()) {
         const auto emvb_centroid_nprobe_candidate = std::stoi(emvb_centroid_nprobe_it->second);
         if (emvb_centroid_nprobe_candidate <= 0) {

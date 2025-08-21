@@ -12,22 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.background_process;
 
 import :ut.base_test;
 import :infinity_context;
 import :infinity_exception;
-import :stl;
-import :third_party;
+import third_party;
 import :logger;
 import :table_def;
 import :value;
@@ -36,7 +30,6 @@ import :default_values;
 import :status;
 import :background_process;
 import :bg_task;
-#endif
 
 import global_resource_usage;
 

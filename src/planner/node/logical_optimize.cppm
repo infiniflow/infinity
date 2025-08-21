@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:logical_optimize;
 
-import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
+
 import data_type;
 import internal_types;
 import optimize_statement;
@@ -29,31 +27,35 @@ namespace infinity {
 
 export class LogicalOptimize : public LogicalNode {
 public:
-    explicit LogicalOptimize(u64 node_id, String schema_name, String table_name, String index_name, Vector<UniquePtr<InitParameter>> opt_params)
+    explicit LogicalOptimize(u64 node_id,
+                             std::string schema_name,
+                             std::string table_name,
+                             std::string index_name,
+                             std::vector<std::unique_ptr<InitParameter>> opt_params)
         : LogicalNode(node_id, LogicalNodeType::kOptimize), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)),
           index_name_(std::move(index_name)), opt_params_(std::move(opt_params)) {}
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalOptimize"; }
+    inline std::string name() final { return "LogicalOptimize"; }
 
-    [[nodiscard]] inline const String &schema_name() const { return schema_name_; }
+    [[nodiscard]] inline const std::string &schema_name() const { return schema_name_; }
 
-    [[nodiscard]] inline const String &object_name() const { return table_name_; }
+    [[nodiscard]] inline const std::string &object_name() const { return table_name_; }
 
 private:
-    String schema_name_;
-    String table_name_;
+    std::string schema_name_;
+    std::string table_name_;
 
 public:
-    String index_name_;
-    Vector<UniquePtr<InitParameter>> opt_params_;
+    std::string index_name_;
+    std::vector<std::unique_ptr<InitParameter>> opt_params_;
 };
 
 } // namespace infinity

@@ -12,17 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 module infinity_core:table_snapshot.impl;
 
 import :snapshot;
-
-import :stl;
 import :new_txn;
 import :new_txn_manager;
 import :query_context;
 import :status;
-import :third_party;
 import :config;
 import :infinity_exception;
 import :snapshot_info;
@@ -31,23 +27,25 @@ import :table_meeta;
 import :txn_state;
 import :logger;
 
+import third_party;
+
 namespace infinity {
 
-Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &snapshot_name, const String &table_name) {
+Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const std::string &snapshot_name, const std::string &table_name) {
     // auto *txn_ptr = query_context->GetNewTxn();
-    // const String &db_name = query_context->schema_name();
+    // const std::string &db_name = query_context->schema_name();
 
     // // Start timing for overall snapshot creation
     // auto snapshot_creation_start = std::chrono::high_resolution_clock::now();
 
-    // SharedPtr<TableSnapshotInfo> table_snapshot;
+    // std::shared_ptr<TableSnapshotInfo> table_snapshot;
     // Status status;
     // std::tie(table_snapshot, status) = txn_ptr->GetTableSnapshotInfo(db_name, table_name);
     // if (!status.ok()) {
     //     RecoverableError(status);
     // }
     // table_snapshot->snapshot_name_ = snapshot_name;
-    // String snapshot_dir = query_context->global_config()->SnapshotDir();
+    // std::string snapshot_dir = query_context->global_config()->SnapshotDir();
     // status = table_snapshot->Serialize(snapshot_dir, txn_ptr->TxnID());
     // if (!status.ok()) {
     //     return status;
@@ -61,15 +59,15 @@ Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &
     return Status::OK();
 }
 
-Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String &snapshot_name) {
+Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const std::string &snapshot_name) {
     auto *txn_ptr = query_context->GetNewTxn();
     // might need to change this
-    const String &db_name = query_context->schema_name();
+    const std::string &db_name = query_context->schema_name();
 
     // Start timing for overall snapshot restoration
     // auto snapshot_restoration_start = std::chrono::high_resolution_clock::now();
 
-    Optional<DBMeeta> db_meta;
+    std::optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = txn_ptr->GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
@@ -79,9 +77,9 @@ Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String 
     if (!db_meta.has_value()) {
         return Status::NotFound("DB not found");
     }
-    String snapshot_dir = query_context->global_config()->SnapshotDir();
+    std::string snapshot_dir = query_context->global_config()->SnapshotDir();
 
-    SharedPtr<TableSnapshotInfo> table_snapshot;
+    std::shared_ptr<TableSnapshotInfo> table_snapshot;
     std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
     if (!status.ok()) {
         return status;
@@ -100,8 +98,8 @@ Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String 
 
     // End timing for overall snapshot restoration
     // auto snapshot_restoration_end = std::chrono::high_resolution_clock::now();
-    // auto snapshot_restoration_duration = std::chrono::duration_cast<std::chrono::milliseconds>(snapshot_restoration_end - snapshot_restoration_start);
-    // LOG_INFO(fmt::format("Total snapshot restoration took {} ms", snapshot_restoration_duration.count()));
+    // auto snapshot_restoration_duration = std::chrono::duration_cast<std::chrono::milliseconds>(snapshot_restoration_end -
+    // snapshot_restoration_start); LOG_INFO(fmt::format("Total snapshot restoration took {} ms", snapshot_restoration_duration.count()));
 
     // print txn state
     // LOG_INFO(fmt::format("txn state: {}", TxnState2Str(txn_ptr->GetTxnState())));

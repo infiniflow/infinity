@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:utility;
 
-import :stl;
+import :infinity_type;
+
+import std;
+import std.compat;
 
 export namespace infinity::Utility {
 
-SizeT NextPowerOfTwo(SizeT input);
-String FormatByteSize(u64 byte_size);
-String FormatTimeInfo(u64 seconds);
+size_t NextPowerOfTwo(size_t input);
+std::string FormatByteSize(u64 byte_size);
+std::string FormatTimeInfo(u64 seconds);
 
 } // namespace infinity::Utility
 
@@ -35,20 +36,51 @@ enum class IdentifierValidationStatus {
     kInvalidName,
 };
 
-IdentifierValidationStatus IdentifierValidation(const String &identifier);
+IdentifierValidationStatus IdentifierValidation(const std::string &identifier);
 
-bool ParseIPPort(const String &str, String &ip, i64 &port);
+bool ParseIPPort(const std::string &str, std::string &ip, i64 &port);
 
-String StringTransform(const String &source, const String &from, const String &to);
+std::string StringTransform(const std::string &source, const std::string &from, const std::string &to);
 
-String CalcMD5(const char *input_str, SizeT length);
+std::string CalcMD5(const char *input_str, size_t length);
 
-String CalcMD5(const String &filename);
+std::string CalcMD5(const std::string &filename);
 
-Tuple<u64, bool> ExtractU64FromStringSuffix(const String &src, SizeT offset);
+std::tuple<u64, bool> ExtractU64FromStringSuffix(const std::string &src, size_t offset);
 
-Vector<String> Partition(const String &text, char delimiter);
+std::vector<std::string> Partition(const std::string &text, char delimiter);
 
-String Concat(const Vector<String> &v, char delimiter);
+std::string Concat(const std::vector<std::string> &v, char delimiter);
+
+void ToLower(std::string &str) {
+    std::ranges::transform(str, str.begin(), [](auto c) { return std::tolower(c); });
+}
+
+void ToUpper(std::string &str) {
+    std::ranges::transform(str, str.begin(), [](auto c) { return std::toupper(c); });
+}
+
+std::vector<std::string> SplitStrByComma(std::string str);
+
+template <typename T1, typename T2>
+struct CompareByFirst {
+    using P = std::pair<T1, T2>;
+
+    bool operator()(const P &lhs, const P &rhs) const { return lhs.first < rhs.first; }
+};
+
+template <typename T1, typename T2>
+struct CompareByFirstReverse {
+    using P = std::pair<T1, T2>;
+
+    bool operator()(const P &lhs, const P &rhs) const { return lhs.first > rhs.first; }
+};
+
+std::string TrimPath(const std::string &path) {
+    const auto pos = path.find("/src/");
+    if (pos == std::string::npos)
+        return path;
+    return path.substr(pos + 1);
+}
 
 } // namespace infinity

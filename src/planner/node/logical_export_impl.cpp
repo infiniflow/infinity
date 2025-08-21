@@ -12,17 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-
 module infinity_core:logical_export.impl;
 
 import :logical_export;
-
-import :stl;
 import :column_binding;
 import :block_index;
+
+import std;
+
 import internal_types;
 import statement_common;
 import data_type;
@@ -30,39 +27,41 @@ import data_type;
 namespace infinity {
 
 LogicalExport::LogicalExport(u64 node_id,
-                             const SharedPtr<TableInfo> &table_info,
-                             String schema_name,
-                             String table_name,
-                             String file_path,
+                             const std::shared_ptr<TableInfo> &table_info,
+                             std::string schema_name,
+                             std::string table_name,
+                             std::string file_path,
                              bool header,
                              char delimiter,
                              CopyFileType type,
-                             SizeT offset,
-                             SizeT limit,
-                             SizeT row_limit,
-                             Vector<u64> column_idx_array,
-                             SharedPtr<BlockIndex> block_index)
+                             size_t offset,
+                             size_t limit,
+                             size_t row_limit,
+                             std::vector<u64> column_idx_array,
+                             std::shared_ptr<BlockIndex> block_index)
     : LogicalNode(node_id, LogicalNodeType::kExport), table_info_(table_info), schema_name_(std::move(schema_name)),
       table_name_(std::move(table_name)), file_path_(std::move(file_path)), header_(header), delimiter_(delimiter), file_type_(type), offset_(offset),
       limit_(limit), row_limit_(row_limit), column_idx_array_(std::move(column_idx_array)), block_index_(std::move(block_index)) {}
 
 LogicalExport::~LogicalExport() = default;
 
-Vector<ColumnBinding> LogicalExport::GetColumnBindings() const { return {}; }
+std::vector<ColumnBinding> LogicalExport::GetColumnBindings() const { return {}; }
 
-SharedPtr<Vector<String>> LogicalExport::GetOutputNames() const { return MakeShared<Vector<String>>(); }
+std::shared_ptr<std::vector<std::string>> LogicalExport::GetOutputNames() const { return std::make_shared<std::vector<std::string>>(); }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalExport::GetOutputTypes() const { return MakeShared<Vector<SharedPtr<DataType>>>(); }
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalExport::GetOutputTypes() const {
+    return std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+}
 
-String LogicalExport::ToString(i64 &space) const {
+std::string LogicalExport::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
 
-    ss << String(space, ' ') << "-> "
+    ss << std::string(space, ' ') << "-> "
        << "Export from: " << file_path_;
 
     switch (file_type_) {

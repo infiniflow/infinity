@@ -12,17 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:logical_insert;
 
-import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
-
 import :base_expression;
 import :meta_info;
+
 import internal_types;
 import data_type;
 
@@ -30,28 +27,31 @@ namespace infinity {
 
 export class LogicalInsert : public LogicalNode {
 public:
-    explicit inline LogicalInsert(u64 node_id, SharedPtr<TableInfo> table_info, u64 table_index, Vector<Vector<SharedPtr<BaseExpression>>> value_list)
+    explicit inline LogicalInsert(u64 node_id,
+                                  std::shared_ptr<TableInfo> table_info,
+                                  u64 table_index,
+                                  std::vector<std::vector<std::shared_ptr<BaseExpression>>> value_list)
         : LogicalNode(node_id, LogicalNodeType::kInsert), table_info_(std::move(table_info)), value_list_(std::move(value_list)),
           table_index_(table_index) {};
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalInsert"; }
+    inline std::string name() final { return "LogicalInsert"; }
 
-    inline void set_value_list(const Vector<Vector<SharedPtr<BaseExpression>>> &value_list) { value_list_ = value_list; }
+    inline void set_value_list(const std::vector<std::vector<std::shared_ptr<BaseExpression>>> &value_list) { value_list_ = value_list; }
 
-    inline SharedPtr<TableInfo>& table_info() { return table_info_; }
-    inline const SharedPtr<TableInfo>& table_info() const { return table_info_; }
+    inline std::shared_ptr<TableInfo> &table_info() { return table_info_; }
+    inline const std::shared_ptr<TableInfo> &table_info() const { return table_info_; }
 
-    inline Vector<Vector<SharedPtr<BaseExpression>>> &value_list() { return value_list_; }
+    inline std::vector<std::vector<std::shared_ptr<BaseExpression>>> &value_list() { return value_list_; }
 
-    [[nodiscard]] inline const Vector<Vector<SharedPtr<BaseExpression>>> &value_list() const { return value_list_; }
+    [[nodiscard]] inline const std::vector<std::vector<std::shared_ptr<BaseExpression>>> &value_list() const { return value_list_; }
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
 
@@ -73,8 +73,8 @@ public:
     }
 
 private:
-    SharedPtr<TableInfo> table_info_{};
-    Vector<Vector<SharedPtr<BaseExpression>>> value_list_{};
+    std::shared_ptr<TableInfo> table_info_{};
+    std::vector<std::vector<std::shared_ptr<BaseExpression>>> value_list_{};
     u64 table_index_{};
 };
 

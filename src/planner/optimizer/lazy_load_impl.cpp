@@ -12,14 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <vector>
 module infinity_core:lazy_load.impl;
 
 import :lazy_load;
-
-import :stl;
 import :logical_node;
 import :column_binding;
 import :base_expression;
@@ -37,11 +32,13 @@ import :base_table_ref;
 import :load_meta;
 import :special_function;
 import :infinity_exception;
-import :third_party;
+
+import std;
+import third_party;
 
 namespace infinity {
 
-Optional<BaseTableRef *> GetScanTableRef(LogicalNode &op) {
+std::optional<BaseTableRef *> GetScanTableRef(LogicalNode &op) {
     switch (op.operator_type()) {
         case LogicalNodeType::kTableScan: {
             auto &table_scan = static_cast<LogicalTableScan &>(op);
@@ -66,7 +63,7 @@ Optional<BaseTableRef *> GetScanTableRef(LogicalNode &op) {
             return match.base_table_ref_.get();
         }
         default: {
-            return None;
+            return std::nullopt;
         }
     }
 }
@@ -98,11 +95,11 @@ void RefencecColumnCollection::VisitNode(LogicalNode &op) {
         }
     }
 
-    op.set_load_metas(MakeShared<Vector<LoadMeta>>(std::move(load_metas_)));
+    op.set_load_metas(std::make_shared<std::vector<LoadMeta>>(std::move(load_metas_)));
     load_metas_.clear();
 }
 
-SharedPtr<BaseExpression> RefencecColumnCollection::VisitReplace(const SharedPtr<ColumnExpression> &expression) {
+std::shared_ptr<BaseExpression> RefencecColumnCollection::VisitReplace(const std::shared_ptr<ColumnExpression> &expression) {
     auto special_type = expression->special();
     if (special_type.has_value()) {
         switch (*special_type) {
@@ -122,7 +119,7 @@ SharedPtr<BaseExpression> RefencecColumnCollection::VisitReplace(const SharedPtr
     }
 
     for (auto &[_, scan_bindings] : scan_bindings_) {
-        for (SizeT idx = 0; idx < scan_bindings.size(); ++idx) {
+        for (size_t idx = 0; idx < scan_bindings.size(); ++idx) {
             if (auto scan_binding = scan_bindings[idx]; expression->binding() == scan_binding) {
                 if (unloaded_bindings_.contains(scan_binding)) {
                     auto types = column_types_[scan_binding.table_idx].get();
@@ -137,10 +134,10 @@ SharedPtr<BaseExpression> RefencecColumnCollection::VisitReplace(const SharedPtr
     return expression;
 }
 
-Vector<SizeT> LoadedColumn(const Vector<LoadMeta> *load_metas, BaseTableRef *table_ref) {
-    Vector<SizeT> column_ids;
+std::vector<size_t> LoadedColumn(const std::vector<LoadMeta> *load_metas, BaseTableRef *table_ref) {
+    std::vector<size_t> column_ids;
 
-    for (SizeT i = 0; i < load_metas->size(); i++) {
+    for (size_t i = 0; i < load_metas->size(); i++) {
         auto binding = (*load_metas)[i].binding_;
 
         if (binding.table_idx == table_ref->table_index_) {
@@ -150,20 +147,22 @@ Vector<SizeT> LoadedColumn(const Vector<LoadMeta> *load_metas, BaseTableRef *tab
     return column_ids;
 }
 
-SharedPtr<BaseExpression> CleanScan::VisitReplace(const SharedPtr<ColumnExpression> &expression) { return expression; }
+std::shared_ptr<BaseExpression> CleanScan::VisitReplace(const std::shared_ptr<ColumnExpression> &expression) { return expression; }
 
 template <typename LogicalNodeSubType>
-inline void CleanScanVisitBaseTableRefNode(LogicalNode &op, SharedPtr<Vector<LoadMeta>> &last_op_load_metas_, Vector<SizeT> &scan_table_indexes_) {
+inline void CleanScanVisitBaseTableRefNode(LogicalNode &op,
+                                           std::shared_ptr<std::vector<LoadMeta>> &last_op_load_metas_,
+                                           std::vector<size_t> &scan_table_indexes_) {
     auto &node = static_cast<LogicalNodeSubType &>(op);
     // node base table ref has two parts:
     // 1. the columns used by next operator
     // 2. the columns used by filter expression in node
     auto &node_load_metas = *node.load_metas();
-    Vector<LoadMeta> node_columns = std::move(node_load_metas);
+    std::vector<LoadMeta> node_columns = std::move(node_load_metas);
     node_load_metas.clear(); // need to set load_metas of node to empty vector
     auto &last_op_load_metas = *last_op_load_metas_;
     node_columns.insert(node_columns.end(), last_op_load_metas.begin(), last_op_load_metas.end());
-    Vector<SizeT> project_idxs = LoadedColumn(&node_columns, node.base_table_ref_.get());
+    std::vector<size_t> project_idxs = LoadedColumn(&node_columns, node.base_table_ref_.get());
     scan_table_indexes_.push_back(node.base_table_ref_->table_index_);
     node.base_table_ref_->RetainColumnByIndices(project_idxs);
 }
@@ -172,7 +171,7 @@ void CleanScan::VisitNode(LogicalNode &op) {
     switch (op.operator_type()) {
         case LogicalNodeType::kTableScan: {
             auto &table_scan = static_cast<LogicalTableScan &>(op);
-            Vector<SizeT> project_idxs = LoadedColumn(last_op_load_metas_.get(), table_scan.base_table_ref_.get());
+            std::vector<size_t> project_idxs = LoadedColumn(last_op_load_metas_.get(), table_scan.base_table_ref_.get());
 
             scan_table_indexes_.push_back(table_scan.base_table_ref_->table_index_);
             table_scan.base_table_ref_->RetainColumnByIndices(project_idxs);
@@ -181,7 +180,7 @@ void CleanScan::VisitNode(LogicalNode &op) {
         }
         case LogicalNodeType::kIndexScan: {
             auto &index_scan = static_cast<LogicalIndexScan &>(op);
-            Vector<SizeT> project_idxs; // empty output
+            std::vector<size_t> project_idxs; // empty output
             index_scan.base_table_ref_->RetainColumnByIndices(project_idxs);
             break;
         }
@@ -261,7 +260,7 @@ void CleanScan::VisitNode(LogicalNode &op) {
             if (op.load_metas() && !op.load_metas()->empty()) {
                 UnrecoverableError("Internal error: Fusion has load_metas");
             }
-            Vector<LoadMeta> children_columns;
+            std::vector<LoadMeta> children_columns;
             apply_to_fusion_children([&children_columns](LogicalNode &node) {
                 auto &node_load_metas = *node.load_metas();
                 children_columns.insert(children_columns.end(),
@@ -291,16 +290,16 @@ void CleanScan::VisitNode(LogicalNode &op) {
             }
             auto load_metas = op.load_metas();
             if (!scan_table_indexes_.empty()) {
-                Vector<LoadMeta> filtered_metas;
+                std::vector<LoadMeta> filtered_metas;
 
-                for (SizeT i = 0; i < scan_table_indexes_.size(); i++) {
-                    for (SizeT j = 0; j < load_metas->size(); j++) {
+                for (size_t i = 0; i < scan_table_indexes_.size(); i++) {
+                    for (size_t j = 0; j < load_metas->size(); j++) {
                         if ((*load_metas)[j].binding_.table_idx != scan_table_indexes_[i]) {
                             filtered_metas.push_back((*load_metas)[j]);
                         }
                     }
                 }
-                op.set_load_metas(MakeShared<Vector<LoadMeta>>(std::move(filtered_metas)));
+                op.set_load_metas(std::make_shared<std::vector<LoadMeta>>(std::move(filtered_metas)));
                 scan_table_indexes_.clear();
             }
             break;

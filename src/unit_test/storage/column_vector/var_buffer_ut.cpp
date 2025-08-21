@@ -12,22 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.var_buffer;
 
 import :ut.base_test;
-import :stl;
+
 import :var_buffer;
 import :infinity_exception;
-#endif
 
 using namespace infinity;
 
@@ -35,19 +29,19 @@ class VarBufferTest : public BaseTest {};
 
 TEST_F(VarBufferTest, test1) {
     VarBuffer var_buffer;
-    auto data = MakeUnique<char[]>(26);
+    auto data = std::make_unique<char[]>(26);
     for (int i = 0; i < 26; ++i) {
         data[i] = 'a' + i;
     }
     char *empty_data = nullptr;
 
-    SizeT offset1 = var_buffer.Append(data.get(), 26);
+    size_t offset1 = var_buffer.Append(data.get(), 26);
     EXPECT_EQ(offset1, 0);
 
-    SizeT offset1_1 = var_buffer.Append(empty_data, 0);
+    size_t offset1_1 = var_buffer.Append(empty_data, 0);
     EXPECT_EQ(offset1_1, 26);
 
-    SizeT offset2 = var_buffer.Append(data.get(), 26);
+    size_t offset2 = var_buffer.Append(data.get(), 26);
     EXPECT_EQ(offset2, 26);
 
     auto test = [&](const VarBuffer &var_buffer) {
@@ -69,7 +63,7 @@ TEST_F(VarBufferTest, test1) {
 
     test(var_buffer);
     auto size = var_buffer.TotalSize();
-    auto buffer = MakeUnique<char[]>(size);
+    auto buffer = std::make_unique<char[]>(size);
     auto *p = buffer.get();
     p += var_buffer.Write(p);
     EXPECT_EQ(p, buffer.get() + size);

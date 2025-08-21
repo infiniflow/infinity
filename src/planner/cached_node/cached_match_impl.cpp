@@ -17,7 +17,6 @@ module;
 module infinity_core:cached_match.impl;
 
 import :cached_match;
-
 import :base_table_ref;
 import :match_expression;
 import :base_expression;

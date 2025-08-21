@@ -12,21 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CI
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.table_cache;
 
 import :ut.base_test;
-import :stl;
+
 import :catalog_cache;
-#else
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#endif
 
 import internal_types;
 
@@ -42,7 +36,7 @@ TEST_P(TestTableCache, test_table_cache) {
     using namespace infinity;
 
     {
-        UniquePtr<TableCache> table_cache_ptr = MakeUnique<TableCache>(1, "tbl1");
+        std::unique_ptr<TableCache> table_cache_ptr = std::make_unique<TableCache>(1, "tbl1");
         EXPECT_EQ(table_cache_ptr->table_id(), 1);
         EXPECT_EQ(table_cache_ptr->uncommitted_append_infos_.size(), 0);
         EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_, nullptr);
@@ -52,7 +46,7 @@ TEST_P(TestTableCache, test_table_cache) {
         EXPECT_EQ(table_cache_ptr->commit_segment_id_, 0);
         EXPECT_EQ(table_cache_ptr->commit_segment_offset_, 0);
 
-        SharedPtr<AppendPrepareInfo> append_prepare_info = table_cache_ptr->PrepareAppendNolock(8190, 2);
+        std::shared_ptr<AppendPrepareInfo> append_prepare_info = table_cache_ptr->PrepareAppendNolock(8190, 2);
         EXPECT_NE(table_cache_ptr->unsealed_segment_cache_, nullptr);
         EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->segment_id_, 0);
         EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->row_count_, 8190);
@@ -111,7 +105,7 @@ TEST_P(TestTableCache, test_table_cache) {
         EXPECT_EQ(table_cache_ptr->commit_segment_id_, 0);
         EXPECT_EQ(table_cache_ptr->commit_segment_offset_, 8190);
 
-        for (SizeT i = 0; i < 1022; ++i) {
+        for (size_t i = 0; i < 1022; ++i) {
             TransactionID txn_id = 2 * i + 10;
             table_cache_ptr->PrepareAppendNolock(8192, txn_id);
         }
@@ -124,7 +118,7 @@ TEST_P(TestTableCache, test_table_cache) {
         EXPECT_EQ(table_cache_ptr->commit_segment_id_, 0);
         EXPECT_EQ(table_cache_ptr->commit_segment_offset_, 8190);
 
-        for (SizeT i = 1022; i < 1022 + 1023; ++i) {
+        for (size_t i = 1022; i < 1022 + 1023; ++i) {
             TransactionID txn_id = 2 * i + 10;
             table_cache_ptr->PrepareAppendNolock(8192, txn_id);
         }

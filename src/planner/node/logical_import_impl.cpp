@@ -12,38 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-
 module infinity_core:logical_import.impl;
 
 import :logical_import;
-
-import :stl;
 import :column_binding;
-import internal_types;
 import :logical_import;
+
+import std;
+
+import internal_types;
 import statement_common;
 import data_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalImport::GetColumnBindings() const { return {}; }
+std::vector<ColumnBinding> LogicalImport::GetColumnBindings() const { return {}; }
 
-SharedPtr<Vector<String>> LogicalImport::GetOutputNames() const { return MakeShared<Vector<String>>(); }
+std::shared_ptr<std::vector<std::string>> LogicalImport::GetOutputNames() const { return std::make_shared<std::vector<std::string>>(); }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalImport::GetOutputTypes() const { return MakeShared<Vector<SharedPtr<DataType>>>(); }
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalImport::GetOutputTypes() const {
+    return std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+}
 
-String LogicalImport::ToString(i64 &space) const {
+std::string LogicalImport::ToString(i64 &space) const {
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
 
-    ss << String(space, ' ') << "-> "
+    ss << std::string(space, ' ') << "-> "
        << "Import from: " << file_path_;
 
     switch (file_type_) {

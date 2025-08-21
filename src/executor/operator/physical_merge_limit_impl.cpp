@@ -12,13 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_merge_limit.impl;
 
 import :physical_merge_limit;
-
-import :stl;
 import :query_context;
 import :base_expression;
 import :load_meta;
@@ -30,11 +26,11 @@ import :operator_state;
 namespace infinity {
 
 PhysicalMergeLimit::PhysicalMergeLimit(u64 id,
-                                       UniquePtr<PhysicalOperator> left,
-                                       SharedPtr<BaseTableRef> base_table_ref,
-                                       SharedPtr<BaseExpression> limit_expr,
-                                       SharedPtr<BaseExpression> offset_expr,
-                                       SharedPtr<Vector<LoadMeta>> load_metas)
+                                       std::unique_ptr<PhysicalOperator> left,
+                                       std::shared_ptr<BaseTableRef> base_table_ref,
+                                       std::shared_ptr<BaseExpression> limit_expr,
+                                       std::shared_ptr<BaseExpression> offset_expr,
+                                       std::shared_ptr<std::vector<LoadMeta>> load_metas)
     : PhysicalOperator(PhysicalOperatorType::kMergeLimit, std::move(left), nullptr, id, std::move(load_metas)),
       base_table_ref_(std::move(base_table_ref)), limit_expr_(std::move(limit_expr)), offset_expr_(std::move(offset_expr)) {
     i64 offset = 0;
@@ -43,10 +39,10 @@ PhysicalMergeLimit::PhysicalMergeLimit(u64 id,
     if (offset_expr_.get() != nullptr) {
         offset = (static_pointer_cast<ValueExpression>(offset_expr_))->GetValue().value_.big_int;
     }
-    counter_ = MakeUnique<UnSyncCounter>(offset, limit);
+    counter_ = std::make_unique<UnSyncCounter>(offset, limit);
 }
 
-void PhysicalMergeLimit::Init(QueryContext* query_context) {}
+void PhysicalMergeLimit::Init(QueryContext *query_context) {}
 
 bool PhysicalMergeLimit::Execute(QueryContext *query_context, OperatorState *operator_state) {
     MergeLimitOperatorState *limit_op_state = (MergeLimitOperatorState *)operator_state;

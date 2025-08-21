@@ -14,8 +14,6 @@ module;
 
 export module infinity_core:week_of_year;
 
-import :stl;
-
 namespace infinity {
 
 class NewCatalog;

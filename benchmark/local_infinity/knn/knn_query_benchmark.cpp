@@ -14,14 +14,9 @@
 
 #include "hnsw_benchmark_util.h"
 #include <cassert>
-#include <cstring>
-#include <functional>
-#include <iomanip>
-#include <iostream>
-#include <memory>
-#include <thread>
-#include <unordered_set>
 
+import std;
+import std.compat;
 import infinity_core;
 import compilation_config;
 import knn_expr;
@@ -100,7 +95,7 @@ int main(int argc, char *argv[]) {
     Infinity::LocalInit(path, config_path);
 
     std::cout << ">>> Query Benchmark Start <<<" << std::endl;
-    std::cout << "Thread Num: " << thread_num << ", Times: " << total_times << std::endl;
+    std::cout << "std::thread Num: " << thread_num << ", Times: " << total_times << std::endl;
 
     std::vector<std::string> results;
 
@@ -145,7 +140,7 @@ int main(int argc, char *argv[]) {
         std::cerr << "File: " << groundtruth_path << " doesn't exist" << std::endl;
         exit(-1);
     }
-    UniquePtr<float[]> queries_ptr;
+    std::unique_ptr<float[]> queries_ptr;
     size_t query_count;
     {
         int dim = -1;
@@ -155,7 +150,7 @@ int main(int argc, char *argv[]) {
     auto queries = queries_ptr.get();
     std::vector<std::unordered_set<int>> ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100;
     {
-        UniquePtr<int[]> gt;
+        std::unique_ptr<int[]> gt;
         size_t gt_count;
         int gt_top_k;
         {

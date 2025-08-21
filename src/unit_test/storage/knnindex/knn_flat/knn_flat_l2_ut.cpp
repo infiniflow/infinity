@@ -12,26 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.knn_flat_l2;
 
 import :ut.base_test;
 import :infinity_exception;
-import :stl;
-import :third_party;
+import third_party;
 import :logger;
 import :deprecated_knn_flat_l2;
 import :infinity_context;
 import :roaring_bitmap;
-#endif
 
 import global_resource_usage;
 import knn_expr;
@@ -47,8 +40,8 @@ TEST_F(KnnFlatL2Test, test1) {
     i64 dimension = 4;
     i64 top_k = 4;
     i64 base_embedding_count = 4;
-    UniquePtr<f32[]> base_embedding = MakeUnique<f32[]>(sizeof(f32) * dimension * base_embedding_count);
-    UniquePtr<f32[]> query_embedding = MakeUnique<f32[]>(sizeof(f32) * dimension);
+    std::unique_ptr<f32[]> base_embedding = std::make_unique<f32[]>(sizeof(f32) * dimension * base_embedding_count);
+    std::unique_ptr<f32[]> query_embedding = std::make_unique<f32[]>(sizeof(f32) * dimension);
 
     {
         base_embedding[0] = 0.1;

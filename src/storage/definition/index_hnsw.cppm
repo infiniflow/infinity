@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:index_hnsw;
 
-import :stl;
 import :index_base;
-
-import :third_party;
 import :index_base;
 import :base_table_ref;
+
+import third_party;
+
 import create_index_info;
 import statement_common;
 
@@ -33,9 +31,9 @@ export enum class HnswEncodeType {
     kInvalid,
 };
 
-export String HnswEncodeTypeToString(HnswEncodeType encode_type);
+export std::string HnswEncodeTypeToString(HnswEncodeType encode_type);
 
-export HnswEncodeType StringToHnswEncodeType(const String &str);
+export HnswEncodeType StringToHnswEncodeType(const std::string &str);
 
 export enum class HnswBuildType {
     kPlain,
@@ -43,45 +41,45 @@ export enum class HnswBuildType {
     kInvalid,
 };
 
-export String HnswBuildTypeToString(HnswBuildType build_type);
+export std::string HnswBuildTypeToString(HnswBuildType build_type);
 
-export HnswBuildType StringToHnswBuildType(const String &str);
+export HnswBuildType StringToHnswBuildType(const std::string &str);
 
 export struct LSGConfig {
-    static LSGConfig FromString(const String &str);
+    static LSGConfig FromString(const std::string &str);
 
-    SizeT GetSizeInBytes() const;
+    size_t GetSizeInBytes() const;
 
     void WriteAdv(char *&ptr) const;
 
     static LSGConfig ReadAdv(const char *&ptr);
 
-    String ToString() const;
+    std::string ToString() const;
 
     float sample_ratio_ = 0.01;
-    SizeT ls_k_ = 10;
+    size_t ls_k_ = 10;
     float alpha_ = 1.0;
 };
 
 export class IndexHnsw final : public IndexBase {
 public:
-    static SharedPtr<IndexBase> Make(SharedPtr<String> index_name,
-                                     SharedPtr<String> index_comment,
-                                     const String &file_name,
-                                     Vector<String> column_names,
-                                     const Vector<InitParameter *> &index_param_list);
+    static std::shared_ptr<IndexBase> Make(std::shared_ptr<std::string> index_name,
+                                           std::shared_ptr<std::string> index_comment,
+                                           const std::string &file_name,
+                                           std::vector<std::string> column_names,
+                                           const std::vector<InitParameter *> &index_param_list);
 
-    IndexHnsw(SharedPtr<String> index_name,
-              SharedPtr<String> index_comment,
-              const String &file_name,
-              Vector<String> column_names,
+    IndexHnsw(std::shared_ptr<std::string> index_name,
+              std::shared_ptr<std::string> index_comment,
+              const std::string &file_name,
+              std::vector<std::string> column_names,
               MetricType metric_type,
               HnswEncodeType encode_type,
               HnswBuildType build_type,
-              SizeT M,
-              SizeT ef_construction,
-              SizeT block_size,
-              Optional<LSGConfig> lsg_config)
+              size_t M,
+              size_t ef_construction,
+              size_t block_size,
+              std::optional<LSGConfig> lsg_config)
         : IndexBase(IndexType::kHnsw, index_name, index_comment, file_name, std::move(column_names)), metric_type_(metric_type),
           encode_type_(encode_type), build_type_(build_type), M_(M), ef_construction_(ef_construction), block_size_(block_size),
           lsg_config_(std::move(lsg_config)) {}
@@ -97,24 +95,25 @@ public:
 
     virtual void WriteAdv(char *&ptr) const override;
 
-    virtual String ToString() const override;
+    virtual std::string ToString() const override;
 
-    virtual String BuildOtherParamsString() const override;
+    virtual std::string BuildOtherParamsString() const override;
 
     virtual nlohmann::json Serialize() const override;
 
 public:
-    static void
-    ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name, const Vector<InitParameter *> &index_param_list);
+    static void ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref,
+                                       const std::string &column_name,
+                                       const std::vector<InitParameter *> &index_param_list);
 
 public:
     const MetricType metric_type_{MetricType::kInvalid};
     HnswEncodeType encode_type_{HnswEncodeType::kInvalid};
     HnswBuildType build_type_{HnswBuildType::kInvalid};
-    const SizeT M_{};
-    const SizeT ef_construction_{};
-    const SizeT block_size_{};
-    Optional<LSGConfig> lsg_config_;
+    const size_t M_{};
+    const size_t ef_construction_{};
+    const size_t block_size_{};
+    std::optional<LSGConfig> lsg_config_;
 };
 
 } // namespace infinity

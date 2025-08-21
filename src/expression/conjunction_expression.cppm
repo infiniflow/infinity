@@ -16,8 +16,8 @@ module;
 
 export module infinity_core:conjunction_expression;
 
-import :stl;
 import :base_expression;
+
 import data_type;
 import logical_type;
 import internal_types;
@@ -33,12 +33,12 @@ export enum class ConjunctionType {
 export class ConjunctionExpression : public BaseExpression {
 public:
     ConjunctionExpression(ConjunctionType conjunction_type,
-                          const SharedPtr<BaseExpression> &left_operand,
-                          const SharedPtr<BaseExpression> &right_operand);
+                          const std::shared_ptr<BaseExpression> &left_operand,
+                          const std::shared_ptr<BaseExpression> &right_operand);
 
     inline DataType Type() const override { return DataType{LogicalType::kBoolean}; }
 
-    String ToString() const override;
+    std::string ToString() const override;
 
     ConjunctionType conjunction_type() const { return conjunction_type_; }
 

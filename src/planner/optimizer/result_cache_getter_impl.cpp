@@ -14,12 +14,9 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:result_cache_getter.impl;
 
 import :result_cache_getter;
-
 import :logical_match;
 import :result_cache_manager;
 import :logical_node_type;
@@ -32,27 +29,28 @@ import :logical_index_scan;
 import :cached_match;
 import :cached_match_scan;
 import :cached_index_scan;
-import :third_party;
-import :logger;
 import :base_table_ref;
 import :knn_expression;
 import :new_txn;
 import :query_context;
 
+import std;
+import third_party;
+
 namespace infinity {
 
-void ResultCacheGetter::ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<LogicalNode> &logical_plan) {
+void ResultCacheGetter::ApplyToPlan(QueryContext *query_context_ptr, std::shared_ptr<LogicalNode> &logical_plan) {
     ResultCacheManager *cache_mgr = query_context_ptr->storage()->result_cache_manager();
     if (cache_mgr == nullptr) {
         return;
     }
     TxnTimeStamp begin_ts = query_context_ptr->GetNewTxn()->BeginTS();
-    std::function<void(SharedPtr<LogicalNode> &)> visit_node = [&](SharedPtr<LogicalNode> &op) {
+    std::function<void(std::shared_ptr<LogicalNode> &)> visit_node = [&](std::shared_ptr<LogicalNode> &op) {
         if (!op) {
             return;
         }
-        Optional<CacheOutput> cache_output;
-        SharedPtr<BaseTableRef> base_table_ref;
+        std::optional<CacheOutput> cache_output;
+        std::shared_ptr<BaseTableRef> base_table_ref;
         bool is_min_heap = false;
         switch (op->operator_type()) {
             case LogicalNodeType::kMatch: {
@@ -107,12 +105,12 @@ void ResultCacheGetter::ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<L
             LOG_INFO(fmt::format("No cache found for match node {}", op->node_id()));
         } else {
             LOG_INFO(fmt::format("Cache found for match node {}", op->node_id()));
-            auto logical_read_cache = MakeShared<LogicalReadCache>(op->node_id(),
-                                                                   op->operator_type(),
-                                                                   base_table_ref,
-                                                                   std::move(cache_output->cache_content_),
-                                                                   std::move(cache_output->column_map_),
-                                                                   is_min_heap);
+            auto logical_read_cache = std::make_shared<LogicalReadCache>(op->node_id(),
+                                                                         op->operator_type(),
+                                                                         base_table_ref,
+                                                                         std::move(cache_output->cache_content_),
+                                                                         std::move(cache_output->column_map_),
+                                                                         is_min_heap);
             logical_read_cache->set_left_node(op->left_node());
             logical_read_cache->set_right_node(op->right_node());
             op = logical_read_cache;

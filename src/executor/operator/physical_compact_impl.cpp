@@ -12,32 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <vector>
-
 module infinity_core:physical_compact.impl;
 
 import :physical_compact;
-
-import :stl;
 import :bg_task;
 import :compaction_process;
 import :infinity_context;
 
+import std;
+
 namespace infinity {
 
-void PhysicalCompact::Init(QueryContext *query_context) {
-}
+void PhysicalCompact::Init(QueryContext *query_context) {}
 
 bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *compact_operator_state = static_cast<CompactOperatorState *>(operator_state);
 
-    const String &db_name = *base_table_ref_->table_info_->db_name_;
-    const String &table_name = *base_table_ref_->table_info_->table_name_;
+    const std::string &db_name = *base_table_ref_->table_info_->db_name_;
+    const std::string &table_name = *base_table_ref_->table_info_->table_name_;
     auto *new_txn = query_context->GetNewTxn();
 
-    auto compact_task = MakeShared<NewCompactTask>(new_txn, db_name, table_name);
+    auto compact_task = std::make_shared<NewCompactTask>(new_txn, db_name, table_name);
     auto *compaction_processor = InfinityContext::instance().storage()->compaction_processor();
     compaction_processor->Submit(compact_task);
     compact_task->Wait();

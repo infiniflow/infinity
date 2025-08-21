@@ -12,31 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <vector>
-
-#include "nlohmann/json.hpp"
-
 module infinity_core:index_ivf.impl;
 
 import :index_ivf;
-
 import :infinity_exception;
-import :stl;
 import :index_base;
 import :status;
-import serialize;
-import logical_type;
-import statement_common;
-import :logger;
+import :utility;
+
+import std;
+import third_party;
+
 import embedding_info;
 import internal_types;
 import data_type;
 import create_index_info;
+import serialize;
+import logical_type;
+import statement_common;
 
 namespace infinity {
 
@@ -47,7 +40,7 @@ bool IndexIVF::operator==(const IndexIVF &other) const {
 bool IndexIVF::operator!=(const IndexIVF &other) const { return !(*this == other); }
 
 i32 IndexIVF::GetSizeInBytes() const {
-    SizeT size = IndexBase::GetSizeInBytes();
+    size_t size = IndexBase::GetSizeInBytes();
     size += sizeof(ivf_option_);
     return size;
 }
@@ -57,16 +50,16 @@ void IndexIVF::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, ivf_option_);
 }
 
-String IndexIVF::ToString() const {
+std::string IndexIVF::ToString() const {
     std::stringstream ss;
     ss << IndexBase::ToString() << ", " << BuildOtherParamsString();
     return std::move(ss).str();
 }
 
-IndexIVF::IndexIVF(SharedPtr<String> index_name,
-                   SharedPtr<String> index_comment,
-                   const String &file_name,
-                   Vector<String> column_names,
+IndexIVF::IndexIVF(std::shared_ptr<std::string> index_name,
+                   std::shared_ptr<std::string> index_comment,
+                   const std::string &file_name,
+                   std::vector<std::string> column_names,
                    const IndexIVFOption &ivf_option)
     : IndexBase(IndexType::kIVF, std::move(index_name), index_comment, file_name, std::move(column_names)), ivf_option_(ivf_option) {}
 
@@ -80,22 +73,22 @@ T GetIntegerFromNodeHandler(const auto &nh) {
     return val;
 }
 
-auto GetMandatoryParamNodeHandler(Map<String, String> &params_map, std::string_view param_name) {
-    auto nh = params_map.extract(String{param_name});
+auto GetMandatoryParamNodeHandler(std::map<std::string, std::string> &params_map, std::string_view param_name) {
+    auto nh = params_map.extract(std::string{param_name});
     if (!nh) {
         RecoverableError(Status::InvalidIndexDefinition(std::format("Missing parameter '{}'.", param_name)));
     }
     return nh;
 }
 
-SharedPtr<IndexIVF> IndexIVF::Make(SharedPtr<String> index_name,
-                                   SharedPtr<String> index_comment,
-                                   const String &file_name,
-                                   Vector<String> column_names,
-                                   const Vector<InitParameter *> &index_param_list) {
-    Map<String, String> params_map;
+std::shared_ptr<IndexIVF> IndexIVF::Make(std::shared_ptr<std::string> index_name,
+                                         std::shared_ptr<std::string> index_comment,
+                                         const std::string &file_name,
+                                         std::vector<std::string> column_names,
+                                         const std::vector<InitParameter *> &index_param_list) {
+    std::map<std::string, std::string> params_map;
     for (const auto *para : index_param_list) {
-        String param_name = para->param_name_;
+        std::string param_name = para->param_name_;
         const auto &param_v = para->param_value_;
         ToLower(param_name);
         if (const auto [_, success] = params_map.emplace(std::move(param_name), param_v); !success) {
@@ -167,7 +160,7 @@ SharedPtr<IndexIVF> IndexIVF::Make(SharedPtr<String> index_name,
         oss << '.';
         RecoverableError(Status::InvalidIndexDefinition(std::move(oss).str()));
     }
-    return MakeShared<IndexIVF>(std::move(index_name), index_comment, file_name, std::move(column_names), ivf_option);
+    return std::make_shared<IndexIVF>(std::move(index_name), index_comment, file_name, std::move(column_names), ivf_option);
 }
 
 void CheckIndexIVFStorageOption(IndexIVFStorageOption &storage_option, const DataType *column_data_type) {
@@ -320,7 +313,7 @@ void CheckIndexIVFCentroidOption(const IndexIVFCentroidOption &centroid_option) 
     }
 }
 
-void IndexIVF::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name) {
+void IndexIVF::ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref, const std::string &column_name) {
     const auto &column_names_vector = *(base_table_ref->column_names_);
     const auto &column_types_vector = *(base_table_ref->column_types_);
     const auto name_it = std::find(column_names_vector.begin(), column_names_vector.end(), column_name);
@@ -341,14 +334,57 @@ void IndexIVF::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_
     }
 }
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFCentroidOption, centroids_num_ratio_, min_points_per_centroid_, max_points_per_centroid_);
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFStorageOption,
-                                   type_,
-                                   plain_storage_data_type_,
-                                   scalar_quantization_bits_,
-                                   product_quantization_subspace_num_,
-                                   product_quantization_subspace_bits_);
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFOption, metric_, centroid_option_, storage_option_);
+// NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFCentroidOption, centroids_num_ratio_, min_points_per_centroid_, max_points_per_centroid_);
+template <typename BasicJsonType, nlohmann::detail::enable_if_t<nlohmann::detail::is_basic_json<BasicJsonType>::value, int> = 0>
+void to_json(BasicJsonType &nlohmann_json_j, const IndexIVFCentroidOption &nlohmann_json_t) {
+    nlohmann_json_j["centroids_num_ratio_"] = nlohmann_json_t.centroids_num_ratio_;
+    nlohmann_json_j["min_points_per_centroid_"] = nlohmann_json_t.min_points_per_centroid_;
+    nlohmann_json_j["max_points_per_centroid_"] = nlohmann_json_t.max_points_per_centroid_;
+}
+
+// NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFStorageOption,
+//                                    type_,
+//                                    plain_storage_data_type_,
+//                                    scalar_quantization_bits_,
+//                                    product_quantization_subspace_num_,
+//                                    product_quantization_subspace_bits_);
+template <typename BasicJsonType, nlohmann::detail::enable_if_t<nlohmann::detail::is_basic_json<BasicJsonType>::value, int> = 0>
+void from_json(const BasicJsonType &nlohmann_json_j, IndexIVFCentroidOption &nlohmann_json_t) {
+    nlohmann_json_j.at("centroids_num_ratio_").get_to(nlohmann_json_t.centroids_num_ratio_);
+    nlohmann_json_j.at("min_points_per_centroid_").get_to(nlohmann_json_t.min_points_per_centroid_);
+    nlohmann_json_j.at("max_points_per_centroid_").get_to(nlohmann_json_t.max_points_per_centroid_);
+}
+
+template <typename BasicJsonType, nlohmann::detail::enable_if_t<nlohmann::detail::is_basic_json<BasicJsonType>::value, int> = 0>
+void to_json(BasicJsonType &nlohmann_json_j, const IndexIVFStorageOption &nlohmann_json_t) {
+    nlohmann_json_j["type_"] = nlohmann_json_t.type_;
+    nlohmann_json_j["plain_storage_data_type_"] = nlohmann_json_t.plain_storage_data_type_;
+    nlohmann_json_j["scalar_quantization_bits_"] = nlohmann_json_t.scalar_quantization_bits_;
+    nlohmann_json_j["product_quantization_subspace_num_"] = nlohmann_json_t.product_quantization_subspace_num_;
+    nlohmann_json_j["product_quantization_subspace_bits_"] = nlohmann_json_t.product_quantization_subspace_bits_;
+}
+template <typename BasicJsonType, nlohmann::detail::enable_if_t<nlohmann::detail::is_basic_json<BasicJsonType>::value, int> = 0>
+void from_json(const BasicJsonType &nlohmann_json_j, IndexIVFStorageOption &nlohmann_json_t) {
+    nlohmann_json_j.at("type_").get_to(nlohmann_json_t.type_);
+    nlohmann_json_j.at("plain_storage_data_type_").get_to(nlohmann_json_t.plain_storage_data_type_);
+    nlohmann_json_j.at("scalar_quantization_bits_").get_to(nlohmann_json_t.scalar_quantization_bits_);
+    nlohmann_json_j.at("product_quantization_subspace_num_").get_to(nlohmann_json_t.product_quantization_subspace_num_);
+    nlohmann_json_j.at("product_quantization_subspace_bits_").get_to(nlohmann_json_t.product_quantization_subspace_bits_);
+}
+
+// NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFOption, metric_, centroid_option_, storage_option_);
+template <typename BasicJsonType, nlohmann::detail::enable_if_t<nlohmann::detail::is_basic_json<BasicJsonType>::value, int> = 0>
+void to_json(BasicJsonType &nlohmann_json_j, const IndexIVFOption &nlohmann_json_t) {
+    nlohmann_json_j["metric_"] = nlohmann_json_t.metric_;
+    nlohmann_json_j["centroid_option_"] = nlohmann_json_t.centroid_option_;
+    nlohmann_json_j["storage_option_"] = nlohmann_json_t.storage_option_;
+}
+template <typename BasicJsonType, nlohmann::detail::enable_if_t<nlohmann::detail::is_basic_json<BasicJsonType>::value, int> = 0>
+void from_json(const BasicJsonType &nlohmann_json_j, IndexIVFOption &nlohmann_json_t) {
+    nlohmann_json_j.at("metric_").get_to(nlohmann_json_t.metric_);
+    nlohmann_json_j.at("centroid_option_").get_to(nlohmann_json_t.centroid_option_);
+    nlohmann_json_j.at("storage_option_").get_to(nlohmann_json_t.storage_option_);
+}
 
 nlohmann::json IndexIVF::Serialize() const {
     nlohmann::json res = IndexBase::Serialize();
@@ -390,16 +426,16 @@ IndexIVFOption IndexIVF::DeserializeIndexIVFOption(std::string_view ivf_option_s
     return doc.get<IndexIVFOption>();
 }
 
-String BuildIndexIVFStorageOptionStr();
+std::string BuildIndexIVFStorageOptionStr();
 
-String IndexIVFCentroidOption::ToString() const {
+std::string IndexIVFCentroidOption::ToString() const {
     return std::format("IndexIVFCentroidOption: [centroids_num_ratio: {}, min_points_per_centroid: {}, max_points_per_centroid: {}]",
                        centroids_num_ratio_,
                        min_points_per_centroid_,
                        max_points_per_centroid_);
 }
 
-String IndexIVFStorageOption::ToString() const {
+std::string IndexIVFStorageOption::ToString() const {
     std::ostringstream oss;
     oss << "IndexIVFStorageOption: [";
     switch (type_) {
@@ -422,7 +458,7 @@ String IndexIVFStorageOption::ToString() const {
     return std::move(oss).str();
 }
 
-String IndexIVF::BuildOtherParamsString() const {
+std::string IndexIVF::BuildOtherParamsString() const {
     return std::format("metric: {}, {}, {}",
                        MetricTypeToString(ivf_option_.metric_),
                        ivf_option_.centroid_option_.ToString(),

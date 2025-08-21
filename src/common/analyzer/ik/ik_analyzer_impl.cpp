@@ -1,12 +1,6 @@
-module;
-
-#include <vector>
-#include <string>
-
 module infinity_core:ik_analyzer.impl;
 
 import :ik_analyzer;
-import :stl;
 import :segmenter;
 import :cjk_segmenter;
 import :cn_quantifier_segmenter;
@@ -17,11 +11,12 @@ import :arbitrator;
 import :term;
 import :status;
 import :character_util;
-import :third_party;
+
+import std;
 
 namespace infinity {
 
-IKAnalyzer::IKAnalyzer(const String &path) : dict_path_(path) {}
+IKAnalyzer::IKAnalyzer(const std::string &path) : dict_path_(path) {}
 
 IKAnalyzer::IKAnalyzer(const IKAnalyzer &other) : own_dict_(false), ik_smart_(other.ik_smart_), dict_(other.dict_) { Init(); }
 
@@ -32,9 +27,9 @@ IKAnalyzer::~IKAnalyzer() {
 }
 
 void IKAnalyzer::Init() {
-    context_ = MakeUnique<AnalyzeContext>(dict_, ik_smart_);
+    context_ = std::make_unique<AnalyzeContext>(dict_, ik_smart_);
     LoadSegmenters();
-    arbitrator_ = MakeUnique<IKArbitrator>();
+    arbitrator_ = std::make_unique<IKArbitrator>();
 }
 
 void IKAnalyzer::SetFineGrained(bool fine_grained) {
@@ -46,8 +41,7 @@ void IKAnalyzer::SetFineGrained(bool fine_grained) {
 
 Status IKAnalyzer::Load() {
     dict_ = new Dictionary(dict_path_);
-    Status load_status = dict_->Load();
-    if (!load_status.ok()) {
+    if (auto load_status = dict_->Load(); !load_status.ok()) {
         return load_status;
     }
     own_dict_ = true;
@@ -57,9 +51,9 @@ Status IKAnalyzer::Load() {
 
 void IKAnalyzer::LoadSegmenters() {
     segmenters_.reserve(4);
-    segmenters_.push_back(MakeUnique<LetterSegmenter>());
-    segmenters_.push_back(MakeUnique<CNQuantifierSegmenter>(dict_));
-    segmenters_.push_back(MakeUnique<CJKSegmenter>(dict_));
+    segmenters_.push_back(std::make_unique<LetterSegmenter>());
+    segmenters_.push_back(std::make_unique<CNQuantifierSegmenter>(dict_));
+    segmenters_.push_back(std::make_unique<CJKSegmenter>(dict_));
 }
 
 void IKAnalyzer::Reset() {
@@ -91,7 +85,7 @@ int IKAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
     Lexeme *lexeme = nullptr;
     while ((lexeme = context_->GetNextLexeme()) != nullptr) {
         std::wstring text = lexeme->GetLexemeText();
-        String token = CharacterUtil::UTF16ToUTF8(text);
+        std::string token = CharacterUtil::UTF16ToUTF8(text);
         func(data, token.c_str(), token.size(), offset++, 0, false, 0);
         delete lexeme;
     };

@@ -12,17 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <algorithm>
-#include <chrono>
-#include <cmath>
-#include <iostream>
-#include <random>
 module infinity_core:emvb_index.impl;
 
 import :emvb_index;
-import :stl;
 import :mlas_matrix_multiply;
 import :vector_distance;
 import :emvb_product_quantization;
@@ -31,20 +23,23 @@ import :kmeans_partition;
 import :index_base;
 import :status;
 import :logger;
-import :third_party;
 import :infinity_exception;
-import internal_types;
 import :column_vector;
-import column_def;
 import :buffer_manager;
 import :default_values;
 import :block_index;
-
 import :new_catalog;
 import :segment_meta;
 import :block_meta;
 import :column_meta;
 import :kv_store;
+
+import std;
+import std.compat;
+import third_party;
+
+import column_def;
+import internal_types;
 
 namespace infinity {
 
@@ -78,7 +73,7 @@ u32 EMVBIndex::GetTotalEmbeddingNum() const {
     return n_total_embeddings_;
 }
 
-void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, SegmentMeta &segment_meta, const SharedPtr<ColumnDef> &column_def) {
+void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, SegmentMeta &segment_meta, const std::shared_ptr<ColumnDef> &column_def) {
     const auto time_0 = std::chrono::high_resolution_clock::now();
     {
         const SegmentID expected_segment_id = base_rowid.segment_id_;
@@ -90,7 +85,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
     const SegmentOffset start_segment_offset = base_rowid.segment_offset_;
     const ColumnID column_id = column_def->id();
     u64 embedding_count = 0;
-    Deque<Pair<u32, u32>> all_embedding_pos;
+    std::deque<std::pair<u32, u32>> all_embedding_pos;
     {
         // read the segment to get total embedding count
         BlockID block_id = start_segment_offset / DEFAULT_BLOCK_CAPACITY;
@@ -157,10 +152,10 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
     // train the index
     {
         const auto training_embedding_num = std::min<u64>(embedding_count, 8ul * least_training_data_num);
-        const auto training_data = MakeUniqueForOverwrite<f32[]>(training_embedding_num * embedding_dimension_);
+        const auto training_data = std::make_unique_for_overwrite<f32[]>(training_embedding_num * embedding_dimension_);
         // prepare training data
         {
-            Vector<Pair<u32, u32>> sample_result;
+            std::vector<std::pair<u32, u32>> sample_result;
             sample_result.reserve(training_embedding_num);
             std::random_device rd;
             std::mt19937 gen(rd());
@@ -266,7 +261,7 @@ void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const 
     // allocate space for centroids
     centroids_data_.resize(static_cast<u64>(n_centroids_) * embedding_dimension_);
     centroid_norms_neg_half_.resize(n_centroids_);
-    centroids_to_docid_ = MakeUnique<EMVBSharedVec<u32>[]>(n_centroids_);
+    centroids_to_docid_ = std::make_unique<EMVBSharedVec<u32>[]>(n_centroids_);
     // check training data num
     if (const auto least_num = ExpectLeastTrainingDataNum(); embedding_num < least_num) {
         const auto error_msg = fmt::format("EMVBIndex::Train: embedding_num must be at least {}, got {} instead.", least_num, embedding_num);
@@ -300,10 +295,10 @@ void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const 
         LOG_INFO(std::move(oss).str());
     }
     // step 2. get residuals
-    const auto residuals = MakeUniqueForOverwrite<f32[]>(embedding_num * embedding_dimension_);
+    const auto residuals = std::make_unique_for_overwrite<f32[]>(embedding_num * embedding_dimension_);
     {
         // distance: for every embedding, e * c - 0.5 * c^2, find max
-        const auto dist_table = MakeUniqueForOverwrite<f32[]>(embedding_num * n_centroids_);
+        const auto dist_table = std::make_unique_for_overwrite<f32[]>(embedding_num * n_centroids_);
         matrixA_multiply_transpose_matrixB_output_to_C(embedding_data,
                                                        centroids_data_.data(),
                                                        embedding_num,
@@ -361,11 +356,11 @@ void EMVBIndex::AddOneDocEmbeddings(const f32 *embedding_data, const u32 embeddi
     doc_lens_.PushBack(embedding_num);
     doc_offsets_.PushBack(old_total_embeddings);
     // step 2. assign to centroids
-    const auto centroid_id_assignments = MakeUniqueForOverwrite<u32[]>(embedding_num);
-    const auto residuals = MakeUniqueForOverwrite<f32[]>(embedding_num * embedding_dimension_);
+    const auto centroid_id_assignments = std::make_unique_for_overwrite<u32[]>(embedding_num);
+    const auto residuals = std::make_unique_for_overwrite<f32[]>(embedding_num * embedding_dimension_);
     {
         // distance: for every embedding, e * c - 0.5 * c^2, find max
-        const auto dist_table = MakeUniqueForOverwrite<f32[]>(embedding_num * n_centroids_);
+        const auto dist_table = std::make_unique_for_overwrite<f32[]>(embedding_num * n_centroids_);
         matrixA_multiply_transpose_matrixB_output_to_C(embedding_data,
                                                        centroids_data_.data(),
                                                        embedding_num,
@@ -481,11 +476,11 @@ EMVBQueryResultType EMVBIndex::query_token_num_helper(const f32 *query_ptr, u32 
 
 template <u32 FIXED_QUERY_TOKEN_NUM>
 EMVBQueryResultType EMVBIndex::GetQueryResultT(const f32 *query_ptr, const u32 query_embedding_num, auto &&...query_args) const {
-    UniquePtr<f32[]> extended_query_ptr;
+    std::unique_ptr<f32[]> extended_query_ptr;
     const f32 *query_ptr_to_use = query_ptr;
     // extend query to FIXED_QUERY_TOKEN_NUM
     if (query_embedding_num < FIXED_QUERY_TOKEN_NUM) {
-        extended_query_ptr = MakeUniqueForOverwrite<f32[]>(FIXED_QUERY_TOKEN_NUM * embedding_dimension_);
+        extended_query_ptr = std::make_unique_for_overwrite<f32[]>(FIXED_QUERY_TOKEN_NUM * embedding_dimension_);
         std::copy_n(query_ptr, query_embedding_num * embedding_dimension_, extended_query_ptr.get());
         std::fill_n(extended_query_ptr.get() + query_embedding_num * embedding_dimension_,
                     (FIXED_QUERY_TOKEN_NUM - query_embedding_num) * embedding_dimension_,
@@ -511,14 +506,14 @@ EMVBQueryResultType EMVBIndex::GetQueryResultT(const f32 *query_ptr, const u32 q
 }
 
 template <typename T>
-void Serialize(LocalFileHandle &file_handle, const Vector<T> &val) {
+void Serialize(LocalFileHandle &file_handle, const std::vector<T> &val) {
     const u32 size = val.size();
     file_handle.Append(&size, sizeof(size));
     file_handle.Append(val.data(), size * sizeof(T));
 }
 
 template <typename T>
-void DeSerialize(LocalFileHandle &file_handle, Vector<T> &val) {
+void DeSerialize(LocalFileHandle &file_handle, std::vector<T> &val) {
     u32 size = 0;
     file_handle.Read(&size, sizeof(size));
     val.resize(size);
@@ -546,7 +541,7 @@ void DeSerialize(LocalFileHandle &file_handle, EMVBSharedVec<u32> &val, const u3
         const auto error_msg = fmt::format("EMVBSharedVec size mismatch: expect {}, got {}.", expect_element_num, size);
         UnrecoverableError(error_msg);
     }
-    const auto tmp_buffer = MakeUniqueForOverwrite<u32[]>(expect_element_num);
+    const auto tmp_buffer = std::make_unique_for_overwrite<u32[]>(expect_element_num);
     file_handle.Read(tmp_buffer.get(), expect_element_num * sizeof(u32));
     val.PushBack(tmp_buffer.get(), tmp_buffer.get() + expect_element_num);
 }
@@ -565,7 +560,7 @@ void DeSerialize(LocalFileHandle &file_handle, EMVBSharedVec<u32> &val) {
     }
     u32 element_num = 0;
     file_handle.Read(&element_num, sizeof(element_num));
-    const auto tmp_buffer = MakeUniqueForOverwrite<u32[]>(element_num);
+    const auto tmp_buffer = std::make_unique_for_overwrite<u32[]>(element_num);
     file_handle.Read(tmp_buffer.get(), element_num * sizeof(u32));
     val.PushBack(tmp_buffer.get(), tmp_buffer.get() + element_num);
 }
@@ -635,7 +630,7 @@ void EMVBIndex::ReadIndexInner(LocalFileHandle &file_handle) {
     DeSerialize(file_handle, doc_lens_, n_docs);
     DeSerialize(file_handle, doc_offsets_, n_docs);
     DeSerialize(file_handle, centroid_id_assignments_, n_total_embeddings_);
-    centroids_to_docid_ = MakeUnique<EMVBSharedVec<u32>[]>(n_centroids_);
+    centroids_to_docid_ = std::make_unique<EMVBSharedVec<u32>[]>(n_centroids_);
     for (u32 i = 0; i < n_centroids_; ++i) {
         DeSerialize(file_handle, centroids_to_docid_[i]);
     }

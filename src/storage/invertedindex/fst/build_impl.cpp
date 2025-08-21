@@ -19,21 +19,20 @@ module;
 module infinity_core:fst.build.impl;
 
 import :fst.build;
-
-import :stl;
 import :infinity_exception;
-import :third_party;
 import :fst.bytes;
 import :fst.node;
 import :fst.registry;
 import :fst.writer;
+
+import third_party;
 
 namespace infinity {
 
 void FstBuilder::Finish() {
     CompileFrom(0);
     BuilderNode &root_node = unfinished_.TopNode();
-    SizeT root_addr = Compile(root_node);
+    size_t root_addr = Compile(root_node);
     unfinished_.Pop();
     IoWriteU64LE(len_, wtr_);
     IoWriteU64LE(root_addr, wtr_);
@@ -43,14 +42,14 @@ void FstBuilder::Finish() {
     inner_writer.Flush();
 }
 
-void FstBuilder::InsertOutput(u8 *bs_ptr, SizeT bs_len, u64 val) {
+void FstBuilder::InsertOutput(u8 *bs_ptr, size_t bs_len, u64 val) {
     Output out(val);
     if (bs_len == 0) {
         len_ = 1; // must be first key, so length is always 1
         unfinished_.SetRootOutput(out);
         return;
     }
-    SizeT prefix_len = unfinished_.FindCommonPrefixAndSetOutput(bs_ptr, bs_len, out);
+    size_t prefix_len = unfinished_.FindCommonPrefixAndSetOutput(bs_ptr, bs_len, out);
     if (prefix_len == bs_len) {
         // If the prefix found consumes the entire set of bytes, then
         // the prefix *equals* the bytes given. This means it is a
@@ -66,10 +65,10 @@ void FstBuilder::InsertOutput(u8 *bs_ptr, SizeT bs_len, u64 val) {
     unfinished_.AddSuffix(bs_ptr + prefix_len, bs_len - prefix_len, out);
 }
 
-void FstBuilder::CompileFrom(SizeT istate) {
-    SizeT addr = NONE_ADDRESS;
-    SizeT remained = unfinished_.Len() - (istate + 1);
-    for (SizeT i = 0; i < remained; i++) {
+void FstBuilder::CompileFrom(size_t istate) {
+    size_t addr = NONE_ADDRESS;
+    size_t remained = unfinished_.Len() - (istate + 1);
+    for (size_t i = 0; i < remained; i++) {
         if (addr != NONE_ADDRESS) {
             unfinished_.TopLastFreeze(addr);
         }
@@ -95,22 +94,22 @@ CompiledAddr FstBuilder::Compile(BuilderNode &node) {
     return last_addr_;
 }
 
-String FormatBytes(u8 *bs_data, SizeT bs_len) {
-    String output = "[";
-    for (SizeT i = 0; i < bs_len; i++) {
+std::string FormatBytes(u8 *bs_data, size_t bs_len) {
+    std::string output = "[";
+    for (size_t i = 0; i < bs_len; i++) {
         output += fmt::format("{:02X}", bs_data[i]);
     }
     output += "]";
     return output;
 }
 
-void FstBuilder::CheckLastKey(u8 *bs_ptr, SizeT bs_len, bool check_dupe) {
+void FstBuilder::CheckLastKey(u8 *bs_ptr, size_t bs_len, bool check_dupe) {
     if (last_.empty())
         return;
     if (check_dupe && last_.size() == bs_len && std::memcmp(last_.data(), bs_ptr, bs_len) == 0)
         UnrecoverableError(fmt::format("FST duplicated key {}", FormatBytes(bs_ptr, bs_len)));
-    SizeT min_len = std::min(static_cast<SizeT>(last_.size()), bs_len);
-    for (SizeT i = 0; i < min_len; i++) {
+    size_t min_len = std::min(static_cast<size_t>(last_.size()), bs_len);
+    for (size_t i = 0; i < min_len; i++) {
         if (last_[i] > bs_ptr[i]) {
             UnrecoverableError(
                 fmt::format("Out of order key, prev {}, got {}", FormatBytes(last_.data(), last_.size()), FormatBytes(bs_ptr, bs_len)));

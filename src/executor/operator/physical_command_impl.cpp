@@ -14,9 +14,6 @@
 
 module;
 
-// #include <fstream>
-#include <string>
-
 #ifdef ENABLE_JEMALLOC_PROF
 #include <jemalloc/jemalloc.h>
 #endif
@@ -24,17 +21,13 @@ module;
 module infinity_core:physical_command.impl;
 
 import :physical_command;
-import :stl;
-import compilation_config;
 import :query_context;
 import :operator_state;
-
 import :profiler;
 import :file_writer;
 import :table_def;
 import :data_table;
 import :options;
-import :third_party;
 import :defer_op;
 import :config;
 import :status;
@@ -51,8 +44,14 @@ import :periodic_trigger_thread;
 import :new_txn;
 import :bg_task_type;
 import :new_catalog;
-import command_statement;
 import :session_manager;
+
+import std;
+import third_party;
+
+import command_statement;
+import compilation_config;
+
 namespace infinity {
 
 void PhysicalCommand::Init(QueryContext *query_context) {}
@@ -154,12 +153,12 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     switch (config_index) {
                         case GlobalOptionIndex::kResultCache: {
                             if (set_command->value_type() != SetVarType::kString) {
-                                Status status = Status::DataTypeMismatch("String", set_command->value_type_str());
+                                Status status = Status::DataTypeMismatch("std::string", set_command->value_type_str());
                                 RecoverableError(status);
                             }
-                            String cmd = set_command->value_str();
+                            std::string cmd = set_command->value_str();
                             ResultCacheManager *cache_mgr = query_context->storage()->GetResultCacheManagerPtr();
-                            const String &result_cache_status = config->ResultCache();
+                            const std::string &result_cache_status = config->ResultCache();
 
                             if (result_cache_status == "off" && cmd != "on") {
                                 return true;
@@ -192,7 +191,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             }
                             i64 cache_num = set_command->value_int();
                             ResultCacheManager *cache_mgr = query_context->storage()->GetResultCacheManagerPtr();
-                            const String &result_cache_status = config->ResultCache();
+                            const std::string &result_cache_status = config->ResultCache();
                             if (result_cache_status == "off") {
                                 Status status = Status::InvalidCommand(fmt::format("Result cache manager is off"));
                                 RecoverableError(status);
@@ -206,7 +205,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         }
                         case GlobalOptionIndex::kLogLevel: {
                             if (set_command->value_type() != SetVarType::kString) {
-                                Status status = Status::DataTypeMismatch("String", set_command->value_type_str());
+                                Status status = Status::DataTypeMismatch("std::string", set_command->value_type_str());
                                 RecoverableError(status);
                             }
                             if (set_command->value_str() == "trace") {
@@ -320,10 +319,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         }
                         case GlobalOptionIndex::kTimeZone: {
                             if (set_command->value_type() != SetVarType::kString) {
-                                Status status = Status::DataTypeMismatch("String", set_command->value_type_str());
+                                Status status = Status::DataTypeMismatch("std::string", set_command->value_type_str());
                                 RecoverableError(status);
                             }
-                            String tz;
+                            std::string tz;
                             i32 tz_bias = 0;
                             Config::ParseTimeZoneStr(set_command->value_str(), tz, tz_bias);
                             if (tz_bias < -12 || tz_bias > 12) {
@@ -443,7 +442,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             LOG_INFO(fmt::format("Execute snapshot command"));
             SnapshotOp snapshot_operation = snapshot_cmd->operation();
             SnapshotScope snapshot_scope = snapshot_cmd->scope();
-            const String &snapshot_name = snapshot_cmd->name();
+            const std::string &snapshot_name = snapshot_cmd->name();
 
             // auto new_txn_mgr = InfinityContext::instance().storage()-> new_txn_manager();
 
@@ -468,10 +467,9 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     //     LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
 
                     //     // Create and configure checkpoint task
-                    //     auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
+                    //     auto checkpoint_task = std::make_shared<NewCheckpointTask>(wal_size);
                     //     checkpoint_task->ExecuteWithNewTxn();
                     // }
-
 
                     // // wait for checkpoint to complete
                     // while (wal_manager->LastCheckpointTS() + 2 < begin_ts) {
@@ -485,7 +483,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         }
                         case SnapshotScope::kDatabase: {
                             LOG_INFO(fmt::format("Execute snapshot database"));
-                            const String &db_name = snapshot_cmd->object_name();
+                            const std::string &db_name = snapshot_cmd->object_name();
                             Status snapshot_status = Snapshot::CreateDatabaseSnapshot(query_context, snapshot_name, db_name);
                             if (!snapshot_status.ok()) {
                                 RecoverableError(snapshot_status);
@@ -494,8 +492,8 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             break;
                         }
                         case SnapshotScope::kTable: {
-                            const String &table_name = snapshot_cmd->object_name();
-                            const String &db_name = query_context->schema_name();
+                            const std::string &table_name = snapshot_cmd->object_name();
+                            const std::string &db_name = query_context->schema_name();
                             // Status snapshot_status = Snapshot::CreateTableSnapshot(query_context, snapshot_name, table_name);
                             NewTxn *new_txn = query_context->GetNewTxn();
                             Status snapshot_status = new_txn->CreateTableSnapshot(db_name, table_name, snapshot_name);
@@ -510,8 +508,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             break;
                         }
                         default: {
-                            String error_message = "Invalid snapshot scope";
-                            UnrecoverableError(error_message);
+                            UnrecoverableError("Invalid snapshot scope");
                             break;
                         }
                     }
@@ -553,16 +550,14 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             break;
                         }
                         default: {
-                            String error_message = "Invalid snapshot scope";
-                            UnrecoverableError(error_message);
+                            UnrecoverableError("Invalid snapshot scope");
                             break;
                         }
                     }
                     break;
                 }
                 default: {
-                    String error_message = "Invalid snapshot operation type";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Invalid snapshot operation type");
                     break;
                 }
             }
@@ -570,8 +565,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             break;
         }
         default: {
-            String error_message = fmt::format("Invalid command type: {}", command_info_->ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Invalid command type: {}", command_info_->ToString()));
         }
     }
     return true;

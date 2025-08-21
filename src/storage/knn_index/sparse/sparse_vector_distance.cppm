@@ -12,18 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:sparse_vector_distance;
 
-import :stl;
+import std.compat;
 
 namespace infinity {
 
 export template <typename DataType, typename IndexType, typename ResultType = DataType>
-ResultType SparseIPDistance(const DataType *data1, const IndexType *index1, SizeT nnz1, const DataType *data2, const IndexType *index2, SizeT nnz2) {
+ResultType
+SparseIPDistance(const DataType *data1, const IndexType *index1, size_t nnz1, const DataType *data2, const IndexType *index2, size_t nnz2) {
     ResultType distance{};
-    SizeT i = 0, j = 0;
+    size_t i = 0, j = 0;
     while (i < nnz1 && j < nnz2) {
         if (index1[i] == index2[j]) {
             distance += data1[i] * data2[j];
@@ -39,9 +38,9 @@ ResultType SparseIPDistance(const DataType *data1, const IndexType *index1, Size
 }
 
 export template <typename IndexType, typename ResultType = IndexType>
-ResultType SparseBitIPDistance(const IndexType *idx1, SizeT nnz1, const IndexType *idx2, SizeT nnz2) {
+ResultType SparseBitIPDistance(const IndexType *idx1, size_t nnz1, const IndexType *idx2, size_t nnz2) {
     ResultType distance{};
-    SizeT i = 0, j = 0;
+    size_t i = 0, j = 0;
     while (i < nnz1 && j < nnz2) {
         if (idx1[i] == idx2[j]) {
             ++distance;

@@ -12,28 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:order_binder.impl;
 
 import :order_binder;
-import :stl;
 import :base_expression;
-
 import :bind_context;
 import :column_expression;
-import :third_party;
 import :status;
 import :infinity_exception;
+
+import third_party;
+
 import parsed_expr;
 import constant_expr;
 import knn_expr;
 import function_expr;
-import :logger;
 
 namespace infinity {
 
-void OrderBinder::PushExtraExprToSelectList(ParsedExpr *expr, const SharedPtr<BindContext> &bind_context_ptr) {
+void OrderBinder::PushExtraExprToSelectList(ParsedExpr *expr, const std::shared_ptr<BindContext> &bind_context_ptr) {
     if (expr->type_ == ParsedExprType::kConstant) {
         ConstantExpr *order_by_index = (ConstantExpr *)expr;
         if (order_by_index->literal_type_ != LiteralType::kInteger) {
@@ -44,7 +41,7 @@ void OrderBinder::PushExtraExprToSelectList(ParsedExpr *expr, const SharedPtr<Bi
         return;
     }
 
-    String expr_name = expr->GetName();
+    std::string expr_name = expr->GetName();
 
     if (bind_context_ptr->binding_names_by_column_.contains(expr_name)) {
         expr_name = fmt::format("{}.{}", bind_context_ptr->binding_names_by_column_[expr_name][0], expr_name);
@@ -62,19 +59,19 @@ void OrderBinder::PushExtraExprToSelectList(ParsedExpr *expr, const SharedPtr<Bi
     bind_context_ptr->select_expression_.emplace_back(expr);
 }
 
-SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    String expr_name = expr.GetName();
+std::shared_ptr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+    std::string expr_name = expr.GetName();
     // If the expr isn't from aggregate function and coming from group by lists.
     if (bind_context_ptr->group_index_by_name_.contains(expr_name)) {
         i64 groupby_index = bind_context_ptr->group_index_by_name_[expr_name];
-        const SharedPtr<BaseExpression> &group_expr = bind_context_ptr->group_exprs_[groupby_index];
+        const std::shared_ptr<BaseExpression> &group_expr = bind_context_ptr->group_exprs_[groupby_index];
 
-        SharedPtr<ColumnExpression> result = ColumnExpression::Make(group_expr->Type(),
-                                                                    bind_context_ptr->group_by_table_name_,
-                                                                    bind_context_ptr->group_by_table_index_,
-                                                                    expr_name,
-                                                                    groupby_index,
-                                                                    depth);
+        std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(group_expr->Type(),
+                                                                          bind_context_ptr->group_by_table_name_,
+                                                                          bind_context_ptr->group_by_table_index_,
+                                                                          expr_name,
+                                                                          groupby_index,
+                                                                          depth);
 
         result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kGroupBy);
         return result;
@@ -82,20 +79,20 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
     // If the expr is coming from aggregate function list
     if (bind_context_ptr->aggregate_index_by_name_.contains(expr_name)) {
         i64 aggregate_index = bind_context_ptr->aggregate_index_by_name_[expr_name];
-        const SharedPtr<BaseExpression> &aggregate_expr = bind_context_ptr->aggregate_exprs_[aggregate_index];
+        const std::shared_ptr<BaseExpression> &aggregate_expr = bind_context_ptr->aggregate_exprs_[aggregate_index];
 
-        SharedPtr<ColumnExpression> result = ColumnExpression::Make(aggregate_expr->Type(),
-                                                                    bind_context_ptr->aggregate_table_name_,
-                                                                    bind_context_ptr->aggregate_table_index_,
-                                                                    expr_name,
-                                                                    aggregate_index,
-                                                                    depth);
+        std::shared_ptr<ColumnExpression> result = ColumnExpression::Make(aggregate_expr->Type(),
+                                                                          bind_context_ptr->aggregate_table_name_,
+                                                                          bind_context_ptr->aggregate_table_index_,
+                                                                          expr_name,
+                                                                          aggregate_index,
+                                                                          depth);
 
         result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
         return result;
     }
     if (!bind_context_ptr->aggregate_index_by_name_.empty() || !bind_context_ptr->group_index_by_name_.empty()) {
-        String error_message = fmt::format("Column: {} must appear in the GROUP BY clause or be used in an aggregate function", expr_name);
+        std::string error_message = fmt::format("Column: {} must appear in the GROUP BY clause or be used in an aggregate function", expr_name);
         RecoverableError(Status::SyntaxError(error_message));
     }
 
@@ -107,8 +104,8 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
     }
 
     i64 column_id = -1;
-    String binding_table_name = bind_context_ptr->project_table_name_;
-    SizeT binding_table_index = bind_context_ptr->project_table_index_;
+    std::string binding_table_name = bind_context_ptr->project_table_name_;
+    size_t binding_table_index = bind_context_ptr->project_table_index_;
 
     // TODO: fix "order by 1" statement
     // If the expr is from projection, then create a column reference from projection.
@@ -129,9 +126,8 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
             RecoverableError(status);
         }
     } else {
-        String expr_name = expr.GetName();
-        String error_message = fmt::format("Need to add support for {} in order_binder.", expr_name);
-        UnrecoverableError(error_message);
+        std::string expr_name = expr.GetName();
+        UnrecoverableError(fmt::format("Need to add support for {} in order_binder.", expr_name));
 
         if (bind_context_ptr->binding_names_by_column_.contains(expr_name)) {
             auto table_name = bind_context_ptr->binding_names_by_column_[expr_name][0];
@@ -150,14 +146,13 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
         }
 
         if (column_id == -1) {
-            String error_message = fmt::format("{} isn't found in project list.", expr_name);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("{} isn't found in project list.", expr_name));
         }
     }
 
-    const SharedPtr<BaseExpression> &project_expr = bind_context_ptr->project_exprs_[column_id];
+    const std::shared_ptr<BaseExpression> &project_expr = bind_context_ptr->project_exprs_[column_id];
 
-    SharedPtr<ColumnExpression> result =
+    std::shared_ptr<ColumnExpression> result =
         ColumnExpression::Make(project_expr->Type(), binding_table_name, binding_table_index, std::to_string(column_id), column_id, depth);
     result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kProjection);
     return result;

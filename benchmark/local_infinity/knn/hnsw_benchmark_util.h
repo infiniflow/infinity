@@ -14,26 +14,26 @@
 
 #pragma once
 
-#include <CLI/CLI.hpp>
-
 import infinity_core;
+import std;
+import std.compat;
 
 using namespace infinity;
 
 namespace benchmark {
 
 template <typename T>
-Tuple<SizeT, i32, UniquePtr<T[]>> DecodeFvecsDataset(const Path &path) {
+std::tuple<size_t, i32, std::unique_ptr<T[]>> DecodeFvecsDataset(const std::filesystem::path &path) {
     auto [file_handle, status] = VirtualStore::Open(path.string(), FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
     i32 dim = 0;
     file_handle->Read(&dim, sizeof(dim));
-    SizeT file_size = file_handle->FileSize();
-    SizeT vec_num = file_size / (dim * sizeof(T) + sizeof(dim));
-    auto data = MakeUniqueForOverwrite<T[]>(vec_num * dim);
-    for (SizeT i = 0; i < vec_num - 1; ++i) {
+    size_t file_size = file_handle->FileSize();
+    size_t vec_num = file_size / (dim * sizeof(T) + sizeof(dim));
+    auto data = std::make_unique_for_overwrite<T[]>(vec_num * dim);
+    for (size_t i = 0; i < vec_num - 1; ++i) {
         file_handle->Read(data.get() + i * dim, dim * sizeof(T));
         i32 dim1 = 0;
         file_handle->Read(&dim1, sizeof(dim1));

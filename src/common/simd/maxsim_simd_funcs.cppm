@@ -15,25 +15,25 @@
 module;
 
 #include "simd_common_intrin_include.h"
-#include <bit>
 #include <cassert>
 
 export module infinity_core:maxsim_simd_funcs;
 
-import :stl;
 import :simd_common_tools;
+
+import std;
 
 namespace infinity {
 
-export f32 maxsim_f32_bit_ip_plain(const f32 *v1, const u8 *v2, SizeT dim) {
+export f32 maxsim_f32_bit_ip_plain(const f32 *v1, const u8 *v2, size_t dim) {
     assert(dim % 8 == 0);
     const auto u8_mask_p = GetU8MasksForAVX2();
-    const SizeT dim8 = dim / 8;
+    const size_t dim8 = dim / 8;
     f32 sum = 0.0f;
-    for (SizeT i = 0; i < dim8; ++i) {
+    for (size_t i = 0; i < dim8; ++i) {
         auto *mask_ptr = u8_mask_p[v2[i]];
         auto *v1_ptr = v1 + i * 8;
-        for (SizeT j = 0; j < 8; ++j) {
+        for (size_t j = 0; j < 8; ++j) {
             sum += std::bit_cast<f32>(std::bit_cast<u32>(v1_ptr[j]) & mask_ptr[j]);
         }
     }
@@ -41,14 +41,14 @@ export f32 maxsim_f32_bit_ip_plain(const f32 *v1, const u8 *v2, SizeT dim) {
 }
 
 #if defined(__AVX2__)
-export f32 maxsim_f32_bit_ip_avx2(const f32 *v1, const u8 *v2, SizeT dim) {
+export f32 maxsim_f32_bit_ip_avx2(const f32 *v1, const u8 *v2, size_t dim) {
     assert(dim % 8 == 0);
     const auto u8_mask_p = GetU8MasksForAVX2();
-    const SizeT dim8 = dim / 8;
+    const size_t dim8 = dim / 8;
     __m256 v2_mask = _mm256_load_ps(reinterpret_cast<float const *>(u8_mask_p[v2[0]]));
     __m256 v1_8 = _mm256_loadu_ps(v1);
     __m256 sum_8 = _mm256_and_ps(v1_8, v2_mask);
-    for (SizeT i = 1; i < dim8; ++i) {
+    for (size_t i = 1; i < dim8; ++i) {
         v2_mask = _mm256_load_ps(reinterpret_cast<float const *>(u8_mask_p[v2[i]]));
         v1_8 = _mm256_loadu_ps(v1 + i * 8);
         __m256 mid_v = _mm256_and_ps(v1_8, v2_mask);
@@ -59,7 +59,7 @@ export f32 maxsim_f32_bit_ip_avx2(const f32 *v1, const u8 *v2, SizeT dim) {
 #endif
 
 #if defined(__AVX512F__)
-export f32 maxsim_f32_bit_ip_avx512(const f32 *v1, const u8 *v2, SizeT dim) {
+export f32 maxsim_f32_bit_ip_avx512(const f32 *v1, const u8 *v2, size_t dim) {
     assert(dim % 8 == 0);
     if (dim < 16) {
         return maxsim_f32_bit_ip_avx2(v1, v2, dim);
@@ -67,19 +67,19 @@ export f32 maxsim_f32_bit_ip_avx512(const f32 *v1, const u8 *v2, SizeT dim) {
     if (reinterpret_cast<uintptr_t>(v2) % alignof(u16) == 0) {
         // use u16 ptr
         // assume endianness
-        const SizeT dim8 = dim / 8;
+        const size_t dim8 = dim / 8;
         const auto *v2_16 = reinterpret_cast<const u16 *>(v2);
         __m512 sum = _mm512_maskz_loadu_ps(v2_16[0], v1);
-        for (SizeT i = 1; 2 * i < dim8; ++i) {
+        for (size_t i = 1; 2 * i < dim8; ++i) {
             __m512 mid_v = _mm512_maskz_loadu_ps(v2_16[i], v1 + i * 16);
             sum = _mm512_add_ps(sum, mid_v);
         }
         return _mm512_reduce_add_ps(sum);
     } else {
-        const SizeT dim8 = dim / 8;
+        const size_t dim8 = dim / 8;
         u16 mask_16 = v2[0] | (static_cast<u32>(v2[1]) << 8);
         __m512 sum = _mm512_maskz_loadu_ps(mask_16, v1);
-        SizeT i = 2;
+        size_t i = 2;
         for (; i < dim8; i += 2) {
             mask_16 = v2[i] | (static_cast<u32>(v2[i + static_cast<int>(i + 1 < dim8)]) << 8);
             __m512 mid_v = _mm512_maskz_loadu_ps(mask_16, v1 + i * 8);
@@ -90,15 +90,15 @@ export f32 maxsim_f32_bit_ip_avx512(const f32 *v1, const u8 *v2, SizeT dim) {
 }
 #endif
 
-export i32 maxsim_i32_bit_ip_plain(const i32 *v1, const u8 *v2, SizeT dim) {
+export i32 maxsim_i32_bit_ip_plain(const i32 *v1, const u8 *v2, size_t dim) {
     assert(dim % 8 == 0);
     const auto u8_mask_p = GetU8MasksForAVX2();
-    const SizeT dim8 = dim / 8;
+    const size_t dim8 = dim / 8;
     i32 sum = 0;
-    for (SizeT i = 0; i < dim8; ++i) {
+    for (size_t i = 0; i < dim8; ++i) {
         auto *mask_ptr = u8_mask_p[v2[i]];
         auto *v1_ptr = v1 + i * 8;
-        for (SizeT j = 0; j < 8; ++j) {
+        for (size_t j = 0; j < 8; ++j) {
             sum += v1_ptr[j] & static_cast<i32>(mask_ptr[j]);
         }
     }
@@ -106,14 +106,14 @@ export i32 maxsim_i32_bit_ip_plain(const i32 *v1, const u8 *v2, SizeT dim) {
 }
 
 #if defined(__AVX2__)
-export i32 maxsim_i32_bit_ip_avx2(const i32 *v1, const u8 *v2, SizeT dim) {
+export i32 maxsim_i32_bit_ip_avx2(const i32 *v1, const u8 *v2, size_t dim) {
     assert(dim % 8 == 0);
     const auto u8_mask_p = GetU8MasksForAVX2();
-    const SizeT dim8 = dim / 8;
+    const size_t dim8 = dim / 8;
     __m256i v2_mask = _mm256_load_si256(reinterpret_cast<const __m256i *>(u8_mask_p[v2[0]]));
     __m256i v1_8 = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(v1));
     __m256i sum_8 = _mm256_and_si256(v1_8, v2_mask);
-    for (SizeT i = 1; i < dim8; ++i) {
+    for (size_t i = 1; i < dim8; ++i) {
         v2_mask = _mm256_load_si256(reinterpret_cast<const __m256i *>(u8_mask_p[v2[i]]));
         v1_8 = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(v1 + i * 8));
         __m256i mid_v = _mm256_and_si256(v1_8, v2_mask);
@@ -124,7 +124,7 @@ export i32 maxsim_i32_bit_ip_avx2(const i32 *v1, const u8 *v2, SizeT dim) {
 #endif
 
 #if defined(__AVX512F__)
-export i32 maxsim_i32_bit_ip_avx512(const i32 *v1, const u8 *v2, SizeT dim) {
+export i32 maxsim_i32_bit_ip_avx512(const i32 *v1, const u8 *v2, size_t dim) {
     assert(dim % 8 == 0);
     if (dim < 16) {
         return maxsim_i32_bit_ip_avx2(v1, v2, dim);
@@ -132,19 +132,19 @@ export i32 maxsim_i32_bit_ip_avx512(const i32 *v1, const u8 *v2, SizeT dim) {
     if (reinterpret_cast<uintptr_t>(v2) % alignof(u16) == 0) {
         // use u16 ptr
         // assume endianness
-        const SizeT dim8 = dim / 8;
+        const size_t dim8 = dim / 8;
         const auto *v2_16 = reinterpret_cast<const u16 *>(v2);
         __m512i sum = _mm512_maskz_loadu_epi32(v2_16[0], v1);
-        for (SizeT i = 1; 2 * i < dim8; ++i) {
+        for (size_t i = 1; 2 * i < dim8; ++i) {
             __m512i mid_v = _mm512_maskz_loadu_epi32(v2_16[i], v1 + i * 16);
             sum = _mm512_add_epi32(sum, mid_v);
         }
         return _mm512_reduce_add_epi32(sum);
     } else {
-        const SizeT dim8 = dim / 8;
+        const size_t dim8 = dim / 8;
         u16 mask_16 = v2[0] | (static_cast<u32>(v2[1]) << 8);
         __m512i sum = _mm512_maskz_loadu_epi32(mask_16, v1);
-        SizeT i = 2;
+        size_t i = 2;
         for (; i < dim8; i += 2) {
             mask_16 = v2[i] | (static_cast<u32>(v2[i + static_cast<int>(i + 1 < dim8)]) << 8);
             __m512i mid_v = _mm512_maskz_loadu_epi32(mask_16, v1 + i * 8);
@@ -155,15 +155,15 @@ export i32 maxsim_i32_bit_ip_avx512(const i32 *v1, const u8 *v2, SizeT dim) {
 }
 #endif
 
-export i64 maxsim_i64_bit_ip_plain(const i64 *v1, const u8 *v2, SizeT dim) {
+export i64 maxsim_i64_bit_ip_plain(const i64 *v1, const u8 *v2, size_t dim) {
     assert(dim % 8 == 0);
     const auto u8_mask_p = GetU8MasksForAVX2();
-    const SizeT dim8 = dim / 8;
+    const size_t dim8 = dim / 8;
     i64 sum = 0;
-    for (SizeT i = 0; i < dim8; ++i) {
+    for (size_t i = 0; i < dim8; ++i) {
         auto *mask_ptr = u8_mask_p[v2[i]];
         auto *v1_ptr = v1 + i * 8;
-        for (SizeT j = 0; j < 8; ++j) {
+        for (size_t j = 0; j < 8; ++j) {
             sum += v1_ptr[j] & static_cast<i64>(static_cast<i32>(mask_ptr[j])); // -1 -> -1
         }
     }
@@ -171,10 +171,10 @@ export i64 maxsim_i64_bit_ip_plain(const i64 *v1, const u8 *v2, SizeT dim) {
 }
 
 #if defined(__AVX2__)
-export i64 maxsim_i64_bit_ip_avx2(const i64 *v1, const u8 *v2, SizeT dim) {
+export i64 maxsim_i64_bit_ip_avx2(const i64 *v1, const u8 *v2, size_t dim) {
     assert(dim % 8 == 0);
     const auto u8_mask_p = GetU8MasksForAVX2();
-    const SizeT dim8 = dim / 8;
+    const size_t dim8 = dim / 8;
     __m256i v2_mask = _mm256_load_si256(reinterpret_cast<const __m256i *>(u8_mask_p[v2[0]]));
     __m256i v2_mask_0 = _mm256_unpacklo_epi32(v2_mask, v2_mask);
     __m256i v2_mask_1 = _mm256_unpackhi_epi32(v2_mask, v2_mask);
@@ -182,7 +182,7 @@ export i64 maxsim_i64_bit_ip_avx2(const i64 *v1, const u8 *v2, SizeT dim) {
     __m256i v1_4_1 = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(v1 + 4));
     __m256i sum_4_0 = _mm256_and_si256(v1_4_0, v2_mask_0);
     __m256i sum_4_1 = _mm256_and_si256(v1_4_1, v2_mask_1);
-    for (SizeT i = 1; i < dim8; ++i) {
+    for (size_t i = 1; i < dim8; ++i) {
         v2_mask = _mm256_load_si256(reinterpret_cast<const __m256i *>(u8_mask_p[v2[i]]));
         v2_mask_0 = _mm256_unpacklo_epi32(v2_mask, v2_mask);
         v2_mask_1 = _mm256_unpackhi_epi32(v2_mask, v2_mask);
@@ -202,11 +202,11 @@ export i64 maxsim_i64_bit_ip_avx2(const i64 *v1, const u8 *v2, SizeT dim) {
 #endif
 
 #if defined(__AVX512F__)
-export i64 maxsim_i64_bit_ip_avx512(const i64 *v1, const u8 *v2, SizeT dim) {
+export i64 maxsim_i64_bit_ip_avx512(const i64 *v1, const u8 *v2, size_t dim) {
     assert(dim % 8 == 0);
-    const SizeT dim8 = dim / 8;
+    const size_t dim8 = dim / 8;
     __m512i sum = _mm512_maskz_loadu_epi64(v2[0], v1);
-    for (SizeT i = 1; i < dim8; ++i) {
+    for (size_t i = 1; i < dim8; ++i) {
         __m512i mid_v = _mm512_maskz_loadu_epi64(v2[i], v1 + i * 8);
         sum = _mm512_add_epi64(sum, mid_v);
     }

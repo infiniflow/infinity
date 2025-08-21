@@ -14,18 +14,19 @@
 
 module;
 
-#include <vector>
-
 module infinity_core:catalog_meta.impl;
 
 import :catalog_meta;
 import :kv_code;
 import :kv_store;
 import :infinity_exception;
-import :third_party;
 import :kv_utility;
 import :default_values;
 import :new_txn;
+
+import std;
+import std.compat;
+import third_party;
 
 namespace infinity {
 
@@ -39,12 +40,12 @@ CatalogMeta::CatalogMeta(NewTxn *txn) : txn_(txn) {
 
 CatalogMeta::CatalogMeta(KVInstance *kv_instance) : read_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance} {}
 
-Status CatalogMeta::GetDBID(const String &db_name, String &db_key, String &db_id, TxnTimeStamp &create_ts) {
-    String db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);
+Status CatalogMeta::GetDBID(const std::string &db_name, std::string &db_key, std::string &db_id, TxnTimeStamp &create_ts) {
+    std::string db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);
     auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(db_key_prefix);
 
-    Vector<Pair<String, String>> db_kvs;
+    std::vector<std::pair<std::string, std::string>> db_kvs;
     while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
         db_kvs.emplace_back(iter2->Key().ToString(), iter2->Value().ToString());
         iter2->Next();
@@ -54,10 +55,10 @@ Status CatalogMeta::GetDBID(const String &db_name, String &db_key, String &db_id
         return Status::DBNotExist(db_name);
     }
 
-    SizeT max_visible_db_index = std::numeric_limits<SizeT>::max();
+    size_t max_visible_db_index = std::numeric_limits<size_t>::max();
     TxnTimeStamp max_commit_ts = 0;
-    for (SizeT i = 0; i < db_kvs.size(); ++i) {
-        String commit_ts_str = GetLastPartOfKey(db_kvs[i].first, '|');
+    for (size_t i = 0; i < db_kvs.size(); ++i) {
+        std::string commit_ts_str = GetLastPartOfKey(db_kvs[i].first, '|');
         TxnTimeStamp commit_ts = std::stoull(commit_ts_str);
         if (commit_ts <= read_ts_ && commit_ts > max_commit_ts) {
             max_commit_ts = commit_ts;
@@ -65,14 +66,14 @@ Status CatalogMeta::GetDBID(const String &db_name, String &db_key, String &db_id
         }
     }
 
-    if (max_visible_db_index == std::numeric_limits<SizeT>::max()) {
+    if (max_visible_db_index == std::numeric_limits<size_t>::max()) {
         return Status::DBNotExist(db_name);
     }
 
     db_key = db_kvs[max_visible_db_index].first;
     db_id = db_kvs[max_visible_db_index].second;
 
-    String drop_db_ts{};
+    std::string drop_db_ts{};
     kv_instance_->Get(KeyEncode::DropDBKey(db_name, max_commit_ts, db_id), drop_db_ts);
 
     if (!drop_db_ts.empty() && std::stoull(drop_db_ts) <= read_ts_) {
@@ -82,7 +83,7 @@ Status CatalogMeta::GetDBID(const String &db_name, String &db_key, String &db_id
     return Status::OK();
 }
 
-Status CatalogMeta::GetDBIDs(Vector<String> *&db_id_strs, Vector<String> **db_names) {
+Status CatalogMeta::GetDBIDs(std::vector<std::string> *&db_id_strs, std::vector<std::string> **db_names) {
     Status status = LoadDBIDs();
     if (!status.ok()) {
         return status;
@@ -96,27 +97,27 @@ Status CatalogMeta::GetDBIDs(Vector<String> *&db_id_strs, Vector<String> **db_na
 }
 
 Status CatalogMeta::LoadDBIDs() {
-    Vector<String> db_id_strs;
-    Vector<String> db_names;
-    Map<String, Vector<Pair<String, String>>> db_kvs_map;
+    std::vector<std::string> db_id_strs;
+    std::vector<std::string> db_names;
+    std::map<std::string, std::vector<std::pair<std::string, std::string>>> db_kvs_map;
 
     auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(KeyEncode::kCatalogDbHeader);
     while (iter2->Valid() && iter2->Key().starts_with(KeyEncode::kCatalogDbHeader)) {
-        String key_str = iter2->Key().ToString();
-        String db_id = iter2->Value().ToString();
+        std::string key_str = iter2->Key().ToString();
+        std::string db_id = iter2->Value().ToString();
         size_t start = KeyEncode::kCatalogDbHeader.size();
         size_t end = key_str.find('|', start);
-        String db_name = key_str.substr(start, end - start);
+        std::string db_name = key_str.substr(start, end - start);
         db_kvs_map[db_name].emplace_back(key_str, db_id);
         iter2->Next();
     }
 
     for (const auto &[db_name, db_kv] : db_kvs_map) {
-        SizeT max_visible_db_index = std::numeric_limits<SizeT>::max();
+        size_t max_visible_db_index = std::numeric_limits<size_t>::max();
         TxnTimeStamp max_commit_ts = 0;
-        for (SizeT i = 0; i < db_kv.size(); ++i) {
-            String commit_ts_str = GetLastPartOfKey(db_kv[i].first, '|');
+        for (size_t i = 0; i < db_kv.size(); ++i) {
+            std::string commit_ts_str = GetLastPartOfKey(db_kv[i].first, '|');
             TxnTimeStamp commit_ts = std::stoull(commit_ts_str);
             if (commit_ts <= read_ts_ && commit_ts > max_commit_ts) {
                 max_commit_ts = commit_ts;
@@ -124,9 +125,9 @@ Status CatalogMeta::LoadDBIDs() {
             }
         }
 
-        if (max_visible_db_index != std::numeric_limits<SizeT>::max()) {
-            String drop_db_ts{};
-            const String &db_id = db_kv[max_visible_db_index].second;
+        if (max_visible_db_index != std::numeric_limits<size_t>::max()) {
+            std::string drop_db_ts{};
+            const std::string &db_id = db_kv[max_visible_db_index].second;
             kv_instance_->Get(KeyEncode::DropDBKey(db_name, max_commit_ts, db_id), drop_db_ts);
 
             if (drop_db_ts.empty() || std::stoull(drop_db_ts) > read_ts_) {

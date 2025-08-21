@@ -12,22 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CI
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.kv_utility;
 
 import :ut.base_test;
 import :kv_utility;
 import :kv_code;
-import :stl;
-#else
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#endif
 
 using namespace infinity;
 
@@ -35,21 +28,21 @@ class KVUtilityTest : public BaseTest {};
 
 TEST_F(KVUtilityTest, test1) {
     // Test code here
-    String db_name = "db1";
-    String db_id = "3";
-    String table_name = "tbl1";
-    String table_id = "10";
-    String column_name = "col1";
+    std::string db_name = "db1";
+    std::string db_id = "3";
+    std::string table_name = "tbl1";
+    std::string table_id = "10";
+    std::string column_name = "col1";
     TxnTimeStamp ts1 = 123;
     TxnTimeStamp ts2 = 0;
     {
-        String key = KeyEncode::CatalogDbKey(db_name, ts1);
+        std::string key = KeyEncode::CatalogDbKey(db_name, ts1);
         EXPECT_STREQ(key.c_str(), "catalog|db|db1|123");
         u64 ts = GetTimestampFromKey(key);
         EXPECT_EQ(ts, 123);
     }
     {
-        String key = KeyEncode::CatalogTableKey(db_id, table_name, ts2);
+        std::string key = KeyEncode::CatalogTableKey(db_id, table_name, ts2);
         EXPECT_STREQ(key.c_str(), "catalog|tbl|3|tbl1|0");
         u64 ts = GetTimestampFromKey(key);
         EXPECT_EQ(ts, 0);

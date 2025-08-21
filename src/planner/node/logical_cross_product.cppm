@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:logical_cross_product;
 
-import :stl;
 import :logical_node_type;
 import :column_binding;
 import :logical_node;
+
 import data_type;
 import internal_types;
 
@@ -27,19 +25,19 @@ namespace infinity {
 
 export class LogicalCrossProduct : public LogicalNode {
 public:
-    explicit LogicalCrossProduct(u64 node_id, String alias, const SharedPtr<LogicalNode> &left, const SharedPtr<LogicalNode> &right);
+    explicit LogicalCrossProduct(u64 node_id, std::string alias, const std::shared_ptr<LogicalNode> &left, const std::shared_ptr<LogicalNode> &right);
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    [[nodiscard]] std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) const final;
+    std::string ToString(i64 &space) const final;
 
-    inline String name() final { return "LogicalCrossProduct"; }
+    inline std::string name() final { return "LogicalCrossProduct"; }
 
-    String alias_{};
+    std::string alias_{};
 };
 
 } // namespace infinity

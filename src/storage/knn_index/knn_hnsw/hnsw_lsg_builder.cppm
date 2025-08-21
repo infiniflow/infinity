@@ -12,36 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <future>
-
 export module infinity_core:hnsw_lsg_builder;
 
-import :stl;
-import column_def;
 import :index_hnsw;
 import :index_ivf;
-import statement_common;
 import :defer_op;
 import :infinity_exception;
 import :index_base;
 import :ivf_index_data;
-import :third_party;
-import internal_types;
 import :knn_scan_data;
-import knn_expr;
 import :ivf_index_search;
-import data_type;
 import :roaring_bitmap;
 import :knn_result_handler;
-import logical_type;
-import embedding_info;
 import :hnsw_common;
 import :status;
 import :merge_knn;
 import :infinity_context;
 import :logger;
+
+import std;
+import std.compat;
+import column_def;
+import statement_common;
+import third_party;
+import internal_types;
+import knn_expr;
+import data_type;
+import logical_type;
+import embedding_info;
 
 namespace infinity {
 
@@ -52,12 +50,12 @@ public:
     IterIVFDataAccessor() {}
 
     template <typename Iter>
-    SizeT InsertEmbedding(Iter iter, SizeT sample_num) {
-        SizeT count = 0;
+    size_t InsertEmbedding(Iter iter, size_t sample_num) {
+        size_t count = 0;
         while (count < sample_num) {
             if (auto ret = iter.Next(); ret) {
                 auto &[embedding, offset] = *ret;
-                embeddings_.emplace_back(reinterpret_cast<const_ptr_t>(embedding), offset);
+                embeddings_.emplace_back(reinterpret_cast<const char *>(embedding), offset);
                 ++count;
             } else {
                 break;
@@ -66,17 +64,17 @@ public:
         return count;
     }
 
-    const_ptr_t GetEmbedding(SizeT offset) override { return embeddings_[offset].first; }
+    const char *GetEmbedding(size_t offset) override { return embeddings_[offset].first; }
 
-    Pair<Span<const char>, SizeT> GetMultiVector(SizeT offset) override {
+    std::pair<std::span<const char>, size_t> GetMultiVector(size_t offset) override {
         UnrecoverableError("Not implemented");
         return {};
     }
 
-    SizeT size() const { return embeddings_.size(); }
+    size_t size() const { return embeddings_.size(); }
 
 private:
-    Vector<Pair<const_ptr_t, SizeT>> embeddings_;
+    std::vector<std::pair<const char *, size_t>> embeddings_;
 };
 
 template <typename Iter>
@@ -116,7 +114,7 @@ class HnswLSGBuilder {
 public:
     using This = HnswLSGBuilder<DataType, DistanceType>;
 
-    HnswLSGBuilder(const IndexHnsw *index_hnsw, SharedPtr<ColumnDef> column_def) : index_hnsw_(index_hnsw), column_def_(column_def) {
+    HnswLSGBuilder(const IndexHnsw *index_hnsw, std::shared_ptr<ColumnDef> column_def) : index_hnsw_(index_hnsw), column_def_(column_def) {
         if (index_hnsw_->build_type_ != HnswBuildType::kLSG) {
             RecoverableError(Status::NotSupport("Only support LSG build type"));
         }
@@ -162,14 +160,14 @@ public:
 
 public:
     template <typename Iter>
-    SizeT InsertSampleVec(Iter iter, SizeT sample_num = std::numeric_limits<SizeT>::max()) {
+    size_t InsertSampleVec(Iter iter, size_t sample_num = std::numeric_limits<size_t>::max()) {
         float sample_ratio = index_hnsw_->lsg_config_->sample_ratio_;
-        SizeT count = 0;
+        size_t count = 0;
 #ifdef use_ivf
         SampleIter<Iter> sample_iter(iter, sample_ratio);
         count = ivf_sample_iter_.InsertEmbedding(std::move(sample_iter), sample_num);
 #else
-        SizeT dim = static_cast<EmbeddingInfo *>(column_def_->type()->type_info().get())->Dimension();
+        size_t dim = static_cast<EmbeddingInfo *>(column_def_->type()->type_info().get())->Dimension();
         SampleIter<Iter> sample_iter(iter, sample_ratio);
         for (; count < sample_num; ++count) {
             auto next_opt = sample_iter.Next();
@@ -184,7 +182,7 @@ public:
     }
 
     template <typename Iter>
-    void InsertLSAvg(Iter iter, SizeT row_count) {
+    void InsertLSAvg(Iter iter, size_t row_count) {
 #ifdef use_ivf
         switch (index_hnsw_->metric_type_) {
             case MetricType::kMetricL2:
@@ -227,21 +225,21 @@ private:
         return sum / size;
     }
 
-    UniquePtr<IVFIndexInChunk> MakeIVFIndex() {
+    std::unique_ptr<IVFIndexInChunk> MakeIVFIndex() {
         auto *embedding_info = static_cast<EmbeddingInfo *>(column_def_->type().get()->type_info().get());
 
-        auto index_name = MakeShared<String>("tmp_index_name");
-        String filename = "tmp_index_file";
-        Vector<String> column_names = {column_def_->name()};
+        auto index_name = std::make_shared<std::string>("tmp_index_name");
+        std::string filename = "tmp_index_file";
+        std::vector<std::string> column_names = {column_def_->name()};
 
-        Vector<InitParameter *> parameters;
+        std::vector<InitParameter *> parameters;
         DeferFn defer_params([&] {
             for (auto parameter : parameters) {
                 delete parameter;
             }
         });
         {
-            String metric = "";
+            std::string metric = "";
             switch (index_hnsw_->metric_type_) {
                 case MetricType::kMetricL2:
                     metric = "l2";
@@ -255,17 +253,17 @@ private:
             parameters.push_back(new InitParameter("metric", std::move(metric)));
         }
         // {
-        //     String sample_ratio_ = std::to_string(lsg_config_.sample_ratio_);
+        //     std::string sample_ratio_ = std::to_string(lsg_config_.sample_ratio_);
         //     parameters.push_back(new InitParameter("centroids_num_ratio", std::move(sample_ratio_)));
         // }
         parameters.push_back(new InitParameter("storage_type", "plain"));
         {
-            String data_type = EmbeddingT::EmbeddingDataType2String(embedding_info->Type());
+            std::string data_type = EmbeddingT::EmbeddingDataType2String(embedding_info->Type());
             parameters.push_back(new InitParameter("plain_storage_data_type", std::move(data_type)));
         }
 
-        SharedPtr<IndexIVF> index_ivf = IndexIVF::Make(index_name, nullptr, filename, std::move(column_names), parameters);
-        UniquePtr<IVFIndexInChunk> ivf_index(IVFIndexInChunk::GetNewIVFIndexInChunk(index_ivf.get(), column_def_.get()));
+        std::shared_ptr<IndexIVF> index_ivf = IndexIVF::Make(index_name, nullptr, filename, std::move(column_names), parameters);
+        std::unique_ptr<IVFIndexInChunk> ivf_index(IVFIndexInChunk::GetNewIVFIndexInChunk(index_ivf.get(), column_def_.get()));
         return ivf_index;
     }
 
@@ -291,7 +289,7 @@ private:
     }
 
     template <typename Iter, template <typename, typename> typename Compare>
-    void GetAvgByIVF(Iter iter, SizeT row_count) {
+    void GetAvgByIVF(Iter iter, size_t row_count) {
         auto ivf_index = MakeIVFIndex();
         ivf_index->BuildIVFIndex(RowID(0, 0), ivf_sample_iter_.size(), &ivf_sample_iter_, column_def_);
 
@@ -320,12 +318,12 @@ private:
     }
 
     template <typename Iter, template <typename, typename> typename Compare>
-    void GetAvgBF(Iter iter, SizeT row_count) {
+    void GetAvgBF(Iter iter, size_t row_count) {
         const auto *embedding_info = static_cast<EmbeddingInfo *>(column_def_->type()->type_info().get());
-        SizeT dim = embedding_info->Dimension();
+        size_t dim = embedding_info->Dimension();
         const LSGConfig &lsg_config = *index_hnsw_->lsg_config_;
 
-        const SizeT sample_count = bf_sample_vecs_.size() / dim;
+        const size_t sample_count = bf_sample_vecs_.size() / dim;
         const auto &sample_data = bf_sample_vecs_;
 
         bf_avg_.resize(bf_avg_.size() + row_count);
@@ -344,15 +342,15 @@ private:
                 UnrecoverableError(fmt::format("Invalid metric type: {}", MetricTypeToString(index_hnsw_->metric_type_)));
         }
         KnnDistance1<DataType, DistanceType> dist_f(dist_type);
-        SizeT ls_k = std::min(lsg_config.ls_k_, sample_count);
+        size_t ls_k = std::min(lsg_config.ls_k_, sample_count);
         if constexpr (SplitIter<Iter>) {
             Iter iter_copy = iter;
             auto iters = std::move(iter_copy).split();
             auto &thread_pool = InfinityContext::instance().GetLsgBuildThreadPool();
-            Vector<std::future<void>> futs;
+            std::vector<std::future<void>> futs;
             for (auto &splited_iter : iters) {
                 futs.emplace_back(thread_pool.push([&](int id) {
-                    MergeKnn<DataType, Compare, DistanceType> merge_heap(1, ls_k, None);
+                    MergeKnn<DataType, Compare, DistanceType> merge_heap(1, ls_k, std::nullopt);
                     while (true) {
                         auto next_opt = splited_iter.Next();
                         if (!next_opt.has_value()) {
@@ -372,14 +370,14 @@ private:
                     }
                 }));
             }
-            [[maybe_unused]] SizeT i = 0;
+            [[maybe_unused]] size_t i = 0;
             for (auto &fut : futs) {
                 fut.get();
                 LOG_INFO(fmt::format("Future {} finished", i++));
             }
 
         } else {
-            MergeKnn<DataType, Compare, DistanceType> merge_heap(1, ls_k, None);
+            MergeKnn<DataType, Compare, DistanceType> merge_heap(1, ls_k, std::nullopt);
             while (true) {
                 auto next_opt = iter.Next();
                 if (!next_opt.has_value()) {
@@ -400,14 +398,14 @@ private:
 
 private:
     const IndexHnsw *index_hnsw_ = nullptr;
-    SharedPtr<ColumnDef> column_def_ = nullptr;
+    std::shared_ptr<ColumnDef> column_def_ = nullptr;
 
-    UniquePtr<KnnDistanceBase1> knn_distance_;
+    std::unique_ptr<KnnDistanceBase1> knn_distance_;
 
-    Vector<DataType> bf_sample_vecs_;
-    Vector<DistanceType> bf_avg_;
+    std::vector<DataType> bf_sample_vecs_;
+    std::vector<DistanceType> bf_avg_;
     IterIVFDataAccessor ivf_sample_iter_;
-    Vector<DistanceType> ivf_avg_;
+    std::vector<DistanceType> ivf_avg_;
 };
 
 } // namespace infinity

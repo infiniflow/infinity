@@ -15,7 +15,12 @@
 #include "bitmap_info.h"
 #include "default_value.h"
 #include "parser_assert.h"
-#include <memory>
+
+#ifndef PARESER_USE_STD_MODULE
+#define PARESER_USE_STD_MODULE 1
+import std;
+import std.compat;
+#endif
 
 namespace infinity {
 

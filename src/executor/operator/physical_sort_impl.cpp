@@ -12,15 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <string>
-
 module infinity_core:physical_sort.impl;
 
 import :physical_sort;
-
-import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
@@ -30,15 +24,16 @@ import :column_vector;
 import :expression_state;
 import :base_expression;
 import :expression_evaluator;
-
 import :physical_operator_type;
 import :operator_state;
 import :data_block;
 import :infinity_exception;
-import :third_party;
 import :status;
 import :physical_top;
 import :logger;
+
+import std;
+import third_party;
 
 namespace infinity {
 
@@ -52,9 +47,9 @@ struct BlockRawIndex {
 class Comparator {
 public:
     explicit Comparator(const CompareTwoRowAndPreferLeft &prefer_left_function,
-                        const Vector<UniquePtr<DataBlock>> &order_by_blocks,
-                        const Vector<SharedPtr<BaseExpression>> &expressions,
-                        Vector<SharedPtr<ExpressionState>> &expr_states)
+                        const std::vector<std::unique_ptr<DataBlock>> &order_by_blocks,
+                        const std::vector<std::shared_ptr<BaseExpression>> &expressions,
+                        std::vector<std::shared_ptr<ExpressionState>> &expr_states)
         : prefer_left_function_(prefer_left_function), order_by_blocks_(order_by_blocks), expressions_(expressions), expr_states_(expr_states) {}
 
     void Init() {
@@ -72,19 +67,19 @@ public:
 
 private:
     const CompareTwoRowAndPreferLeft &prefer_left_function_;
-    const Vector<UniquePtr<DataBlock>> &order_by_blocks_;
-    const Vector<SharedPtr<BaseExpression>> &expressions_;
-    Vector<SharedPtr<ExpressionState>> &expr_states_;
+    const std::vector<std::unique_ptr<DataBlock>> &order_by_blocks_;
+    const std::vector<std::shared_ptr<BaseExpression>> &expressions_;
+    std::vector<std::shared_ptr<ExpressionState>> &expr_states_;
 
     // Blocks -> Expressions
-    Vector<Vector<SharedPtr<ColumnVector>>> eval_results_;
+    std::vector<std::vector<std::shared_ptr<ColumnVector>>> eval_results_;
 };
 
-Vector<BlockRawIndex> MergeTwoIndexes(Vector<BlockRawIndex> &&indexes_a, Vector<BlockRawIndex> &&indexes_b, Comparator &comparator) {
+std::vector<BlockRawIndex> MergeTwoIndexes(std::vector<BlockRawIndex> &&indexes_a, std::vector<BlockRawIndex> &&indexes_b, Comparator &comparator) {
     if (indexes_a.empty() || indexes_b.empty()) {
         return indexes_a.empty() ? indexes_b : indexes_a;
     }
-    Vector<BlockRawIndex> merged_indexes;
+    std::vector<BlockRawIndex> merged_indexes;
     merged_indexes.reserve(indexes_a.size() + indexes_b.size());
 
     auto ptr_a = indexes_a.begin();
@@ -109,55 +104,55 @@ Vector<BlockRawIndex> MergeTwoIndexes(Vector<BlockRawIndex> &&indexes_a, Vector<
     return merged_indexes;
 }
 
-Vector<BlockRawIndex> MergeIndexes(Vector<Vector<BlockRawIndex>> &indexes_group, SizeT l, SizeT r, Comparator &comparator) {
+std::vector<BlockRawIndex> MergeIndexes(std::vector<std::vector<BlockRawIndex>> &indexes_group, size_t l, size_t r, Comparator &comparator) {
     if (l > r or r >= indexes_group.size())
-        return Vector<BlockRawIndex>();
+        return std::vector<BlockRawIndex>();
     if (l == r)
         return indexes_group[l];
-    SizeT mid = (l + r) >> 1;
+    size_t mid = (l + r) >> 1;
     return MergeTwoIndexes(MergeIndexes(indexes_group, l, mid, comparator), MergeIndexes(indexes_group, mid + 1, r, comparator), comparator);
 }
 
-void CopyWithIndexes(const Vector<UniquePtr<DataBlock>> &input_blocks,
-                     Vector<UniquePtr<DataBlock>> &output_blocks,
-                     const Vector<BlockRawIndex> &block_indexes) {
+void CopyWithIndexes(const std::vector<std::unique_ptr<DataBlock>> &input_blocks,
+                     std::vector<std::unique_ptr<DataBlock>> &output_blocks,
+                     const std::vector<BlockRawIndex> &block_indexes) {
     if (input_blocks.empty()) {
         return;
     }
 
-    SizeT start_block_index = output_blocks.size();
+    size_t start_block_index = output_blocks.size();
     auto block_count = (block_indexes.size() + DEFAULT_BLOCK_CAPACITY - 1) / DEFAULT_BLOCK_CAPACITY;
 
     // copy with block_indexes and push to unmerge_sorted_blocks
-    for (SizeT i = 0; i < block_count; ++i) {
+    for (size_t i = 0; i < block_count; ++i) {
         auto sorted_datablock = DataBlock::MakeUniquePtr();
         sorted_datablock->Init(input_blocks[0]->types());
 
         output_blocks.push_back(std::move(sorted_datablock));
     }
-    for (SizeT index_idx = 0; index_idx < block_indexes.size(); ++index_idx) {
+    for (size_t index_idx = 0; index_idx < block_indexes.size(); ++index_idx) {
         auto &block_index = block_indexes[index_idx];
-        const Vector<SharedPtr<ColumnVector>> &output_column_vectors =
+        const std::vector<std::shared_ptr<ColumnVector>> &output_column_vectors =
             output_blocks[(index_idx / DEFAULT_BLOCK_CAPACITY) + start_block_index]->column_vectors;
 
-        for (SizeT column_id = 0; column_id < output_column_vectors.size(); ++column_id) {
+        for (size_t column_id = 0; column_id < output_column_vectors.size(); ++column_id) {
             output_column_vectors[column_id]->AppendWith(*input_blocks[block_index.block_idx_]->column_vectors[column_id].get(),
                                                          block_index.offset_,
                                                          1);
         }
     }
-    for (SizeT i = 0; i < block_count; ++i) {
+    for (size_t i = 0; i < block_count; ++i) {
         output_blocks[i + start_block_index]->Finalize();
     }
 }
 
-void PhysicalSort::Init(QueryContext* query_context) {
+void PhysicalSort::Init(QueryContext *query_context) {
     auto sort_expr_count = order_by_types_.size();
     if (sort_expr_count != expressions_.size()) {
-        String error_message = "order_by_types_.size() != expressions_.size()";
-        UnrecoverableError(error_message);
+        UnrecoverableError("order_by_types_.size() != expressions_.size()");
     }
-    Vector<std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> sort_functions;
+    std::vector<std::function<std::strong_ordering(const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32)>>
+        sort_functions;
     sort_functions.reserve(sort_expr_count);
     for (u32 i = 0; i < sort_expr_count; ++i) {
         sort_functions.emplace_back(PhysicalTop::GenerateSortFunction(order_by_types_[i], expressions_[i]));
@@ -170,7 +165,7 @@ bool PhysicalSort::Execute(QueryContext *, OperatorState *operator_state) {
     auto *sort_operator_state = static_cast<SortOperatorState *>(operator_state);
 
     // Generate block indexes
-    Vector<BlockRawIndex> block_indexes;
+    std::vector<BlockRawIndex> block_indexes;
     auto pre_op_state = operator_state->prev_op_state_;
 
     block_indexes.reserve(pre_op_state->data_block_array_.size() * DEFAULT_BLOCK_CAPACITY);
@@ -198,13 +193,13 @@ bool PhysicalSort::Execute(QueryContext *, OperatorState *operator_state) {
     }
     auto &unmerge_sorted_blocks = sort_operator_state->unmerge_sorted_blocks_;
     auto merge_comparator = Comparator(prefer_left_function_, unmerge_sorted_blocks, expressions_, expr_states);
-    Vector<Vector<BlockRawIndex>> indexes_group;
+    std::vector<std::vector<BlockRawIndex>> indexes_group;
 
     merge_comparator.Init();
     indexes_group.reserve(unmerge_sorted_blocks.size());
 
     for (u32 block_id = 0; block_id < unmerge_sorted_blocks.size(); ++block_id) {
-        Vector<BlockRawIndex> indexes;
+        std::vector<BlockRawIndex> indexes;
         indexes.reserve(unmerge_sorted_blocks[block_id]->row_count());
 
         for (u32 offset = 0; offset < unmerge_sorted_blocks[block_id]->row_count(); ++offset) {

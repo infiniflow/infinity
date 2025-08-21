@@ -7,7 +7,6 @@ module;
 module infinity_core:hnsw_handler.impl;
 
 import :hnsw_handler;
-
 import :buffer_manager;
 import :buffer_handle;
 import :block_column_iter;
@@ -15,11 +14,12 @@ import :memindex_tracer;
 import :default_values;
 import :multivector_util;
 import :infinity_exception;
-import :third_party;
 import :column_vector;
 import :local_file_handle;
 import :chunk_index_meta;
 import :plain_vec_store;
+
+import third_party;
 
 import embedding_info;
 import embedding_type;
@@ -37,15 +37,15 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
                         using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType, true>, SegmentOffset, OwnMem>;
-                        return UniquePtr<HnswIndex>();
+                        return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricInnerProduct: {
                         using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType, true>, SegmentOffset, OwnMem>;
-                        return UniquePtr<HnswIndex>();
+                        return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricCosine: {
                         using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType, true>, SegmentOffset, OwnMem>;
-                        return UniquePtr<HnswIndex>();
+                        return std::unique_ptr<HnswIndex>();
                     }
                     default: {
                         return nullptr;
@@ -55,15 +55,15 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
                         using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType>, SegmentOffset, OwnMem>;
-                        return UniquePtr<HnswIndex>();
+                        return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricInnerProduct: {
                         using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType>, SegmentOffset, OwnMem>;
-                        return UniquePtr<HnswIndex>();
+                        return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricCosine: {
                         using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType>, SegmentOffset, OwnMem>;
-                        return UniquePtr<HnswIndex>();
+                        return std::unique_ptr<HnswIndex>();
                     }
                     default: {
                         return nullptr;
@@ -80,15 +80,15 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
                         using HnswIndex = KnnHnsw<LVQL2VecStoreType<DataType, i8, true>, SegmentOffset, OwnMem>;
-                        return UniquePtr<HnswIndex>();
+                        return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricInnerProduct: {
                         using HnswIndex = KnnHnsw<LVQIPVecStoreType<DataType, i8, true>, SegmentOffset, OwnMem>;
-                        return UniquePtr<HnswIndex>();
+                        return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricCosine: {
                         using HnswIndex = KnnHnsw<LVQCosVecStoreType<DataType, i8, true>, SegmentOffset, OwnMem>;
-                        return UniquePtr<HnswIndex>();
+                        return std::unique_ptr<HnswIndex>();
                     }
                     default: {
                         return nullptr;
@@ -98,15 +98,15 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
                         using HnswIndex = KnnHnsw<LVQL2VecStoreType<DataType, i8>, SegmentOffset, OwnMem>;
-                        return UniquePtr<HnswIndex>();
+                        return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricInnerProduct: {
                         using HnswIndex = KnnHnsw<LVQIPVecStoreType<DataType, i8>, SegmentOffset, OwnMem>;
-                        return UniquePtr<HnswIndex>();
+                        return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricCosine: {
                         using HnswIndex = KnnHnsw<LVQCosVecStoreType<DataType, i8>, SegmentOffset, OwnMem>;
-                        return UniquePtr<HnswIndex>();
+                        return std::unique_ptr<HnswIndex>();
                     }
                     default: {
                         return nullptr;
@@ -123,7 +123,7 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
 }
 
 template <bool OwnMem>
-AbstractHnsw InitAbstractIndexT(const IndexBase *index_base, SharedPtr<ColumnDef> column_def) {
+AbstractHnsw InitAbstractIndexT(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def) {
     const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get());
 
@@ -143,7 +143,7 @@ AbstractHnsw InitAbstractIndexT(const IndexBase *index_base, SharedPtr<ColumnDef
     }
 }
 
-AbstractHnsw HnswHandler::InitAbstractIndex(const IndexBase *index_base, SharedPtr<ColumnDef> column_def, bool own_mem) {
+AbstractHnsw HnswHandler::InitAbstractIndex(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem) {
     if (own_mem) {
         return InitAbstractIndexT<true>(index_base, column_def);
     } else {
@@ -151,19 +151,19 @@ AbstractHnsw HnswHandler::InitAbstractIndex(const IndexBase *index_base, SharedP
     }
 }
 
-HnswHandler::HnswHandler(const IndexBase *index_base, SharedPtr<ColumnDef> column_def, bool own_mem)
+HnswHandler::HnswHandler(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem)
     : hnsw_(InitAbstractIndex(index_base, column_def, own_mem)) {
     if (!own_mem)
         return;
     const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get());
 
-    SizeT chunk_size = index_hnsw->block_size_;
-    SizeT max_chunk_num = (DEFAULT_SEGMENT_CAPACITY - 1) / chunk_size + 1;
+    size_t chunk_size = index_hnsw->block_size_;
+    size_t max_chunk_num = (DEFAULT_SEGMENT_CAPACITY - 1) / chunk_size + 1;
 
-    SizeT dim = embedding_info->Dimension();
-    SizeT M = index_hnsw->M_;
-    SizeT ef_construction = index_hnsw->ef_construction_;
+    size_t dim = embedding_info->Dimension();
+    size_t M = index_hnsw->M_;
+    size_t ef_construction = index_hnsw->ef_construction_;
     std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
@@ -182,17 +182,17 @@ HnswHandler::HnswHandler(const IndexBase *index_base, SharedPtr<ColumnDef> colum
         hnsw_);
 }
 
-UniquePtr<HnswHandler> HnswHandler::Make(const IndexBase *index_base, SharedPtr<ColumnDef> column_def, bool own_mem) {
-    return MakeUnique<HnswHandler>(index_base, column_def, own_mem);
+std::unique_ptr<HnswHandler> HnswHandler::Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem) {
+    return std::make_unique<HnswHandler>(index_base, column_def, own_mem);
 }
 
-SizeT HnswHandler::InsertVecs(SegmentOffset block_offset,
-                              const ColumnVector &col,
-                              BlockOffset offset,
-                              BlockOffset row_count,
-                              const HnswInsertConfig &config,
-                              SizeT kBuildBucketSize) {
-    SizeT mem_usage{};
+size_t HnswHandler::InsertVecs(SegmentOffset block_offset,
+                               const ColumnVector &col,
+                               BlockOffset offset,
+                               BlockOffset row_count,
+                               const HnswInsertConfig &config,
+                               size_t kBuildBucketSize) {
+    size_t mem_usage{};
     std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
@@ -225,12 +225,12 @@ SizeT HnswHandler::InsertVecs(SegmentOffset block_offset,
     return mem_usage;
 }
 
-SizeT HnswHandler::InsertSampleVecs(SizeT sample_num,
+size_t HnswHandler::InsertSampleVecs(size_t sample_num,
                                     SegmentOffset block_offset,
                                     BlockOffset offset,
                                     const ColumnVector &col,
                                     BlockOffset row_count) {
-    SizeT insert_num = 0;
+    size_t insert_num = 0;
     std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
@@ -305,12 +305,12 @@ void HnswHandler::SetLSGParam() {
         hnsw_);
 }
 
-SizeT HnswHandler::MemUsage() const {
+size_t HnswHandler::MemUsage() const {
     return std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                return SizeT(0);
+                return size_t(0);
             } else {
                 return index->mem_usage();
             }
@@ -318,12 +318,12 @@ SizeT HnswHandler::MemUsage() const {
         hnsw_);
 }
 
-SizeT HnswHandler::GetRowCount() const {
+size_t HnswHandler::GetRowCount() const {
     return std::visit(
         [](auto &&index) {
             using IndexType = std::decay_t<decltype(index)>;
             if constexpr (std::is_same_v<IndexType, std::nullptr_t>) {
-                return SizeT(0);
+                return size_t(0);
             } else {
                 return index->GetVecNum();
             }
@@ -331,25 +331,25 @@ SizeT HnswHandler::GetRowCount() const {
         hnsw_);
 }
 
-SizeT HnswHandler::GetSizeInBytes() const {
+size_t HnswHandler::GetSizeInBytes() const {
     return std::visit(
         [](auto &&index) {
             using T = std::decay_t<decltype(index)>;
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                return SizeT(0);
+                return size_t(0);
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
                     return index->GetSizeInBytes();
                 } else {
-                    return SizeT(0);
+                    return size_t(0);
                 }
             }
         },
         hnsw_);
 }
 
-Pair<SizeT, SizeT> HnswHandler::GetInfo() const { return {MemUsage(), GetRowCount()}; }
+std::pair<size_t, size_t> HnswHandler::GetInfo() const { return {MemUsage(), GetRowCount()}; }
 
 void HnswHandler::Check() const {
     std::visit(
@@ -400,7 +400,7 @@ void HnswHandler::Load(LocalFileHandle &file_handle) {
         hnsw_);
 }
 
-void HnswHandler::LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {
+void HnswHandler::LoadFromPtr(LocalFileHandle &file_handle, size_t file_size) {
     std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
@@ -418,7 +418,7 @@ void HnswHandler::LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {
         hnsw_);
 }
 
-void HnswHandler::LoadFromPtr(const char *ptr, SizeT size) {
+void HnswHandler::LoadFromPtr(const char *ptr, size_t size) {
     std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
@@ -496,7 +496,7 @@ void HnswHandler::CompressToLVQ() {
 }
 
 HnswIndexInMem::~HnswIndexInMem() {
-    SizeT mem_usage = hnsw_handler_->MemUsage();
+    size_t mem_usage = hnsw_handler_->MemUsage();
     if (own_memory_ && hnsw_handler_ != nullptr) {
         delete hnsw_handler_;
     }
@@ -512,8 +512,8 @@ HnswIndexInMem::~HnswIndexInMem() {
     }
 }
 
-UniquePtr<HnswIndexInMem> HnswIndexInMem::Make(RowID begin_row_id, const IndexBase *index_base, SharedPtr<ColumnDef> column_def, bool trace) {
-    auto memidx = MakeUnique<HnswIndexInMem>(begin_row_id, index_base, column_def, trace);
+std::unique_ptr<HnswIndexInMem> HnswIndexInMem::Make(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool trace) {
+    auto memidx = std::make_unique<HnswIndexInMem>(begin_row_id, index_base, column_def, trace);
     if (trace) {
         auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
         if (memindex_tracer != nullptr) {
@@ -523,9 +523,9 @@ UniquePtr<HnswIndexInMem> HnswIndexInMem::Make(RowID begin_row_id, const IndexBa
     return memidx;
 }
 
-UniquePtr<HnswIndexInMem> HnswIndexInMem::Make(const IndexBase *index_base, SharedPtr<ColumnDef> column_def, bool trace) {
+std::unique_ptr<HnswIndexInMem> HnswIndexInMem::Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool trace) {
     RowID begin_row_id{0, 0};
-    auto memidx = MakeUnique<HnswIndexInMem>(begin_row_id, index_base, column_def, trace);
+    auto memidx = std::make_unique<HnswIndexInMem>(begin_row_id, index_base, column_def, trace);
     if (trace) {
         auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
         if (memindex_tracer != nullptr) {
@@ -537,7 +537,11 @@ UniquePtr<HnswIndexInMem> HnswIndexInMem::Make(const IndexBase *index_base, Shar
 
 MemIndexTracerInfo HnswIndexInMem::GetInfo() const {
     auto [mem_used, row_cnt] = hnsw_handler_->GetInfo();
-    return MemIndexTracerInfo(MakeShared<String>(index_name_), MakeShared<String>(table_name_), MakeShared<String>(db_name_), mem_used, row_cnt);
+    return MemIndexTracerInfo(std::make_shared<std::string>(index_name_),
+                              std::make_shared<std::string>(table_name_),
+                              std::make_shared<std::string>(db_name_),
+                              mem_used,
+                              row_cnt);
 }
 
 void HnswIndexInMem::InsertVecs(SegmentOffset block_offset,
@@ -545,15 +549,15 @@ void HnswIndexInMem::InsertVecs(SegmentOffset block_offset,
                                 BlockOffset offset,
                                 BlockOffset row_count,
                                 const HnswInsertConfig &config) {
-    SizeT mem_usage = hnsw_handler_->InsertVecs(block_offset, col, offset, row_count, config, kBuildBucketSize);
+    size_t mem_usage = hnsw_handler_->InsertVecs(block_offset, col, offset, row_count, config, kBuildBucketSize);
     row_count_ += row_count;
     this->IncreaseMemoryUsageBase(mem_usage);
 }
 
-void HnswIndexInMem::Dump(BufferObj *buffer_obj, SizeT *dump_size_ptr) {
+void HnswIndexInMem::Dump(BufferObj *buffer_obj, size_t *dump_size_ptr) {
     trace_ = false;
     if (dump_size_ptr != nullptr) {
-        SizeT dump_size = hnsw_handler_->MemUsage();
+        size_t dump_size = hnsw_handler_->MemUsage();
         *dump_size_ptr = dump_size;
     }
 
@@ -564,7 +568,7 @@ void HnswIndexInMem::Dump(BufferObj *buffer_obj, SizeT *dump_size_ptr) {
     chunk_handle_ = std::move(handle);
 }
 
-SizeT HnswIndexInMem::InsertSampleVecs(SizeT sample_num,
+size_t HnswIndexInMem::InsertSampleVecs(size_t sample_num,
                                        SegmentOffset block_offset,
                                        BlockOffset offset,
                                        const ColumnVector &col,
@@ -578,9 +582,9 @@ void HnswIndexInMem::InsertLSAvg(SegmentOffset block_offset, BlockOffset offset,
 
 void HnswIndexInMem::SetLSGParam() { hnsw_handler_->SetLSGParam(); }
 
-SizeT HnswIndexInMem::GetRowCount() const { return row_count_; }
+size_t HnswIndexInMem::GetRowCount() const { return row_count_; }
 
-SizeT HnswIndexInMem::GetSizeInBytes() const { return hnsw_handler_->GetSizeInBytes(); }
+size_t HnswIndexInMem::GetSizeInBytes() const { return hnsw_handler_->GetSizeInBytes(); }
 
 const ChunkIndexMetaInfo HnswIndexInMem::GetChunkIndexMetaInfo() const {
     return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), GetSizeInBytes()};

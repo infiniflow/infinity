@@ -1,10 +1,6 @@
-module;
-
 module infinity_core:posting_byte_slice.impl;
 
 import :posting_byte_slice;
-import :stl;
-
 import :posting_field;
 import :flush_info;
 import :file_writer;
@@ -16,10 +12,10 @@ PostingByteSlice::PostingByteSlice() : buffer_(), posting_writer_() {}
 
 void PostingByteSlice::Init(const PostingFields *value) { buffer_.Init(value); }
 
-SizeT PostingByteSlice::DoFlush() {
+size_t PostingByteSlice::DoFlush() {
     u32 flush_size = 0;
     const PostingFields *posting_fields = buffer_.GetPostingFields();
-    for (SizeT i = 0; i < posting_fields->GetSize(); ++i) {
+    for (size_t i = 0; i < posting_fields->GetSize(); ++i) {
         PostingField *posting_field = posting_fields->GetValue(i);
         u8 *buffer = buffer_.GetRow(posting_field->location_);
         flush_size += posting_field->Encode(posting_writer_, buffer, buffer_.Size() * posting_field->GetSize());
@@ -27,11 +23,11 @@ SizeT PostingByteSlice::DoFlush() {
     return flush_size;
 }
 
-SizeT PostingByteSlice::Flush() {
+size_t PostingByteSlice::Flush() {
     if (buffer_.Size() == 0) {
         return 0;
     }
-    SizeT flush_size = DoFlush();
+    size_t flush_size = DoFlush();
     FlushInfo flush_info;
     flush_info.SetFlushCount(flush_info_.GetFlushCount() + buffer_.Size());
     flush_info.SetFlushLength(flush_info_.GetFlushLength() + flush_size);
@@ -42,7 +38,7 @@ SizeT PostingByteSlice::Flush() {
     return flush_size;
 }
 
-void PostingByteSlice::Dump(const SharedPtr<FileWriter> &file, bool spill) {
+void PostingByteSlice::Dump(const std::shared_ptr<FileWriter> &file, bool spill) {
     if (spill) {
         buffer_.Dump(file);
         file->WriteVLong(flush_info_.flush_info_);
@@ -54,7 +50,7 @@ void PostingByteSlice::Dump(const SharedPtr<FileWriter> &file, bool spill) {
     posting_writer_.Dump(file);
 }
 
-void PostingByteSlice::Load(const SharedPtr<FileReader> &file) {
+void PostingByteSlice::Load(const std::shared_ptr<FileReader> &file) {
     buffer_.Load(file);
     flush_info_.flush_info_ = file->ReadVLong();
     u32 byte_slice_size = file->ReadVInt();

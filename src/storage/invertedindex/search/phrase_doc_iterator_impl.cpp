@@ -1,25 +1,24 @@
 module;
 
 #include <cassert>
-#include <iostream>
-#include <vector>
-#include <cmath>
 
 module infinity_core:phrase_doc_iterator.impl;
 
 import :phrase_doc_iterator;
-
-import :stl;
 import :doc_iterator;
-import internal_types;
-import :third_party;
 import :posting_iterator;
 import :column_length_io;
 import :logger;
 
+import std;
+import std.compat;
+import third_party;
+
+import internal_types;
+
 namespace infinity {
 
-PhraseDocIterator::PhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters,
+PhraseDocIterator::PhraseDocIterator(std::vector<std::unique_ptr<PostingIterator>> &&iters,
                                      const float weight,
                                      const u32 slop,
                                      const FulltextSimilarity ft_similarity)
@@ -31,7 +30,7 @@ PhraseDocIterator::PhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters,
     } else {
         estimate_doc_freq_ = 0;
     }
-    for (SizeT i = 0; i < pos_iters_.size(); ++i) {
+    for (size_t i = 0; i < pos_iters_.size(); ++i) {
         estimate_doc_freq_ = std::min(estimate_doc_freq_, pos_iters_[i]->GetDocFreq());
     }
     estimate_iterate_cost_ = {1, estimate_doc_freq_};
@@ -39,7 +38,10 @@ PhraseDocIterator::PhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters,
     block_max_bm25_score_cache_part_info_vals_.resize(pos_iters_.size());
 }
 
-void PhraseDocIterator::InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader, const float delta, const float k1, const float b) {
+void PhraseDocIterator::InitBM25Info(std::unique_ptr<FullTextColumnLengthReader> &&column_length_reader,
+                                     const float delta,
+                                     const float k1,
+                                     const float b) {
     column_length_reader_ = std::move(column_length_reader);
     const u64 total_df = column_length_reader_->GetTotalDF();
     const float avg_column_len = column_length_reader_->GetAvgColumnLength();
@@ -55,7 +57,7 @@ void PhraseDocIterator::InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&col
     f3 = f2 * std::numeric_limits<u16>::max();
     f4 = delta / (k1 + 1.0F);
     if (SHOULD_LOG_TRACE()) {
-        OStringStream oss;
+        std::ostringstream oss;
         oss << "PhraseDocIterator: ";
         if (column_name_ptr_ != nullptr) {
             oss << "column: " << *column_name_ptr_ << ",";
@@ -115,7 +117,7 @@ float PhraseDocIterator::BlockMaxBM25Score() {
         // bm25_common_score_ / (1.0F + k1 * ((1.0F - b) / block_max_tf + b / block_max_percentage / avg_column_len));
         // block_max_bm25_score_cache_ = bm25_common_score_ / (1.0F + f1 / block_max_tf + f3 / block_max_percentage_u16);
         float div_add_min = std::numeric_limits<float>::max();
-        for (SizeT i = 0; i < pos_iters_.size(); ++i) {
+        for (size_t i = 0; i < pos_iters_.size(); ++i) {
             const auto *iter = pos_iters_[i].get();
             float current_div_add_min = {};
             if (const auto iter_block_last_doc_id = iter->BlockLastDocID();
@@ -171,7 +173,7 @@ float PhraseDocIterator::BM25Score() {
     return bm25_score_cache_;
 }
 
-void PhraseDocIterator::PrintTree(std::ostream &os, const String &prefix, bool is_final) const {
+void PhraseDocIterator::PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const {
     os << prefix;
     os << (is_final ? "└──" : "├──");
     os << "PhraseDocIterator";
@@ -190,7 +192,7 @@ void PhraseDocIterator::PrintTree(std::ostream &os, const String &prefix, bool i
 bool PhraseDocIterator::GetExactPhraseMatchData() {
     pos_t beg_position0 = 0;
     pos_t now_position0 = 0;
-    Vector<pos_t> begin_positions;
+    std::vector<pos_t> begin_positions;
     while (true) {
         pos_iters_[0]->SeekPosition(beg_position0, now_position0);
         if (now_position0 == INVALID_POSITION) {
@@ -198,7 +200,7 @@ bool PhraseDocIterator::GetExactPhraseMatchData() {
         }
         beg_position0 = now_position0 + 1;
         bool found = true;
-        for (SizeT i = 1; i < pos_iters_.size(); ++i) {
+        for (size_t i = 1; i < pos_iters_.size(); ++i) {
             auto &iter = pos_iters_[i];
             pos_t beg_position = now_position0 + i;
             pos_t now_position = beg_position;
@@ -216,11 +218,11 @@ bool PhraseDocIterator::GetExactPhraseMatchData() {
     if (SHOULD_LOG_DEBUG()) {
         std::ostringstream oss;
         oss << "Phrase \"" << terms_ptr_->at(0);
-        for (SizeT i = 1; i < terms_ptr_->size(); i++) {
+        for (size_t i = 1; i < terms_ptr_->size(); i++) {
             oss << " " << terms_ptr_->at(i);
         }
         oss << "\"~" << slop_ << " has " << begin_positions.size() << " sulotions:" << std::endl;
-        for (SizeT i = 0; i < begin_positions.size(); i++) {
+        for (size_t i = 0; i < begin_positions.size(); i++) {
             oss << "solution " << i << ": " << begin_positions[0] << std::endl;
         }
         LOG_DEBUG(oss.str());
@@ -237,9 +239,9 @@ bool PhraseDocIterator::GetExactPhraseMatchData() {
 }
 
 bool PhraseDocIterator::GetSloppyPhraseMatchData() {
-    Vector<Vector<int>> positions;
+    std::vector<std::vector<int>> positions;
     for (auto &pos_iter : pos_iters_) {
-        Vector<int> pos_vec;
+        std::vector<int> pos_vec;
         pos_t beg_position = 0;
         pos_t position = INVALID_POSITION;
         while (true) {
@@ -272,17 +274,17 @@ bool PhraseDocIterator::GetSloppyPhraseMatchData() {
     For a phrase, its freq is sum of every acceptable solution's sloppyWeight.
     */
     struct StepState {
-        SizeT pos_i;
-        SizeT term_pos_idx; // index to positions[pos_i]
+        size_t pos_i;
+        size_t term_pos_idx; // index to positions[pos_i]
         int min_phrase_pos;
         int max_phrase_pos;
     };
     struct Solution {
-        Vector<StepState> steps;
+        std::vector<StepState> steps;
         u32 matchLength;
     };
-    Vector<StepState> steps = {{0, 0, int(positions[0][0]), int(positions[0][0])}};
-    Vector<Solution> solutions;
+    std::vector<StepState> steps = {{0, 0, int(positions[0][0]), int(positions[0][0])}};
+    std::vector<Solution> solutions;
     auto CalibrateLastStep = [this, &positions, &steps] {
         StepState &step = steps.back();
         if (step.term_pos_idx >= positions[step.pos_i].size())
@@ -343,14 +345,14 @@ bool PhraseDocIterator::GetSloppyPhraseMatchData() {
     if (SHOULD_LOG_DEBUG()) {
         std::ostringstream oss;
         oss << "Phrase \"" << terms_ptr_->at(0);
-        for (SizeT i = 1; i < terms_ptr_->size(); i++) {
+        for (size_t i = 1; i < terms_ptr_->size(); i++) {
             oss << " " << terms_ptr_->at(i);
         }
         oss << "\"~" << slop_ << " has " << solutions.size() << " sulotions:" << std::endl;
-        for (SizeT i = 0; i < solutions.size(); i++) {
+        for (size_t i = 0; i < solutions.size(); i++) {
             oss << "solution " << i << ": ";
             Solution &solution = solutions[i];
-            for (SizeT j = 0; j < solution.steps.size(); j++) {
+            for (size_t j = 0; j < solution.steps.size(); j++) {
                 oss << "(" << solution.steps[j].pos_i << "," << solution.steps[j].term_pos_idx << "," << solution.steps[j].min_phrase_pos << ","
                     << solution.steps[j].max_phrase_pos << ") ";
             }

@@ -13,16 +13,12 @@
 // limitations under the License.
 
 module;
+
 #include <cassert>
-#include <cmath>
-#include <cstdlib>
-#include <string>
 
 module infinity_core:physical_fusion.impl;
 
 import :physical_fusion;
-
-import :stl;
 import :query_context;
 import :operator_state;
 import :physical_operator;
@@ -38,25 +34,29 @@ import :base_expression;
 import :fusion_expression;
 import :load_meta;
 import :default_values;
-import :third_party;
 import :infinity_exception;
 import :value;
-import internal_types;
 import :logger;
-import logical_type;
-import knn_expr;
-import match_tensor_expr;
 import :buffer_manager;
 import :meta_info;
-import column_def;
-import embedding_info;
 import :block_index;
 import :mlas_matrix_multiply;
 import :physical_match_tensor_scan;
 import :physical_knn_scan;
 import :physical_merge_knn;
 import :physical_read_cache;
+
+import std;
+import std.compat;
+import third_party;
+
 import data_type;
+import column_def;
+import embedding_info;
+import logical_type;
+import knn_expr;
+import match_tensor_expr;
+import internal_types;
 
 namespace infinity {
 
@@ -66,26 +66,26 @@ struct DocScore {
     u32 from_block_idx_;
     u32 from_row_idx_;
     float fusion_score_;
-    Vector<float> child_scores_;
-    Vector<bool> mask_;
+    std::vector<float> child_scores_;
+    std::vector<bool> mask_;
 };
 
 PhysicalFusion::PhysicalFusion(const u64 id,
-                               SharedPtr<BaseTableRef> base_table_ref,
-                               UniquePtr<PhysicalOperator> left,
-                               UniquePtr<PhysicalOperator> right,
-                               Vector<UniquePtr<PhysicalOperator>> other_children,
-                               SharedPtr<FusionExpression> fusion_expr,
-                               SharedPtr<Vector<LoadMeta>> load_metas)
+                               std::shared_ptr<BaseTableRef> base_table_ref,
+                               std::unique_ptr<PhysicalOperator> left,
+                               std::unique_ptr<PhysicalOperator> right,
+                               std::vector<std::unique_ptr<PhysicalOperator>> other_children,
+                               std::shared_ptr<FusionExpression> fusion_expr,
+                               std::shared_ptr<std::vector<LoadMeta>> load_metas)
     : PhysicalOperator(PhysicalOperatorType::kFusion, std::move(left), std::move(right), id, load_metas), other_children_(std::move(other_children)),
       base_table_ref_(std::move(base_table_ref)), fusion_expr_(std::move(fusion_expr)) {}
 
 PhysicalFusion::~PhysicalFusion() {}
 
-void PhysicalFusion::Init(QueryContext* query_context) {
+void PhysicalFusion::Init(QueryContext *query_context) {
     {
-        String &method = fusion_expr_->method_;
-        String to_lower_method;
+        std::string &method = fusion_expr_->method_;
+        std::string to_lower_method;
         std::transform(method.begin(), method.end(), std::back_inserter(to_lower_method), [](unsigned char c) { return std::tolower(c); });
         if (to_lower_method == "weighted_sum") {
             fusion_method_ = FusionMethod::kWeightedSum;
@@ -97,54 +97,52 @@ void PhysicalFusion::Init(QueryContext* query_context) {
     }
     {
         const auto prev_output_names_ptr = left_->GetOutputNames();
-        const Vector<String> &prev_output_names = *prev_output_names_ptr;
-        output_names_ = MakeShared<Vector<String>>(prev_output_names);
+        const std::vector<std::string> &prev_output_names = *prev_output_names_ptr;
+        output_names_ = std::make_shared<std::vector<std::string>>(prev_output_names);
         (*output_names_)[output_names_->size() - 2] = COLUMN_NAME_SCORE;
     }
     {
         const auto prev_output_types_ptr = left_->GetOutputTypes();
-        const Vector<SharedPtr<DataType>> &prev_output_types = *prev_output_types_ptr;
-        output_types_ = MakeShared<Vector<SharedPtr<DataType>>>(prev_output_types);
-        (*output_types_)[output_types_->size() - 2] = MakeShared<DataType>(LogicalType::kFloat);
+        const std::vector<std::shared_ptr<DataType>> &prev_output_types = *prev_output_types_ptr;
+        output_types_ = std::make_shared<std::vector<std::shared_ptr<DataType>>>(prev_output_types);
+        (*output_types_)[output_types_->size() - 2] = std::make_shared<DataType>(LogicalType::kFloat);
     }
     if (output_names_->size() != output_types_->size()) {
-        String error_message =
-            fmt::format("output_names_ size {} is not equal to output_types_ size {}.", output_names_->size(), output_types_->size());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("output_names_ size {} is not equal to output_types_ size {}.", output_names_->size(), output_types_->size()));
     }
 }
 
 // Refers to https://www.elastic.co/guide/en/elasticsearch/reference/current/rrf.html
-void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBlock>>> &input_data_blocks,
-                                        Vector<UniquePtr<DataBlock>> &output_data_block_array) const {
-    SizeT num_children = 2 + other_children_.size();
-    SizeT rank_constant = 60;
-    SizeT topn = DEFAULT_FUSION_OPTION_TOP_N;
-    Vector<float> weights;
+void PhysicalFusion::ExecuteRRFWeighted(const std::map<u64, std::vector<std::unique_ptr<DataBlock>>> &input_data_blocks,
+                                        std::vector<std::unique_ptr<DataBlock>> &output_data_block_array) const {
+    size_t num_children = 2 + other_children_.size();
+    size_t rank_constant = 60;
+    size_t topn = DEFAULT_FUSION_OPTION_TOP_N;
+    std::vector<float> weights;
     if (fusion_expr_->options_.get() != nullptr) {
         if (auto it = fusion_expr_->options_->options_.find("window_size"); it != fusion_expr_->options_->options_.end()) {
-            long l = std::strtol(it->second.c_str(), NULL, 10);
+            long l = std::strtol(it->second.c_str(), nullptr, 10);
             if (l >= 1) {
-                topn = (SizeT)l;
+                topn = (size_t)l;
             }
         }
         if (auto it = fusion_expr_->options_->options_.find("topn"); it != fusion_expr_->options_->options_.end()) {
-            long l = std::strtol(it->second.c_str(), NULL, 10);
+            long l = std::strtol(it->second.c_str(), nullptr, 10);
             if (l >= 1) {
-                topn = (SizeT)l;
+                topn = (size_t)l;
             }
         }
         if (fusion_method_ == FusionMethod::kRRF) {
             if (auto it = fusion_expr_->options_->options_.find("rank_constant"); it != fusion_expr_->options_->options_.end()) {
-                long l = std::strtol(it->second.c_str(), NULL, 10);
+                long l = std::strtol(it->second.c_str(), nullptr, 10);
                 if (l >= 1) {
-                    rank_constant = (SizeT)l;
+                    rank_constant = (size_t)l;
                 }
             }
         } else {
             weights.reserve(num_children);
             if (auto it = fusion_expr_->options_->options_.find("weights"); it != fusion_expr_->options_->options_.end()) {
-                const String &weight_str = it->second;
+                const std::string &weight_str = it->second;
                 std::stringstream ss(weight_str);
                 std::string item;
                 while (std::getline(ss, item, ',')) {
@@ -155,34 +153,33 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
         }
     }
     if (fusion_method_ == FusionMethod::kWeightedSum) {
-        SizeT num_weights = weights.size();
+        size_t num_weights = weights.size();
         if (num_weights < num_children) {
-            for (SizeT i = num_weights; i < num_children; ++i) {
+            for (size_t i = num_weights; i < num_children; ++i) {
                 weights.push_back(1.0F);
             }
         }
     }
 
-    Vector<DocScore> rescore_vec;
-    Map<RowID, SizeT> rescore_map; // row_id to index of rescore_vec_
+    std::vector<DocScore> rescore_vec;
+    std::map<RowID, size_t> rescore_map; // row_id to index of rescore_vec_
     // 1 Prepare rescore_vec
-    SizeT fragment_idx = 0;
+    size_t fragment_idx = 0;
     for (const auto &[fragment_id, input_blocks] : input_data_blocks) {
-        SizeT base_rank = 1;
+        size_t base_rank = 1;
         u32 from_block_idx = 0;
-        for (const UniquePtr<DataBlock> &input_data_block : input_blocks) {
+        for (const std::unique_ptr<DataBlock> &input_data_block : input_blocks) {
             if (input_data_block->column_count() != GetOutputTypes()->size()) {
-                String error_message = fmt::format("input_data_block column count {} is incorrect, expect {}.",
-                                                   input_data_block->column_count(),
-                                                   GetOutputTypes()->size());
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("input_data_block column count {} is incorrect, expect {}.",
+                                               input_data_block->column_count(),
+                                               GetOutputTypes()->size()));
             }
             auto &row_id_column = *input_data_block->column_vectors[input_data_block->column_count() - 1];
             auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
-            SizeT row_n = input_data_block->row_count();
+            size_t row_n = input_data_block->row_count();
             auto &row_score_column = *input_data_block->column_vectors[input_data_block->column_count() - 2];
             auto row_scores = reinterpret_cast<float *>(row_score_column.data());
-            for (SizeT i = 0; i < row_n; i++) {
+            for (size_t i = 0; i < row_n; i++) {
                 RowID docId = row_ids[i];
                 if (rescore_map.find(docId) == rescore_map.end()) {
                     DocScore doc;
@@ -195,7 +192,7 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
                     rescore_vec.push_back(doc);
                     rescore_map[docId] = rescore_vec.size() - 1;
                 }
-                SizeT doc_idx = rescore_map[docId];
+                size_t doc_idx = rescore_map[docId];
                 DocScore &doc = rescore_vec[doc_idx];
                 assert(fragment_idx < num_children);
                 doc.mask_[fragment_idx] = true;
@@ -223,8 +220,8 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
             }
         }
     } else {
-        Vector<bool> min_heaps(num_children, false);
-        for (SizeT i = 0; i < num_children; i++) {
+        std::vector<bool> min_heaps(num_children, false);
+        for (size_t i = 0; i < num_children; i++) {
             PhysicalOperator *child_op = nullptr;
             if (i == 0)
                 child_op = left();
@@ -253,23 +250,22 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
                     break;
                 }
                 case PhysicalOperatorType::kReadCache: {
-                    PhysicalReadCache *phy_read_cache = static_cast<PhysicalReadCache *>(child_op);
+                    auto *phy_read_cache = static_cast<PhysicalReadCache *>(child_op);
                     min_heaps[i] = phy_read_cache->is_min_heap();
                     break;
                 }
                 default: {
-                    String error_message = fmt::format("Cannot determine heap type of operator {}", int(child_op->operator_type()));
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Cannot determine heap type of operator {}", int(child_op->operator_type())));
                 }
             }
         }
         for (auto &doc : rescore_vec) {
             doc.fusion_score_ = 0.0f;
-            for (SizeT i = 0; i < num_children; ++i) {
+            for (size_t i = 0; i < num_children; ++i) {
                 if (!doc.mask_[i])
                     continue;
                 // Normalize the child score in R to [0, 1]
-                double normalized_score = std::atan(doc.child_scores_[i]) / M_PI + 0.5;
+                double normalized_score = std::atan(doc.child_scores_[i]) / std::numbers::pi + 0.5;
                 if (!min_heaps[i])
                     normalized_score = 1.0 - normalized_score;
                 doc.fusion_score_ += weights[i] * normalized_score;
@@ -286,9 +282,9 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
     }
 
     // 4 generate output data blocks
-    UniquePtr<DataBlock> output_data_block = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_data_block = DataBlock::MakeUniquePtr();
     output_data_block->Init(*GetOutputTypes());
-    SizeT row_count = 0;
+    size_t row_count = 0;
     for (DocScore &doc : rescore_vec) {
         // 4.1 get every doc's columns from input data blocks
         if (row_count == output_data_block->capacity()) {
@@ -299,8 +295,8 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
             row_count = 0;
         }
         const auto &input_blocks = input_data_blocks.at(doc.from_input_data_block_id_);
-        SizeT column_n = GetOutputTypes()->size() - 2;
-        for (SizeT i = 0; i < column_n; ++i) {
+        size_t column_n = GetOutputTypes()->size() - 2;
+        for (size_t i = 0; i < column_n; ++i) {
             output_data_block->column_vectors[i]->AppendWith(*input_blocks[doc.from_block_idx_]->column_vectors[i], doc.from_row_idx_, 1);
         }
         // 4.2 add hidden columns: score, row_id
@@ -314,8 +310,8 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
 }
 
 void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
-                                        const Map<u64, Vector<UniquePtr<DataBlock>>> &input_data_blocks,
-                                        Vector<UniquePtr<DataBlock>> &output_data_block_array) const {
+                                        const std::map<u64, std::vector<std::unique_ptr<DataBlock>>> &input_data_blocks,
+                                        std::vector<std::unique_ptr<DataBlock>> &output_data_block_array) const {
     const BlockIndex *block_index = base_table_ref_->block_index_.get();
     const TableInfo *table_info = base_table_ref_->table_info_.get();
     const ColumnID column_id = fusion_expr_->match_tensor_expr_->column_expr_->binding().column_idx;
@@ -355,16 +351,15 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
         }
     }
     BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
-    Vector<MatchTensorRerankDoc> rerank_docs;
+    std::vector<MatchTensorRerankDoc> rerank_docs;
     // 1. prepare query target rows
     for (std::unordered_set<u64> row_id_set; const auto &[input_data_block_id, input_blocks] : input_data_blocks) {
         for (u32 block_id = 0; block_id < input_blocks.size(); ++block_id) {
-            const UniquePtr<DataBlock> &input_data_block = input_blocks[block_id];
+            const std::unique_ptr<DataBlock> &input_data_block = input_blocks[block_id];
             if (input_data_block->column_count() != GetOutputTypes()->size()) {
-                String error_message = fmt::format("input_data_block column count {} is incorrect, expect {}.",
-                                                   input_data_block->column_count(),
-                                                   GetOutputTypes()->size());
-                UnrecoverableError(error_message);
+                UnrecoverableError(fmt::format("input_data_block column count {} is incorrect, expect {}.",
+                                               input_data_block->column_count(),
+                                               GetOutputTypes()->size()));
             }
             auto &row_id_column = *input_data_block->column_vectors[input_data_block->column_count() - 1];
             auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
@@ -394,7 +389,7 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
         rerank_docs.erase(rerank_docs.begin() + topn, rerank_docs.end());
     }
     // 5. generate output data blocks
-    UniquePtr<DataBlock> output_data_block = DataBlock::MakeUniquePtr();
+    std::unique_ptr<DataBlock> output_data_block = DataBlock::MakeUniquePtr();
     output_data_block->Init(*GetOutputTypes());
     u32 row_count = 0;
     for (MatchTensorRerankDoc &doc : rerank_docs) {
@@ -454,12 +449,11 @@ bool PhysicalFusion::ExecuteFirstOp(QueryContext *query_context, FusionOperatorS
 bool PhysicalFusion::ExecuteNotFirstOp(QueryContext *query_context, OperatorState *operator_state) const {
     // this op has prev fusion op
     if (!operator_state->prev_op_state_->Complete()) {
-        String error_message = "Fusion with previous fusion op, but prev_op_state_ is not complete.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Fusion with previous fusion op, but prev_op_state_ is not complete.");
         return false;
     }
     if (fusion_method_ == FusionMethod::kMatchTensor) {
-        Map<u64, Vector<UniquePtr<DataBlock>>> input_data_blocks;
+        std::map<u64, std::vector<std::unique_ptr<DataBlock>>> input_data_blocks;
         input_data_blocks.emplace(0, std::move(operator_state->prev_op_state_->data_block_array_));
         operator_state->prev_op_state_->data_block_array_.clear();
         ExecuteMatchTensor(query_context, input_data_blocks, operator_state->data_block_array_);
@@ -471,15 +465,15 @@ bool PhysicalFusion::ExecuteNotFirstOp(QueryContext *query_context, OperatorStat
     return false;
 }
 
-String PhysicalFusion::ToString(i64 &space) const {
-    String arrow_str;
+std::string PhysicalFusion::ToString(i64 &space) const {
+    std::string arrow_str;
     if (space != 0) {
-        arrow_str = String(space - 2, ' ');
+        arrow_str = std::string(space - 2, ' ');
         arrow_str += "-> PhysicalFusion ";
     } else {
         arrow_str = "PhysicalFusion ";
     }
-    String res = fmt::format("{} {}", arrow_str, fusion_expr_->ToString());
+    std::string res = fmt::format("{} {}", arrow_str, fusion_expr_->ToString());
     return res;
 }
 

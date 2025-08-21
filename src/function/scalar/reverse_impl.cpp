@@ -12,21 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
 module infinity_core:reverse.impl;
 
 import :reverse;
-import :stl;
 import :new_catalog;
 import :status;
-import logical_type;
 import :infinity_exception;
 import :scalar_function;
 import :scalar_function_set;
-import :third_party;
+import :column_vector;
+
 import internal_types;
 import data_type;
-import :column_vector;
+import logical_type;
 
 namespace infinity {
 
@@ -36,30 +34,28 @@ struct ReverseFunction {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
     }
-
 };
 
 template <>
 inline void ReverseFunction::Run(VarcharT &left, VarcharT &result, ColumnVector *left_ptr, ColumnVector *result_ptr) {
-    Span<const char> left_v = left_ptr->GetVarcharInner(left);
+    std::span<const char> left_v = left_ptr->GetVarcharInner(left);
     const char *input = left_v.data();
-    SizeT input_len = left_v.size();
-    String reversed_str(input, input_len);
+    size_t input_len = left_v.size();
+    std::string reversed_str(input, input_len);
     std::reverse(reversed_str.begin(), reversed_str.end());
     result_ptr->AppendVarcharInner(reversed_str, result);
 }
 
 void RegisterReverseFunction(NewCatalog *catalog_ptr) {
-    String func_name = "reverse";
+    std::string func_name = "reverse";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction resverse_function(func_name,
-                                  {DataType(LogicalType::kVarchar)},
-                                  {DataType(LogicalType::kVarchar)},
-                                  &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, ReverseFunction>);
+                                     {DataType(LogicalType::kVarchar)},
+                                     {DataType(LogicalType::kVarchar)},
+                                     &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, ReverseFunction>);
     function_set_ptr->AddFunction(resverse_function);
-
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }

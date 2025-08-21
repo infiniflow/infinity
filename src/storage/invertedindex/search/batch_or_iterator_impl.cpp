@@ -15,35 +15,34 @@
 module;
 
 #include <cassert>
-#include <cstdlib>
-#include <tuple>
-#include <vector>
 
 module infinity_core:batch_or_iterator.impl;
 
 import :batch_or_iterator;
-
-import :stl;
-import :third_party;
 import :index_defines;
 import :term_doc_iterator;
 import :multi_doc_iterator;
-import internal_types;
 import :logger;
 import :infinity_exception;
 import :simd_functions;
 import :default_values;
+
+import std;
+import std.compat;
+import third_party;
+
+import internal_types;
 
 namespace infinity {
 
 // aligned_buffer_: tf * child_num, doc_len * child_num, match_cnt, bm25_score_sum
 // vector of f1, f2, bm25_common_score
 
-BatchOrIterator::BatchOrIterator(Vector<UniquePtr<DocIterator>> &&iterators) : MultiDocIterator(std::move(iterators)) {
+BatchOrIterator::BatchOrIterator(std::vector<std::unique_ptr<DocIterator>> &&iterators) : MultiDocIterator(std::move(iterators)) {
     bm25_score_upper_bound_ = 0.0f;
     estimate_iterate_cost_ = {};
-    const SizeT num_iterators = children_.size();
-    for (SizeT i = 0; i < num_iterators; i++) {
+    const size_t num_iterators = children_.size();
+    for (size_t i = 0; i < num_iterators; i++) {
         auto tdi = dynamic_cast<const TermDocIterator *>(children_[i].get());
         if (tdi == nullptr) {
             UnrecoverableError("BatchOrIterator only supports TermDocIterator");

@@ -14,8 +14,6 @@ module;
 
 export module infinity_core:era;
 
-import :stl;
-
 namespace infinity {
 
 class NewCatalog;

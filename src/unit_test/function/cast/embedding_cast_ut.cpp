@@ -12,24 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-#else
 module;
 
 #include "unit_test/gtest_expand.h"
-#include "gtest/gtest.h"
 
 module infinity_core:ut.embedding_cast;
 
 import :ut.base_test;
 import :infinity_exception;
-import :third_party;
+import third_party;
 import :logger;
-import :stl;
 import :infinity_context;
 import :function_set;
 import :aggregate_function_set;
@@ -42,7 +34,6 @@ import :data_block;
 import :embedding_cast;
 import :column_vector;
 import :bound_cast_func;
-#endif
 
 import global_resource_usage;
 import internal_types;
@@ -69,12 +60,12 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
     }
 
     auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
-    SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);
-    auto col_source = MakeShared<ColumnVector>(source_type);
+    std::shared_ptr<DataType> source_type = std::make_shared<DataType>(LogicalType::kEmbedding, embedding_info);
+    auto col_source = std::make_shared<ColumnVector>(source_type);
     col_source->Initialize();
-    Vector<float> data(embedding_info->Dimension());
+    std::vector<float> data(embedding_info->Dimension());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        for (SizeT j = 0; j < embedding_info->Dimension(); ++j) {
+        for (size_t j = 0; j < embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
@@ -82,7 +73,7 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
     }
 
     for (i64 i = 0; i < 1; ++i) {
-        for (SizeT j = 0; j < embedding_info->Dimension(); ++j) {
+        for (size_t j = 0; j < embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
@@ -93,19 +84,19 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
     // cast embedding float column vector to embedding double column vector
     {
         auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemDouble, 16);
-        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);
+        std::shared_ptr<DataType> target_type = std::make_shared<DataType>(LogicalType::kEmbedding, embedding_info);
         auto source2target_ptr = BindEmbeddingCast(*source_type, *target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
-        auto col_target = MakeShared<ColumnVector>(target_type);
+        auto col_target = std::make_shared<ColumnVector>(target_type);
         col_target->Initialize();
 
         CastParameters cast_parameters;
         EXPECT_TRUE(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters));
 
-        Vector<double> data2(embedding_info->Dimension());
+        std::vector<double> data2(embedding_info->Dimension());
         for (i64 i = 0; i < 1; ++i) {
-            for (SizeT j = 0; j < embedding_info->Dimension(); ++j) {
+            for (size_t j = 0; j < embedding_info->Dimension(); ++j) {
                 data2[j] = double(static_cast<float>(i) + static_cast<float>(j) + 0.5f);
             }
             Value v = Value::MakeEmbedding(data2);

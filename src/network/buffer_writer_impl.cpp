@@ -14,39 +14,37 @@
 
 module;
 
-#include <arpa/inet.h>
-#include <boost/asio/write.hpp>
+#include <netinet/in.h>
 
 module infinity_core:buffer_writer.impl;
 
 import :buffer_writer;
-import :stl;
-import :third_party;
 import :pg_message;
 import :ring_buffer_iterator;
-
 import :infinity_exception;
 import :default_values;
-import :logger;
+
+import std;
+import third_party;
 
 namespace infinity {
 
-SizeT BufferWriter::size() const {
+size_t BufferWriter::size() const {
     const auto current_size = RingBufferIterator::Distance(start_pos_, current_pos_);
     return (current_size < 0) ? (current_size + PG_MSG_BUFFER_SIZE) : current_size;
 }
 
-void BufferWriter::send_string(const String &value, NullTerminator null_terminator) {
+void BufferWriter::send_string(const std::string &value, NullTerminator null_terminator) {
     auto position_in_string = 0u;
 
     if (!full()) {
-        position_in_string = static_cast<u32>(std::min(max_capacity() - size(), static_cast<SizeT>(value.size())));
+        position_in_string = static_cast<u32>(std::min(max_capacity() - size(), value.size()));
         RingBufferIterator::CopyN(value.c_str(), position_in_string, current_pos_);
         current_pos_.increment(position_in_string);
     }
 
     while (position_in_string < value.size()) {
-        const auto bytes_to_transfer = std::min(max_capacity(), static_cast<SizeT>(value.size() - position_in_string));
+        const auto bytes_to_transfer = std::min(max_capacity(), value.size() - position_in_string);
         try_flush(bytes_to_transfer);
         RingBufferIterator::CopyN(value.c_str() + position_in_string, bytes_to_transfer, current_pos_);
         current_pos_.increment(bytes_to_transfer);
@@ -107,13 +105,12 @@ void BufferWriter::send_value_u32(u32 host_value) {
     current_pos_.increment(sizeof(u32));
 }
 
-void BufferWriter::flush(SizeT bytes) {
+void BufferWriter::flush(size_t bytes) {
     if (bytes > size()) {
-        String error_message = "Can't flush more bytes than available";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Can't flush more bytes than available");
     }
     const auto bytes_to_send = bytes ? bytes : size();
-    SizeT bytes_sent{0};
+    size_t bytes_sent{0};
 
     boost::system::error_code boost_error;
     if ((RingBufferIterator::Distance(start_pos_, current_pos_) < 0)) {
@@ -131,8 +128,7 @@ void BufferWriter::flush(SizeT bytes) {
     }
 
     if (boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset || bytes_sent == 0) {
-        String error_message = fmt::format("Can't flush more bytes than available: {}", boost_error.message());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Can't flush more bytes than available: {}", boost_error.message()));
     }
 
     if (boost_error) {
@@ -141,7 +137,7 @@ void BufferWriter::flush(SizeT bytes) {
     start_pos_.increment(bytes_sent);
 }
 
-void BufferWriter::try_flush(SizeT bytes) {
+void BufferWriter::try_flush(size_t bytes) {
     if (bytes >= max_capacity() - size()) {
         flush(bytes);
     }

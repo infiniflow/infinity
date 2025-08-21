@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:physical_project;
 
-import :stl;
 import :query_context;
 import :operator_state;
 import :physical_operator;
@@ -24,9 +21,10 @@ import :physical_operator_type;
 import :base_expression;
 import :load_meta;
 import :infinity_exception;
+import :highlighter;
+
 import internal_types;
 import data_type;
-import :highlighter;
 
 namespace infinity {
 
@@ -34,33 +32,33 @@ export class PhysicalProject : public PhysicalOperator {
 public:
     explicit PhysicalProject(u64 id,
                              u64 table_index,
-                             UniquePtr<PhysicalOperator> left,
-                             Vector<SharedPtr<BaseExpression>> expressions,
-                             SharedPtr<Vector<LoadMeta>> load_metas,
-                             Map<SizeT, SharedPtr<HighlightInfo>> highlight_columns)
+                             std::unique_ptr<PhysicalOperator> left,
+                             std::vector<std::shared_ptr<BaseExpression>> expressions,
+                             std::shared_ptr<std::vector<LoadMeta>> load_metas,
+                             std::map<size_t, std::shared_ptr<HighlightInfo>> highlight_columns)
         : PhysicalOperator(PhysicalOperatorType::kProjection, std::move(left), nullptr, id, load_metas), expressions_(std::move(expressions)),
           projection_table_index_(table_index), highlight_columns_(std::move(highlight_columns)) {}
 
     ~PhysicalProject() override = default;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    SharedPtr<Vector<String>> GetOutputNames() const final;
+    std::shared_ptr<std::vector<std::string>> GetOutputNames() const final;
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final;
 
-    SizeT TaskletCount() override { return left_->TaskletCount(); }
+    size_t TaskletCount() override { return left_->TaskletCount(); }
 
-    Vector<SharedPtr<BaseExpression>> expressions_{};
+    std::vector<std::shared_ptr<BaseExpression>> expressions_{};
 
     inline u64 TableIndex() const { return projection_table_index_; }
 
 private:
     //    ExpressionExecutor executor;
     u64 projection_table_index_{};
-    Map<SizeT, SharedPtr<HighlightInfo>> highlight_columns_{};
+    std::map<size_t, std::shared_ptr<HighlightInfo>> highlight_columns_{};
 };
 
 } // namespace infinity

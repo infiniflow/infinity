@@ -14,19 +14,11 @@
 
 module;
 
-#include <algorithm>
-#include <array>
-#include <bitset>
 #include <cassert>
-#include <cstdlib>
-#include <map>
-#include <vector>
-#include <memory>
 
 module infinity_core:emvb_search.impl;
 
 import :emvb_search;
-import :stl;
 import :emvb_result_handler;
 import :simd_init;
 import :emvb_simd_funcs;
@@ -37,6 +29,9 @@ import :infinity_exception;
 import :roaring_bitmap;
 import :block_index;
 import :knn_filter;
+
+import std;
+import std.compat;
 
 namespace infinity {
 
@@ -120,7 +115,7 @@ auto EMVBSearch<FIXED_QUERY_TOKEN_NUM>::compute_hit_frequency(std::vector<u32> c
     static_assert(std::is_same_v<typename decltype(centroid_q_token_sim)::value_type, std::bitset<FIXED_QUERY_TOKEN_NUM>>);
     if (n_doc_to_score >= candidate_documents.size()) [[unlikely]] {
         // too few documents
-        std::pair<u32, UniquePtr<u32[]>> result(candidate_documents.size(), nullptr);
+        std::pair<u32, std::unique_ptr<u32[]>> result(candidate_documents.size(), nullptr);
         result.second = std::make_unique_for_overwrite<u32[]>(candidate_documents.size());
         std::copy(candidate_documents.begin(), candidate_documents.end(), result.second.get());
         return result;
@@ -345,7 +340,7 @@ EMVBSearch<FIXED_QUERY_TOKEN_NUM>::EMVBSearch(const u32 embedding_dimension,
 
 // return docid: start from 0
 template <u32 FIXED_QUERY_TOKEN_NUM>
-std::tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> EMVBSearch<FIXED_QUERY_TOKEN_NUM>::GetQueryResult(const f32 *query_ptr,
+std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> EMVBSearch<FIXED_QUERY_TOKEN_NUM>::GetQueryResult(const f32 *query_ptr,
                                                                                                                   const u32 nprobe,
                                                                                                                   const f32 thresh,
                                                                                                                   const u32 n_doc_to_score,
@@ -367,23 +362,23 @@ std::tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> EMVBSearch<FIXED_QUERY_TOKEN
     auto selected_docs_centroid_scores =
         second_stage_filtering(std::move(selected_cnt_and_docs), out_second_stage, std::move(query_token_centroids_scores));
     auto query_res = compute_topk_documents_selected(query_ptr, std::move(selected_docs_centroid_scores), k, thresh_query);
-    static_assert(std::is_same_v<decltype(query_res), std::tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>>>);
+    static_assert(std::is_same_v<decltype(query_res), std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>>>);
     return query_res;
 }
 
 // return docid: start from start_segment_offset
 template <u32 FIXED_QUERY_TOKEN_NUM>
-Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> EMVBSearch<FIXED_QUERY_TOKEN_NUM>::GetQueryResult(const f32 *query_ptr,
-                                                                                                 const u32 nprobe,
-                                                                                                 const f32 thresh,
-                                                                                                 const u32 n_doc_to_score,
-                                                                                                 const u32 out_second_stage,
-                                                                                                 const u32 k,
-                                                                                                 const f32 thresh_query,
-                                                                                                 Bitmask &bitmask,
-                                                                                                 const u32 start_segment_offset,
-                                                                                                 const BlockIndex *block_index,
-                                                                                                 const TxnTimeStamp begin_ts) const {
+std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> EMVBSearch<FIXED_QUERY_TOKEN_NUM>::GetQueryResult(const f32 *query_ptr,
+                                                                                                                  const u32 nprobe,
+                                                                                                                  const f32 thresh,
+                                                                                                                  const u32 n_doc_to_score,
+                                                                                                                  const u32 out_second_stage,
+                                                                                                                  const u32 k,
+                                                                                                                  const f32 thresh_query,
+                                                                                                                  Bitmask &bitmask,
+                                                                                                                  const u32 start_segment_offset,
+                                                                                                                  const BlockIndex *block_index,
+                                                                                                                  const TxnTimeStamp begin_ts) const {
     assert(n_centroids_ % 8 == 0);
     auto query_token_centroids_scores = Get256AlignedF32Array(FIXED_QUERY_TOKEN_NUM * n_centroids_);
     matrixA_multiply_transpose_matrixB_output_to_C(query_ptr,
@@ -415,7 +410,7 @@ Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> EMVBSearch<FIXED_QUERY_TOKEN_NUM>
     auto selected_docs_centroid_scores =
         second_stage_filtering(std::move(selected_cnt_and_docs), out_second_stage, std::move(query_token_centroids_scores));
     auto query_res = compute_topk_documents_selected(query_ptr, std::move(selected_docs_centroid_scores), k, thresh_query);
-    static_assert(std::is_same_v<decltype(query_res), std::tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>>>);
+    static_assert(std::is_same_v<decltype(query_res), std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>>>);
     // consider start_segment_offset
     auto &[doc_num, scores, doc_ids] = query_res;
     for (u32 i = 0; i < doc_num; ++i) {

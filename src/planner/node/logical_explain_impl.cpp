@@ -12,27 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:logical_explain.impl;
 
 import :logical_explain;
-
-import :stl;
 import :column_binding;
-
 import :base_expression;
+
 import internal_types;
 import data_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalExplain::GetColumnBindings() const { return {}; }
+std::vector<ColumnBinding> LogicalExplain::GetColumnBindings() const { return {}; }
 
-SharedPtr<Vector<String>> LogicalExplain::GetOutputNames() const { return MakeShared<Vector<String>>(); }
+std::shared_ptr<std::vector<std::string>> LogicalExplain::GetOutputNames() const { return std::make_shared<std::vector<std::string>>(); }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalExplain::GetOutputTypes() const { return MakeShared<Vector<SharedPtr<DataType>>>(); }
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalExplain::GetOutputTypes() const {
+    return std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+}
 
-String LogicalExplain::ToString(i64 &space) const { return "LogicalExplain"; }
+std::string LogicalExplain::ToString(i64 &space) const { return "LogicalExplain"; }
 
 } // namespace infinity

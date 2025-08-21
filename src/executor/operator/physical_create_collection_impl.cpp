@@ -12,43 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:physical_create_collection.impl;
 
 import :physical_create_collection;
-
-import :stl;
-// import :query_context;
 import :table_def;
 import :data_table;
-
 import :physical_operator_type;
 import :operator_state;
 import :load_meta;
-import internal_types;
-import extra_ddl_info;
-import data_type;
 import :wal_manager;
 import :infinity_context;
 import :status;
 import :infinity_exception;
 
+import internal_types;
+import extra_ddl_info;
+import data_type;
+
 namespace infinity {
 
-PhysicalCreateCollection::PhysicalCreateCollection(SharedPtr<String> schema_name,
-                                                   SharedPtr<String> collection_name,
+PhysicalCreateCollection::PhysicalCreateCollection(std::shared_ptr<std::string> schema_name,
+                                                   std::shared_ptr<std::string> collection_name,
                                                    ConflictType conflict_type,
-                                                   SharedPtr<Vector<String>> output_names,
-                                                   SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                                                   std::shared_ptr<std::vector<std::string>> output_names,
+                                                   std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
                                                    u64 table_index,
                                                    u64 id,
-                                                   SharedPtr<Vector<LoadMeta>> load_metas)
+                                                   std::shared_ptr<std::vector<LoadMeta>> load_metas)
     : PhysicalOperator(PhysicalOperatorType::kCreateCollection, nullptr, nullptr, id, load_metas), schema_name_(std::move(schema_name)),
       collection_name_(std::move(collection_name)), conflict_type_(conflict_type), table_index_(table_index), output_names_(std::move(output_names)),
       output_types_(std::move(output_types)) {}
 
-void PhysicalCreateCollection::Init(QueryContext* query_context) {}
+void PhysicalCreateCollection::Init(QueryContext *query_context) {}
 
 bool PhysicalCreateCollection::Execute(QueryContext *, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

@@ -12,42 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:insert_binder.impl;
 
 import :insert_binder;
-import :stl;
 import :base_expression;
-
 import :bind_context;
 import :column_expression;
 import :function;
 import :status;
 import :infinity_exception;
-import :third_party;
 import :function_set;
 import :bind_alias_proxy;
-import :logger;
 import :insert_binder;
+
+import third_party;
+
 import parsed_expr;
 import knn_expr;
 
 namespace infinity {
 
-SharedPtr<BaseExpression> InsertBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    SharedPtr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
+std::shared_ptr<BaseExpression> InsertBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+    std::shared_ptr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
     return result;
 }
 
-SharedPtr<BaseExpression> InsertBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
-    Status status = Status::SyntaxError("KNN expression isn't supported in insert clause");
-    RecoverableError(status);
+std::shared_ptr<BaseExpression> InsertBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
+    RecoverableError(Status::SyntaxError("KNN expression isn't supported in insert clause"));
     return nullptr;
 }
 
-// SharedPtr<BaseExpression>
-// InsertBinder::BuildColRefExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
+// std::shared_ptr<BaseExpression>
+// InsertBinder::BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
 //     PlannerError("HavingBinder::BuildColRefExpr");
 // }
 

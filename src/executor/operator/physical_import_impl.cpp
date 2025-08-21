@@ -14,70 +14,61 @@
 
 module;
 
-// extern "C" {
-// #include "zsv/api.h"
-// #include "zsv/common.h"
-// }
-
 #include <cassert>
 #include <cerrno>
-#include <cstdio>
 #include <cstring>
-#include <vector>
-#include <string>
-#include <memory>
 
 module infinity_core:physical_import.impl;
 
 import :physical_import;
-
-import :stl;
 import :query_context;
 import :table_def;
 import :data_table;
-import internal_types;
-import logical_type;
 import :physical_operator_type;
 import :operator_state;
 import :expression_state;
 import :data_block;
 import :logger;
-import :third_party;
 import :defer_op;
-
 import :buffer_handle;
 import :data_file_worker;
-
 import :infinity_exception;
 import :zsv;
 import :status;
 import :column_vector;
 import :default_values;
+import :wal_entry;
+import :value;
+import :build_fast_rough_filter_task;
+import :stream_reader;
+import :virtual_store;
+import :local_file_handle;
+import :wal_manager;
+import :infinity_context;
+import :new_txn;
+import :txn_state;
+
+import std;
+import std.compat;
+import third_party;
+
+import data_type;
+import internal_types;
+import logical_type;
+import statement_common;
+import parser_assert;
+import knn_expr;
 import embedding_info;
 import sparse_info;
 import array_info;
 import column_def;
 import constant_expr;
-import :wal_entry;
-import knn_expr;
-import :value;
-import :build_fast_rough_filter_task;
-import :stream_reader;
-import parser_assert;
-import :virtual_store;
-import :local_file_handle;
-import :wal_manager;
-import :infinity_context;
-import statement_common;
-import :new_txn;
-import :txn_state;
-import data_type;
 
 namespace infinity {
 
 class NewImportCtx {
 public:
-    NewImportCtx(Vector<SharedPtr<ColumnDef>> column_defs, SizeT block_capacity = DEFAULT_BLOCK_CAPACITY)
+    NewImportCtx(std::vector<std::shared_ptr<ColumnDef>> column_defs, size_t block_capacity = DEFAULT_BLOCK_CAPACITY)
         : block_capacity_(block_capacity), column_defs_(std::move(column_defs)) {
         column_types_.reserve(column_defs_.size());
         for (const auto &column_def : column_defs_) {
@@ -88,7 +79,7 @@ public:
     bool CheckInit() const { return cur_block_ != nullptr; }
 
     void Init() {
-        auto data_block = MakeShared<DataBlock>();
+        auto data_block = std::make_shared<DataBlock>();
         data_block->Init(column_types_, block_capacity_);
 
         data_blocks_.push_back(data_block);
@@ -101,7 +92,7 @@ public:
         cur_row_count_ = 0;
     }
 
-    Vector<SharedPtr<DataBlock>> Finalize() && {
+    std::vector<std::shared_ptr<DataBlock>> Finalize() && {
         if (CheckInit()) {
             FinalizeBlock();
         }
@@ -115,43 +106,43 @@ public:
         ++cur_row_count_;
     }
 
-    ColumnVector &GetColumnVector(SizeT column_idx) {
+    ColumnVector &GetColumnVector(size_t column_idx) {
         assert(column_idx < column_defs_.size());
         return *cur_block_->column_vectors[column_idx];
     }
 
-    Vector<SharedPtr<ColumnVector>> &GetColumnVectors() { return cur_block_->column_vectors; }
+    std::vector<std::shared_ptr<ColumnVector>> &GetColumnVectors() { return cur_block_->column_vectors; }
 
-    SharedPtr<ColumnDef> GetColumnDef(SizeT column_idx) {
+    std::shared_ptr<ColumnDef> GetColumnDef(size_t column_idx) {
         assert(column_idx < column_defs_.size());
         return column_defs_[column_idx];
     }
 
-    SizeT row_count() const { return row_count_; }
-    SizeT column_count() const { return column_defs_.size(); }
+    size_t row_count() const { return row_count_; }
+    size_t column_count() const { return column_defs_.size(); }
 
     ZsvParser parser_;
 
 private:
-    SizeT block_capacity_ = 0;
-    SizeT row_count_ = 0;
-    Vector<SharedPtr<ColumnDef>> column_defs_;
-    Vector<SharedPtr<DataType>> column_types_;
+    size_t block_capacity_ = 0;
+    size_t row_count_ = 0;
+    std::vector<std::shared_ptr<ColumnDef>> column_defs_;
+    std::vector<std::shared_ptr<DataType>> column_types_;
 
-    Vector<SharedPtr<DataBlock>> data_blocks_;
+    std::vector<std::shared_ptr<DataBlock>> data_blocks_;
 
     DataBlock *cur_block_ = nullptr;
-    SizeT cur_row_count_ = 0;
+    size_t cur_row_count_ = 0;
 };
 
 class NewZxvParserCtx : public NewImportCtx {
 public:
-    NewZxvParserCtx(Vector<SharedPtr<ColumnDef>> column_defs, SizeT block_capacity = DEFAULT_BLOCK_CAPACITY)
+    NewZxvParserCtx(std::vector<std::shared_ptr<ColumnDef>> column_defs, size_t block_capacity = DEFAULT_BLOCK_CAPACITY)
         : NewImportCtx(std::move(column_defs), block_capacity) {}
 
 public:
     ZsvParser parser_;
-    SharedPtr<String> err_msg_;
+    std::shared_ptr<std::string> err_msg_;
 };
 
 void PhysicalImport::Init(QueryContext *query_context) {}
@@ -175,7 +166,7 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
     }
 
     if (file_type_ == CopyFileType::kInvalid) {
-        String extension = Path(file_path_).filename().extension().string();
+        std::string extension = std::filesystem::path(file_path_).filename().extension().string();
         if (extension == ".jsonl") {
             file_type_ = CopyFileType::kJSONL;
         } else if (extension == ".json") {
@@ -195,7 +186,7 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
 
     ImportOperatorState *import_op_state = static_cast<ImportOperatorState *>(operator_state);
 
-    Vector<SharedPtr<DataBlock>> data_blocks;
+    std::vector<std::shared_ptr<DataBlock>> data_blocks;
 
     switch (file_type_) {
         case CopyFileType::kCSV: {
@@ -242,18 +233,22 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
     return true;
 }
 
-void PhysicalImport::NewImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks) {
+void PhysicalImport::NewImportFVECS(QueryContext *query_context,
+                                    ImportOperatorState *import_op_state,
+                                    std::vector<std::shared_ptr<DataBlock>> &data_blocks) {
     NewImportTypeVecs(query_context, import_op_state, EmbeddingDataType::kElemFloat, data_blocks);
 }
 
-void PhysicalImport::NewImportBVECS(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks) {
+void PhysicalImport::NewImportBVECS(QueryContext *query_context,
+                                    ImportOperatorState *import_op_state,
+                                    std::vector<std::shared_ptr<DataBlock>> &data_blocks) {
     NewImportTypeVecs(query_context, import_op_state, EmbeddingDataType::kElemUInt8, data_blocks);
 }
 
 void PhysicalImport::NewImportTypeVecs(QueryContext *query_context,
                                        ImportOperatorState *import_op_state,
                                        EmbeddingDataType embedding_data_type,
-                                       Vector<SharedPtr<DataBlock>> &data_blocks) {
+                                       std::vector<std::shared_ptr<DataBlock>> &data_blocks) {
     if (table_info_->column_count_ != 1) {
         Status status = Status::ImportFileFormatError("file must have only one column.");
         RecoverableError(status);
@@ -282,7 +277,7 @@ void PhysicalImport::NewImportTypeVecs(QueryContext *query_context,
     file_handle->Seek(0);
     if (nbytes == 0) {
         // file is empty
-        auto result_msg = MakeUnique<String>("IMPORT 0 Rows");
+        auto result_msg = std::make_unique<std::string>("IMPORT 0 Rows");
         import_op_state->result_msg_ = std::move(result_msg);
         return;
     }
@@ -300,16 +295,15 @@ void PhysicalImport::NewImportTypeVecs(QueryContext *query_context,
     if (file_size == -1) {
         UnrecoverableError("Can't get file size");
     }
-    SizeT embedding_width = EmbeddingType::embedding_type_width[static_cast<int>(embedding_data_type)];
-    SizeT row_size = dimension * embedding_width + sizeof(dimension);
+    size_t embedding_width = EmbeddingType::embedding_type_width[static_cast<int>(embedding_data_type)];
+    size_t row_size = dimension * embedding_width + sizeof(dimension);
     if (file_size % row_size != 0) {
-        String error_message = "Weird file size.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Weird file size.");
     }
-    SizeT vector_n = file_size / row_size;
+    size_t vector_n = file_size / row_size;
 
-    auto import_ctx = MakeUnique<NewImportCtx>(table_info_->column_defs_);
-    auto buffer = MakeUnique<f32[]>(dimension);
+    auto import_ctx = std::make_unique<NewImportCtx>(table_info_->column_defs_);
+    auto buffer = std::make_unique<f32[]>(dimension);
     while (import_ctx->row_count() < vector_n) {
         i32 dim;
         auto [nbytes, status_read] = file_handle->Read(&dim, sizeof(dimension));
@@ -337,25 +331,24 @@ void PhysicalImport::NewImportTypeVecs(QueryContext *query_context,
 
     data_blocks = std::move(*import_ctx).Finalize();
 
-    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", vector_n));
+    auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", vector_n));
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
 template <typename IdxT>
-UniquePtr<char[]> ConvertCSRIndice(const i32 *tmp_indice_ptr, SizeT nnz) {
-    auto res = MakeUnique<char[]>(sizeof(IdxT) * nnz);
+std::unique_ptr<char[]> ConvertCSRIndice(const i32 *tmp_indice_ptr, size_t nnz) {
+    auto res = std::make_unique<char[]>(sizeof(IdxT) * nnz);
     auto *ptr = reinterpret_cast<IdxT *>(res.get());
-    for (SizeT i = 0; i < nnz; ++i) {
+    for (size_t i = 0; i < nnz; ++i) {
         if (tmp_indice_ptr[i] < 0 || tmp_indice_ptr[i] > std::numeric_limits<IdxT>::max()) {
-            String error_message = fmt::format("In compactible idx {} in csr file.", tmp_indice_ptr[i]);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("In compactible idx {} in csr file.", tmp_indice_ptr[i]));
         }
         ptr[i] = tmp_indice_ptr[i];
     }
     return res;
 }
 
-UniquePtr<char[]> ConvertCSRIndice(UniquePtr<char[]> tmp_indice_ptr, SparseInfo *sparse_info, SizeT nnz) {
+std::unique_ptr<char[]> ConvertCSRIndice(std::unique_ptr<char[]> tmp_indice_ptr, SparseInfo *sparse_info, size_t nnz) {
     switch (sparse_info->IndexType()) {
         case EmbeddingDataType::kElemInt8: {
             return ConvertCSRIndice<TinyIntT>(reinterpret_cast<i32 *>(tmp_indice_ptr.get()), nnz);
@@ -370,14 +363,15 @@ UniquePtr<char[]> ConvertCSRIndice(UniquePtr<char[]> tmp_indice_ptr, SparseInfo 
             return ConvertCSRIndice<BigIntT>(reinterpret_cast<i32 *>(tmp_indice_ptr.get()), nnz);
         }
         default: {
-            String error_message = fmt::format("Unsupported index type {}.", EmbeddingT::EmbeddingDataType2String(sparse_info->IndexType()));
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Unsupported index type {}.", EmbeddingT::EmbeddingDataType2String(sparse_info->IndexType())));
         }
     }
     return {};
 }
 
-void PhysicalImport::NewImportCSR(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks) {
+void PhysicalImport::NewImportCSR(QueryContext *query_context,
+                                  ImportOperatorState *import_op_state,
+                                  std::vector<std::shared_ptr<DataBlock>> &data_blocks) {
     if (table_info_->column_count_ != 1) {
         Status status = Status::ImportFileFormatError("CSR file must have only one column.");
         RecoverableError(status);
@@ -407,15 +401,13 @@ void PhysicalImport::NewImportCSR(QueryContext *query_context, ImportOperatorSta
     file_handle->Read(&nnz, sizeof(nnz));
 
     i64 file_size = file_handle->FileSize();
-    if ((SizeT)file_size != 3 * sizeof(i64) + (nrow + 1) * sizeof(i64) + nnz * sizeof(i32) + nnz * sizeof(FloatT)) {
-        String error_message = "Invalid CSR file format.";
-        UnrecoverableError(error_message);
+    if ((size_t)file_size != 3 * sizeof(i64) + (nrow + 1) * sizeof(i64) + nnz * sizeof(i32) + nnz * sizeof(FloatT)) {
+        UnrecoverableError("Invalid CSR file format.");
     }
     i64 prev_off = 0;
     file_handle->Read(&prev_off, sizeof(i64));
     if (prev_off != 0) {
-        String error_message = "Invalid CSR file format.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Invalid CSR file format.");
     }
     auto [idx_file_handle, idx_status] = VirtualStore::Open(file_path_, FileAccessMode::kRead);
     if (!idx_status.ok()) {
@@ -432,16 +424,16 @@ void PhysicalImport::NewImportCSR(QueryContext *query_context, ImportOperatorSta
 
     // ------------------------------------------------------------------------------------------------------------------------
 
-    auto import_ctx = MakeUnique<NewImportCtx>(table_info_->column_defs_);
+    auto import_ctx = std::make_unique<NewImportCtx>(table_info_->column_defs_);
 
     while (i64(import_ctx->row_count()) < nrow) {
         i64 off = 0;
         file_handle->Read(&off, sizeof(i64));
         i64 nnz = off - prev_off;
         prev_off = off;
-        SizeT data_len = sparse_info->DataSize(nnz);
-        auto tmp_indice_ptr = MakeUnique<char[]>(sizeof(i32) * nnz);
-        auto data_ptr = MakeUnique<char[]>(data_len);
+        size_t data_len = sparse_info->DataSize(nnz);
+        auto tmp_indice_ptr = std::make_unique<char[]>(sizeof(i32) * nnz);
+        auto data_ptr = std::make_unique<char[]>(data_len);
         idx_file_handle->Read(tmp_indice_ptr.get(), sizeof(i32) * nnz);
         data_file_handle->Read(data_ptr.get(), data_len);
         auto indice_ptr = ConvertCSRIndice(std::move(tmp_indice_ptr), sparse_info.get(), nnz);
@@ -464,11 +456,13 @@ void PhysicalImport::NewImportCSR(QueryContext *query_context, ImportOperatorSta
 
     data_blocks = std::move(*import_ctx).Finalize();
 
-    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", import_ctx->row_count()));
+    auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", import_ctx->row_count()));
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
-void PhysicalImport::NewImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks) {
+void PhysicalImport::NewImportCSV(QueryContext *query_context,
+                                  ImportOperatorState *import_op_state,
+                                  std::vector<std::shared_ptr<DataBlock>> &data_blocks) {
     FILE *fp = fopen(file_path_.c_str(), "rb");
     if (!fp) {
         UnrecoverableError(strerror(errno));
@@ -479,9 +473,9 @@ void PhysicalImport::NewImportCSV(QueryContext *query_context, ImportOperatorSta
         }
     });
 
-    auto parser_context = MakeUnique<NewZxvParserCtx>(table_info_->column_defs_);
+    auto parser_context = std::make_unique<NewZxvParserCtx>(table_info_->column_defs_);
 
-    auto opts = MakeUnique<ZsvOpts>();
+    auto opts = std::make_unique<ZsvOpts>();
     if (header_) {
         opts->row_handler = NewCSVHeaderHandler;
     } else {
@@ -506,21 +500,23 @@ void PhysicalImport::NewImportCSV(QueryContext *query_context, ImportOperatorSta
         if (parser_context->err_msg_.get() != nullptr) {
             UnrecoverableError(*parser_context->err_msg_);
         } else {
-            String err_msg = ZsvParser::ParseStatusDesc(csv_parser_status);
+            std::string err_msg = ZsvParser::ParseStatusDesc(csv_parser_status);
             UnrecoverableError(err_msg);
         }
     }
 
-    import_op_state->result_msg_ = MakeUnique<String>(fmt::format("IMPORT {} Rows", parser_context->row_count()));
+    import_op_state->result_msg_ = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", parser_context->row_count()));
 }
 
-void PhysicalImport::NewImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks) {
-    UniquePtr<StreamReader> stream_reader = VirtualStore::OpenStreamReader(file_path_);
+void PhysicalImport::NewImportJSONL(QueryContext *query_context,
+                                    ImportOperatorState *import_op_state,
+                                    std::vector<std::shared_ptr<DataBlock>> &data_blocks) {
+    std::unique_ptr<StreamReader> stream_reader = VirtualStore::OpenStreamReader(file_path_);
 
-    auto import_ctx = MakeUnique<NewImportCtx>(table_info_->column_defs_);
+    auto import_ctx = std::make_unique<NewImportCtx>(table_info_->column_defs_);
 
     while (true) {
-        String json_str;
+        std::string json_str;
         if (!stream_reader->ReadLine(json_str)) {
             break;
         }
@@ -538,11 +534,13 @@ void PhysicalImport::NewImportJSONL(QueryContext *query_context, ImportOperatorS
 
     data_blocks = std::move(*import_ctx).Finalize();
 
-    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", import_ctx->row_count()));
+    auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", import_ctx->row_count()));
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
-void PhysicalImport::NewImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks) {
+void PhysicalImport::NewImportJSON(QueryContext *query_context,
+                                   ImportOperatorState *import_op_state,
+                                   std::vector<std::shared_ptr<DataBlock>> &data_blocks) {
     auto [file_handle, status] = VirtualStore::Open(file_path_, FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());
@@ -551,17 +549,16 @@ void PhysicalImport::NewImportJSON(QueryContext *query_context, ImportOperatorSt
     if (file_size == -1) {
         UnrecoverableError("Can't get file size");
     }
-    String json_str(file_size, 0);
+    std::string json_str(file_size, 0);
     auto [read_n, status_read] = file_handle->Read(json_str.data(), file_size);
     if (!status_read.ok()) {
         UnrecoverableError(status_read.message());
     }
     if ((i64)read_n != file_size) {
-        String error_message = fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size));
     }
     if (read_n == 0) {
-        auto result_msg = MakeUnique<String>(fmt::format("Empty JSON file, IMPORT 0 Rows"));
+        auto result_msg = std::make_unique<std::string>(fmt::format("Empty JSON file, IMPORT 0 Rows"));
         import_op_state->result_msg_ = std::move(result_msg);
         return;
     }
@@ -570,12 +567,12 @@ void PhysicalImport::NewImportJSON(QueryContext *query_context, ImportOperatorSt
     simdjson::parser parser;
     simdjson::document doc = parser.iterate(json_arr);
     if (doc.type() != simdjson::json_type::array) {
-        auto result_msg = MakeUnique<String>(fmt::format("Invalid json format, IMPORT 0 rows"));
+        auto result_msg = std::make_unique<std::string>(fmt::format("Invalid json format, IMPORT 0 rows"));
         import_op_state->result_msg_ = std::move(result_msg);
         return;
     }
 
-    auto import_ctx = MakeUnique<NewImportCtx>(table_info_->column_defs_);
+    auto import_ctx = std::make_unique<NewImportCtx>(table_info_->column_defs_);
     for (auto element : doc.get_array()) {
         if (!import_ctx->CheckInit()) {
             import_ctx->Init();
@@ -589,29 +586,30 @@ void PhysicalImport::NewImportJSON(QueryContext *query_context, ImportOperatorSt
     }
     data_blocks = std::move(*import_ctx).Finalize();
 
-    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", import_ctx->row_count()));
+    auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", import_ctx->row_count()));
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
 void PhysicalImport::NewCSVHeaderHandler(void *context_raw_ptr) {
     auto *parser_context = static_cast<NewZxvParserCtx *>(context_raw_ptr);
     ZsvParser &parser = parser_context->parser_;
-    SizeT csv_column_count = parser.CellCount();
+    size_t csv_column_count = parser.CellCount();
 
-    SizeT table_column_count = parser_context->column_count();
+    size_t table_column_count = parser_context->column_count();
     if (csv_column_count != table_column_count) {
-        parser_context->err_msg_ = MakeShared<String>(fmt::format("Unmatched column count ({} != {})", csv_column_count, table_column_count));
+        parser_context->err_msg_ =
+            std::make_shared<std::string>(fmt::format("Unmatched column count ({} != {})", csv_column_count, table_column_count));
 
         parser.Abort(); // return zsv_status_cancelled
         return;
     }
 
     // Not check the header column name
-    for (SizeT idx = 0; idx < csv_column_count; ++idx) {
+    for (size_t idx = 0; idx < csv_column_count; ++idx) {
         auto *csv_col_name = reinterpret_cast<const char *>(parser.GetCellStr(idx));
         const char *table_col_name = parser_context->GetColumnDef(idx)->name().c_str();
         if (!strcmp(csv_col_name, table_col_name)) {
-            parser_context->err_msg_ = MakeShared<String>(fmt::format("Unmatched column name({} != {})", csv_col_name, table_col_name));
+            parser_context->err_msg_ = std::make_shared<std::string>(fmt::format("Unmatched column name({} != {})", csv_col_name, table_col_name));
 
             parser.Abort(); // return zsv_status_cancelled
             return;
@@ -629,8 +627,8 @@ void PhysicalImport::NewCSVRowHandler(void *context_raw_ptr) {
         parser_context->Init();
     }
 
-    SizeT column_count = parser_context->parser_.CellCount();
-    SizeT table_column_count = parser_context->column_count();
+    size_t column_count = parser_context->parser_.CellCount();
+    size_t table_column_count = parser_context->column_count();
     if (column_count > table_column_count) {
         Status status = Status::ColumnCountMismatch(
             fmt::format("CSV file column count isn't match with table schema, row id: {}, column_count: {}, table_entry->ColumnCount: {}.",
@@ -640,10 +638,10 @@ void PhysicalImport::NewCSVRowHandler(void *context_raw_ptr) {
         RecoverableError(status);
     }
 
-    Vector<String> parsed_cell;
+    std::vector<std::string> parsed_cell;
     parsed_cell.reserve(column_count);
 
-    for (SizeT column_idx = 0; column_idx < table_column_count; ++column_idx) {
+    for (size_t column_idx = 0; column_idx < table_column_count; ++column_idx) {
         ColumnVector &column_vector = parser_context->GetColumnVector(column_idx);
 
         if (column_idx < column_count) {
@@ -654,7 +652,7 @@ void PhysicalImport::NewCSVRowHandler(void *context_raw_ptr) {
                 continue;
             }
         }
-        SharedPtr<ColumnDef> column_def = parser_context->GetColumnDef(column_idx);
+        std::shared_ptr<ColumnDef> column_def = parser_context->GetColumnDef(column_idx);
         if (column_def->has_default_value()) {
             auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
             column_vector.AppendByConstantExpr(const_expr);
@@ -671,13 +669,13 @@ void PhysicalImport::NewCSVRowHandler(void *context_raw_ptr) {
     }
 }
 
-SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view object_sv) {
+std::shared_ptr<ConstantExpr> BuildConstantExprFromJson(std::string_view object_sv) {
     simdjson::padded_string json_str(object_sv);
     simdjson::parser parser;
     simdjson::document doc = parser.iterate(json_str);
     switch (doc.type()) {
         case simdjson::json_type::boolean: {
-            auto res = MakeShared<ConstantExpr>(LiteralType::kBoolean);
+            auto res = std::make_shared<ConstantExpr>(LiteralType::kBoolean);
             res->bool_value_ = doc.get<bool>();
             return res;
         }
@@ -686,12 +684,12 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view object_sv) {
             switch (num.get_number_type()) {
                 case simdjson::number_type::unsigned_integer:
                 case simdjson::number_type::signed_integer: {
-                    auto res = MakeShared<ConstantExpr>(LiteralType::kInteger);
+                    auto res = std::make_shared<ConstantExpr>(LiteralType::kInteger);
                     res->integer_value_ = (i64)num;
                     return res;
                 }
                 case simdjson::number_type::floating_point_number: {
-                    auto res = MakeShared<ConstantExpr>(LiteralType::kDouble);
+                    auto res = std::make_shared<ConstantExpr>(LiteralType::kDouble);
                     res->double_value_ = (double)num;
                     return res;
                 }
@@ -703,8 +701,8 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view object_sv) {
             }
         }
         case simdjson::json_type::string: {
-            auto res = MakeShared<ConstantExpr>(LiteralType::kString);
-            const String str = doc.get<String>();
+            auto res = std::make_shared<ConstantExpr>(LiteralType::kString);
+            const std::string str = doc.get<std::string>();
             res->str_value_ = strdup(str.c_str());
             return res;
         }
@@ -731,7 +729,7 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view object_sv) {
                     switch (nums[0].get_number_type()) {
                         case simdjson::number_type::unsigned_integer:
                         case simdjson::number_type::signed_integer: {
-                            auto res = MakeShared<ConstantExpr>(LiteralType::kIntegerArray);
+                            auto res = std::make_shared<ConstantExpr>(LiteralType::kIntegerArray);
                             res->long_array_.resize(array_size);
                             for (u32 i = 0; i < array_size; ++i) {
                                 res->long_array_[i] = (i64)nums[i];
@@ -739,7 +737,7 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view object_sv) {
                             return res;
                         }
                         case simdjson::number_type::floating_point_number: {
-                            auto res = MakeShared<ConstantExpr>(LiteralType::kDoubleArray);
+                            auto res = std::make_shared<ConstantExpr>(LiteralType::kDoubleArray);
                             res->double_array_.resize(array_size);
                             for (u32 i = 0; i < array_size; ++i) {
                                 res->double_array_[i] = (double)nums[i];
@@ -754,7 +752,7 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view object_sv) {
                     }
                 }
                 case simdjson::json_type::array: {
-                    auto res = MakeShared<ConstantExpr>(LiteralType::kSubArrayArray);
+                    auto res = std::make_shared<ConstantExpr>(LiteralType::kSubArrayArray);
                     res->sub_array_array_.resize(array_size);
                     for (u32 i = 0; i < array_size; ++i) {
                         res->sub_array_array_[i] = BuildConstantExprFromJson(json_strs[i]);
@@ -776,7 +774,7 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view object_sv) {
                 return nullptr;
             }
             for (auto obj : doc.get_object()) {
-                String key = String((std::string_view)obj.unescaped_key());
+                std::string key = std::string((std::string_view)obj.unescaped_key());
                 if (key != "array") {
                     const auto error_info = fmt::format("Unrecognized json key name: Expacted array, but got {}", key);
                     RecoverableError(Status::ImportFileFormatError(error_info));
@@ -788,7 +786,7 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view object_sv) {
                     RecoverableError(Status::ImportFileFormatError(error_info));
                     return nullptr;
                 }
-                auto res = MakeShared<ConstantExpr>(LiteralType::kCurlyBracketsArray);
+                auto res = std::make_shared<ConstantExpr>(LiteralType::kCurlyBracketsArray);
                 for (auto elem : value) {
                     auto elem_expr = BuildConstantExprFromJson(elem.raw_json());
                     if (!elem_expr) {
@@ -808,11 +806,11 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view object_sv) {
     }
 }
 
-SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(std::string_view object_sv, const SparseInfo *sparse_info) {
-    SharedPtr<ConstantExpr> res = nullptr;
+std::shared_ptr<ConstantExpr> BuildConstantSparseExprFromJson(std::string_view object_sv, const SparseInfo *sparse_info) {
+    std::shared_ptr<ConstantExpr> res = nullptr;
     switch (sparse_info->DataType()) {
         case EmbeddingDataType::kElemBit: {
-            res = MakeShared<ConstantExpr>(LiteralType::kIntegerArray);
+            res = std::make_shared<ConstantExpr>(LiteralType::kIntegerArray);
             break;
         }
         case EmbeddingDataType::kElemUInt8:
@@ -820,14 +818,14 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(std::string_view object_
         case EmbeddingDataType::kElemInt16:
         case EmbeddingDataType::kElemInt32:
         case EmbeddingDataType::kElemInt64: {
-            res = MakeShared<ConstantExpr>(LiteralType::kLongSparseArray);
+            res = std::make_shared<ConstantExpr>(LiteralType::kLongSparseArray);
             break;
         }
         case EmbeddingDataType::kElemFloat16:
         case EmbeddingDataType::kElemBFloat16:
         case EmbeddingDataType::kElemFloat:
         case EmbeddingDataType::kElemDouble: {
-            res = MakeShared<ConstantExpr>(LiteralType::kDoubleSparseArray);
+            res = std::make_shared<ConstantExpr>(LiteralType::kDoubleSparseArray);
             break;
         }
         case EmbeddingDataType::kElemInvalid: {
@@ -881,9 +879,9 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(std::string_view object_
             if (object_size == 0) {
                 return res;
             }
-            HashSet<i64> key_set;
+            std::unordered_set<i64> key_set;
             for (auto field : doc.get_object()) {
-                i64 field_key = std::stoll(String((std::string_view)field.unescaped_key()));
+                i64 field_key = std::stoll(std::string((std::string_view)field.unescaped_key()));
                 auto field_value = field.value();
                 auto [_, insert_ok] = key_set.insert(field_key);
                 if (!insert_ok) {
@@ -937,11 +935,11 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(std::string_view object_
     }
 }
 
-void PhysicalImport::JSONLRowHandler(std::string_view line_sv, Vector<SharedPtr<ColumnVector>> &column_vectors) {
+void PhysicalImport::JSONLRowHandler(std::string_view line_sv, std::vector<std::shared_ptr<ColumnVector>> &column_vectors) {
     simdjson::padded_string json_str(line_sv);
     simdjson::parser parser;
     simdjson::document doc = parser.iterate(json_str);
-    for (SizeT i = 0; auto &column_vector_ptr : column_vectors) {
+    for (size_t i = 0; auto &column_vector_ptr : column_vectors) {
         ColumnVector &column_vector = *column_vector_ptr;
         const ColumnDef *column_def = table_info_->GetColumnDefByIdx(i++);
 
@@ -949,49 +947,49 @@ void PhysicalImport::JSONLRowHandler(std::string_view line_sv, Vector<SharedPtr<
             switch (column_vector.data_type()->type()) {
                 case LogicalType::kBoolean: {
                     bool v = val.get<bool>();
-                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    column_vector.AppendByPtr(reinterpret_cast<const char *>(&v));
                     break;
                 }
                 case LogicalType::kTinyInt: {
                     i8 v = val.get<i8>();
-                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    column_vector.AppendByPtr(reinterpret_cast<const char *>(&v));
                     break;
                 }
                 case LogicalType::kSmallInt: {
                     i16 v = val.get<i16>();
-                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    column_vector.AppendByPtr(reinterpret_cast<const char *>(&v));
                     break;
                 }
                 case LogicalType::kInteger: {
                     i32 v = val.get<i32>();
-                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    column_vector.AppendByPtr(reinterpret_cast<const char *>(&v));
                     break;
                 }
                 case LogicalType::kBigInt: {
                     i64 v = val.get<i64>();
-                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    column_vector.AppendByPtr(reinterpret_cast<const char *>(&v));
                     break;
                 }
                 case LogicalType::kFloat16: {
                     float v = val.get<float>();
                     Float16T float16_v(v);
-                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&float16_v));
+                    column_vector.AppendByPtr(reinterpret_cast<const char *>(&float16_v));
                     break;
                 }
                 case LogicalType::kBFloat16: {
                     float v = val.get<float>(v);
                     BFloat16T bfloat16_v(v);
-                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&bfloat16_v));
+                    column_vector.AppendByPtr(reinterpret_cast<const char *>(&bfloat16_v));
                     break;
                 }
                 case LogicalType::kFloat: {
                     float v = val.get<float>(v);
-                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    column_vector.AppendByPtr(reinterpret_cast<const char *>(&v));
                     break;
                 }
                 case LogicalType::kDouble: {
                     double v = val.get<double>(v);
-                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    column_vector.AppendByPtr(reinterpret_cast<const char *>(&v));
                     break;
                 }
                 case LogicalType::kDate:
@@ -1005,11 +1003,11 @@ void PhysicalImport::JSONLRowHandler(std::string_view line_sv, Vector<SharedPtr<
                 }
                 case LogicalType::kEmbedding: {
                     auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
-                    SizeT dim = embedding_info->Dimension();
+                    size_t dim = embedding_info->Dimension();
                     switch (embedding_info->Type()) {
                         case EmbeddingDataType::kElemBit: {
-                            const Vector<i8> i8_embedding = doc[column_def->name_].get<Vector<i8>>();
-                            const SizeT embedding_dim = i8_embedding.size();
+                            const std::vector<i8> i8_embedding = doc[column_def->name_].get<std::vector<i8>>();
+                            const size_t embedding_dim = i8_embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
                                     fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
@@ -1019,125 +1017,124 @@ void PhysicalImport::JSONLRowHandler(std::string_view line_sv, Vector<SharedPtr<
                                 Status status = Status::InvalidJsonFormat(fmt::format("Invalid bit vector length: {}", embedding_dim));
                                 RecoverableError(status);
                             }
-                            Vector<u8> bit_vector(embedding_dim / 8);
-                            for (SizeT k = 0; k < embedding_dim; ++k) {
+                            std::vector<u8> bit_vector(embedding_dim / 8);
+                            for (size_t k = 0; k < embedding_dim; ++k) {
                                 if (i8_embedding[k]) {
                                     bit_vector[k / 8] |= 1u << (k % 8);
                                 }
                             }
-                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(bit_vector.data()));
+                            column_vector.AppendByPtr(reinterpret_cast<const char *>(bit_vector.data()));
                             break;
                         }
                         case EmbeddingDataType::kElemUInt8: {
-                            const Vector<u8> embedding = doc[column_def->name_].get<Vector<u8>>();
-                            SizeT embedding_dim = embedding.size();
+                            const std::vector<u8> embedding = doc[column_def->name_].get<std::vector<u8>>();
+                            size_t embedding_dim = embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
                                     fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 RecoverableError(status);
                             }
-                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            column_vector.AppendByPtr(reinterpret_cast<const char *>(embedding.data()));
                             break;
                         }
                         case EmbeddingDataType::kElemInt8: {
-                            const Vector<i8> embedding = doc[column_def->name_].get<Vector<i8>>();
-                            SizeT embedding_dim = embedding.size();
+                            const std::vector<i8> embedding = doc[column_def->name_].get<std::vector<i8>>();
+                            size_t embedding_dim = embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
                                     fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 RecoverableError(status);
                             }
-                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            column_vector.AppendByPtr(reinterpret_cast<const char *>(embedding.data()));
                             break;
                         }
                         case EmbeddingDataType::kElemInt16: {
-                            const Vector<i16> embedding = doc[column_def->name_].get<Vector<i16>>();
-                            SizeT embedding_dim = embedding.size();
+                            const std::vector<i16> embedding = doc[column_def->name_].get<std::vector<i16>>();
+                            size_t embedding_dim = embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
                                     fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 RecoverableError(status);
                             }
-                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            column_vector.AppendByPtr(reinterpret_cast<const char *>(embedding.data()));
                             break;
                         }
                         case EmbeddingDataType::kElemInt32: {
-                            const Vector<i32> embedding = doc[column_def->name_].get<Vector<i32>>();
-                            SizeT embedding_dim = embedding.size();
+                            const std::vector<i32> embedding = doc[column_def->name_].get<std::vector<i32>>();
+                            size_t embedding_dim = embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
                                     fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 RecoverableError(status);
                             }
-                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            column_vector.AppendByPtr(reinterpret_cast<const char *>(embedding.data()));
                             break;
                         }
                         case EmbeddingDataType::kElemInt64: {
-                            const Vector<i64> embedding = doc[column_def->name_].get<Vector<i64>>();
-                            SizeT embedding_dim = embedding.size();
+                            const std::vector<i64> embedding = doc[column_def->name_].get<std::vector<i64>>();
+                            size_t embedding_dim = embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
                                     fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 RecoverableError(status);
                             }
-                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            column_vector.AppendByPtr(reinterpret_cast<const char *>(embedding.data()));
                             break;
                         }
                         case EmbeddingDataType::kElemFloat16: {
-                            const Vector<float> f_embedding = doc[column_def->name_].get<Vector<float>>();
-                            SizeT embedding_dim = f_embedding.size();
+                            const std::vector<float> f_embedding = doc[column_def->name_].get<std::vector<float>>();
+                            size_t embedding_dim = f_embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
                                     fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 RecoverableError(status);
                             }
-                            Vector<Float16T> embedding(embedding_dim);
-                            for (SizeT k = 0; k < embedding_dim; ++k) {
+                            std::vector<Float16T> embedding(embedding_dim);
+                            for (size_t k = 0; k < embedding_dim; ++k) {
                                 embedding[k] = f_embedding[k];
                             }
-                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            column_vector.AppendByPtr(reinterpret_cast<const char *>(embedding.data()));
                             break;
                         }
                         case EmbeddingDataType::kElemBFloat16: {
-                            const Vector<float> f_embedding = doc[column_def->name_].get<Vector<float>>();
-                            SizeT embedding_dim = f_embedding.size();
+                            const std::vector<float> f_embedding = doc[column_def->name_].get<std::vector<float>>();
+                            size_t embedding_dim = f_embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
                                     fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 RecoverableError(status);
                             }
-                            Vector<BFloat16T> embedding(embedding_dim);
-                            for (SizeT k = 0; k < embedding_dim; ++k) {
+                            std::vector<BFloat16T> embedding(embedding_dim);
+                            for (size_t k = 0; k < embedding_dim; ++k) {
                                 embedding[k] = f_embedding[k];
                             }
-                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            column_vector.AppendByPtr(reinterpret_cast<const char *>(embedding.data()));
                             break;
                         }
                         case EmbeddingDataType::kElemFloat: {
-                            const Vector<float> embedding = doc[column_def->name_].get<Vector<float>>();
-                            SizeT embedding_dim = embedding.size();
+                            const std::vector<float> embedding = doc[column_def->name_].get<std::vector<float>>();
+                            size_t embedding_dim = embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
                                     fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 RecoverableError(status);
                             }
-                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            column_vector.AppendByPtr(reinterpret_cast<const char *>(embedding.data()));
                             break;
                         }
                         case EmbeddingDataType::kElemDouble: {
-                            const Vector<double> embedding = doc[column_def->name_].get<Vector<double>>();
-                            SizeT embedding_dim = embedding.size();
+                            const std::vector<double> embedding = doc[column_def->name_].get<std::vector<double>>();
+                            size_t embedding_dim = embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
                                     fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 RecoverableError(status);
                             }
-                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            column_vector.AppendByPtr(reinterpret_cast<const char *>(embedding.data()));
                             break;
                         }
                         case EmbeddingDataType::kElemInvalid: {
-                            String error_message = "Not implement: Embedding type.";
-                            UnrecoverableError(error_message);
+                            UnrecoverableError("Not implement: Embedding type.");
                             break;
                         }
                     }
@@ -1148,7 +1145,7 @@ void PhysicalImport::JSONLRowHandler(std::string_view line_sv, Vector<SharedPtr<
                 case LogicalType::kTensor:
                 case LogicalType::kTensorArray: {
                     // build ConstantExpr
-                    SharedPtr<ConstantExpr> const_expr = BuildConstantExprFromJson(doc[column_def->name_].raw_json());
+                    std::shared_ptr<ConstantExpr> const_expr = BuildConstantExprFromJson(doc[column_def->name_].raw_json());
                     if (const_expr.get() == nullptr) {
                         RecoverableError(Status::ImportFileFormatError("Invalid json object."));
                     }
@@ -1157,7 +1154,7 @@ void PhysicalImport::JSONLRowHandler(std::string_view line_sv, Vector<SharedPtr<
                 }
                 case LogicalType::kSparse: {
                     const auto *sparse_info = static_cast<SparseInfo *>(column_vector.data_type()->type_info().get());
-                    SharedPtr<ConstantExpr> const_expr = BuildConstantSparseExprFromJson(doc[column_def->name_].raw_json(), sparse_info);
+                    std::shared_ptr<ConstantExpr> const_expr = BuildConstantSparseExprFromJson(doc[column_def->name_].raw_json(), sparse_info);
                     const_expr->TrySortSparseVec(column_def);
                     if (const_expr.get() == nullptr) {
                         RecoverableError(Status::ImportFileFormatError("Invalid json object."));
@@ -1181,8 +1178,7 @@ void PhysicalImport::JSONLRowHandler(std::string_view line_sv, Vector<SharedPtr<
                 case LogicalType::kMissing:
                 case LogicalType::kEmptyArray:
                 case LogicalType::kInvalid: {
-                    String error_message = "Not implement: Invalid data type.";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError("Not implement: Invalid data type.");
                 }
             }
         } else if (column_def->has_default_value()) {
@@ -1198,17 +1194,17 @@ void PhysicalImport::JSONLRowHandler(std::string_view line_sv, Vector<SharedPtr<
 namespace {
 
 Status CheckParquetColumns(TableInfo *table_info, arrow::ParquetFileReader *arrow_reader) {
-    SharedPtr<arrow::Schema> schema;
+    std::shared_ptr<arrow::Schema> schema;
     arrow::Status status = arrow_reader->GetSchema(&schema);
     if (!status.ok()) {
         return Status::ImportFileFormatError(status.ToString());
     }
     const arrow::FieldVector &fields = schema->fields();
-    const Vector<SharedPtr<ColumnDef>> &column_defs = table_info->column_defs_;
+    const std::vector<std::shared_ptr<ColumnDef>> &column_defs = table_info->column_defs_;
     if (fields.size() != column_defs.size()) {
         return Status::ColumnCountMismatch(fmt::format("Column count mismatch: {} != {}", fields.size(), column_defs.size()));
     }
-    for (SizeT i = 0; i < fields.size(); ++i) {
+    for (size_t i = 0; i < fields.size(); ++i) {
         const auto &field = fields[i];
         const auto &column_def = column_defs[i];
 
@@ -1223,7 +1219,9 @@ Status CheckParquetColumns(TableInfo *table_info, arrow::ParquetFileReader *arro
 
 } // namespace
 
-void PhysicalImport::NewImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks) {
+void PhysicalImport::NewImportPARQUET(QueryContext *query_context,
+                                      ImportOperatorState *import_op_state,
+                                      std::vector<std::shared_ptr<DataBlock>> &data_blocks) {
     arrow::MemoryPool *pool = arrow::DefaultMemoryPool();
 
     // Configure general Parquet reader settings
@@ -1245,7 +1243,7 @@ void PhysicalImport::NewImportPARQUET(QueryContext *query_context, ImportOperato
     if (!build_result.ok()) {
         RecoverableError(Status::ImportFileFormatError(build_result.status().ToString()));
     }
-    UniquePtr<arrow::ParquetFileReader> arrow_reader = build_result.MoveValueUnsafe();
+    std::unique_ptr<arrow::ParquetFileReader> arrow_reader = build_result.MoveValueUnsafe();
 
     if (Status status = CheckParquetColumns(table_info_.get(), arrow_reader.get()); !status.ok()) {
         RecoverableError(status);
@@ -1256,7 +1254,7 @@ void PhysicalImport::NewImportPARQUET(QueryContext *query_context, ImportOperato
         RecoverableError(Status::ImportFileFormatError(status.ToString()));
     }
 
-    auto import_ctx = MakeUnique<NewImportCtx>(table_info_->column_defs_);
+    auto import_ctx = std::make_unique<NewImportCtx>(table_info_->column_defs_);
 
     for (arrow::ArrowResult<std::shared_ptr<arrow::RecordBatch>> maybe_batch : *rb_reader) {
         if (!maybe_batch.ok()) {
@@ -1271,7 +1269,7 @@ void PhysicalImport::NewImportPARQUET(QueryContext *query_context, ImportOperato
                 import_ctx->Init();
             }
             for (int column_idx = 0; column_idx < batch_col_count; ++column_idx) {
-                SharedPtr<arrow::Array> column = batch->column(column_idx);
+                std::shared_ptr<arrow::Array> column = batch->column(column_idx);
                 if (column->length() != batch_row_count) {
                     UnrecoverableError("column length mismatch");
                 }
@@ -1286,39 +1284,39 @@ void PhysicalImport::NewImportPARQUET(QueryContext *query_context, ImportOperato
 
     data_blocks = std::move(*import_ctx).Finalize();
 
-    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", import_ctx->row_count()));
+    auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", import_ctx->row_count()));
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
 template <typename IndexType, typename IndexArray, typename DataType, typename DataArray>
 void ParquetSparseValueHandler(const SparseInfo *sparse_info,
-                               SharedPtr<IndexArray> index_array,
-                               SharedPtr<DataArray> data_array,
+                               std::shared_ptr<IndexArray> index_array,
+                               std::shared_ptr<DataArray> data_array,
                                ColumnVector &column_vector,
                                i64 start_offset,
                                i64 end_offset) {
-    Vector<IndexType> index_vec;
+    std::vector<IndexType> index_vec;
     if constexpr (std::is_same_v<DataType, bool>) {
         for (i64 j = start_offset; j < end_offset; ++j) {
             index_vec.push_back(index_array->Value(j));
         }
-        SizeT nnz = index_vec.size();
+        size_t nnz = index_vec.size();
         column_vector.AppendSparse(nnz, static_cast<DataType *>(nullptr), index_vec.data());
     } else {
-        Vector<DataType> data_vec;
+        std::vector<DataType> data_vec;
         for (i64 j = start_offset; j < end_offset; ++j) {
             index_vec.push_back(index_array->Value(j));
             data_vec.push_back(data_array->Value(j));
         }
-        SizeT nnz = index_vec.size();
+        size_t nnz = index_vec.size();
         column_vector.AppendSparse(nnz, data_vec.data(), index_vec.data());
     }
 }
 
 template <typename IndexType, typename IndexArray>
 void ParquetSparseValueHandler(const SparseInfo *sparse_info,
-                               SharedPtr<IndexArray> index_array,
-                               SharedPtr<arrow::ListArray> data_array,
+                               std::shared_ptr<IndexArray> index_array,
+                               std::shared_ptr<arrow::ListArray> data_array,
                                ColumnVector &column_vector,
                                i64 start_offset,
                                i64 end_offset) {
@@ -1431,24 +1429,25 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info,
 namespace {
 
 template <typename LstArray>
-Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_array, const EmbeddingInfo *embedding_info, u64 value_idx) {
-    SizeT dim = embedding_info->Dimension();
+std::pair<std::unique_ptr<char[]>, size_t>
+ParquetEmbeddingHandler(std::shared_ptr<LstArray> list_array, const EmbeddingInfo *embedding_info, u64 value_idx) {
+    size_t dim = embedding_info->Dimension();
     i64 start_offset = list_array->value_offset(value_idx);
     i64 end_offset = list_array->value_offset(value_idx + 1);
     if (end_offset - start_offset != (i64)dim) {
-        String error_message = fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, end_offset - start_offset);
+        std::string error_message = fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, end_offset - start_offset);
         LOG_ERROR(error_message);
         UnrecoverableError(error_message);
     }
     switch (embedding_info->Type()) {
         case EmbeddingDataType::kElemBit: {
             if (dim == 0 or dim % 8 != 0) {
-                String error_message = fmt::format("Invalid bit embedding dimension: {}", dim);
+                std::string error_message = fmt::format("Invalid bit embedding dimension: {}", dim);
                 LOG_ERROR(error_message);
                 UnrecoverableError(error_message);
             }
-            const SizeT byte_size = dim / 8;
-            auto embedding = MakeUnique<char[]>(byte_size);
+            const size_t byte_size = dim / 8;
+            auto embedding = std::make_unique<char[]>(byte_size);
             auto bool_array = std::static_pointer_cast<arrow::BooleanArray>(list_array->values());
             auto *raw_u8_ptr = reinterpret_cast<u8 *>(embedding.get());
             for (i64 j = start_offset; j < end_offset; ++j) {
@@ -1460,7 +1459,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
             return {std::move(embedding), byte_size};
         }
         case EmbeddingDataType::kElemUInt8: {
-            auto embedding = MakeUnique<char[]>(dim * sizeof(u8));
+            auto embedding = std::make_unique<char[]>(dim * sizeof(u8));
             auto uint8_array = std::static_pointer_cast<arrow::UInt8Array>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 const u8 value = uint8_array->Value(j);
@@ -1469,7 +1468,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
             return {std::move(embedding), dim * sizeof(u8)};
         }
         case EmbeddingDataType::kElemInt8: {
-            auto embedding = MakeUnique<char[]>(dim * sizeof(i8));
+            auto embedding = std::make_unique<char[]>(dim * sizeof(i8));
             auto int8_array = std::static_pointer_cast<arrow::Int8Array>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 i8 value = int8_array->Value(j);
@@ -1478,7 +1477,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
             return {std::move(embedding), dim * sizeof(i8)};
         }
         case EmbeddingDataType::kElemInt16: {
-            auto embedding = MakeUnique<char[]>(dim * sizeof(i16));
+            auto embedding = std::make_unique<char[]>(dim * sizeof(i16));
             auto int16_array = std::static_pointer_cast<arrow::Int16Array>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 i16 value = int16_array->Value(j);
@@ -1487,7 +1486,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
             return {std::move(embedding), dim * sizeof(i16)};
         }
         case EmbeddingDataType::kElemInt32: {
-            auto embedding = MakeUnique<char[]>(dim * sizeof(i32));
+            auto embedding = std::make_unique<char[]>(dim * sizeof(i32));
             auto int32_array = std::static_pointer_cast<arrow::Int32Array>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 i32 value = int32_array->Value(j);
@@ -1496,7 +1495,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
             return {std::move(embedding), dim * sizeof(i32)};
         }
         case EmbeddingDataType::kElemInt64: {
-            auto embedding = MakeUnique<char[]>(dim * sizeof(i64));
+            auto embedding = std::make_unique<char[]>(dim * sizeof(i64));
             auto int64_array = std::static_pointer_cast<arrow::Int64Array>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 i64 value = int64_array->Value(j);
@@ -1505,7 +1504,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
             return {std::move(embedding), dim * sizeof(i64)};
         }
         case EmbeddingDataType::kElemFloat16: {
-            auto embedding = MakeUnique<char[]>(dim * sizeof(Float16T));
+            auto embedding = std::make_unique<char[]>(dim * sizeof(Float16T));
             auto float16_array = std::static_pointer_cast<arrow::HalfFloatArray>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 const u16 value = float16_array->Value(j);
@@ -1514,7 +1513,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
             return {std::move(embedding), dim * sizeof(Float16T)};
         }
         case EmbeddingDataType::kElemBFloat16: {
-            auto embedding = MakeUnique<char[]>(dim * sizeof(BFloat16T));
+            auto embedding = std::make_unique<char[]>(dim * sizeof(BFloat16T));
             auto float_array = std::static_pointer_cast<arrow::FloatArray>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 const float value = float_array->Value(j);
@@ -1523,7 +1522,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
             return {std::move(embedding), dim * sizeof(BFloat16T)};
         }
         case EmbeddingDataType::kElemFloat: {
-            auto embedding = MakeUnique<char[]>(dim * sizeof(float));
+            auto embedding = std::make_unique<char[]>(dim * sizeof(float));
             auto float_array = std::static_pointer_cast<arrow::FloatArray>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 float value = float_array->Value(j);
@@ -1532,7 +1531,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
             return {std::move(embedding), dim * sizeof(float)};
         }
         case EmbeddingDataType::kElemDouble: {
-            auto embedding = MakeUnique<char[]>(dim * sizeof(double));
+            auto embedding = std::make_unique<char[]>(dim * sizeof(double));
             auto double_array = std::static_pointer_cast<arrow::DoubleArray>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 double value = double_array->Value(j);
@@ -1547,12 +1546,12 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
     }
 }
 
-Vector<Pair<UniquePtr<char[]>, SizeT>>
-ParquetTensorHandler(SharedPtr<arrow::ListArray> list_array, const EmbeddingInfo *embedding_info, u64 value_idx) {
+std::vector<std::pair<std::unique_ptr<char[]>, size_t>>
+ParquetTensorHandler(std::shared_ptr<arrow::ListArray> list_array, const EmbeddingInfo *embedding_info, u64 value_idx) {
     i64 start_offset = list_array->value_offset(value_idx);
     i64 end_offset = list_array->value_offset(value_idx + 1);
 
-    Vector<Pair<UniquePtr<char[]>, SizeT>> embedding_vec;
+    std::vector<std::pair<std::unique_ptr<char[]>, size_t>> embedding_vec;
     if (auto fixed_tensor_ele_array = std::dynamic_pointer_cast<arrow::FixedSizeListArray>(list_array->values());
         fixed_tensor_ele_array.get() != nullptr) {
         for (i64 j = start_offset; j < end_offset; ++j) {
@@ -1571,83 +1570,83 @@ ParquetTensorHandler(SharedPtr<arrow::ListArray> list_array, const EmbeddingInfo
 
 } // namespace
 
-Value GetValueFromParquetRecursively(const DataType &data_type, const SharedPtr<arrow::Array> &array, u64 value_idx);
+Value GetValueFromParquetRecursively(const DataType &data_type, const std::shared_ptr<arrow::Array> &array, u64 value_idx);
 
-void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, ColumnVector &column_vector, u64 value_idx) {
+void PhysicalImport::ParquetValueHandler(const std::shared_ptr<arrow::Array> &array, ColumnVector &column_vector, u64 value_idx) {
     switch (const auto column_data_logical_type = column_vector.data_type()->type(); column_data_logical_type) {
         case LogicalType::kBoolean: {
             auto value = std::static_pointer_cast<arrow::BooleanArray>(array)->Value(value_idx);
-            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
+            column_vector.AppendByPtr(reinterpret_cast<const char *>(&value));
             break;
         }
         case LogicalType::kTinyInt: {
             auto value = std::static_pointer_cast<arrow::Int8Array>(array)->Value(value_idx);
-            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
+            column_vector.AppendByPtr(reinterpret_cast<const char *>(&value));
             break;
         }
         case LogicalType::kSmallInt: {
             auto value = std::static_pointer_cast<arrow::Int16Array>(array)->Value(value_idx);
-            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
+            column_vector.AppendByPtr(reinterpret_cast<const char *>(&value));
             break;
         }
         case LogicalType::kInteger: {
             auto value = std::static_pointer_cast<arrow::Int32Array>(array)->Value(value_idx);
-            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
+            column_vector.AppendByPtr(reinterpret_cast<const char *>(&value));
             break;
         }
         case LogicalType::kBigInt: {
             auto value = std::static_pointer_cast<arrow::Int64Array>(array)->Value(value_idx);
-            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
+            column_vector.AppendByPtr(reinterpret_cast<const char *>(&value));
             break;
         }
         case LogicalType::kFloat16: {
             auto value = std::static_pointer_cast<arrow::HalfFloatArray>(array)->Value(value_idx);
             const Float16T float16_value(value);
-            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&float16_value));
+            column_vector.AppendByPtr(reinterpret_cast<const char *>(&float16_value));
             break;
         }
         case LogicalType::kBFloat16: {
             auto value = std::static_pointer_cast<arrow::FloatArray>(array)->Value(value_idx);
             const BFloat16T bfloat16_value(value);
-            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&bfloat16_value));
+            column_vector.AppendByPtr(reinterpret_cast<const char *>(&bfloat16_value));
             break;
         }
         case LogicalType::kFloat: {
             auto value = std::static_pointer_cast<arrow::FloatArray>(array)->Value(value_idx);
-            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
+            column_vector.AppendByPtr(reinterpret_cast<const char *>(&value));
             break;
         }
         case LogicalType::kDouble: {
             auto value = std::static_pointer_cast<arrow::DoubleArray>(array)->Value(value_idx);
-            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
+            column_vector.AppendByPtr(reinterpret_cast<const char *>(&value));
             break;
         }
         case LogicalType::kDate: {
             auto value = std::static_pointer_cast<arrow::Date32Array>(array)->Value(value_idx);
             const DateT date_value(value);
-            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&date_value));
+            column_vector.AppendByPtr(reinterpret_cast<const char *>(&date_value));
             break;
         }
         case LogicalType::kTime: {
             auto value = std::static_pointer_cast<arrow::Time32Array>(array)->Value(value_idx);
             const TimeT time_value(value);
-            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&time_value));
+            column_vector.AppendByPtr(reinterpret_cast<const char *>(&time_value));
             break;
         }
         case LogicalType::kDateTime: {
             auto value = std::static_pointer_cast<arrow::TimestampArray>(array)->Value(value_idx);
             const DateTimeT datetime_value(value);
-            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&datetime_value));
+            column_vector.AppendByPtr(reinterpret_cast<const char *>(&datetime_value));
             break;
         }
         case LogicalType::kTimestamp: {
             auto value = std::static_pointer_cast<arrow::TimestampArray>(array)->Value(value_idx);
             const TimestampT timestamp_value(value);
-            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&timestamp_value));
+            column_vector.AppendByPtr(reinterpret_cast<const char *>(&timestamp_value));
             break;
         }
         case LogicalType::kVarchar: {
-            String value_str = std::static_pointer_cast<arrow::StringArray>(array)->GetString(value_idx);
+            std::string value_str = std::static_pointer_cast<arrow::StringArray>(array)->GetString(value_idx);
             std::string_view value(value_str);
             column_vector.AppendByStringView(value);
             break;
@@ -1656,11 +1655,11 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
             auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
             if (auto fixed_list_array = std::dynamic_pointer_cast<arrow::FixedSizeListArray>(array); fixed_list_array.get() != nullptr) {
                 auto [data, size] = ParquetEmbeddingHandler(fixed_list_array, embedding_info, value_idx);
-                column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(data.get()));
+                column_vector.AppendByPtr(reinterpret_cast<const char *>(data.get()));
             } else {
                 auto list_array = std::static_pointer_cast<arrow::ListArray>(array);
                 auto [data, size] = ParquetEmbeddingHandler(list_array, embedding_info, value_idx);
-                column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(data.get()));
+                column_vector.AppendByPtr(reinterpret_cast<const char *>(data.get()));
             }
             break;
         }
@@ -1674,7 +1673,7 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
             i64 start_offset = index_array->value_offset(value_idx);
             i64 end_offset = index_array->value_offset(value_idx + 1);
 
-            SharedPtr<arrow::ListArray> data_array;
+            std::shared_ptr<arrow::ListArray> data_array;
             auto value_raw_array = struct_array->GetFieldByName("value");
             if (value_raw_array.get() != nullptr) {
                 data_array = std::static_pointer_cast<arrow::ListArray>(value_raw_array);
@@ -1737,8 +1736,8 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
         case LogicalType::kTensor: {
             auto embedding_info = std::static_pointer_cast<EmbeddingInfo>(column_vector.data_type()->type_info());
             auto list_array = std::static_pointer_cast<arrow::ListArray>(array);
-            Vector<Pair<UniquePtr<char[]>, SizeT>> embedding_vec = ParquetTensorHandler(list_array, embedding_info.get(), value_idx);
-            Vector<Pair<ptr_t, SizeT>> embedding_data;
+            std::vector<std::pair<std::unique_ptr<char[]>, size_t>> embedding_vec = ParquetTensorHandler(list_array, embedding_info.get(), value_idx);
+            std::vector<std::pair<char *, size_t>> embedding_data;
             for (const auto &[data_ptr, data_bytes] : embedding_vec) {
                 embedding_data.emplace_back(data_ptr.get(), data_bytes);
             }
@@ -1759,8 +1758,8 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
             i64 end_offset = list_array->value_offset(value_idx + 1);
             auto tensor_array = std::static_pointer_cast<arrow::ListArray>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
-                Vector<Pair<UniquePtr<char[]>, SizeT>> embedding_vec = ParquetTensorHandler(tensor_array, embedding_info.get(), j);
-                Vector<Pair<ptr_t, SizeT>> embedding_data;
+                std::vector<std::pair<std::unique_ptr<char[]>, size_t>> embedding_vec = ParquetTensorHandler(tensor_array, embedding_info.get(), j);
+                std::vector<std::pair<char *, size_t>> embedding_data;
                 for (auto &data : embedding_vec) {
                     embedding_data.push_back({data.first.get(), data.second});
                 }
@@ -1790,20 +1789,19 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
         case LogicalType::kInvalid: {
-            String error_message = "Not implement: Invalid data type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not implement: Invalid data type.");
         }
     }
 }
 
 template <typename IndexType, typename IndexArray, typename DataType, typename DataArray>
-Value GetSparseValueFromParquet(const SharedPtr<SparseInfo> &sparse_info,
-                                const SharedPtr<IndexArray> &index_array,
-                                const SharedPtr<DataArray> &data_array,
+Value GetSparseValueFromParquet(const std::shared_ptr<SparseInfo> &sparse_info,
+                                const std::shared_ptr<IndexArray> &index_array,
+                                const std::shared_ptr<DataArray> &data_array,
                                 const i64 start_offset,
                                 const i64 end_offset) {
-    Vector<IndexType> index_vec;
-    Vector<DataType> data_vec;
+    std::vector<IndexType> index_vec;
+    std::vector<DataType> data_vec;
     for (i64 j = start_offset; j < end_offset; ++j) {
         index_vec.push_back(index_array->Value(j));
         if constexpr (!std::is_same_v<DataType, bool>) {
@@ -1818,9 +1816,9 @@ Value GetSparseValueFromParquet(const SharedPtr<SparseInfo> &sparse_info,
 }
 
 template <typename IndexType, typename IndexArray>
-Value GetSparseValueFromParquet(const SharedPtr<SparseInfo> &sparse_info,
-                                const SharedPtr<IndexArray> &index_array,
-                                const SharedPtr<arrow::ListArray> &data_array,
+Value GetSparseValueFromParquet(const std::shared_ptr<SparseInfo> &sparse_info,
+                                const std::shared_ptr<IndexArray> &index_array,
+                                const std::shared_ptr<arrow::ListArray> &data_array,
                                 const i64 start_offset,
                                 const i64 end_offset) {
     switch (sparse_info->DataType()) {
@@ -1910,7 +1908,7 @@ Value GetSparseValueFromParquet(const SharedPtr<SparseInfo> &sparse_info,
     }
 }
 
-Value GetValueFromParquetRecursively(const DataType &data_type, const SharedPtr<arrow::Array> &array, u64 value_idx) {
+Value GetValueFromParquetRecursively(const DataType &data_type, const std::shared_ptr<arrow::Array> &array, u64 value_idx) {
     switch (const auto data_logical_type = data_type.type(); data_logical_type) {
         case LogicalType::kBoolean: {
             auto value = std::static_pointer_cast<arrow::BooleanArray>(array)->Value(value_idx);
@@ -1971,7 +1969,7 @@ Value GetValueFromParquetRecursively(const DataType &data_type, const SharedPtr<
             return Value::MakeTimestamp(timestamp_value);
         }
         case LogicalType::kVarchar: {
-            String value_str = std::static_pointer_cast<arrow::StringArray>(array)->GetString(value_idx);
+            std::string value_str = std::static_pointer_cast<arrow::StringArray>(array)->GetString(value_idx);
             return Value::MakeVarchar(std::move(value_str));
         }
         case LogicalType::kEmbedding: {
@@ -1991,7 +1989,7 @@ Value GetValueFromParquetRecursively(const DataType &data_type, const SharedPtr<
             auto index_array = std::static_pointer_cast<arrow::ListArray>(index_raw_array);
             i64 start_offset = index_array->value_offset(value_idx);
             i64 end_offset = index_array->value_offset(value_idx + 1);
-            SharedPtr<arrow::ListArray> data_array;
+            std::shared_ptr<arrow::ListArray> data_array;
             auto value_raw_array = struct_array->GetFieldByName("value");
             if (value_raw_array.get() != nullptr) {
                 data_array = std::static_pointer_cast<arrow::ListArray>(value_raw_array);
@@ -2028,8 +2026,8 @@ Value GetValueFromParquetRecursively(const DataType &data_type, const SharedPtr<
         case LogicalType::kTensor: {
             auto embedding_info = std::static_pointer_cast<EmbeddingInfo>(data_type.type_info());
             auto list_array = std::static_pointer_cast<arrow::ListArray>(array);
-            Vector<Pair<UniquePtr<char[]>, SizeT>> embedding_vec = ParquetTensorHandler(list_array, embedding_info.get(), value_idx);
-            Vector<Pair<ptr_t, SizeT>> embedding_data;
+            std::vector<std::pair<std::unique_ptr<char[]>, size_t>> embedding_vec = ParquetTensorHandler(list_array, embedding_info.get(), value_idx);
+            std::vector<std::pair<char *, size_t>> embedding_data;
             for (const auto &[data_ptr, data_bytes] : embedding_vec) {
                 embedding_data.emplace_back(data_ptr.get(), data_bytes);
             }
@@ -2047,8 +2045,8 @@ Value GetValueFromParquetRecursively(const DataType &data_type, const SharedPtr<
             i64 end_offset = list_array->value_offset(value_idx + 1);
             auto tensor_array = std::static_pointer_cast<arrow::ListArray>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
-                Vector<Pair<UniquePtr<char[]>, SizeT>> embedding_vec = ParquetTensorHandler(tensor_array, embedding_info.get(), j);
-                Vector<Pair<ptr_t, SizeT>> embedding_data;
+                std::vector<std::pair<std::unique_ptr<char[]>, size_t>> embedding_vec = ParquetTensorHandler(tensor_array, embedding_info.get(), j);
+                std::vector<std::pair<char *, size_t>> embedding_data;
                 for (auto &data : embedding_vec) {
                     embedding_data.push_back({data.first.get(), data.second});
                 }
@@ -2063,7 +2061,7 @@ Value GetValueFromParquetRecursively(const DataType &data_type, const SharedPtr<
             const auto start_offset = list_array->value_offset(value_idx);
             const auto end_offset = list_array->value_offset(value_idx + 1);
             const auto array_elements = list_array->values();
-            Vector<Value> array_value_vec;
+            std::vector<Value> array_value_vec;
             for (auto j = start_offset; j < end_offset; ++j) {
                 auto v = GetValueFromParquetRecursively(elem_type, array_elements, j);
                 array_value_vec.push_back(std::move(v));
@@ -2086,8 +2084,7 @@ Value GetValueFromParquetRecursively(const DataType &data_type, const SharedPtr<
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
         case LogicalType::kInvalid: {
-            String error_message = "Not implement: Invalid data type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not implement: Invalid data type.");
             return Value::MakeInvalid();
         }
     }

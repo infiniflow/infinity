@@ -12,79 +12,75 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-
 module infinity_core:logical_aggregate.impl;
 
 import :logical_aggregate;
-
-import :stl;
 import :column_binding;
-
 import :base_expression;
+
+import std;
+
 import internal_types;
 import data_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalAggregate::GetColumnBindings() const {
-    Vector<ColumnBinding> result;
-    SizeT groups_count = groups_.size();
-    SizeT aggregates_count = aggregates_.size();
+std::vector<ColumnBinding> LogicalAggregate::GetColumnBindings() const {
+    std::vector<ColumnBinding> result;
+    size_t groups_count = groups_.size();
+    size_t aggregates_count = aggregates_.size();
     result.reserve(groups_count + aggregates_count);
-    for (SizeT i = 0; i < groups_count; ++i) {
+    for (size_t i = 0; i < groups_count; ++i) {
         result.emplace_back(groupby_index_, i);
     }
-    for (SizeT i = 0; i < aggregates_count; ++i) {
+    for (size_t i = 0; i < aggregates_count; ++i) {
         result.emplace_back(aggregate_index_, i);
     }
     return result;
 }
 
-SharedPtr<Vector<String>> LogicalAggregate::GetOutputNames() const {
-    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
-    SizeT groups_count = groups_.size();
-    SizeT aggregates_count = aggregates_.size();
+std::shared_ptr<std::vector<std::string>> LogicalAggregate::GetOutputNames() const {
+    std::shared_ptr<std::vector<std::string>> result = std::make_shared<std::vector<std::string>>();
+    size_t groups_count = groups_.size();
+    size_t aggregates_count = aggregates_.size();
     result->reserve(groups_count + aggregates_count);
-    for (SizeT i = 0; i < groups_count; ++i) {
+    for (size_t i = 0; i < groups_count; ++i) {
         result->emplace_back(groups_[i]->Name());
     }
-    for (SizeT i = 0; i < aggregates_count; ++i) {
+    for (size_t i = 0; i < aggregates_count; ++i) {
         result->emplace_back(aggregates_[i]->Name());
     }
     return result;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalAggregate::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result = MakeShared<Vector<SharedPtr<DataType>>>();
-    SizeT groups_count = groups_.size();
-    SizeT aggregates_count = aggregates_.size();
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalAggregate::GetOutputTypes() const {
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+    size_t groups_count = groups_.size();
+    size_t aggregates_count = aggregates_.size();
     result->reserve(groups_count + aggregates_count);
-    for (SizeT i = 0; i < groups_count; ++i) {
-        result->emplace_back(MakeShared<DataType>(groups_[i]->Type()));
+    for (size_t i = 0; i < groups_count; ++i) {
+        result->emplace_back(std::make_shared<DataType>(groups_[i]->Type()));
     }
-    for (SizeT i = 0; i < aggregates_count; ++i) {
-        result->emplace_back(MakeShared<DataType>(aggregates_[i]->Type()));
+    for (size_t i = 0; i < aggregates_count; ++i) {
+        result->emplace_back(std::make_shared<DataType>(aggregates_[i]->Type()));
     }
     return result;
 }
 
-String LogicalAggregate::ToString(i64 &space) const {
+std::string LogicalAggregate::ToString(i64 &space) const {
 
     std::stringstream ss;
-    String arrow_str;
+    std::string arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str;
+    ss << std::string(space, ' ') << arrow_str;
 
     if (!aggregates_.empty()) {
         ss << "Aggregate on: ";
-        SizeT expression_count = aggregates_.size();
-        for (SizeT i = 0; i < expression_count - 1; ++i) {
+        size_t expression_count = aggregates_.size();
+        for (size_t i = 0; i < expression_count - 1; ++i) {
             ss << aggregates_[i]->Name() << ", ";
         }
         ss << aggregates_.back()->Name();
@@ -96,8 +92,8 @@ String LogicalAggregate::ToString(i64 &space) const {
         } else {
             ss << ", Group by: ";
         }
-        SizeT expression_count = groups_.size();
-        for (SizeT i = 0; i < expression_count - 1; ++i) {
+        size_t expression_count = groups_.size();
+        for (size_t i = 0; i < expression_count - 1; ++i) {
             ss << groups_[i]->Name() << ", ";
         }
         ss << groups_.back()->Name();

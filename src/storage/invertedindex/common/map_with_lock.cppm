@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:map_with_lock;
-import :stl;
+
+import std;
 
 namespace infinity {
 
@@ -23,7 +22,7 @@ export template <typename KeyType, typename ValueType>
 class MapWithLock {
 private:
     std::shared_mutex mutex_;
-    Map<KeyType, ValueType> map_;
+    std::map<KeyType, ValueType> map_;
 
 public:
     MapWithLock() = default;
@@ -62,7 +61,7 @@ public:
         map_.clear();
     }
 
-    void Range(const KeyType &key_min, const KeyType &key_max, Vector<Pair<KeyType, ValueType>> &items) {
+    void Range(const KeyType &key_min, const KeyType &key_max, std::vector<std::pair<KeyType, ValueType>> &items) {
         items.clear();
         std::shared_lock<std::shared_mutex> lock(mutex_);
         auto it1 = map_.lower_bound(key_min);
@@ -74,9 +73,9 @@ public:
     }
 
     // WARN: Caller shall ensure there's no concurrent write access
-    Map<KeyType, ValueType>::iterator UnsafeBegin() { return map_.begin(); }
+    std::map<KeyType, ValueType>::iterator UnsafeBegin() { return map_.begin(); }
 
     // WARN: Caller shall ensure there's no concurrent write access
-    Map<KeyType, ValueType>::iterator UnsafeEnd() { return map_.end(); }
+    std::map<KeyType, ValueType>::iterator UnsafeEnd() { return map_.end(); }
 };
 } // namespace infinity

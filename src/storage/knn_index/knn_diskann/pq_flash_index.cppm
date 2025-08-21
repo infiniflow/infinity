@@ -14,10 +14,8 @@
 
 module;
 
-#include <boost/dynamic_bitset.hpp>
 #include <cassert>
-#include <ostream>
-#include <random>
+
 #if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
 #include <xmmintrin.h>
 #elif defined(__GNUC__) && defined(__aarch64__)
@@ -26,19 +24,22 @@ module;
 
 export module infinity_core:pq_flash_index;
 
-import :stl;
 import :logger;
 import :index_base;
 import :local_file_handle;
 import :status;
 import :infinity_exception;
-import logical_type;
-import :third_party;
 import :diskann_dist_func;
 import :diskann_utils;
 import :default_values;
 import :diskann_partition_and_pq;
 import :virtual_store;
+
+import std;
+import std.compat;
+import third_party;
+
+import logical_type;
 
 namespace infinity {
 
@@ -47,16 +48,17 @@ class PqFlashIndex {
     using This = PqFlashIndex<VectorDataType, LabelType>;
 
 public:
-    PqFlashIndex(UniquePtr<AlignedFileReader> &fileReader, DiskAnnMetricType metric, u64 data_dim, u64 num_points, u64 num_pq_chunks)
+    PqFlashIndex(std::unique_ptr<AlignedFileReader> &fileReader, DiskAnnMetricType metric, u64 data_dim, u64 num_points, u64 num_pq_chunks)
         : data_dim_(data_dim), num_points_(num_points), n_chunks_(num_pq_chunks), metric_(metric), reader_(std::move(fileReader)) {
         this->aligned_dim_ = RoundUp(data_dim, 8);
-        dist_cmp_ = MakeShared<DiskAnnDistance<VectorDataType>>(metric);
-        dist_cmp_float_ = MakeShared<DiskAnnDistance<f32>>(metric);
-        pq_table_ = MakeUnique<FixedChunkPQTable>(data_dim, n_chunks_);
+        dist_cmp_ = std::make_shared<DiskAnnDistance<VectorDataType>>(metric);
+        dist_cmp_float_ = std::make_shared<DiskAnnDistance<f32>>(metric);
+        pq_table_ = std::make_unique<FixedChunkPQTable>(data_dim, n_chunks_);
     }
 
     PqFlashIndex(This &&other)
-        : data_dim_(other.data_dim_), num_points_(other.num_points_), n_chunks_(other.n_chunks_), metric_(other.metric_), reader_(std::move(other.reader_)) {
+        : data_dim_(other.data_dim_), num_points_(other.num_points_), n_chunks_(other.n_chunks_), metric_(other.metric_),
+          reader_(std::move(other.reader_)) {
         this->aligned_dim_ = other.aligned_dim_;
         this->dist_cmp_ = std::move(other.dist_cmp_);
         this->dist_cmp_float_ = std::move(other.dist_cmp_float_);
@@ -71,9 +73,9 @@ public:
         }
     }
 
-    static UniquePtr<This> Make(DiskAnnMetricType metric, u64 data_dim, u64 num_points, u64 num_pq_chunks) {
+    static std::unique_ptr<This> Make(DiskAnnMetricType metric, u64 data_dim, u64 num_points, u64 num_pq_chunks) {
         auto fileReader = AlignedFileReader::Make();
-        return MakeUnique<This>(fileReader, metric, data_dim, num_points, num_pq_chunks);
+        return std::make_unique<This>(fileReader, metric, data_dim, num_points, num_pq_chunks);
     }
 
     // First step
@@ -108,10 +110,10 @@ public:
 
     // Second step
     // nodes ids to cache in the bfs level order which starting from the medoids node
-    void CacheBfsLevels(u64 num_nodes_to_cache, Vector<SizeT> &node_list, const bool shuffle = false) {
+    void CacheBfsLevels(u64 num_nodes_to_cache, std::vector<size_t> &node_list, const bool shuffle = false) {
         std::random_device rng;
         std::mt19937 urng(rng());
-        std::unordered_set<SizeT> node_set;
+        std::unordered_set<size_t> node_set;
 
         u64 tenp_nodes = (u64)(std::round(this->num_points_ * 0.1));
         if (num_nodes_to_cache > tenp_nodes) {
@@ -119,9 +121,9 @@ public:
             RecoverableError(status);
         }
 
-        UniquePtr<std::unordered_set<SizeT>> cur_level, prev_level;
-        cur_level = MakeUnique<std::unordered_set<SizeT>>();
-        prev_level = MakeUnique<std::unordered_set<SizeT>>();
+        std::unique_ptr<std::unordered_set<size_t>> cur_level, prev_level;
+        cur_level = std::make_unique<std::unordered_set<size_t>>();
+        prev_level = std::make_unique<std::unordered_set<size_t>>();
 
         for (u64 miter = 0; miter < this->num_medoids_ && cur_level->size() < num_nodes_to_cache; miter++) {
             cur_level->insert(this->medoids_[miter]);
@@ -145,9 +147,9 @@ public:
             std::swap(cur_level, prev_level);
             cur_level->clear();
 
-            Vector<SizeT> nodes_to_expand; // nodes to expand in this level
+            std::vector<size_t> nodes_to_expand; // nodes to expand in this level
 
-            for (const SizeT &id : *prev_level) {
+            for (const size_t &id : *prev_level) {
                 if (node_set.find(id) != node_set.end()) {
                     continue;
                 }
@@ -163,18 +165,18 @@ public:
 
             // read expanded nodes data in this level
             bool finish_flag = false;
-            SizeT BLOCK_SIZE = 1024;
-            SizeT nblocks = DivRoundUp(nodes_to_expand.size(), BLOCK_SIZE);
-            for (SizeT block = 0; block < nblocks && !finish_flag; block++) {
-                SizeT start = block * BLOCK_SIZE;
-                SizeT end = std::min((block + 1) * BLOCK_SIZE, (SizeT)nodes_to_expand.size());
+            size_t BLOCK_SIZE = 1024;
+            size_t nblocks = DivRoundUp(nodes_to_expand.size(), BLOCK_SIZE);
+            for (size_t block = 0; block < nblocks && !finish_flag; block++) {
+                size_t start = block * BLOCK_SIZE;
+                size_t end = std::min((block + 1) * BLOCK_SIZE, (size_t)nodes_to_expand.size());
 
-                Vector<SizeT> nodes_to_read;
-                Vector<VectorDataType *> coord_buffers(end - start, nullptr); // nullptr for not reading coord in ReadNodes()
-                Vector<Pair<u32, SizeT *>> nbr_buffers;
-                for (SizeT cur_pt = start; cur_pt < end; cur_pt++) {
+                std::vector<size_t> nodes_to_read;
+                std::vector<VectorDataType *> coord_buffers(end - start, nullptr); // nullptr for not reading coord in ReadNodes()
+                std::vector<std::pair<u32, size_t *>> nbr_buffers;
+                for (size_t cur_pt = start; cur_pt < end; cur_pt++) {
                     nodes_to_read.push_back(nodes_to_expand[cur_pt]);
-                    nbr_buffers.emplace_back(MakePair(0, new SizeT[max_degree_ + 1]));
+                    nbr_buffers.emplace_back(std::make_pair(0, new size_t[max_degree_ + 1]));
                 }
 
                 auto read_status = ReadNodes(nodes_to_read, coord_buffers, nbr_buffers);
@@ -184,7 +186,7 @@ public:
                         continue;
                     } else {
                         u32 nnbrs = nbr_buffers[i].first;
-                        SizeT *nbrs = nbr_buffers[i].second;
+                        size_t *nbrs = nbr_buffers[i].second;
                         for (u32 j = 0; j < nnbrs && !finish_flag; j++) {
                             if (node_set.find(nbrs[j]) == node_set.end()) {
                                 cur_level->insert(nbrs[j]);
@@ -215,31 +217,31 @@ public:
 
     // Third step
     // load cache list from disk index
-    void LoadCacheList(Vector<SizeT> &node_list) {
-        SizeT num_cached_nodes = node_list.size();
+    void LoadCacheList(std::vector<size_t> &node_list) {
+        size_t num_cached_nodes = node_list.size();
 
         // nhood cache buffer
-        nhood_cache_buf_ = MakeUnique<SizeT[]>(num_cached_nodes * (max_degree_ + 1));
-        memset(nhood_cache_buf_.get(), 0, sizeof(SizeT) * num_cached_nodes * (max_degree_ + 1));
+        nhood_cache_buf_ = std::make_unique<size_t[]>(num_cached_nodes * (max_degree_ + 1));
+        memset(nhood_cache_buf_.get(), 0, sizeof(size_t) * num_cached_nodes * (max_degree_ + 1));
 
         // coord cache buffer
-        SizeT coord_cache_buf_len = num_cached_nodes * aligned_dim_;
+        size_t coord_cache_buf_len = num_cached_nodes * aligned_dim_;
         char *tmp_coord_cache_ptr = nullptr;
         AllocAligned((void **)&tmp_coord_cache_ptr, coord_cache_buf_len * sizeof(VectorDataType), 8 * sizeof(VectorDataType));
         this->coord_cache_buf_.reset(reinterpret_cast<VectorDataType *>(tmp_coord_cache_ptr));
         memset(coord_cache_buf_.get(), 0, coord_cache_buf_len * sizeof(VectorDataType));
 
         // process block by block for caching
-        SizeT BLOCK_SIZE = 8;
-        SizeT num_blocks = DivRoundUp(num_cached_nodes, BLOCK_SIZE);
-        for (SizeT block = 0; block < num_blocks; block++) {
-            SizeT start_idx = block * BLOCK_SIZE;
-            SizeT end_idx = std::min((block + 1) * BLOCK_SIZE, num_cached_nodes);
+        size_t BLOCK_SIZE = 8;
+        size_t num_blocks = DivRoundUp(num_cached_nodes, BLOCK_SIZE);
+        for (size_t block = 0; block < num_blocks; block++) {
+            size_t start_idx = block * BLOCK_SIZE;
+            size_t end_idx = std::min((block + 1) * BLOCK_SIZE, num_cached_nodes);
 
-            Vector<SizeT> nodes_to_read;
-            Vector<VectorDataType *> coord_buffers;
-            Vector<Pair<u32, SizeT *>> nbr_buffers;
-            for (SizeT node_idx = start_idx; node_idx < end_idx; node_idx++) {
+            std::vector<size_t> nodes_to_read;
+            std::vector<VectorDataType *> coord_buffers;
+            std::vector<std::pair<u32, size_t *>> nbr_buffers;
+            for (size_t node_idx = start_idx; node_idx < end_idx; node_idx++) {
                 nodes_to_read.push_back(node_list[node_idx]);
                 coord_buffers.push_back(coord_cache_buf_.get() + node_idx * aligned_dim_);
                 nbr_buffers.emplace_back(0, nhood_cache_buf_.get() + node_idx * (max_degree_ + 1));
@@ -247,7 +249,7 @@ public:
 
             auto read_status = ReadNodes(nodes_to_read, coord_buffers, nbr_buffers);
 
-            for (SizeT i = 0; i < read_status.size(); i++) {
+            for (size_t i = 0; i < read_status.size(); i++) {
                 if (read_status[i] == true) {
                     coord_cache_.insert(std::make_pair(nodes_to_read[i], coord_buffers[i]));
                     nhood_cache_.insert(std::make_pair(nodes_to_read[i], nbr_buffers[i])); // use MakePair compiler error
@@ -329,7 +331,7 @@ public:
         u8 *pq_coord_scratch = pq_query_scratch->aligned_pq_coord_scratch_;
 
         // lamda to batch compute query<-> node distances in PQ space
-        auto compute_dists = [this, pq_coord_scratch, pq_dists](const SizeT *ids, const SizeT n_ids, f32 *dists_out) {
+        auto compute_dists = [this, pq_coord_scratch, pq_dists](const size_t *ids, const size_t n_ids, f32 *dists_out) {
             AggregateCoords(ids,
                             n_ids,
                             this->data_.get(),
@@ -339,13 +341,13 @@ public:
         };
 
         // bind query scratch data
-        std::unordered_set<SizeT> &visited = query_scratch->visited_;
+        std::unordered_set<size_t> &visited = query_scratch->visited_;
         NeighborPriorityQueue &retset = query_scratch->retset_; // priority queue for beam search, store pq distances to query
         retset.Reserve(l_search);
-        Vector<Neighbor> &full_retset = query_scratch->full_retset_; // store all expanded nodes' full precision distances to query
+        std::vector<Neighbor> &full_retset = query_scratch->full_retset_; // store all expanded nodes' full precision distances to query
 
         // compute best medoid as the enter point of beam search
-        SizeT best_medoid = 0;
+        size_t best_medoid = 0;
         f32 best_dist = std::numeric_limits<f32>::max();
         if (!use_filter) {
             for (u64 cur_m = 0; cur_m < this->num_medoids_; cur_m++) {
@@ -361,20 +363,21 @@ public:
         }
 
         // searching start from the best medoid
-        compute_dists(&best_medoid, (SizeT)1, dist_scratch);
+        compute_dists(&best_medoid, (size_t)1, dist_scratch);
         retset.Insert(Neighbor(best_medoid, dist_scratch[0]));
         visited.insert(best_medoid);
         u32 cmps = 0;
         u32 hops = 0;
         u32 num_ios = 0;
 
-        Vector<SizeT> frontier; // expanding nodes not found in cache in one iteration, needs to read from disk
+        std::vector<size_t> frontier; // expanding nodes not found in cache in one iteration, needs to read from disk
         frontier.push_back(2 * beam_width);
-        Vector<Pair<SizeT, char *>> frontier_nhoods; // store ptr in sector_scratch of frontier nodes' nhoods info read from disk
+        std::vector<std::pair<size_t, char *>> frontier_nhoods; // store ptr in sector_scratch of frontier nodes' nhoods info read from disk
         frontier_nhoods.reserve(2 * beam_width);
-        Vector<AlignedRead> frontier_read_reqs;
+        std::vector<AlignedRead> frontier_read_reqs;
         frontier_read_reqs.reserve(2 * beam_width);
-        Vector<Pair<SizeT, Pair<u32, SizeT *>>> cached_nhoods; // cached id and neighbors while searching, [node_id, (num_nbrs, nbrs*)]
+        std::vector<std::pair<size_t, std::pair<u32, size_t *>>>
+            cached_nhoods; // cached id and neighbors while searching, [node_id, (num_nbrs, nbrs*)]
         cached_nhoods.reserve(2 * beam_width);
 
         while (retset.HasUnexpandedNode() && num_ios < io_limit) {
@@ -410,7 +413,7 @@ public:
                 }
                 for (u64 i = 0; i < frontier.size(); i++) {
                     auto id = frontier[i];
-                    Pair<SizeT, char *> fnhood;
+                    std::pair<size_t, char *> fnhood;
                     fnhood.first = id;
                     fnhood.second = sector_scratch + num_sector_per_node * sector_scratch_idx * DISKANN_SECTOR_LEN; // read buf
                     sector_scratch_idx++;
@@ -434,7 +437,7 @@ public:
                 full_retset.push_back(Neighbor(cached_nhood.first, cur_expanded_dist));
 
                 u64 nnbrs = cached_nhood.second.first;
-                SizeT *node_nbrs = cached_nhood.second.second;
+                size_t *node_nbrs = cached_nhood.second.second;
                 compute_dists(node_nbrs, nnbrs, dist_scratch); // compute cached node nbrs' pq distances to query
                 if (stats != nullptr) {
                     stats->n_cmps_ += nnbrs;
@@ -472,7 +475,7 @@ public:
                 cur_expanded_dist = dist_cmp_->Compare(aligned_query_T, data_buf, (u32)this->aligned_dim_);
 
                 full_retset.push_back(Neighbor(frontier_nhood.first, cur_expanded_dist));
-                SizeT *node_nbrs = (SizeT *)(node_buf + 1);
+                size_t *node_nbrs = (size_t *)(node_buf + 1);
                 // compute node_nbrs <-> query dist in PQ space
                 compute_dists(node_nbrs, nnbrs, dist_scratch);
                 if (stats != nullptr) {
@@ -481,7 +484,7 @@ public:
 
                 // process prefetched nhood
                 for (u64 m = 0; m < nnbrs; m++) {
-                    SizeT id = node_nbrs[m];
+                    size_t id = node_nbrs[m];
                     if (visited.insert(id).second) { // if not visited, insert successfullly
                         // filter
                         if (!use_filter && this->dummy_pts_.find(id) != this->dummy_pts_.end()) {
@@ -532,8 +535,8 @@ public:
 private:
     // read pq compressed vectors from disk to this->data_
     void LoadPqCompressedVec(std::string pq_compressed_vectors_path) {
-        this->data_ = MakeUnique<u8[]>(this->num_points_ * this->n_chunks_);
-        auto read_buf = MakeUnique<u32[]>(this->num_points_ * this->n_chunks_ * sizeof(u32));
+        this->data_ = std::make_unique<u8[]>(this->num_points_ * this->n_chunks_);
+        auto read_buf = std::make_unique<u32[]>(this->num_points_ * this->n_chunks_ * sizeof(u32));
         auto [pq_data_handle, status] = VirtualStore::Open(pq_compressed_vectors_path, FileAccessMode::kRead);
         if (!status.ok()) {
             UnrecoverableError(status.message());
@@ -555,9 +558,9 @@ private:
         this->centroid_data_.reset(reinterpret_cast<f32 *>(tmp_centroid_data_ptr));
         memset(this->centroid_data_.get(), 0, sizeof(f32) * this->aligned_dim_ * this->num_medoids_);
 
-        Vector<SizeT> nodes_to_read;          // node ids to read
-        Vector<VectorDataType *> medoid_bufs; // store the data of the medoid nodes
-        Vector<Pair<u32, SizeT *>> nbr_bufs;  // node's id and its neighbors' ids
+        std::vector<size_t> nodes_to_read;              // node ids to read
+        std::vector<VectorDataType *> medoid_bufs;      // store the data of the medoid nodes
+        std::vector<std::pair<u32, size_t *>> nbr_bufs; // node's id and its neighbors' ids
         for (u64 i = 0; i < this->num_medoids_; i++) {
             nodes_to_read.push_back(this->medoids_[i]);
             medoid_bufs.push_back(new VectorDataType[this->data_dim_]);
@@ -581,9 +584,10 @@ private:
 
     // process a batch of read requests of nodes data in disk index file
     // return a vector of bool indicating whether each node is read successfully or not
-    Vector<bool> ReadNodes(const Vector<SizeT> &node_ids, Vector<VectorDataType *> &coord_buffers, Vector<Pair<u32, SizeT *>> &nbr_buffers) {
-        Vector<AlignedRead> read_reqs;
-        Vector<bool> retval(node_ids.size(), true);
+    std::vector<bool>
+    ReadNodes(const std::vector<size_t> &node_ids, std::vector<VectorDataType *> &coord_buffers, std::vector<std::pair<u32, size_t *>> &nbr_buffers) {
+        std::vector<AlignedRead> read_reqs;
+        std::vector<bool> retval(node_ids.size(), true);
 
         std::unique_ptr<char[], decltype([](char *p) { std::free(p); })> buf =
             nullptr; // the whole buffer of all read requests aligned to DISKANN_SECTOR_LEN
@@ -592,7 +596,7 @@ private:
         AllocAligned((void **)&tmp_buf_ptr, node_ids.size() * num_sectors * DISKANN_SECTOR_LEN, DISKANN_SECTOR_LEN);
         buf.reset(tmp_buf_ptr);
 
-        for (SizeT i = 0; i < node_ids.size(); i++) {
+        for (size_t i = 0; i < node_ids.size(); i++) {
             auto node_id = node_ids[i];
 
             AlignedRead read;
@@ -616,7 +620,7 @@ private:
                 u32 *node_nhood = OffsetToNodeNhood(node_buf);
                 u32 num_nbrs = *node_nhood; // the first u32 is the number of neighbors
                 nbr_buffers[i].first = num_nbrs;
-                memcpy(nbr_buffers[i].second, node_nhood + 1, num_nbrs * sizeof(SizeT));
+                memcpy(nbr_buffers[i].second, node_nhood + 1, num_nbrs * sizeof(size_t));
             }
         }
 
@@ -624,13 +628,13 @@ private:
     }
 
     // get the sector NO of a node in the disk index file
-    inline SizeT GetNodeSector(SizeT node_id) {
+    inline size_t GetNodeSector(size_t node_id) {
         // +1 for the meta data in the first sector
         return 1 + (nnodes_per_sector_ > 0 ? node_id / nnodes_per_sector_ : node_id * DivRoundUp(max_node_len_, DISKANN_SECTOR_LEN));
     }
 
     // get the offset of a node in its start sector buffer
-    inline char *OffsetToNode(char *sector_buf, SizeT node_id) {
+    inline char *OffsetToNode(char *sector_buf, size_t node_id) {
         return sector_buf + (nnodes_per_sector_ == 0 ? 0 : (node_id % nnodes_per_sector_) * max_node_len_);
     }
 
@@ -657,7 +661,7 @@ private:
         u64 medoid_id_on_file; // medoid node id
         index_file_handle->Read(&medoid_id_on_file, sizeof(u64));
         this->num_medoids_ = 1;
-        this->medoids_ = MakeUnique<SizeT[]>(1);
+        this->medoids_ = std::make_unique<size_t[]>(1);
         this->medoids_[0] = medoid_id_on_file;
         LOG_DEBUG(fmt::format("LoadDiskIndexMetaData(): Loaded medoid node id: {}", medoid_id_on_file));
 
@@ -700,9 +704,9 @@ private:
     bool load_flag_ = false;      // whether the index is loaded or not
 
     // PQ data
-    UniquePtr<u8[]> data_;                  // npts * [u8 * n_chunks_], store pq compressed vector
-    u64 n_chunks_;                          // num of pq chunks
-    UniquePtr<FixedChunkPQTable> pq_table_; // store the PQ table
+    std::unique_ptr<u8[]> data_;                  // npts * [u8 * n_chunks_], store pq compressed vector
+    u64 n_chunks_;                                // num of pq chunks
+    std::unique_ptr<FixedChunkPQTable> pq_table_; // store the PQ table
 
     u64 max_node_len_;      // max bytes of a node in the disk index
     u64 nnodes_per_sector_; // 0 for multi-sector nodes, >0 for multi-node sectors
@@ -710,8 +714,8 @@ private:
     u64 sector_num_;        // num of sectors in the disk index
     u64 disk_index_size_;   // bytes of the disk index file
 
-    UniquePtr<SizeT[]> medoids_;                                                   // one entry point by default
-    SizeT num_medoids_;                                                            // defaults to 1
+    std::unique_ptr<size_t[]> medoids_;                                            // one entry point by default
+    size_t num_medoids_;                                                           // defaults to 1
     std::unique_ptr<f32[], decltype([](f32 *p) { std::free(p); })> centroid_data_; // centroid data for the medoids node
 
     u64 num_frozen_points_; // number of frozen points in the disk index
@@ -724,24 +728,24 @@ private:
     ConcurrentQueue<SsdQueryScratch<VectorDataType> *> ssd_query_data_; // only ssd search scratch for now
 
     // nhood cache
-    UniquePtr<SizeT[]> nhood_cache_buf_; // cache buffer for all cached node's nhood
-    std::unordered_map<SizeT, Pair<u32, SizeT *>>
-        nhood_cache_; // each node's ptr in nhood_cache_buf_, u32 is the number of neighbors, SizeT * is the ptr to the neighbors
+    std::unique_ptr<size_t[]> nhood_cache_buf_; // cache buffer for all cached node's nhood
+    std::unordered_map<size_t, std::pair<u32, size_t *>>
+        nhood_cache_; // each node's ptr in nhood_cache_buf_, u32 is the number of neighbors, size_t * is the ptr to the neighbors
     // coord cache
     std::unique_ptr<VectorDataType[], decltype([](VectorDataType *p) { std::free(p); })>
-        coord_cache_buf_;                                     // cache buffer for all cached node's coord data
-    std::unordered_map<SizeT, VectorDataType *> coord_cache_; // each node's ptr in coord_cache_buf_
+        coord_cache_buf_;                                      // cache buffer for all cached node's coord data
+    std::unordered_map<size_t, VectorDataType *> coord_cache_; // each node's ptr in coord_cache_buf_
 
     DiskAnnMetricType metric_;
-    UniquePtr<AlignedFileReader> reader_; // reader for the disk index file
+    std::unique_ptr<AlignedFileReader> reader_; // reader for the disk index file
 
-    SharedPtr<DiskAnnDistance<VectorDataType>> dist_cmp_;
-    SharedPtr<DiskAnnDistance<f32>> dist_cmp_float_;
+    std::shared_ptr<DiskAnnDistance<VectorDataType>> dist_cmp_;
+    std::shared_ptr<DiskAnnDistance<f32>> dist_cmp_float_;
 
     // filter support
-    std::unordered_map<LabelType, Vector<SizeT>> filter_to_medoid_ids_;
-    std::unordered_set<SizeT> dummy_pts_;                // dummy points for filter
-    std::unordered_map<SizeT, SizeT> dummy_to_real_map_; // map the dummy point to its real point
+    std::unordered_map<LabelType, std::vector<size_t>> filter_to_medoid_ids_;
+    std::unordered_set<size_t> dummy_pts_;                 // dummy points for filter
+    std::unordered_map<size_t, size_t> dummy_to_real_map_; // map the dummy point to its real point
 };
 
 } // namespace infinity

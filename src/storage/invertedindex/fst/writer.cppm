@@ -12,12 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <cassert>
-
 export module infinity_core:fst.writer;
-import :stl;
+
 import :crc;
 
 export namespace infinity {
@@ -25,18 +21,18 @@ export namespace infinity {
 class Writer {
 public:
     virtual ~Writer() = default;
-    virtual void Write(const u8 *buf, SizeT size) = 0;
+    virtual void Write(const u8 *buf, size_t size) = 0;
     virtual void Flush() = 0;
 };
 
 class FstBufferWriter : public Writer {
 public:
-    Vector<u8> &buffer_;
+    std::vector<u8> &buffer_;
 
 public:
-    FstBufferWriter(Vector<u8> &buffer) : buffer_(buffer) {}
+    FstBufferWriter(std::vector<u8> &buffer) : buffer_(buffer) {}
 
-    void Write(const u8 *data_ptr, SizeT data_size) override { buffer_.insert(buffer_.end(), data_ptr, data_ptr + data_size); }
+    void Write(const u8 *data_ptr, size_t data_size) override { buffer_.insert(buffer_.end(), data_ptr, data_ptr + data_size); }
 
     void Flush() override {}
 };
@@ -48,7 +44,7 @@ private:
 public:
     explicit OstreamWriter(std::ostream &os) : ostream_(os) {}
 
-    void Write(const u8 *buf, SizeT size) override { ostream_.write((const char *)buf, size); }
+    void Write(const u8 *buf, size_t size) override { ostream_.write((const char *)buf, size); }
 
     void Flush() override { ostream_.flush(); }
 };
@@ -63,7 +59,7 @@ private:
 public:
     explicit CountingWriter(Writer &wtr) : wtr_(wtr) {}
 
-    void Write(const u8 *buf, SizeT size) override {
+    void Write(const u8 *buf, size_t size) override {
         wtr_.Write(buf, size);
         count_ += size;
         summer_.update(buf, size);

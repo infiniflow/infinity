@@ -18,7 +18,6 @@ module;
 
 export module infinity_core:fst.build;
 
-import :stl;
 import :fst.bytes;
 import :fst.node;
 import :fst.registry;
@@ -49,8 +48,8 @@ struct BuilderNodeUnfinished {
         if (node_.is_final_) {
             node_.final_output_ = prefix.Cat(node_.final_output_);
         }
-        SizeT ntrans = node_.trans_.size();
-        for (SizeT i = 0; i < ntrans; i++) {
+        size_t ntrans = node_.trans_.size();
+        for (size_t i = 0; i < ntrans; i++) {
             Transition &t = node_.trans_[i];
             t.out_ = prefix.Cat(t.out_);
         }
@@ -60,14 +59,14 @@ struct BuilderNodeUnfinished {
 };
 
 struct UnfinishedNodes {
-    Vector<BuilderNodeUnfinished> stack_;
+    std::vector<BuilderNodeUnfinished> stack_;
 
     UnfinishedNodes() {
         stack_.reserve(256);
         PushEmpty(false);
     }
 
-    SizeT Len() { return stack_.size(); }
+    size_t Len() { return stack_.size(); }
 
     void PushEmpty(bool is_final) {
         stack_.resize(stack_.size() + 1);
@@ -91,15 +90,15 @@ struct UnfinishedNodes {
         unfinished.LastCompiled(addr);
     }
 
-    void AddSuffix(u8 *bs_ptr, SizeT bs_len, Output out) {
+    void AddSuffix(u8 *bs_ptr, size_t bs_len, Output out) {
         if (bs_len == 0)
             return;
         auto &unfinished = stack_.back();
         assert(!unfinished.last_.present_);
         unfinished.last_ = LastTransition(bs_ptr[0], out);
-        SizeT len = Len();
+        size_t len = Len();
         stack_.resize(len + bs_len - 1);
-        for (SizeT i = 1; i < bs_len; i++) {
+        for (size_t i = 1; i < bs_len; i++) {
             LastTransition &t = stack_[len + i - 1].last_;
             t.present_ = true;
             t.inp_ = bs_ptr[i];
@@ -107,8 +106,8 @@ struct UnfinishedNodes {
         PushEmpty(true);
     }
 
-    SizeT FindCommonPrefix(u8 *bs_ptr, SizeT bs_len) {
-        SizeT i = 0;
+    size_t FindCommonPrefix(u8 *bs_ptr, size_t bs_len) {
+        size_t i = 0;
         for (; i < bs_len; i++) {
             if (i >= stack_.size())
                 break;
@@ -119,10 +118,10 @@ struct UnfinishedNodes {
         return i;
     }
 
-    SizeT FindCommonPrefixAndSetOutput(u8 *bs_ptr, SizeT bs_len, Output &out) {
+    size_t FindCommonPrefixAndSetOutput(u8 *bs_ptr, size_t bs_len, Output &out) {
         assert(stack_.size() >= 1);
-        SizeT i = 0;
-        SizeT common_len = std::min(bs_len, static_cast<SizeT>(stack_.size() - 1));
+        size_t i = 0;
+        size_t common_len = std::min(bs_len, static_cast<size_t>(stack_.size() - 1));
         for (; i < common_len; i++) {
             auto &t = stack_[i].last_;
             assert(t.present_);
@@ -189,7 +188,7 @@ private:
     ///
     /// This is used to enforce the invariant that words are added in sorted
     /// order.
-    Vector<u8> last_;
+    std::vector<u8> last_;
     /// The address of the last compiled node.
     ///
     /// This is used to optimize states with one transition that point
@@ -198,7 +197,7 @@ private:
     /// since states are compiled in reverse.)
     CompiledAddr last_addr_;
     /// The number of keys added.
-    SizeT len_;
+    size_t len_;
 
 public:
     FstBuilder(Writer &wtr, FstType ty = 0) : wtr_(wtr), registry_(16), last_addr_(NONE_ADDRESS), len_(0) {
@@ -207,7 +206,7 @@ public:
     }
 
     /// Adds a byte string to this FST with a zero output value.
-    void Add(u8 *bs_ptr, SizeT bs_len) {
+    void Add(u8 *bs_ptr, size_t bs_len) {
         CheckLastKey(bs_ptr, bs_len, false);
         InsertOutput(bs_ptr, bs_len, 0);
     }
@@ -221,7 +220,7 @@ public:
     /// If a key is inserted that is less than or equal to any previous key
     /// added, then an error is returned. Similarly, if there was a problem
     /// writing to the underlying writer, an error is returned.
-    void Insert(u8 *bs_ptr, SizeT bs_len, u64 val) {
+    void Insert(u8 *bs_ptr, size_t bs_len, u64 val) {
         CheckLastKey(bs_ptr, bs_len, true);
         InsertOutput(bs_ptr, bs_len, val);
     }
@@ -236,10 +235,10 @@ public:
     void Finish();
 
 private:
-    void InsertOutput(u8 *bs_ptr, SizeT bs_len, u64 val);
-    void CompileFrom(SizeT istate);
+    void InsertOutput(u8 *bs_ptr, size_t bs_len, u64 val);
+    void CompileFrom(size_t istate);
     CompiledAddr Compile(BuilderNode &node);
-    void CheckLastKey(u8 *bs_ptr, SizeT bs_len, bool check_dupe);
+    void CheckLastKey(u8 *bs_ptr, size_t bs_len, bool check_dupe);
 };
 
 } // namespace infinity

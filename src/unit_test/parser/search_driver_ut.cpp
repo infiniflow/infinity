@@ -12,21 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef CI
-#include "gtest/gtest.h"
-import infinity_core;
-import base_test;
-import log_helper;
-#else
 module;
 
-#include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.search_driver;
 
 import :ut.base_test;
 import :ut.log_helper;
-import :stl;
 import :search_driver;
 import :query_node;
 import :term;
@@ -34,8 +27,7 @@ import :analyzer;
 import :infinity_exception;
 import :infinity_context;
 import :logger;
-import :third_party;
-#endif
+import third_party;
 
 import global_resource_usage;
 
@@ -154,10 +146,10 @@ DS\-K3AJ303\/Dm140
 "a b c"~4
     )##";
 
-    Map<String, String> column2analyzer;
-    String default_field("body");
+    std::map<std::string, std::string> column2analyzer;
+    std::string default_field("body");
     SearchDriver driver(column2analyzer, default_field);
-    IStringStream iss(row_quires);
+    std::istringstream iss(row_quires);
     int rc = ParseStream(driver, iss);
     EXPECT_EQ(rc, 0);
 }
@@ -217,11 +209,11 @@ graphic cards
 ((互联网 OR "联网" OR ("联网"~2)^0.5)^0.37996928602305424 (服务)^0.37996928602305424 (文章)^0.13455624904801738 (系统)^0.10443628332697895 (\+)^0.0004189177488833171 (监管)^0.00020561620385239324 (提到)^0.0001805935548173221 (提供)^0.00013985485008990281 (主要)^0.00012391322125226468 ("文章 提到 互联网 \+ 监管 系统 主要 提供 服务"~4)^1.5)
     )##";
 
-    Map<String, String> column2analyzer;
+    std::map<std::string, std::string> column2analyzer;
     column2analyzer["body"] = "chinese";
-    String default_field("body");
+    std::string default_field("body");
     SearchDriver driver(column2analyzer, default_field);
-    IStringStream iss(row_quires);
+    std::istringstream iss(row_quires);
     try {
         int rc = ParseStream(driver, iss);
         EXPECT_EQ(rc, 0);
@@ -256,14 +248,14 @@ graphic cards
 
     static constexpr FulltextQueryOperatorOption ops[] = {FulltextQueryOperatorOption::kOr, FulltextQueryOperatorOption::kAnd};
     //    static constexpr const char *ops_chars[] = {"OR", "AND"};
-    Map<String, String> column2analyzer;
+    std::map<std::string, std::string> column2analyzer;
     column2analyzer["body"] = "chinese";
-    String default_field("body");
+    std::string default_field("body");
     for (size_t i = 0; i < std::size(ops); ++i) {
         const auto op = ops[i];
         //        LOG_INFO(fmt::format("Test With Operator Option: {}", ops_chars[i]));
         SearchDriver driver(column2analyzer, default_field, op);
-        IStringStream iss(row_quires);
+        std::istringstream iss(row_quires);
         try {
             int rc = ParseStream(driver, iss);
             EXPECT_EQ(rc, 0);
@@ -295,13 +287,13 @@ _exists_:"author" AND page_count:xxx AND name:star^1.3
 "吉祥物nanjing\"DS-K3AJ303/Dm140\"头部"
     )##";
 
-    Map<String, String> column2analyzer;
+    std::map<std::string, std::string> column2analyzer;
     for (auto v : std::array{"name", "num", "label", "date", "_exists_", "body"}) {
         column2analyzer[v] = "whitespace";
     }
-    String default_field("body");
+    std::string default_field("body");
     SearchDriver driver(column2analyzer, default_field);
-    IStringStream iss(row_quires);
+    std::istringstream iss(row_quires);
     try {
         int rc = ParseStream(driver, iss);
         EXPECT_EQ(rc, 0);

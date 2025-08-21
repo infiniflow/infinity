@@ -12,14 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:var_buffer;
 
-import :stl;
 import :buffer_obj;
 import :buffer_handle;
-// import :logger;
 
 namespace infinity {
 
@@ -34,15 +30,16 @@ public:
     VarBuffer(BufferObj *buffer_obj) : buffer_size_prefix_sum_({0}), buffer_obj_(buffer_obj) {}
 
     // this is called by VarFileWorker
-    VarBuffer(BufferObj *buffer_obj, UniquePtr<char[]> buffer, SizeT size) : buffer_size_prefix_sum_({0, size}), buffer_obj_(buffer_obj) {
-        std::get<Vector<UniquePtr<char[]>>>(buffers_).push_back(std::move(buffer));
+    VarBuffer(BufferObj *buffer_obj, std::unique_ptr<char[]> buffer, size_t size) : buffer_size_prefix_sum_({0, size}), buffer_obj_(buffer_obj) {
+        std::get<std::vector<std::unique_ptr<char[]>>>(buffers_).push_back(std::move(buffer));
     }
 
-    VarBuffer(BufferObj *buffer_obj, const char *buffer, SizeT size) : buffer_size_prefix_sum_({0, size}), buffer_obj_(buffer_obj) {
+    VarBuffer(BufferObj *buffer_obj, const char *buffer, size_t size) : buffer_size_prefix_sum_({0, size}), buffer_obj_(buffer_obj) {
         buffers_ = buffer;
     }
 
-    VarBuffer(VarBuffer &&other) : buffers_(std::move(other.buffers_)), buffer_size_prefix_sum_(std::move(other.buffer_size_prefix_sum_)), buffer_obj_(other.buffer_obj_) {}
+    VarBuffer(VarBuffer &&other)
+        : buffers_(std::move(other.buffers_)), buffer_size_prefix_sum_(std::move(other.buffer_size_prefix_sum_)), buffer_obj_(other.buffer_obj_) {}
 
     VarBuffer &operator=(VarBuffer &&other) {
         if (this != &other) {
@@ -54,23 +51,23 @@ public:
     }
 
 public:
-    SizeT Append(UniquePtr<char[]> buffer, SizeT size, bool *free_success = nullptr);
+    size_t Append(std::unique_ptr<char[]> buffer, size_t size, bool *free_success = nullptr);
 
-    SizeT Append(const char *data, SizeT size, bool *free_success = nullptr);
+    size_t Append(const char *data, size_t size, bool *free_success = nullptr);
 
-    const char *Get(SizeT offset, SizeT size) const;
+    const char *Get(size_t offset, size_t size) const;
 
-    SizeT Write(char *ptr) const;
+    size_t Write(char *ptr) const;
 
-    SizeT Write(char *ptr, SizeT offset, SizeT size) const;
+    size_t Write(char *ptr, size_t offset, size_t size) const;
 
-    SizeT TotalSize() const;
+    size_t TotalSize() const;
 
 private:
     mutable std::shared_mutex mtx_;
 
-    std::variant<Vector<UniquePtr<char[]>>, const char *> buffers_;
-    Vector<SizeT> buffer_size_prefix_sum_ = {0};
+    std::variant<std::vector<std::unique_ptr<char[]>>, const char *> buffers_;
+    std::vector<size_t> buffer_size_prefix_sum_ = {0};
 
     BufferObj *buffer_obj_ = nullptr;
 };
@@ -81,17 +78,17 @@ public:
 
     VarBufferManager(BufferObj *outline_buffer_obj);
 
-    SizeT Append(UniquePtr<char[]> buffer, SizeT size, bool *free_success = nullptr);
+    size_t Append(std::unique_ptr<char[]> buffer, size_t size, bool *free_success = nullptr);
 
-    SizeT Append(const char *data, SizeT size, bool *free_success = nullptr);
+    size_t Append(const char *data, size_t size, bool *free_success = nullptr);
 
-    const char *Get(SizeT offset, SizeT size);
+    const char *Get(size_t offset, size_t size);
 
-    SizeT Write(char *ptr);
+    size_t Write(char *ptr);
 
-    SizeT Write(char *ptr, SizeT offset, SizeT size);
+    size_t Write(char *ptr, size_t offset, size_t size);
 
-    SizeT TotalSize();
+    size_t TotalSize();
 
     void SetToCatalog(BufferObj *outline_buffer_obj);
 
@@ -105,8 +102,8 @@ private:
         kNewCatalog,
     } type_;
 
-    UniquePtr<VarBuffer> mem_buffer_;
-    Optional<BufferHandle> buffer_handle_;
+    std::unique_ptr<VarBuffer> mem_buffer_;
+    std::optional<BufferHandle> buffer_handle_;
     BufferObj *outline_buffer_obj_ = nullptr;
 
     mutable std::mutex mutex_;

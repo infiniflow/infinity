@@ -12,18 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <sstream>
-#include <stdexcept>
-
 export module infinity_core:thrift_server;
 
-import :stl;
-// import :infinity;
 import :infinity_thrift_service;
-// import query_options;
-import :thrift;
+
+import third_party;
 
 using namespace std;
 
@@ -41,12 +34,12 @@ enum class ThriftServerStatus : u8 {
 
 export class ThreadedThriftServer {
 public:
-    void Init(const String &server_address, i32 port_no);
+    void Init(const std::string &server_address, i32 port_no);
     void Start();
     void Shutdown();
 
 private:
-    UniquePtr<apache::thrift::server::TThreadedServer> server{nullptr};
+    std::unique_ptr<apache::thrift::server::TThreadedServer> server{nullptr};
 
     atomic_bool started_{false};
 };
@@ -55,30 +48,30 @@ private:
 
 export class PoolThriftServer {
 public:
-    void Init(const String &server_address, i32 port_no, i32 pool_size);
-    Thread Start();
+    void Init(const std::string &server_address, i32 port_no, i32 pool_size);
+    std::thread Start();
 
     void Shutdown();
 
 private:
-    UniquePtr<apache::thrift::server::TServer> server{nullptr};
+    std::unique_ptr<apache::thrift::server::TServer> server{nullptr};
 
     bool initialized_{false};
-    Atomic<ThriftServerStatus> status_ = ThriftServerStatus::kStopped;
+    std::atomic<ThriftServerStatus> status_ = ThriftServerStatus::kStopped;
 };
 
 #elif THRIFT_SERVER_TYPE == 1
 
 export class NonBlockPoolThriftServer {
 public:
-    void Init(const String &server_address, i32 port_no, i32 pool_size);
+    void Init(const std::string &server_address, i32 port_no, i32 pool_size);
     void Start();
     void Shutdown();
 
 private:
-    //    UniquePtr<TServer> server{nullptr};
-    SharedPtr<InfinityThriftService> service_handler_{};
-    SharedPtr<apache::thrift::concurrency::Thread> server_thread_{};
+    //    std::unique_ptr<TServer> server{nullptr};
+    std::shared_ptr<InfinityThriftService> service_handler_{};
+    std::shared_ptr<apache::thrift::concurrency::std::thread> server_thread_{};
 
     atomic_bool started_{false};
 };

@@ -1,11 +1,6 @@
-module;
-
-#include <string>
-#include <stdexcept>
-
 export module infinity_core:lexeme;
 
-import :stl;
+import std;
 
 namespace infinity {
 export class Lexeme {

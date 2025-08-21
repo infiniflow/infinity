@@ -1,8 +1,4 @@
-module;
-
 export module infinity_core:posting_byte_slice;
-
-import :stl;
 
 import :byte_slice;
 import :byte_slice_writer;
@@ -43,24 +39,24 @@ public:
 
     const PostingBuffer &GetBuffer() const { return buffer_; }
 
-    SizeT GetBufferSize() const { return buffer_.Size(); }
+    size_t GetBufferSize() const { return buffer_.Size(); }
 
-    SizeT GetTotalCount() const { return flush_info_.GetFlushCount() + buffer_.Size(); }
+    size_t GetTotalCount() const { return flush_info_.GetFlushCount() + buffer_.Size(); }
 
     FlushInfo GetFlushInfo() const { return flush_info_; }
 
-    SizeT Flush();
+    size_t Flush();
 
-    void Dump(const SharedPtr<FileWriter> &file, bool spill = false);
+    void Dump(const std::shared_ptr<FileWriter> &file, bool spill = false);
 
-    void Load(const SharedPtr<FileReader> &file);
+    void Load(const std::shared_ptr<FileReader> &file);
 
-    SizeT EstimateDumpSize() const { return posting_writer_.GetSize(); }
+    size_t EstimateDumpSize() const { return posting_writer_.GetSize(); }
 
-    inline SizeT GetSizeInBytes() const { return buffer_.GetSizeInBytes() + posting_writer_.GetSize(); }
+    inline size_t GetSizeInBytes() const { return buffer_.GetSizeInBytes() + posting_writer_.GetSize(); }
 
 protected:
-    SizeT DoFlush();
+    size_t DoFlush();
 
 protected:
     FlushInfo flush_info_;

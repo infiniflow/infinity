@@ -12,19 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <string>
-
 module infinity_core:physical_hash_join.impl;
 
 import :physical_hash_join;
-
 import :query_context;
 import :operator_state;
-import :stl;
 import :physical_hash_join;
-import data_type;;
+
+import std;
+
+import data_type;
 
 namespace infinity {
 
@@ -32,10 +29,10 @@ void PhysicalHashJoin::Init(QueryContext *query_context) {}
 
 bool PhysicalHashJoin::Execute(QueryContext *, OperatorState *) { return true; }
 
-SharedPtr<Vector<String>> PhysicalHashJoin::GetOutputNames() const {
-    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
-    SharedPtr<Vector<String>> left_output_names = left_->GetOutputNames();
-    SharedPtr<Vector<String>> right_output_names = right_->GetOutputNames();
+std::shared_ptr<std::vector<std::string>> PhysicalHashJoin::GetOutputNames() const {
+    std::shared_ptr<std::vector<std::string>> result = std::make_shared<std::vector<std::string>>();
+    std::shared_ptr<std::vector<std::string>> left_output_names = left_->GetOutputNames();
+    std::shared_ptr<std::vector<std::string>> right_output_names = right_->GetOutputNames();
 
     result->reserve(left_output_names->size() + right_output_names->size());
     for (auto &name_str : *left_output_names) {
@@ -49,10 +46,10 @@ SharedPtr<Vector<String>> PhysicalHashJoin::GetOutputNames() const {
     return result;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> PhysicalHashJoin::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result = MakeShared<Vector<SharedPtr<DataType>>>();
-    SharedPtr<Vector<SharedPtr<DataType>>> left_output_types = left_->GetOutputTypes();
-    SharedPtr<Vector<SharedPtr<DataType>>> right_output_types = right_->GetOutputTypes();
+std::shared_ptr<std::vector<std::shared_ptr<DataType>>> PhysicalHashJoin::GetOutputTypes() const {
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> left_output_types = left_->GetOutputTypes();
+    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> right_output_types = right_->GetOutputTypes();
 
     result->reserve(left_output_types->size() + right_output_types->size());
     for (auto &left_type : *left_output_types) {

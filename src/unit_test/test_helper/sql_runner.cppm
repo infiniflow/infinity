@@ -12,25 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#ifdef CI
-export module sql_runner;
-
-import infinity_core;
-#else
 export module infinity_core:ut.sql_runner;
 
-import :stl;
 import :data_table;
-#endif
 
 namespace infinity {
 
 export class SQLRunner {
 
 public:
-    static SharedPtr<DataTable> Run(const String &sql_text, bool print = true);
+    static std::shared_ptr<DataTable> Run(const std::string &sql_text, bool print = true);
 };
 
 } // namespace infinity

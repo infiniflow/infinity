@@ -14,25 +14,21 @@
 
 module;
 
-#include <cstring>
-#include <filesystem>
-
 #include <openccxx.h>
 
 module infinity_core:traditional_chinese_analyzer.impl;
 
 import :traditional_chinese_analyzer;
-import :stl;
-import :logger;
-import :third_party;
 import :chinese_analyzer;
+
+import std;
 
 namespace fs = std::filesystem;
 
 namespace infinity {
-static const String OPENCC_PATH = "opencc";
+static const std::string OPENCC_PATH = "opencc";
 
-TraditionalChineseAnalyzer::TraditionalChineseAnalyzer(const String &path) : ChineseAnalyzer(path) {}
+TraditionalChineseAnalyzer::TraditionalChineseAnalyzer(const std::string &path) : ChineseAnalyzer(path) {}
 
 TraditionalChineseAnalyzer::TraditionalChineseAnalyzer(const TraditionalChineseAnalyzer &other) : ChineseAnalyzer(other) { own_opencc_ = false; }
 
@@ -63,8 +59,8 @@ Status TraditionalChineseAnalyzer::Load() {
     return Status::OK();
 }
 
-void TraditionalChineseAnalyzer::Parse(const String &input) {
-    String out;
+void TraditionalChineseAnalyzer::Parse(const std::string &input) {
+    std::string out;
     opencc_->convert(input, out);
     ChineseAnalyzer::Parse(out);
 }
