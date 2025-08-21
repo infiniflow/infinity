@@ -1491,13 +1491,15 @@ Inserts rows of data into a specified table.
 
 ##### Request example
 
+- **Standard insert with pre-computed vectors:**
+
 ```shell
 curl --request POST \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' 
-     [    
+     --data '
+     [
           {
                "name": "Jennifer",
                "score": 5.0,
@@ -1520,7 +1522,32 @@ curl --request POST \
                "multivector_column": [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]],
                "array_array_varchar_column": {"array": []}
           }
-     ] '  
+     ] '
+```
+
+- **Insert with FDE (Feature Dimension Expansion) function:**
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     [
+          {
+               "name": "Document with FDE",
+               "score": 7.5,
+               "dense_column": {
+                    "function": "fde",
+                    "tensor_data": [
+                         [1.0, 2.0, 3.0, 4.0],
+                         [0.5, 1.5, 2.5, 3.5],
+                         [2.0, 1.0, 4.0, 3.0]
+                    ],
+                    "target_dimension": 8
+               }
+          }
+     ] '
 ```
 
 ##### Request parameters
@@ -1530,8 +1557,45 @@ curl --request POST \
 - `table_name`: (*Path parameter*)  
   The name of the table.
 - `"file_path"`: (*Body parameter*), `string`, *Required* 
-- `Body`: (*Body parameter*),  `object[]`, *Required*  
+- `Body`: (*Body parameter*),  `object[]`, *Required*
   Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `object[]`. Each JSON object corresponds to a row to insert, and each key-value pair it corresponds to a column name and the table cell value.
+
+#### FDE (Feature Dimension Expansion) Function
+
+For vector columns, you can use the FDE function to automatically convert 2D tensor data into embeddings instead of providing pre-computed vectors. This is useful when you have feature matrices that need to be converted to fixed-dimension embeddings.
+
+**FDE Function Format:**
+```json
+{
+  "vector_column_name": {
+    "function": "fde",
+    "tensor_data": [[...], [...], ...],
+    "target_dimension": <integer>
+  }
+}
+```
+
+**Parameters:**
+- `"function"`: Must be `"fde"`.
+- `"tensor_data"`: A 2D array of numbers representing the input feature matrix.
+- `"target_dimension"`: The desired output embedding dimension.
+
+**Example:**
+```json
+{
+  "vector_col": {
+    "function": "fde",
+    "tensor_data": [
+      [1.0, 2.0, 3.0, 4.0],
+      [0.5, 1.5, 2.5, 3.5],
+      [2.0, 1.0, 4.0, 3.0]
+    ],
+    "target_dimension": 64
+  }
+}
+```
+
+This will automatically convert the 3x4 feature matrix above into a 64-dimensional embedding vector.
 
 :::tip NOTE
 - When inserting incomplete rows of data, ensure that all un-inserted columns have default values when creating the table. Otherwise, an error will occur.
@@ -1848,6 +1912,31 @@ curl --request GET \
             }
         ]
     } '
+    ```
+
+#### Example: FDE-based dense vector search
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/my_table/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '{
+        "output": ["id", "name", "_similarity"],
+        "search": [
+            {
+                "match_method": "dense",
+                "fields": "vector_column",
+                "fde": {
+                    "query_tensor": [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
+                    "target_dimension": 64
+                },
+                "element_type": "float",
+                "metric_type": "cosine",
+                "topn": 5
+            }
+        ]
+    } '
 ```
 
 ##### Request parameters
@@ -1915,11 +2004,20 @@ curl --request GET \
 
   - `"fields"`: `string`, *Required*  
     A non-empty string indicating the name of the column/field to search on.  
-  - `"query_vector"`: `[]/object`, *Optional*  
-    The query vector data to compare against. This should be provided as a list or a JSON object.  
-    Used *only* when `"match_method"` is set to `"dense"` or `"sparse"`.  
+  - `"query_vector"`: `[]/object`, *Optional*
+    The query vector data to compare with. This should be provided as a list or a JSON object.
+    Used *only* when `"match_method"` is set to `"dense"` or `"sparse"`.
     - Dense query vector example:  `[1.0, 2.2, 3.4, 1.5]`
     - Sparse query vector example: `{"10":1.1, "20":2.2, "30": 3.3}`
+    > **Note**: You must provide either `"query_vector"` or `"fde"` for a dense vector search, but *not* both.
+  - `"fde"`: `object`, *Optional*
+    Feature Dimension Expansion (FDE) function parameters for generating embeddings from tensor input.
+    Used *only* when `"match_method"` is set to `"dense"`.
+    - `"query_tensor"`: `number[][]`, *Required* - A 2D array (matrix) of numeric values representing the input tensor data.
+      Example: `[[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]`
+    - `"target_dimension"`: `integer`, *Required* - The target dimension for the output embedding vector. Must be a positive integer.
+      Example: `64`
+    > **Note**: You must provide either `"query_vector"` or `"fde"` for a dense vector search, but *not* both.
   - `"matching_text"`: `string`, *Optional*  
     A non-empty text string to search for. Used *only* when `"match_method"` is set to `"text"`.  
     You can use various search options within the matching text, including:  

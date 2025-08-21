@@ -27,6 +27,7 @@ import match_expr;
 import fusion_expr;
 import match_tensor_expr;
 import match_sparse_expr;
+import function_expr;
 import internal_types;
 import constant_expr;
 import search_expr;
@@ -62,6 +63,8 @@ public:
     static std::tuple<i64, void *>
     ParseVector(std::string_view json_sv, EmbeddingDataType elem_type, HTTPStatus &http_status, nlohmann::json &response);
     static std::unique_ptr<ConstantExpr> ParseSparseVector(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
+    static std::unique_ptr<FunctionExpr>
+    ParseFDEFunction(std::string_view json_sv, EmbeddingDataType elem_type, HTTPStatus &http_status, nlohmann::json &response);
 };
 
 } // namespace infinity
