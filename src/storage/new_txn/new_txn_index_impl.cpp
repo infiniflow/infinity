@@ -1247,7 +1247,7 @@ Status NewTxn::InitSegmentIndex(SegmentIndexMeta &segment_index_meta, SegmentMet
                     BlockMeta block_meta(block_id, segment_meta);
                     ColumnMeta column_meta(column_id, block_meta);
                     ColumnVector col;
-                    status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, col);
+                    status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
                     if (!status.ok()) {
                         return status;
                     }
@@ -1286,7 +1286,7 @@ Status NewTxn::InitSegmentIndex(SegmentIndexMeta &segment_index_meta, SegmentMet
                     BlockMeta block_meta(block_id, segment_meta);
                     ColumnMeta column_meta(column_id, block_meta);
                     ColumnVector col;
-                    status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, col);
+                    status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
                     if (!status.ok()) {
                         return status;
                     }
