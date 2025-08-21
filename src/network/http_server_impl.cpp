@@ -1147,7 +1147,7 @@ public:
 
                             // Check for FDE function call
                             if (simdjson::value fde_func; value_obj["function"].get(fde_func) == simdjson::SUCCESS) {
-                                String func_name = String((std::string_view)fde_func.get_string());
+                                std::string func_name = std::string((std::string_view)fde_func.get_string());
                                 ToLower(func_name);
 
                                 if (func_name == "fde") {

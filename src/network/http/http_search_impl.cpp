@@ -989,7 +989,7 @@ std::unique_ptr<KnnExpr> HTTPSearch::ParseMatchDense(std::string_view json_sv, H
         } else if (key == "query_vector") {
             query_vector_json = value.raw_json();
             has_query_vector = true;
-        } else if (IsEqual(key, "fde")) {
+        } else if (key == "fde") {
             fde_json = value.raw_json();
             has_fde = true;
         } else if (key == "element_type") {
@@ -1828,7 +1828,7 @@ HTTPSearch::ParseVector(std::string_view json_sv, EmbeddingDataType elem_type, H
     }
 }
 
-UniquePtr<FunctionExpr>
+std::unique_ptr<FunctionExpr>
 HTTPSearch::ParseFDEFunction(std::string_view json_sv, EmbeddingDataType elem_type, HTTPStatus &http_status, nlohmann::json &response) {
     simdjson::padded_string json_pad(json_sv);
     simdjson::parser parser;
@@ -1845,10 +1845,10 @@ HTTPSearch::ParseFDEFunction(std::string_view json_sv, EmbeddingDataType elem_ty
 
     // must have: "query_tensor", "target_dimension"
     constexpr std::array possible_keys{"query_tensor", "target_dimension"};
-    std::set<String> possible_keys_set(possible_keys.begin(), possible_keys.end());
+    std::set<std::string> possible_keys_set(possible_keys.begin(), possible_keys.end());
 
     for (auto field_json_obj : doc.get_object()) {
-        String key = String((std::string_view)field_json_obj.unescaped_key());
+        std::string key = std::string((std::string_view)field_json_obj.unescaped_key());
         auto value = field_json_obj.value();
         ToLower(key);
         if (!possible_keys_set.erase(key)) {
@@ -1856,9 +1856,9 @@ HTTPSearch::ParseFDEFunction(std::string_view json_sv, EmbeddingDataType elem_ty
             response["error_message"] = fmt::format("Unknown or duplicate FDE field: {}", key);
             return nullptr;
         }
-        if (IsEqual(key, "query_tensor")) {
+        if (key == "query_tensor") {
             query_tensor_json = value.raw_json();
-        } else if (IsEqual(key, "target_dimension")) {
+        } else if (key == "target_dimension") {
             if (!value.is_integer()) {
                 response["error_code"] = ErrorCode::kInvalidExpression;
                 response["error_message"] = "FDE target_dimension field should be integer";
@@ -1883,7 +1883,7 @@ HTTPSearch::ParseFDEFunction(std::string_view json_sv, EmbeddingDataType elem_ty
     }
 
     // Parse the query tensor
-    SharedPtr<ConstantExpr> tensor_expr;
+    std::shared_ptr<ConstantExpr> tensor_expr;
     try {
         tensor_expr = BuildConstantExprFromJson(query_tensor_json);
         if (!tensor_expr) {
@@ -1898,9 +1898,9 @@ HTTPSearch::ParseFDEFunction(std::string_view json_sv, EmbeddingDataType elem_ty
     }
 
     // Create FDE function expression
-    auto fde_function = MakeUnique<FunctionExpr>();
+    auto fde_function = std::make_unique<FunctionExpr>();
     fde_function->func_name_ = "FDE";
-    fde_function->arguments_ = new Vector<ParsedExpr *>();
+    fde_function->arguments_ = new std::vector<ParsedExpr *>();
 
     // Transfer ownership of tensor_expr to FunctionExpr
     // Create a new ConstantExpr by moving from the shared_ptr content
@@ -1908,7 +1908,7 @@ HTTPSearch::ParseFDEFunction(std::string_view json_sv, EmbeddingDataType elem_ty
     fde_function->arguments_->push_back(tensor_arg);
 
     // Add target dimension as second argument
-    auto target_dim_expr = MakeUnique<ConstantExpr>(LiteralType::kInteger);
+    auto target_dim_expr = std::make_unique<ConstantExpr>(LiteralType::kInteger);
     target_dim_expr->integer_value_ = target_dimension;
     fde_function->arguments_->push_back(target_dim_expr.release());
 

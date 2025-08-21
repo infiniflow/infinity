@@ -185,10 +185,10 @@ void PhysicalKnnScan::Init(QueryContext *query_context) {
         evaluator.Init(nullptr);
 
         // Create expression state for the function
-        SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(function_expr);
+        std::shared_ptr<ExpressionState> expr_state = ExpressionState::CreateState(function_expr);
 
         // Create output column vector for function result
-        SharedPtr<ColumnVector> output_column = ColumnVector::Make(MakeShared<DataType>(function_expr->Type()));
+        std::shared_ptr<ColumnVector> output_column = ColumnVector::Make(std::make_shared<DataType>(function_expr->Type()));
         output_column->Initialize();
 
         // Evaluate the function expression
@@ -199,7 +199,7 @@ void PhysicalKnnScan::Init(QueryContext *query_context) {
             Value embedding_value = output_column->GetValueByIndex(0);
             if (embedding_value.type().type() == LogicalType::kEmbedding) {
                 auto embedding_info = static_cast<const EmbeddingInfo *>(embedding_value.type().type_info().get());
-                Span<char> embedding_data = embedding_value.GetEmbedding();
+                std::span<char> embedding_data = embedding_value.GetEmbedding();
                 real_knn_query_embedding_ptr_ = embedding_data.data();
                 real_knn_query_elem_type_ = embedding_info->Type();
                 real_query_embedding_dimension_ = embedding_info->Dimension(); // Store actual dimension
