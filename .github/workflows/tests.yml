@@ -68,7 +68,7 @@ jobs:
           fi
 
   debug_tests_congigure_and_build:
-    name: debug_tests_clang_format
+    name: debug_tests_congigure_and_build
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
