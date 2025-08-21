@@ -148,14 +148,14 @@ std::shared_ptr<WalEntry> RestoreTableTxnStore::ToWalEntry(TxnTimeStamp commit_t
     wal_entry->commit_ts_ = commit_ts;
 
     std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdRestoreTableSnapshot>(db_name_,
-                                                                           db_id_str_,
-                                                                           table_name_,
-                                                                           table_id_str_,
-                                                                           snapshot_name_,
-                                                                           table_def_,
-                                                                           segment_infos_,
-                                                                           index_cmds_,
-                                                                           files_);
+                                                                                       db_id_str_,
+                                                                                       table_name_,
+                                                                                       table_id_str_,
+                                                                                       snapshot_name_,
+                                                                                       table_def_,
+                                                                                       segment_infos_,
+                                                                                       index_cmds_,
+                                                                                       files_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }
@@ -528,13 +528,13 @@ std::shared_ptr<WalEntry> CompactTxnStore::ToWalEntry(TxnTimeStamp commit_ts) co
     std::shared_ptr<WalEntry> wal_entry = std::make_shared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
     std::shared_ptr<WalCmdCompactV2> wal_command = std::make_shared<WalCmdCompactV2>(db_name_,
-                                                                         db_id_str_,
-                                                                         table_name_,
-                                                                         table_id_str_,
-                                                                         index_names_,
-                                                                         index_ids_str_,
-                                                                         segment_infos_,
-                                                                         deprecated_segment_ids_);
+                                                                                     db_id_str_,
+                                                                                     table_name_,
+                                                                                     table_id_str_,
+                                                                                     index_names_,
+                                                                                     index_ids_str_,
+                                                                                     segment_infos_,
+                                                                                     deprecated_segment_ids_);
     wal_entry->cmds_.push_back(wal_command);
 
     std::shared_ptr<WalCmdDumpIndexV2> dump_command{};

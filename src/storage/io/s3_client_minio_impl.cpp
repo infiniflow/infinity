@@ -118,7 +118,8 @@ Status S3ClientMinio::BucketExists(const std::string &bucket_name) {
                 return Status::MinioInvalidAccessKey(resp.Error().String());
             }
             default: {
-                std::string err_msg = fmt::format("Unable to do bucket existence check: {}, Please check if the MINIO connection", resp.Error().String());
+                std::string err_msg =
+                    fmt::format("Unable to do bucket existence check: {}, Please check if the MINIO connection", resp.Error().String());
                 LOG_CRITICAL(err_msg);
                 UnrecoverableError(err_msg);
             }
