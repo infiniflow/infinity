@@ -76,7 +76,7 @@ jobs:
     runs-on: [ "self-hosted", "debug" ]
     #    needs: debug_clang_format
     outputs:
-      build_ip: ${{ steps.step1.outputs.build_ip }}
+      BUILD_IP: ${{ steps.get_ip.outputs.build_ip }}
     steps:
       #      - id: step1
       #        #      - name: Start builder container
@@ -108,7 +108,7 @@ jobs:
       #            sudo docker rm -f -v ${BUILDER_CONTAINER}
       #          fi
 
-      - name: ssh to remote server
+      - name: SSH to remote server
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
         with:
@@ -119,15 +119,13 @@ jobs:
           script: |
             hostname -I | awk '{print $1}'
 
-      - name: get ip
-        id: step1
+      - name: Get ip
+        id: get_ip
         if: ${{ !cancelled() && !failure() }}
         run: |
-          read -r STEP_BUILD_IP _ <<< "${{ steps.ssh.outputs.stdout }}"
-          echo "*******************"
-          echo "Build ip is: ${STEP_BUILD_IP}"
-          echo "*******************"
-          echo "build_ip=${STEP_BUILD_IP}" >> ${GITHUB_OUTPUT}
+          read -r BUILD_IP _ <<< "${{ steps.ssh.outputs.stdout }}"
+          echo "Build ip is: ${BUILD_IP}"
+          echo "BUILD_IP=${BUILD_IP}" >> ${GITHUB_OUTPUT}
 
   debug_unit_test:
     name: debug_tests_unit_test
@@ -137,12 +135,12 @@ jobs:
     runs-on: [ "self-hosted", "debug" ]
     needs: debug_configure_and_build
     env:
-      build_ip: ${{needs.debug_configure_and_build.outputs.build_ip}}
+      BUILD_IP: ${{needs.debug_configure_and_build.outputs.BUILD_IP}}
     steps:
       - name: Get container name
         if: ${{ !cancelled() && !failure() }}
         run: |
-          echo "Build ip is: ${build_ip}"
+          echo "Build ip is: ${BUILD_IP}"
 
       - name: ssh to remote server
         uses: appleboy/ssh-action@v1
