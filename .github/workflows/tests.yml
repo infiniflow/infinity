@@ -142,8 +142,8 @@ jobs:
           script: |
             hostname -I | awk '{print $1}'
             mkdir -p /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
-            scp /infinity/cmake-build-debug/src/infinity infiniflow@172.17.0.1:/home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
-            scp /infinity/cmake-build-debug/src/test_main infiniflow@172.17.0.1:/home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
+            scp infiniflow@172.17.0.2:/infinity/cmake-build-debug/src/infinity /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
+            scp infiniflow@172.17.0.2:/infinity/cmake-build-debug/src/test_main /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
 
       - name: Get host ip
         id: get_ip
