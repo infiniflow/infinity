@@ -115,18 +115,6 @@ jobs:
           ip=$(ip route get 1.1.1.1 | awk '{print $7}')
           echo ${ip}
           hostname -I
-          
-          scp infiniflow@192.168.200.246:1.txt .
-
-#      - name: ssh to remote server
-#        uses: appleboy/ssh-action@v1
-#        with:
-#          host: 192.168.200.120
-#          username: infiniflow
-#          # password: ${{ secrets.PASSWORD }}
-#          password: infiniflow
-#          script: |
-#            hostname -I
 
   debug_unit_test:
     name: debug_tests_unit_test
@@ -145,6 +133,16 @@ jobs:
           
           ip=$(ip route get 1.1.1.1 | awk '{print $7}')
           echo "My IP: ${ip}"
+
+      - name: ssh to remote server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 172.17.0.1
+          username: infiniflow
+          # password: ${{ secrets.PASSWORD }}
+          password: infiniflow
+          script: |
+            hostname -I
 #      - name: Unit test debug version
 #        if: ${{ !cancelled() && !failure() }}
 #        id: run_unit_test_debug
