@@ -116,10 +116,10 @@ jobs:
           echo ${ip}
           hostname -I
 
-      - name: 执行远程 SSH 命令（密码认证）
+      - name: ssh to remote server
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.HOST }}
+          host: 192.168.200.120
           username: infiniflow
           password: ${{ secrets.PASSWORD }}
           script: |
