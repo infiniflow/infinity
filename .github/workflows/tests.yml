@@ -117,6 +117,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && cmake --build /infinity/cmake-build-debug --target infinity"
+          sudo apt update
           sudo apt install -y openssh-server
 
 #      - name: Build unit test
