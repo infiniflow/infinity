@@ -115,7 +115,7 @@ jobs:
           host: 172.17.0.1
           username: infiniflow
           password: infiniflow
-          capture_stdout: 'true'
+          capture_stdout: true
           script: |
             hostname -I | awk '{print $1}'
 
@@ -123,8 +123,9 @@ jobs:
         id: step1
         if: ${{ !cancelled() && !failure() }}
         run: |
-          echo "Build ip is: ${{ steps.ssh.outputs.stdout }}"
-          echo "build_ip=${{ steps.ssh.outputs.stdout }}" >> $GITHUB_OUTPUT
+          STEP_BUILD_IP=${{ steps.ssh.outputs.stdout }} | awk '{print $4}'
+          echo "Build ip is: ${STEP_BUILD_IP}"
+          echo "build_ip=${STEP_BUILD_IP}" >> ${GITHUB_OUTPUT}
 
   debug_unit_test:
     name: debug_tests_unit_test
