@@ -133,8 +133,6 @@ public:
 
     void ShowColumns(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowColumnsRequest &request) final;
 
-    void ShowTables(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowTablesRequest &request) final;
-
     void ShowSegments(infinity_thrift_rpc::SelectResponse &_return, const infinity_thrift_rpc::ShowSegmentsRequest &request) final;
 
     void ShowSegment(infinity_thrift_rpc::ShowSegmentResponse &_return, const infinity_thrift_rpc::ShowSegmentRequest &request) final;

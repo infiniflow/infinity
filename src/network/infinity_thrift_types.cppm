@@ -60,7 +60,6 @@ export using infinity_thrift_rpc::ListTableRequest;
 export using infinity_thrift_rpc::ShowDatabaseRequest;
 export using infinity_thrift_rpc::ShowTableRequest;
 export using infinity_thrift_rpc::ShowColumnsRequest;
-export using infinity_thrift_rpc::ShowTablesRequest;
 export using infinity_thrift_rpc::ShowSegmentsRequest;
 export using infinity_thrift_rpc::ShowSegmentRequest;
 export using infinity_thrift_rpc::ShowBlocksRequest;

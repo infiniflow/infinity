@@ -662,11 +662,6 @@ struct DumpIndexRequest {
 4:  i64 session_id,
 }
 
-struct ShowTablesRequest{
-1: i64 session_id,
-2: string db_name,
-}
-
 struct ShowSegmentsRequest {
 1: i64 session_id,
 2: string db_name,
@@ -850,7 +845,6 @@ ListIndexResponse ListIndex(1:ListIndexRequest request),
 ShowTableResponse ShowTable(1:ShowTableRequest request),
 SelectResponse ShowColumns(1:ShowColumnsRequest request),
 ShowDatabaseResponse ShowDatabase(1:ShowDatabaseRequest request),
-SelectResponse ShowTables(1:ShowTablesRequest request),
 
 SelectResponse ShowSegments(1:ShowSegmentsRequest request),
 ShowSegmentResponse ShowSegment(1:ShowSegmentRequest request),

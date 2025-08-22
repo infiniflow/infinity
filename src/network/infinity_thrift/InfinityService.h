@@ -41,7 +41,6 @@ class InfinityServiceIf {
   virtual void ShowTable(ShowTableResponse& _return, const ShowTableRequest& request) = 0;
   virtual void ShowColumns(SelectResponse& _return, const ShowColumnsRequest& request) = 0;
   virtual void ShowDatabase(ShowDatabaseResponse& _return, const ShowDatabaseRequest& request) = 0;
-  virtual void ShowTables(SelectResponse& _return, const ShowTablesRequest& request) = 0;
   virtual void ShowSegments(SelectResponse& _return, const ShowSegmentsRequest& request) = 0;
   virtual void ShowSegment(ShowSegmentResponse& _return, const ShowSegmentRequest& request) = 0;
   virtual void ShowBlocks(SelectResponse& _return, const ShowBlocksRequest& request) = 0;
@@ -152,9 +151,6 @@ class InfinityServiceNull : virtual public InfinityServiceIf {
     return;
   }
   void ShowDatabase(ShowDatabaseResponse& /* _return */, const ShowDatabaseRequest& /* request */) override {
-    return;
-  }
-  void ShowTables(SelectResponse& /* _return */, const ShowTablesRequest& /* request */) override {
     return;
   }
   void ShowSegments(SelectResponse& /* _return */, const ShowSegmentsRequest& /* request */) override {
@@ -1980,98 +1976,6 @@ class InfinityService_ShowDatabase_presult {
   ShowDatabaseResponse* success;
 
   _InfinityService_ShowDatabase_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
-};
-
-typedef struct _InfinityService_ShowTables_args__isset {
-  _InfinityService_ShowTables_args__isset() : request(false) {}
-  bool request :1;
-} _InfinityService_ShowTables_args__isset;
-
-class InfinityService_ShowTables_args {
- public:
-
-  InfinityService_ShowTables_args(const InfinityService_ShowTables_args&);
-  InfinityService_ShowTables_args& operator=(const InfinityService_ShowTables_args&);
-  InfinityService_ShowTables_args() noexcept;
-
-  virtual ~InfinityService_ShowTables_args() noexcept;
-  ShowTablesRequest request;
-
-  _InfinityService_ShowTables_args__isset __isset;
-
-  void __set_request(const ShowTablesRequest& val);
-
-  bool operator == (const InfinityService_ShowTables_args & rhs) const;
-  bool operator != (const InfinityService_ShowTables_args &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const InfinityService_ShowTables_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-
-class InfinityService_ShowTables_pargs {
- public:
-
-
-  virtual ~InfinityService_ShowTables_pargs() noexcept;
-  const ShowTablesRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-typedef struct _InfinityService_ShowTables_result__isset {
-  _InfinityService_ShowTables_result__isset() : success(false) {}
-  bool success :1;
-} _InfinityService_ShowTables_result__isset;
-
-class InfinityService_ShowTables_result {
- public:
-
-  InfinityService_ShowTables_result(const InfinityService_ShowTables_result&);
-  InfinityService_ShowTables_result& operator=(const InfinityService_ShowTables_result&);
-  InfinityService_ShowTables_result() noexcept;
-
-  virtual ~InfinityService_ShowTables_result() noexcept;
-  SelectResponse success;
-
-  _InfinityService_ShowTables_result__isset __isset;
-
-  void __set_success(const SelectResponse& val);
-
-  bool operator == (const InfinityService_ShowTables_result & rhs) const;
-  bool operator != (const InfinityService_ShowTables_result &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const InfinityService_ShowTables_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-typedef struct _InfinityService_ShowTables_presult__isset {
-  _InfinityService_ShowTables_presult__isset() : success(false) {}
-  bool success :1;
-} _InfinityService_ShowTables_presult__isset;
-
-class InfinityService_ShowTables_presult {
- public:
-
-
-  virtual ~InfinityService_ShowTables_presult() noexcept;
-  SelectResponse* success;
-
-  _InfinityService_ShowTables_presult__isset __isset;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
 
@@ -4551,9 +4455,6 @@ class InfinityServiceClient : virtual public InfinityServiceIf {
   void ShowDatabase(ShowDatabaseResponse& _return, const ShowDatabaseRequest& request) override;
   void send_ShowDatabase(const ShowDatabaseRequest& request);
   void recv_ShowDatabase(ShowDatabaseResponse& _return);
-  void ShowTables(SelectResponse& _return, const ShowTablesRequest& request) override;
-  void send_ShowTables(const ShowTablesRequest& request);
-  void recv_ShowTables(SelectResponse& _return);
   void ShowSegments(SelectResponse& _return, const ShowSegmentsRequest& request) override;
   void send_ShowSegments(const ShowSegmentsRequest& request);
   void recv_ShowSegments(SelectResponse& _return);
@@ -4666,7 +4567,6 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_ShowTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ShowColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ShowDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_ShowTables(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ShowSegments(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ShowSegment(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ShowBlocks(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
@@ -4715,7 +4615,6 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["ShowTable"] = &InfinityServiceProcessor::process_ShowTable;
     processMap_["ShowColumns"] = &InfinityServiceProcessor::process_ShowColumns;
     processMap_["ShowDatabase"] = &InfinityServiceProcessor::process_ShowDatabase;
-    processMap_["ShowTables"] = &InfinityServiceProcessor::process_ShowTables;
     processMap_["ShowSegments"] = &InfinityServiceProcessor::process_ShowSegments;
     processMap_["ShowSegment"] = &InfinityServiceProcessor::process_ShowSegment;
     processMap_["ShowBlocks"] = &InfinityServiceProcessor::process_ShowBlocks;
@@ -4957,16 +4856,6 @@ class InfinityServiceMultiface : virtual public InfinityServiceIf {
       ifaces_[i]->ShowDatabase(_return, request);
     }
     ifaces_[i]->ShowDatabase(_return, request);
-    return;
-  }
-
-  void ShowTables(SelectResponse& _return, const ShowTablesRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->ShowTables(_return, request);
-    }
-    ifaces_[i]->ShowTables(_return, request);
     return;
   }
 
@@ -5319,9 +5208,6 @@ class InfinityServiceConcurrentClient : virtual public InfinityServiceIf {
   void ShowDatabase(ShowDatabaseResponse& _return, const ShowDatabaseRequest& request) override;
   int32_t send_ShowDatabase(const ShowDatabaseRequest& request);
   void recv_ShowDatabase(ShowDatabaseResponse& _return, const int32_t seqid);
-  void ShowTables(SelectResponse& _return, const ShowTablesRequest& request) override;
-  int32_t send_ShowTables(const ShowTablesRequest& request);
-  void recv_ShowTables(SelectResponse& _return, const int32_t seqid);
   void ShowSegments(SelectResponse& _return, const ShowSegmentsRequest& request) override;
   int32_t send_ShowSegments(const ShowSegmentsRequest& request);
   void recv_ShowSegments(SelectResponse& _return, const int32_t seqid);

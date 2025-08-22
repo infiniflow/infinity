@@ -1375,23 +1375,6 @@ void InfinityThriftService::ShowColumns(infinity_thrift_rpc::SelectResponse &res
     }
 }
 
-void InfinityThriftService::ShowTables(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowTablesRequest &request) {
-    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
-    if (!infinity_status.ok()) {
-        ProcessStatus(response, infinity_status);
-        return;
-    }
-
-    const QueryResult result = infinity->ShowTables(request.db_name);
-    if (result.IsOk()) {
-        auto &columns = response.column_fields;
-        columns.resize(result.result_table_->ColumnCount());
-        ProcessDataBlocks(result, response, columns);
-    } else {
-        ProcessQueryResult(response, result);
-    }
-}
-
 void InfinityThriftService::GetDatabase(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::GetDatabaseRequest &request) {
     auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
     if (!infinity_status.ok()) {
