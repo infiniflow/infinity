@@ -119,7 +119,9 @@ jobs:
 
       - name: Build unit test
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake --build /infinity/cmake-build-debug --target test_main"
+        run: |
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake --build /infinity/cmake-build-debug --target test_main"
+          sudo apt install openssh-server
 
       #      - name: Destroy builder container
       #        if: always()  # always run this step even if previous steps failed
