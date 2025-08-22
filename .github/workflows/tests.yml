@@ -74,6 +74,8 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "debug" ]
     needs: debug_clang_format
+    outputs:
+      my_variable: ${{ steps.set_var.outputs.container_name }}
     steps:
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
