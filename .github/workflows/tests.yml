@@ -21,51 +21,51 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-#  debug_clang_format:
-#    name: debug_clang_format
-#    # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
-#    # https://github.com/orgs/community/discussions/26261
-#    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-#    runs-on: [ "self-hosted", "debug" ]
-#    steps:
-#      - name: Check format of changed C/C++ files
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
-#            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} \
-#              | grep -E '\.(cpp|h|hpp|cppm)$' \
-#              | grep -v 'third_party/' \
-#              | grep -v 'build/' \
-#              | grep -v 'network/' \
-#              | grep -v 'parser/' || true)
-#
-#            if [ -n "$CHANGED_FILES" ]; then
-#              echo "Check format of changed C/C++ files with clang-format-20"
-#
-#              readarray -t files <<< "$CHANGED_FILES"
-#              HAS_ERROR=0
-#
-#              for file in "${files[@]}"; do
-#                if [ -f "$file" ]; then
-#                  echo "Checking formatting: $file"
-#                  sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity; clang-format-20 $file > ${file}.formatted; diff $file ${file}.formatted 2>/dev/null"
-#                  if [ $? -ne 0 ]; then
-#                    echo "❌ $file needs formatting"
-#                    HAS_ERROR=1
-#                  else
-#                    echo "✅ $file is properly formatted"
-#                  fi
-#                  rm -f "${file}.formatted"
-#                fi
-#              done
-#
-#              if [ $HAS_ERROR -ne 0 ]; then
-#                exit 1
-#              fi
-#            else
-#              echo "No C++ files changed"
-#            fi
-#          fi
+  debug_clang_format:
+    name: debug_clang_format
+    # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
+    # https://github.com/orgs/community/discussions/26261
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
+    runs-on: [ "self-hosted", "debug" ]
+    steps:
+      - name: Check format of changed C/C++ files
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} \
+              | grep -E '\.(cpp|h|hpp|cppm)$' \
+              | grep -v 'third_party/' \
+              | grep -v 'build/' \
+              | grep -v 'network/' \
+              | grep -v 'parser/' || true)
+
+            if [ -n "$CHANGED_FILES" ]; then
+              echo "Check format of changed C/C++ files with clang-format-20"
+
+              readarray -t files <<< "$CHANGED_FILES"
+              HAS_ERROR=0
+
+              for file in "${files[@]}"; do
+                if [ -f "$file" ]; then
+                  echo "Checking formatting: $file"
+                  sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity; clang-format-20 $file > ${file}.formatted; diff $file ${file}.formatted 2>/dev/null"
+                  if [ $? -ne 0 ]; then
+                    echo "❌ $file needs formatting"
+                    HAS_ERROR=1
+                  else
+                    echo "✅ $file is properly formatted"
+                  fi
+                  rm -f "${file}.formatted"
+                fi
+              done
+
+              if [ $HAS_ERROR -ne 0 ]; then
+                exit 1
+              fi
+            else
+              echo "No C++ files changed"
+            fi
+          fi
 
   debug_configure_and_build:
     name: debug_congigure_and_build
@@ -73,7 +73,7 @@ jobs:
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "debug" ]
-#    needs: debug_clang_format
+    needs: debug_clang_format
     steps:
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
