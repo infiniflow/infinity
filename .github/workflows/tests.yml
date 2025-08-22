@@ -115,10 +115,7 @@ jobs:
 
       - name: Build debug version
         if: ${{ !cancelled() && !failure() }}
-        run: |
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && cmake --build /infinity/cmake-build-debug --target infinity"
-          sudo apt update
-          sudo apt install -y openssh-server
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && cmake --build /infinity/cmake-build-debug --target infinity"
 
 #      - name: Build unit test
 #        if: ${{ !cancelled() && !failure() }}
@@ -147,8 +144,15 @@ jobs:
           script: |
             hostname -I | awk '{print $1}'
             mkdir -p /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
-            scp infiniflow@172.17.0.2:/infinity/cmake-build-debug/src/infinity /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
-#            scp infiniflow@172.17.0.2:/infinity/cmake-build-debug/src/test_main /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
+
+      - name: Scp artifacts
+        uses: appleboy/scp-action@v1
+        with:
+          host: 172.17.0.1
+          username: infiniflow
+          password: infiniflow
+          source: "/infinity/cmake-build-debug/src/infinity"
+          target: infiniflow@172.17.0.1:/home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
 
       - name: Get host ip
         id: get_ip
