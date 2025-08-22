@@ -79,7 +79,6 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "container_name=${BUILDER_CONTAINER}" >> $GITHUB_OUTPUT
           CPUS=${CPUS:-$(nproc)}
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
           echo "CPUS=${CPUS}" >> $GITHUB_ENV
@@ -115,7 +114,7 @@ jobs:
       - name: Get container name
         if: ${{ !cancelled() && !failure() }}
         run: |
-          echo "------${{ needs.debug_configure_and_build.outputs.container_name }}"
+          echo "------${BUILDER_CONTAINER}"
 #      - name: Unit test debug version
 #        if: ${{ !cancelled() && !failure() }}
 #        id: run_unit_test_debug
