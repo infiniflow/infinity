@@ -92,7 +92,7 @@ struct ExpressionIndexScanInfo {
     inline void NewInitColumnIndexEntries(TableInfo *table_info, NewTxn *new_txn, BaseTableRef *base_table_ref) {
         Status status;
         if (!base_table_ref->block_index_->table_meta_) {
-            base_table_ref->block_index_->table_meta_ = std::make_unique<TableMeeta>(table_info->db_id_, table_info->table_id_, new_txn, nullptr);
+            base_table_ref->block_index_->table_meta_ = std::make_unique<TableMeeta>(table_info->db_id_, table_info->table_id_, new_txn);
         }
         table_meta_ = base_table_ref->block_index_->table_meta_.get();
         auto &table_index_meta_map = base_table_ref->block_index_->table_index_meta_map_;

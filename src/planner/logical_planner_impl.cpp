@@ -1076,6 +1076,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, std::shared_p
     std::shared_ptr<TableInfo> table_info;
     Status status;
     NewTxn *new_txn = query_context_ptr_->GetNewTxn();
+    MetaCache *meta_cache = query_context_ptr_->storage()->meta_cache();
     std::optional<DBMeeta> db_meta;
     std::optional<TableMeeta> tmp_table_meta;
     status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, tmp_table_meta);
@@ -1086,7 +1087,8 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, std::shared_p
                                                    tmp_table_meta->table_id_str(),
                                                    tmp_table_meta->kv_instance(),
                                                    tmp_table_meta->begin_ts(),
-                                                   tmp_table_meta->commit_ts());
+                                                   tmp_table_meta->commit_ts(),
+                                                   meta_cache);
     table_info = std::make_shared<TableInfo>();
     status = table_meta->GetTableInfo(*table_info);
     if (!status.ok()) {

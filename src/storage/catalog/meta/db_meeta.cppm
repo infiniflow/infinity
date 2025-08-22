@@ -40,11 +40,7 @@ public:
 
     Status GetTableIDs(std::vector<std::string> *&table_id_strs, std::vector<std::string> **table_names = nullptr);
 
-    Status GetTableID(const std::string &table_name,
-                      std::string &table_key,
-                      std::string &table_id_str,
-                      TxnTimeStamp &create_table_ts,
-                      std::shared_ptr<MetaTableCache> &table_cache);
+    Status GetTableID(const std::string &table_name, std::string &table_key, std::string &table_id_str, TxnTimeStamp &create_table_ts);
 
     std::tuple<std::shared_ptr<DatabaseInfo>, Status> GetDatabaseInfo();
 
@@ -54,6 +50,8 @@ public:
 
     std::string GetDBName() const { return db_name_; }
     void SetDBName(const std::string &db_name) { db_name_ = db_name; }
+
+    MetaCache *meta_cache() const;
 
 private:
     Status GetComment(std::string *&comment);

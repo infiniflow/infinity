@@ -876,19 +876,20 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
         }
         case IndexType::kEMVB: {
             std::shared_ptr<EMVBIndexInMem> memory_emvb_index;
+            TableMeeta &table_meta = segment_index_meta.table_index_meta().table_meta();
             if (is_null) {
                 auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
                 if (!status.ok()) {
                     return status;
                 }
                 memory_emvb_index = EMVBIndexInMem::NewEMVBIndexInMem(index_base, column_def, base_row_id);
-                TableMeeta &table_meta = segment_index_meta.table_index_meta().table_meta();
                 memory_emvb_index->SetSegmentID(table_meta.db_id_str(), table_meta.table_id_str(), segment_index_meta.segment_id());
                 mem_index->SetEMVBIndex(memory_emvb_index);
             } else {
                 memory_emvb_index = mem_index->GetEMVBIndex();
             }
-            memory_emvb_index->Insert(col, offset, row_cnt, segment_index_meta.kv_instance(), begin_ts);
+            MetaCache *meta_cache = table_meta.meta_cache();
+            memory_emvb_index->Insert(col, offset, row_cnt, segment_index_meta.kv_instance(), begin_ts, meta_cache);
             break;
         }
         default: {
@@ -2065,7 +2066,7 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     std::string table_key = create_index_cmd->table_key_;
     std::string index_id_str = create_index_cmd->index_id_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, this, nullptr);
+    TableMeeta table_meta(db_id_str, table_id_str, this);
     std::optional<TableIndexMeeta> table_index_meta_opt;
     Status status = new_catalog_->AddNewTableIndex(table_meta, index_id_str, commit_ts, create_index_cmd->index_base_, table_index_meta_opt);
     if (!status.ok()) {
@@ -2137,7 +2138,7 @@ Status NewTxn::PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
     auto ts_str = std::to_string(commit_ts);
     kv_instance_->Put(KeyEncode::DropTableIndexKey(db_id_str, table_id_str, drop_index_cmd->index_name_, create_ts, index_id_str), ts_str);
 
-    TableMeeta table_meta(db_id_str, table_id_str, this, nullptr);
+    TableMeeta table_meta(db_id_str, table_id_str, this);
     TableIndexMeeta table_index_meta(index_id_str, table_meta);
     std::shared_ptr<IndexBase> index_base;
     Status status;
@@ -2165,7 +2166,7 @@ Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, K
     const std::string &index_id_str = dump_index_cmd->index_id_;
     SegmentID segment_id = dump_index_cmd->segment_id_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, this, nullptr);
+    TableMeeta table_meta(db_id_str, table_id_str, this);
 
     const std::string &index_id_str_ = dump_index_cmd->index_id_;
     TableIndexMeeta table_index_meta(index_id_str_, table_meta);

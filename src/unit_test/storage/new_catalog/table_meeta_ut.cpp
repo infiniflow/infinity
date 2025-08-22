@@ -31,6 +31,7 @@ import :txn_state;
 import :segment_meta;
 import :table_meeta;
 import :block_meta;
+import :meta_cache;
 
 import column_def;
 import data_type;
@@ -93,6 +94,7 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
     EXPECT_TRUE(get_status.ok());
 
     std::unique_ptr<KVInstance> kv_instance = infinity::InfinityContext::instance().storage()->KVInstance();
+    MetaCache *meta_cache = infinity::InfinityContext::instance().storage()->meta_cache();
     TableMeeta table_meta(table_info->db_id_, table_info->table_id_, kv_instance.get(), txn2->BeginTS(), txn2->CommitTS());
 
     {

@@ -169,8 +169,7 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
     std::string table_id_str;
     std::string table_key;
     TxnTimeStamp create_table_ts;
-    std::shared_ptr<MetaTableCache> table_cache{};
-    status = db_meta->GetTableID(table_name, table_key, table_id_str, create_table_ts, table_cache);
+    status = db_meta->GetTableID(table_name, table_key, table_id_str, create_table_ts);
 
     if (!status.ok()) {
         output_names_->reserve(1);

@@ -148,11 +148,10 @@ Status DBMeeta::GetTableIDs(std::vector<std::string> *&table_id_strs, std::vecto
 Status DBMeeta::GetTableID(const std::string &table_name,
                            std::string &table_key,
                            std::string &table_id_str,
-                           TxnTimeStamp &create_table_ts,
-                           std::shared_ptr<MetaTableCache> &table_cache) {
+                           TxnTimeStamp &create_table_ts) {
 
     u64 db_id = std::stoull(db_id_str_);
-    table_cache = meta_cache_->GetTable(db_id, table_name, txn_begin_ts_);
+    std::shared_ptr<MetaTableCache> table_cache = meta_cache_->GetTable(db_id, table_name, txn_begin_ts_);
     if (table_cache.get() != nullptr) {
         if (table_cache->is_dropped()) {
             return Status::TableNotExist(table_name);
@@ -208,17 +207,6 @@ Status DBMeeta::GetTableID(const std::string &table_name,
 
     if ((!drop_table_ts.empty() && std::stoull(drop_table_ts) <= txn_begin_ts_) ||
         (!rename_table_ts.empty() && std::stoull(rename_table_ts) <= txn_begin_ts_)) {
-
-        //        table_cache = std::make_shared<MetaTableCache>(db_id, table_name, std::stoull(table_id_str), max_commit_ts, table_key, true);
-        //        meta_cache_->Put({table_cache});
-        //
-        //        LOG_TRACE(fmt::format("Save dropped table meta from cache, db_id: {}, table_name: {}, table_key: {}, table_id: {}, commit_ts: {}",
-        //                              table_cache->db_id_,
-        //                              table_name,
-        //                              table_key,
-        //                              table_cache->table_id_,
-        //                              table_cache->commit_ts_));
-
         return Status::TableNotExist(table_name);
     }
 
@@ -325,4 +313,7 @@ Status DBMeeta::SetNextTableID(const std::string &table_id_str) {
     }
     return Status::OK();
 }
+
+MetaCache *DBMeeta::meta_cache() const { return meta_cache_; }
+
 } // namespace infinity

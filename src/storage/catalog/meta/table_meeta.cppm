@@ -36,9 +36,14 @@ class MetaTableCache;
 export class TableMeeta {
 public:
     // TableMeeta(const std::string &db_id_str, const std::string &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts, UsageEnum usage);
-    TableMeeta(const std::string &db_id_str, const std::string &table_id_str, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+    TableMeeta(const std::string &db_id_str,
+               const std::string &table_id_str,
+               KVInstance *kv_instance,
+               TxnTimeStamp begin_ts,
+               TxnTimeStamp commit_ts,
+               MetaCache *meta_cache);
 
-    TableMeeta(const std::string &db_id_str, const std::string &table_id_str, NewTxn *txn, const std::shared_ptr<MetaTableCache> &table_cache);
+    TableMeeta(const std::string &db_id_str, const std::string &table_id_str, NewTxn *txn);
 
     TxnTimeStamp begin_ts() const { return begin_ts_; }
     TxnTimeStamp commit_ts() const { return commit_ts_; }
@@ -128,6 +133,10 @@ public:
 
     std::tuple<size_t, Status> GetTableRowCount();
 
+    MetaCache *meta_cache() const;
+
+    void SetTableName(const std::string &table_name);
+
 private:
     Status LoadColumnDefs();
 
@@ -146,7 +155,10 @@ private:
     TxnTimeStamp commit_ts_;
     NewTxn *txn_{};
     KVInstance *kv_instance_{};
+    MetaCache *meta_cache_{};
+
     std::string db_id_str_;
+    u64 db_id_;
     std::string table_id_str_;
     std::string db_name_{};
     std::string table_name_{};
@@ -161,8 +173,6 @@ private:
     std::optional<SegmentID> next_segment_id_;
     std::optional<SegmentID> unsealed_segment_id_;
     std::optional<ColumnID> next_column_id_;
-
-    std::shared_ptr<MetaTableCache> table_cache_{};
 };
 
 } // namespace infinity
