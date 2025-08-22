@@ -109,6 +109,7 @@ jobs:
       #          fi
 
       - name: print ip
+        id: step1
         if: ${{ !cancelled() && !failure() }}
         run: |
           ip=$(hostname -I | awk '{print $1}')
