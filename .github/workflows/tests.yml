@@ -69,16 +69,21 @@ jobs:
 
   debug_configure_and_build:
     name: debug_congigure_and_build
+    id: builder_job
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "debug" ]
     #    needs: debug_clang_format
+    outputs:
+      my_variable: ${{ steps.set_var.outputs.container_name }}
     steps:
+      - id: step1
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
         run: |
           BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "container_name=${BUILDER_CONTAINER}" >> $GITHUB_OUTPUT
           CPUS=${CPUS:-$(nproc)}
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
           echo "CPUS=${CPUS}" >> $GITHUB_ENV
@@ -114,7 +119,7 @@ jobs:
       - name: Get container name
         if: ${{ !cancelled() && !failure() }}
         run: |
-          echo "------${BUILDER_CONTAINER}"
+          echo "------${{ needs.builder_job.step1.outputs.container_name }}"
 #      - name: Unit test debug version
 #        if: ${{ !cancelled() && !failure() }}
 #        id: run_unit_test_debug
