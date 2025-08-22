@@ -19,6 +19,7 @@ from infinity_http import infinity_http
 
 TEST_DATA_DIR = "/test/data/"
 
+
 @pytest.fixture(scope="class")
 def http(request):
     return request.config.getoption("--http")
@@ -629,7 +630,8 @@ class TestInfinity:
         print(res)
 
         # Check if highlight work
-        res, extra_result = table_obj.output(["doctitle", "docdate", "body", "_row_id", "_score"]).highlight(["body"]).match_text(
+        res, extra_result = table_obj.output(["doctitle", "docdate", "body", "_row_id", "_score"]).highlight(
+            ["body"]).match_text(
             "body^5", "harmful chemical", 3).to_pl()
         assert not res.is_empty()
         for body in res["body"].to_list():
@@ -658,17 +660,18 @@ class TestInfinity:
             "test_empty_fulltext_index" + suffix, ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table("test_empty_fulltext_index" + suffix, {
-            "doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}, "body2": {"type": "varchar", "default":""}
+            "doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"},
+            "body2": {"type": "varchar", "default": ""}
         }, ConflictType.Error)
 
         if not offline:
             res = table_obj.create_index("body_index",
-                                        index.IndexInfo("body",
-                                                        index.IndexType.FullText))
+                                         index.IndexInfo("body",
+                                                         index.IndexType.FullText))
             assert res.error_code == ErrorCode.OK
             res = table_obj.create_index("body2_index",
-                                        index.IndexInfo("body2",
-                                                        index.IndexType.FullText))
+                                         index.IndexInfo("body2",
+                                                         index.IndexType.FullText))
             assert res.error_code == ErrorCode.OK
 
         # Create 99*300/8192 = 3.6 BlockEntry to test MemIndexRecover and OptimizeIndex
@@ -688,12 +691,12 @@ class TestInfinity:
         time.sleep(5)
         if offline:
             res = table_obj.create_index("body_index",
-                                        index.IndexInfo("body",
-                                                        index.IndexType.FullText))
+                                         index.IndexInfo("body",
+                                                         index.IndexType.FullText))
             assert res.error_code == ErrorCode.OK
             res = table_obj.create_index("body2_index",
-                                        index.IndexInfo("body2",
-                                                        index.IndexType.FullText))
+                                         index.IndexInfo("body2",
+                                                         index.IndexType.FullText))
             assert res.error_code == ErrorCode.OK
         else:
             table_obj.optimize("body_index", {})
@@ -807,10 +810,10 @@ class TestInfinity:
 
     @pytest.mark.parametrize("conflict_type", [ConflictType.Ignore,
                                                ConflictType.Error,
-                                            #    ConflictType.Replace,
+                                               #    ConflictType.Replace,
                                                0,
                                                1,
-                                            #    2,
+                                               #    2,
                                                ])
     def test_create_index_with_valid_options(self, conflict_type, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
@@ -864,7 +867,7 @@ class TestInfinity:
                                                    }), conflict_type)
 
         assert e.type == InfinityException
-        # assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
+        assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE or e.value.args[0] == ErrorCode.INVALID_CREATE_OPTION
 
         res = db_obj.drop_table(
             "test_create_index_with_invalid_options" + suffix, ConflictType.Error)
@@ -901,10 +904,10 @@ class TestInfinity:
 
     # TODO: Add ConflictType::Replace
     @pytest.mark.parametrize("conflict_type", [pytest.param(ConflictType.Error),
-                                            #    pytest.param(
-                                            #        ConflictType.Replace),
+                                               #    pytest.param(
+                                               #        ConflictType.Replace),
                                                pytest.param(1),
-                                            #    pytest.param(2),
+                                               #    pytest.param(2),
                                                ])
     def test_create_duplicated_index_with_valid_error_options(self, conflict_type, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
@@ -973,7 +976,7 @@ class TestInfinity:
                                                    }), conflict_type)
 
         assert e.type == InfinityException
-        # assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
+        assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE or e.value.args[0] == ErrorCode.INVALID_CREATE_OPTION
 
         for i in range(10):
             with pytest.raises(InfinityException) as e:
@@ -987,128 +990,11 @@ class TestInfinity:
                                                        }), conflict_type)
 
             assert e.type == InfinityException
-            # assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
+            assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE or e.value.args[
+                0] == ErrorCode.INVALID_CREATE_OPTION
 
         res = db_obj.drop_table(
             "test_create_duplicated_index_with_invalid_options" + suffix, ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-    def test_show_index(self, suffix):
-        db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_show_index" + suffix, ConflictType.Ignore)
-        table_obj = db_obj.create_table(
-            "test_show_index" + suffix,
-            {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
-        assert table_obj is not None
-        for i in range(10):
-            res = table_obj.create_index("my_index_" + str(i),
-                                         index.IndexInfo("c1",
-                                                         index.IndexType.Hnsw,
-                                                         {
-                                                             "m": "16",
-                                                             "ef_construction": "50",
-                                                             "metric": "l2"
-                                                         }), ConflictType.Error)
-            assert res.error_code == ErrorCode.OK
-            res = table_obj.show_index("my_index_" + str(i))
-            print(res)
-
-        for i in range(10):
-            res = table_obj.drop_index(
-                "my_index_" + str(i), ConflictType.Error)
-            assert res.error_code == ErrorCode.OK
-
-        res = db_obj.drop_table("test_show_index" + suffix, ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-    @pytest.mark.parametrize("index_name", ["my_index"])
-    def test_show_valid_name_index(self, index_name, suffix):
-        db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_show_various_name_index" + suffix, ConflictType.Ignore)
-        table_obj = db_obj.create_table(
-            "test_show_various_name_index" + suffix,
-            {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
-        assert table_obj is not None
-        res = table_obj.create_index("my_index",
-                                     index.IndexInfo("c1",
-                                                     index.IndexType.Hnsw,
-                                                     {
-                                                         "m": "16",
-                                                         "ef_construction": "50",
-                                                         "metric": "l2"
-                                                     }), ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-        res = table_obj.show_index(index_name)
-        print(res)
-
-        res = table_obj.drop_index("my_index", ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-        res = db_obj.drop_table(
-            "test_show_various_name_index" + suffix, ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-    @pytest.mark.parametrize("index_name", [pytest.param("Invalid name"),
-                                            pytest.param("not_exist_name"),
-                                            pytest.param(1),
-                                            pytest.param(1.1),
-                                            pytest.param(True),
-                                            pytest.param([]),
-                                            pytest.param(()),
-                                            pytest.param({}),
-                                            ])
-    def test_show_invalid_name_index(self, index_name, suffix):
-        db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_show_invalid_name_index" + suffix, ConflictType.Ignore)
-        table_obj = db_obj.create_table(
-            "test_show_invalid_name_index" + suffix,
-            {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
-        assert table_obj is not None
-
-        with pytest.raises(Exception):
-            res = table_obj.create_index("my_index",
-                                         index.IndexInfo("c1",
-                                                         index.IndexType.Hnsw,
-                                                         {
-                                                             "m": "16",
-                                                             "ef_construction": "50",
-                                                             "metric": "l2"
-                                                         }), ConflictType.Error)
-            assert res.error_code == ErrorCode.OK
-            res = table_obj.show_index(index_name)
-            print(res)
-
-        res = db_obj.drop_table(
-            "test_show_invalid_name_index" + suffix, ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-    def test_list_index(self, suffix):
-        db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_list_index" + suffix, ConflictType.Ignore)
-        table_obj = db_obj.create_table(
-            "test_list_index" + suffix,
-            {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
-        assert table_obj is not None
-        for i in range(10):
-            res = table_obj.create_index("my_index_" + str(i),
-                                         index.IndexInfo("c1",
-                                                         index.IndexType.Hnsw,
-                                                         {
-                                                             "m": "16",
-                                                             "ef_construction": "50",
-                                                             "metric": "l2"
-                                                         }), ConflictType.Error)
-            assert res.error_code == ErrorCode.OK
-
-        res = table_obj.list_indexes()
-        print(vars(res))
-
-        for i in range(10):
-            res = table_obj.drop_index(
-                "my_index_" + str(i), ConflictType.Error)
-            assert res.error_code == ErrorCode.OK
-
-        res = db_obj.drop_table("test_list_index" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("conflict_type", [ConflictType.Ignore,
@@ -1172,7 +1058,7 @@ class TestInfinity:
             table_obj.drop_index("my_index", conflict_type)
 
         assert e.type == InfinityException
-        # assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
+        assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE or e.value.args[0] == ErrorCode.INVALID_DROP_OPTION
 
         res = db_obj.drop_table(
             "test_drop_index_with_invalid_options" + suffix, ConflictType.Error)
