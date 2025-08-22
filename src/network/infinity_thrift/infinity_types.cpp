@@ -14829,131 +14829,6 @@ void DumpIndexRequest::printTo(std::ostream& out) const {
 }
 
 
-ShowTablesRequest::~ShowTablesRequest() noexcept {
-}
-
-ShowTablesRequest::ShowTablesRequest() noexcept
-   : session_id(0),
-     db_name() {
-}
-
-void ShowTablesRequest::__set_session_id(const int64_t val) {
-  this->session_id = val;
-}
-
-void ShowTablesRequest::__set_db_name(const std::string& val) {
-  this->db_name = val;
-}
-std::ostream& operator<<(std::ostream& out, const ShowTablesRequest& obj)
-{
-  obj.printTo(out);
-  return out;
-}
-
-
-uint32_t ShowTablesRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
-
-  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-  uint32_t xfer = 0;
-  std::string fname;
-  ::apache::thrift::protocol::TType ftype;
-  int16_t fid;
-
-  xfer += iprot->readStructBegin(fname);
-
-  using ::apache::thrift::protocol::TProtocolException;
-
-
-  while (true)
-  {
-    xfer += iprot->readFieldBegin(fname, ftype, fid);
-    if (ftype == ::apache::thrift::protocol::T_STOP) {
-      break;
-    }
-    switch (fid)
-    {
-      case 1:
-        if (ftype == ::apache::thrift::protocol::T_I64) {
-          xfer += iprot->readI64(this->session_id);
-          this->__isset.session_id = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      case 2:
-        if (ftype == ::apache::thrift::protocol::T_STRING) {
-          xfer += iprot->readString(this->db_name);
-          this->__isset.db_name = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      default:
-        xfer += iprot->skip(ftype);
-        break;
-    }
-    xfer += iprot->readFieldEnd();
-  }
-
-  xfer += iprot->readStructEnd();
-
-  return xfer;
-}
-
-uint32_t ShowTablesRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
-  uint32_t xfer = 0;
-  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-  xfer += oprot->writeStructBegin("ShowTablesRequest");
-
-  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
-  xfer += oprot->writeI64(this->session_id);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("db_name", ::apache::thrift::protocol::T_STRING, 2);
-  xfer += oprot->writeString(this->db_name);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldStop();
-  xfer += oprot->writeStructEnd();
-  return xfer;
-}
-
-void swap(ShowTablesRequest &a, ShowTablesRequest &b) {
-  using ::std::swap;
-  swap(a.session_id, b.session_id);
-  swap(a.db_name, b.db_name);
-  swap(a.__isset, b.__isset);
-}
-
-bool ShowTablesRequest::operator==(const ShowTablesRequest & rhs) const
-{
-  if (!(session_id == rhs.session_id))
-    return false;
-  if (!(db_name == rhs.db_name))
-    return false;
-  return true;
-}
-
-ShowTablesRequest::ShowTablesRequest(const ShowTablesRequest& other528) {
-  session_id = other528.session_id;
-  db_name = other528.db_name;
-  __isset = other528.__isset;
-}
-ShowTablesRequest& ShowTablesRequest::operator=(const ShowTablesRequest& other529) {
-  session_id = other529.session_id;
-  db_name = other529.db_name;
-  __isset = other529.__isset;
-  return *this;
-}
-void ShowTablesRequest::printTo(std::ostream& out) const {
-  using ::apache::thrift::to_string;
-  out << "ShowTablesRequest(";
-  out << "session_id=" << to_string(session_id);
-  out << ", " << "db_name=" << to_string(db_name);
-  out << ")";
-}
-
-
 ShowSegmentsRequest::~ShowSegmentsRequest() noexcept {
 }
 
@@ -15079,17 +14954,17 @@ bool ShowSegmentsRequest::operator==(const ShowSegmentsRequest & rhs) const
   return true;
 }
 
-ShowSegmentsRequest::ShowSegmentsRequest(const ShowSegmentsRequest& other530) {
-  session_id = other530.session_id;
-  db_name = other530.db_name;
-  table_name = other530.table_name;
-  __isset = other530.__isset;
+ShowSegmentsRequest::ShowSegmentsRequest(const ShowSegmentsRequest& other528) {
+  session_id = other528.session_id;
+  db_name = other528.db_name;
+  table_name = other528.table_name;
+  __isset = other528.__isset;
 }
-ShowSegmentsRequest& ShowSegmentsRequest::operator=(const ShowSegmentsRequest& other531) {
-  session_id = other531.session_id;
-  db_name = other531.db_name;
-  table_name = other531.table_name;
-  __isset = other531.__isset;
+ShowSegmentsRequest& ShowSegmentsRequest::operator=(const ShowSegmentsRequest& other529) {
+  session_id = other529.session_id;
+  db_name = other529.db_name;
+  table_name = other529.table_name;
+  __isset = other529.__isset;
   return *this;
 }
 void ShowSegmentsRequest::printTo(std::ostream& out) const {
@@ -15247,19 +15122,19 @@ bool ShowSegmentRequest::operator==(const ShowSegmentRequest & rhs) const
   return true;
 }
 
-ShowSegmentRequest::ShowSegmentRequest(const ShowSegmentRequest& other532) {
-  session_id = other532.session_id;
-  db_name = other532.db_name;
-  table_name = other532.table_name;
-  segment_id = other532.segment_id;
-  __isset = other532.__isset;
+ShowSegmentRequest::ShowSegmentRequest(const ShowSegmentRequest& other530) {
+  session_id = other530.session_id;
+  db_name = other530.db_name;
+  table_name = other530.table_name;
+  segment_id = other530.segment_id;
+  __isset = other530.__isset;
 }
-ShowSegmentRequest& ShowSegmentRequest::operator=(const ShowSegmentRequest& other533) {
-  session_id = other533.session_id;
-  db_name = other533.db_name;
-  table_name = other533.table_name;
-  segment_id = other533.segment_id;
-  __isset = other533.__isset;
+ShowSegmentRequest& ShowSegmentRequest::operator=(const ShowSegmentRequest& other531) {
+  session_id = other531.session_id;
+  db_name = other531.db_name;
+  table_name = other531.table_name;
+  segment_id = other531.segment_id;
+  __isset = other531.__isset;
   return *this;
 }
 void ShowSegmentRequest::printTo(std::ostream& out) const {
@@ -15558,33 +15433,33 @@ bool ShowSegmentResponse::operator==(const ShowSegmentResponse & rhs) const
   return true;
 }
 
-ShowSegmentResponse::ShowSegmentResponse(const ShowSegmentResponse& other534) {
-  error_code = other534.error_code;
-  error_msg = other534.error_msg;
-  segment_id = other534.segment_id;
-  status = other534.status;
-  path = other534.path;
-  size = other534.size;
-  block_count = other534.block_count;
-  row_capacity = other534.row_capacity;
-  row_count = other534.row_count;
-  room = other534.room;
-  column_count = other534.column_count;
-  __isset = other534.__isset;
+ShowSegmentResponse::ShowSegmentResponse(const ShowSegmentResponse& other532) {
+  error_code = other532.error_code;
+  error_msg = other532.error_msg;
+  segment_id = other532.segment_id;
+  status = other532.status;
+  path = other532.path;
+  size = other532.size;
+  block_count = other532.block_count;
+  row_capacity = other532.row_capacity;
+  row_count = other532.row_count;
+  room = other532.room;
+  column_count = other532.column_count;
+  __isset = other532.__isset;
 }
-ShowSegmentResponse& ShowSegmentResponse::operator=(const ShowSegmentResponse& other535) {
-  error_code = other535.error_code;
-  error_msg = other535.error_msg;
-  segment_id = other535.segment_id;
-  status = other535.status;
-  path = other535.path;
-  size = other535.size;
-  block_count = other535.block_count;
-  row_capacity = other535.row_capacity;
-  row_count = other535.row_count;
-  room = other535.room;
-  column_count = other535.column_count;
-  __isset = other535.__isset;
+ShowSegmentResponse& ShowSegmentResponse::operator=(const ShowSegmentResponse& other533) {
+  error_code = other533.error_code;
+  error_msg = other533.error_msg;
+  segment_id = other533.segment_id;
+  status = other533.status;
+  path = other533.path;
+  size = other533.size;
+  block_count = other533.block_count;
+  row_capacity = other533.row_capacity;
+  row_count = other533.row_count;
+  room = other533.room;
+  column_count = other533.column_count;
+  __isset = other533.__isset;
   return *this;
 }
 void ShowSegmentResponse::printTo(std::ostream& out) const {
@@ -15750,19 +15625,19 @@ bool ShowBlocksRequest::operator==(const ShowBlocksRequest & rhs) const
   return true;
 }
 
-ShowBlocksRequest::ShowBlocksRequest(const ShowBlocksRequest& other536) {
-  session_id = other536.session_id;
-  db_name = other536.db_name;
-  table_name = other536.table_name;
-  segment_id = other536.segment_id;
-  __isset = other536.__isset;
+ShowBlocksRequest::ShowBlocksRequest(const ShowBlocksRequest& other534) {
+  session_id = other534.session_id;
+  db_name = other534.db_name;
+  table_name = other534.table_name;
+  segment_id = other534.segment_id;
+  __isset = other534.__isset;
 }
-ShowBlocksRequest& ShowBlocksRequest::operator=(const ShowBlocksRequest& other537) {
-  session_id = other537.session_id;
-  db_name = other537.db_name;
-  table_name = other537.table_name;
-  segment_id = other537.segment_id;
-  __isset = other537.__isset;
+ShowBlocksRequest& ShowBlocksRequest::operator=(const ShowBlocksRequest& other535) {
+  session_id = other535.session_id;
+  db_name = other535.db_name;
+  table_name = other535.table_name;
+  segment_id = other535.segment_id;
+  __isset = other535.__isset;
   return *this;
 }
 void ShowBlocksRequest::printTo(std::ostream& out) const {
@@ -15941,21 +15816,21 @@ bool ShowBlockRequest::operator==(const ShowBlockRequest & rhs) const
   return true;
 }
 
-ShowBlockRequest::ShowBlockRequest(const ShowBlockRequest& other538) {
-  session_id = other538.session_id;
-  db_name = other538.db_name;
-  table_name = other538.table_name;
-  segment_id = other538.segment_id;
-  block_id = other538.block_id;
-  __isset = other538.__isset;
+ShowBlockRequest::ShowBlockRequest(const ShowBlockRequest& other536) {
+  session_id = other536.session_id;
+  db_name = other536.db_name;
+  table_name = other536.table_name;
+  segment_id = other536.segment_id;
+  block_id = other536.block_id;
+  __isset = other536.__isset;
 }
-ShowBlockRequest& ShowBlockRequest::operator=(const ShowBlockRequest& other539) {
-  session_id = other539.session_id;
-  db_name = other539.db_name;
-  table_name = other539.table_name;
-  segment_id = other539.segment_id;
-  block_id = other539.block_id;
-  __isset = other539.__isset;
+ShowBlockRequest& ShowBlockRequest::operator=(const ShowBlockRequest& other537) {
+  session_id = other537.session_id;
+  db_name = other537.db_name;
+  table_name = other537.table_name;
+  segment_id = other537.segment_id;
+  block_id = other537.block_id;
+  __isset = other537.__isset;
   return *this;
 }
 void ShowBlockRequest::printTo(std::ostream& out) const {
@@ -16195,27 +16070,27 @@ bool ShowBlockResponse::operator==(const ShowBlockResponse & rhs) const
   return true;
 }
 
-ShowBlockResponse::ShowBlockResponse(const ShowBlockResponse& other540) {
-  error_code = other540.error_code;
-  error_msg = other540.error_msg;
-  block_id = other540.block_id;
-  path = other540.path;
-  size = other540.size;
-  row_capacity = other540.row_capacity;
-  row_count = other540.row_count;
-  column_count = other540.column_count;
-  __isset = other540.__isset;
+ShowBlockResponse::ShowBlockResponse(const ShowBlockResponse& other538) {
+  error_code = other538.error_code;
+  error_msg = other538.error_msg;
+  block_id = other538.block_id;
+  path = other538.path;
+  size = other538.size;
+  row_capacity = other538.row_capacity;
+  row_count = other538.row_count;
+  column_count = other538.column_count;
+  __isset = other538.__isset;
 }
-ShowBlockResponse& ShowBlockResponse::operator=(const ShowBlockResponse& other541) {
-  error_code = other541.error_code;
-  error_msg = other541.error_msg;
-  block_id = other541.block_id;
-  path = other541.path;
-  size = other541.size;
-  row_capacity = other541.row_capacity;
-  row_count = other541.row_count;
-  column_count = other541.column_count;
-  __isset = other541.__isset;
+ShowBlockResponse& ShowBlockResponse::operator=(const ShowBlockResponse& other539) {
+  error_code = other539.error_code;
+  error_msg = other539.error_msg;
+  block_id = other539.block_id;
+  path = other539.path;
+  size = other539.size;
+  row_capacity = other539.row_capacity;
+  row_count = other539.row_count;
+  column_count = other539.column_count;
+  __isset = other539.__isset;
   return *this;
 }
 void ShowBlockResponse::printTo(std::ostream& out) const {
@@ -16418,23 +16293,23 @@ bool ShowBlockColumnRequest::operator==(const ShowBlockColumnRequest & rhs) cons
   return true;
 }
 
-ShowBlockColumnRequest::ShowBlockColumnRequest(const ShowBlockColumnRequest& other542) {
-  session_id = other542.session_id;
-  db_name = other542.db_name;
-  table_name = other542.table_name;
-  segment_id = other542.segment_id;
-  block_id = other542.block_id;
-  column_id = other542.column_id;
-  __isset = other542.__isset;
+ShowBlockColumnRequest::ShowBlockColumnRequest(const ShowBlockColumnRequest& other540) {
+  session_id = other540.session_id;
+  db_name = other540.db_name;
+  table_name = other540.table_name;
+  segment_id = other540.segment_id;
+  block_id = other540.block_id;
+  column_id = other540.column_id;
+  __isset = other540.__isset;
 }
-ShowBlockColumnRequest& ShowBlockColumnRequest::operator=(const ShowBlockColumnRequest& other543) {
-  session_id = other543.session_id;
-  db_name = other543.db_name;
-  table_name = other543.table_name;
-  segment_id = other543.segment_id;
-  block_id = other543.block_id;
-  column_id = other543.column_id;
-  __isset = other543.__isset;
+ShowBlockColumnRequest& ShowBlockColumnRequest::operator=(const ShowBlockColumnRequest& other541) {
+  session_id = other541.session_id;
+  db_name = other541.db_name;
+  table_name = other541.table_name;
+  segment_id = other541.segment_id;
+  block_id = other541.block_id;
+  column_id = other541.column_id;
+  __isset = other541.__isset;
   return *this;
 }
 void ShowBlockColumnRequest::printTo(std::ostream& out) const {
@@ -16675,27 +16550,27 @@ bool ShowBlockColumnResponse::operator==(const ShowBlockColumnResponse & rhs) co
   return true;
 }
 
-ShowBlockColumnResponse::ShowBlockColumnResponse(const ShowBlockColumnResponse& other544) {
-  error_code = other544.error_code;
-  error_msg = other544.error_msg;
-  column_name = other544.column_name;
-  column_id = other544.column_id;
-  data_type = other544.data_type;
-  path = other544.path;
-  extra_file_count = other544.extra_file_count;
-  extra_file_names = other544.extra_file_names;
-  __isset = other544.__isset;
+ShowBlockColumnResponse::ShowBlockColumnResponse(const ShowBlockColumnResponse& other542) {
+  error_code = other542.error_code;
+  error_msg = other542.error_msg;
+  column_name = other542.column_name;
+  column_id = other542.column_id;
+  data_type = other542.data_type;
+  path = other542.path;
+  extra_file_count = other542.extra_file_count;
+  extra_file_names = other542.extra_file_names;
+  __isset = other542.__isset;
 }
-ShowBlockColumnResponse& ShowBlockColumnResponse::operator=(const ShowBlockColumnResponse& other545) {
-  error_code = other545.error_code;
-  error_msg = other545.error_msg;
-  column_name = other545.column_name;
-  column_id = other545.column_id;
-  data_type = other545.data_type;
-  path = other545.path;
-  extra_file_count = other545.extra_file_count;
-  extra_file_names = other545.extra_file_names;
-  __isset = other545.__isset;
+ShowBlockColumnResponse& ShowBlockColumnResponse::operator=(const ShowBlockColumnResponse& other543) {
+  error_code = other543.error_code;
+  error_msg = other543.error_msg;
+  column_name = other543.column_name;
+  column_id = other543.column_id;
+  data_type = other543.data_type;
+  path = other543.path;
+  extra_file_count = other543.extra_file_count;
+  extra_file_names = other543.extra_file_names;
+  __isset = other543.__isset;
   return *this;
 }
 void ShowBlockColumnResponse::printTo(std::ostream& out) const {
@@ -16798,13 +16673,13 @@ bool ShowCurrentNodeRequest::operator==(const ShowCurrentNodeRequest & rhs) cons
   return true;
 }
 
-ShowCurrentNodeRequest::ShowCurrentNodeRequest(const ShowCurrentNodeRequest& other546) noexcept {
-  session_id = other546.session_id;
-  __isset = other546.__isset;
+ShowCurrentNodeRequest::ShowCurrentNodeRequest(const ShowCurrentNodeRequest& other544) noexcept {
+  session_id = other544.session_id;
+  __isset = other544.__isset;
 }
-ShowCurrentNodeRequest& ShowCurrentNodeRequest::operator=(const ShowCurrentNodeRequest& other547) noexcept {
-  session_id = other547.session_id;
-  __isset = other547.__isset;
+ShowCurrentNodeRequest& ShowCurrentNodeRequest::operator=(const ShowCurrentNodeRequest& other545) noexcept {
+  session_id = other545.session_id;
+  __isset = other545.__isset;
   return *this;
 }
 void ShowCurrentNodeRequest::printTo(std::ostream& out) const {
@@ -16960,19 +16835,19 @@ bool ShowCurrentNodeResponse::operator==(const ShowCurrentNodeResponse & rhs) co
   return true;
 }
 
-ShowCurrentNodeResponse::ShowCurrentNodeResponse(const ShowCurrentNodeResponse& other548) {
-  error_code = other548.error_code;
-  error_msg = other548.error_msg;
-  node_role = other548.node_role;
-  server_status = other548.server_status;
-  __isset = other548.__isset;
+ShowCurrentNodeResponse::ShowCurrentNodeResponse(const ShowCurrentNodeResponse& other546) {
+  error_code = other546.error_code;
+  error_msg = other546.error_msg;
+  node_role = other546.node_role;
+  server_status = other546.server_status;
+  __isset = other546.__isset;
 }
-ShowCurrentNodeResponse& ShowCurrentNodeResponse::operator=(const ShowCurrentNodeResponse& other549) {
-  error_code = other549.error_code;
-  error_msg = other549.error_msg;
-  node_role = other549.node_role;
-  server_status = other549.server_status;
-  __isset = other549.__isset;
+ShowCurrentNodeResponse& ShowCurrentNodeResponse::operator=(const ShowCurrentNodeResponse& other547) {
+  error_code = other547.error_code;
+  error_msg = other547.error_msg;
+  node_role = other547.node_role;
+  server_status = other547.server_status;
+  __isset = other547.__isset;
   return *this;
 }
 void ShowCurrentNodeResponse::printTo(std::ostream& out) const {
@@ -17111,17 +16986,17 @@ bool CommandRequest::operator==(const CommandRequest & rhs) const
   return true;
 }
 
-CommandRequest::CommandRequest(const CommandRequest& other550) {
-  session_id = other550.session_id;
-  command_type = other550.command_type;
-  test_command_content = other550.test_command_content;
-  __isset = other550.__isset;
+CommandRequest::CommandRequest(const CommandRequest& other548) {
+  session_id = other548.session_id;
+  command_type = other548.command_type;
+  test_command_content = other548.test_command_content;
+  __isset = other548.__isset;
 }
-CommandRequest& CommandRequest::operator=(const CommandRequest& other551) {
-  session_id = other551.session_id;
-  command_type = other551.command_type;
-  test_command_content = other551.test_command_content;
-  __isset = other551.__isset;
+CommandRequest& CommandRequest::operator=(const CommandRequest& other549) {
+  session_id = other549.session_id;
+  command_type = other549.command_type;
+  test_command_content = other549.test_command_content;
+  __isset = other549.__isset;
   return *this;
 }
 void CommandRequest::printTo(std::ostream& out) const {
@@ -17239,15 +17114,15 @@ bool FlushRequest::operator==(const FlushRequest & rhs) const
   return true;
 }
 
-FlushRequest::FlushRequest(const FlushRequest& other552) {
-  session_id = other552.session_id;
-  flush_type = other552.flush_type;
-  __isset = other552.__isset;
+FlushRequest::FlushRequest(const FlushRequest& other550) {
+  session_id = other550.session_id;
+  flush_type = other550.flush_type;
+  __isset = other550.__isset;
 }
-FlushRequest& FlushRequest::operator=(const FlushRequest& other553) {
-  session_id = other553.session_id;
-  flush_type = other553.flush_type;
-  __isset = other553.__isset;
+FlushRequest& FlushRequest::operator=(const FlushRequest& other551) {
+  session_id = other551.session_id;
+  flush_type = other551.flush_type;
+  __isset = other551.__isset;
   return *this;
 }
 void FlushRequest::printTo(std::ostream& out) const {
@@ -17384,17 +17259,17 @@ bool CompactRequest::operator==(const CompactRequest & rhs) const
   return true;
 }
 
-CompactRequest::CompactRequest(const CompactRequest& other554) {
-  session_id = other554.session_id;
-  db_name = other554.db_name;
-  table_name = other554.table_name;
-  __isset = other554.__isset;
+CompactRequest::CompactRequest(const CompactRequest& other552) {
+  session_id = other552.session_id;
+  db_name = other552.db_name;
+  table_name = other552.table_name;
+  __isset = other552.__isset;
 }
-CompactRequest& CompactRequest::operator=(const CompactRequest& other555) {
-  session_id = other555.session_id;
-  db_name = other555.db_name;
-  table_name = other555.table_name;
-  __isset = other555.__isset;
+CompactRequest& CompactRequest::operator=(const CompactRequest& other553) {
+  session_id = other553.session_id;
+  db_name = other553.db_name;
+  table_name = other553.table_name;
+  __isset = other553.__isset;
   return *this;
 }
 void CompactRequest::printTo(std::ostream& out) const {
@@ -17552,19 +17427,19 @@ bool CreateTableSnapshotRequest::operator==(const CreateTableSnapshotRequest & r
   return true;
 }
 
-CreateTableSnapshotRequest::CreateTableSnapshotRequest(const CreateTableSnapshotRequest& other556) {
-  session_id = other556.session_id;
-  db_name = other556.db_name;
-  table_name = other556.table_name;
-  snapshot_name = other556.snapshot_name;
-  __isset = other556.__isset;
+CreateTableSnapshotRequest::CreateTableSnapshotRequest(const CreateTableSnapshotRequest& other554) {
+  session_id = other554.session_id;
+  db_name = other554.db_name;
+  table_name = other554.table_name;
+  snapshot_name = other554.snapshot_name;
+  __isset = other554.__isset;
 }
-CreateTableSnapshotRequest& CreateTableSnapshotRequest::operator=(const CreateTableSnapshotRequest& other557) {
-  session_id = other557.session_id;
-  db_name = other557.db_name;
-  table_name = other557.table_name;
-  snapshot_name = other557.snapshot_name;
-  __isset = other557.__isset;
+CreateTableSnapshotRequest& CreateTableSnapshotRequest::operator=(const CreateTableSnapshotRequest& other555) {
+  session_id = other555.session_id;
+  db_name = other555.db_name;
+  table_name = other555.table_name;
+  snapshot_name = other555.snapshot_name;
+  __isset = other555.__isset;
   return *this;
 }
 void CreateTableSnapshotRequest::printTo(std::ostream& out) const {
@@ -17703,17 +17578,17 @@ bool CreateDatabaseSnapshotRequest::operator==(const CreateDatabaseSnapshotReque
   return true;
 }
 
-CreateDatabaseSnapshotRequest::CreateDatabaseSnapshotRequest(const CreateDatabaseSnapshotRequest& other558) {
-  session_id = other558.session_id;
-  db_name = other558.db_name;
-  snapshot_name = other558.snapshot_name;
-  __isset = other558.__isset;
+CreateDatabaseSnapshotRequest::CreateDatabaseSnapshotRequest(const CreateDatabaseSnapshotRequest& other556) {
+  session_id = other556.session_id;
+  db_name = other556.db_name;
+  snapshot_name = other556.snapshot_name;
+  __isset = other556.__isset;
 }
-CreateDatabaseSnapshotRequest& CreateDatabaseSnapshotRequest::operator=(const CreateDatabaseSnapshotRequest& other559) {
-  session_id = other559.session_id;
-  db_name = other559.db_name;
-  snapshot_name = other559.snapshot_name;
-  __isset = other559.__isset;
+CreateDatabaseSnapshotRequest& CreateDatabaseSnapshotRequest::operator=(const CreateDatabaseSnapshotRequest& other557) {
+  session_id = other557.session_id;
+  db_name = other557.db_name;
+  snapshot_name = other557.snapshot_name;
+  __isset = other557.__isset;
   return *this;
 }
 void CreateDatabaseSnapshotRequest::printTo(std::ostream& out) const {
@@ -17831,15 +17706,15 @@ bool CreateSystemSnapshotRequest::operator==(const CreateSystemSnapshotRequest &
   return true;
 }
 
-CreateSystemSnapshotRequest::CreateSystemSnapshotRequest(const CreateSystemSnapshotRequest& other560) {
-  session_id = other560.session_id;
-  snapshot_name = other560.snapshot_name;
-  __isset = other560.__isset;
+CreateSystemSnapshotRequest::CreateSystemSnapshotRequest(const CreateSystemSnapshotRequest& other558) {
+  session_id = other558.session_id;
+  snapshot_name = other558.snapshot_name;
+  __isset = other558.__isset;
 }
-CreateSystemSnapshotRequest& CreateSystemSnapshotRequest::operator=(const CreateSystemSnapshotRequest& other561) {
-  session_id = other561.session_id;
-  snapshot_name = other561.snapshot_name;
-  __isset = other561.__isset;
+CreateSystemSnapshotRequest& CreateSystemSnapshotRequest::operator=(const CreateSystemSnapshotRequest& other559) {
+  session_id = other559.session_id;
+  snapshot_name = other559.snapshot_name;
+  __isset = other559.__isset;
   return *this;
 }
 void CreateSystemSnapshotRequest::printTo(std::ostream& out) const {
@@ -17976,17 +17851,17 @@ bool RestoreSnapshotRequest::operator==(const RestoreSnapshotRequest & rhs) cons
   return true;
 }
 
-RestoreSnapshotRequest::RestoreSnapshotRequest(const RestoreSnapshotRequest& other562) {
-  session_id = other562.session_id;
-  snapshot_name = other562.snapshot_name;
-  scope = other562.scope;
-  __isset = other562.__isset;
+RestoreSnapshotRequest::RestoreSnapshotRequest(const RestoreSnapshotRequest& other560) {
+  session_id = other560.session_id;
+  snapshot_name = other560.snapshot_name;
+  scope = other560.scope;
+  __isset = other560.__isset;
 }
-RestoreSnapshotRequest& RestoreSnapshotRequest::operator=(const RestoreSnapshotRequest& other563) {
-  session_id = other563.session_id;
-  snapshot_name = other563.snapshot_name;
-  scope = other563.scope;
-  __isset = other563.__isset;
+RestoreSnapshotRequest& RestoreSnapshotRequest::operator=(const RestoreSnapshotRequest& other561) {
+  session_id = other561.session_id;
+  snapshot_name = other561.snapshot_name;
+  scope = other561.scope;
+  __isset = other561.__isset;
   return *this;
 }
 void RestoreSnapshotRequest::printTo(std::ostream& out) const {
@@ -18164,21 +18039,21 @@ bool SnapshotInfo::operator==(const SnapshotInfo & rhs) const
   return true;
 }
 
-SnapshotInfo::SnapshotInfo(const SnapshotInfo& other564) {
-  name = other564.name;
-  scope = other564.scope;
-  time = other564.time;
-  commit = other564.commit;
-  size = other564.size;
-  __isset = other564.__isset;
+SnapshotInfo::SnapshotInfo(const SnapshotInfo& other562) {
+  name = other562.name;
+  scope = other562.scope;
+  time = other562.time;
+  commit = other562.commit;
+  size = other562.size;
+  __isset = other562.__isset;
 }
-SnapshotInfo& SnapshotInfo::operator=(const SnapshotInfo& other565) {
-  name = other565.name;
-  scope = other565.scope;
-  time = other565.time;
-  commit = other565.commit;
-  size = other565.size;
-  __isset = other565.__isset;
+SnapshotInfo& SnapshotInfo::operator=(const SnapshotInfo& other563) {
+  name = other563.name;
+  scope = other563.scope;
+  time = other563.time;
+  commit = other563.commit;
+  size = other563.size;
+  __isset = other563.__isset;
   return *this;
 }
 void SnapshotInfo::printTo(std::ostream& out) const {
@@ -18298,15 +18173,15 @@ bool ShowSnapshotRequest::operator==(const ShowSnapshotRequest & rhs) const
   return true;
 }
 
-ShowSnapshotRequest::ShowSnapshotRequest(const ShowSnapshotRequest& other566) {
-  session_id = other566.session_id;
-  snapshot_name = other566.snapshot_name;
-  __isset = other566.__isset;
+ShowSnapshotRequest::ShowSnapshotRequest(const ShowSnapshotRequest& other564) {
+  session_id = other564.session_id;
+  snapshot_name = other564.snapshot_name;
+  __isset = other564.__isset;
 }
-ShowSnapshotRequest& ShowSnapshotRequest::operator=(const ShowSnapshotRequest& other567) {
-  session_id = other567.session_id;
-  snapshot_name = other567.snapshot_name;
-  __isset = other567.__isset;
+ShowSnapshotRequest& ShowSnapshotRequest::operator=(const ShowSnapshotRequest& other565) {
+  session_id = other565.session_id;
+  snapshot_name = other565.snapshot_name;
+  __isset = other565.__isset;
   return *this;
 }
 void ShowSnapshotRequest::printTo(std::ostream& out) const {
@@ -18442,17 +18317,17 @@ bool ShowSnapshotResponse::operator==(const ShowSnapshotResponse & rhs) const
   return true;
 }
 
-ShowSnapshotResponse::ShowSnapshotResponse(const ShowSnapshotResponse& other568) {
-  error_code = other568.error_code;
-  error_msg = other568.error_msg;
-  snapshot = other568.snapshot;
-  __isset = other568.__isset;
+ShowSnapshotResponse::ShowSnapshotResponse(const ShowSnapshotResponse& other566) {
+  error_code = other566.error_code;
+  error_msg = other566.error_msg;
+  snapshot = other566.snapshot;
+  __isset = other566.__isset;
 }
-ShowSnapshotResponse& ShowSnapshotResponse::operator=(const ShowSnapshotResponse& other569) {
-  error_code = other569.error_code;
-  error_msg = other569.error_msg;
-  snapshot = other569.snapshot;
-  __isset = other569.__isset;
+ShowSnapshotResponse& ShowSnapshotResponse::operator=(const ShowSnapshotResponse& other567) {
+  error_code = other567.error_code;
+  error_msg = other567.error_msg;
+  snapshot = other567.snapshot;
+  __isset = other567.__isset;
   return *this;
 }
 void ShowSnapshotResponse::printTo(std::ostream& out) const {
@@ -18550,13 +18425,13 @@ bool ListSnapshotsRequest::operator==(const ListSnapshotsRequest & rhs) const
   return true;
 }
 
-ListSnapshotsRequest::ListSnapshotsRequest(const ListSnapshotsRequest& other570) noexcept {
-  session_id = other570.session_id;
-  __isset = other570.__isset;
+ListSnapshotsRequest::ListSnapshotsRequest(const ListSnapshotsRequest& other568) noexcept {
+  session_id = other568.session_id;
+  __isset = other568.__isset;
 }
-ListSnapshotsRequest& ListSnapshotsRequest::operator=(const ListSnapshotsRequest& other571) noexcept {
-  session_id = other571.session_id;
-  __isset = other571.__isset;
+ListSnapshotsRequest& ListSnapshotsRequest::operator=(const ListSnapshotsRequest& other569) noexcept {
+  session_id = other569.session_id;
+  __isset = other569.__isset;
   return *this;
 }
 void ListSnapshotsRequest::printTo(std::ostream& out) const {
@@ -18635,14 +18510,14 @@ uint32_t ListSnapshotsResponse::read(::apache::thrift::protocol::TProtocol* ipro
         if (ftype == ::apache::thrift::protocol::T_LIST) {
           {
             this->snapshots.clear();
-            uint32_t _size572;
-            ::apache::thrift::protocol::TType _etype575;
-            xfer += iprot->readListBegin(_etype575, _size572);
-            this->snapshots.resize(_size572);
-            uint32_t _i576;
-            for (_i576 = 0; _i576 < _size572; ++_i576)
+            uint32_t _size570;
+            ::apache::thrift::protocol::TType _etype573;
+            xfer += iprot->readListBegin(_etype573, _size570);
+            this->snapshots.resize(_size570);
+            uint32_t _i574;
+            for (_i574 = 0; _i574 < _size570; ++_i574)
             {
-              xfer += this->snapshots[_i576].read(iprot);
+              xfer += this->snapshots[_i574].read(iprot);
             }
             xfer += iprot->readListEnd();
           }
@@ -18679,10 +18554,10 @@ uint32_t ListSnapshotsResponse::write(::apache::thrift::protocol::TProtocol* opr
   xfer += oprot->writeFieldBegin("snapshots", ::apache::thrift::protocol::T_LIST, 3);
   {
     xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->snapshots.size()));
-    std::vector<SnapshotInfo> ::const_iterator _iter577;
-    for (_iter577 = this->snapshots.begin(); _iter577 != this->snapshots.end(); ++_iter577)
+    std::vector<SnapshotInfo> ::const_iterator _iter575;
+    for (_iter575 = this->snapshots.begin(); _iter575 != this->snapshots.end(); ++_iter575)
     {
-      xfer += (*_iter577).write(oprot);
+      xfer += (*_iter575).write(oprot);
     }
     xfer += oprot->writeListEnd();
   }
@@ -18712,17 +18587,17 @@ bool ListSnapshotsResponse::operator==(const ListSnapshotsResponse & rhs) const
   return true;
 }
 
-ListSnapshotsResponse::ListSnapshotsResponse(const ListSnapshotsResponse& other578) {
-  error_code = other578.error_code;
-  error_msg = other578.error_msg;
-  snapshots = other578.snapshots;
-  __isset = other578.__isset;
+ListSnapshotsResponse::ListSnapshotsResponse(const ListSnapshotsResponse& other576) {
+  error_code = other576.error_code;
+  error_msg = other576.error_msg;
+  snapshots = other576.snapshots;
+  __isset = other576.__isset;
 }
-ListSnapshotsResponse& ListSnapshotsResponse::operator=(const ListSnapshotsResponse& other579) {
-  error_code = other579.error_code;
-  error_msg = other579.error_msg;
-  snapshots = other579.snapshots;
-  __isset = other579.__isset;
+ListSnapshotsResponse& ListSnapshotsResponse::operator=(const ListSnapshotsResponse& other577) {
+  error_code = other577.error_code;
+  error_msg = other577.error_msg;
+  snapshots = other577.snapshots;
+  __isset = other577.__isset;
   return *this;
 }
 void ListSnapshotsResponse::printTo(std::ostream& out) const {
@@ -18840,15 +18715,15 @@ bool DropSnapshotRequest::operator==(const DropSnapshotRequest & rhs) const
   return true;
 }
 
-DropSnapshotRequest::DropSnapshotRequest(const DropSnapshotRequest& other580) {
-  session_id = other580.session_id;
-  snapshot_name = other580.snapshot_name;
-  __isset = other580.__isset;
+DropSnapshotRequest::DropSnapshotRequest(const DropSnapshotRequest& other578) {
+  session_id = other578.session_id;
+  snapshot_name = other578.snapshot_name;
+  __isset = other578.__isset;
 }
-DropSnapshotRequest& DropSnapshotRequest::operator=(const DropSnapshotRequest& other581) {
-  session_id = other581.session_id;
-  snapshot_name = other581.snapshot_name;
-  __isset = other581.__isset;
+DropSnapshotRequest& DropSnapshotRequest::operator=(const DropSnapshotRequest& other579) {
+  session_id = other579.session_id;
+  snapshot_name = other579.snapshot_name;
+  __isset = other579.__isset;
   return *this;
 }
 void DropSnapshotRequest::printTo(std::ostream& out) const {
