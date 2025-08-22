@@ -77,31 +77,31 @@ jobs:
     #    needs: debug_clang_format
     outputs:
       BUILD_IP: ${{ steps.get_ip.outputs.BUILD_IP }}
-#      INFINITY_PATH: ${{ steps.get_ip.outputs.build_ip }}
-#      INFINITY_UT_PATH: ${{ steps.get_ip.outputs.build_ip }}
+      INFINITY_PATH: ${{ steps.get_ip.outputs.INFINITY_PATH }}
+      INFINITY_UT_PATH: ${{ steps.get_ip.outputs.INFINITY_UT_PATH }}
     steps:
-#      - id: step1
-#        #      - name: Start builder container
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-#          echo "test=${BUILDER_CONTAINER}" >> $GITHUB_OUTPUT
-#          CPUS=${CPUS:-$(nproc)}
-#          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
-#          echo "CPUS=${CPUS}" >> $GITHUB_ENV
-#          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-#          sudo docker rm -f -v ${BUILDER_CONTAINER} && sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity --cpus ${CPUS} infiniflow/infinity_builder:ubuntu20_clang20
-#      - name: Configure debug version
-#        if: ${{ !cancelled() && !failure() }}
-#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOLS:STRING=link=8 -DCI=ON -S /infinity -B /infinity/cmake-build-debug"
-#
-#      - name: Build debug version
-#        if: ${{ !cancelled() && !failure() }}
-#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && cmake --build /infinity/cmake-build-debug --target infinity"
-#
-#      - name: Build unit test
-#        if: ${{ !cancelled() && !failure() }}
-#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake --build /infinity/cmake-build-debug --target test_main"
+      - id: step1
+        #      - name: Start builder container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "test=${BUILDER_CONTAINER}" >> $GITHUB_OUTPUT
+          CPUS=${CPUS:-$(nproc)}
+          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
+          echo "CPUS=${CPUS}" >> $GITHUB_ENV
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker rm -f -v ${BUILDER_CONTAINER} && sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity --cpus ${CPUS} infiniflow/infinity_builder:ubuntu20_clang20
+      - name: Configure debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOLS:STRING=link=8 -DCI=ON -S /infinity -B /infinity/cmake-build-debug"
+
+      - name: Build debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && cmake --build /infinity/cmake-build-debug --target infinity"
+
+      - name: Build unit test
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake --build /infinity/cmake-build-debug --target test_main"
 
       #      - name: Destroy builder container
       #        if: always()  # always run this step even if previous steps failed
@@ -144,15 +144,15 @@ jobs:
         run: |
           echo "Build ip is: ${BUILD_IP}"
 
-      - name: ssh to remote server
-        uses: appleboy/ssh-action@v1
-        with:
-          host: 172.17.0.1
-          username: infiniflow
-          # password: ${{ secrets.PASSWORD }}
-          password: infiniflow
-          script: |
-            hostname -I
+#      - name: ssh to remote server
+#        uses: appleboy/ssh-action@v1
+#        with:
+#          host: 172.17.0.1
+#          username: infiniflow
+#          # password: ${{ secrets.PASSWORD }}
+#          password: infiniflow
+#          script: |
+#            hostname -I
 #      - name: Unit test debug version
 #        if: ${{ !cancelled() && !failure() }}
 #        id: run_unit_test_debug
