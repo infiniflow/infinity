@@ -68,7 +68,7 @@ jobs:
           fi
 
   debug_configure_and_build:
-    name: debug_congigure_and_build
+    name: debug_configure_and_build
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
