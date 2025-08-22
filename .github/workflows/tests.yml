@@ -111,13 +111,12 @@ jobs:
       - name: ssh to remote server
         uses: appleboy/ssh-action@v1
         with:
-          host: 172.17.0.1
-          username: infiniflow
-          # password: ${{ secrets.PASSWORD }}
-          password: infiniflow
+          host: xxxx
+          username: xxxx
+          password: xxxx
           script: |
             BUILD_IP=$(hostname -I | awk '{print $1}')
-            echo "build_ip=${BUILD_IP}" >> $GITHUB_OUTPUT
+            echo "build_ip=${BUILD_IP}" >> ${GITHUB_OUTPUT}
             
 
 #      - name: print ip
