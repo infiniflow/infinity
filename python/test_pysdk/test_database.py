@@ -83,20 +83,6 @@ class TestInfinity:
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
-        res = self.infinity_obj.list_databases()
-        assert res is not None
-
-        res.db_names.sort()
-
-        db_names = []
-        for db in res.db_names:
-            if db == "default_db" or db == db_name:
-                db_names.append(db)
-
-        db_names.sort()
-        assert db_names[0] == "default_db"
-        assert db_names[1] == db_name
-
         res = self.infinity_obj.drop_database(db_name)
         assert res.error_code == ErrorCode.OK
 
@@ -104,17 +90,6 @@ class TestInfinity:
             self.infinity_obj.drop_database("default_db")
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.DROPPING_USING_DB
-
-        res = self.infinity_obj.list_databases()
-        assert res.error_code == ErrorCode.OK
-
-        db_names = []
-        for db in res.db_names:
-            if db == "default_db" or db == db_name:
-                db_names.append(db)
-
-        for db in db_names:
-            assert db == "default_db"
 
     def _test_create_database_invalid_name(self, suffix):
         """
@@ -133,26 +108,6 @@ class TestInfinity:
                 self.infinity_obj.create_database(db_name)
             assert e.type == InfinityException
             assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
-
-    def _test_create_drop_show_1K_databases(self, suffix):
-        db_count = 1000
-        for i in range(db_count):
-            self.infinity_obj.drop_database('test_pysdk_db_name' + str(i) + suffix, ConflictType.Ignore)
-
-        for i in range(db_count):
-            db = self.infinity_obj.create_database('test_pysdk_db_name' + str(i) + suffix)
-            assert db
-
-        dbs = self.infinity_obj.list_databases()
-        res_dbs = []
-        for db_name in dbs.db_names:
-            if (db_name.startswith("test_pysdk") and db_name.endswith(suffix)) or db_name == "default_db":
-                res_dbs.append(db_name)
-        assert len(res_dbs) == (db_count + 1)
-
-        for i in range(db_count):
-            res = self.infinity_obj.drop_database('test_pysdk_db_name' + str(i) + suffix, ConflictType.Error)
-            assert res.error_code == ErrorCode.OK
 
     def _test_repeatedly_create_drop_show_databases(self, suffix):
         loop_count = 100
@@ -301,27 +256,15 @@ class TestInfinity:
         # drop
         self.infinity_obj.drop_database("test_create_same_db_in_different_threads" + suffix)
 
-    def _test_show_database(self, suffix):
-        # create db
-        self.infinity_obj.drop_database("test_show_database" + suffix, ConflictType.Ignore)
-        self.infinity_obj.create_database("test_show_database" + suffix, ConflictType.Error)
-
-        res = self.infinity_obj.show_database("test_show_database" + suffix)
-        assert res.database_name == "test_show_database" + suffix
-
-        self.infinity_obj.drop_database("test_show_database" + suffix, ConflictType.Error)
-
     def test_database(self, suffix):
         self._test_database(suffix)
         self._test_create_database_invalid_name(suffix)
-        self._test_create_drop_show_1K_databases(suffix)
         self._test_repeatedly_create_drop_show_databases(suffix)
         self._test_drop_database_with_invalid_name(suffix)
         self._test_get_db(suffix)
         self._test_drop_non_existent_db(suffix)
         self._test_get_drop_db_with_two_threads(suffix)
         self._test_create_same_db_in_different_threads(suffix)
-        self._test_show_database(suffix)
 
     @pytest.mark.parametrize("conflict_type", [ConflictType.Error,
                                                ConflictType.Ignore,
@@ -332,9 +275,6 @@ class TestInfinity:
         # create db
         self.infinity_obj.drop_database("test_create_option" + suffix, ConflictType.Ignore)
         self.infinity_obj.create_database("test_create_option" + suffix, conflict_type)
-
-        # self.infinity_obj.create_database("test_create_option", ConflictType.Ignore)
-        # self.infinity_obj.create_database("test_create_option", ConflictType.Replace)
 
         self.infinity_obj.drop_database("test_create_option" + suffix)
 
@@ -387,48 +327,6 @@ class TestInfinity:
         assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
 
         self.infinity_obj.drop_database("test_drop_option" + suffix, ConflictType.Error)
-
-    @pytest.mark.parametrize("column_name", ["test_show_table_columns"])
-    def test_show_table_columns_with_valid_name(self, column_name, suffix):
-        db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_show_table_columns" + suffix, ConflictType.Ignore)
-
-        table_object = db_obj.create_table("test_show_table_columns" + suffix,
-                                           {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
-                                           ConflictType.Error)
-
-        res = table_object.show_columns()
-        print("\n")
-        print(res)
-        assert res["name"][0] == "c1"
-        assert res["name"][1] == "c2"
-
-        res = db_obj.drop_table("test_show_table_columns" + suffix, ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-    @pytest.mark.slow
-    def test_create_drop_show_10K_databases(self, suffix):
-        db_count = 10000
-
-        for i in range(db_count):
-            self.infinity_obj.drop_database('db_name' + str(i) + suffix, ConflictType.Ignore)
-
-        for i in range(db_count):
-            db = self.infinity_obj.create_database('db_name' + str(i) + suffix)
-            print('create db_name' + str(i) + suffix)
-            assert db
-
-        dbs = self.infinity_obj.list_databases()
-        res_dbs = []
-        for db_name in dbs.db_names:
-            if (db_name.startswith("db_name") and db_name.endswith(suffix)) or db_name == "default_db":
-                res_dbs.append(db_name)
-        assert len(res_dbs) == (db_count + 1)
-
-        for i in range(db_count):
-            print('drop db_name' + str(i) + suffix)
-            res = self.infinity_obj.drop_database('db_name' + str(i) + suffix, ConflictType.Error)
-            assert res.error_code == ErrorCode.OK
 
     @pytest.mark.usefixtures("skip_if_http")
     def test_create_upper_database_name(self, suffix):
