@@ -120,9 +120,13 @@ jobs:
         id: ip
         uses: haythem/public-ip@v1.2
 
-      - name: xxx
-        run: |
-          echo ${{ steps.ip.outputs.ipv4 }}
+      - name: ssh to remote server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 192.168.200.120
+          username: infiniflow
+          script: |
+            hostname -I
 
   debug_unit_test:
     name: debug_tests_unit_test
