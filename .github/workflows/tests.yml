@@ -80,8 +80,7 @@ jobs:
       INFINITY_PATH: ${{ steps.get_ip.outputs.INFINITY_PATH }}
       INFINITY_UT_PATH: ${{ steps.get_ip.outputs.INFINITY_UT_PATH }}
     steps:
-      - id: step1
-        #      - name: Start builder container
+      - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
         run: |
           BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
