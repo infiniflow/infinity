@@ -123,7 +123,7 @@ jobs:
         id: step1
         if: ${{ !cancelled() && !failure() }}
         run: |
-          STEP_BUILD_IP="$(echo "${{ steps.ssh.outputs.stdout }}" | awk '{print $1}')"
+          read -r STEP_BUILD_IP _ <<< "${{ steps.ssh.outputs.stdout }}"
           echo "*******************"
           echo "Build ip is: ${STEP_BUILD_IP}"
           echo "*******************"
