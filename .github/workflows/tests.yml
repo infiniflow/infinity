@@ -111,21 +111,20 @@ jobs:
       - name: ssh to remote server
         uses: appleboy/ssh-action@v1
         with:
-          host: xxxx
-          username: xxxx
-          password: xxxx
+          host: 172.17.0.1
+          username: infiniflow
+          password: infiniflow
           script: |
             BUILD_IP=$(hostname -I | awk '{print $1}')
             echo "build_ip=${BUILD_IP}" >> ${GITHUB_OUTPUT}
-            
 
-#      - name: print ip
-#        id: step1
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          ip=$(ip route get 1.1.1.1 | awk '{print $7}')
-#          echo ${ip}
-#          hostname -I
+  #      - name: print ip
+  #        id: step1
+  #        if: ${{ !cancelled() && !failure() }}
+  #        run: |
+  #          ip=$(ip route get 1.1.1.1 | awk '{print $7}')
+  #          echo ${ip}
+  #          hostname -I
 
   debug_unit_test:
     name: debug_tests_unit_test
