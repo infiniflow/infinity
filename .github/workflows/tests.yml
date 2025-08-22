@@ -68,7 +68,7 @@ jobs:
   #          fi
 
   debug_configure_and_build:
-    name: debug_congigure_and_build
+    name: debug_configure_and_build
     #    id: builder_job
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
@@ -116,7 +116,7 @@ jobs:
     runs-on: [ "self-hosted", "debug" ]
     needs: debug_configure_and_build
     env:
-      OUTPUT1: ${{needs.debug_congigure_and_build.outputs.output1}}
+      OUTPUT1: ${{needs.debug_configure_and_build.outputs.output1}}
     steps:
       - name: Get container name
         if: ${{ !cancelled() && !failure() }}
