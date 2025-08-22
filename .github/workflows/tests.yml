@@ -109,23 +109,20 @@ jobs:
       #          fi
 
       - name: ssh to remote server
+        id: ssh
         uses: appleboy/ssh-action@v1
         with:
           host: 172.17.0.1
           username: infiniflow
           password: infiniflow
-          allenvs: true
           script: |
-            BUILD_IP=$(hostname -I | awk '{print $1}')
-            echo "build_ip=${BUILD_IP}" >> ${GITHUB_OUTPUT}
+            hostname -I | awk '{print $1}'
 
-  #      - name: print ip
-  #        id: step1
-  #        if: ${{ !cancelled() && !failure() }}
-  #        run: |
-  #          ip=$(ip route get 1.1.1.1 | awk '{print $7}')
-  #          echo ${ip}
-  #          hostname -I
+      - name: get ip
+        id: step1
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "build_ip=${{ steps.ssh.outputs.stdout }}" >> $GITHUB_OUTPUT
 
   debug_unit_test:
     name: debug_tests_unit_test
