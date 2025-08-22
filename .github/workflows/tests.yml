@@ -73,15 +73,15 @@ jobs:
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "debug" ]
-#    needs: debug_clang_format
-    outputs:
-      my_variable: ${{ steps.set_var.outputs.container_name }}
+##    needs: debug_clang_format
+#    outputs:
+#      my_variable: ${{ steps.set_var.outputs.container_name }}
     steps:
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
         run: |
           BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "container_name=${BUILDER_CONTAINER}" >> $GITHUB_OUTPUT
+#          echo "container_name=${BUILDER_CONTAINER}" >> $GITHUB_OUTPUT
           CPUS=${CPUS:-$(nproc)}
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
           echo "CPUS=${CPUS}" >> $GITHUB_ENV
@@ -119,7 +119,7 @@ jobs:
       - name: Get container name
         if: ${{ !cancelled() && !failure() }}
         run: |
-          echo "------${{ needs.debug_configure_and_build.outputs.container_name }}"
+          echo "------${BUILDER_CONTAINER}"
 #      - name: Unit test debug version
 #        if: ${{ !cancelled() && !failure() }}
 #        id: run_unit_test_debug
