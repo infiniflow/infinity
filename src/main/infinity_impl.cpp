@@ -438,17 +438,6 @@ QueryResult Infinity::DropTable(const std::string &db_name, const std::string &t
     return result;
 }
 
-QueryResult Infinity::ListTables(const std::string &db_name) {
-    std::unique_ptr<QueryContext> query_context_ptr;
-    GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
-    show_statement->schema_name_ = db_name;
-    ToLower(show_statement->schema_name_);
-    show_statement->show_type_ = ShowStmtType::kTables;
-    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
-    return result;
-}
-
 QueryResult Infinity::ShowTable(const std::string &db_name, const std::string &table_name) {
     std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
