@@ -116,6 +116,14 @@ jobs:
           echo ${ip}
           hostname -I
 
+      - name: get runner ip addresses
+        id: ip
+        uses: haythem/public-ip@v1.2
+
+      - name: xxx
+        run: |
+          echo ${{ steps.ip.outputs.ipv4 }}
+
   debug_unit_test:
     name: debug_tests_unit_test
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
