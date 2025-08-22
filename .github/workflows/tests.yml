@@ -115,6 +115,7 @@ jobs:
           ip=$(hostname -I | awk '{print $1}')
           echo "test=${ip}" >> $GITHUB_OUTPUT
           echo ${ip}
+          hostname -I
 
   debug_unit_test:
     name: debug_tests_unit_test
