@@ -115,6 +115,7 @@ jobs:
           host: 172.17.0.1
           username: infiniflow
           password: infiniflow
+          capture_stdout: 'true'
           script: |
             hostname -I | awk '{print $1}'
 
