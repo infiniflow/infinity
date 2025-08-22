@@ -110,7 +110,7 @@ jobs:
 
       - name: ssh to remote server
         id: ssh
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host: 172.17.0.1
           username: infiniflow
