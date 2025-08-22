@@ -122,6 +122,7 @@ jobs:
         id: step1
         if: ${{ !cancelled() && !failure() }}
         run: |
+          echo "Build ip is: ${{ steps.ssh.outputs.stdout }}"
           echo "build_ip=${{ steps.ssh.outputs.stdout }}" >> $GITHUB_OUTPUT
 
   debug_unit_test:
