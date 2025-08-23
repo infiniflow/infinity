@@ -145,10 +145,7 @@ Status DBMeeta::GetTableIDs(std::vector<std::string> *&table_id_strs, std::vecto
     return Status::OK();
 }
 
-Status DBMeeta::GetTableID(const std::string &table_name,
-                           std::string &table_key,
-                           std::string &table_id_str,
-                           TxnTimeStamp &create_table_ts) {
+Status DBMeeta::GetTableID(const std::string &table_name, std::string &table_key, std::string &table_id_str, TxnTimeStamp &create_table_ts) {
 
     u64 db_id = std::stoull(db_id_str_);
     std::shared_ptr<MetaTableCache> table_cache = meta_cache_->GetTable(db_id, table_name, txn_begin_ts_);
