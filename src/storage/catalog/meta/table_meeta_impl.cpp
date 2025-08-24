@@ -699,12 +699,27 @@ Status TableMeeta::LoadIndexIDs() {
 
         if (max_visible_index_index != std::numeric_limits<size_t>::max()) {
             std::string drop_index_ts{};
+            const std::string &index_key = index_kv[max_visible_index_index].first;
             const std::string &index_id = index_kv[max_visible_index_index].second;
             kv_instance_->Get(KeyEncode::DropTableIndexKey(db_id_str_, table_id_str_, index_name, max_commit_ts, index_id), drop_index_ts);
 
             if (drop_index_ts.empty() || std::stoull(drop_index_ts) > begin_ts_) {
                 index_id_strs.push_back(index_id);
                 index_names.push_back(index_name);
+                if (txn_ != nullptr) {
+                    std::shared_ptr<MetaIndexCache> index_cache = meta_cache_->GetIndex(db_id_, table_id_, index_name, begin_ts_);
+                    if (index_cache.get() == nullptr) {
+                        index_cache = std::make_shared<MetaIndexCache>(db_id_,
+                                                                       table_id_,
+                                                                       index_name,
+                                                                       std::stoull(index_id),
+                                                                       max_commit_ts,
+                                                                       index_key,
+                                                                       false,
+                                                                       txn_->TxnID());
+                        txn_->AddMetaCache(index_cache);
+                    }
+                }
             }
         }
     }
