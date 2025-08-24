@@ -31,6 +31,7 @@ import :utility;
 import :kv_utility;
 import :snapshot_info;
 import :segment_index_meta;
+import :meta_cache;
 
 import std;
 import third_party;
@@ -47,10 +48,27 @@ TableIndexMeeta::~TableIndexMeeta() = default;
 
 std::tuple<std::shared_ptr<IndexBase>, Status> TableIndexMeeta::GetIndexBase() {
     std::lock_guard<std::mutex> lock(mtx_);
+
+    //    MetaCache *meta_cache = table_meta_.meta_cache();
+    //    u64 db_id = table_meta_.db_id();
+    //    u64 table_id = table_meta_.table_id();
+    //    std::string &index_name = *index_def_->index_name_;
+    //    std::shared_ptr<MetaIndexCache> index_cache = meta_cache->GetIndex(db_id, table_id, index_name, table_meta_.begin_ts());
+    //    if (index_cache.get() != nullptr) {
+    //        index_def_ = index_cache->get_index_def();
+    //    }
+
     if (!index_def_) {
         index_def_ =
             infinity::GetTableIndexDef(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
     }
+
+    //    u64 index_id = std::stoull(index_id_str_);
+    //
+    //    NewTxn *txn = table_meta_.txn();
+    //    index_cache = std::shared_ptr<MetaIndexCache>(db_id, table_id, index_name, index_id, );
+    //    txn->AddMetaCache(index_cache);
+
     return {index_def_, Status::OK()};
 }
 

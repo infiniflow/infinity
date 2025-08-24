@@ -156,18 +156,42 @@ std::string MetaIndexCache::name() const {
     std::unique_lock lock(mtx_);
     return index_name_;
 }
+
 u64 MetaIndexCache::db_id() const {
     std::unique_lock lock(mtx_);
     return db_id_;
 }
+
 u64 MetaIndexCache::table_id() const {
     std::unique_lock lock(mtx_);
     return table_id_;
 }
+
+u64 MetaIndexCache::index_id() const {
+    std::unique_lock lock(mtx_);
+    return index_id_;
+}
+
 u64 MetaIndexCache::commit_ts() const {
     std::unique_lock lock(mtx_);
     return commit_ts_;
 }
+
+const std::string &MetaIndexCache::index_key() const {
+    std::unique_lock lock(mtx_);
+    return index_key_;
+}
+
+std::shared_ptr<IndexBase> MetaIndexCache::get_index_def() const {
+    std::unique_lock lock(mtx_);
+    return index_def_;
+}
+
+void MetaIndexCache::set_index_ids(const std::shared_ptr<IndexBase> &index_def_ptr) {
+    std::unique_lock lock(mtx_);
+    index_def_ = index_def_ptr;
+}
+
 std::string MetaIndexCache::detail() const {
     std::unique_lock lock(mtx_);
     std::string extend = is_dropped_ ? "dropped" : "created";

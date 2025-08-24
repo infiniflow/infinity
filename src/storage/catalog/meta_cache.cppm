@@ -21,6 +21,7 @@ import :default_values;
 import internal_types;
 import third_party;
 import :status;
+import :index_base;
 import column_def;
 
 namespace infinity {
@@ -154,9 +155,14 @@ public:
     std::string name() const final;
     u64 db_id() const;
     u64 table_id() const;
+    u64 index_id() const;
     u64 commit_ts() const final;
+    const std::string &index_key() const;
     std::string detail() const final;
     bool is_dropped() const final;
+
+    std::shared_ptr<IndexBase> get_index_def() const;
+    void set_index_ids(const std::shared_ptr<IndexBase> &index_def_ptr);
 
 private:
     u64 db_id_{};
@@ -165,6 +171,7 @@ private:
     u64 index_id_{};
     std::string index_key_{};
     u64 commit_ts_{};
+    std::shared_ptr<IndexBase> index_def_{};
 };
 
 export struct EraseBaseCache {

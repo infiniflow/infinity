@@ -55,6 +55,7 @@ TableMeeta::TableMeeta(const std::string &db_id_str,
     : begin_ts_(begin_ts), commit_ts_(commit_ts), kv_instance_(kv_instance), meta_cache_(meta_cache), db_id_str_(db_id_str),
       table_id_str_(table_id_str) {
     db_id_ = std::stoull(db_id_str);
+    table_id_ = std::stoull(table_id_str);
 }
 
 TableMeeta::TableMeeta(const std::string &db_id_str, const std::string &table_id_str, NewTxn *txn)
@@ -67,6 +68,7 @@ TableMeeta::TableMeeta(const std::string &db_id_str, const std::string &table_id
     kv_instance_ = txn->kv_instance();
     meta_cache_ = txn->txn_mgr()->storage()->meta_cache();
     db_id_ = std::stoull(db_id_str);
+    table_id_ = std::stoull(table_id_str);
 }
 
 Status TableMeeta::GetComment(TableInfo &table_info) {
@@ -99,6 +101,25 @@ Status TableMeeta::GetIndexIDs(std::vector<std::string> *&index_id_strs, std::ve
 }
 
 Status TableMeeta::GetIndexID(const std::string &index_name, std::string &index_key, std::string &index_id_str, TxnTimeStamp &create_index_ts) {
+
+    std::shared_ptr<MetaIndexCache> index_cache = meta_cache_->GetIndex(db_id_, table_id_, index_name, begin_ts_);
+    if (index_cache.get() != nullptr) {
+        if (index_cache->is_dropped()) {
+            return Status::IndexNotExist(index_name);
+        }
+        index_key = index_cache->index_key();
+        index_id_str = std::to_string(index_cache->index_id());
+        create_index_ts = index_cache->commit_ts();
+        LOG_TRACE(fmt::format("Get table index meta from cache, db_id: {}, table_id: {}, index_name: {}, index_id{}, index_key: {}, commit_ts: {}",
+                              db_id_,
+                              table_id_,
+                              index_name,
+                              index_id_str,
+                              index_key,
+                              create_index_ts));
+        return Status::OK();
+    }
+
     std::string index_key_prefix = KeyEncode::CatalogIndexPrefix(db_id_str_, table_id_str_, index_name);
     auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(index_key_prefix);
@@ -135,6 +156,11 @@ Status TableMeeta::GetIndexID(const std::string &index_name, std::string &index_
 
     if (!drop_index_ts.empty() && std::stoull(drop_index_ts) <= begin_ts_) {
         return Status::IndexNotExist(index_name);
+    }
+
+    if (txn_ != nullptr) {
+        txn_->AddMetaCache(std::make_shared<
+                           MetaIndexCache>(db_id_, table_id_, index_name, std::stoull(index_id_str), max_commit_ts, index_key, false, txn_->TxnID()));
     }
 
     create_index_ts = max_commit_ts;
@@ -1080,5 +1106,11 @@ std::tuple<size_t, Status> TableMeeta::GetTableRowCount() {
 MetaCache *TableMeeta::meta_cache() const { return meta_cache_; }
 
 void TableMeeta::SetTableName(const std::string &table_name) { table_name_ = table_name; }
+
+u64 TableMeeta::db_id() const { return db_id_; }
+
+u64 TableMeeta::table_id() const { return table_id_; }
+
+NewTxn *TableMeeta::txn() const { return txn_; }
 
 } // namespace infinity

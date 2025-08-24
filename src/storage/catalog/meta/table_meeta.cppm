@@ -137,6 +137,12 @@ public:
 
     void SetTableName(const std::string &table_name);
 
+    u64 db_id() const;
+
+    u64 table_id() const;
+
+    NewTxn *txn() const;
+
 private:
     Status LoadColumnDefs();
 
@@ -158,8 +164,9 @@ private:
     MetaCache *meta_cache_{};
 
     std::string db_id_str_;
-    u64 db_id_;
+    u64 db_id_{};
     std::string table_id_str_;
+    u64 table_id_{};
     std::string db_name_{};
     std::string table_name_{};
 
