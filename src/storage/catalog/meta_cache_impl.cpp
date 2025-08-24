@@ -187,7 +187,7 @@ std::shared_ptr<IndexBase> MetaIndexCache::get_index_def() const {
     return index_def_;
 }
 
-void MetaIndexCache::set_index_ids(const std::shared_ptr<IndexBase> &index_def_ptr) {
+void MetaIndexCache::set_index_def(const std::shared_ptr<IndexBase> &index_def_ptr) {
     std::unique_lock lock(mtx_);
     index_def_ = index_def_ptr;
 }

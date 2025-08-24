@@ -162,7 +162,7 @@ public:
     bool is_dropped() const final;
 
     std::shared_ptr<IndexBase> get_index_def() const;
-    void set_index_ids(const std::shared_ptr<IndexBase> &index_def_ptr);
+    void set_index_def(const std::shared_ptr<IndexBase> &index_def_ptr);
 
 private:
     u64 db_id_{};

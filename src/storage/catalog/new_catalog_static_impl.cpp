@@ -186,8 +186,8 @@ Status NewCatalog::InitCatalog(MetaCache *meta_cache, KVInstance *kv_instance, T
         }
         return Status::OK();
     };
-    auto InitTableIndex = [&](const std::string &index_id_str, TableMeeta &table_meta) {
-        TableIndexMeeta table_index_meta(index_id_str, table_meta);
+    auto InitTableIndex = [&](const std::string &index_id_str, const std::string &index_name_str, TableMeeta &table_meta) {
+        TableIndexMeeta table_index_meta(index_id_str, index_name_str, table_meta);
 
         std::vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
@@ -219,13 +219,16 @@ Status NewCatalog::InitCatalog(MetaCache *meta_cache, KVInstance *kv_instance, T
         }
 
         std::vector<std::string> *index_id_strs_ptr = nullptr;
-        status = table_meta.GetIndexIDs(index_id_strs_ptr);
+        std::vector<std::string> *index_name_strs_ptr = nullptr;
+        status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
         if (!status.ok()) {
             return status;
         }
-        for (const std::string &index_id_str : *index_id_strs_ptr) {
-            TableIndexMeeta table_index_meta(index_id_str, table_meta);
-            status = InitTableIndex(index_id_str, table_meta);
+        size_t index_count = index_id_strs_ptr->size();
+        for (size_t idx = 0; idx < index_count; ++idx) {
+            const std::string &index_id_str = index_id_strs_ptr->at(idx);
+            const std::string &index_name_str = index_name_strs_ptr->at(idx);
+            status = InitTableIndex(index_id_str, index_name_str, table_meta);
             if (!status.ok()) {
                 return status;
             }
@@ -275,12 +278,16 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn) {
     }
     auto IndexRecoverTable = [&](TableMeeta &table_meta) {
         std::vector<std::string> *index_id_strs_ptr = nullptr;
-        status = table_meta.GetIndexIDs(index_id_strs_ptr);
+        std::vector<std::string> *index_name_strs_ptr = nullptr;
+        status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
         if (!status.ok()) {
             return status;
         }
-        for (const std::string &index_id_str : *index_id_strs_ptr) {
-            TableIndexMeeta table_index_meta(index_id_str, table_meta);
+        size_t index_count = index_id_strs_ptr->size();
+        for (size_t idx = 0; idx < index_count; ++idx) {
+            const std::string &index_id_str = index_id_strs_ptr->at(idx);
+            const std::string &index_name_str = index_name_strs_ptr->at(idx);
+            TableIndexMeeta table_index_meta(index_id_str, index_name_str, table_meta);
             status = txn->RecoverMemIndex(table_index_meta);
             if (!status.ok()) {
                 return status;
@@ -324,12 +331,17 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
     }
     auto IndexCommitTable = [&](TableMeeta &table_meta) {
         std::vector<std::string> *index_id_strs_ptr = nullptr;
-        status = table_meta.GetIndexIDs(index_id_strs_ptr);
+        std::vector<std::string> *index_name_strs_ptr = nullptr;
+        status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
         if (!status.ok()) {
             return status;
         }
-        for (const std::string &index_id_str : *index_id_strs_ptr) {
-            TableIndexMeeta table_index_meta(index_id_str, table_meta);
+        size_t index_count = index_id_strs_ptr->size();
+        for (size_t idx = 0; idx < index_count; ++idx) {
+            const std::string &index_id_str = index_id_strs_ptr->at(idx);
+            const std::string &index_name_str = index_name_strs_ptr->at(idx);
+
+            TableIndexMeeta table_index_meta(index_id_str, index_name_str, table_meta);
             status = new_txn->CommitMemIndex(table_index_meta);
             if (!status.ok()) {
                 return status;
@@ -391,7 +403,7 @@ Status NewCatalog::GetAllMemIndexes(NewTxn *txn, std::vector<std::shared_ptr<Mem
         for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
             const std::string &index_id_str = (*index_id_strs_ptr)[i];
             const std::string &index_name = (*index_names_ptr)[i];
-            TableIndexMeeta table_index_meta(index_id_str, table_meta);
+            TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta);
             status = TraverseTableIndex(table_index_meta, db_name, table_name, index_name);
             if (!status.ok()) {
                 return status;
@@ -537,7 +549,8 @@ Status NewCatalog::CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts, Usa
     }
     for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
         const std::string &index_id_str = (*index_id_strs_ptr)[i];
-        TableIndexMeeta table_index_meta(index_id_str, table_meta);
+        const std::string &index_name_str = (*index_names_ptr)[i];
+        TableIndexMeeta table_index_meta(index_id_str, index_name_str, table_meta);
         status = NewCatalog::CleanTableIndex(table_index_meta, usage_flag);
         if (!status.ok()) {
             return status;
@@ -566,7 +579,7 @@ Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
         return status;
     }
 
-    table_index_meta.emplace(index_id_str, table_meta);
+    table_index_meta.emplace(index_id_str, index_name, table_meta);
     status = table_index_meta->InitSet1(index_base, this);
     if (!status.ok()) {
         return status;
@@ -768,13 +781,16 @@ Status NewCatalog::LoadImportedOrCompactedSegment(TableMeeta &table_meta, const 
 
     // Load segment index
     std::vector<std::string> *index_id_strs_ptr = nullptr;
-    Status status = table_meta.GetIndexIDs(index_id_strs_ptr);
+    std::vector<std::string> *index_name_strs_ptr = nullptr;
+    Status status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
     if (!status.ok()) {
         return status;
     }
-
-    for (const std::string &index_id_str : *index_id_strs_ptr) {
-        TableIndexMeeta table_index_meta(index_id_str, table_meta);
+    size_t index_count = index_id_strs_ptr->size();
+    for (size_t idx = 0; idx < index_count; ++idx) {
+        const std::string &index_id_str = index_id_strs_ptr->at(idx);
+        const std::string &index_name_str = index_name_strs_ptr->at(idx);
+        TableIndexMeeta table_index_meta(index_id_str, index_name_str, table_meta);
         SegmentIndexMeta segment_index_meta(segment_info.segment_id_, table_index_meta);
         status = segment_index_meta.LoadSet();
         if (!status.ok()) {
@@ -1279,12 +1295,17 @@ Status NewCatalog::GetTableFilePaths(TxnTimeStamp begin_ts,
         }
     }
     std::vector<std::string> *index_id_strs_ptr = nullptr;
-    status = table_meta.GetIndexIDs(index_id_strs_ptr);
+
+    std::vector<std::string> *index_name_strs_ptr = nullptr;
+    status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
     if (!status.ok()) {
         return status;
     }
-    for (const std::string &index_id_str : *index_id_strs_ptr) {
-        TableIndexMeeta table_index_meta(index_id_str, table_meta);
+    size_t index_count = index_id_strs_ptr->size();
+    for (size_t idx = 0; idx < index_count; ++idx) {
+        const std::string &index_id_str = index_id_strs_ptr->at(idx);
+        const std::string &index_name_str = index_name_strs_ptr->at(idx);
+        TableIndexMeeta table_index_meta(index_id_str, index_name_str, table_meta);
         status = GetTableIndexFilePaths(table_index_meta, file_paths);
         if (!status.ok()) {
             return status;
@@ -1401,12 +1422,17 @@ Status NewCatalog::GetChunkIndexFilePaths(ChunkIndexMeta &chunk_index_meta, std:
 
 Status NewCatalog::CheckColumnIfIndexed(TableMeeta &table_meta, ColumnID column_id, bool &has_index) {
     std::vector<std::string> *index_id_strs_ptr = nullptr;
-    Status status = table_meta.GetIndexIDs(index_id_strs_ptr);
+
+    std::vector<std::string> *index_name_strs_ptr = nullptr;
+    Status status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
     if (!status.ok()) {
         return status;
     }
-    for (const std::string &index_id_str : *index_id_strs_ptr) {
-        TableIndexMeeta table_index_meta(index_id_str, table_meta);
+    size_t index_count = index_id_strs_ptr->size();
+    for (size_t idx = 0; idx < index_count; ++idx) {
+        const std::string &index_id_str = index_id_strs_ptr->at(idx);
+        const std::string &index_name_str = index_name_strs_ptr->at(idx);
+        TableIndexMeeta table_index_meta(index_id_str, index_name_str, table_meta);
         std::shared_ptr<IndexBase> index_base;
         std::tie(index_base, status) = table_index_meta.GetIndexBase();
         if (!status.ok()) {

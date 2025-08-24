@@ -4733,7 +4733,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_EQ(index_names_ptr->size(), 1);
         EXPECT_EQ(index_names_ptr->at(0), "idx1");
 
-        TableIndexMeeta table_index_meta(index_id_strs_ptr->at(0), table_meta);
+        TableIndexMeeta table_index_meta(index_id_strs_ptr->at(0), index_names_ptr->at(0), table_meta);
         auto [index_base, index_status] = table_index_meta.GetIndexBase();
         EXPECT_TRUE(index_status.ok());
         EXPECT_EQ(*index_base->index_name_, std::string("idx1"));

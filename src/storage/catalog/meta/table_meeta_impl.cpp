@@ -87,7 +87,7 @@ Status TableMeeta::GetComment(TableInfo &table_info) {
 }
 
 Status TableMeeta::GetIndexIDs(std::vector<std::string> *&index_id_strs, std::vector<std::string> **index_names) {
-    if (!index_id_strs_ || !index_names_) {
+    if (!index_id_strs_ || !index_name_strs_) {
         Status status = LoadIndexIDs();
         if (!status.ok()) {
             return status;
@@ -95,7 +95,7 @@ Status TableMeeta::GetIndexIDs(std::vector<std::string> *&index_id_strs, std::ve
     }
     index_id_strs = &index_id_strs_.value();
     if (index_names) {
-        *index_names = &index_names_.value();
+        *index_names = &index_name_strs_.value();
     }
     return Status::OK();
 }
@@ -322,13 +322,18 @@ Status TableMeeta::InitSet(std::shared_ptr<TableDef> table_def) {
 
 Status TableMeeta::LoadSet() {
     std::vector<std::string> *index_id_strs_ptr = nullptr;
-    Status status = GetIndexIDs(index_id_strs_ptr);
+    std::vector<std::string> *index_name_strs_ptr = nullptr;
+    Status status = this->GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
     if (!status.ok()) {
         return status;
     }
     LOG_DEBUG(fmt::format("LoadSet for table: {} with number of indexes: {}", table_id_str_, index_id_strs_ptr->size()));
-    for (const std::string &index_id_str : *index_id_strs_ptr) {
-        TableIndexMeeta table_index_meta(index_id_str, *this);
+
+    size_t index_count = index_id_strs_ptr->size();
+    for (size_t idx = 0; idx < index_count; ++idx) {
+        const std::string &index_id_str = index_id_strs_ptr->at(idx);
+        const std::string &index_name_str = index_name_strs_ptr->at(idx);
+        TableIndexMeeta table_index_meta(index_id_str, index_name_str, *this);
         auto [index_def, status] = table_index_meta.GetIndexBase();
         if (!status.ok()) {
             return status;
@@ -653,13 +658,13 @@ Status TableMeeta::LoadColumnDefs() {
 Status TableMeeta::LoadIndexIDs() {
 
     std::shared_ptr<MetaTableCache> table_cache{};
-    if (index_id_strs_ == std::nullopt or index_names_ == std::nullopt) {
+    if (index_id_strs_ == std::nullopt or index_name_strs_ == std::nullopt) {
         table_cache = meta_cache_->GetTable(db_id_, table_name_, begin_ts_);
         if (table_cache.get() != nullptr) {
             auto [index_ids_ptr, index_names_ptr] = table_cache->get_index_ids();
             if (index_ids_ptr != nullptr and index_names_ptr != nullptr) {
                 index_id_strs_ = *index_ids_ptr;
-                index_names_ = *index_names_ptr;
+                index_name_strs_ = *index_names_ptr;
                 return Status::OK();
             }
         }
@@ -729,7 +734,7 @@ Status TableMeeta::LoadIndexIDs() {
     }
 
     index_id_strs_ = index_id_strs;
-    index_names_ = index_names;
+    index_name_strs_ = index_names;
     return Status::OK();
 }
 
@@ -1053,8 +1058,11 @@ std::tuple<std::shared_ptr<TableSnapshotInfo>, Status> TableMeeta::MapMetaToSnap
             return {nullptr, status};
         }
     }
-    for (const std::string &index_id : *index_id_strs_) {
-        TableIndexMeeta table_index_meta(index_id, *this);
+    size_t index_count = index_id_strs_->size();
+    for (size_t idx = 0; idx < index_count; ++idx) {
+        const std::string &index_id = index_id_strs_->at(idx);
+        const std::string &index_name = index_name_strs_->at(idx);
+        TableIndexMeeta table_index_meta(index_id, index_name, *this);
         auto [table_index_snapshot, table_index_status] = table_index_meta.MapMetaToSnapShotInfo();
         if (!table_index_status.ok()) {
             return {nullptr, table_index_status};

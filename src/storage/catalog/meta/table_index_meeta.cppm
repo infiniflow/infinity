@@ -36,7 +36,7 @@ export enum class SecondaryIndexCardinality : u8 { kHighCardinality = 0, kLowCar
 
 export class TableIndexMeeta {
 public:
-    TableIndexMeeta(std::string index_id_str, TableMeeta &table_meta);
+    TableIndexMeeta(const std::string &index_id_str, const std::string &index_name, TableMeeta &table_meta);
 
     ~TableIndexMeeta();
 
@@ -97,6 +97,7 @@ private:
     KVInstance &kv_instance_;
     TableMeeta &table_meta_;
     std::string index_id_str_;
+    std::string index_name_str_;
 
     std::shared_ptr<IndexBase> index_def_;
     std::optional<std::vector<SegmentID>> segment_ids_;

@@ -325,7 +325,7 @@ Status NewTxn::OptimizeTableIndexes(const std::string &db_name, const std::strin
     for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
         const std::string &index_id_str = (*index_id_strs_ptr)[i];
         const std::string &index_name = (*index_names_ptr)[i];
-        TableIndexMeeta table_index_meta(index_id_str, *table_meta);
+        TableIndexMeeta table_index_meta(index_id_str, index_name, *table_meta);
 
         std::vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
@@ -2130,6 +2130,7 @@ Status NewTxn::PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
     const std::string &db_id_str = drop_index_cmd->db_id_;
     const std::string &table_id_str = drop_index_cmd->table_id_;
     const std::string &index_id_str = drop_index_cmd->index_id_;
+    const std::string &index_name = drop_index_cmd->index_name_;
     const std::string &index_key = drop_index_cmd->index_key_;
     const TxnTimeStamp create_ts = infinity::GetTimestampFromKey(index_key);
 
@@ -2139,7 +2140,7 @@ Status NewTxn::PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
     kv_instance_->Put(KeyEncode::DropTableIndexKey(db_id_str, table_id_str, drop_index_cmd->index_name_, create_ts, index_id_str), ts_str);
 
     TableMeeta table_meta(db_id_str, table_id_str, this);
-    TableIndexMeeta table_index_meta(index_id_str, table_meta);
+    TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta);
     std::shared_ptr<IndexBase> index_base;
     Status status;
     std::tie(index_base, status) = table_index_meta.GetIndexBase();
@@ -2164,12 +2165,12 @@ Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, K
     const std::string &db_id_str = dump_index_cmd->db_id_;
     const std::string &table_id_str = dump_index_cmd->table_id_;
     const std::string &index_id_str = dump_index_cmd->index_id_;
+    const std::string &index_name = dump_index_cmd->index_name_;
     SegmentID segment_id = dump_index_cmd->segment_id_;
 
     TableMeeta table_meta(db_id_str, table_id_str, this);
 
-    const std::string &index_id_str_ = dump_index_cmd->index_id_;
-    TableIndexMeeta table_index_meta(index_id_str_, table_meta);
+    TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta);
 
     auto [index_base, status] = table_index_meta.GetIndexBase();
     if (!status.ok()) {
@@ -2197,6 +2198,7 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const std
         if (index_id > max_index_id) {
             max_index_id = index_id;
         }
+        const std::string &index_name = *(index_cmd.index_base_->index_name_);
         std::optional<TableIndexMeeta> table_index_meta;
         if (!is_link_files) {
             status = new_catalog_->AddNewTableIndex(table_meta,
@@ -2208,7 +2210,7 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const std
                 return status;
             }
         } else {
-            table_index_meta.emplace(index_cmd.index_id_, table_meta);
+            table_index_meta.emplace(index_cmd.index_id_, index_name, table_meta);
         }
 
         for (const auto &segment_index : index_cmd.segment_index_infos_) {
@@ -2279,8 +2281,11 @@ Status NewTxn::ManualDumpIndex(const std::string &db_name, const std::string &ta
     if (!status.ok()) {
         return status;
     }
-    for (const auto &index_id : *index_ids_ptr) {
-        TableIndexMeeta table_index_meta(index_id, *table_meta);
+    size_t index_count = index_ids_ptr->size();
+    for (size_t i = 0; i < index_count; ++i) {
+        const std::string &index_id_str = (*index_ids_ptr)[i];
+        const std::string &index_name_str = (*index_names_ptr)[i];
+        TableIndexMeeta table_index_meta(index_id_str, index_name_str, *table_meta);
 
         // 2. Get all segment IDs for this index
         std::vector<SegmentID> *segment_ids_ptr = nullptr;

@@ -138,7 +138,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
         for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
             const std::string &index_id_str = (*index_id_strs_ptr)[i];
             const std::string &index_name = (*index_names_ptr)[i];
-            auto table_index_meta = std::make_shared<TableIndexMeeta>(index_id_str, *table_meta);
+            auto table_index_meta = std::make_shared<TableIndexMeeta>(index_id_str, index_name, *table_meta);
 
             std::shared_ptr<IndexBase> index_base;
             std::tie(index_base, status) = table_index_meta->GetIndexBase();
@@ -167,7 +167,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
         }
         const std::string &index_id_str = (*index_id_strs_ptr)[iter - index_names_ptr->begin()];
         const std::string &index_name = match_sparse_expr_->index_name_;
-        auto table_index_meta = std::make_shared<TableIndexMeeta>(index_id_str, *table_meta);
+        auto table_index_meta = std::make_shared<TableIndexMeeta>(index_id_str, index_name, *table_meta);
 
         std::shared_ptr<IndexBase> index_base;
         std::tie(index_base, status) = table_index_meta->GetIndexBase();

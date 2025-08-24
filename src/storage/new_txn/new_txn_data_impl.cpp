@@ -365,7 +365,7 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
     for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
         const std::string &index_id_str = (*index_id_strs_ptr)[i];
         const std::string &index_name = (*index_names_ptr)[i];
-        TableIndexMeeta table_index_meta(index_id_str, table_meta);
+        TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta);
 
         for (size_t segment_idx = 0; segment_idx < segment_count; ++segment_idx) {
             size_t segment_row_cnt = segment_row_cnts[segment_idx];
@@ -773,7 +773,7 @@ Status NewTxn::Compact(const std::string &db_name, const std::string &table_name
     for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
         const std::string &index_id_str = (*index_id_strs_ptr)[i];
         const std::string &index_name = (*index_name_ptr)[i];
-        TableIndexMeeta table_index_meta(index_id_str, table_meta);
+        TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta);
 
         status = this->PopulateIndex(db_name,
                                      table_name,
@@ -1535,7 +1535,8 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
         }
         for (size_t i = 0; i < index_id_strs->size(); ++i) {
             const std::string &index_id_str = (*index_id_strs)[i];
-            table_index_metas.push_back(std::make_shared<TableIndexMeeta>(index_id_str, table_meta));
+            const std::string &index_name_str = (*index_name_strs)[i];
+            table_index_metas.push_back(std::make_shared<TableIndexMeeta>(index_id_str, index_name_str, table_meta));
         }
     }
 
@@ -1759,12 +1760,17 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
     }
     {
         std::vector<std::string> *index_id_strs_ptr = nullptr;
-        status = table_meta.GetIndexIDs(index_id_strs_ptr);
+        std::vector<std::string> *index_name_strs_ptr = nullptr;
+        status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
         if (!status.ok()) {
             return status;
         }
-        for (const std::string &index_id_str : *index_id_strs_ptr) {
-            TableIndexMeeta table_index_meta(index_id_str, table_meta);
+        size_t index_count = index_id_strs_ptr->size();
+        for (size_t idx = 0; idx < index_count; ++idx) {
+            const std::string &index_id_str = index_id_strs_ptr->at(idx);
+            const std::string &index_name_str = index_name_strs_ptr->at(idx);
+
+            TableIndexMeeta table_index_meta(index_id_str, index_name_str, table_meta);
             std::vector<SegmentID> *segment_ids_ptr = nullptr;
             std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
             if (!status.ok()) {

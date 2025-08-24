@@ -176,7 +176,7 @@ private:
     std::shared_ptr<std::vector<SegmentID>> segment_ids1_;
 
     std::optional<std::vector<std::string>> index_id_strs_;
-    std::optional<std::vector<std::string>> index_names_;
+    std::optional<std::vector<std::string>> index_name_strs_;
     std::optional<SegmentID> next_segment_id_;
     std::optional<SegmentID> unsealed_segment_id_;
     std::optional<ColumnID> next_column_id_;

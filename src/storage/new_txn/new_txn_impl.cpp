@@ -893,13 +893,17 @@ Status NewTxn::DropColumns(const std::string &db_name, const std::string &table_
     }
 
     std::vector<std::string> *index_id_strs_ptr = nullptr;
-    status = table_meta->GetIndexIDs(index_id_strs_ptr);
+    std::vector<std::string> *index_name_strs_ptr = nullptr;
+    status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
     if (!status.ok()) {
         return status;
     }
 
-    for (const std::string &index_id : *index_id_strs_ptr) {
-        TableIndexMeeta table_index_meta(index_id, *table_meta);
+    size_t index_count = index_id_strs_ptr->size();
+    for (size_t i = 0; i < index_count; ++i) {
+        const std::string &index_id_str = (*index_id_strs_ptr)[i];
+        const std::string &index_name_str = (*index_name_strs_ptr)[i];
+        TableIndexMeeta table_index_meta(index_id_str, index_name_str, *table_meta);
         auto [index_base, index_status] = table_index_meta.GetIndexBase();
         if (!index_status.ok()) {
             return index_status;
@@ -1174,7 +1178,7 @@ Status NewTxn::DropIndexByName(const std::string &db_name, const std::string &ta
         return status;
     }
 
-    TableIndexMeeta table_index_meta(index_id, *table_meta);
+    TableIndexMeeta table_index_meta(index_id, index_name, *table_meta);
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
         return index_status;
@@ -2392,7 +2396,7 @@ Status NewTxn::GetTableIndexMeta(const std::string &index_name,
     if (!status.ok()) {
         return status;
     }
-    table_index_meta.emplace(index_id_str, table_meta);
+    table_index_meta.emplace(index_id_str, index_name, table_meta);
     if (index_key_ptr) {
         *index_key_ptr = index_key;
     }
@@ -5539,7 +5543,7 @@ Status NewTxn::CleanupInner(const std::vector<std::unique_ptr<MetaKey>> &metas) 
                                       begin_ts,
                                       MAX_TIMESTAMP,
                                       meta_cache);
-                TableIndexMeeta table_index_meta(table_index_meta_key->index_id_str_, table_meta);
+                TableIndexMeeta table_index_meta(table_index_meta_key->index_id_str_, table_index_meta_key->index_name_, table_meta);
                 status = NewCatalog::CleanTableIndex(table_index_meta, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
@@ -5557,7 +5561,7 @@ Status NewTxn::CleanupInner(const std::vector<std::unique_ptr<MetaKey>> &metas) 
                                       begin_ts,
                                       MAX_TIMESTAMP,
                                       meta_cache);
-                TableIndexMeeta table_index_meta(segment_index_meta_key->index_id_str_, table_meta);
+                TableIndexMeeta table_index_meta(segment_index_meta_key->index_id_str_, "", table_meta);
                 SegmentIndexMeta segment_index_meta(segment_index_meta_key->segment_id_, table_index_meta);
                 Status status = NewCatalog::CleanSegmentIndex(segment_index_meta, UsageFlag::kOther);
                 if (!status.ok()) {
@@ -5573,7 +5577,7 @@ Status NewTxn::CleanupInner(const std::vector<std::unique_ptr<MetaKey>> &metas) 
                                       begin_ts,
                                       MAX_TIMESTAMP,
                                       meta_cache);
-                TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
+                TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, "", table_meta);
                 SegmentIndexMeta segment_index_meta(chunk_index_meta_key->segment_id_, table_index_meta);
                 ChunkIndexMeta chunk_index_meta(chunk_index_meta_key->chunk_id_, segment_index_meta);
                 Status status = NewCatalog::CleanChunkIndex(chunk_index_meta, UsageFlag::kOther);
