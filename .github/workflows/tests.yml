@@ -184,10 +184,19 @@ jobs:
           echo "Build ip is: ${BUILD_IP}"
           echo "Container name is: ${CONTAINER_NAME}"
 
-      - name: ssh to remote server
+#      - name: ssh to remote server
+#        uses: appleboy/ssh-action@v1.2.2
+#        with:
+#          host: 172.17.0.1
+#          username: infiniflow
+#          # password: ${{ secrets.PASSWORD }}
+#          password: infiniflow
+#          envs: CONTAINER_NAME, BUILD_IP
+#          script: |
+#            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+#            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+      - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
-        #        env:
-        #          CONTAINER_NAME: ${{ steps.start.outputs.CONTAINER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
@@ -197,6 +206,27 @@ jobs:
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
             scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+
+#            TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+#            echo "TEST_CONTAINER=${TEST_CONTAINER}" >> $GITHUB_ENV
+#            TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+#            sudo docker rm -f -v ${TEST_CONTAINER} && sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER} -e TZ=$TZ -e -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+#            docker cp /home/infiniflow/artifacts/${CONTAINER_NAME}/infinity ${TEST_CONTAINER}:/infinity/cmake-build-debug/
+
+      - name: Start test container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER=${TEST_CONTAINER}" >> $GITHUB_ENV
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker rm -f -v ${TEST_CONTAINER} && sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER} -e TZ=$TZ -e -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          docker exec ${TEST_CONTAINER} mkdir -p /infinity/cmake-build-debug
+          docker cp /home/infiniflow/artifacts/${CONTAINER_NAME}/infinity ${TEST_CONTAINER}:/infinity/cmake-build-debug/
+
+      - name: Run sqllogictest debug version
+        if: ${{ !cancelled() && !failure() }}
+        id: run_tests_debug
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py" && sleep 1s
 
 
 #      - name: Unit test debug version
