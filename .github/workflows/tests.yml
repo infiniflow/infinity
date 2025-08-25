@@ -186,40 +186,15 @@ jobs:
           echo "Build ip is: ${BUILD_IP}"
           echo "Container name is: ${CONTAINER_NAME}"
 
-      - name: Download artifacts
-        uses: appleboy/ssh-action@v1.2.2
+      - name: Download artifacts via SSH
+        uses: nicklasfrahm/scp-action@main
         with:
+          direction: download
           host: 172.17.0.1
           username: infiniflow
-          # password: ${{ secrets.PASSWORD }}
-          password: infiniflow
-          envs: CONTAINER_NAME, BUILD_IP
-          script: |
-            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
-
-      - name: add host to known_hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H 172.17.0.1 >> ~/.ssh/known_hosts
-
-      - name: ssh to remote server
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: 172.17.0.1
-          username: infiniflow
-          # password: ${{ secrets.PASSWORD }}
-          password: infiniflow
-          envs: CONTAINER_NAME, BUILD_IP
-          script: |
-            mkdir -p /home/infiniflow/artifacts/infinity/
-            scp infiniflow@172.17.0.1:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
-
-#            TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-#            echo "TEST_CONTAINER=${TEST_CONTAINER}" >> $GITHUB_ENV
-#            TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-#            sudo docker rm -f -v ${TEST_CONTAINER} && sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER} -e TZ=$TZ -e -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
-#            docker cp /home/infiniflow/artifacts/${CONTAINER_NAME}/infinity ${TEST_CONTAINER}:/infinity/cmake-build-debug/
+          insecure_password: infiniflow
+          source: /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+          target: /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}
