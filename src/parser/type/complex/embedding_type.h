@@ -319,6 +319,104 @@ public:
     bool Eq(const EmbeddingType &other, EmbeddingDataType type, size_t dimension) const {
         return std::memcmp(ptr, other.ptr, EmbeddingSize(type, dimension)) == 0;
     }
+
+    std::shared_ptr<char[]> Cast(EmbeddingDataType from, EmbeddingDataType to, size_t dimension) const {
+        size_t from_size = EmbeddingSize(from, dimension);
+        size_t to_size = EmbeddingSize(to, dimension);
+        std::shared_ptr<char[]> to_buf = std::make_shared<char[]>(to_size);
+        if (from_size == to_size) {
+            std::memcpy(to_buf.get(), ptr, from_size);
+        } else {
+            size_t from_width = EmbeddingDataWidth(from);
+            size_t to_width = EmbeddingDataWidth(to);
+            char *from_addr = ptr;
+            char *to_addr = to_buf.get();
+            for (size_t i = 0; i < dimension; ++i) {
+                switch (from) {
+                    case EmbeddingDataType::kElemUInt8: {
+                        CastFromDataType<uint8_t>(to, from_addr, to_addr);
+                        break;
+                    }
+                    case EmbeddingDataType::kElemInt8: {
+                        CastFromDataType<int8_t>(to, from_addr, to_addr);
+                        break;
+                    }
+                    case EmbeddingDataType::kElemFloat: {
+                        CastFromDataType<float>(to, from_addr, to_addr);
+                        break;
+                    }
+                    case EmbeddingDataType::kElemDouble: {
+                        CastFromDataType<double>(to, from_addr, to_addr);
+                        break;
+                    }
+                    case EmbeddingDataType::kElemFloat16: {
+                        CastFromDataType<float16_t>(to, from_addr, to_addr);
+                        break;
+                    }
+                    case EmbeddingDataType::kElemBFloat16: {
+                        CastFromDataType<bfloat16_t>(to, from_addr, to_addr);
+                        break;
+                    }
+                    case EmbeddingDataType::kElemBit:
+                        [[fallthrough]];
+                    case EmbeddingDataType::kElemInt16:
+                        [[fallthrough]];
+                    case EmbeddingDataType::kElemInt32:
+                        [[fallthrough]];
+                    case EmbeddingDataType::kElemInt64:
+                        [[fallthrough]];
+                    case EmbeddingDataType::kElemInvalid: {
+                        ParserError(fmt::format("Cast: Invalid embedding data type {}.", EmbeddingType::EmbeddingDataType2String(from)));
+                    }
+                }
+                from_addr += from_width;
+                to_addr += to_width;
+            }
+        }
+        return to_buf;
+    }
+
+private:
+    template <typename FromDataType>
+    static inline void CastFromDataType(EmbeddingDataType to, char *from_addr, char *to_addr) {
+        switch (to) {
+            case EmbeddingDataType::kElemUInt8: {
+                *(uint8_t *)to_addr = *(FromDataType *)from_addr;
+                break;
+            }
+            case EmbeddingDataType::kElemInt8: {
+                *(int8_t *)to_addr = *(FromDataType *)from_addr;
+                break;
+            }
+            case EmbeddingDataType::kElemFloat: {
+                *(float *)to_addr = *(FromDataType *)from_addr;
+                break;
+            }
+            case EmbeddingDataType::kElemDouble: {
+                *(double *)to_addr = *(FromDataType *)from_addr;
+                break;
+            }
+            case EmbeddingDataType::kElemFloat16: {
+                *(float16_t *)to_addr = *(FromDataType *)from_addr;
+                break;
+            }
+            case EmbeddingDataType::kElemBFloat16: {
+                *(bfloat16_t *)to_addr = *(FromDataType *)from_addr;
+                break;
+            }
+            case EmbeddingDataType::kElemBit:
+                [[fallthrough]];
+            case EmbeddingDataType::kElemInt16:
+                [[fallthrough]];
+            case EmbeddingDataType::kElemInt32:
+                [[fallthrough]];
+            case EmbeddingDataType::kElemInt64:
+                [[fallthrough]];
+            case EmbeddingDataType::kElemInvalid: {
+                ParserError(fmt::format("CastFromDataType: Invalid embedding data type {}.", EmbeddingType::EmbeddingDataType2String(to)));
+            }
+        }
+    }
 };
 
 } // namespace infinity

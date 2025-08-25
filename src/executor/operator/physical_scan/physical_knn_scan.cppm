@@ -106,10 +106,10 @@ private:
     template <LogicalType t, typename ColumnDataT>
     void ExecuteInternalByColumnDataType(QueryContext *query_context, KnnScanOperatorState *knn_scan_operator_state);
 
-    template <LogicalType t, typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
+    template <LogicalType t, typename ColumnDataType, template <typename, typename> typename C, typename DistanceDataType>
     void ExecuteInternalByColumnDataTypeAndQueryDataType(QueryContext *query_context, KnnScanOperatorState *knn_scan_operator_state);
 
-    template <LogicalType t, typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
+    template <LogicalType t, typename ColumnDataType, template <typename, typename> typename C, typename DistanceDataType>
     friend struct ExecuteDispatchHelper;
 };
 
