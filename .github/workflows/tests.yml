@@ -212,8 +212,9 @@ jobs:
           host: 172.17.0.1
           username: infiniflow
           insecure_password: infiniflow
+          insecure_ignore_fingerprint: true
           source: /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
-          target: /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
+          target: /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
 
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}
