@@ -134,7 +134,7 @@ jobs:
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
         env:
-          CONTAINER_NAME: ${BUILDER_CONTAINER}
+          CONTAINER_NAME: BUILDER_CONTAINER
         with:
           host: 172.17.0.1
           username: infiniflow
@@ -143,7 +143,7 @@ jobs:
           envs: CONTAINER_NAME
           script: |
             hostname -I | awk '{print $1}'
-            echo ${CONTAINER_NAME}
+            echo "${CONTAINER_NAME}"
 #            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
 #            docker cp ${CONTAINER_NAME}:/infinity/cmake-build-debug/src/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
 #            docker cp ${CONTAINER_NAME}:/infinity/cmake-build-debug/src/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
