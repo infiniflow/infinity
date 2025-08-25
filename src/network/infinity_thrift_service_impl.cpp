@@ -298,6 +298,17 @@ void InfinityThriftService::DropTable(infinity_thrift_rpc::CommonResponse &respo
     ProcessQueryResult(response, result);
 }
 
+void InfinityThriftService::RenameTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::RenameTableRequest &request) {
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+
+    auto result = infinity->RenameTable(request.db_name, request.table_name, request.new_table_name);
+    ProcessQueryResult(response, result);
+}
+
 void InfinityThriftService::Insert(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::InsertRequest &request) {
     auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
     if (!infinity_status.ok()) {

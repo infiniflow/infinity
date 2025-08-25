@@ -553,6 +553,15 @@ class table_http:
         self.database_name = database_name
         self.table_name = table_name
 
+    def rename(self, new_table_name):
+        check_valid_name(new_table_name)
+        url = f"databases/{self.database_name}/tables/{self.table_name}/rename"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = self.net.set_up_data([], {"new_table_name": new_table_name})
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
+        return database_result()
+
     def show_columns(self):
         url = f"databases/{self.database_name}/tables/{self.table_name}/columns"
         h = self.net.set_up_header(["accept"])

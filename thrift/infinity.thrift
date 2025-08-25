@@ -539,6 +539,13 @@ struct DropTableRequest {
 4:  DropOption drop_option,
 }
 
+struct RenameTableRequest {
+1:  string db_name,
+2:  string table_name,
+3:  string new_table_name,
+4:  i64 session_id,
+}
+
 struct InsertRequest {
 1:  string db_name,
 2:  string table_name,
@@ -830,6 +837,7 @@ CommonResponse CreateDatabase(1:CreateDatabaseRequest request),
 CommonResponse DropDatabase(1:DropDatabaseRequest request),
 CommonResponse CreateTable(1:CreateTableRequest request),
 CommonResponse DropTable(1:DropTableRequest request),
+CommonResponse RenameTable(1:RenameTableRequest request),
 CommonResponse Insert(1:InsertRequest request),
 CommonResponse Import(1:ImportRequest request),
 CommonResponse Export(1:ExportRequest request),

@@ -47,6 +47,7 @@ export using infinity_thrift_rpc::CreateDatabaseRequest;
 export using infinity_thrift_rpc::DropDatabaseRequest;
 export using infinity_thrift_rpc::CreateTableRequest;
 export using infinity_thrift_rpc::DropTableRequest;
+export using infinity_thrift_rpc::RenameTableRequest;
 export using infinity_thrift_rpc::InsertRequest;
 export using infinity_thrift_rpc::CopyFileType;
 export using infinity_thrift_rpc::ImportRequest;

@@ -6265,6 +6265,98 @@ class DropTableRequest(object):
         return not (self == other)
 
 
+class RenameTableRequest(object):
+    """
+    Attributes:
+     - db_name
+     - table_name
+     - new_table_name
+     - session_id
+
+    """
+    thrift_spec = None
+
+
+    def __init__(self, db_name = None, table_name = None, new_table_name = None, session_id = None,):
+        self.db_name = db_name
+        self.table_name = table_name
+        self.new_table_name = new_table_name
+        self.session_id = session_id
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.db_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.table_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.new_table_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        self.validate()
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('RenameTableRequest')
+        if self.db_name is not None:
+            oprot.writeFieldBegin('db_name', TType.STRING, 1)
+            oprot.writeString(self.db_name.encode('utf-8') if sys.version_info[0] == 2 else self.db_name)
+            oprot.writeFieldEnd()
+        if self.table_name is not None:
+            oprot.writeFieldBegin('table_name', TType.STRING, 2)
+            oprot.writeString(self.table_name.encode('utf-8') if sys.version_info[0] == 2 else self.table_name)
+            oprot.writeFieldEnd()
+        if self.new_table_name is not None:
+            oprot.writeFieldBegin('new_table_name', TType.STRING, 3)
+            oprot.writeString(self.new_table_name.encode('utf-8') if sys.version_info[0] == 2 else self.new_table_name)
+            oprot.writeFieldEnd()
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 4)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
 class InsertRequest(object):
     """
     Attributes:
@@ -10518,6 +10610,14 @@ DropTableRequest.thrift_spec = (
     (2, TType.STRING, 'table_name', 'UTF8', None, ),  # 2
     (3, TType.I64, 'session_id', None, None, ),  # 3
     (4, TType.STRUCT, 'drop_option', [DropOption, None], None, ),  # 4
+)
+all_structs.append(RenameTableRequest)
+RenameTableRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'db_name', 'UTF8', None, ),  # 1
+    (2, TType.STRING, 'table_name', 'UTF8', None, ),  # 2
+    (3, TType.STRING, 'new_table_name', 'UTF8', None, ),  # 3
+    (4, TType.I64, 'session_id', None, None, ),  # 4
 )
 all_structs.append(InsertRequest)
 InsertRequest.thrift_spec = (
