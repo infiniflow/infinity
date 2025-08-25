@@ -31,11 +31,17 @@ class TableIndexReaderCache;
 class NewTxn;
 // struct SegmentUpdateTS;
 struct TableDetail;
+class MetaTableCache;
 
 export class TableMeeta {
 public:
     // TableMeeta(const std::string &db_id_str, const std::string &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts, UsageEnum usage);
-    TableMeeta(const std::string &db_id_str, const std::string &table_id_str, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+    TableMeeta(const std::string &db_id_str,
+               const std::string &table_id_str,
+               KVInstance *kv_instance,
+               TxnTimeStamp begin_ts,
+               TxnTimeStamp commit_ts,
+               MetaCache *meta_cache);
 
     TableMeeta(const std::string &db_id_str, const std::string &table_id_str, NewTxn *txn);
 
@@ -88,7 +94,6 @@ public:
 
     std::tuple<std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>>, Status> GetColumnDefs();
     std::tuple<std::shared_ptr<ColumnDef>, Status> GetColumnDefByColumnName(const std::string &column_name, size_t *column_idx = nullptr);
-    std::tuple<std::shared_ptr<ColumnDef>, Status> GetColumnDefByColumnID(const size_t &column_idx);
 
     Status GetTableInfo(TableInfo &table_info);
 
@@ -128,12 +133,20 @@ public:
 
     std::tuple<size_t, Status> GetTableRowCount();
 
+    MetaCache *meta_cache() const;
+
+    void SetTableName(const std::string &table_name);
+
+    const std::string &table_name() const;
+
+    u64 db_id() const;
+
+    u64 table_id() const;
+
+    NewTxn *txn() const;
+
 private:
-    Status LoadComment();
-
     Status LoadColumnDefs();
-
-    Status LoadSegmentIDs1();
 
     Status LoadIndexIDs();
 
@@ -150,18 +163,22 @@ private:
     TxnTimeStamp commit_ts_;
     NewTxn *txn_{};
     KVInstance *kv_instance_{};
+    MetaCache *meta_cache_{};
+
     std::string db_id_str_;
+    u64 db_id_{};
     std::string table_id_str_;
+    u64 table_id_{};
     std::string db_name_{};
     std::string table_name_{};
 
     std::optional<std::string> comment_;
-    std::optional<std::vector<std::shared_ptr<ColumnDef>>> column_defs_;
+    std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs_;
     // std::optional<std::vector<SegmentID>> segment_ids_;
-    std::optional<std::vector<SegmentID>> segment_ids1_;
+    std::shared_ptr<std::vector<SegmentID>> segment_ids1_;
 
     std::optional<std::vector<std::string>> index_id_strs_;
-    std::optional<std::vector<std::string>> index_names_;
+    std::optional<std::vector<std::string>> index_name_strs_;
     std::optional<SegmentID> next_segment_id_;
     std::optional<SegmentID> unsealed_segment_id_;
     std::optional<ColumnID> next_column_id_;

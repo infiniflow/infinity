@@ -784,10 +784,14 @@ TEST_P(TestTxnCleanup, cleanup_and_update) {
         {
             auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
-            EXPECT_TRUE(status.ok());
-            status = new_txn_mgr_->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
+            if (txn == nullptr) {
+                LOG_WARN("Conflict checkpoint, ignore");
+            } else {
+                auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+                EXPECT_TRUE(status.ok());
+                status = new_txn_mgr_->CommitTxn(txn);
+                EXPECT_TRUE(status.ok());
+            }
         }
 
         { // check update

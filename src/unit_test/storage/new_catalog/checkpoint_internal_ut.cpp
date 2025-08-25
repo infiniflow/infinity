@@ -172,7 +172,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint0) {
             auto check_column = [&](ColumnID column_id, const Value &v) {
                 ColumnMeta column_meta(column_id, block_meta);
                 ColumnVector col1;
-                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col1);
+                status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col1);
                 EXPECT_TRUE(status.ok());
 
                 for (u32 i = 0; i < row_count; ++i) {

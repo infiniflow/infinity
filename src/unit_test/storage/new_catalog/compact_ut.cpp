@@ -1520,7 +1520,7 @@ TEST_P(TestTxnCompact, compact_and_create_index) {
         status = table_meta->GetIndexIDs(index_ids_strs_ptr, &index_names_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_names_ptr, std::vector<std::string>({*index_name1}));
-        TableIndexMeeta table_index_meta((*index_ids_strs_ptr)[0], *table_meta);
+        TableIndexMeeta table_index_meta((*index_ids_strs_ptr)[0], (*index_names_ptr)[0], *table_meta);
 
         std::shared_ptr<IndexBase> index_base;
         std::tie(index_base, status) = table_index_meta.GetIndexBase();
@@ -1732,7 +1732,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = table_meta->GetIndexIDs(index_ids_strs_ptr, &index_names_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_names_ptr, std::vector<std::string>({*index_name1}));
-        TableIndexMeeta table_index_meta((*index_ids_strs_ptr)[0], *table_meta);
+        TableIndexMeeta table_index_meta((*index_ids_strs_ptr)[0], (*index_names_ptr)[0], *table_meta);
 
         std::shared_ptr<IndexBase> index_base;
         std::tie(index_base, status) = table_index_meta.GetIndexBase();

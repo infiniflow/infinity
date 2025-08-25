@@ -343,6 +343,8 @@ export {
 
     constexpr int MAX_TUPLE_LENGTH = 1024;
     constexpr size_t L1_CACHE_SIZE = 32 * KB;
+
+    constexpr u64 DEFAULT_META_CACHE_SIZE = 8192;
 }
 
 } // namespace infinity

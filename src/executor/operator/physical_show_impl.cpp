@@ -67,9 +67,9 @@ import :chunk_index_meta;
 import :new_txn_manager;
 import :kv_store;
 import :meta_tree;
+import :meta_cache;
 
 import std;
-
 import show_statement;
 import column_def;
 import data_type;
@@ -87,6 +87,7 @@ namespace infinity {
 void PhysicalShow::Init(QueryContext *query_context) {
     auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
     auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
+    auto double_type = std::make_shared<DataType>(LogicalType::kDouble);
 
     output_names_ = std::make_shared<std::vector<std::string>>();
     output_types_ = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
@@ -596,6 +597,34 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowStmtType::kListCaches: {
+            output_names_->reserve(4);
+            output_types_->reserve(4);
+            output_names_->emplace_back("type");
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("commit_ts");
+            output_names_->emplace_back("detail");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
+        case ShowStmtType::kShowCache: {
+            output_names_->reserve(5);
+            output_types_->reserve(5);
+            output_names_->emplace_back("cache_type");
+            output_names_->emplace_back("number");
+            output_names_->emplace_back("request_count");
+            output_names_->emplace_back("hit_count");
+            output_names_->emplace_back("hit_rate");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(double_type);
+            break;
+        }
         default: {
             Status status = Status::NotSupport("Not implemented show type");
             RecoverableError(status);
@@ -770,6 +799,14 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowStmtType::kShowSnapshot: {
             ExecuteShowSnapshot(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kListCaches: {
+            ExecuteListCaches(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kShowCache: {
+            ExecuteShowCache(query_context, show_operator_state);
             break;
         }
         default: {
@@ -6463,6 +6500,208 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
             Value value = Value::MakeVarchar(snapshot_size_str);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
+}
+
+void PhysicalShow::ExecuteListCaches(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Storage *storage = query_context->storage();
+    MetaCache *meta_cache = storage->meta_cache();
+    std::vector<std::shared_ptr<MetaBaseCache>> cache_items = meta_cache->GetAllCacheItems();
+
+    output_block_ptr->Init(*output_types_);
+
+    size_t row_count = 0;
+    for (auto &cache_item : cache_items) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(*output_types_);
+        }
+
+        {
+            // name
+            Value value = Value::MakeVarchar(cache_item->name());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // cache type
+            Value value = Value::MakeVarchar(ToString(cache_item->type()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        {
+            // commit ts
+            Value value = Value::MakeBigInt(cache_item->commit_ts());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+
+        {
+            // detailed info
+            Value value = Value::MakeVarchar(cache_item->detail());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
+}
+
+void PhysicalShow::ExecuteShowCache(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Storage *storage = query_context->storage();
+    MetaCache *meta_cache = storage->meta_cache();
+    std::vector<std::shared_ptr<MetaBaseCache>> cache_items = meta_cache->GetAllCacheItems();
+
+    output_block_ptr->Init(*output_types_);
+
+    {
+        // db_cache
+        CacheStatus db_cache_status = meta_cache->GetCacheStatus(MetaCacheType::kCreateDB);
+        {
+            // cache_type
+            Value value = Value::MakeVarchar("database");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // db cache number
+            Value value = Value::MakeBigInt(db_cache_status.item_count_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        {
+            // hit count
+            Value value = Value::MakeBigInt(db_cache_status.hit_count_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+
+        {
+            // request count
+            Value value = Value::MakeBigInt(db_cache_status.request_count_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        {
+            // hit rate
+            double hit_rate = 0;
+            if (db_cache_status.request_count_ > 0) {
+                hit_rate = (double)(db_cache_status.hit_count_) / (double)(db_cache_status.request_count_);
+            }
+            Value value = Value::MakeDouble(hit_rate);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+        }
+    }
+
+    {
+        // table_cache
+        CacheStatus table_cache_status = meta_cache->GetCacheStatus(MetaCacheType::kCreateTable);
+        {
+            // cache_type
+            Value value = Value::MakeVarchar("table");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // db cache number
+            Value value = Value::MakeBigInt(table_cache_status.item_count_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        {
+            // hit count
+            Value value = Value::MakeBigInt(table_cache_status.hit_count_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+
+        {
+            // request count
+            Value value = Value::MakeBigInt(table_cache_status.request_count_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        {
+            // hit rate
+            double hit_rate = 0;
+            if (table_cache_status.request_count_ > 0) {
+                hit_rate = (double)(table_cache_status.hit_count_) / (double)(table_cache_status.request_count_);
+            }
+            Value value = Value::MakeDouble(hit_rate);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+        }
+    }
+
+    {
+        // index_cache
+        CacheStatus index_cache_status = meta_cache->GetCacheStatus(MetaCacheType::kCreateIndex);
+        {
+            // cache_type
+            Value value = Value::MakeVarchar("index");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // db cache number
+            Value value = Value::MakeBigInt(index_cache_status.item_count_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        {
+            // hit count
+            Value value = Value::MakeBigInt(index_cache_status.hit_count_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+
+        {
+            // request count
+            Value value = Value::MakeBigInt(index_cache_status.request_count_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        {
+            // hit rate
+            double hit_rate = 0;
+            if (index_cache_status.request_count_ > 0) {
+                hit_rate = (double)(index_cache_status.hit_count_) / (double)(index_cache_status.request_count_);
+            }
+
+            Value value = Value::MakeDouble(hit_rate);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
         }
     }
 

@@ -188,6 +188,8 @@ public:
     QueryResult ShowMemoryObjects();
     QueryResult ShowMemoryAllocations();
     QueryResult ShowFunction(const std::string &function_name);
+    QueryResult ListCaches();
+    QueryResult ShowCache();
 
     QueryResult Insert(const std::string &db_name, const std::string &table_name, std::vector<InsertRowExpr *> *&insert_rows);
 

@@ -22,11 +22,13 @@ namespace infinity {
 class KVInstance;
 struct DatabaseInfo;
 class NewTxn;
+class MetaCache;
+class MetaTableCache;
 
 export class DBMeeta {
 public:
     DBMeeta(std::string db_id_str, NewTxn *txn);
-    DBMeeta(std::string db_id_str, KVInstance *kv_instance);
+    DBMeeta(std::string db_id_str, KVInstance *kv_instance, MetaCache *meta_cache);
 
     const std::string &db_id_str() const;
 
@@ -49,6 +51,8 @@ public:
     std::string GetDBName() const { return db_name_; }
     void SetDBName(const std::string &db_name) { db_name_ = db_name; }
 
+    MetaCache *meta_cache() const;
+
 private:
     Status GetComment(std::string *&comment);
     Status LoadTableIDs();
@@ -62,6 +66,7 @@ private:
     NewTxn *txn_{};
     TxnTimeStamp txn_begin_ts_{};
     KVInstance *kv_instance_{};
+    MetaCache *meta_cache_{};
 
     std::optional<std::string> comment_;
     std::optional<std::vector<std::string>> table_id_strs_;

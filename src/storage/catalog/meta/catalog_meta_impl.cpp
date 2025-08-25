@@ -23,6 +23,9 @@ import :infinity_exception;
 import :kv_utility;
 import :default_values;
 import :new_txn;
+import :new_txn_manager;
+import :storage;
+import :meta_cache;
 
 import std;
 import std.compat;
@@ -36,12 +39,28 @@ CatalogMeta::CatalogMeta(NewTxn *txn) : txn_(txn) {
     }
     read_ts_ = txn->BeginTS();
     kv_instance_ = txn_->kv_instance();
+    meta_cache_ = txn_->txn_mgr()->storage()->meta_cache();
 }
 
-CatalogMeta::CatalogMeta(KVInstance *kv_instance) : read_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance} {}
+CatalogMeta::CatalogMeta(KVInstance *kv_instance, MetaCache *meta_cache)
+    : read_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance}, meta_cache_(meta_cache) {}
 
-Status CatalogMeta::GetDBID(const std::string &db_name, std::string &db_key, std::string &db_id, TxnTimeStamp &create_ts) {
+Status CatalogMeta::GetDBID(const std::string &db_name, std::string &db_key, std::string &db_id_str, TxnTimeStamp &create_ts) {
+
+    std::shared_ptr<MetaDbCache> db_cache = meta_cache_->GetDb(db_name, this->read_ts_);
+    if (db_cache.get() != nullptr) {
+        if (db_cache->is_dropped()) {
+            return Status::DBNotExist(db_name);
+        }
+        db_id_str = std::to_string(db_cache->db_id());
+        db_key = db_cache->db_key();
+        create_ts = db_cache->commit_ts();
+        LOG_TRACE(fmt::format("Get db meta from cache, db: {}, db_id: {}, commit_ts: {}", db_name, db_id_str, create_ts));
+        return Status::OK();
+    }
+
     std::string db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);
+
     auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(db_key_prefix);
 
@@ -71,14 +90,21 @@ Status CatalogMeta::GetDBID(const std::string &db_name, std::string &db_key, std
     }
 
     db_key = db_kvs[max_visible_db_index].first;
-    db_id = db_kvs[max_visible_db_index].second;
+    db_id_str = db_kvs[max_visible_db_index].second;
 
     std::string drop_db_ts{};
-    kv_instance_->Get(KeyEncode::DropDBKey(db_name, max_commit_ts, db_id), drop_db_ts);
+    kv_instance_->Get(KeyEncode::DropDBKey(db_name, max_commit_ts, db_id_str), drop_db_ts);
 
     if (!drop_db_ts.empty() && std::stoull(drop_db_ts) <= read_ts_) {
+        //        db_cache = std::make_shared<MetaDbCache>(db_name, std::stoull(db_id_str), max_commit_ts, db_key, true);
+        //        meta_cache_->Put({db_cache});
         return Status::DBNotExist(db_name);
     }
+
+    if (txn_ != nullptr) {
+        txn_->AddMetaCache(std::make_shared<MetaDbCache>(db_name, std::stoull(db_id_str), max_commit_ts, db_key, false, txn_->TxnID()));
+    }
+
     create_ts = max_commit_ts;
     return Status::OK();
 }

@@ -23,6 +23,8 @@ import :default_values;
 import :new_txn;
 import :utility;
 import :kv_utility;
+import :new_txn_manager;
+import :meta_cache;
 
 import std;
 import std.compat;
@@ -36,10 +38,11 @@ DBMeeta::DBMeeta(std::string db_id_str, NewTxn *txn) : db_id_str_(std::move(db_i
     }
     txn_begin_ts_ = txn->BeginTS();
     kv_instance_ = txn_->kv_instance();
+    meta_cache_ = txn_->txn_mgr()->storage()->meta_cache();
 }
 
-DBMeeta::DBMeeta(std::string db_id_str, KVInstance *kv_instance)
-    : db_id_str_(std::move(db_id_str)), txn_begin_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance} {}
+DBMeeta::DBMeeta(std::string db_id_str, KVInstance *kv_instance, MetaCache *meta_cache)
+    : db_id_str_(std::move(db_id_str)), txn_begin_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance}, meta_cache_(meta_cache) {}
 
 const std::string &DBMeeta::db_id_str() const { return db_id_str_; }
 
@@ -99,14 +102,29 @@ Status DBMeeta::UninitSet(UsageFlag usage_flag) {
 Status DBMeeta::GetComment(std::string *&comment) {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!comment_) {
+        std::shared_ptr<MetaDbCache> db_cache = meta_cache_->GetDb(db_name_, txn_begin_ts_);
+        if (db_cache.get() != nullptr) {
+            if (db_cache->get_comment()) {
+                LOG_TRACE(fmt::format("Get db comment from db: {}", db_name_));
+                comment_ = *db_cache->comment();
+                comment = &*comment_;
+                return Status::OK();
+            }
+        }
+
         std::string comment_str;
         std::string db_comment_key = GetDBTag("comment");
+
         Status status = kv_instance_->Get(db_comment_key, comment_str);
         if (!status.ok() && status.code() != ErrorCode::kNotFound) {
             // "comment" not found is ok
             return status;
         }
         comment_ = std::move(comment_str);
+
+        if (db_cache.get() != nullptr) {
+            db_cache->set_comment(std::make_shared<std::string>(*comment_));
+        }
     }
     comment = &*comment_;
     return Status::OK();
@@ -128,6 +146,24 @@ Status DBMeeta::GetTableIDs(std::vector<std::string> *&table_id_strs, std::vecto
 }
 
 Status DBMeeta::GetTableID(const std::string &table_name, std::string &table_key, std::string &table_id_str, TxnTimeStamp &create_table_ts) {
+
+    u64 db_id = std::stoull(db_id_str_);
+    std::shared_ptr<MetaTableCache> table_cache = meta_cache_->GetTable(db_id, table_name, txn_begin_ts_);
+    if (table_cache.get() != nullptr) {
+        if (table_cache->is_dropped()) {
+            return Status::TableNotExist(table_name);
+        }
+        table_id_str = std::to_string(table_cache->table_id());
+        table_key = table_cache->table_key();
+        create_table_ts = table_cache->commit_ts();
+        LOG_TRACE(fmt::format("Get table meta from cache, db_id: {}, table_name: {}, table_key: {}, table_id: {}, commit_ts: {}",
+                              db_id,
+                              table_name,
+                              table_key,
+                              table_id_str,
+                              create_table_ts));
+        return Status::OK();
+    }
 
     std::string table_key_prefix = KeyEncode::CatalogTablePrefix(db_id_str_, table_name);
     auto iter2 = kv_instance_->GetIterator();
@@ -169,6 +205,11 @@ Status DBMeeta::GetTableID(const std::string &table_name, std::string &table_key
     if ((!drop_table_ts.empty() && std::stoull(drop_table_ts) <= txn_begin_ts_) ||
         (!rename_table_ts.empty() && std::stoull(rename_table_ts) <= txn_begin_ts_)) {
         return Status::TableNotExist(table_name);
+    }
+
+    if (txn_ != nullptr) {
+        txn_->AddMetaCache(
+            std::make_shared<MetaTableCache>(db_id, table_name, std::stoull(table_id_str), max_commit_ts, table_key, false, txn_->TxnID()));
     }
 
     create_table_ts = max_commit_ts;
@@ -269,4 +310,7 @@ Status DBMeeta::SetNextTableID(const std::string &table_id_str) {
     }
     return Status::OK();
 }
+
+MetaCache *DBMeeta::meta_cache() const { return meta_cache_; }
+
 } // namespace infinity

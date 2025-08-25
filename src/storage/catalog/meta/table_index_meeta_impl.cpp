@@ -31,6 +31,7 @@ import :utility;
 import :kv_utility;
 import :snapshot_info;
 import :segment_index_meta;
+import :meta_cache;
 
 import std;
 import third_party;
@@ -40,17 +41,41 @@ import create_index_info;
 
 namespace infinity {
 
-TableIndexMeeta::TableIndexMeeta(std::string index_id_str, TableMeeta &table_meta)
-    : kv_instance_(*table_meta.kv_instance()), table_meta_(table_meta), index_id_str_(std::move(index_id_str)) {}
+TableIndexMeeta::TableIndexMeeta(const std::string &index_id_str, const std::string &index_name, TableMeeta &table_meta)
+    : kv_instance_(*table_meta.kv_instance()), table_meta_(table_meta), index_id_str_(index_id_str), index_name_str_(index_name) {
+    if (index_name_str_.empty()) {
+        index_def_ =
+            infinity::GetTableIndexDef(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
+        index_name_str_ = *index_def_->index_name_;
+    }
+}
 
 TableIndexMeeta::~TableIndexMeeta() = default;
 
 std::tuple<std::shared_ptr<IndexBase>, Status> TableIndexMeeta::GetIndexBase() {
     std::lock_guard<std::mutex> lock(mtx_);
-    if (!index_def_) {
-        index_def_ =
-            infinity::GetTableIndexDef(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
+    if (index_def_.get() != nullptr) {
+        return {index_def_, Status::OK()};
     }
+
+    MetaCache *meta_cache = table_meta_.meta_cache();
+    u64 db_id = table_meta_.db_id();
+    u64 table_id = table_meta_.table_id();
+    std::shared_ptr<MetaIndexCache> index_cache = meta_cache->GetIndex(db_id, table_id, index_name_str_, table_meta_.begin_ts());
+    if (index_cache.get() != nullptr) {
+        index_def_ = index_cache->get_index_def();
+        if (index_def_.get() != nullptr) {
+            return {index_def_, Status::OK()};
+        }
+    }
+
+    index_def_ =
+        infinity::GetTableIndexDef(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
+
+    if (index_cache.get() != nullptr) {
+        index_cache->set_index_def(index_def_);
+    }
+
     return {index_def_, Status::OK()};
 }
 
@@ -281,7 +306,7 @@ Status TableIndexMeeta::GetTableIndexInfo(TableIndexInfo &table_index_info) {
         return status;
     }
 
-    table_index_info.index_name_ = index_def_->index_name_;
+    table_index_info.index_name_ = std::make_shared<std::string>(index_name_str_);
     table_index_info.index_entry_dir_ = GetTableIndexDir();
     table_index_info.segment_index_count_ = segment_ids_.value().size();
     table_index_info.index_comment_ = std::make_shared<std::string>(*index_def_->index_comment_);

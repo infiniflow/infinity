@@ -156,7 +156,7 @@ TEST_P(TestTxnImport, test_import1) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -169,7 +169,7 @@ TEST_P(TestTxnImport, test_import1) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -456,7 +456,7 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -469,7 +469,7 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -745,7 +745,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -758,7 +758,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -1284,7 +1284,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -1297,7 +1297,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -1879,7 +1879,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -1892,7 +1892,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -2512,7 +2512,7 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -3114,7 +3114,7 @@ TEST_P(TestTxnImport, test_import) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -3127,7 +3127,7 @@ TEST_P(TestTxnImport, test_import) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -3224,7 +3224,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -3237,7 +3237,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -3835,7 +3835,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -3848,7 +3848,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -4678,7 +4678,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -4691,7 +4691,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -4733,7 +4733,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_EQ(index_names_ptr->size(), 1);
         EXPECT_EQ(index_names_ptr->at(0), "idx1");
 
-        TableIndexMeeta table_index_meta(index_id_strs_ptr->at(0), table_meta);
+        TableIndexMeeta table_index_meta(index_id_strs_ptr->at(0), index_names_ptr->at(0), table_meta);
         auto [index_base, index_status] = table_index_meta.GetIndexBase();
         EXPECT_TRUE(index_status.ok());
         EXPECT_EQ(*index_base->index_name_, std::string("idx1"));
@@ -5298,7 +5298,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -5311,7 +5311,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));

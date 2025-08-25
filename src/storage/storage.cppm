@@ -36,6 +36,7 @@ class BGMemIndexTracer;
 class ObjectStorageProcess;
 // export class Config;
 class PersistenceManager;
+class MetaCache;
 
 export enum class ReaderInitPhase {
     kInvalid,
@@ -76,6 +77,8 @@ public:
     std::unique_ptr<KVInstance> KVInstance();
 
     [[nodiscard]] KVStore *kv_store() const { return kv_store_.get(); }
+
+    [[nodiscard]] MetaCache *meta_cache() const { return meta_cache_.get(); }
 
     [[nodiscard]] ResultCacheManager *result_cache_manager() const noexcept;
 
@@ -125,6 +128,7 @@ private:
     std::unique_ptr<MemIndexAppender> mem_index_appender_{};
     std::unique_ptr<PeriodicTriggerThread> periodic_trigger_thread_{};
     std::unique_ptr<KVStore> kv_store_{};
+    std::unique_ptr<MetaCache> meta_cache_{};
 
     mutable std::mutex mutex_;
     StorageMode current_storage_mode_{StorageMode::kUnInitialized};
