@@ -79,14 +79,14 @@ struct RabitqStoreData {
     AlignType compress_vec_[];
 };
 
-export template <typename DataType, typename AlignType>
+export template <typename DataType, typename CompressType>
 struct RabitqQueryData {
-    DataType raw_norm_{0};
+    DataType query_raw_norm_{0};
     DataType query_norm_{0};
     DataType query_sum_{0};
     DataType query_lower_bound_{0};
     DataType query_delta_{0};
-    AlignType compress_vec_[];
+    CompressType query_compress_vec_[];
 };
 
 /////////////////////////// meta info of rabitq ///////////////////////////
@@ -97,14 +97,15 @@ class RabitqVecStoreInner;
 export template <typename DataType>
 class RabitqVecStoreMetaType {
 public:
-    using AlignType = u8;
+    using AlignType = u8;    // Align for 1-bit quantizer
+    using CompressType = u8; // Compress query per dimension size
     using DistanceType = f32;
     using StoreData = RabitqStoreData<DataType, AlignType>;
-    using QueryData = RabitqQueryData<DataType, AlignType>;
+    using QueryData = RabitqQueryData<DataType, CompressType>;
     using StoreType = const StoreData *;
     struct QueryType {
         std::unique_ptr<QueryData> inner_;
-        operator const QueryData *() const { return inner_.get(); }
+        QueryData *operator->() const { return inner_.get(); }
 
         QueryType(size_t compress_data_size) : inner_(new(new char[compress_data_size]) QueryData) {}
         QueryType(QueryType &&other) = default;
@@ -126,22 +127,27 @@ public:
     using StoreType = typename MetaType::StoreType;
     using QueryType = typename MetaType::QueryType;
     using AlignType = typename MetaType::AlignType;
+    using CompressType = typename MetaType::CompressType;
     using DistanceType = typename MetaType::DistanceType;
 
-    constexpr static size_t align_size_ = sizeof(AlignType) * 8;                                                             // 8 for i8
-    constexpr static size_t max_bucket_idx_ = std::numeric_limits<AlignType>::max() - std::numeric_limits<AlignType>::min(); // 255 for i8
+    constexpr static DataType tolerance = 1e-5;
+    constexpr static size_t align_size_ = sizeof(AlignType) * 8;                                                                         // 8 for u8
+    constexpr static size_t compress_bucket_size_ = std::numeric_limits<CompressType>::max() - std::numeric_limits<CompressType>::min(); // 255 for u8
 
 public:
-    RabitqVecStoreMetaBase() : dim_(0), align_dim_(0), compress_data_size_(0) {}
+    RabitqVecStoreMetaBase() : dim_(0), align_dim_(0), compress_data_size_(0), compress_query_size_(0) {}
     RabitqVecStoreMetaBase(This &&other)
-        : dim_(std::exchange(other.dim_, 0)), align_dim_(std::exchange(other.align_dim_, 0)),
-          compress_data_size_(std::exchange(other.compress_data_size_, 0)), rom_(std::move(other.rom_)) {}
+        : dim_(std::exchange(other.dim_, 0)), rom_(std::move(other.rom_)), centroid_(std::move(other.centroid_)),
+          align_dim_(std::exchange(other.align_dim_, 0)), compress_data_size_(std::exchange(other.compress_data_size_, 0)),
+          compress_query_size_(std::exchange(other.compress_data_size_, 0)) {}
     RabitqVecStoreMetaBase &operator=(This &&other) {
         if (this != &other) {
             dim_ = std::exchange(other.dim_, 0);
+            rom_ = std::move(other.rom_);
+            centroid_ = std::move(other.centroid_);
             align_dim_ = std::exchange(other.align_dim_, 0);
             compress_data_size_ = std::exchange(other.compress_data_size_, 0);
-            rom_ = std::move(other.rom_);
+            compress_query_size_ = std::exchange(other.compress_query_size_, 0);
         }
         return *this;
     }
@@ -153,24 +159,26 @@ public:
     }
 
     QueryType MakeQuery(const DataType *vec) const {
-        QueryType query(compress_data_size_);
+        QueryType query(compress_query_size_);
         CompressToQuery(vec, query.inner_.get());
         return query;
     }
 
     void CompressToCode(const DataType *src, StoreData *dest) const {
+        size_t bin_code_size = align_dim_ / align_size_;
+
         // 1.Init
         memset(dest, 0, compress_data_size_);
         std::vector<DataType> align_src(align_dim_, 0);
         std::copy(src, src + dim_, align_src.begin());
         std::vector<DataType> rot_src(align_dim_, 0);
-        auto u8_bin_src = std::make_unique<AlignType[]>(align_dim_ / align_size_);
-        memset(u8_bin_src.get(), 0, align_dim_ / align_size_); // 1 dim -> 1 bit
+        auto bin_src = std::make_unique<AlignType[]>(bin_code_size);
+        memset(bin_src.get(), 0, bin_code_size); // 1 dim -> 1 bit
 
         // 2.Compute raw vector Norm for IP or Cos distance
         DataType raw_norm = 0;
-        for (size_t d = 0; d < this->dim_; ++d) {
-            raw_norm += src[d] * src[d];
+        for (size_t d = 0; d < align_dim_; ++d) {
+            raw_norm += align_src[d] * align_src[d];
         }
 
         // 3.Rotation align_src by rom
@@ -181,7 +189,7 @@ public:
         for (size_t d = 0; d < align_dim_; ++d) {
             norm += (rot_src[d] - centroid_[d]) * (rot_src[d] - centroid_[d]);
         }
-        norm = norm < 1e-5 ? 1 : std::sqrt(norm);
+        norm = norm < tolerance ? 1 : std::sqrt(norm);
         for (size_t d = 0; d < align_dim_; d++) {
             rot_src[d] = (rot_src[d] - centroid_[d]) / norm;
         }
@@ -191,7 +199,7 @@ public:
         for (size_t d = 0; d < align_dim_; ++d) {
             if (rot_src[d] >= 0.0F) {
                 sum += 1;
-                u8_bin_src[d / align_size_] |= (1 << (d % align_size_));
+                bin_src[d / align_size_] |= (1 << (d % align_size_));
             }
         }
 
@@ -199,7 +207,7 @@ public:
         float error = 0.0f;
         float inv_sqrt_d = 1.0f / std::sqrt(align_dim_);
         for (size_t d = 0; d < align_dim_; ++d) {
-            float x_i = ((u8_bin_src[d / align_size_] >> (d % align_size_)) & 1) ? inv_sqrt_d : -inv_sqrt_d;
+            float x_i = ((bin_src[d / align_size_] >> (d % align_size_)) & 1) ? inv_sqrt_d : -inv_sqrt_d;
             error += x_i * rot_src[d];
         }
 
@@ -208,13 +216,69 @@ public:
         dest->norm_ = norm;
         dest->sum_ = sum;
         dest->error_ = error;
-        std::copy(u8_bin_src.get(), u8_bin_src.get() + align_dim_ / align_size_, dest->compress_vec_);
+        std::copy(bin_src.get(), bin_src.get() + bin_code_size, dest->compress_vec_);
     }
 
-    void CompressToQuery(const DataType *src, QueryData *dest) const { UnrecoverableError("Not implemented"); }
+    void CompressToQuery(const DataType *src, QueryData *dest) const {
+        // 1.Init
+        memset(dest, 0, compress_query_size_);
+        std::vector<DataType> align_src(align_dim_, 0);
+        std::copy(src, src + dim_, align_src.begin());
+        std::vector<DataType> rot_src(align_dim_, 0);
+        auto compress_src = std::make_unique<CompressType[]>(align_dim_);
+
+        // 2.Compute raw vector Norm for IP or Cos distance
+        DataType raw_norm = 0;
+        for (size_t d = 0; d < align_dim_; ++d) {
+            raw_norm += align_src[d] * align_src[d];
+        }
+
+        // 3.Rotation align_src by rom
+        matrixA_multiply_matrixB_output_to_C(align_src.data(), rom_.get(), 1, align_dim_, align_dim_, rot_src.data());
+
+        // 4.normalize rot_src
+        DataType norm = 0;
+        for (size_t d = 0; d < align_dim_; ++d) {
+            norm += (rot_src[d] - centroid_[d]) * (rot_src[d] - centroid_[d]);
+        }
+        norm = norm < tolerance ? 1 : std::sqrt(norm);
+        for (size_t d = 0; d < align_dim_; ++d) {
+            rot_src[d] = (rot_src[d] - centroid_[d]) / norm;
+        }
+
+        // 5.Quantized query (Mean Scalar Quantization)
+        DataType sum = 0;
+        DataType lower_bound = std::numeric_limits<DataType>::max();
+        DataType upper_bound = std::numeric_limits<DataType>::lowest();
+        DataType delta = 0;
+        for (size_t d = 0; d < align_dim_; ++d) {
+            const DataType val = rot_src[d];
+            lower_bound = std::min(lower_bound, val);
+            upper_bound = std::max(upper_bound, val);
+        }
+        delta = (upper_bound - lower_bound) / compress_bucket_size_;
+        const float inv_delta = delta < tolerance ? 0 : 1 / delta;
+        for (size_t d = 0; d < align_dim_; ++d) {
+            const DataType val = std::round((rot_src[d] - lower_bound) * inv_delta);
+            sum += val;
+            compress_src[d] = static_cast<CompressType>(val);
+        }
+
+        // 6.store data in dest
+        dest->query_raw_norm_ = raw_norm;
+        dest->query_norm_ = norm;
+        dest->query_sum_ = sum;
+        dest->query_lower_bound_ = lower_bound;
+        dest->query_delta_ = delta;
+        std::copy(compress_src.get(), compress_src.get() + align_dim_, dest->query_compress_vec_);
+    }
 
     void Dump(std::ostream &os) const {
-        os << fmt::format("[CONST] dim: {}, align_dim: {}, compress_data_size: {}", dim_, align_dim_, compress_data_size_, align_dim_, align_dim_)
+        os << fmt::format("[CONST] dim: {}, align_dim: {}, compress_data_size: {}, compress_query_size: {}",
+                          dim_,
+                          align_dim_,
+                          compress_data_size_,
+                          compress_query_size_)
            << std::endl;
 
         os << "rom: " << std::endl;
@@ -239,15 +303,18 @@ public:
     size_t dim() const { return dim_; }
     size_t align_dim() const { return align_dim_; }
     size_t compress_data_size() const { return compress_data_size_; }
+    size_t compress_query_size() const { return compress_query_size_; }
     const DataType *rom() const { return rom_.get(); }
     const DataType *centroid() const { return centroid_.get(); }
 
 protected:
     size_t dim_;
-    size_t align_dim_;
-    size_t compress_data_size_;
     ArrayPtr<DataType, OwnMem> rom_;      // Random orthogonal matrix
     ArrayPtr<DataType, OwnMem> centroid_; // Centroid of all vector in DataStore
+
+    size_t align_dim_;
+    size_t compress_data_size_;
+    size_t compress_query_size_;
 };
 
 export template <typename DataType, bool OwnMem>
@@ -257,17 +324,20 @@ public:
     using Base = RabitqVecStoreMetaBase<DataType, OwnMem>;
     using Inner = RabitqVecStoreInner<DataType, OwnMem>;
     using StoreData = typename Base::StoreData;
+    using QueryData = typename Base::QueryData;
     using AlignType = typename Base::AlignType;
+    using CompressType = typename Base::CompressType;
 
 private:
     RabitqVecStoreMeta(size_t dim) {
         this->dim_ = dim;
         size_t align_dim = AlignUp(dim, Base::align_size_);
         this->align_dim_ = align_dim;
-        this->compress_data_size_ = sizeof(StoreData) + align_dim / Base::align_size_;
         this->rom_ = std::make_unique<DataType[]>(align_dim * align_dim);
         this->centroid_ = std::make_unique<DataType[]>(align_dim);
         GenerateRandomOrthogonalMatrix<DataType>(this->rom_.get(), this->align_dim_);
+        this->compress_data_size_ = sizeof(StoreData) + align_dim / Base::align_size_;
+        this->compress_query_size_ = sizeof(QueryData) + align_dim * sizeof(CompressType);
     }
 
 public:
@@ -324,16 +394,19 @@ public:
     using This = RabitqVecStoreMeta<DataType, false>;
     using Base = RabitqVecStoreMetaBase<DataType, false>;
     using StoreData = typename Base::StoreData;
+    using QueryData = typename Base::QueryData;
     using AlignType = typename Base::AlignType;
+    using CompressType = typename Base::CompressType;
 
 private:
     RabitqVecStoreMeta(size_t dim, DataType *rom, DataType *centroid) {
         this->dim_ = dim;
-        size_t align_dim = AlignUp(dim, Base::align_size_);
-        this->align_dim_ = align_dim;
-        this->compress_data_size_ = sizeof(StoreData) + align_dim / 8;
         this->rom_ = rom;
         this->centroid_ = centroid;
+        size_t align_dim = AlignUp(dim, Base::align_size_);
+        this->align_dim_ = align_dim;
+        this->compress_data_size_ = sizeof(StoreData) + align_dim / Base::align_size_;
+        this->compress_query_size_ = sizeof(QueryData) + align_dim * sizeof(CompressType);
     }
 
 public:
