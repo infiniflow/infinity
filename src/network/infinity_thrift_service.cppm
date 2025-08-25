@@ -97,6 +97,8 @@ public:
 
     void DropTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropTableRequest &request) final;
 
+    void RenameTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::RenameTableRequest &request) final;
+
     void Insert(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::InsertRequest &request) final;
 
     std::tuple<CopyFileType, Status> GetCopyFileType(infinity_thrift_rpc::CopyFileType::type copy_file_type);

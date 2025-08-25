@@ -446,8 +446,6 @@ class TestInfinity:
         res = db_obj.drop_table(table_name2, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-
-
     def _test_table(self, suffix):
         """
         target: test table apis
@@ -725,6 +723,32 @@ class TestInfinity:
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
+    def test_rename_table(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_rename_table" + suffix, ConflictType.Ignore)
+        db_obj.drop_table("test_rename_table_new" + suffix, ConflictType.Ignore)
+
+        table_obj = db_obj.create_table("test_rename_table" + suffix, {"c1": {"type": "int"}}, ConflictType.Error)
+        assert table_obj is not None
+
+        res = table_obj.rename("test_rename_table_new" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+        with pytest.raises(InfinityException) as e:
+            db_obj.get_table("test_rename_table" + suffix)
+        assert e.type == InfinityException
+        assert (e.value.args[0] == ErrorCode.TABLE_NOT_EXIST)
+
+        new_table_obj = db_obj.get_table("test_rename_table_new" + suffix)
+        assert new_table_obj is not None
+
+        with pytest.raises(InfinityException) as e:
+            table_obj.rename("123" + suffix)
+        assert e.type == InfinityException
+        assert (e.value.args[0] == ErrorCode.INVALID_TABLE_NAME or e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME)
+
+        res = db_obj.drop_table("test_rename_table_new" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
     def test_create_1K_table(self, suffix):
         infinity_obj = infinity.connect(self.uri)

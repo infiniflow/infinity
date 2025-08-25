@@ -181,6 +181,13 @@ class ThriftInfinityClient:
                                                       drop_option=DropOption(conflict_type=conflict_type)))
 
     @retry_wrapper
+    def rename_table(self, db_name: str, table_name: str, new_table_name: str):
+        return self.client.RenameTable(RenameTableRequest(session_id=self.session_id,
+                                                          db_name=db_name,
+                                                          table_name=table_name,
+                                                          new_table_name=new_table_name))
+
+    @retry_wrapper
     def list_tables(self, db_name: str):
         return self.client.ListTable(ListTableRequest(session_id=self.session_id,
                                                       db_name=db_name))
