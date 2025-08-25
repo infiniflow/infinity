@@ -214,6 +214,7 @@ jobs:
         run: |
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_OUTPUT
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
           echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_OUTPUT
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
@@ -233,23 +234,34 @@ jobs:
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
             docker cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${TEST_CONTAINER_NAME}:/infinity/cmake-build-debug/src/infinity 
 
+      - name: Install pysdk
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf
+          cd /infinity/
+          pip3 uninstall -y infinity-sdk
+          pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+
+
       - name: Run sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
         id: run_tests_debug
-        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py" && sleep 1s
-
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
+          LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py"
+          sleep 1s
 
 #      - name: Unit test debug version
 #        if: ${{ !cancelled() && !failure() }}
 #        id: run_unit_test_debug
 #        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main > unittest_debug.log 2> unittest_debug_error.log"
 #
-#      - name: Destroy builder container
-#        if: always()  # always run this step even if previous steps failed
-#        run: |
-#          if [ -n "${BUILDER_CONTAINER}" ]; then
-#            sudo docker rm -f -v ${BUILDER_CONTAINER}
-#          fi
+      - name: Destroy builder container
+        if: always()  # always run this step even if previous steps failed
+        run: |
+          if [ -n "${TEST_CONTAINER_NAME}" ]; then
+            sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          fi
 
 
 #  debug_tests:
