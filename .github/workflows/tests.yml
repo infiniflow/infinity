@@ -176,6 +176,9 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "debug" ]
     needs: debug_configure_and_build
+    outputs:
+      BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
+      TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
     env:
       BUILD_IP: ${{needs.debug_configure_and_build.outputs.BUILD_IP}}
       CONTAINER_NAME: ${{needs.debug_configure_and_build.outputs.CONTAINER_NAME}}
@@ -206,27 +209,29 @@ jobs:
           echo "Container name is: ${CONTAINER_NAME}"
 
       - name: Start test container
+        id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
-          TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "TEST_CONTAINER=${TEST_CONTAINER}" >> $GITHUB_ENV
+          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: SSH to host server
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
         env:
-          CONTAINER_NAME: ${{ steps.start.outputs.CONTAINER_NAME }}
+          TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
+          BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
           password: infiniflow
-          capture_stdout: true
-          envs: CONTAINER_NAME
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
           script: |
-            sudo docker exec ${TEST_CONTAINER} mkdir -p /infinity/cmake-build-debug
-            docker cp /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity ${TEST_CONTAINER}:/infinity/cmake-build-debug/src/infinity 
+            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug
+            docker cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${TEST_CONTAINER_NAME}:/infinity/cmake-build-debug/src/infinity 
 
       - name: Run sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
