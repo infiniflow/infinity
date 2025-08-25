@@ -193,7 +193,7 @@ jobs:
           username: infiniflow
           # password: ${{ secrets.PASSWORD }}
           password: infiniflow
-          env: CONTAINER_NAME, BUILD_IP
+          envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
             scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME} /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
