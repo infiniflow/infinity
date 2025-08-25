@@ -69,6 +69,7 @@ public:
     static constexpr size_t dim_ = 128;
     static constexpr size_t vec_n_ = 8192;
     const std::string file_dir_ = GetFullTmpDir();
+    MetricType metric_type_ = MetricType::kMetricL2;
 };
 
 TEST_F(RabitqTest, test_simple) {
@@ -210,6 +211,7 @@ TEST_F(RabitqTest, test_compress) {
     using namespace infinity;
     using RabitqVecStoreMeta = RabitqVecStoreMeta<DataType, true>;
     using RabitqVecStoreInner = RabitqVecStoreInner<DataType, true>;
+    constexpr size_t align_size = RabitqVecStoreMeta::align_size_;
 
     // generate dataset
     auto data = std::make_unique<float[]>(dim_ * vec_n_);
@@ -227,6 +229,7 @@ TEST_F(RabitqTest, test_compress) {
     // Init meta
     RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
     meta.Optimize(DenseVectorIter(iter), 0);
+    meta.Dump(std::cout);
 
     // Compress data
     size_t mem_usage = 0;
@@ -246,12 +249,12 @@ TEST_F(RabitqTest, test_compress) {
         auto code = vec->compress_vec_;
         size_t sum = 0;
         for (size_t d = 0; d < meta.align_dim(); ++d) {
-            if (d % meta.align_size_ == 0) {
+            bool c_i = code[d / align_size] >> (align_size - 1 - d % align_size) & 1;
+            sum += c_i;
+            if (d % align_size == 0) {
                 std::cout << " ";
             }
-            bool c_i = code[d / meta.align_size_] >> (meta.align_size_ - 1 - d % meta.align_size_) & 1;
             std::cout << c_i;
-            sum += c_i;
         }
         std::cout << std::endl;
         ASSERT_EQ(sum, vec->sum_);
@@ -270,4 +273,174 @@ TEST_F(RabitqTest, test_compress) {
         std::cout << " " << (i32)query_code->query_compress_vec_[d];
     }
     std::cout << std::endl;
+}
+
+TEST_F(RabitqTest, test_distance) {
+    using namespace infinity;
+    using RabitqVecStoreMeta = RabitqVecStoreMeta<DataType, true>;
+    using RabitqVecStoreInner = RabitqVecStoreInner<DataType, true>;
+    using StoreType = RabitqVecStoreMeta::StoreType;
+    using QueryType = RabitqVecStoreMeta::QueryType;
+    using StoreType = RabitqVecStoreMeta::StoreType;
+    using QueryType = RabitqVecStoreMeta::QueryType;
+    using DistanceType = RabitqVecStoreMeta::DistanceType;
+    using CompressType = RabitqVecStoreMeta::CompressType;
+    constexpr size_t align_size = RabitqVecStoreMeta::align_size_;
+    constexpr size_t topk = 10;
+
+    // generate dataset
+    auto data = std::make_unique<float[]>(dim_ * vec_n_);
+    auto query = std::make_unique<float[]>(dim_);
+    std::default_random_engine rng;
+    std::uniform_real_distribution<float> distrib_real(100, 200);
+    for (size_t i = 0; i < dim_ * vec_n_; ++i) {
+        data[i] = distrib_real(rng);
+    }
+    auto iter = DenseVectorIter<DataType, LabelType>(data.get(), dim_, vec_n_);
+    for (size_t i = 0; i < dim_; ++i) {
+        query[i] = distrib_real(rng);
+    }
+
+    // Init meta
+    RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
+    meta.Optimize(DenseVectorIter(iter), 0);
+
+    // Compress dataset
+    size_t mem_usage = 0;
+    RabitqVecStoreInner inner = RabitqVecStoreInner::Make(vec_n_, meta, mem_usage);
+    size_t insert_n = 0;
+    for (auto val = iter.Next(); val; val = iter.Next()) {
+        const auto &[embedding, offset] = val.value();
+        inner.SetVec(insert_n++, embedding, meta, mem_usage);
+    }
+    ASSERT_EQ(insert_n, vec_n_);
+    auto query_code = meta.MakeQuery(query.get());
+
+    auto l2_distance_sqr = [&](const DataType *query, const DataType *data, size_t dim) {
+        DistanceType res = 0;
+        for (size_t d = 0; d < dim; ++d) {
+            res += (data[d] - query[d]) * (data[d] - query[d]);
+        }
+        return res;
+    };
+
+    auto is_approx_zero = [&](auto num) { return num < RabitqVecStoreMeta::tolerance_; };
+
+    auto ip_distance_between_compress_and_bincode = [&](const AlignType *query, const CompressType *data, size_t align_dim) {
+        DistanceType ip_estimate = 0;
+        for (size_t d = 0; d < align_dim; ++d) {
+            if ((data[d / align_size] >> (d % align_size)) & 1) {
+                ip_estimate += static_cast<DistanceType>(query[d]);
+            }
+        }
+        return ip_estimate;
+    };
+
+    auto recover_ip_distance = [&](f32 ip_dist, f32 dim, f32 base_sum, f32 query_sum, f32 lower_bound, f32 delta) {
+        // RaBitQ equation: estimate <\bar{x}, \bar{q}>
+        f32 inv_sqrt_d = 1 / std::sqrt(dim);
+        f32 p1 = inv_sqrt_d * 2 * delta * ip_dist;
+        f32 p2 = inv_sqrt_d * 2 * lower_bound * base_sum;
+        f32 p3 = inv_sqrt_d * delta * query_sum;
+        f32 p4 = dim * inv_sqrt_d * lower_bound;
+        return p1 + p2 - p3 - p4;
+    };
+
+    auto recover_l2_distance_sqr = [&](f32 ip_dist, f32 base_norm, f32 query_norm) {
+        // RaBitQ equation: estimate <\bar{o}, \bar{q}>
+        float p1 = base_norm * base_norm;
+        float p2 = query_norm * query_norm;
+        float p3 = 2 * base_norm * query_norm * ip_dist;
+        return p1 + p2 - p3;
+    };
+
+    auto estimate_l2_distance_sqr = [&](const QueryType &query, const StoreType &data) {
+        // estimate <x, q>
+        DistanceType ip_estimate = ip_distance_between_compress_and_bincode(query->query_compress_vec_, data->compress_vec_, meta.align_dim());
+        DistanceType ip_recover =
+            recover_ip_distance(ip_estimate, dim_, data->sum_, query->query_sum_, query->query_lower_bound_, query->query_delta_);
+        DataType error = data->error_;
+        if (is_approx_zero(error)) {
+            error = error > 0 ? 1 : -1;
+        }
+        ip_recover = ip_recover / error;
+
+        // estimate <o, q>
+        DistanceType res = recover_l2_distance_sqr(ip_recover, data->norm_, query->query_norm_);
+
+        // estimate other metric
+        if (metric_type_ == MetricType::kMetricCosine) {
+            if (is_approx_zero(data->raw_norm_) || is_approx_zero(query->query_raw_norm_)) {
+                res = 1;
+            } else {
+                res = 1 - (query->query_raw_norm_ * query->query_raw_norm_ + data->raw_norm_ * data->raw_norm_ - res) * 0.5f /
+                              (query->query_raw_norm_ * data->raw_norm_);
+            }
+        }
+        if (metric_type_ == MetricType::kMetricInnerProduct) {
+            if (is_approx_zero(data->raw_norm_) || is_approx_zero(query->query_raw_norm_)) {
+                res = 1;
+            } else {
+                res = 1 - (query->query_raw_norm_ * query->query_raw_norm_ + data->raw_norm_ * data->raw_norm_ - res) * 0.5f;
+            }
+        }
+
+        return res;
+    };
+
+    class MaxHeap {
+    public:
+        MaxHeap(size_t max_size) : max_size_(max_size) {}
+
+        void push(LabelType id, DistanceType dist) {
+            if (pq_.size() < max_size_) {
+                pq_.emplace(dist, id);
+                return;
+            }
+            if (dist < pq_.top().first) {
+                pq_.pop();
+                pq_.emplace(dist, id);
+            }
+        }
+
+        std::pair<DistanceType, LabelType> top() { return pq_.top(); }
+        void pop() { pq_.pop(); }
+        size_t size() { return pq_.size(); }
+
+    private:
+        size_t max_size_;
+        std::priority_queue<std::pair<DistanceType, LabelType>> pq_;
+    };
+
+    // Compute recall
+    MaxHeap truth_heap(1);
+    MaxHeap rabitq_heap(topk);
+    for (LabelType i = 0; i < vec_n_; ++i) {
+        // Compute truth distance
+        auto truth_dis = l2_distance_sqr(query.get(), data.get() + i * dim_, dim_);
+        truth_heap.push(i, truth_dis);
+
+        // Estimate l2 distance by rabitq
+        auto vec = inner.GetVec(i, meta);
+        auto estimate_dis = estimate_l2_distance_sqr(query_code, vec);
+        rabitq_heap.push(i, estimate_dis);
+
+        // output
+        std::cout << fmt::format("id: {}, truth distance: {:.2f}, estimate distance: {:.2f}", i, truth_dis, estimate_dis) << std::endl;
+    }
+
+    LabelType gt_id = truth_heap.top().second;
+    size_t cnt = 0;
+    std::cout << "truth id: " << gt_id << std::endl;
+    std::cout << "rabitq heap:";
+    while (rabitq_heap.size()) {
+        LabelType id = rabitq_heap.top().second;
+        rabitq_heap.pop();
+        std::cout << " " << id;
+        if (id == gt_id) {
+            ++cnt;
+        }
+    }
+    std::cout << std::endl;
+    ASSERT_EQ(cnt, 1);
 }
