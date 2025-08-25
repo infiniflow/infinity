@@ -130,7 +130,7 @@ public:
     using CompressType = typename MetaType::CompressType;
     using DistanceType = typename MetaType::DistanceType;
 
-    constexpr static DataType tolerance = 1e-5;
+    constexpr static DataType tolerance_ = 1e-5;
     constexpr static size_t align_size_ = sizeof(AlignType) * 8;                                                                         // 8 for u8
     constexpr static size_t compress_bucket_size_ = std::numeric_limits<CompressType>::max() - std::numeric_limits<CompressType>::min(); // 255 for u8
 
@@ -189,7 +189,7 @@ public:
         for (size_t d = 0; d < align_dim_; ++d) {
             norm += (rot_src[d] - centroid_[d]) * (rot_src[d] - centroid_[d]);
         }
-        norm = norm < tolerance ? 1 : std::sqrt(norm);
+        norm = norm < tolerance_ ? 1 : std::sqrt(norm);
         for (size_t d = 0; d < align_dim_; d++) {
             rot_src[d] = (rot_src[d] - centroid_[d]) / norm;
         }
@@ -241,7 +241,7 @@ public:
         for (size_t d = 0; d < align_dim_; ++d) {
             norm += (rot_src[d] - centroid_[d]) * (rot_src[d] - centroid_[d]);
         }
-        norm = norm < tolerance ? 1 : std::sqrt(norm);
+        norm = norm < tolerance_ ? 1 : std::sqrt(norm);
         for (size_t d = 0; d < align_dim_; ++d) {
             rot_src[d] = (rot_src[d] - centroid_[d]) / norm;
         }
@@ -257,7 +257,7 @@ public:
             upper_bound = std::max(upper_bound, val);
         }
         delta = (upper_bound - lower_bound) / compress_bucket_size_;
-        const float inv_delta = delta < tolerance ? 0 : 1 / delta;
+        const float inv_delta = delta < tolerance_ ? 0 : 1 / delta;
         for (size_t d = 0; d < align_dim_; ++d) {
             const DataType val = std::round((rot_src[d] - lower_bound) * inv_delta);
             sum += val;
