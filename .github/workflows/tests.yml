@@ -198,6 +198,7 @@ jobs:
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
             scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME} /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
 
+
 #      - name: Unit test debug version
 #        if: ${{ !cancelled() && !failure() }}
 #        id: run_unit_test_debug
