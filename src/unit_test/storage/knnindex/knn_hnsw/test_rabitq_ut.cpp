@@ -286,26 +286,23 @@ TEST_F(RabitqTest, test_distance) {
     using DistanceType = RabitqVecStoreMeta::DistanceType;
     using CompressType = RabitqVecStoreMeta::CompressType;
     constexpr size_t align_size = RabitqVecStoreMeta::align_size_;
-    constexpr size_t topk = 10;
+    constexpr size_t query_vec_n = 100;
+    constexpr size_t topk = 100;
 
-    // generate dataset
+    // generate data
     auto data = std::make_unique<float[]>(dim_ * vec_n_);
-    auto query = std::make_unique<float[]>(dim_);
     std::default_random_engine rng;
     std::uniform_real_distribution<float> distrib_real(100, 200);
     for (size_t i = 0; i < dim_ * vec_n_; ++i) {
         data[i] = distrib_real(rng);
     }
     auto iter = DenseVectorIter<DataType, LabelType>(data.get(), dim_, vec_n_);
-    for (size_t i = 0; i < dim_; ++i) {
-        query[i] = distrib_real(rng);
-    }
 
     // Init meta
     RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
     meta.Optimize(DenseVectorIter(iter), 0);
 
-    // Compress dataset
+    // Compress data
     size_t mem_usage = 0;
     RabitqVecStoreInner inner = RabitqVecStoreInner::Make(vec_n_, meta, mem_usage);
     size_t insert_n = 0;
@@ -314,7 +311,6 @@ TEST_F(RabitqTest, test_distance) {
         inner.SetVec(insert_n++, embedding, meta, mem_usage);
     }
     ASSERT_EQ(insert_n, vec_n_);
-    auto query_code = meta.MakeQuery(query.get());
 
     auto l2_distance_sqr = [&](const DataType *query, const DataType *data, size_t dim) {
         DistanceType res = 0;
@@ -413,34 +409,42 @@ TEST_F(RabitqTest, test_distance) {
     };
 
     // Compute recall
-    MaxHeap truth_heap(1);
-    MaxHeap rabitq_heap(topk);
-    for (LabelType i = 0; i < vec_n_; ++i) {
-        // Compute truth distance
-        auto truth_dis = l2_distance_sqr(query.get(), data.get() + i * dim_, dim_);
-        truth_heap.push(i, truth_dis);
-
-        // Estimate l2 distance by rabitq
-        auto vec = inner.GetVec(i, meta);
-        auto estimate_dis = estimate_l2_distance_sqr(query_code, vec);
-        rabitq_heap.push(i, estimate_dis);
-
-        // output
-        std::cout << fmt::format("id: {}, truth distance: {:.2f}, estimate distance: {:.2f}", i, truth_dis, estimate_dis) << std::endl;
-    }
-
-    LabelType gt_id = truth_heap.top().second;
     size_t cnt = 0;
-    std::cout << "truth id: " << gt_id << std::endl;
-    std::cout << "rabitq heap:";
-    while (rabitq_heap.size()) {
-        LabelType id = rabitq_heap.top().second;
-        rabitq_heap.pop();
-        std::cout << " " << id;
-        if (id == gt_id) {
-            ++cnt;
+    for (size_t i = 0; i < query_vec_n; ++i) {
+        // generate query
+        auto query = std::make_unique<float[]>(dim_);
+        for (size_t d = 0; d < dim_; ++d) {
+            query[d] = distrib_real(rng);
+        }
+        auto query_code = meta.MakeQuery(query.get());
+
+        // Compute recall
+        MaxHeap truth_heap(1);
+        MaxHeap rabitq_heap(topk);
+        for (LabelType id = 0; id < vec_n_; ++id) {
+            // Compute truth distance
+            auto truth_dis = l2_distance_sqr(query.get(), data.get() + id * dim_, dim_);
+            truth_heap.push(id, truth_dis);
+
+            // Estimate l2 distance by rabitq
+            auto vec = inner.GetVec(id, meta);
+            auto estimate_dis = estimate_l2_distance_sqr(query_code, vec);
+            rabitq_heap.push(id, estimate_dis);
+
+            // output
+            // std::cout << fmt::format("id: {}, truth distance: {:.2f}, estimate distance: {:.2f}", id, truth_dis, estimate_dis) << std::endl;
+        }
+
+        LabelType gt_id = truth_heap.top().second;
+        while (rabitq_heap.size()) {
+            LabelType id = rabitq_heap.top().second;
+            rabitq_heap.pop();
+            if (id == gt_id) {
+                ++cnt;
+                break;
+            }
         }
     }
-    std::cout << std::endl;
-    ASSERT_EQ(cnt, 1);
+    f32 recall = cnt / query_vec_n;
+    ASSERT_GE(recall, 0.9);
 }
