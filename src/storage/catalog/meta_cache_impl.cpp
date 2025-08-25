@@ -152,6 +152,24 @@ void MetaTableCache::set_index_ids(const std::shared_ptr<std::vector<std::string
     index_names_ptr_ = index_names;
 }
 
+void MetaTableCache::set_segment_tag(SegmentID segment_id, const std::string &tag, u64 value) {
+    std::unique_lock lock(mtx_);
+    segment2tag2value_[segment_id][tag] = value;
+}
+
+std::optional<u64> MetaTableCache::get_segment_tag(SegmentID segment_id, const std::string &tag) {
+    std::unique_lock lock(mtx_);
+    auto segment_iter = segment2tag2value_.find(segment_id);
+    if (segment_iter == segment2tag2value_.end()) {
+        return std::nullopt;
+    }
+    auto tag_iter = segment_iter->second.find(tag);
+    if (tag_iter == segment_iter->second.end()) {
+        return std::nullopt;
+    }
+    return tag_iter->second;
+}
+
 std::string MetaIndexCache::name() const {
     std::unique_lock lock(mtx_);
     return index_name_;

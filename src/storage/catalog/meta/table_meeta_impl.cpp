@@ -1130,6 +1130,8 @@ MetaCache *TableMeeta::meta_cache() const { return meta_cache_; }
 
 void TableMeeta::SetTableName(const std::string &table_name) { table_name_ = table_name; }
 
+const std::string &TableMeeta::table_name() const { return table_name_; }
+
 u64 TableMeeta::db_id() const { return db_id_; }
 
 u64 TableMeeta::table_id() const { return table_id_; }

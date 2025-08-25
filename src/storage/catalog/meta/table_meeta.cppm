@@ -137,6 +137,8 @@ public:
 
     void SetTableName(const std::string &table_name);
 
+    const std::string &table_name() const;
+
     u64 db_id() const;
 
     u64 table_id() const;

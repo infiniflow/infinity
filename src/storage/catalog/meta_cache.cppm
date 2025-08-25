@@ -126,6 +126,9 @@ public:
     void set_index_ids(const std::shared_ptr<std::vector<std::string>> &index_names_ptr,
                        const std::shared_ptr<std::vector<std::string>> &index_ids_ptr);
 
+    void set_segment_tag(SegmentID segment_id, const std::string &tag, u64 value);
+    std::optional<u64> get_segment_tag(SegmentID segment_id, const std::string &tag);
+
 private:
     u64 db_id_{};
     std::string table_name_{};
@@ -136,6 +139,8 @@ private:
     std::shared_ptr<std::vector<SegmentID>> segment_ids_{};
     std::shared_ptr<std::vector<std::string>> index_names_ptr_{};
     std::shared_ptr<std::vector<std::string>> index_ids_ptr_{};
+
+    std::map<u64, std::map<std::string, u64>> segment2tag2value_{};
 };
 
 export class MetaIndexCache final : public MetaBaseCache {
