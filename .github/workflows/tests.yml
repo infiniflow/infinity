@@ -162,7 +162,7 @@ jobs:
           echo "pwd=${PWD}"
 
   debug_sqllogical_test:
-    name: debug_tests_unit_test
+    name: debug_sqllogical_test
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
@@ -264,11 +264,6 @@ jobs:
           LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py"
           sleep 1s
 
-#      - name: Unit test debug version
-#        if: ${{ !cancelled() && !failure() }}
-#        id: run_unit_test_debug
-#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main > unittest_debug.log 2> unittest_debug_error.log"
-#
       - name: Destroy builder container
         if: always()  # always run this step even if previous steps failed
         run: |
@@ -277,7 +272,7 @@ jobs:
           fi
 
   debug_unit_test:
-    name: debug_tests_unit_test
+    name: debug_unit_test
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
@@ -308,12 +303,6 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: false
-
-      - name: Get container name
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "Build ip is: ${BUILD_IP}"
-          echo "Container name is: ${CONTAINER_NAME}"
 
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
@@ -367,7 +356,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         id: run_unit_test_debug
         run: |
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mkdir -p /var/infinity
           cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main > unittest_debug.log 2> unittest_debug_error.log"
 
       - name: Destroy builder container
