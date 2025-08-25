@@ -119,11 +119,11 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && cmake --build /infinity/cmake-build-debug --target infinity"
 
-#      - name: Build unit test
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake --build /infinity/cmake-build-debug --target test_main"
-#
+      #      - name: Build unit test
+      #        if: ${{ !cancelled() && !failure() }}
+      #        run: |
+      #          sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && cmake --build /infinity/cmake-build-debug --target test_main"
+      #
 
       #      - name: Destroy builder container
       #        if: always()  # always run this step even if previous steps failed
@@ -148,16 +148,16 @@ jobs:
             echo "${CONTAINER_NAME}"
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
             docker cp ${CONTAINER_NAME}:/infinity/cmake-build-debug/src/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-#            docker cp ${CONTAINER_NAME}:/infinity/cmake-build-debug/src/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+      #            docker cp ${CONTAINER_NAME}:/infinity/cmake-build-debug/src/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
 
-#      - name: Scp artifacts
-#        uses: appleboy/scp-action@v1
-#        with:
-#          host: 172.17.0.1
-#          username: infiniflow
-#          password: infiniflow
-#          source: "/infinity/cmake-build-debug/src/infinity"
-#          target: infiniflow@172.17.0.1:/home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
+      #      - name: Scp artifacts
+      #        uses: appleboy/scp-action@v1
+      #        with:
+      #          host: 172.17.0.1
+      #          username: infiniflow
+      #          password: infiniflow
+      #          source: "/infinity/cmake-build-debug/src/infinity"
+      #          target: infiniflow@172.17.0.1:/home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
 
       - name: Get host ip
         id: get_ip
@@ -177,21 +177,28 @@ jobs:
     needs: debug_configure_and_build
     env:
       BUILD_IP: ${{needs.debug_configure_and_build.outputs.BUILD_IP}}
+      CONTAINER_NAME: ${{needs.debug_configure_and_build.outputs.CONTAINER_NAME}}
     steps:
       - name: Get container name
         if: ${{ !cancelled() && !failure() }}
         run: |
           echo "Build ip is: ${BUILD_IP}"
+          echo "Build ip is: ${CONTAINER_NAME}"
 
-#      - name: ssh to remote server
-#        uses: appleboy/ssh-action@v1
-#        with:
-#          host: 172.17.0.1
-#          username: infiniflow
-#          # password: ${{ secrets.PASSWORD }}
-#          password: infiniflow
-#          script: |
-#            hostname -I
+      - name: ssh to remote server
+        uses: appleboy/ssh-action@v1.2.2
+        #        env:
+        #          CONTAINER_NAME: ${{ steps.start.outputs.CONTAINER_NAME }}
+        with:
+          host: 172.17.0.1
+          username: infiniflow
+          # password: ${{ secrets.PASSWORD }}
+          password: infiniflow
+          env: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME} /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+
 #      - name: Unit test debug version
 #        if: ${{ !cancelled() && !failure() }}
 #        id: run_unit_test_debug
