@@ -100,10 +100,12 @@ jobs:
           fetch-tags: false
 
       - name: Start builder container
+        id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
           BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "test=${BUILDER_CONTAINER}" >> $GITHUB_OUTPUT
+          echo "CONTAINER_NAME=${BUILDER_CONTAINER}" >> $GITHUB_OUTPUT
           CPUS=${CPUS:-$(nproc)}
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
           echo "CPUS=${CPUS}" >> $GITHUB_ENV
@@ -134,7 +136,7 @@ jobs:
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
         env:
-          CONTAINER_NAME: BUILDER_CONTAINER
+          CONTAINER_NAME: ${{ steps.start.outputs.CONTAINER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
