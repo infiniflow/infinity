@@ -245,6 +245,13 @@ jobs:
           pip3 uninstall -y infinity-sdk
           pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
 
+      - name: Start infinity debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          # Run a command in the background
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/
+          mkdir /var/infinity
+          cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > sqllogictest_debug.log 2> sqllogictest_debug_error.log" &
 
       - name: Run sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
@@ -259,12 +266,12 @@ jobs:
 #        id: run_unit_test_debug
 #        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main > unittest_debug.log 2> unittest_debug_error.log"
 #
-      - name: Destroy builder container
-        if: always()  # always run this step even if previous steps failed
-        run: |
-          if [ -n "${TEST_CONTAINER_NAME}" ]; then
-            sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-          fi
+#      - name: Destroy builder container
+#        if: always()  # always run this step even if previous steps failed
+#        run: |
+#          if [ -n "${TEST_CONTAINER_NAME}" ]; then
+#            sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+#          fi
 
 
 #  debug_tests:
