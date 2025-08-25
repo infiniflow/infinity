@@ -156,8 +156,8 @@ jobs:
       #        id: stop_tests_debug_minio
       #        run: |
       #          sudo chmod +x scripts/timeout_kill.sh
-      #          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
-      #          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+      #          pids=$(sudo docker exec ${BUILDER_CONTAINER} pidof infinity | xargs echo)
+      #          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 30 ${pids}"
       #          if [ $? -ne 0 ]; then
       #            echo "Failed to kill infinity debug version"
       #            exit 1
@@ -191,8 +191,6 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > sqllogictest_debug.log 2> sqllogictest_debug_error.log" &
-          echo "INFINITY_PID=$!" >> $GITHUB_ENV
-          echo "Start infinity with PID=$INFINITY_PID"
 
       - name: Run sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
@@ -203,10 +201,9 @@ jobs:
         if: ${{ !cancelled() }}
         id: stop_tests_debug
         run: |
-          echo "Attempt to kill infinity process: $INFINITY_PID"
           sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+          pids=$(sudo docker exec ${BUILDER_CONTAINER} pidof infinity | xargs echo)
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 30 ${pids}"
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -225,8 +222,6 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > pysdk_remote_debug.log 2> pysdk_remote_debug_error.log" &
-          echo "INFINITY_PID=$!" >> $GITHUB_ENV
-          echo "Start infinity with PID=$INFINITY_PID"
 
       - name: Run pysdk remote infinity test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -237,10 +232,9 @@ jobs:
         if: ${{ !cancelled() }}
         id: stop_pysdk_remote_debug
         run: |
-          echo "Attempt to kill infinity process: $INFINITY_PID"
           sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+          pids=$(sudo docker exec ${BUILDER_CONTAINER} pidof infinity | xargs echo)
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 30 ${pids}"
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -259,8 +253,6 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > http_remote_debug.log 2> http_remote_debug_error.log" &
-          echo "INFINITY_PID=$!" >> $GITHUB_ENV
-          echo "Start infinity with PID=$INFINITY_PID"
 
       - name: Run HTTP infinity test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -271,10 +263,9 @@ jobs:
         if: ${{ !cancelled() }}
         id: stop_http_remote_debug
         run: |
-          echo "Attempt to kill infinity process: $INFINITY_PID"
           sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+          pids=$(sudo docker exec ${BUILDER_CONTAINER} pidof infinity | xargs echo)
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 30 ${pids}"
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -293,8 +284,6 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_debug.log 2> parallel_test_debug_error.log" &
-          echo "INFINITY_PID=$!" >> $GITHUB_ENV
-          echo "Start infinity with PID=$INFINITY_PID"
 
       - name: Run pysdk parallel test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -305,10 +294,9 @@ jobs:
         if: ${{ !cancelled() }}
         id: stop_parallel_test_debug
         run: |
-          echo "Attempt to kill infinity process: $INFINITY_PID"
           sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+          pids=$(sudo docker exec ${BUILDER_CONTAINER} pidof infinity | xargs echo)
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 30 ${pids}"
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -433,8 +421,8 @@ jobs:
       #        id: stop_tests_release_minio
       #        run: |
       #          sudo chmod +x scripts/timeout_kill.sh
-      #          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
-      #          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+      #          pids=$(sudo docker exec ${BUILDER_CONTAINER} pidof infinity | xargs echo)
+      #          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 30 ${pids}"
       #          if [ $? -ne 0 ]; then
       #            echo "Failed to kill infinity debug version"
       #            exit 1
@@ -464,8 +452,6 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > sqllogictest_release.log 2> sqllogictest_release_error.log" &
-          echo "INFINITY_PID=$!" >> $GITHUB_ENV
-          echo "Start infinity with PID=$INFINITY_PID"
 
       - name: Run sqllogictest release version
         if: ${{ !cancelled() && !failure() }}
@@ -476,10 +462,9 @@ jobs:
         if: ${{ !cancelled() }}
         id: stop_tests_release
         run: |
-          echo "Attempt to kill infinity process: $INFINITY_PID"
           sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+          pids=$(sudo docker exec ${BUILDER_CONTAINER} pidof infinity | xargs echo)
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 30 ${pids}"
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -498,8 +483,6 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > pysdk_remote_release.log 2> pysdk_remote_release_error.log" &
-          echo "INFINITY_PID=$!" >> $GITHUB_ENV
-          echo "Start infinity with PID=$INFINITY_PID"
 
       - name: Run pysdk remote test
         if: ${{ !cancelled() && !failure() }}
@@ -511,8 +494,8 @@ jobs:
         id: stop_pysdk_remote_release
         run: |
           sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+          pids=$(sudo docker exec ${BUILDER_CONTAINER} pidof infinity | xargs echo)
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 30 ${pids}"
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -531,8 +514,6 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > http_remote_release.log 2> http_remote_release_error.log" &
-          echo "INFINITY_PID=$!" >> $GITHUB_ENV
-          echo "Start infinity with PID=$INFINITY_PID"
 
       - name: Run HTTP test
         if: ${{ !cancelled() && !failure() }}
@@ -543,10 +524,9 @@ jobs:
         if: ${{ !cancelled() }}
         id: stop_http_remote_release
         run: |
-          echo "Attempt to kill infinity process: $INFINITY_PID"
           sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+          pids=$(sudo docker exec ${BUILDER_CONTAINER} pidof infinity | xargs echo)
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 30 ${pids}"
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -565,9 +545,6 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_release.log 2> parallel_test_release_error.log" &
-          echo "INFINITY_PID=$!" >> $GITHUB_ENV
-          echo "Start infinity with PID=$INFINITY_PID"
-          
 
       - name: Run parallel test
         if: ${{ !cancelled() && !failure() }}
@@ -578,10 +555,9 @@ jobs:
         if: ${{ !cancelled() }}
         id: stop_parallel_test_release
         run: |
-          echo "Attempt to kill infinity process: $INFINITY_PID"
           sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+          pids=$(sudo docker exec ${BUILDER_CONTAINER} pidof infinity | xargs echo)
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 30 ${pids}"
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -642,8 +618,6 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/infinity_minio_conf.toml > minio_pysdk_remote_release.log 2> minio_pysdk_remote_release_error.log" &
-          echo "INFINITY_PID=$!" >> $GITHUB_ENV
-          echo "Start infinity with PID=$INFINITY_PID"
 
       - name: Run minio pysdk remote test
         if: ${{ !cancelled() && !failure() }}
@@ -654,10 +628,9 @@ jobs:
         if: ${{ !cancelled() }}
         id: stop_minio_pysdk_remote_release
         run: |
-          echo "Attempt to kill infinity process: $INFINITY_PID"
           sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+          pids=$(sudo docker exec ${BUILDER_CONTAINER} pidof infinity | xargs echo)
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 30 ${pids}"
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -677,8 +650,6 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/infinity_minio_conf.toml > minio_parallel_test_release.log 2> minio_parallel_test_release_error.log" &
-          echo "INFINITY_PID=$!" >> $GITHUB_ENV
-          echo "Start infinity with PID=$INFINITY_PID"
 
       - name: Run minio parallel test
         if: ${{ !cancelled() && !failure() }}
@@ -689,11 +660,9 @@ jobs:
         if: ${{ !cancelled() }}
         id: stop_minio_parallel_test_release
         run: |
-          echo "INFINITY_PID=$!" >> $GITHUB_ENV
-          echo "Start infinity with PID=$INFINITY_PID"
           sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
+          pids=$(sudo docker exec ${BUILDER_CONTAINER} pidof infinity | xargs echo)
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 30 ${pids}"
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
