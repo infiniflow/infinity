@@ -45,6 +45,9 @@ ColumnType::GetDataTypeFromColumnType(const ColumnType &column_type, const std::
         case LogicalType::kMultiVector:
         case LogicalType::kTensor:
         case LogicalType::kTensorArray: {
+            if (column_type.width <= 0) {
+                return {nullptr, fmt::format("Embedding dimension column_type.width is {}, shall be positive", column_type.width)};
+            }
             type_info_ptr = EmbeddingInfo::Make(column_type.embedding_type_, column_type.width);
             break;
         }
