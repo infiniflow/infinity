@@ -198,6 +198,11 @@ jobs:
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
             scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
+      - name: add host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H 172.17.0.1 >> ~/.ssh/known_hosts
+
       - name: ssh to remote server
         uses: appleboy/ssh-action@v1.2.2
         with:
