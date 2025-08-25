@@ -230,7 +230,7 @@ jobs:
           password: infiniflow
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
           script: |
-            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug
+            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
             docker cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${TEST_CONTAINER_NAME}:/infinity/cmake-build-debug/src/infinity 
 
       - name: Run sqllogictest debug version
