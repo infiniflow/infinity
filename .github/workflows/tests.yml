@@ -249,7 +249,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
           mkdir /var/infinity
           cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > sqllogictest_debug.log 2> sqllogictest_debug_error.log" &
 
