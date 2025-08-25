@@ -224,7 +224,7 @@ jobs:
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
           sleep 10
           sudo docker exec ${TEST_CONTAINER} mkdir -p /infinity/cmake-build-debug
-          sudo docker cp /home/infiniflow/artifacts/${CONTAINER_NAME}/infinity ${TEST_CONTAINER}:/infinity/cmake-build-debug/
+          sudo docker cp /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity ${TEST_CONTAINER}:/infinity/cmake-build-debug/
 
       - name: Run sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
