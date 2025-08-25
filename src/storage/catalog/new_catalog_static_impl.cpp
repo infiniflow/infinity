@@ -569,7 +569,7 @@ Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
                                     const std::string &index_id_str,
                                     TxnTimeStamp commit_ts,
                                     const std::shared_ptr<IndexBase> &index_base,
-                                    std::optional<TableIndexMeeta> &table_index_meta) {
+                                    std::shared_ptr<TableIndexMeeta> &table_index_meta_ptr) {
     // Create index a key value pair
     KVInstance *kv_instance = table_meta.kv_instance();
     const std::string &index_name = *index_base->index_name_;
@@ -579,8 +579,8 @@ Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
         return status;
     }
 
-    table_index_meta.emplace(index_id_str, index_name, table_meta);
-    status = table_index_meta->InitSet1(index_base, this);
+    table_index_meta_ptr = std::make_shared<TableIndexMeeta>(index_id_str, index_name, table_meta);
+    status = table_index_meta_ptr->InitSet1(index_base, this);
     if (!status.ok()) {
         return status;
     }

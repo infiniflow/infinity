@@ -267,7 +267,7 @@ public:
                             const std::string &index_id_str,
                             TxnTimeStamp commit_ts,
                             const std::shared_ptr<IndexBase> &index_base,
-                            std::optional<TableIndexMeeta> &table_index_meta);
+                            std::shared_ptr<TableIndexMeeta> &table_index_meta);
 
     static Status CleanTableIndex(TableIndexMeeta &table_index_meta, UsageFlag usage_flag);
 

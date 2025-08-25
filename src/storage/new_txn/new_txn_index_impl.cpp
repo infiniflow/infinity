@@ -2067,12 +2067,11 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     std::string index_id_str = create_index_cmd->index_id_;
 
     TableMeeta table_meta(db_id_str, table_id_str, this);
-    std::optional<TableIndexMeeta> table_index_meta_opt;
-    Status status = new_catalog_->AddNewTableIndex(table_meta, index_id_str, commit_ts, create_index_cmd->index_base_, table_index_meta_opt);
+    std::shared_ptr<TableIndexMeeta> table_index_meta_ptr;
+    Status status = new_catalog_->AddNewTableIndex(table_meta, index_id_str, commit_ts, create_index_cmd->index_base_, table_index_meta_ptr);
     if (!status.ok()) {
         return status;
     }
-    TableIndexMeeta &table_index_meta = *table_index_meta_opt;
 
     std::vector<SegmentID> *segment_ids_ptr = nullptr;
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
@@ -2095,7 +2094,8 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     } else {
         for (SegmentID segment_id : *segment_ids_ptr) {
             SegmentMeta segment_meta(segment_id, table_meta);
-            auto [segment_row_cnt, status] = segment_meta.GetRowCnt1();
+            size_t segment_row_cnt = 0;
+            std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
             if (!status.ok()) {
                 return status;
             }
@@ -2103,7 +2103,7 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
                                          table_name,
                                          index_name,
                                          table_key,
-                                         table_index_meta,
+                                         *table_index_meta_ptr,
                                          segment_meta,
                                          segment_row_cnt,
                                          DumpIndexCause::kCreateIndex,
@@ -2115,7 +2115,7 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     }
     if (create_index_cmd->index_base_->index_type_ == IndexType::kFullText) {
         // Invalidate existing fulltext index cache
-        Status status = table_meta.InvalidateFtIndexCache();
+        status = table_meta.InvalidateFtIndexCache();
         if (!status.ok()) {
             return status;
         }
@@ -2199,7 +2199,7 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const std
             max_index_id = index_id;
         }
         const std::string &index_name = *(index_cmd.index_base_->index_name_);
-        std::optional<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<TableIndexMeeta> table_index_meta;
         if (!is_link_files) {
             status = new_catalog_->AddNewTableIndex(table_meta,
                                                     index_cmd.index_id_,
@@ -2210,7 +2210,7 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const std
                 return status;
             }
         } else {
-            table_index_meta.emplace(index_cmd.index_id_, index_name, table_meta);
+            table_index_meta = std::make_shared<TableIndexMeeta>(index_cmd.index_id_, index_name, table_meta);
         }
 
         for (const auto &segment_index : index_cmd.segment_index_infos_) {
