@@ -223,8 +223,8 @@ jobs:
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
           sleep 10
-          docker exec ${TEST_CONTAINER} mkdir -p /infinity/cmake-build-debug
-          docker cp /home/infiniflow/artifacts/${CONTAINER_NAME}/infinity ${TEST_CONTAINER}:/infinity/cmake-build-debug/
+          sudo docker exec ${TEST_CONTAINER} mkdir -p /infinity/cmake-build-debug
+          sudo docker cp /home/infiniflow/artifacts/${CONTAINER_NAME}/infinity ${TEST_CONTAINER}:/infinity/cmake-build-debug/
 
       - name: Run sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
