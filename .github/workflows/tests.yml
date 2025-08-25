@@ -180,6 +180,25 @@ jobs:
       BUILD_IP: ${{needs.debug_configure_and_build.outputs.BUILD_IP}}
       CONTAINER_NAME: ${{needs.debug_configure_and_build.outputs.CONTAINER_NAME}}
     steps:
+      - name: Show PR labels
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "Workflow triggered by ${{ github.event_name }}"
+          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
+          fi
+
+      - name: Ensure workspace ownership
+        if: ${{ !cancelled() && !failure() }}
+        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+
+      - name: Check out code
+        if: ${{ !cancelled() && !failure() }}
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: false
+
       - name: Get container name
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -194,7 +213,7 @@ jobs:
           username: infiniflow
           insecure_password: infiniflow
           source: /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
-          target: /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+          target: /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
 
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}
