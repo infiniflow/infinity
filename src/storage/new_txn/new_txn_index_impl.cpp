@@ -2064,11 +2064,12 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     std::string db_id_str = create_index_cmd->db_id_;
     std::string table_id_str = create_index_cmd->table_id_;
     std::string table_key = create_index_cmd->table_key_;
-    std::string index_id_str = create_index_cmd->index_id_;
+    std::string &index_id_str = create_index_cmd->index_id_;
+    std::shared_ptr<IndexBase> &index_base = create_index_cmd->index_base_;
 
     TableMeeta table_meta(db_id_str, table_id_str, this);
     std::shared_ptr<TableIndexMeeta> table_index_meta_ptr;
-    Status status = new_catalog_->AddNewTableIndex(table_meta, index_id_str, commit_ts, create_index_cmd->index_base_, table_index_meta_ptr);
+    Status status = new_catalog_->AddNewTableIndex(table_meta, index_id_str, commit_ts, index_base, table_index_meta_ptr);
     if (!status.ok()) {
         return status;
     }
