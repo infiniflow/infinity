@@ -1,4 +1,5 @@
 from concurrent import futures
+import os
 from run_pytest_parallel import run_command
 import time
 import argparse
@@ -13,6 +14,10 @@ commands = [
 LOG_PATH = "/var/infinity/log/infinity.log"
 # TEST_SEC = 3600 # 1 hour
 TEST_SEC = 10 # run once
+
+def clear_infinity_log():
+    if os.path.exists(infinity_log_path):
+        os.remove(infinity_log_path)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pytest Parallel Continuous")
@@ -39,6 +44,7 @@ if __name__ == "__main__":
                     except RuntimeError as e:
                         print(e)
                         command_failed = True
+                clear_infinity_log()
 
     except Exception as e:
         print(e)
