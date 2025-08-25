@@ -1942,6 +1942,9 @@ std::shared_ptr<DataType> InfinityThriftService::GetColumnTypeFromProto(const in
             if (embedding_type == EmbeddingDataType::kElemInvalid) {
                 return std::make_shared<infinity::DataType>(infinity::LogicalType::kInvalid);
             }
+            if (type.physical_type.embedding_type.dimension <= 0) {
+                return std::make_shared<infinity::DataType>(infinity::LogicalType::kInvalid);
+            }
             auto embedding_info = EmbeddingInfo::Make(embedding_type, type.physical_type.embedding_type.dimension);
             infinity::LogicalType dt = infinity::LogicalType::kInvalid;
             switch (type.logic_type) {

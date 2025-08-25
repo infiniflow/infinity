@@ -55,13 +55,13 @@ KnnScanSharedData::KnnScanSharedData(std::shared_ptr<BaseTableRef> table_ref,
                                      std::unique_ptr<std::vector<std::shared_ptr<SegmentIndexMeta>>> segment_index_metas,
                                      std::vector<InitParameter> opt_params,
                                      i64 topk,
-                                     i64 dimension,
+                                     i64 query_dimension,
                                      i64 query_embedding_count,
                                      void *query_embedding,
                                      EmbeddingDataType elem_type,
                                      KnnDistanceType knn_distance_type)
     : table_ref_(table_ref), block_metas_(std::move(block_metas)), table_index_meta_(std::move(table_index_meta)),
-      segment_index_metas_(std::move(segment_index_metas)), opt_params_(std::move(opt_params)), topk_(topk), dimension_(dimension),
+      segment_index_metas_(std::move(segment_index_metas)), opt_params_(std::move(opt_params)), topk_(topk), query_dimension_(query_dimension),
       query_count_(query_embedding_count), query_embedding_(query_embedding), query_elem_type_(elem_type), knn_distance_type_(knn_distance_type) {}
 
 KnnScanSharedData::~KnnScanSharedData() = default;

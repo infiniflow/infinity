@@ -1,4 +1,3 @@
-import importlib
 import sys
 import os
 import pytest
@@ -1172,37 +1171,6 @@ class TestInfinity:
             assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table("test_with_index" + suffix, ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-    def test_zero_dimension_vector(self, suffix):
-        db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_zero_dimension_vector" + suffix,
-                          conflict_type=ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_zero_dimension_vector" + suffix, {
-            "zero_vector": {"type": "vector,0,float"},
-        }, ConflictType.Error)
-
-        # try to insert and search a non-zero dim vector
-        with pytest.raises(InfinityException) as e:
-            table_obj.insert([{"zero_vector": [0.0]}])
-        assert e.type == InfinityException
-        assert e.value.args[0] == ErrorCode.DATA_TYPE_MISMATCH
-        with pytest.raises(InfinityException) as e:
-            res, extra_result = table_obj.output(["_row_id"]).match_dense(
-                "zero_vector", [0.0], "float", "l2", 5).to_pl()
-        assert e.type == InfinityException
-        assert e.value.args[0] == ErrorCode.SYNTAX_ERROR
-
-        # try to insert and search a zero dim vector
-        with pytest.raises(Exception):
-            table_obj.insert([{"zero_vector": []}])
-        try:
-            res, extra_result = table_obj.output(["_row_id"]).match_dense(
-                "zero_vector", [], "float", "l2", 5).to_pl()
-        except:
-            print("Exception")
-
-        res = db_obj.drop_table("test_zero_dimension_vector" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("dim", [1000, 16384])
