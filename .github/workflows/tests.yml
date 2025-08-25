@@ -196,7 +196,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME} /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
 
 #      - name: Unit test debug version
