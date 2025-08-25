@@ -7,5297 +7,4695 @@
 #ifndef InfinityService_H
 #define InfinityService_H
 
+#include "infinity_types.h"
+#include <memory>
 #include <thrift/TDispatchProcessor.h>
 #include <thrift/async/TConcurrentClientSyncInfo.h>
-#include <memory>
-#include "infinity_types.h"
 
 namespace infinity_thrift_rpc {
 
 #ifdef _MSC_VER
-  #pragma warning( push )
-  #pragma warning (disable : 4250 ) //inheriting methods via dominance 
+#pragma warning(push)
+#pragma warning(disable : 4250) // inheriting methods via dominance
 #endif
 
 class InfinityServiceIf {
- public:
-  virtual ~InfinityServiceIf() {}
-  virtual void Connect(CommonResponse& _return, const ConnectRequest& request) = 0;
-  virtual void Disconnect(CommonResponse& _return, const CommonRequest& request) = 0;
-  virtual void CreateDatabase(CommonResponse& _return, const CreateDatabaseRequest& request) = 0;
-  virtual void DropDatabase(CommonResponse& _return, const DropDatabaseRequest& request) = 0;
-  virtual void CreateTable(CommonResponse& _return, const CreateTableRequest& request) = 0;
-  virtual void DropTable(CommonResponse& _return, const DropTableRequest& request) = 0;
-  virtual void Insert(CommonResponse& _return, const InsertRequest& request) = 0;
-  virtual void Import(CommonResponse& _return, const ImportRequest& request) = 0;
-  virtual void Export(CommonResponse& _return, const ExportRequest& request) = 0;
-  virtual void Select(SelectResponse& _return, const SelectRequest& request) = 0;
-  virtual void Explain(SelectResponse& _return, const ExplainRequest& request) = 0;
-  virtual void Delete(DeleteResponse& _return, const DeleteRequest& request) = 0;
-  virtual void Update(CommonResponse& _return, const UpdateRequest& request) = 0;
-  virtual void ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request) = 0;
-  virtual void ListTable(ListTableResponse& _return, const ListTableRequest& request) = 0;
-  virtual void ListIndex(ListIndexResponse& _return, const ListIndexRequest& request) = 0;
-  virtual void ShowTable(ShowTableResponse& _return, const ShowTableRequest& request) = 0;
-  virtual void ShowColumns(SelectResponse& _return, const ShowColumnsRequest& request) = 0;
-  virtual void ShowDatabase(ShowDatabaseResponse& _return, const ShowDatabaseRequest& request) = 0;
-  virtual void ShowSegments(SelectResponse& _return, const ShowSegmentsRequest& request) = 0;
-  virtual void ShowSegment(ShowSegmentResponse& _return, const ShowSegmentRequest& request) = 0;
-  virtual void ShowBlocks(SelectResponse& _return, const ShowBlocksRequest& request) = 0;
-  virtual void ShowBlock(ShowBlockResponse& _return, const ShowBlockRequest& request) = 0;
-  virtual void ShowBlockColumn(ShowBlockColumnResponse& _return, const ShowBlockColumnRequest& request) = 0;
-  virtual void ShowCurrentNode(ShowCurrentNodeResponse& _return, const ShowCurrentNodeRequest& request) = 0;
-  virtual void GetDatabase(CommonResponse& _return, const GetDatabaseRequest& request) = 0;
-  virtual void GetTable(CommonResponse& _return, const GetTableRequest& request) = 0;
-  virtual void CreateIndex(CommonResponse& _return, const CreateIndexRequest& request) = 0;
-  virtual void DropIndex(CommonResponse& _return, const DropIndexRequest& request) = 0;
-  virtual void ShowIndex(ShowIndexResponse& _return, const ShowIndexRequest& request) = 0;
-  virtual void Optimize(CommonResponse& _return, const OptimizeRequest& request) = 0;
-  virtual void AddColumns(CommonResponse& _return, const AddColumnsRequest& request) = 0;
-  virtual void DropColumns(CommonResponse& _return, const DropColumnsRequest& request) = 0;
-  virtual void Cleanup(CommonResponse& _return, const CommonRequest& request) = 0;
-  virtual void DumpIndex(CommonResponse& _return, const DumpIndexRequest& request) = 0;
-  virtual void Command(CommonResponse& _return, const CommandRequest& request) = 0;
-  virtual void Flush(CommonResponse& _return, const FlushRequest& request) = 0;
-  virtual void Compact(CommonResponse& _return, const CompactRequest& request) = 0;
-  virtual void CreateTableSnapshot(CommonResponse& _return, const CreateTableSnapshotRequest& request) = 0;
-  virtual void CreateDatabaseSnapshot(CommonResponse& _return, const CreateDatabaseSnapshotRequest& request) = 0;
-  virtual void CreateSystemSnapshot(CommonResponse& _return, const CreateSystemSnapshotRequest& request) = 0;
-  virtual void RestoreSnapshot(CommonResponse& _return, const RestoreSnapshotRequest& request) = 0;
-  virtual void ShowSnapshot(ShowSnapshotResponse& _return, const ShowSnapshotRequest& request) = 0;
-  virtual void ListSnapshots(ListSnapshotsResponse& _return, const ListSnapshotsRequest& request) = 0;
-  virtual void DropSnapshot(CommonResponse& _return, const DropSnapshotRequest& request) = 0;
+public:
+    virtual ~InfinityServiceIf() {}
+    virtual void Connect(CommonResponse &_return, const ConnectRequest &request) = 0;
+    virtual void Disconnect(CommonResponse &_return, const CommonRequest &request) = 0;
+    virtual void CreateDatabase(CommonResponse &_return, const CreateDatabaseRequest &request) = 0;
+    virtual void DropDatabase(CommonResponse &_return, const DropDatabaseRequest &request) = 0;
+    virtual void CreateTable(CommonResponse &_return, const CreateTableRequest &request) = 0;
+    virtual void DropTable(CommonResponse &_return, const DropTableRequest &request) = 0;
+    virtual void RenameTable(CommonResponse &_return, const RenameTableRequest &request) = 0;
+    virtual void Insert(CommonResponse &_return, const InsertRequest &request) = 0;
+    virtual void Import(CommonResponse &_return, const ImportRequest &request) = 0;
+    virtual void Export(CommonResponse &_return, const ExportRequest &request) = 0;
+    virtual void Select(SelectResponse &_return, const SelectRequest &request) = 0;
+    virtual void Explain(SelectResponse &_return, const ExplainRequest &request) = 0;
+    virtual void Delete(DeleteResponse &_return, const DeleteRequest &request) = 0;
+    virtual void Update(CommonResponse &_return, const UpdateRequest &request) = 0;
+    virtual void ListDatabase(ListDatabaseResponse &_return, const ListDatabaseRequest &request) = 0;
+    virtual void ListTable(ListTableResponse &_return, const ListTableRequest &request) = 0;
+    virtual void ListIndex(ListIndexResponse &_return, const ListIndexRequest &request) = 0;
+    virtual void ShowTable(ShowTableResponse &_return, const ShowTableRequest &request) = 0;
+    virtual void ShowColumns(SelectResponse &_return, const ShowColumnsRequest &request) = 0;
+    virtual void ShowDatabase(ShowDatabaseResponse &_return, const ShowDatabaseRequest &request) = 0;
+    virtual void ShowSegments(SelectResponse &_return, const ShowSegmentsRequest &request) = 0;
+    virtual void ShowSegment(ShowSegmentResponse &_return, const ShowSegmentRequest &request) = 0;
+    virtual void ShowBlocks(SelectResponse &_return, const ShowBlocksRequest &request) = 0;
+    virtual void ShowBlock(ShowBlockResponse &_return, const ShowBlockRequest &request) = 0;
+    virtual void ShowBlockColumn(ShowBlockColumnResponse &_return, const ShowBlockColumnRequest &request) = 0;
+    virtual void ShowCurrentNode(ShowCurrentNodeResponse &_return, const ShowCurrentNodeRequest &request) = 0;
+    virtual void GetDatabase(CommonResponse &_return, const GetDatabaseRequest &request) = 0;
+    virtual void GetTable(CommonResponse &_return, const GetTableRequest &request) = 0;
+    virtual void CreateIndex(CommonResponse &_return, const CreateIndexRequest &request) = 0;
+    virtual void DropIndex(CommonResponse &_return, const DropIndexRequest &request) = 0;
+    virtual void ShowIndex(ShowIndexResponse &_return, const ShowIndexRequest &request) = 0;
+    virtual void Optimize(CommonResponse &_return, const OptimizeRequest &request) = 0;
+    virtual void AddColumns(CommonResponse &_return, const AddColumnsRequest &request) = 0;
+    virtual void DropColumns(CommonResponse &_return, const DropColumnsRequest &request) = 0;
+    virtual void Cleanup(CommonResponse &_return, const CommonRequest &request) = 0;
+    virtual void DumpIndex(CommonResponse &_return, const DumpIndexRequest &request) = 0;
+    virtual void Command(CommonResponse &_return, const CommandRequest &request) = 0;
+    virtual void Flush(CommonResponse &_return, const FlushRequest &request) = 0;
+    virtual void Compact(CommonResponse &_return, const CompactRequest &request) = 0;
+    virtual void CreateTableSnapshot(CommonResponse &_return, const CreateTableSnapshotRequest &request) = 0;
+    virtual void CreateDatabaseSnapshot(CommonResponse &_return, const CreateDatabaseSnapshotRequest &request) = 0;
+    virtual void CreateSystemSnapshot(CommonResponse &_return, const CreateSystemSnapshotRequest &request) = 0;
+    virtual void RestoreSnapshot(CommonResponse &_return, const RestoreSnapshotRequest &request) = 0;
+    virtual void ShowSnapshot(ShowSnapshotResponse &_return, const ShowSnapshotRequest &request) = 0;
+    virtual void ListSnapshots(ListSnapshotsResponse &_return, const ListSnapshotsRequest &request) = 0;
+    virtual void DropSnapshot(CommonResponse &_return, const DropSnapshotRequest &request) = 0;
 };
 
 class InfinityServiceIfFactory {
- public:
-  typedef InfinityServiceIf Handler;
+public:
+    typedef InfinityServiceIf Handler;
 
-  virtual ~InfinityServiceIfFactory() {}
+    virtual ~InfinityServiceIfFactory() {}
 
-  virtual InfinityServiceIf* getHandler(const ::apache::thrift::TConnectionInfo& connInfo) = 0;
-  virtual void releaseHandler(InfinityServiceIf* /* handler */) = 0;
-  };
+    virtual InfinityServiceIf *getHandler(const ::apache::thrift::TConnectionInfo &connInfo) = 0;
+    virtual void releaseHandler(InfinityServiceIf * /* handler */) = 0;
+};
 
 class InfinityServiceIfSingletonFactory : virtual public InfinityServiceIfFactory {
- public:
-  InfinityServiceIfSingletonFactory(const ::std::shared_ptr<InfinityServiceIf>& iface) : iface_(iface) {}
-  virtual ~InfinityServiceIfSingletonFactory() {}
+public:
+    InfinityServiceIfSingletonFactory(const ::std::shared_ptr<InfinityServiceIf> &iface) : iface_(iface) {}
+    virtual ~InfinityServiceIfSingletonFactory() {}
 
-  virtual InfinityServiceIf* getHandler(const ::apache::thrift::TConnectionInfo&) override {
-    return iface_.get();
-  }
-  virtual void releaseHandler(InfinityServiceIf* /* handler */) override {}
+    virtual InfinityServiceIf *getHandler(const ::apache::thrift::TConnectionInfo &) override { return iface_.get(); }
+    virtual void releaseHandler(InfinityServiceIf * /* handler */) override {}
 
- protected:
-  ::std::shared_ptr<InfinityServiceIf> iface_;
+protected:
+    ::std::shared_ptr<InfinityServiceIf> iface_;
 };
 
 class InfinityServiceNull : virtual public InfinityServiceIf {
- public:
-  virtual ~InfinityServiceNull() {}
-  void Connect(CommonResponse& /* _return */, const ConnectRequest& /* request */) override {
-    return;
-  }
-  void Disconnect(CommonResponse& /* _return */, const CommonRequest& /* request */) override {
-    return;
-  }
-  void CreateDatabase(CommonResponse& /* _return */, const CreateDatabaseRequest& /* request */) override {
-    return;
-  }
-  void DropDatabase(CommonResponse& /* _return */, const DropDatabaseRequest& /* request */) override {
-    return;
-  }
-  void CreateTable(CommonResponse& /* _return */, const CreateTableRequest& /* request */) override {
-    return;
-  }
-  void DropTable(CommonResponse& /* _return */, const DropTableRequest& /* request */) override {
-    return;
-  }
-  void Insert(CommonResponse& /* _return */, const InsertRequest& /* request */) override {
-    return;
-  }
-  void Import(CommonResponse& /* _return */, const ImportRequest& /* request */) override {
-    return;
-  }
-  void Export(CommonResponse& /* _return */, const ExportRequest& /* request */) override {
-    return;
-  }
-  void Select(SelectResponse& /* _return */, const SelectRequest& /* request */) override {
-    return;
-  }
-  void Explain(SelectResponse& /* _return */, const ExplainRequest& /* request */) override {
-    return;
-  }
-  void Delete(DeleteResponse& /* _return */, const DeleteRequest& /* request */) override {
-    return;
-  }
-  void Update(CommonResponse& /* _return */, const UpdateRequest& /* request */) override {
-    return;
-  }
-  void ListDatabase(ListDatabaseResponse& /* _return */, const ListDatabaseRequest& /* request */) override {
-    return;
-  }
-  void ListTable(ListTableResponse& /* _return */, const ListTableRequest& /* request */) override {
-    return;
-  }
-  void ListIndex(ListIndexResponse& /* _return */, const ListIndexRequest& /* request */) override {
-    return;
-  }
-  void ShowTable(ShowTableResponse& /* _return */, const ShowTableRequest& /* request */) override {
-    return;
-  }
-  void ShowColumns(SelectResponse& /* _return */, const ShowColumnsRequest& /* request */) override {
-    return;
-  }
-  void ShowDatabase(ShowDatabaseResponse& /* _return */, const ShowDatabaseRequest& /* request */) override {
-    return;
-  }
-  void ShowSegments(SelectResponse& /* _return */, const ShowSegmentsRequest& /* request */) override {
-    return;
-  }
-  void ShowSegment(ShowSegmentResponse& /* _return */, const ShowSegmentRequest& /* request */) override {
-    return;
-  }
-  void ShowBlocks(SelectResponse& /* _return */, const ShowBlocksRequest& /* request */) override {
-    return;
-  }
-  void ShowBlock(ShowBlockResponse& /* _return */, const ShowBlockRequest& /* request */) override {
-    return;
-  }
-  void ShowBlockColumn(ShowBlockColumnResponse& /* _return */, const ShowBlockColumnRequest& /* request */) override {
-    return;
-  }
-  void ShowCurrentNode(ShowCurrentNodeResponse& /* _return */, const ShowCurrentNodeRequest& /* request */) override {
-    return;
-  }
-  void GetDatabase(CommonResponse& /* _return */, const GetDatabaseRequest& /* request */) override {
-    return;
-  }
-  void GetTable(CommonResponse& /* _return */, const GetTableRequest& /* request */) override {
-    return;
-  }
-  void CreateIndex(CommonResponse& /* _return */, const CreateIndexRequest& /* request */) override {
-    return;
-  }
-  void DropIndex(CommonResponse& /* _return */, const DropIndexRequest& /* request */) override {
-    return;
-  }
-  void ShowIndex(ShowIndexResponse& /* _return */, const ShowIndexRequest& /* request */) override {
-    return;
-  }
-  void Optimize(CommonResponse& /* _return */, const OptimizeRequest& /* request */) override {
-    return;
-  }
-  void AddColumns(CommonResponse& /* _return */, const AddColumnsRequest& /* request */) override {
-    return;
-  }
-  void DropColumns(CommonResponse& /* _return */, const DropColumnsRequest& /* request */) override {
-    return;
-  }
-  void Cleanup(CommonResponse& /* _return */, const CommonRequest& /* request */) override {
-    return;
-  }
-  void DumpIndex(CommonResponse& /* _return */, const DumpIndexRequest& /* request */) override {
-    return;
-  }
-  void Command(CommonResponse& /* _return */, const CommandRequest& /* request */) override {
-    return;
-  }
-  void Flush(CommonResponse& /* _return */, const FlushRequest& /* request */) override {
-    return;
-  }
-  void Compact(CommonResponse& /* _return */, const CompactRequest& /* request */) override {
-    return;
-  }
-  void CreateTableSnapshot(CommonResponse& /* _return */, const CreateTableSnapshotRequest& /* request */) override {
-    return;
-  }
-  void CreateDatabaseSnapshot(CommonResponse& /* _return */, const CreateDatabaseSnapshotRequest& /* request */) override {
-    return;
-  }
-  void CreateSystemSnapshot(CommonResponse& /* _return */, const CreateSystemSnapshotRequest& /* request */) override {
-    return;
-  }
-  void RestoreSnapshot(CommonResponse& /* _return */, const RestoreSnapshotRequest& /* request */) override {
-    return;
-  }
-  void ShowSnapshot(ShowSnapshotResponse& /* _return */, const ShowSnapshotRequest& /* request */) override {
-    return;
-  }
-  void ListSnapshots(ListSnapshotsResponse& /* _return */, const ListSnapshotsRequest& /* request */) override {
-    return;
-  }
-  void DropSnapshot(CommonResponse& /* _return */, const DropSnapshotRequest& /* request */) override {
-    return;
-  }
+public:
+    virtual ~InfinityServiceNull() {}
+    void Connect(CommonResponse & /* _return */, const ConnectRequest & /* request */) override { return; }
+    void Disconnect(CommonResponse & /* _return */, const CommonRequest & /* request */) override { return; }
+    void CreateDatabase(CommonResponse & /* _return */, const CreateDatabaseRequest & /* request */) override { return; }
+    void DropDatabase(CommonResponse & /* _return */, const DropDatabaseRequest & /* request */) override { return; }
+    void CreateTable(CommonResponse & /* _return */, const CreateTableRequest & /* request */) override { return; }
+    void DropTable(CommonResponse & /* _return */, const DropTableRequest & /* request */) override { return; }
+    void RenameTable(CommonResponse & /* _return */, const RenameTableRequest & /* request */) override { return; }
+    void Insert(CommonResponse & /* _return */, const InsertRequest & /* request */) override { return; }
+    void Import(CommonResponse & /* _return */, const ImportRequest & /* request */) override { return; }
+    void Export(CommonResponse & /* _return */, const ExportRequest & /* request */) override { return; }
+    void Select(SelectResponse & /* _return */, const SelectRequest & /* request */) override { return; }
+    void Explain(SelectResponse & /* _return */, const ExplainRequest & /* request */) override { return; }
+    void Delete(DeleteResponse & /* _return */, const DeleteRequest & /* request */) override { return; }
+    void Update(CommonResponse & /* _return */, const UpdateRequest & /* request */) override { return; }
+    void ListDatabase(ListDatabaseResponse & /* _return */, const ListDatabaseRequest & /* request */) override { return; }
+    void ListTable(ListTableResponse & /* _return */, const ListTableRequest & /* request */) override { return; }
+    void ListIndex(ListIndexResponse & /* _return */, const ListIndexRequest & /* request */) override { return; }
+    void ShowTable(ShowTableResponse & /* _return */, const ShowTableRequest & /* request */) override { return; }
+    void ShowColumns(SelectResponse & /* _return */, const ShowColumnsRequest & /* request */) override { return; }
+    void ShowDatabase(ShowDatabaseResponse & /* _return */, const ShowDatabaseRequest & /* request */) override { return; }
+    void ShowSegments(SelectResponse & /* _return */, const ShowSegmentsRequest & /* request */) override { return; }
+    void ShowSegment(ShowSegmentResponse & /* _return */, const ShowSegmentRequest & /* request */) override { return; }
+    void ShowBlocks(SelectResponse & /* _return */, const ShowBlocksRequest & /* request */) override { return; }
+    void ShowBlock(ShowBlockResponse & /* _return */, const ShowBlockRequest & /* request */) override { return; }
+    void ShowBlockColumn(ShowBlockColumnResponse & /* _return */, const ShowBlockColumnRequest & /* request */) override { return; }
+    void ShowCurrentNode(ShowCurrentNodeResponse & /* _return */, const ShowCurrentNodeRequest & /* request */) override { return; }
+    void GetDatabase(CommonResponse & /* _return */, const GetDatabaseRequest & /* request */) override { return; }
+    void GetTable(CommonResponse & /* _return */, const GetTableRequest & /* request */) override { return; }
+    void CreateIndex(CommonResponse & /* _return */, const CreateIndexRequest & /* request */) override { return; }
+    void DropIndex(CommonResponse & /* _return */, const DropIndexRequest & /* request */) override { return; }
+    void ShowIndex(ShowIndexResponse & /* _return */, const ShowIndexRequest & /* request */) override { return; }
+    void Optimize(CommonResponse & /* _return */, const OptimizeRequest & /* request */) override { return; }
+    void AddColumns(CommonResponse & /* _return */, const AddColumnsRequest & /* request */) override { return; }
+    void DropColumns(CommonResponse & /* _return */, const DropColumnsRequest & /* request */) override { return; }
+    void Cleanup(CommonResponse & /* _return */, const CommonRequest & /* request */) override { return; }
+    void DumpIndex(CommonResponse & /* _return */, const DumpIndexRequest & /* request */) override { return; }
+    void Command(CommonResponse & /* _return */, const CommandRequest & /* request */) override { return; }
+    void Flush(CommonResponse & /* _return */, const FlushRequest & /* request */) override { return; }
+    void Compact(CommonResponse & /* _return */, const CompactRequest & /* request */) override { return; }
+    void CreateTableSnapshot(CommonResponse & /* _return */, const CreateTableSnapshotRequest & /* request */) override { return; }
+    void CreateDatabaseSnapshot(CommonResponse & /* _return */, const CreateDatabaseSnapshotRequest & /* request */) override { return; }
+    void CreateSystemSnapshot(CommonResponse & /* _return */, const CreateSystemSnapshotRequest & /* request */) override { return; }
+    void RestoreSnapshot(CommonResponse & /* _return */, const RestoreSnapshotRequest & /* request */) override { return; }
+    void ShowSnapshot(ShowSnapshotResponse & /* _return */, const ShowSnapshotRequest & /* request */) override { return; }
+    void ListSnapshots(ListSnapshotsResponse & /* _return */, const ListSnapshotsRequest & /* request */) override { return; }
+    void DropSnapshot(CommonResponse & /* _return */, const DropSnapshotRequest & /* request */) override { return; }
 };
 
 typedef struct _InfinityService_Connect_args__isset {
-  _InfinityService_Connect_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_Connect_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_Connect_args__isset;
 
 class InfinityService_Connect_args {
- public:
+public:
+    InfinityService_Connect_args(const InfinityService_Connect_args &) noexcept;
+    InfinityService_Connect_args &operator=(const InfinityService_Connect_args &) noexcept;
+    InfinityService_Connect_args() noexcept;
 
-  InfinityService_Connect_args(const InfinityService_Connect_args&) noexcept;
-  InfinityService_Connect_args& operator=(const InfinityService_Connect_args&) noexcept;
-  InfinityService_Connect_args() noexcept;
+    virtual ~InfinityService_Connect_args() noexcept;
+    ConnectRequest request;
 
-  virtual ~InfinityService_Connect_args() noexcept;
-  ConnectRequest request;
+    _InfinityService_Connect_args__isset __isset;
 
-  _InfinityService_Connect_args__isset __isset;
+    void __set_request(const ConnectRequest &val);
 
-  void __set_request(const ConnectRequest& val);
+    bool operator==(const InfinityService_Connect_args &rhs) const;
+    bool operator!=(const InfinityService_Connect_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Connect_args & rhs) const;
-  bool operator != (const InfinityService_Connect_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Connect_args &) const;
 
-  bool operator < (const InfinityService_Connect_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_Connect_pargs {
- public:
+public:
+    virtual ~InfinityService_Connect_pargs() noexcept;
+    const ConnectRequest *request;
 
-
-  virtual ~InfinityService_Connect_pargs() noexcept;
-  const ConnectRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Connect_result__isset {
-  _InfinityService_Connect_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Connect_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Connect_result__isset;
 
 class InfinityService_Connect_result {
- public:
+public:
+    InfinityService_Connect_result(const InfinityService_Connect_result &);
+    InfinityService_Connect_result &operator=(const InfinityService_Connect_result &);
+    InfinityService_Connect_result() noexcept;
 
-  InfinityService_Connect_result(const InfinityService_Connect_result&);
-  InfinityService_Connect_result& operator=(const InfinityService_Connect_result&);
-  InfinityService_Connect_result() noexcept;
+    virtual ~InfinityService_Connect_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_Connect_result() noexcept;
-  CommonResponse success;
+    _InfinityService_Connect_result__isset __isset;
 
-  _InfinityService_Connect_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_Connect_result &rhs) const;
+    bool operator!=(const InfinityService_Connect_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Connect_result & rhs) const;
-  bool operator != (const InfinityService_Connect_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Connect_result &) const;
 
-  bool operator < (const InfinityService_Connect_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Connect_presult__isset {
-  _InfinityService_Connect_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Connect_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Connect_presult__isset;
 
 class InfinityService_Connect_presult {
- public:
+public:
+    virtual ~InfinityService_Connect_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_Connect_presult__isset __isset;
 
-  virtual ~InfinityService_Connect_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_Connect_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_Disconnect_args__isset {
-  _InfinityService_Disconnect_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_Disconnect_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_Disconnect_args__isset;
 
 class InfinityService_Disconnect_args {
- public:
+public:
+    InfinityService_Disconnect_args(const InfinityService_Disconnect_args &) noexcept;
+    InfinityService_Disconnect_args &operator=(const InfinityService_Disconnect_args &) noexcept;
+    InfinityService_Disconnect_args() noexcept;
 
-  InfinityService_Disconnect_args(const InfinityService_Disconnect_args&) noexcept;
-  InfinityService_Disconnect_args& operator=(const InfinityService_Disconnect_args&) noexcept;
-  InfinityService_Disconnect_args() noexcept;
+    virtual ~InfinityService_Disconnect_args() noexcept;
+    CommonRequest request;
 
-  virtual ~InfinityService_Disconnect_args() noexcept;
-  CommonRequest request;
+    _InfinityService_Disconnect_args__isset __isset;
 
-  _InfinityService_Disconnect_args__isset __isset;
+    void __set_request(const CommonRequest &val);
 
-  void __set_request(const CommonRequest& val);
+    bool operator==(const InfinityService_Disconnect_args &rhs) const;
+    bool operator!=(const InfinityService_Disconnect_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Disconnect_args & rhs) const;
-  bool operator != (const InfinityService_Disconnect_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Disconnect_args &) const;
 
-  bool operator < (const InfinityService_Disconnect_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_Disconnect_pargs {
- public:
+public:
+    virtual ~InfinityService_Disconnect_pargs() noexcept;
+    const CommonRequest *request;
 
-
-  virtual ~InfinityService_Disconnect_pargs() noexcept;
-  const CommonRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Disconnect_result__isset {
-  _InfinityService_Disconnect_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Disconnect_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Disconnect_result__isset;
 
 class InfinityService_Disconnect_result {
- public:
+public:
+    InfinityService_Disconnect_result(const InfinityService_Disconnect_result &);
+    InfinityService_Disconnect_result &operator=(const InfinityService_Disconnect_result &);
+    InfinityService_Disconnect_result() noexcept;
 
-  InfinityService_Disconnect_result(const InfinityService_Disconnect_result&);
-  InfinityService_Disconnect_result& operator=(const InfinityService_Disconnect_result&);
-  InfinityService_Disconnect_result() noexcept;
+    virtual ~InfinityService_Disconnect_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_Disconnect_result() noexcept;
-  CommonResponse success;
+    _InfinityService_Disconnect_result__isset __isset;
 
-  _InfinityService_Disconnect_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_Disconnect_result &rhs) const;
+    bool operator!=(const InfinityService_Disconnect_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Disconnect_result & rhs) const;
-  bool operator != (const InfinityService_Disconnect_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Disconnect_result &) const;
 
-  bool operator < (const InfinityService_Disconnect_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Disconnect_presult__isset {
-  _InfinityService_Disconnect_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Disconnect_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Disconnect_presult__isset;
 
 class InfinityService_Disconnect_presult {
- public:
+public:
+    virtual ~InfinityService_Disconnect_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_Disconnect_presult__isset __isset;
 
-  virtual ~InfinityService_Disconnect_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_Disconnect_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_CreateDatabase_args__isset {
-  _InfinityService_CreateDatabase_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_CreateDatabase_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_CreateDatabase_args__isset;
 
 class InfinityService_CreateDatabase_args {
- public:
+public:
+    InfinityService_CreateDatabase_args(const InfinityService_CreateDatabase_args &);
+    InfinityService_CreateDatabase_args &operator=(const InfinityService_CreateDatabase_args &);
+    InfinityService_CreateDatabase_args() noexcept;
 
-  InfinityService_CreateDatabase_args(const InfinityService_CreateDatabase_args&);
-  InfinityService_CreateDatabase_args& operator=(const InfinityService_CreateDatabase_args&);
-  InfinityService_CreateDatabase_args() noexcept;
+    virtual ~InfinityService_CreateDatabase_args() noexcept;
+    CreateDatabaseRequest request;
 
-  virtual ~InfinityService_CreateDatabase_args() noexcept;
-  CreateDatabaseRequest request;
+    _InfinityService_CreateDatabase_args__isset __isset;
 
-  _InfinityService_CreateDatabase_args__isset __isset;
+    void __set_request(const CreateDatabaseRequest &val);
 
-  void __set_request(const CreateDatabaseRequest& val);
+    bool operator==(const InfinityService_CreateDatabase_args &rhs) const;
+    bool operator!=(const InfinityService_CreateDatabase_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_CreateDatabase_args & rhs) const;
-  bool operator != (const InfinityService_CreateDatabase_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_CreateDatabase_args &) const;
 
-  bool operator < (const InfinityService_CreateDatabase_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_CreateDatabase_pargs {
- public:
+public:
+    virtual ~InfinityService_CreateDatabase_pargs() noexcept;
+    const CreateDatabaseRequest *request;
 
-
-  virtual ~InfinityService_CreateDatabase_pargs() noexcept;
-  const CreateDatabaseRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_CreateDatabase_result__isset {
-  _InfinityService_CreateDatabase_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_CreateDatabase_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_CreateDatabase_result__isset;
 
 class InfinityService_CreateDatabase_result {
- public:
+public:
+    InfinityService_CreateDatabase_result(const InfinityService_CreateDatabase_result &);
+    InfinityService_CreateDatabase_result &operator=(const InfinityService_CreateDatabase_result &);
+    InfinityService_CreateDatabase_result() noexcept;
 
-  InfinityService_CreateDatabase_result(const InfinityService_CreateDatabase_result&);
-  InfinityService_CreateDatabase_result& operator=(const InfinityService_CreateDatabase_result&);
-  InfinityService_CreateDatabase_result() noexcept;
+    virtual ~InfinityService_CreateDatabase_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_CreateDatabase_result() noexcept;
-  CommonResponse success;
+    _InfinityService_CreateDatabase_result__isset __isset;
 
-  _InfinityService_CreateDatabase_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_CreateDatabase_result &rhs) const;
+    bool operator!=(const InfinityService_CreateDatabase_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_CreateDatabase_result & rhs) const;
-  bool operator != (const InfinityService_CreateDatabase_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_CreateDatabase_result &) const;
 
-  bool operator < (const InfinityService_CreateDatabase_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_CreateDatabase_presult__isset {
-  _InfinityService_CreateDatabase_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_CreateDatabase_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_CreateDatabase_presult__isset;
 
 class InfinityService_CreateDatabase_presult {
- public:
+public:
+    virtual ~InfinityService_CreateDatabase_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_CreateDatabase_presult__isset __isset;
 
-  virtual ~InfinityService_CreateDatabase_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_CreateDatabase_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_DropDatabase_args__isset {
-  _InfinityService_DropDatabase_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_DropDatabase_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_DropDatabase_args__isset;
 
 class InfinityService_DropDatabase_args {
- public:
+public:
+    InfinityService_DropDatabase_args(const InfinityService_DropDatabase_args &);
+    InfinityService_DropDatabase_args &operator=(const InfinityService_DropDatabase_args &);
+    InfinityService_DropDatabase_args() noexcept;
 
-  InfinityService_DropDatabase_args(const InfinityService_DropDatabase_args&);
-  InfinityService_DropDatabase_args& operator=(const InfinityService_DropDatabase_args&);
-  InfinityService_DropDatabase_args() noexcept;
+    virtual ~InfinityService_DropDatabase_args() noexcept;
+    DropDatabaseRequest request;
 
-  virtual ~InfinityService_DropDatabase_args() noexcept;
-  DropDatabaseRequest request;
+    _InfinityService_DropDatabase_args__isset __isset;
 
-  _InfinityService_DropDatabase_args__isset __isset;
+    void __set_request(const DropDatabaseRequest &val);
 
-  void __set_request(const DropDatabaseRequest& val);
+    bool operator==(const InfinityService_DropDatabase_args &rhs) const;
+    bool operator!=(const InfinityService_DropDatabase_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_DropDatabase_args & rhs) const;
-  bool operator != (const InfinityService_DropDatabase_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_DropDatabase_args &) const;
 
-  bool operator < (const InfinityService_DropDatabase_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_DropDatabase_pargs {
- public:
+public:
+    virtual ~InfinityService_DropDatabase_pargs() noexcept;
+    const DropDatabaseRequest *request;
 
-
-  virtual ~InfinityService_DropDatabase_pargs() noexcept;
-  const DropDatabaseRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_DropDatabase_result__isset {
-  _InfinityService_DropDatabase_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_DropDatabase_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_DropDatabase_result__isset;
 
 class InfinityService_DropDatabase_result {
- public:
+public:
+    InfinityService_DropDatabase_result(const InfinityService_DropDatabase_result &);
+    InfinityService_DropDatabase_result &operator=(const InfinityService_DropDatabase_result &);
+    InfinityService_DropDatabase_result() noexcept;
 
-  InfinityService_DropDatabase_result(const InfinityService_DropDatabase_result&);
-  InfinityService_DropDatabase_result& operator=(const InfinityService_DropDatabase_result&);
-  InfinityService_DropDatabase_result() noexcept;
+    virtual ~InfinityService_DropDatabase_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_DropDatabase_result() noexcept;
-  CommonResponse success;
+    _InfinityService_DropDatabase_result__isset __isset;
 
-  _InfinityService_DropDatabase_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_DropDatabase_result &rhs) const;
+    bool operator!=(const InfinityService_DropDatabase_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_DropDatabase_result & rhs) const;
-  bool operator != (const InfinityService_DropDatabase_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_DropDatabase_result &) const;
 
-  bool operator < (const InfinityService_DropDatabase_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_DropDatabase_presult__isset {
-  _InfinityService_DropDatabase_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_DropDatabase_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_DropDatabase_presult__isset;
 
 class InfinityService_DropDatabase_presult {
- public:
+public:
+    virtual ~InfinityService_DropDatabase_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_DropDatabase_presult__isset __isset;
 
-  virtual ~InfinityService_DropDatabase_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_DropDatabase_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_CreateTable_args__isset {
-  _InfinityService_CreateTable_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_CreateTable_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_CreateTable_args__isset;
 
 class InfinityService_CreateTable_args {
- public:
+public:
+    InfinityService_CreateTable_args(const InfinityService_CreateTable_args &);
+    InfinityService_CreateTable_args &operator=(const InfinityService_CreateTable_args &);
+    InfinityService_CreateTable_args() noexcept;
 
-  InfinityService_CreateTable_args(const InfinityService_CreateTable_args&);
-  InfinityService_CreateTable_args& operator=(const InfinityService_CreateTable_args&);
-  InfinityService_CreateTable_args() noexcept;
+    virtual ~InfinityService_CreateTable_args() noexcept;
+    CreateTableRequest request;
 
-  virtual ~InfinityService_CreateTable_args() noexcept;
-  CreateTableRequest request;
+    _InfinityService_CreateTable_args__isset __isset;
 
-  _InfinityService_CreateTable_args__isset __isset;
+    void __set_request(const CreateTableRequest &val);
 
-  void __set_request(const CreateTableRequest& val);
+    bool operator==(const InfinityService_CreateTable_args &rhs) const;
+    bool operator!=(const InfinityService_CreateTable_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_CreateTable_args & rhs) const;
-  bool operator != (const InfinityService_CreateTable_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_CreateTable_args &) const;
 
-  bool operator < (const InfinityService_CreateTable_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_CreateTable_pargs {
- public:
+public:
+    virtual ~InfinityService_CreateTable_pargs() noexcept;
+    const CreateTableRequest *request;
 
-
-  virtual ~InfinityService_CreateTable_pargs() noexcept;
-  const CreateTableRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_CreateTable_result__isset {
-  _InfinityService_CreateTable_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_CreateTable_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_CreateTable_result__isset;
 
 class InfinityService_CreateTable_result {
- public:
+public:
+    InfinityService_CreateTable_result(const InfinityService_CreateTable_result &);
+    InfinityService_CreateTable_result &operator=(const InfinityService_CreateTable_result &);
+    InfinityService_CreateTable_result() noexcept;
 
-  InfinityService_CreateTable_result(const InfinityService_CreateTable_result&);
-  InfinityService_CreateTable_result& operator=(const InfinityService_CreateTable_result&);
-  InfinityService_CreateTable_result() noexcept;
+    virtual ~InfinityService_CreateTable_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_CreateTable_result() noexcept;
-  CommonResponse success;
+    _InfinityService_CreateTable_result__isset __isset;
 
-  _InfinityService_CreateTable_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_CreateTable_result &rhs) const;
+    bool operator!=(const InfinityService_CreateTable_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_CreateTable_result & rhs) const;
-  bool operator != (const InfinityService_CreateTable_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_CreateTable_result &) const;
 
-  bool operator < (const InfinityService_CreateTable_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_CreateTable_presult__isset {
-  _InfinityService_CreateTable_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_CreateTable_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_CreateTable_presult__isset;
 
 class InfinityService_CreateTable_presult {
- public:
+public:
+    virtual ~InfinityService_CreateTable_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_CreateTable_presult__isset __isset;
 
-  virtual ~InfinityService_CreateTable_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_CreateTable_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_DropTable_args__isset {
-  _InfinityService_DropTable_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_DropTable_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_DropTable_args__isset;
 
 class InfinityService_DropTable_args {
- public:
+public:
+    InfinityService_DropTable_args(const InfinityService_DropTable_args &);
+    InfinityService_DropTable_args &operator=(const InfinityService_DropTable_args &);
+    InfinityService_DropTable_args() noexcept;
 
-  InfinityService_DropTable_args(const InfinityService_DropTable_args&);
-  InfinityService_DropTable_args& operator=(const InfinityService_DropTable_args&);
-  InfinityService_DropTable_args() noexcept;
+    virtual ~InfinityService_DropTable_args() noexcept;
+    DropTableRequest request;
 
-  virtual ~InfinityService_DropTable_args() noexcept;
-  DropTableRequest request;
+    _InfinityService_DropTable_args__isset __isset;
 
-  _InfinityService_DropTable_args__isset __isset;
+    void __set_request(const DropTableRequest &val);
 
-  void __set_request(const DropTableRequest& val);
+    bool operator==(const InfinityService_DropTable_args &rhs) const;
+    bool operator!=(const InfinityService_DropTable_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_DropTable_args & rhs) const;
-  bool operator != (const InfinityService_DropTable_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_DropTable_args &) const;
 
-  bool operator < (const InfinityService_DropTable_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_DropTable_pargs {
- public:
+public:
+    virtual ~InfinityService_DropTable_pargs() noexcept;
+    const DropTableRequest *request;
 
-
-  virtual ~InfinityService_DropTable_pargs() noexcept;
-  const DropTableRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_DropTable_result__isset {
-  _InfinityService_DropTable_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_DropTable_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_DropTable_result__isset;
 
 class InfinityService_DropTable_result {
- public:
+public:
+    InfinityService_DropTable_result(const InfinityService_DropTable_result &);
+    InfinityService_DropTable_result &operator=(const InfinityService_DropTable_result &);
+    InfinityService_DropTable_result() noexcept;
 
-  InfinityService_DropTable_result(const InfinityService_DropTable_result&);
-  InfinityService_DropTable_result& operator=(const InfinityService_DropTable_result&);
-  InfinityService_DropTable_result() noexcept;
+    virtual ~InfinityService_DropTable_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_DropTable_result() noexcept;
-  CommonResponse success;
+    _InfinityService_DropTable_result__isset __isset;
 
-  _InfinityService_DropTable_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_DropTable_result &rhs) const;
+    bool operator!=(const InfinityService_DropTable_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_DropTable_result & rhs) const;
-  bool operator != (const InfinityService_DropTable_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_DropTable_result &) const;
 
-  bool operator < (const InfinityService_DropTable_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_DropTable_presult__isset {
-  _InfinityService_DropTable_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_DropTable_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_DropTable_presult__isset;
 
 class InfinityService_DropTable_presult {
- public:
+public:
+    virtual ~InfinityService_DropTable_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_DropTable_presult__isset __isset;
 
-  virtual ~InfinityService_DropTable_presult() noexcept;
-  CommonResponse* success;
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+};
 
-  _InfinityService_DropTable_presult__isset __isset;
+typedef struct _InfinityService_RenameTable_args__isset {
+    _InfinityService_RenameTable_args__isset() : request(false) {}
+    bool request : 1;
+} _InfinityService_RenameTable_args__isset;
 
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+class InfinityService_RenameTable_args {
+public:
+    InfinityService_RenameTable_args(const InfinityService_RenameTable_args &);
+    InfinityService_RenameTable_args &operator=(const InfinityService_RenameTable_args &);
+    InfinityService_RenameTable_args() noexcept;
 
+    virtual ~InfinityService_RenameTable_args() noexcept;
+    RenameTableRequest request;
+
+    _InfinityService_RenameTable_args__isset __isset;
+
+    void __set_request(const RenameTableRequest &val);
+
+    bool operator==(const InfinityService_RenameTable_args &rhs) const;
+    bool operator!=(const InfinityService_RenameTable_args &rhs) const { return !(*this == rhs); }
+
+    bool operator<(const InfinityService_RenameTable_args &) const;
+
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
+};
+
+class InfinityService_RenameTable_pargs {
+public:
+    virtual ~InfinityService_RenameTable_pargs() noexcept;
+    const RenameTableRequest *request;
+
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
+};
+
+typedef struct _InfinityService_RenameTable_result__isset {
+    _InfinityService_RenameTable_result__isset() : success(false) {}
+    bool success : 1;
+} _InfinityService_RenameTable_result__isset;
+
+class InfinityService_RenameTable_result {
+public:
+    InfinityService_RenameTable_result(const InfinityService_RenameTable_result &);
+    InfinityService_RenameTable_result &operator=(const InfinityService_RenameTable_result &);
+    InfinityService_RenameTable_result() noexcept;
+
+    virtual ~InfinityService_RenameTable_result() noexcept;
+    CommonResponse success;
+
+    _InfinityService_RenameTable_result__isset __isset;
+
+    void __set_success(const CommonResponse &val);
+
+    bool operator==(const InfinityService_RenameTable_result &rhs) const;
+    bool operator!=(const InfinityService_RenameTable_result &rhs) const { return !(*this == rhs); }
+
+    bool operator<(const InfinityService_RenameTable_result &) const;
+
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
+};
+
+typedef struct _InfinityService_RenameTable_presult__isset {
+    _InfinityService_RenameTable_presult__isset() : success(false) {}
+    bool success : 1;
+} _InfinityService_RenameTable_presult__isset;
+
+class InfinityService_RenameTable_presult {
+public:
+    virtual ~InfinityService_RenameTable_presult() noexcept;
+    CommonResponse *success;
+
+    _InfinityService_RenameTable_presult__isset __isset;
+
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_Insert_args__isset {
-  _InfinityService_Insert_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_Insert_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_Insert_args__isset;
 
 class InfinityService_Insert_args {
- public:
+public:
+    InfinityService_Insert_args(const InfinityService_Insert_args &);
+    InfinityService_Insert_args &operator=(const InfinityService_Insert_args &);
+    InfinityService_Insert_args() noexcept;
 
-  InfinityService_Insert_args(const InfinityService_Insert_args&);
-  InfinityService_Insert_args& operator=(const InfinityService_Insert_args&);
-  InfinityService_Insert_args() noexcept;
+    virtual ~InfinityService_Insert_args() noexcept;
+    InsertRequest request;
 
-  virtual ~InfinityService_Insert_args() noexcept;
-  InsertRequest request;
+    _InfinityService_Insert_args__isset __isset;
 
-  _InfinityService_Insert_args__isset __isset;
+    void __set_request(const InsertRequest &val);
 
-  void __set_request(const InsertRequest& val);
+    bool operator==(const InfinityService_Insert_args &rhs) const;
+    bool operator!=(const InfinityService_Insert_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Insert_args & rhs) const;
-  bool operator != (const InfinityService_Insert_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Insert_args &) const;
 
-  bool operator < (const InfinityService_Insert_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_Insert_pargs {
- public:
+public:
+    virtual ~InfinityService_Insert_pargs() noexcept;
+    const InsertRequest *request;
 
-
-  virtual ~InfinityService_Insert_pargs() noexcept;
-  const InsertRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Insert_result__isset {
-  _InfinityService_Insert_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Insert_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Insert_result__isset;
 
 class InfinityService_Insert_result {
- public:
+public:
+    InfinityService_Insert_result(const InfinityService_Insert_result &);
+    InfinityService_Insert_result &operator=(const InfinityService_Insert_result &);
+    InfinityService_Insert_result() noexcept;
 
-  InfinityService_Insert_result(const InfinityService_Insert_result&);
-  InfinityService_Insert_result& operator=(const InfinityService_Insert_result&);
-  InfinityService_Insert_result() noexcept;
+    virtual ~InfinityService_Insert_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_Insert_result() noexcept;
-  CommonResponse success;
+    _InfinityService_Insert_result__isset __isset;
 
-  _InfinityService_Insert_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_Insert_result &rhs) const;
+    bool operator!=(const InfinityService_Insert_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Insert_result & rhs) const;
-  bool operator != (const InfinityService_Insert_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Insert_result &) const;
 
-  bool operator < (const InfinityService_Insert_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Insert_presult__isset {
-  _InfinityService_Insert_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Insert_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Insert_presult__isset;
 
 class InfinityService_Insert_presult {
- public:
+public:
+    virtual ~InfinityService_Insert_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_Insert_presult__isset __isset;
 
-  virtual ~InfinityService_Insert_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_Insert_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_Import_args__isset {
-  _InfinityService_Import_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_Import_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_Import_args__isset;
 
 class InfinityService_Import_args {
- public:
+public:
+    InfinityService_Import_args(const InfinityService_Import_args &);
+    InfinityService_Import_args &operator=(const InfinityService_Import_args &);
+    InfinityService_Import_args() noexcept;
 
-  InfinityService_Import_args(const InfinityService_Import_args&);
-  InfinityService_Import_args& operator=(const InfinityService_Import_args&);
-  InfinityService_Import_args() noexcept;
+    virtual ~InfinityService_Import_args() noexcept;
+    ImportRequest request;
 
-  virtual ~InfinityService_Import_args() noexcept;
-  ImportRequest request;
+    _InfinityService_Import_args__isset __isset;
 
-  _InfinityService_Import_args__isset __isset;
+    void __set_request(const ImportRequest &val);
 
-  void __set_request(const ImportRequest& val);
+    bool operator==(const InfinityService_Import_args &rhs) const;
+    bool operator!=(const InfinityService_Import_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Import_args & rhs) const;
-  bool operator != (const InfinityService_Import_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Import_args &) const;
 
-  bool operator < (const InfinityService_Import_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_Import_pargs {
- public:
+public:
+    virtual ~InfinityService_Import_pargs() noexcept;
+    const ImportRequest *request;
 
-
-  virtual ~InfinityService_Import_pargs() noexcept;
-  const ImportRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Import_result__isset {
-  _InfinityService_Import_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Import_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Import_result__isset;
 
 class InfinityService_Import_result {
- public:
+public:
+    InfinityService_Import_result(const InfinityService_Import_result &);
+    InfinityService_Import_result &operator=(const InfinityService_Import_result &);
+    InfinityService_Import_result() noexcept;
 
-  InfinityService_Import_result(const InfinityService_Import_result&);
-  InfinityService_Import_result& operator=(const InfinityService_Import_result&);
-  InfinityService_Import_result() noexcept;
+    virtual ~InfinityService_Import_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_Import_result() noexcept;
-  CommonResponse success;
+    _InfinityService_Import_result__isset __isset;
 
-  _InfinityService_Import_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_Import_result &rhs) const;
+    bool operator!=(const InfinityService_Import_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Import_result & rhs) const;
-  bool operator != (const InfinityService_Import_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Import_result &) const;
 
-  bool operator < (const InfinityService_Import_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Import_presult__isset {
-  _InfinityService_Import_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Import_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Import_presult__isset;
 
 class InfinityService_Import_presult {
- public:
+public:
+    virtual ~InfinityService_Import_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_Import_presult__isset __isset;
 
-  virtual ~InfinityService_Import_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_Import_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_Export_args__isset {
-  _InfinityService_Export_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_Export_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_Export_args__isset;
 
 class InfinityService_Export_args {
- public:
+public:
+    InfinityService_Export_args(const InfinityService_Export_args &);
+    InfinityService_Export_args &operator=(const InfinityService_Export_args &);
+    InfinityService_Export_args() noexcept;
 
-  InfinityService_Export_args(const InfinityService_Export_args&);
-  InfinityService_Export_args& operator=(const InfinityService_Export_args&);
-  InfinityService_Export_args() noexcept;
+    virtual ~InfinityService_Export_args() noexcept;
+    ExportRequest request;
 
-  virtual ~InfinityService_Export_args() noexcept;
-  ExportRequest request;
+    _InfinityService_Export_args__isset __isset;
 
-  _InfinityService_Export_args__isset __isset;
+    void __set_request(const ExportRequest &val);
 
-  void __set_request(const ExportRequest& val);
+    bool operator==(const InfinityService_Export_args &rhs) const;
+    bool operator!=(const InfinityService_Export_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Export_args & rhs) const;
-  bool operator != (const InfinityService_Export_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Export_args &) const;
 
-  bool operator < (const InfinityService_Export_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_Export_pargs {
- public:
+public:
+    virtual ~InfinityService_Export_pargs() noexcept;
+    const ExportRequest *request;
 
-
-  virtual ~InfinityService_Export_pargs() noexcept;
-  const ExportRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Export_result__isset {
-  _InfinityService_Export_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Export_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Export_result__isset;
 
 class InfinityService_Export_result {
- public:
+public:
+    InfinityService_Export_result(const InfinityService_Export_result &);
+    InfinityService_Export_result &operator=(const InfinityService_Export_result &);
+    InfinityService_Export_result() noexcept;
 
-  InfinityService_Export_result(const InfinityService_Export_result&);
-  InfinityService_Export_result& operator=(const InfinityService_Export_result&);
-  InfinityService_Export_result() noexcept;
+    virtual ~InfinityService_Export_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_Export_result() noexcept;
-  CommonResponse success;
+    _InfinityService_Export_result__isset __isset;
 
-  _InfinityService_Export_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_Export_result &rhs) const;
+    bool operator!=(const InfinityService_Export_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Export_result & rhs) const;
-  bool operator != (const InfinityService_Export_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Export_result &) const;
 
-  bool operator < (const InfinityService_Export_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Export_presult__isset {
-  _InfinityService_Export_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Export_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Export_presult__isset;
 
 class InfinityService_Export_presult {
- public:
+public:
+    virtual ~InfinityService_Export_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_Export_presult__isset __isset;
 
-  virtual ~InfinityService_Export_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_Export_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_Select_args__isset {
-  _InfinityService_Select_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_Select_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_Select_args__isset;
 
 class InfinityService_Select_args {
- public:
+public:
+    InfinityService_Select_args(const InfinityService_Select_args &);
+    InfinityService_Select_args &operator=(const InfinityService_Select_args &);
+    InfinityService_Select_args() noexcept;
 
-  InfinityService_Select_args(const InfinityService_Select_args&);
-  InfinityService_Select_args& operator=(const InfinityService_Select_args&);
-  InfinityService_Select_args() noexcept;
+    virtual ~InfinityService_Select_args() noexcept;
+    SelectRequest request;
 
-  virtual ~InfinityService_Select_args() noexcept;
-  SelectRequest request;
+    _InfinityService_Select_args__isset __isset;
 
-  _InfinityService_Select_args__isset __isset;
+    void __set_request(const SelectRequest &val);
 
-  void __set_request(const SelectRequest& val);
+    bool operator==(const InfinityService_Select_args &rhs) const;
+    bool operator!=(const InfinityService_Select_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Select_args & rhs) const;
-  bool operator != (const InfinityService_Select_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Select_args &) const;
 
-  bool operator < (const InfinityService_Select_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_Select_pargs {
- public:
+public:
+    virtual ~InfinityService_Select_pargs() noexcept;
+    const SelectRequest *request;
 
-
-  virtual ~InfinityService_Select_pargs() noexcept;
-  const SelectRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Select_result__isset {
-  _InfinityService_Select_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Select_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Select_result__isset;
 
 class InfinityService_Select_result {
- public:
+public:
+    InfinityService_Select_result(const InfinityService_Select_result &);
+    InfinityService_Select_result &operator=(const InfinityService_Select_result &);
+    InfinityService_Select_result() noexcept;
 
-  InfinityService_Select_result(const InfinityService_Select_result&);
-  InfinityService_Select_result& operator=(const InfinityService_Select_result&);
-  InfinityService_Select_result() noexcept;
+    virtual ~InfinityService_Select_result() noexcept;
+    SelectResponse success;
 
-  virtual ~InfinityService_Select_result() noexcept;
-  SelectResponse success;
+    _InfinityService_Select_result__isset __isset;
 
-  _InfinityService_Select_result__isset __isset;
+    void __set_success(const SelectResponse &val);
 
-  void __set_success(const SelectResponse& val);
+    bool operator==(const InfinityService_Select_result &rhs) const;
+    bool operator!=(const InfinityService_Select_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Select_result & rhs) const;
-  bool operator != (const InfinityService_Select_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Select_result &) const;
 
-  bool operator < (const InfinityService_Select_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Select_presult__isset {
-  _InfinityService_Select_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Select_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Select_presult__isset;
 
 class InfinityService_Select_presult {
- public:
+public:
+    virtual ~InfinityService_Select_presult() noexcept;
+    SelectResponse *success;
 
+    _InfinityService_Select_presult__isset __isset;
 
-  virtual ~InfinityService_Select_presult() noexcept;
-  SelectResponse* success;
-
-  _InfinityService_Select_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_Explain_args__isset {
-  _InfinityService_Explain_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_Explain_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_Explain_args__isset;
 
 class InfinityService_Explain_args {
- public:
+public:
+    InfinityService_Explain_args(const InfinityService_Explain_args &);
+    InfinityService_Explain_args &operator=(const InfinityService_Explain_args &);
+    InfinityService_Explain_args() noexcept;
 
-  InfinityService_Explain_args(const InfinityService_Explain_args&);
-  InfinityService_Explain_args& operator=(const InfinityService_Explain_args&);
-  InfinityService_Explain_args() noexcept;
+    virtual ~InfinityService_Explain_args() noexcept;
+    ExplainRequest request;
 
-  virtual ~InfinityService_Explain_args() noexcept;
-  ExplainRequest request;
+    _InfinityService_Explain_args__isset __isset;
 
-  _InfinityService_Explain_args__isset __isset;
+    void __set_request(const ExplainRequest &val);
 
-  void __set_request(const ExplainRequest& val);
+    bool operator==(const InfinityService_Explain_args &rhs) const;
+    bool operator!=(const InfinityService_Explain_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Explain_args & rhs) const;
-  bool operator != (const InfinityService_Explain_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Explain_args &) const;
 
-  bool operator < (const InfinityService_Explain_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_Explain_pargs {
- public:
+public:
+    virtual ~InfinityService_Explain_pargs() noexcept;
+    const ExplainRequest *request;
 
-
-  virtual ~InfinityService_Explain_pargs() noexcept;
-  const ExplainRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Explain_result__isset {
-  _InfinityService_Explain_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Explain_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Explain_result__isset;
 
 class InfinityService_Explain_result {
- public:
+public:
+    InfinityService_Explain_result(const InfinityService_Explain_result &);
+    InfinityService_Explain_result &operator=(const InfinityService_Explain_result &);
+    InfinityService_Explain_result() noexcept;
 
-  InfinityService_Explain_result(const InfinityService_Explain_result&);
-  InfinityService_Explain_result& operator=(const InfinityService_Explain_result&);
-  InfinityService_Explain_result() noexcept;
+    virtual ~InfinityService_Explain_result() noexcept;
+    SelectResponse success;
 
-  virtual ~InfinityService_Explain_result() noexcept;
-  SelectResponse success;
+    _InfinityService_Explain_result__isset __isset;
 
-  _InfinityService_Explain_result__isset __isset;
+    void __set_success(const SelectResponse &val);
 
-  void __set_success(const SelectResponse& val);
+    bool operator==(const InfinityService_Explain_result &rhs) const;
+    bool operator!=(const InfinityService_Explain_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Explain_result & rhs) const;
-  bool operator != (const InfinityService_Explain_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Explain_result &) const;
 
-  bool operator < (const InfinityService_Explain_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Explain_presult__isset {
-  _InfinityService_Explain_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Explain_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Explain_presult__isset;
 
 class InfinityService_Explain_presult {
- public:
+public:
+    virtual ~InfinityService_Explain_presult() noexcept;
+    SelectResponse *success;
 
+    _InfinityService_Explain_presult__isset __isset;
 
-  virtual ~InfinityService_Explain_presult() noexcept;
-  SelectResponse* success;
-
-  _InfinityService_Explain_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_Delete_args__isset {
-  _InfinityService_Delete_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_Delete_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_Delete_args__isset;
 
 class InfinityService_Delete_args {
- public:
+public:
+    InfinityService_Delete_args(const InfinityService_Delete_args &);
+    InfinityService_Delete_args &operator=(const InfinityService_Delete_args &);
+    InfinityService_Delete_args() noexcept;
 
-  InfinityService_Delete_args(const InfinityService_Delete_args&);
-  InfinityService_Delete_args& operator=(const InfinityService_Delete_args&);
-  InfinityService_Delete_args() noexcept;
+    virtual ~InfinityService_Delete_args() noexcept;
+    DeleteRequest request;
 
-  virtual ~InfinityService_Delete_args() noexcept;
-  DeleteRequest request;
+    _InfinityService_Delete_args__isset __isset;
 
-  _InfinityService_Delete_args__isset __isset;
+    void __set_request(const DeleteRequest &val);
 
-  void __set_request(const DeleteRequest& val);
+    bool operator==(const InfinityService_Delete_args &rhs) const;
+    bool operator!=(const InfinityService_Delete_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Delete_args & rhs) const;
-  bool operator != (const InfinityService_Delete_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Delete_args &) const;
 
-  bool operator < (const InfinityService_Delete_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_Delete_pargs {
- public:
+public:
+    virtual ~InfinityService_Delete_pargs() noexcept;
+    const DeleteRequest *request;
 
-
-  virtual ~InfinityService_Delete_pargs() noexcept;
-  const DeleteRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Delete_result__isset {
-  _InfinityService_Delete_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Delete_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Delete_result__isset;
 
 class InfinityService_Delete_result {
- public:
+public:
+    InfinityService_Delete_result(const InfinityService_Delete_result &);
+    InfinityService_Delete_result &operator=(const InfinityService_Delete_result &);
+    InfinityService_Delete_result() noexcept;
 
-  InfinityService_Delete_result(const InfinityService_Delete_result&);
-  InfinityService_Delete_result& operator=(const InfinityService_Delete_result&);
-  InfinityService_Delete_result() noexcept;
+    virtual ~InfinityService_Delete_result() noexcept;
+    DeleteResponse success;
 
-  virtual ~InfinityService_Delete_result() noexcept;
-  DeleteResponse success;
+    _InfinityService_Delete_result__isset __isset;
 
-  _InfinityService_Delete_result__isset __isset;
+    void __set_success(const DeleteResponse &val);
 
-  void __set_success(const DeleteResponse& val);
+    bool operator==(const InfinityService_Delete_result &rhs) const;
+    bool operator!=(const InfinityService_Delete_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Delete_result & rhs) const;
-  bool operator != (const InfinityService_Delete_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Delete_result &) const;
 
-  bool operator < (const InfinityService_Delete_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Delete_presult__isset {
-  _InfinityService_Delete_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Delete_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Delete_presult__isset;
 
 class InfinityService_Delete_presult {
- public:
+public:
+    virtual ~InfinityService_Delete_presult() noexcept;
+    DeleteResponse *success;
 
+    _InfinityService_Delete_presult__isset __isset;
 
-  virtual ~InfinityService_Delete_presult() noexcept;
-  DeleteResponse* success;
-
-  _InfinityService_Delete_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_Update_args__isset {
-  _InfinityService_Update_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_Update_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_Update_args__isset;
 
 class InfinityService_Update_args {
- public:
+public:
+    InfinityService_Update_args(const InfinityService_Update_args &);
+    InfinityService_Update_args &operator=(const InfinityService_Update_args &);
+    InfinityService_Update_args() noexcept;
 
-  InfinityService_Update_args(const InfinityService_Update_args&);
-  InfinityService_Update_args& operator=(const InfinityService_Update_args&);
-  InfinityService_Update_args() noexcept;
+    virtual ~InfinityService_Update_args() noexcept;
+    UpdateRequest request;
 
-  virtual ~InfinityService_Update_args() noexcept;
-  UpdateRequest request;
+    _InfinityService_Update_args__isset __isset;
 
-  _InfinityService_Update_args__isset __isset;
+    void __set_request(const UpdateRequest &val);
 
-  void __set_request(const UpdateRequest& val);
+    bool operator==(const InfinityService_Update_args &rhs) const;
+    bool operator!=(const InfinityService_Update_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Update_args & rhs) const;
-  bool operator != (const InfinityService_Update_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Update_args &) const;
 
-  bool operator < (const InfinityService_Update_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_Update_pargs {
- public:
+public:
+    virtual ~InfinityService_Update_pargs() noexcept;
+    const UpdateRequest *request;
 
-
-  virtual ~InfinityService_Update_pargs() noexcept;
-  const UpdateRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Update_result__isset {
-  _InfinityService_Update_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Update_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Update_result__isset;
 
 class InfinityService_Update_result {
- public:
+public:
+    InfinityService_Update_result(const InfinityService_Update_result &);
+    InfinityService_Update_result &operator=(const InfinityService_Update_result &);
+    InfinityService_Update_result() noexcept;
 
-  InfinityService_Update_result(const InfinityService_Update_result&);
-  InfinityService_Update_result& operator=(const InfinityService_Update_result&);
-  InfinityService_Update_result() noexcept;
+    virtual ~InfinityService_Update_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_Update_result() noexcept;
-  CommonResponse success;
+    _InfinityService_Update_result__isset __isset;
 
-  _InfinityService_Update_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_Update_result &rhs) const;
+    bool operator!=(const InfinityService_Update_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Update_result & rhs) const;
-  bool operator != (const InfinityService_Update_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Update_result &) const;
 
-  bool operator < (const InfinityService_Update_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Update_presult__isset {
-  _InfinityService_Update_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Update_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Update_presult__isset;
 
 class InfinityService_Update_presult {
- public:
+public:
+    virtual ~InfinityService_Update_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_Update_presult__isset __isset;
 
-  virtual ~InfinityService_Update_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_Update_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_ListDatabase_args__isset {
-  _InfinityService_ListDatabase_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_ListDatabase_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_ListDatabase_args__isset;
 
 class InfinityService_ListDatabase_args {
- public:
+public:
+    InfinityService_ListDatabase_args(const InfinityService_ListDatabase_args &) noexcept;
+    InfinityService_ListDatabase_args &operator=(const InfinityService_ListDatabase_args &) noexcept;
+    InfinityService_ListDatabase_args() noexcept;
 
-  InfinityService_ListDatabase_args(const InfinityService_ListDatabase_args&) noexcept;
-  InfinityService_ListDatabase_args& operator=(const InfinityService_ListDatabase_args&) noexcept;
-  InfinityService_ListDatabase_args() noexcept;
+    virtual ~InfinityService_ListDatabase_args() noexcept;
+    ListDatabaseRequest request;
 
-  virtual ~InfinityService_ListDatabase_args() noexcept;
-  ListDatabaseRequest request;
+    _InfinityService_ListDatabase_args__isset __isset;
 
-  _InfinityService_ListDatabase_args__isset __isset;
+    void __set_request(const ListDatabaseRequest &val);
 
-  void __set_request(const ListDatabaseRequest& val);
+    bool operator==(const InfinityService_ListDatabase_args &rhs) const;
+    bool operator!=(const InfinityService_ListDatabase_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ListDatabase_args & rhs) const;
-  bool operator != (const InfinityService_ListDatabase_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ListDatabase_args &) const;
 
-  bool operator < (const InfinityService_ListDatabase_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_ListDatabase_pargs {
- public:
+public:
+    virtual ~InfinityService_ListDatabase_pargs() noexcept;
+    const ListDatabaseRequest *request;
 
-
-  virtual ~InfinityService_ListDatabase_pargs() noexcept;
-  const ListDatabaseRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ListDatabase_result__isset {
-  _InfinityService_ListDatabase_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ListDatabase_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ListDatabase_result__isset;
 
 class InfinityService_ListDatabase_result {
- public:
+public:
+    InfinityService_ListDatabase_result(const InfinityService_ListDatabase_result &);
+    InfinityService_ListDatabase_result &operator=(const InfinityService_ListDatabase_result &);
+    InfinityService_ListDatabase_result() noexcept;
 
-  InfinityService_ListDatabase_result(const InfinityService_ListDatabase_result&);
-  InfinityService_ListDatabase_result& operator=(const InfinityService_ListDatabase_result&);
-  InfinityService_ListDatabase_result() noexcept;
+    virtual ~InfinityService_ListDatabase_result() noexcept;
+    ListDatabaseResponse success;
 
-  virtual ~InfinityService_ListDatabase_result() noexcept;
-  ListDatabaseResponse success;
+    _InfinityService_ListDatabase_result__isset __isset;
 
-  _InfinityService_ListDatabase_result__isset __isset;
+    void __set_success(const ListDatabaseResponse &val);
 
-  void __set_success(const ListDatabaseResponse& val);
+    bool operator==(const InfinityService_ListDatabase_result &rhs) const;
+    bool operator!=(const InfinityService_ListDatabase_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ListDatabase_result & rhs) const;
-  bool operator != (const InfinityService_ListDatabase_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ListDatabase_result &) const;
 
-  bool operator < (const InfinityService_ListDatabase_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ListDatabase_presult__isset {
-  _InfinityService_ListDatabase_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ListDatabase_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ListDatabase_presult__isset;
 
 class InfinityService_ListDatabase_presult {
- public:
+public:
+    virtual ~InfinityService_ListDatabase_presult() noexcept;
+    ListDatabaseResponse *success;
 
+    _InfinityService_ListDatabase_presult__isset __isset;
 
-  virtual ~InfinityService_ListDatabase_presult() noexcept;
-  ListDatabaseResponse* success;
-
-  _InfinityService_ListDatabase_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_ListTable_args__isset {
-  _InfinityService_ListTable_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_ListTable_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_ListTable_args__isset;
 
 class InfinityService_ListTable_args {
- public:
+public:
+    InfinityService_ListTable_args(const InfinityService_ListTable_args &);
+    InfinityService_ListTable_args &operator=(const InfinityService_ListTable_args &);
+    InfinityService_ListTable_args() noexcept;
 
-  InfinityService_ListTable_args(const InfinityService_ListTable_args&);
-  InfinityService_ListTable_args& operator=(const InfinityService_ListTable_args&);
-  InfinityService_ListTable_args() noexcept;
+    virtual ~InfinityService_ListTable_args() noexcept;
+    ListTableRequest request;
 
-  virtual ~InfinityService_ListTable_args() noexcept;
-  ListTableRequest request;
+    _InfinityService_ListTable_args__isset __isset;
 
-  _InfinityService_ListTable_args__isset __isset;
+    void __set_request(const ListTableRequest &val);
 
-  void __set_request(const ListTableRequest& val);
+    bool operator==(const InfinityService_ListTable_args &rhs) const;
+    bool operator!=(const InfinityService_ListTable_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ListTable_args & rhs) const;
-  bool operator != (const InfinityService_ListTable_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ListTable_args &) const;
 
-  bool operator < (const InfinityService_ListTable_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_ListTable_pargs {
- public:
+public:
+    virtual ~InfinityService_ListTable_pargs() noexcept;
+    const ListTableRequest *request;
 
-
-  virtual ~InfinityService_ListTable_pargs() noexcept;
-  const ListTableRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ListTable_result__isset {
-  _InfinityService_ListTable_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ListTable_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ListTable_result__isset;
 
 class InfinityService_ListTable_result {
- public:
+public:
+    InfinityService_ListTable_result(const InfinityService_ListTable_result &);
+    InfinityService_ListTable_result &operator=(const InfinityService_ListTable_result &);
+    InfinityService_ListTable_result() noexcept;
 
-  InfinityService_ListTable_result(const InfinityService_ListTable_result&);
-  InfinityService_ListTable_result& operator=(const InfinityService_ListTable_result&);
-  InfinityService_ListTable_result() noexcept;
+    virtual ~InfinityService_ListTable_result() noexcept;
+    ListTableResponse success;
 
-  virtual ~InfinityService_ListTable_result() noexcept;
-  ListTableResponse success;
+    _InfinityService_ListTable_result__isset __isset;
 
-  _InfinityService_ListTable_result__isset __isset;
+    void __set_success(const ListTableResponse &val);
 
-  void __set_success(const ListTableResponse& val);
+    bool operator==(const InfinityService_ListTable_result &rhs) const;
+    bool operator!=(const InfinityService_ListTable_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ListTable_result & rhs) const;
-  bool operator != (const InfinityService_ListTable_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ListTable_result &) const;
 
-  bool operator < (const InfinityService_ListTable_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ListTable_presult__isset {
-  _InfinityService_ListTable_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ListTable_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ListTable_presult__isset;
 
 class InfinityService_ListTable_presult {
- public:
+public:
+    virtual ~InfinityService_ListTable_presult() noexcept;
+    ListTableResponse *success;
 
+    _InfinityService_ListTable_presult__isset __isset;
 
-  virtual ~InfinityService_ListTable_presult() noexcept;
-  ListTableResponse* success;
-
-  _InfinityService_ListTable_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_ListIndex_args__isset {
-  _InfinityService_ListIndex_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_ListIndex_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_ListIndex_args__isset;
 
 class InfinityService_ListIndex_args {
- public:
+public:
+    InfinityService_ListIndex_args(const InfinityService_ListIndex_args &);
+    InfinityService_ListIndex_args &operator=(const InfinityService_ListIndex_args &);
+    InfinityService_ListIndex_args() noexcept;
 
-  InfinityService_ListIndex_args(const InfinityService_ListIndex_args&);
-  InfinityService_ListIndex_args& operator=(const InfinityService_ListIndex_args&);
-  InfinityService_ListIndex_args() noexcept;
+    virtual ~InfinityService_ListIndex_args() noexcept;
+    ListIndexRequest request;
 
-  virtual ~InfinityService_ListIndex_args() noexcept;
-  ListIndexRequest request;
+    _InfinityService_ListIndex_args__isset __isset;
 
-  _InfinityService_ListIndex_args__isset __isset;
+    void __set_request(const ListIndexRequest &val);
 
-  void __set_request(const ListIndexRequest& val);
+    bool operator==(const InfinityService_ListIndex_args &rhs) const;
+    bool operator!=(const InfinityService_ListIndex_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ListIndex_args & rhs) const;
-  bool operator != (const InfinityService_ListIndex_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ListIndex_args &) const;
 
-  bool operator < (const InfinityService_ListIndex_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_ListIndex_pargs {
- public:
+public:
+    virtual ~InfinityService_ListIndex_pargs() noexcept;
+    const ListIndexRequest *request;
 
-
-  virtual ~InfinityService_ListIndex_pargs() noexcept;
-  const ListIndexRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ListIndex_result__isset {
-  _InfinityService_ListIndex_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ListIndex_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ListIndex_result__isset;
 
 class InfinityService_ListIndex_result {
- public:
+public:
+    InfinityService_ListIndex_result(const InfinityService_ListIndex_result &);
+    InfinityService_ListIndex_result &operator=(const InfinityService_ListIndex_result &);
+    InfinityService_ListIndex_result() noexcept;
 
-  InfinityService_ListIndex_result(const InfinityService_ListIndex_result&);
-  InfinityService_ListIndex_result& operator=(const InfinityService_ListIndex_result&);
-  InfinityService_ListIndex_result() noexcept;
+    virtual ~InfinityService_ListIndex_result() noexcept;
+    ListIndexResponse success;
 
-  virtual ~InfinityService_ListIndex_result() noexcept;
-  ListIndexResponse success;
+    _InfinityService_ListIndex_result__isset __isset;
 
-  _InfinityService_ListIndex_result__isset __isset;
+    void __set_success(const ListIndexResponse &val);
 
-  void __set_success(const ListIndexResponse& val);
+    bool operator==(const InfinityService_ListIndex_result &rhs) const;
+    bool operator!=(const InfinityService_ListIndex_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ListIndex_result & rhs) const;
-  bool operator != (const InfinityService_ListIndex_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ListIndex_result &) const;
 
-  bool operator < (const InfinityService_ListIndex_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ListIndex_presult__isset {
-  _InfinityService_ListIndex_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ListIndex_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ListIndex_presult__isset;
 
 class InfinityService_ListIndex_presult {
- public:
+public:
+    virtual ~InfinityService_ListIndex_presult() noexcept;
+    ListIndexResponse *success;
 
+    _InfinityService_ListIndex_presult__isset __isset;
 
-  virtual ~InfinityService_ListIndex_presult() noexcept;
-  ListIndexResponse* success;
-
-  _InfinityService_ListIndex_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_ShowTable_args__isset {
-  _InfinityService_ShowTable_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_ShowTable_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_ShowTable_args__isset;
 
 class InfinityService_ShowTable_args {
- public:
+public:
+    InfinityService_ShowTable_args(const InfinityService_ShowTable_args &);
+    InfinityService_ShowTable_args &operator=(const InfinityService_ShowTable_args &);
+    InfinityService_ShowTable_args() noexcept;
 
-  InfinityService_ShowTable_args(const InfinityService_ShowTable_args&);
-  InfinityService_ShowTable_args& operator=(const InfinityService_ShowTable_args&);
-  InfinityService_ShowTable_args() noexcept;
+    virtual ~InfinityService_ShowTable_args() noexcept;
+    ShowTableRequest request;
 
-  virtual ~InfinityService_ShowTable_args() noexcept;
-  ShowTableRequest request;
+    _InfinityService_ShowTable_args__isset __isset;
 
-  _InfinityService_ShowTable_args__isset __isset;
+    void __set_request(const ShowTableRequest &val);
 
-  void __set_request(const ShowTableRequest& val);
+    bool operator==(const InfinityService_ShowTable_args &rhs) const;
+    bool operator!=(const InfinityService_ShowTable_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowTable_args & rhs) const;
-  bool operator != (const InfinityService_ShowTable_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowTable_args &) const;
 
-  bool operator < (const InfinityService_ShowTable_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_ShowTable_pargs {
- public:
+public:
+    virtual ~InfinityService_ShowTable_pargs() noexcept;
+    const ShowTableRequest *request;
 
-
-  virtual ~InfinityService_ShowTable_pargs() noexcept;
-  const ShowTableRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowTable_result__isset {
-  _InfinityService_ShowTable_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowTable_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowTable_result__isset;
 
 class InfinityService_ShowTable_result {
- public:
+public:
+    InfinityService_ShowTable_result(const InfinityService_ShowTable_result &);
+    InfinityService_ShowTable_result &operator=(const InfinityService_ShowTable_result &);
+    InfinityService_ShowTable_result() noexcept;
 
-  InfinityService_ShowTable_result(const InfinityService_ShowTable_result&);
-  InfinityService_ShowTable_result& operator=(const InfinityService_ShowTable_result&);
-  InfinityService_ShowTable_result() noexcept;
+    virtual ~InfinityService_ShowTable_result() noexcept;
+    ShowTableResponse success;
 
-  virtual ~InfinityService_ShowTable_result() noexcept;
-  ShowTableResponse success;
+    _InfinityService_ShowTable_result__isset __isset;
 
-  _InfinityService_ShowTable_result__isset __isset;
+    void __set_success(const ShowTableResponse &val);
 
-  void __set_success(const ShowTableResponse& val);
+    bool operator==(const InfinityService_ShowTable_result &rhs) const;
+    bool operator!=(const InfinityService_ShowTable_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowTable_result & rhs) const;
-  bool operator != (const InfinityService_ShowTable_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowTable_result &) const;
 
-  bool operator < (const InfinityService_ShowTable_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowTable_presult__isset {
-  _InfinityService_ShowTable_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowTable_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowTable_presult__isset;
 
 class InfinityService_ShowTable_presult {
- public:
+public:
+    virtual ~InfinityService_ShowTable_presult() noexcept;
+    ShowTableResponse *success;
 
+    _InfinityService_ShowTable_presult__isset __isset;
 
-  virtual ~InfinityService_ShowTable_presult() noexcept;
-  ShowTableResponse* success;
-
-  _InfinityService_ShowTable_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_ShowColumns_args__isset {
-  _InfinityService_ShowColumns_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_ShowColumns_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_ShowColumns_args__isset;
 
 class InfinityService_ShowColumns_args {
- public:
+public:
+    InfinityService_ShowColumns_args(const InfinityService_ShowColumns_args &);
+    InfinityService_ShowColumns_args &operator=(const InfinityService_ShowColumns_args &);
+    InfinityService_ShowColumns_args() noexcept;
 
-  InfinityService_ShowColumns_args(const InfinityService_ShowColumns_args&);
-  InfinityService_ShowColumns_args& operator=(const InfinityService_ShowColumns_args&);
-  InfinityService_ShowColumns_args() noexcept;
+    virtual ~InfinityService_ShowColumns_args() noexcept;
+    ShowColumnsRequest request;
 
-  virtual ~InfinityService_ShowColumns_args() noexcept;
-  ShowColumnsRequest request;
+    _InfinityService_ShowColumns_args__isset __isset;
 
-  _InfinityService_ShowColumns_args__isset __isset;
+    void __set_request(const ShowColumnsRequest &val);
 
-  void __set_request(const ShowColumnsRequest& val);
+    bool operator==(const InfinityService_ShowColumns_args &rhs) const;
+    bool operator!=(const InfinityService_ShowColumns_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowColumns_args & rhs) const;
-  bool operator != (const InfinityService_ShowColumns_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowColumns_args &) const;
 
-  bool operator < (const InfinityService_ShowColumns_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_ShowColumns_pargs {
- public:
+public:
+    virtual ~InfinityService_ShowColumns_pargs() noexcept;
+    const ShowColumnsRequest *request;
 
-
-  virtual ~InfinityService_ShowColumns_pargs() noexcept;
-  const ShowColumnsRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowColumns_result__isset {
-  _InfinityService_ShowColumns_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowColumns_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowColumns_result__isset;
 
 class InfinityService_ShowColumns_result {
- public:
+public:
+    InfinityService_ShowColumns_result(const InfinityService_ShowColumns_result &);
+    InfinityService_ShowColumns_result &operator=(const InfinityService_ShowColumns_result &);
+    InfinityService_ShowColumns_result() noexcept;
 
-  InfinityService_ShowColumns_result(const InfinityService_ShowColumns_result&);
-  InfinityService_ShowColumns_result& operator=(const InfinityService_ShowColumns_result&);
-  InfinityService_ShowColumns_result() noexcept;
+    virtual ~InfinityService_ShowColumns_result() noexcept;
+    SelectResponse success;
 
-  virtual ~InfinityService_ShowColumns_result() noexcept;
-  SelectResponse success;
+    _InfinityService_ShowColumns_result__isset __isset;
 
-  _InfinityService_ShowColumns_result__isset __isset;
+    void __set_success(const SelectResponse &val);
 
-  void __set_success(const SelectResponse& val);
+    bool operator==(const InfinityService_ShowColumns_result &rhs) const;
+    bool operator!=(const InfinityService_ShowColumns_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowColumns_result & rhs) const;
-  bool operator != (const InfinityService_ShowColumns_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowColumns_result &) const;
 
-  bool operator < (const InfinityService_ShowColumns_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowColumns_presult__isset {
-  _InfinityService_ShowColumns_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowColumns_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowColumns_presult__isset;
 
 class InfinityService_ShowColumns_presult {
- public:
+public:
+    virtual ~InfinityService_ShowColumns_presult() noexcept;
+    SelectResponse *success;
 
+    _InfinityService_ShowColumns_presult__isset __isset;
 
-  virtual ~InfinityService_ShowColumns_presult() noexcept;
-  SelectResponse* success;
-
-  _InfinityService_ShowColumns_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_ShowDatabase_args__isset {
-  _InfinityService_ShowDatabase_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_ShowDatabase_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_ShowDatabase_args__isset;
 
 class InfinityService_ShowDatabase_args {
- public:
+public:
+    InfinityService_ShowDatabase_args(const InfinityService_ShowDatabase_args &);
+    InfinityService_ShowDatabase_args &operator=(const InfinityService_ShowDatabase_args &);
+    InfinityService_ShowDatabase_args() noexcept;
 
-  InfinityService_ShowDatabase_args(const InfinityService_ShowDatabase_args&);
-  InfinityService_ShowDatabase_args& operator=(const InfinityService_ShowDatabase_args&);
-  InfinityService_ShowDatabase_args() noexcept;
+    virtual ~InfinityService_ShowDatabase_args() noexcept;
+    ShowDatabaseRequest request;
 
-  virtual ~InfinityService_ShowDatabase_args() noexcept;
-  ShowDatabaseRequest request;
+    _InfinityService_ShowDatabase_args__isset __isset;
 
-  _InfinityService_ShowDatabase_args__isset __isset;
+    void __set_request(const ShowDatabaseRequest &val);
 
-  void __set_request(const ShowDatabaseRequest& val);
+    bool operator==(const InfinityService_ShowDatabase_args &rhs) const;
+    bool operator!=(const InfinityService_ShowDatabase_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowDatabase_args & rhs) const;
-  bool operator != (const InfinityService_ShowDatabase_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowDatabase_args &) const;
 
-  bool operator < (const InfinityService_ShowDatabase_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_ShowDatabase_pargs {
- public:
+public:
+    virtual ~InfinityService_ShowDatabase_pargs() noexcept;
+    const ShowDatabaseRequest *request;
 
-
-  virtual ~InfinityService_ShowDatabase_pargs() noexcept;
-  const ShowDatabaseRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowDatabase_result__isset {
-  _InfinityService_ShowDatabase_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowDatabase_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowDatabase_result__isset;
 
 class InfinityService_ShowDatabase_result {
- public:
+public:
+    InfinityService_ShowDatabase_result(const InfinityService_ShowDatabase_result &);
+    InfinityService_ShowDatabase_result &operator=(const InfinityService_ShowDatabase_result &);
+    InfinityService_ShowDatabase_result() noexcept;
 
-  InfinityService_ShowDatabase_result(const InfinityService_ShowDatabase_result&);
-  InfinityService_ShowDatabase_result& operator=(const InfinityService_ShowDatabase_result&);
-  InfinityService_ShowDatabase_result() noexcept;
+    virtual ~InfinityService_ShowDatabase_result() noexcept;
+    ShowDatabaseResponse success;
 
-  virtual ~InfinityService_ShowDatabase_result() noexcept;
-  ShowDatabaseResponse success;
+    _InfinityService_ShowDatabase_result__isset __isset;
 
-  _InfinityService_ShowDatabase_result__isset __isset;
+    void __set_success(const ShowDatabaseResponse &val);
 
-  void __set_success(const ShowDatabaseResponse& val);
+    bool operator==(const InfinityService_ShowDatabase_result &rhs) const;
+    bool operator!=(const InfinityService_ShowDatabase_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowDatabase_result & rhs) const;
-  bool operator != (const InfinityService_ShowDatabase_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowDatabase_result &) const;
 
-  bool operator < (const InfinityService_ShowDatabase_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowDatabase_presult__isset {
-  _InfinityService_ShowDatabase_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowDatabase_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowDatabase_presult__isset;
 
 class InfinityService_ShowDatabase_presult {
- public:
+public:
+    virtual ~InfinityService_ShowDatabase_presult() noexcept;
+    ShowDatabaseResponse *success;
 
+    _InfinityService_ShowDatabase_presult__isset __isset;
 
-  virtual ~InfinityService_ShowDatabase_presult() noexcept;
-  ShowDatabaseResponse* success;
-
-  _InfinityService_ShowDatabase_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_ShowSegments_args__isset {
-  _InfinityService_ShowSegments_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_ShowSegments_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_ShowSegments_args__isset;
 
 class InfinityService_ShowSegments_args {
- public:
+public:
+    InfinityService_ShowSegments_args(const InfinityService_ShowSegments_args &);
+    InfinityService_ShowSegments_args &operator=(const InfinityService_ShowSegments_args &);
+    InfinityService_ShowSegments_args() noexcept;
 
-  InfinityService_ShowSegments_args(const InfinityService_ShowSegments_args&);
-  InfinityService_ShowSegments_args& operator=(const InfinityService_ShowSegments_args&);
-  InfinityService_ShowSegments_args() noexcept;
+    virtual ~InfinityService_ShowSegments_args() noexcept;
+    ShowSegmentsRequest request;
 
-  virtual ~InfinityService_ShowSegments_args() noexcept;
-  ShowSegmentsRequest request;
+    _InfinityService_ShowSegments_args__isset __isset;
 
-  _InfinityService_ShowSegments_args__isset __isset;
+    void __set_request(const ShowSegmentsRequest &val);
 
-  void __set_request(const ShowSegmentsRequest& val);
+    bool operator==(const InfinityService_ShowSegments_args &rhs) const;
+    bool operator!=(const InfinityService_ShowSegments_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowSegments_args & rhs) const;
-  bool operator != (const InfinityService_ShowSegments_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowSegments_args &) const;
 
-  bool operator < (const InfinityService_ShowSegments_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_ShowSegments_pargs {
- public:
+public:
+    virtual ~InfinityService_ShowSegments_pargs() noexcept;
+    const ShowSegmentsRequest *request;
 
-
-  virtual ~InfinityService_ShowSegments_pargs() noexcept;
-  const ShowSegmentsRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowSegments_result__isset {
-  _InfinityService_ShowSegments_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowSegments_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowSegments_result__isset;
 
 class InfinityService_ShowSegments_result {
- public:
+public:
+    InfinityService_ShowSegments_result(const InfinityService_ShowSegments_result &);
+    InfinityService_ShowSegments_result &operator=(const InfinityService_ShowSegments_result &);
+    InfinityService_ShowSegments_result() noexcept;
 
-  InfinityService_ShowSegments_result(const InfinityService_ShowSegments_result&);
-  InfinityService_ShowSegments_result& operator=(const InfinityService_ShowSegments_result&);
-  InfinityService_ShowSegments_result() noexcept;
+    virtual ~InfinityService_ShowSegments_result() noexcept;
+    SelectResponse success;
 
-  virtual ~InfinityService_ShowSegments_result() noexcept;
-  SelectResponse success;
+    _InfinityService_ShowSegments_result__isset __isset;
 
-  _InfinityService_ShowSegments_result__isset __isset;
+    void __set_success(const SelectResponse &val);
 
-  void __set_success(const SelectResponse& val);
+    bool operator==(const InfinityService_ShowSegments_result &rhs) const;
+    bool operator!=(const InfinityService_ShowSegments_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowSegments_result & rhs) const;
-  bool operator != (const InfinityService_ShowSegments_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowSegments_result &) const;
 
-  bool operator < (const InfinityService_ShowSegments_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowSegments_presult__isset {
-  _InfinityService_ShowSegments_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowSegments_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowSegments_presult__isset;
 
 class InfinityService_ShowSegments_presult {
- public:
+public:
+    virtual ~InfinityService_ShowSegments_presult() noexcept;
+    SelectResponse *success;
 
+    _InfinityService_ShowSegments_presult__isset __isset;
 
-  virtual ~InfinityService_ShowSegments_presult() noexcept;
-  SelectResponse* success;
-
-  _InfinityService_ShowSegments_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_ShowSegment_args__isset {
-  _InfinityService_ShowSegment_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_ShowSegment_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_ShowSegment_args__isset;
 
 class InfinityService_ShowSegment_args {
- public:
+public:
+    InfinityService_ShowSegment_args(const InfinityService_ShowSegment_args &);
+    InfinityService_ShowSegment_args &operator=(const InfinityService_ShowSegment_args &);
+    InfinityService_ShowSegment_args() noexcept;
 
-  InfinityService_ShowSegment_args(const InfinityService_ShowSegment_args&);
-  InfinityService_ShowSegment_args& operator=(const InfinityService_ShowSegment_args&);
-  InfinityService_ShowSegment_args() noexcept;
+    virtual ~InfinityService_ShowSegment_args() noexcept;
+    ShowSegmentRequest request;
 
-  virtual ~InfinityService_ShowSegment_args() noexcept;
-  ShowSegmentRequest request;
+    _InfinityService_ShowSegment_args__isset __isset;
 
-  _InfinityService_ShowSegment_args__isset __isset;
+    void __set_request(const ShowSegmentRequest &val);
 
-  void __set_request(const ShowSegmentRequest& val);
+    bool operator==(const InfinityService_ShowSegment_args &rhs) const;
+    bool operator!=(const InfinityService_ShowSegment_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowSegment_args & rhs) const;
-  bool operator != (const InfinityService_ShowSegment_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowSegment_args &) const;
 
-  bool operator < (const InfinityService_ShowSegment_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_ShowSegment_pargs {
- public:
+public:
+    virtual ~InfinityService_ShowSegment_pargs() noexcept;
+    const ShowSegmentRequest *request;
 
-
-  virtual ~InfinityService_ShowSegment_pargs() noexcept;
-  const ShowSegmentRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowSegment_result__isset {
-  _InfinityService_ShowSegment_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowSegment_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowSegment_result__isset;
 
 class InfinityService_ShowSegment_result {
- public:
+public:
+    InfinityService_ShowSegment_result(const InfinityService_ShowSegment_result &);
+    InfinityService_ShowSegment_result &operator=(const InfinityService_ShowSegment_result &);
+    InfinityService_ShowSegment_result() noexcept;
 
-  InfinityService_ShowSegment_result(const InfinityService_ShowSegment_result&);
-  InfinityService_ShowSegment_result& operator=(const InfinityService_ShowSegment_result&);
-  InfinityService_ShowSegment_result() noexcept;
+    virtual ~InfinityService_ShowSegment_result() noexcept;
+    ShowSegmentResponse success;
 
-  virtual ~InfinityService_ShowSegment_result() noexcept;
-  ShowSegmentResponse success;
+    _InfinityService_ShowSegment_result__isset __isset;
 
-  _InfinityService_ShowSegment_result__isset __isset;
+    void __set_success(const ShowSegmentResponse &val);
 
-  void __set_success(const ShowSegmentResponse& val);
+    bool operator==(const InfinityService_ShowSegment_result &rhs) const;
+    bool operator!=(const InfinityService_ShowSegment_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowSegment_result & rhs) const;
-  bool operator != (const InfinityService_ShowSegment_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowSegment_result &) const;
 
-  bool operator < (const InfinityService_ShowSegment_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowSegment_presult__isset {
-  _InfinityService_ShowSegment_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowSegment_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowSegment_presult__isset;
 
 class InfinityService_ShowSegment_presult {
- public:
+public:
+    virtual ~InfinityService_ShowSegment_presult() noexcept;
+    ShowSegmentResponse *success;
 
+    _InfinityService_ShowSegment_presult__isset __isset;
 
-  virtual ~InfinityService_ShowSegment_presult() noexcept;
-  ShowSegmentResponse* success;
-
-  _InfinityService_ShowSegment_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_ShowBlocks_args__isset {
-  _InfinityService_ShowBlocks_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_ShowBlocks_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_ShowBlocks_args__isset;
 
 class InfinityService_ShowBlocks_args {
- public:
+public:
+    InfinityService_ShowBlocks_args(const InfinityService_ShowBlocks_args &);
+    InfinityService_ShowBlocks_args &operator=(const InfinityService_ShowBlocks_args &);
+    InfinityService_ShowBlocks_args() noexcept;
 
-  InfinityService_ShowBlocks_args(const InfinityService_ShowBlocks_args&);
-  InfinityService_ShowBlocks_args& operator=(const InfinityService_ShowBlocks_args&);
-  InfinityService_ShowBlocks_args() noexcept;
+    virtual ~InfinityService_ShowBlocks_args() noexcept;
+    ShowBlocksRequest request;
 
-  virtual ~InfinityService_ShowBlocks_args() noexcept;
-  ShowBlocksRequest request;
+    _InfinityService_ShowBlocks_args__isset __isset;
 
-  _InfinityService_ShowBlocks_args__isset __isset;
+    void __set_request(const ShowBlocksRequest &val);
 
-  void __set_request(const ShowBlocksRequest& val);
+    bool operator==(const InfinityService_ShowBlocks_args &rhs) const;
+    bool operator!=(const InfinityService_ShowBlocks_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowBlocks_args & rhs) const;
-  bool operator != (const InfinityService_ShowBlocks_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowBlocks_args &) const;
 
-  bool operator < (const InfinityService_ShowBlocks_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_ShowBlocks_pargs {
- public:
+public:
+    virtual ~InfinityService_ShowBlocks_pargs() noexcept;
+    const ShowBlocksRequest *request;
 
-
-  virtual ~InfinityService_ShowBlocks_pargs() noexcept;
-  const ShowBlocksRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowBlocks_result__isset {
-  _InfinityService_ShowBlocks_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowBlocks_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowBlocks_result__isset;
 
 class InfinityService_ShowBlocks_result {
- public:
+public:
+    InfinityService_ShowBlocks_result(const InfinityService_ShowBlocks_result &);
+    InfinityService_ShowBlocks_result &operator=(const InfinityService_ShowBlocks_result &);
+    InfinityService_ShowBlocks_result() noexcept;
 
-  InfinityService_ShowBlocks_result(const InfinityService_ShowBlocks_result&);
-  InfinityService_ShowBlocks_result& operator=(const InfinityService_ShowBlocks_result&);
-  InfinityService_ShowBlocks_result() noexcept;
+    virtual ~InfinityService_ShowBlocks_result() noexcept;
+    SelectResponse success;
 
-  virtual ~InfinityService_ShowBlocks_result() noexcept;
-  SelectResponse success;
+    _InfinityService_ShowBlocks_result__isset __isset;
 
-  _InfinityService_ShowBlocks_result__isset __isset;
+    void __set_success(const SelectResponse &val);
 
-  void __set_success(const SelectResponse& val);
+    bool operator==(const InfinityService_ShowBlocks_result &rhs) const;
+    bool operator!=(const InfinityService_ShowBlocks_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowBlocks_result & rhs) const;
-  bool operator != (const InfinityService_ShowBlocks_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowBlocks_result &) const;
 
-  bool operator < (const InfinityService_ShowBlocks_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowBlocks_presult__isset {
-  _InfinityService_ShowBlocks_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowBlocks_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowBlocks_presult__isset;
 
 class InfinityService_ShowBlocks_presult {
- public:
+public:
+    virtual ~InfinityService_ShowBlocks_presult() noexcept;
+    SelectResponse *success;
 
+    _InfinityService_ShowBlocks_presult__isset __isset;
 
-  virtual ~InfinityService_ShowBlocks_presult() noexcept;
-  SelectResponse* success;
-
-  _InfinityService_ShowBlocks_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_ShowBlock_args__isset {
-  _InfinityService_ShowBlock_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_ShowBlock_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_ShowBlock_args__isset;
 
 class InfinityService_ShowBlock_args {
- public:
+public:
+    InfinityService_ShowBlock_args(const InfinityService_ShowBlock_args &);
+    InfinityService_ShowBlock_args &operator=(const InfinityService_ShowBlock_args &);
+    InfinityService_ShowBlock_args() noexcept;
 
-  InfinityService_ShowBlock_args(const InfinityService_ShowBlock_args&);
-  InfinityService_ShowBlock_args& operator=(const InfinityService_ShowBlock_args&);
-  InfinityService_ShowBlock_args() noexcept;
+    virtual ~InfinityService_ShowBlock_args() noexcept;
+    ShowBlockRequest request;
 
-  virtual ~InfinityService_ShowBlock_args() noexcept;
-  ShowBlockRequest request;
+    _InfinityService_ShowBlock_args__isset __isset;
 
-  _InfinityService_ShowBlock_args__isset __isset;
+    void __set_request(const ShowBlockRequest &val);
 
-  void __set_request(const ShowBlockRequest& val);
+    bool operator==(const InfinityService_ShowBlock_args &rhs) const;
+    bool operator!=(const InfinityService_ShowBlock_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowBlock_args & rhs) const;
-  bool operator != (const InfinityService_ShowBlock_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowBlock_args &) const;
 
-  bool operator < (const InfinityService_ShowBlock_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_ShowBlock_pargs {
- public:
+public:
+    virtual ~InfinityService_ShowBlock_pargs() noexcept;
+    const ShowBlockRequest *request;
 
-
-  virtual ~InfinityService_ShowBlock_pargs() noexcept;
-  const ShowBlockRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowBlock_result__isset {
-  _InfinityService_ShowBlock_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowBlock_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowBlock_result__isset;
 
 class InfinityService_ShowBlock_result {
- public:
+public:
+    InfinityService_ShowBlock_result(const InfinityService_ShowBlock_result &);
+    InfinityService_ShowBlock_result &operator=(const InfinityService_ShowBlock_result &);
+    InfinityService_ShowBlock_result() noexcept;
 
-  InfinityService_ShowBlock_result(const InfinityService_ShowBlock_result&);
-  InfinityService_ShowBlock_result& operator=(const InfinityService_ShowBlock_result&);
-  InfinityService_ShowBlock_result() noexcept;
+    virtual ~InfinityService_ShowBlock_result() noexcept;
+    ShowBlockResponse success;
 
-  virtual ~InfinityService_ShowBlock_result() noexcept;
-  ShowBlockResponse success;
+    _InfinityService_ShowBlock_result__isset __isset;
 
-  _InfinityService_ShowBlock_result__isset __isset;
+    void __set_success(const ShowBlockResponse &val);
 
-  void __set_success(const ShowBlockResponse& val);
+    bool operator==(const InfinityService_ShowBlock_result &rhs) const;
+    bool operator!=(const InfinityService_ShowBlock_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowBlock_result & rhs) const;
-  bool operator != (const InfinityService_ShowBlock_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowBlock_result &) const;
 
-  bool operator < (const InfinityService_ShowBlock_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowBlock_presult__isset {
-  _InfinityService_ShowBlock_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowBlock_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowBlock_presult__isset;
 
 class InfinityService_ShowBlock_presult {
- public:
+public:
+    virtual ~InfinityService_ShowBlock_presult() noexcept;
+    ShowBlockResponse *success;
 
+    _InfinityService_ShowBlock_presult__isset __isset;
 
-  virtual ~InfinityService_ShowBlock_presult() noexcept;
-  ShowBlockResponse* success;
-
-  _InfinityService_ShowBlock_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_ShowBlockColumn_args__isset {
-  _InfinityService_ShowBlockColumn_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_ShowBlockColumn_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_ShowBlockColumn_args__isset;
 
 class InfinityService_ShowBlockColumn_args {
- public:
+public:
+    InfinityService_ShowBlockColumn_args(const InfinityService_ShowBlockColumn_args &);
+    InfinityService_ShowBlockColumn_args &operator=(const InfinityService_ShowBlockColumn_args &);
+    InfinityService_ShowBlockColumn_args() noexcept;
 
-  InfinityService_ShowBlockColumn_args(const InfinityService_ShowBlockColumn_args&);
-  InfinityService_ShowBlockColumn_args& operator=(const InfinityService_ShowBlockColumn_args&);
-  InfinityService_ShowBlockColumn_args() noexcept;
+    virtual ~InfinityService_ShowBlockColumn_args() noexcept;
+    ShowBlockColumnRequest request;
 
-  virtual ~InfinityService_ShowBlockColumn_args() noexcept;
-  ShowBlockColumnRequest request;
+    _InfinityService_ShowBlockColumn_args__isset __isset;
 
-  _InfinityService_ShowBlockColumn_args__isset __isset;
+    void __set_request(const ShowBlockColumnRequest &val);
 
-  void __set_request(const ShowBlockColumnRequest& val);
+    bool operator==(const InfinityService_ShowBlockColumn_args &rhs) const;
+    bool operator!=(const InfinityService_ShowBlockColumn_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowBlockColumn_args & rhs) const;
-  bool operator != (const InfinityService_ShowBlockColumn_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowBlockColumn_args &) const;
 
-  bool operator < (const InfinityService_ShowBlockColumn_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_ShowBlockColumn_pargs {
- public:
+public:
+    virtual ~InfinityService_ShowBlockColumn_pargs() noexcept;
+    const ShowBlockColumnRequest *request;
 
-
-  virtual ~InfinityService_ShowBlockColumn_pargs() noexcept;
-  const ShowBlockColumnRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowBlockColumn_result__isset {
-  _InfinityService_ShowBlockColumn_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowBlockColumn_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowBlockColumn_result__isset;
 
 class InfinityService_ShowBlockColumn_result {
- public:
+public:
+    InfinityService_ShowBlockColumn_result(const InfinityService_ShowBlockColumn_result &);
+    InfinityService_ShowBlockColumn_result &operator=(const InfinityService_ShowBlockColumn_result &);
+    InfinityService_ShowBlockColumn_result() noexcept;
 
-  InfinityService_ShowBlockColumn_result(const InfinityService_ShowBlockColumn_result&);
-  InfinityService_ShowBlockColumn_result& operator=(const InfinityService_ShowBlockColumn_result&);
-  InfinityService_ShowBlockColumn_result() noexcept;
+    virtual ~InfinityService_ShowBlockColumn_result() noexcept;
+    ShowBlockColumnResponse success;
 
-  virtual ~InfinityService_ShowBlockColumn_result() noexcept;
-  ShowBlockColumnResponse success;
+    _InfinityService_ShowBlockColumn_result__isset __isset;
 
-  _InfinityService_ShowBlockColumn_result__isset __isset;
+    void __set_success(const ShowBlockColumnResponse &val);
 
-  void __set_success(const ShowBlockColumnResponse& val);
+    bool operator==(const InfinityService_ShowBlockColumn_result &rhs) const;
+    bool operator!=(const InfinityService_ShowBlockColumn_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowBlockColumn_result & rhs) const;
-  bool operator != (const InfinityService_ShowBlockColumn_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowBlockColumn_result &) const;
 
-  bool operator < (const InfinityService_ShowBlockColumn_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowBlockColumn_presult__isset {
-  _InfinityService_ShowBlockColumn_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowBlockColumn_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowBlockColumn_presult__isset;
 
 class InfinityService_ShowBlockColumn_presult {
- public:
+public:
+    virtual ~InfinityService_ShowBlockColumn_presult() noexcept;
+    ShowBlockColumnResponse *success;
 
+    _InfinityService_ShowBlockColumn_presult__isset __isset;
 
-  virtual ~InfinityService_ShowBlockColumn_presult() noexcept;
-  ShowBlockColumnResponse* success;
-
-  _InfinityService_ShowBlockColumn_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_ShowCurrentNode_args__isset {
-  _InfinityService_ShowCurrentNode_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_ShowCurrentNode_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_ShowCurrentNode_args__isset;
 
 class InfinityService_ShowCurrentNode_args {
- public:
+public:
+    InfinityService_ShowCurrentNode_args(const InfinityService_ShowCurrentNode_args &) noexcept;
+    InfinityService_ShowCurrentNode_args &operator=(const InfinityService_ShowCurrentNode_args &) noexcept;
+    InfinityService_ShowCurrentNode_args() noexcept;
 
-  InfinityService_ShowCurrentNode_args(const InfinityService_ShowCurrentNode_args&) noexcept;
-  InfinityService_ShowCurrentNode_args& operator=(const InfinityService_ShowCurrentNode_args&) noexcept;
-  InfinityService_ShowCurrentNode_args() noexcept;
+    virtual ~InfinityService_ShowCurrentNode_args() noexcept;
+    ShowCurrentNodeRequest request;
 
-  virtual ~InfinityService_ShowCurrentNode_args() noexcept;
-  ShowCurrentNodeRequest request;
+    _InfinityService_ShowCurrentNode_args__isset __isset;
 
-  _InfinityService_ShowCurrentNode_args__isset __isset;
+    void __set_request(const ShowCurrentNodeRequest &val);
 
-  void __set_request(const ShowCurrentNodeRequest& val);
+    bool operator==(const InfinityService_ShowCurrentNode_args &rhs) const;
+    bool operator!=(const InfinityService_ShowCurrentNode_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowCurrentNode_args & rhs) const;
-  bool operator != (const InfinityService_ShowCurrentNode_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowCurrentNode_args &) const;
 
-  bool operator < (const InfinityService_ShowCurrentNode_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_ShowCurrentNode_pargs {
- public:
+public:
+    virtual ~InfinityService_ShowCurrentNode_pargs() noexcept;
+    const ShowCurrentNodeRequest *request;
 
-
-  virtual ~InfinityService_ShowCurrentNode_pargs() noexcept;
-  const ShowCurrentNodeRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowCurrentNode_result__isset {
-  _InfinityService_ShowCurrentNode_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowCurrentNode_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowCurrentNode_result__isset;
 
 class InfinityService_ShowCurrentNode_result {
- public:
+public:
+    InfinityService_ShowCurrentNode_result(const InfinityService_ShowCurrentNode_result &);
+    InfinityService_ShowCurrentNode_result &operator=(const InfinityService_ShowCurrentNode_result &);
+    InfinityService_ShowCurrentNode_result() noexcept;
 
-  InfinityService_ShowCurrentNode_result(const InfinityService_ShowCurrentNode_result&);
-  InfinityService_ShowCurrentNode_result& operator=(const InfinityService_ShowCurrentNode_result&);
-  InfinityService_ShowCurrentNode_result() noexcept;
+    virtual ~InfinityService_ShowCurrentNode_result() noexcept;
+    ShowCurrentNodeResponse success;
 
-  virtual ~InfinityService_ShowCurrentNode_result() noexcept;
-  ShowCurrentNodeResponse success;
+    _InfinityService_ShowCurrentNode_result__isset __isset;
 
-  _InfinityService_ShowCurrentNode_result__isset __isset;
+    void __set_success(const ShowCurrentNodeResponse &val);
 
-  void __set_success(const ShowCurrentNodeResponse& val);
+    bool operator==(const InfinityService_ShowCurrentNode_result &rhs) const;
+    bool operator!=(const InfinityService_ShowCurrentNode_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowCurrentNode_result & rhs) const;
-  bool operator != (const InfinityService_ShowCurrentNode_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowCurrentNode_result &) const;
 
-  bool operator < (const InfinityService_ShowCurrentNode_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowCurrentNode_presult__isset {
-  _InfinityService_ShowCurrentNode_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowCurrentNode_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowCurrentNode_presult__isset;
 
 class InfinityService_ShowCurrentNode_presult {
- public:
+public:
+    virtual ~InfinityService_ShowCurrentNode_presult() noexcept;
+    ShowCurrentNodeResponse *success;
 
+    _InfinityService_ShowCurrentNode_presult__isset __isset;
 
-  virtual ~InfinityService_ShowCurrentNode_presult() noexcept;
-  ShowCurrentNodeResponse* success;
-
-  _InfinityService_ShowCurrentNode_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_GetDatabase_args__isset {
-  _InfinityService_GetDatabase_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_GetDatabase_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_GetDatabase_args__isset;
 
 class InfinityService_GetDatabase_args {
- public:
+public:
+    InfinityService_GetDatabase_args(const InfinityService_GetDatabase_args &);
+    InfinityService_GetDatabase_args &operator=(const InfinityService_GetDatabase_args &);
+    InfinityService_GetDatabase_args() noexcept;
 
-  InfinityService_GetDatabase_args(const InfinityService_GetDatabase_args&);
-  InfinityService_GetDatabase_args& operator=(const InfinityService_GetDatabase_args&);
-  InfinityService_GetDatabase_args() noexcept;
+    virtual ~InfinityService_GetDatabase_args() noexcept;
+    GetDatabaseRequest request;
 
-  virtual ~InfinityService_GetDatabase_args() noexcept;
-  GetDatabaseRequest request;
+    _InfinityService_GetDatabase_args__isset __isset;
 
-  _InfinityService_GetDatabase_args__isset __isset;
+    void __set_request(const GetDatabaseRequest &val);
 
-  void __set_request(const GetDatabaseRequest& val);
+    bool operator==(const InfinityService_GetDatabase_args &rhs) const;
+    bool operator!=(const InfinityService_GetDatabase_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_GetDatabase_args & rhs) const;
-  bool operator != (const InfinityService_GetDatabase_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_GetDatabase_args &) const;
 
-  bool operator < (const InfinityService_GetDatabase_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_GetDatabase_pargs {
- public:
+public:
+    virtual ~InfinityService_GetDatabase_pargs() noexcept;
+    const GetDatabaseRequest *request;
 
-
-  virtual ~InfinityService_GetDatabase_pargs() noexcept;
-  const GetDatabaseRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_GetDatabase_result__isset {
-  _InfinityService_GetDatabase_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_GetDatabase_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_GetDatabase_result__isset;
 
 class InfinityService_GetDatabase_result {
- public:
+public:
+    InfinityService_GetDatabase_result(const InfinityService_GetDatabase_result &);
+    InfinityService_GetDatabase_result &operator=(const InfinityService_GetDatabase_result &);
+    InfinityService_GetDatabase_result() noexcept;
 
-  InfinityService_GetDatabase_result(const InfinityService_GetDatabase_result&);
-  InfinityService_GetDatabase_result& operator=(const InfinityService_GetDatabase_result&);
-  InfinityService_GetDatabase_result() noexcept;
+    virtual ~InfinityService_GetDatabase_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_GetDatabase_result() noexcept;
-  CommonResponse success;
+    _InfinityService_GetDatabase_result__isset __isset;
 
-  _InfinityService_GetDatabase_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_GetDatabase_result &rhs) const;
+    bool operator!=(const InfinityService_GetDatabase_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_GetDatabase_result & rhs) const;
-  bool operator != (const InfinityService_GetDatabase_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_GetDatabase_result &) const;
 
-  bool operator < (const InfinityService_GetDatabase_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_GetDatabase_presult__isset {
-  _InfinityService_GetDatabase_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_GetDatabase_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_GetDatabase_presult__isset;
 
 class InfinityService_GetDatabase_presult {
- public:
+public:
+    virtual ~InfinityService_GetDatabase_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_GetDatabase_presult__isset __isset;
 
-  virtual ~InfinityService_GetDatabase_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_GetDatabase_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_GetTable_args__isset {
-  _InfinityService_GetTable_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_GetTable_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_GetTable_args__isset;
 
 class InfinityService_GetTable_args {
- public:
+public:
+    InfinityService_GetTable_args(const InfinityService_GetTable_args &);
+    InfinityService_GetTable_args &operator=(const InfinityService_GetTable_args &);
+    InfinityService_GetTable_args() noexcept;
 
-  InfinityService_GetTable_args(const InfinityService_GetTable_args&);
-  InfinityService_GetTable_args& operator=(const InfinityService_GetTable_args&);
-  InfinityService_GetTable_args() noexcept;
+    virtual ~InfinityService_GetTable_args() noexcept;
+    GetTableRequest request;
 
-  virtual ~InfinityService_GetTable_args() noexcept;
-  GetTableRequest request;
+    _InfinityService_GetTable_args__isset __isset;
 
-  _InfinityService_GetTable_args__isset __isset;
+    void __set_request(const GetTableRequest &val);
 
-  void __set_request(const GetTableRequest& val);
+    bool operator==(const InfinityService_GetTable_args &rhs) const;
+    bool operator!=(const InfinityService_GetTable_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_GetTable_args & rhs) const;
-  bool operator != (const InfinityService_GetTable_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_GetTable_args &) const;
 
-  bool operator < (const InfinityService_GetTable_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_GetTable_pargs {
- public:
+public:
+    virtual ~InfinityService_GetTable_pargs() noexcept;
+    const GetTableRequest *request;
 
-
-  virtual ~InfinityService_GetTable_pargs() noexcept;
-  const GetTableRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_GetTable_result__isset {
-  _InfinityService_GetTable_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_GetTable_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_GetTable_result__isset;
 
 class InfinityService_GetTable_result {
- public:
+public:
+    InfinityService_GetTable_result(const InfinityService_GetTable_result &);
+    InfinityService_GetTable_result &operator=(const InfinityService_GetTable_result &);
+    InfinityService_GetTable_result() noexcept;
 
-  InfinityService_GetTable_result(const InfinityService_GetTable_result&);
-  InfinityService_GetTable_result& operator=(const InfinityService_GetTable_result&);
-  InfinityService_GetTable_result() noexcept;
+    virtual ~InfinityService_GetTable_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_GetTable_result() noexcept;
-  CommonResponse success;
+    _InfinityService_GetTable_result__isset __isset;
 
-  _InfinityService_GetTable_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_GetTable_result &rhs) const;
+    bool operator!=(const InfinityService_GetTable_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_GetTable_result & rhs) const;
-  bool operator != (const InfinityService_GetTable_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_GetTable_result &) const;
 
-  bool operator < (const InfinityService_GetTable_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_GetTable_presult__isset {
-  _InfinityService_GetTable_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_GetTable_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_GetTable_presult__isset;
 
 class InfinityService_GetTable_presult {
- public:
+public:
+    virtual ~InfinityService_GetTable_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_GetTable_presult__isset __isset;
 
-  virtual ~InfinityService_GetTable_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_GetTable_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_CreateIndex_args__isset {
-  _InfinityService_CreateIndex_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_CreateIndex_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_CreateIndex_args__isset;
 
 class InfinityService_CreateIndex_args {
- public:
+public:
+    InfinityService_CreateIndex_args(const InfinityService_CreateIndex_args &);
+    InfinityService_CreateIndex_args &operator=(const InfinityService_CreateIndex_args &);
+    InfinityService_CreateIndex_args() noexcept;
 
-  InfinityService_CreateIndex_args(const InfinityService_CreateIndex_args&);
-  InfinityService_CreateIndex_args& operator=(const InfinityService_CreateIndex_args&);
-  InfinityService_CreateIndex_args() noexcept;
+    virtual ~InfinityService_CreateIndex_args() noexcept;
+    CreateIndexRequest request;
 
-  virtual ~InfinityService_CreateIndex_args() noexcept;
-  CreateIndexRequest request;
+    _InfinityService_CreateIndex_args__isset __isset;
 
-  _InfinityService_CreateIndex_args__isset __isset;
+    void __set_request(const CreateIndexRequest &val);
 
-  void __set_request(const CreateIndexRequest& val);
+    bool operator==(const InfinityService_CreateIndex_args &rhs) const;
+    bool operator!=(const InfinityService_CreateIndex_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_CreateIndex_args & rhs) const;
-  bool operator != (const InfinityService_CreateIndex_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_CreateIndex_args &) const;
 
-  bool operator < (const InfinityService_CreateIndex_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_CreateIndex_pargs {
- public:
+public:
+    virtual ~InfinityService_CreateIndex_pargs() noexcept;
+    const CreateIndexRequest *request;
 
-
-  virtual ~InfinityService_CreateIndex_pargs() noexcept;
-  const CreateIndexRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_CreateIndex_result__isset {
-  _InfinityService_CreateIndex_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_CreateIndex_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_CreateIndex_result__isset;
 
 class InfinityService_CreateIndex_result {
- public:
+public:
+    InfinityService_CreateIndex_result(const InfinityService_CreateIndex_result &);
+    InfinityService_CreateIndex_result &operator=(const InfinityService_CreateIndex_result &);
+    InfinityService_CreateIndex_result() noexcept;
 
-  InfinityService_CreateIndex_result(const InfinityService_CreateIndex_result&);
-  InfinityService_CreateIndex_result& operator=(const InfinityService_CreateIndex_result&);
-  InfinityService_CreateIndex_result() noexcept;
+    virtual ~InfinityService_CreateIndex_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_CreateIndex_result() noexcept;
-  CommonResponse success;
+    _InfinityService_CreateIndex_result__isset __isset;
 
-  _InfinityService_CreateIndex_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_CreateIndex_result &rhs) const;
+    bool operator!=(const InfinityService_CreateIndex_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_CreateIndex_result & rhs) const;
-  bool operator != (const InfinityService_CreateIndex_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_CreateIndex_result &) const;
 
-  bool operator < (const InfinityService_CreateIndex_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_CreateIndex_presult__isset {
-  _InfinityService_CreateIndex_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_CreateIndex_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_CreateIndex_presult__isset;
 
 class InfinityService_CreateIndex_presult {
- public:
+public:
+    virtual ~InfinityService_CreateIndex_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_CreateIndex_presult__isset __isset;
 
-  virtual ~InfinityService_CreateIndex_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_CreateIndex_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_DropIndex_args__isset {
-  _InfinityService_DropIndex_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_DropIndex_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_DropIndex_args__isset;
 
 class InfinityService_DropIndex_args {
- public:
+public:
+    InfinityService_DropIndex_args(const InfinityService_DropIndex_args &);
+    InfinityService_DropIndex_args &operator=(const InfinityService_DropIndex_args &);
+    InfinityService_DropIndex_args() noexcept;
 
-  InfinityService_DropIndex_args(const InfinityService_DropIndex_args&);
-  InfinityService_DropIndex_args& operator=(const InfinityService_DropIndex_args&);
-  InfinityService_DropIndex_args() noexcept;
+    virtual ~InfinityService_DropIndex_args() noexcept;
+    DropIndexRequest request;
 
-  virtual ~InfinityService_DropIndex_args() noexcept;
-  DropIndexRequest request;
+    _InfinityService_DropIndex_args__isset __isset;
 
-  _InfinityService_DropIndex_args__isset __isset;
+    void __set_request(const DropIndexRequest &val);
 
-  void __set_request(const DropIndexRequest& val);
+    bool operator==(const InfinityService_DropIndex_args &rhs) const;
+    bool operator!=(const InfinityService_DropIndex_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_DropIndex_args & rhs) const;
-  bool operator != (const InfinityService_DropIndex_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_DropIndex_args &) const;
 
-  bool operator < (const InfinityService_DropIndex_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_DropIndex_pargs {
- public:
+public:
+    virtual ~InfinityService_DropIndex_pargs() noexcept;
+    const DropIndexRequest *request;
 
-
-  virtual ~InfinityService_DropIndex_pargs() noexcept;
-  const DropIndexRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_DropIndex_result__isset {
-  _InfinityService_DropIndex_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_DropIndex_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_DropIndex_result__isset;
 
 class InfinityService_DropIndex_result {
- public:
+public:
+    InfinityService_DropIndex_result(const InfinityService_DropIndex_result &);
+    InfinityService_DropIndex_result &operator=(const InfinityService_DropIndex_result &);
+    InfinityService_DropIndex_result() noexcept;
 
-  InfinityService_DropIndex_result(const InfinityService_DropIndex_result&);
-  InfinityService_DropIndex_result& operator=(const InfinityService_DropIndex_result&);
-  InfinityService_DropIndex_result() noexcept;
+    virtual ~InfinityService_DropIndex_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_DropIndex_result() noexcept;
-  CommonResponse success;
+    _InfinityService_DropIndex_result__isset __isset;
 
-  _InfinityService_DropIndex_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_DropIndex_result &rhs) const;
+    bool operator!=(const InfinityService_DropIndex_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_DropIndex_result & rhs) const;
-  bool operator != (const InfinityService_DropIndex_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_DropIndex_result &) const;
 
-  bool operator < (const InfinityService_DropIndex_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_DropIndex_presult__isset {
-  _InfinityService_DropIndex_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_DropIndex_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_DropIndex_presult__isset;
 
 class InfinityService_DropIndex_presult {
- public:
+public:
+    virtual ~InfinityService_DropIndex_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_DropIndex_presult__isset __isset;
 
-  virtual ~InfinityService_DropIndex_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_DropIndex_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_ShowIndex_args__isset {
-  _InfinityService_ShowIndex_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_ShowIndex_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_ShowIndex_args__isset;
 
 class InfinityService_ShowIndex_args {
- public:
+public:
+    InfinityService_ShowIndex_args(const InfinityService_ShowIndex_args &);
+    InfinityService_ShowIndex_args &operator=(const InfinityService_ShowIndex_args &);
+    InfinityService_ShowIndex_args() noexcept;
 
-  InfinityService_ShowIndex_args(const InfinityService_ShowIndex_args&);
-  InfinityService_ShowIndex_args& operator=(const InfinityService_ShowIndex_args&);
-  InfinityService_ShowIndex_args() noexcept;
+    virtual ~InfinityService_ShowIndex_args() noexcept;
+    ShowIndexRequest request;
 
-  virtual ~InfinityService_ShowIndex_args() noexcept;
-  ShowIndexRequest request;
+    _InfinityService_ShowIndex_args__isset __isset;
 
-  _InfinityService_ShowIndex_args__isset __isset;
+    void __set_request(const ShowIndexRequest &val);
 
-  void __set_request(const ShowIndexRequest& val);
+    bool operator==(const InfinityService_ShowIndex_args &rhs) const;
+    bool operator!=(const InfinityService_ShowIndex_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowIndex_args & rhs) const;
-  bool operator != (const InfinityService_ShowIndex_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowIndex_args &) const;
 
-  bool operator < (const InfinityService_ShowIndex_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_ShowIndex_pargs {
- public:
+public:
+    virtual ~InfinityService_ShowIndex_pargs() noexcept;
+    const ShowIndexRequest *request;
 
-
-  virtual ~InfinityService_ShowIndex_pargs() noexcept;
-  const ShowIndexRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowIndex_result__isset {
-  _InfinityService_ShowIndex_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowIndex_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowIndex_result__isset;
 
 class InfinityService_ShowIndex_result {
- public:
+public:
+    InfinityService_ShowIndex_result(const InfinityService_ShowIndex_result &);
+    InfinityService_ShowIndex_result &operator=(const InfinityService_ShowIndex_result &);
+    InfinityService_ShowIndex_result() noexcept;
 
-  InfinityService_ShowIndex_result(const InfinityService_ShowIndex_result&);
-  InfinityService_ShowIndex_result& operator=(const InfinityService_ShowIndex_result&);
-  InfinityService_ShowIndex_result() noexcept;
+    virtual ~InfinityService_ShowIndex_result() noexcept;
+    ShowIndexResponse success;
 
-  virtual ~InfinityService_ShowIndex_result() noexcept;
-  ShowIndexResponse success;
+    _InfinityService_ShowIndex_result__isset __isset;
 
-  _InfinityService_ShowIndex_result__isset __isset;
+    void __set_success(const ShowIndexResponse &val);
 
-  void __set_success(const ShowIndexResponse& val);
+    bool operator==(const InfinityService_ShowIndex_result &rhs) const;
+    bool operator!=(const InfinityService_ShowIndex_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowIndex_result & rhs) const;
-  bool operator != (const InfinityService_ShowIndex_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowIndex_result &) const;
 
-  bool operator < (const InfinityService_ShowIndex_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowIndex_presult__isset {
-  _InfinityService_ShowIndex_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowIndex_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowIndex_presult__isset;
 
 class InfinityService_ShowIndex_presult {
- public:
+public:
+    virtual ~InfinityService_ShowIndex_presult() noexcept;
+    ShowIndexResponse *success;
 
+    _InfinityService_ShowIndex_presult__isset __isset;
 
-  virtual ~InfinityService_ShowIndex_presult() noexcept;
-  ShowIndexResponse* success;
-
-  _InfinityService_ShowIndex_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_Optimize_args__isset {
-  _InfinityService_Optimize_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_Optimize_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_Optimize_args__isset;
 
 class InfinityService_Optimize_args {
- public:
+public:
+    InfinityService_Optimize_args(const InfinityService_Optimize_args &);
+    InfinityService_Optimize_args &operator=(const InfinityService_Optimize_args &);
+    InfinityService_Optimize_args() noexcept;
 
-  InfinityService_Optimize_args(const InfinityService_Optimize_args&);
-  InfinityService_Optimize_args& operator=(const InfinityService_Optimize_args&);
-  InfinityService_Optimize_args() noexcept;
+    virtual ~InfinityService_Optimize_args() noexcept;
+    OptimizeRequest request;
 
-  virtual ~InfinityService_Optimize_args() noexcept;
-  OptimizeRequest request;
+    _InfinityService_Optimize_args__isset __isset;
 
-  _InfinityService_Optimize_args__isset __isset;
+    void __set_request(const OptimizeRequest &val);
 
-  void __set_request(const OptimizeRequest& val);
+    bool operator==(const InfinityService_Optimize_args &rhs) const;
+    bool operator!=(const InfinityService_Optimize_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Optimize_args & rhs) const;
-  bool operator != (const InfinityService_Optimize_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Optimize_args &) const;
 
-  bool operator < (const InfinityService_Optimize_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_Optimize_pargs {
- public:
+public:
+    virtual ~InfinityService_Optimize_pargs() noexcept;
+    const OptimizeRequest *request;
 
-
-  virtual ~InfinityService_Optimize_pargs() noexcept;
-  const OptimizeRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Optimize_result__isset {
-  _InfinityService_Optimize_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Optimize_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Optimize_result__isset;
 
 class InfinityService_Optimize_result {
- public:
+public:
+    InfinityService_Optimize_result(const InfinityService_Optimize_result &);
+    InfinityService_Optimize_result &operator=(const InfinityService_Optimize_result &);
+    InfinityService_Optimize_result() noexcept;
 
-  InfinityService_Optimize_result(const InfinityService_Optimize_result&);
-  InfinityService_Optimize_result& operator=(const InfinityService_Optimize_result&);
-  InfinityService_Optimize_result() noexcept;
+    virtual ~InfinityService_Optimize_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_Optimize_result() noexcept;
-  CommonResponse success;
+    _InfinityService_Optimize_result__isset __isset;
 
-  _InfinityService_Optimize_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_Optimize_result &rhs) const;
+    bool operator!=(const InfinityService_Optimize_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Optimize_result & rhs) const;
-  bool operator != (const InfinityService_Optimize_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Optimize_result &) const;
 
-  bool operator < (const InfinityService_Optimize_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Optimize_presult__isset {
-  _InfinityService_Optimize_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Optimize_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Optimize_presult__isset;
 
 class InfinityService_Optimize_presult {
- public:
+public:
+    virtual ~InfinityService_Optimize_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_Optimize_presult__isset __isset;
 
-  virtual ~InfinityService_Optimize_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_Optimize_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_AddColumns_args__isset {
-  _InfinityService_AddColumns_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_AddColumns_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_AddColumns_args__isset;
 
 class InfinityService_AddColumns_args {
- public:
+public:
+    InfinityService_AddColumns_args(const InfinityService_AddColumns_args &);
+    InfinityService_AddColumns_args &operator=(const InfinityService_AddColumns_args &);
+    InfinityService_AddColumns_args() noexcept;
 
-  InfinityService_AddColumns_args(const InfinityService_AddColumns_args&);
-  InfinityService_AddColumns_args& operator=(const InfinityService_AddColumns_args&);
-  InfinityService_AddColumns_args() noexcept;
+    virtual ~InfinityService_AddColumns_args() noexcept;
+    AddColumnsRequest request;
 
-  virtual ~InfinityService_AddColumns_args() noexcept;
-  AddColumnsRequest request;
+    _InfinityService_AddColumns_args__isset __isset;
 
-  _InfinityService_AddColumns_args__isset __isset;
+    void __set_request(const AddColumnsRequest &val);
 
-  void __set_request(const AddColumnsRequest& val);
+    bool operator==(const InfinityService_AddColumns_args &rhs) const;
+    bool operator!=(const InfinityService_AddColumns_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_AddColumns_args & rhs) const;
-  bool operator != (const InfinityService_AddColumns_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_AddColumns_args &) const;
 
-  bool operator < (const InfinityService_AddColumns_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_AddColumns_pargs {
- public:
+public:
+    virtual ~InfinityService_AddColumns_pargs() noexcept;
+    const AddColumnsRequest *request;
 
-
-  virtual ~InfinityService_AddColumns_pargs() noexcept;
-  const AddColumnsRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_AddColumns_result__isset {
-  _InfinityService_AddColumns_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_AddColumns_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_AddColumns_result__isset;
 
 class InfinityService_AddColumns_result {
- public:
+public:
+    InfinityService_AddColumns_result(const InfinityService_AddColumns_result &);
+    InfinityService_AddColumns_result &operator=(const InfinityService_AddColumns_result &);
+    InfinityService_AddColumns_result() noexcept;
 
-  InfinityService_AddColumns_result(const InfinityService_AddColumns_result&);
-  InfinityService_AddColumns_result& operator=(const InfinityService_AddColumns_result&);
-  InfinityService_AddColumns_result() noexcept;
+    virtual ~InfinityService_AddColumns_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_AddColumns_result() noexcept;
-  CommonResponse success;
+    _InfinityService_AddColumns_result__isset __isset;
 
-  _InfinityService_AddColumns_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_AddColumns_result &rhs) const;
+    bool operator!=(const InfinityService_AddColumns_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_AddColumns_result & rhs) const;
-  bool operator != (const InfinityService_AddColumns_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_AddColumns_result &) const;
 
-  bool operator < (const InfinityService_AddColumns_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_AddColumns_presult__isset {
-  _InfinityService_AddColumns_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_AddColumns_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_AddColumns_presult__isset;
 
 class InfinityService_AddColumns_presult {
- public:
+public:
+    virtual ~InfinityService_AddColumns_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_AddColumns_presult__isset __isset;
 
-  virtual ~InfinityService_AddColumns_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_AddColumns_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_DropColumns_args__isset {
-  _InfinityService_DropColumns_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_DropColumns_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_DropColumns_args__isset;
 
 class InfinityService_DropColumns_args {
- public:
+public:
+    InfinityService_DropColumns_args(const InfinityService_DropColumns_args &);
+    InfinityService_DropColumns_args &operator=(const InfinityService_DropColumns_args &);
+    InfinityService_DropColumns_args() noexcept;
 
-  InfinityService_DropColumns_args(const InfinityService_DropColumns_args&);
-  InfinityService_DropColumns_args& operator=(const InfinityService_DropColumns_args&);
-  InfinityService_DropColumns_args() noexcept;
+    virtual ~InfinityService_DropColumns_args() noexcept;
+    DropColumnsRequest request;
 
-  virtual ~InfinityService_DropColumns_args() noexcept;
-  DropColumnsRequest request;
+    _InfinityService_DropColumns_args__isset __isset;
 
-  _InfinityService_DropColumns_args__isset __isset;
+    void __set_request(const DropColumnsRequest &val);
 
-  void __set_request(const DropColumnsRequest& val);
+    bool operator==(const InfinityService_DropColumns_args &rhs) const;
+    bool operator!=(const InfinityService_DropColumns_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_DropColumns_args & rhs) const;
-  bool operator != (const InfinityService_DropColumns_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_DropColumns_args &) const;
 
-  bool operator < (const InfinityService_DropColumns_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_DropColumns_pargs {
- public:
+public:
+    virtual ~InfinityService_DropColumns_pargs() noexcept;
+    const DropColumnsRequest *request;
 
-
-  virtual ~InfinityService_DropColumns_pargs() noexcept;
-  const DropColumnsRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_DropColumns_result__isset {
-  _InfinityService_DropColumns_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_DropColumns_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_DropColumns_result__isset;
 
 class InfinityService_DropColumns_result {
- public:
+public:
+    InfinityService_DropColumns_result(const InfinityService_DropColumns_result &);
+    InfinityService_DropColumns_result &operator=(const InfinityService_DropColumns_result &);
+    InfinityService_DropColumns_result() noexcept;
 
-  InfinityService_DropColumns_result(const InfinityService_DropColumns_result&);
-  InfinityService_DropColumns_result& operator=(const InfinityService_DropColumns_result&);
-  InfinityService_DropColumns_result() noexcept;
+    virtual ~InfinityService_DropColumns_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_DropColumns_result() noexcept;
-  CommonResponse success;
+    _InfinityService_DropColumns_result__isset __isset;
 
-  _InfinityService_DropColumns_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_DropColumns_result &rhs) const;
+    bool operator!=(const InfinityService_DropColumns_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_DropColumns_result & rhs) const;
-  bool operator != (const InfinityService_DropColumns_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_DropColumns_result &) const;
 
-  bool operator < (const InfinityService_DropColumns_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_DropColumns_presult__isset {
-  _InfinityService_DropColumns_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_DropColumns_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_DropColumns_presult__isset;
 
 class InfinityService_DropColumns_presult {
- public:
+public:
+    virtual ~InfinityService_DropColumns_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_DropColumns_presult__isset __isset;
 
-  virtual ~InfinityService_DropColumns_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_DropColumns_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_Cleanup_args__isset {
-  _InfinityService_Cleanup_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_Cleanup_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_Cleanup_args__isset;
 
 class InfinityService_Cleanup_args {
- public:
+public:
+    InfinityService_Cleanup_args(const InfinityService_Cleanup_args &) noexcept;
+    InfinityService_Cleanup_args &operator=(const InfinityService_Cleanup_args &) noexcept;
+    InfinityService_Cleanup_args() noexcept;
 
-  InfinityService_Cleanup_args(const InfinityService_Cleanup_args&) noexcept;
-  InfinityService_Cleanup_args& operator=(const InfinityService_Cleanup_args&) noexcept;
-  InfinityService_Cleanup_args() noexcept;
+    virtual ~InfinityService_Cleanup_args() noexcept;
+    CommonRequest request;
 
-  virtual ~InfinityService_Cleanup_args() noexcept;
-  CommonRequest request;
+    _InfinityService_Cleanup_args__isset __isset;
 
-  _InfinityService_Cleanup_args__isset __isset;
+    void __set_request(const CommonRequest &val);
 
-  void __set_request(const CommonRequest& val);
+    bool operator==(const InfinityService_Cleanup_args &rhs) const;
+    bool operator!=(const InfinityService_Cleanup_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Cleanup_args & rhs) const;
-  bool operator != (const InfinityService_Cleanup_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Cleanup_args &) const;
 
-  bool operator < (const InfinityService_Cleanup_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_Cleanup_pargs {
- public:
+public:
+    virtual ~InfinityService_Cleanup_pargs() noexcept;
+    const CommonRequest *request;
 
-
-  virtual ~InfinityService_Cleanup_pargs() noexcept;
-  const CommonRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Cleanup_result__isset {
-  _InfinityService_Cleanup_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Cleanup_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Cleanup_result__isset;
 
 class InfinityService_Cleanup_result {
- public:
+public:
+    InfinityService_Cleanup_result(const InfinityService_Cleanup_result &);
+    InfinityService_Cleanup_result &operator=(const InfinityService_Cleanup_result &);
+    InfinityService_Cleanup_result() noexcept;
 
-  InfinityService_Cleanup_result(const InfinityService_Cleanup_result&);
-  InfinityService_Cleanup_result& operator=(const InfinityService_Cleanup_result&);
-  InfinityService_Cleanup_result() noexcept;
+    virtual ~InfinityService_Cleanup_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_Cleanup_result() noexcept;
-  CommonResponse success;
+    _InfinityService_Cleanup_result__isset __isset;
 
-  _InfinityService_Cleanup_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_Cleanup_result &rhs) const;
+    bool operator!=(const InfinityService_Cleanup_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Cleanup_result & rhs) const;
-  bool operator != (const InfinityService_Cleanup_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Cleanup_result &) const;
 
-  bool operator < (const InfinityService_Cleanup_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Cleanup_presult__isset {
-  _InfinityService_Cleanup_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Cleanup_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Cleanup_presult__isset;
 
 class InfinityService_Cleanup_presult {
- public:
+public:
+    virtual ~InfinityService_Cleanup_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_Cleanup_presult__isset __isset;
 
-  virtual ~InfinityService_Cleanup_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_Cleanup_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_DumpIndex_args__isset {
-  _InfinityService_DumpIndex_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_DumpIndex_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_DumpIndex_args__isset;
 
 class InfinityService_DumpIndex_args {
- public:
+public:
+    InfinityService_DumpIndex_args(const InfinityService_DumpIndex_args &);
+    InfinityService_DumpIndex_args &operator=(const InfinityService_DumpIndex_args &);
+    InfinityService_DumpIndex_args() noexcept;
 
-  InfinityService_DumpIndex_args(const InfinityService_DumpIndex_args&);
-  InfinityService_DumpIndex_args& operator=(const InfinityService_DumpIndex_args&);
-  InfinityService_DumpIndex_args() noexcept;
+    virtual ~InfinityService_DumpIndex_args() noexcept;
+    DumpIndexRequest request;
 
-  virtual ~InfinityService_DumpIndex_args() noexcept;
-  DumpIndexRequest request;
+    _InfinityService_DumpIndex_args__isset __isset;
 
-  _InfinityService_DumpIndex_args__isset __isset;
+    void __set_request(const DumpIndexRequest &val);
 
-  void __set_request(const DumpIndexRequest& val);
+    bool operator==(const InfinityService_DumpIndex_args &rhs) const;
+    bool operator!=(const InfinityService_DumpIndex_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_DumpIndex_args & rhs) const;
-  bool operator != (const InfinityService_DumpIndex_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_DumpIndex_args &) const;
 
-  bool operator < (const InfinityService_DumpIndex_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_DumpIndex_pargs {
- public:
+public:
+    virtual ~InfinityService_DumpIndex_pargs() noexcept;
+    const DumpIndexRequest *request;
 
-
-  virtual ~InfinityService_DumpIndex_pargs() noexcept;
-  const DumpIndexRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_DumpIndex_result__isset {
-  _InfinityService_DumpIndex_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_DumpIndex_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_DumpIndex_result__isset;
 
 class InfinityService_DumpIndex_result {
- public:
+public:
+    InfinityService_DumpIndex_result(const InfinityService_DumpIndex_result &);
+    InfinityService_DumpIndex_result &operator=(const InfinityService_DumpIndex_result &);
+    InfinityService_DumpIndex_result() noexcept;
 
-  InfinityService_DumpIndex_result(const InfinityService_DumpIndex_result&);
-  InfinityService_DumpIndex_result& operator=(const InfinityService_DumpIndex_result&);
-  InfinityService_DumpIndex_result() noexcept;
+    virtual ~InfinityService_DumpIndex_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_DumpIndex_result() noexcept;
-  CommonResponse success;
+    _InfinityService_DumpIndex_result__isset __isset;
 
-  _InfinityService_DumpIndex_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_DumpIndex_result &rhs) const;
+    bool operator!=(const InfinityService_DumpIndex_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_DumpIndex_result & rhs) const;
-  bool operator != (const InfinityService_DumpIndex_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_DumpIndex_result &) const;
 
-  bool operator < (const InfinityService_DumpIndex_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_DumpIndex_presult__isset {
-  _InfinityService_DumpIndex_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_DumpIndex_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_DumpIndex_presult__isset;
 
 class InfinityService_DumpIndex_presult {
- public:
+public:
+    virtual ~InfinityService_DumpIndex_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_DumpIndex_presult__isset __isset;
 
-  virtual ~InfinityService_DumpIndex_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_DumpIndex_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_Command_args__isset {
-  _InfinityService_Command_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_Command_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_Command_args__isset;
 
 class InfinityService_Command_args {
- public:
+public:
+    InfinityService_Command_args(const InfinityService_Command_args &);
+    InfinityService_Command_args &operator=(const InfinityService_Command_args &);
+    InfinityService_Command_args() noexcept;
 
-  InfinityService_Command_args(const InfinityService_Command_args&);
-  InfinityService_Command_args& operator=(const InfinityService_Command_args&);
-  InfinityService_Command_args() noexcept;
+    virtual ~InfinityService_Command_args() noexcept;
+    CommandRequest request;
 
-  virtual ~InfinityService_Command_args() noexcept;
-  CommandRequest request;
+    _InfinityService_Command_args__isset __isset;
 
-  _InfinityService_Command_args__isset __isset;
+    void __set_request(const CommandRequest &val);
 
-  void __set_request(const CommandRequest& val);
+    bool operator==(const InfinityService_Command_args &rhs) const;
+    bool operator!=(const InfinityService_Command_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Command_args & rhs) const;
-  bool operator != (const InfinityService_Command_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Command_args &) const;
 
-  bool operator < (const InfinityService_Command_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_Command_pargs {
- public:
+public:
+    virtual ~InfinityService_Command_pargs() noexcept;
+    const CommandRequest *request;
 
-
-  virtual ~InfinityService_Command_pargs() noexcept;
-  const CommandRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Command_result__isset {
-  _InfinityService_Command_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Command_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Command_result__isset;
 
 class InfinityService_Command_result {
- public:
+public:
+    InfinityService_Command_result(const InfinityService_Command_result &);
+    InfinityService_Command_result &operator=(const InfinityService_Command_result &);
+    InfinityService_Command_result() noexcept;
 
-  InfinityService_Command_result(const InfinityService_Command_result&);
-  InfinityService_Command_result& operator=(const InfinityService_Command_result&);
-  InfinityService_Command_result() noexcept;
+    virtual ~InfinityService_Command_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_Command_result() noexcept;
-  CommonResponse success;
+    _InfinityService_Command_result__isset __isset;
 
-  _InfinityService_Command_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_Command_result &rhs) const;
+    bool operator!=(const InfinityService_Command_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Command_result & rhs) const;
-  bool operator != (const InfinityService_Command_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Command_result &) const;
 
-  bool operator < (const InfinityService_Command_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Command_presult__isset {
-  _InfinityService_Command_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Command_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Command_presult__isset;
 
 class InfinityService_Command_presult {
- public:
+public:
+    virtual ~InfinityService_Command_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_Command_presult__isset __isset;
 
-  virtual ~InfinityService_Command_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_Command_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_Flush_args__isset {
-  _InfinityService_Flush_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_Flush_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_Flush_args__isset;
 
 class InfinityService_Flush_args {
- public:
+public:
+    InfinityService_Flush_args(const InfinityService_Flush_args &);
+    InfinityService_Flush_args &operator=(const InfinityService_Flush_args &);
+    InfinityService_Flush_args() noexcept;
 
-  InfinityService_Flush_args(const InfinityService_Flush_args&);
-  InfinityService_Flush_args& operator=(const InfinityService_Flush_args&);
-  InfinityService_Flush_args() noexcept;
+    virtual ~InfinityService_Flush_args() noexcept;
+    FlushRequest request;
 
-  virtual ~InfinityService_Flush_args() noexcept;
-  FlushRequest request;
+    _InfinityService_Flush_args__isset __isset;
 
-  _InfinityService_Flush_args__isset __isset;
+    void __set_request(const FlushRequest &val);
 
-  void __set_request(const FlushRequest& val);
+    bool operator==(const InfinityService_Flush_args &rhs) const;
+    bool operator!=(const InfinityService_Flush_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Flush_args & rhs) const;
-  bool operator != (const InfinityService_Flush_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Flush_args &) const;
 
-  bool operator < (const InfinityService_Flush_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_Flush_pargs {
- public:
+public:
+    virtual ~InfinityService_Flush_pargs() noexcept;
+    const FlushRequest *request;
 
-
-  virtual ~InfinityService_Flush_pargs() noexcept;
-  const FlushRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Flush_result__isset {
-  _InfinityService_Flush_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Flush_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Flush_result__isset;
 
 class InfinityService_Flush_result {
- public:
+public:
+    InfinityService_Flush_result(const InfinityService_Flush_result &);
+    InfinityService_Flush_result &operator=(const InfinityService_Flush_result &);
+    InfinityService_Flush_result() noexcept;
 
-  InfinityService_Flush_result(const InfinityService_Flush_result&);
-  InfinityService_Flush_result& operator=(const InfinityService_Flush_result&);
-  InfinityService_Flush_result() noexcept;
+    virtual ~InfinityService_Flush_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_Flush_result() noexcept;
-  CommonResponse success;
+    _InfinityService_Flush_result__isset __isset;
 
-  _InfinityService_Flush_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_Flush_result &rhs) const;
+    bool operator!=(const InfinityService_Flush_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Flush_result & rhs) const;
-  bool operator != (const InfinityService_Flush_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Flush_result &) const;
 
-  bool operator < (const InfinityService_Flush_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Flush_presult__isset {
-  _InfinityService_Flush_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Flush_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Flush_presult__isset;
 
 class InfinityService_Flush_presult {
- public:
+public:
+    virtual ~InfinityService_Flush_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_Flush_presult__isset __isset;
 
-  virtual ~InfinityService_Flush_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_Flush_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_Compact_args__isset {
-  _InfinityService_Compact_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_Compact_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_Compact_args__isset;
 
 class InfinityService_Compact_args {
- public:
+public:
+    InfinityService_Compact_args(const InfinityService_Compact_args &);
+    InfinityService_Compact_args &operator=(const InfinityService_Compact_args &);
+    InfinityService_Compact_args() noexcept;
 
-  InfinityService_Compact_args(const InfinityService_Compact_args&);
-  InfinityService_Compact_args& operator=(const InfinityService_Compact_args&);
-  InfinityService_Compact_args() noexcept;
+    virtual ~InfinityService_Compact_args() noexcept;
+    CompactRequest request;
 
-  virtual ~InfinityService_Compact_args() noexcept;
-  CompactRequest request;
+    _InfinityService_Compact_args__isset __isset;
 
-  _InfinityService_Compact_args__isset __isset;
+    void __set_request(const CompactRequest &val);
 
-  void __set_request(const CompactRequest& val);
+    bool operator==(const InfinityService_Compact_args &rhs) const;
+    bool operator!=(const InfinityService_Compact_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Compact_args & rhs) const;
-  bool operator != (const InfinityService_Compact_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Compact_args &) const;
 
-  bool operator < (const InfinityService_Compact_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_Compact_pargs {
- public:
+public:
+    virtual ~InfinityService_Compact_pargs() noexcept;
+    const CompactRequest *request;
 
-
-  virtual ~InfinityService_Compact_pargs() noexcept;
-  const CompactRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Compact_result__isset {
-  _InfinityService_Compact_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Compact_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Compact_result__isset;
 
 class InfinityService_Compact_result {
- public:
+public:
+    InfinityService_Compact_result(const InfinityService_Compact_result &);
+    InfinityService_Compact_result &operator=(const InfinityService_Compact_result &);
+    InfinityService_Compact_result() noexcept;
 
-  InfinityService_Compact_result(const InfinityService_Compact_result&);
-  InfinityService_Compact_result& operator=(const InfinityService_Compact_result&);
-  InfinityService_Compact_result() noexcept;
+    virtual ~InfinityService_Compact_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_Compact_result() noexcept;
-  CommonResponse success;
+    _InfinityService_Compact_result__isset __isset;
 
-  _InfinityService_Compact_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_Compact_result &rhs) const;
+    bool operator!=(const InfinityService_Compact_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_Compact_result & rhs) const;
-  bool operator != (const InfinityService_Compact_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_Compact_result &) const;
 
-  bool operator < (const InfinityService_Compact_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_Compact_presult__isset {
-  _InfinityService_Compact_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_Compact_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_Compact_presult__isset;
 
 class InfinityService_Compact_presult {
- public:
+public:
+    virtual ~InfinityService_Compact_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_Compact_presult__isset __isset;
 
-  virtual ~InfinityService_Compact_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_Compact_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_CreateTableSnapshot_args__isset {
-  _InfinityService_CreateTableSnapshot_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_CreateTableSnapshot_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_CreateTableSnapshot_args__isset;
 
 class InfinityService_CreateTableSnapshot_args {
- public:
+public:
+    InfinityService_CreateTableSnapshot_args(const InfinityService_CreateTableSnapshot_args &);
+    InfinityService_CreateTableSnapshot_args &operator=(const InfinityService_CreateTableSnapshot_args &);
+    InfinityService_CreateTableSnapshot_args() noexcept;
 
-  InfinityService_CreateTableSnapshot_args(const InfinityService_CreateTableSnapshot_args&);
-  InfinityService_CreateTableSnapshot_args& operator=(const InfinityService_CreateTableSnapshot_args&);
-  InfinityService_CreateTableSnapshot_args() noexcept;
+    virtual ~InfinityService_CreateTableSnapshot_args() noexcept;
+    CreateTableSnapshotRequest request;
 
-  virtual ~InfinityService_CreateTableSnapshot_args() noexcept;
-  CreateTableSnapshotRequest request;
+    _InfinityService_CreateTableSnapshot_args__isset __isset;
 
-  _InfinityService_CreateTableSnapshot_args__isset __isset;
+    void __set_request(const CreateTableSnapshotRequest &val);
 
-  void __set_request(const CreateTableSnapshotRequest& val);
+    bool operator==(const InfinityService_CreateTableSnapshot_args &rhs) const;
+    bool operator!=(const InfinityService_CreateTableSnapshot_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_CreateTableSnapshot_args & rhs) const;
-  bool operator != (const InfinityService_CreateTableSnapshot_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_CreateTableSnapshot_args &) const;
 
-  bool operator < (const InfinityService_CreateTableSnapshot_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_CreateTableSnapshot_pargs {
- public:
+public:
+    virtual ~InfinityService_CreateTableSnapshot_pargs() noexcept;
+    const CreateTableSnapshotRequest *request;
 
-
-  virtual ~InfinityService_CreateTableSnapshot_pargs() noexcept;
-  const CreateTableSnapshotRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_CreateTableSnapshot_result__isset {
-  _InfinityService_CreateTableSnapshot_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_CreateTableSnapshot_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_CreateTableSnapshot_result__isset;
 
 class InfinityService_CreateTableSnapshot_result {
- public:
+public:
+    InfinityService_CreateTableSnapshot_result(const InfinityService_CreateTableSnapshot_result &);
+    InfinityService_CreateTableSnapshot_result &operator=(const InfinityService_CreateTableSnapshot_result &);
+    InfinityService_CreateTableSnapshot_result() noexcept;
 
-  InfinityService_CreateTableSnapshot_result(const InfinityService_CreateTableSnapshot_result&);
-  InfinityService_CreateTableSnapshot_result& operator=(const InfinityService_CreateTableSnapshot_result&);
-  InfinityService_CreateTableSnapshot_result() noexcept;
+    virtual ~InfinityService_CreateTableSnapshot_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_CreateTableSnapshot_result() noexcept;
-  CommonResponse success;
+    _InfinityService_CreateTableSnapshot_result__isset __isset;
 
-  _InfinityService_CreateTableSnapshot_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_CreateTableSnapshot_result &rhs) const;
+    bool operator!=(const InfinityService_CreateTableSnapshot_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_CreateTableSnapshot_result & rhs) const;
-  bool operator != (const InfinityService_CreateTableSnapshot_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_CreateTableSnapshot_result &) const;
 
-  bool operator < (const InfinityService_CreateTableSnapshot_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_CreateTableSnapshot_presult__isset {
-  _InfinityService_CreateTableSnapshot_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_CreateTableSnapshot_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_CreateTableSnapshot_presult__isset;
 
 class InfinityService_CreateTableSnapshot_presult {
- public:
+public:
+    virtual ~InfinityService_CreateTableSnapshot_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_CreateTableSnapshot_presult__isset __isset;
 
-  virtual ~InfinityService_CreateTableSnapshot_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_CreateTableSnapshot_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_CreateDatabaseSnapshot_args__isset {
-  _InfinityService_CreateDatabaseSnapshot_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_CreateDatabaseSnapshot_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_CreateDatabaseSnapshot_args__isset;
 
 class InfinityService_CreateDatabaseSnapshot_args {
- public:
+public:
+    InfinityService_CreateDatabaseSnapshot_args(const InfinityService_CreateDatabaseSnapshot_args &);
+    InfinityService_CreateDatabaseSnapshot_args &operator=(const InfinityService_CreateDatabaseSnapshot_args &);
+    InfinityService_CreateDatabaseSnapshot_args() noexcept;
 
-  InfinityService_CreateDatabaseSnapshot_args(const InfinityService_CreateDatabaseSnapshot_args&);
-  InfinityService_CreateDatabaseSnapshot_args& operator=(const InfinityService_CreateDatabaseSnapshot_args&);
-  InfinityService_CreateDatabaseSnapshot_args() noexcept;
+    virtual ~InfinityService_CreateDatabaseSnapshot_args() noexcept;
+    CreateDatabaseSnapshotRequest request;
 
-  virtual ~InfinityService_CreateDatabaseSnapshot_args() noexcept;
-  CreateDatabaseSnapshotRequest request;
+    _InfinityService_CreateDatabaseSnapshot_args__isset __isset;
 
-  _InfinityService_CreateDatabaseSnapshot_args__isset __isset;
+    void __set_request(const CreateDatabaseSnapshotRequest &val);
 
-  void __set_request(const CreateDatabaseSnapshotRequest& val);
+    bool operator==(const InfinityService_CreateDatabaseSnapshot_args &rhs) const;
+    bool operator!=(const InfinityService_CreateDatabaseSnapshot_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_CreateDatabaseSnapshot_args & rhs) const;
-  bool operator != (const InfinityService_CreateDatabaseSnapshot_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_CreateDatabaseSnapshot_args &) const;
 
-  bool operator < (const InfinityService_CreateDatabaseSnapshot_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_CreateDatabaseSnapshot_pargs {
- public:
+public:
+    virtual ~InfinityService_CreateDatabaseSnapshot_pargs() noexcept;
+    const CreateDatabaseSnapshotRequest *request;
 
-
-  virtual ~InfinityService_CreateDatabaseSnapshot_pargs() noexcept;
-  const CreateDatabaseSnapshotRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_CreateDatabaseSnapshot_result__isset {
-  _InfinityService_CreateDatabaseSnapshot_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_CreateDatabaseSnapshot_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_CreateDatabaseSnapshot_result__isset;
 
 class InfinityService_CreateDatabaseSnapshot_result {
- public:
+public:
+    InfinityService_CreateDatabaseSnapshot_result(const InfinityService_CreateDatabaseSnapshot_result &);
+    InfinityService_CreateDatabaseSnapshot_result &operator=(const InfinityService_CreateDatabaseSnapshot_result &);
+    InfinityService_CreateDatabaseSnapshot_result() noexcept;
 
-  InfinityService_CreateDatabaseSnapshot_result(const InfinityService_CreateDatabaseSnapshot_result&);
-  InfinityService_CreateDatabaseSnapshot_result& operator=(const InfinityService_CreateDatabaseSnapshot_result&);
-  InfinityService_CreateDatabaseSnapshot_result() noexcept;
+    virtual ~InfinityService_CreateDatabaseSnapshot_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_CreateDatabaseSnapshot_result() noexcept;
-  CommonResponse success;
+    _InfinityService_CreateDatabaseSnapshot_result__isset __isset;
 
-  _InfinityService_CreateDatabaseSnapshot_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_CreateDatabaseSnapshot_result &rhs) const;
+    bool operator!=(const InfinityService_CreateDatabaseSnapshot_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_CreateDatabaseSnapshot_result & rhs) const;
-  bool operator != (const InfinityService_CreateDatabaseSnapshot_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_CreateDatabaseSnapshot_result &) const;
 
-  bool operator < (const InfinityService_CreateDatabaseSnapshot_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_CreateDatabaseSnapshot_presult__isset {
-  _InfinityService_CreateDatabaseSnapshot_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_CreateDatabaseSnapshot_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_CreateDatabaseSnapshot_presult__isset;
 
 class InfinityService_CreateDatabaseSnapshot_presult {
- public:
+public:
+    virtual ~InfinityService_CreateDatabaseSnapshot_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_CreateDatabaseSnapshot_presult__isset __isset;
 
-  virtual ~InfinityService_CreateDatabaseSnapshot_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_CreateDatabaseSnapshot_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_CreateSystemSnapshot_args__isset {
-  _InfinityService_CreateSystemSnapshot_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_CreateSystemSnapshot_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_CreateSystemSnapshot_args__isset;
 
 class InfinityService_CreateSystemSnapshot_args {
- public:
+public:
+    InfinityService_CreateSystemSnapshot_args(const InfinityService_CreateSystemSnapshot_args &);
+    InfinityService_CreateSystemSnapshot_args &operator=(const InfinityService_CreateSystemSnapshot_args &);
+    InfinityService_CreateSystemSnapshot_args() noexcept;
 
-  InfinityService_CreateSystemSnapshot_args(const InfinityService_CreateSystemSnapshot_args&);
-  InfinityService_CreateSystemSnapshot_args& operator=(const InfinityService_CreateSystemSnapshot_args&);
-  InfinityService_CreateSystemSnapshot_args() noexcept;
+    virtual ~InfinityService_CreateSystemSnapshot_args() noexcept;
+    CreateSystemSnapshotRequest request;
 
-  virtual ~InfinityService_CreateSystemSnapshot_args() noexcept;
-  CreateSystemSnapshotRequest request;
+    _InfinityService_CreateSystemSnapshot_args__isset __isset;
 
-  _InfinityService_CreateSystemSnapshot_args__isset __isset;
+    void __set_request(const CreateSystemSnapshotRequest &val);
 
-  void __set_request(const CreateSystemSnapshotRequest& val);
+    bool operator==(const InfinityService_CreateSystemSnapshot_args &rhs) const;
+    bool operator!=(const InfinityService_CreateSystemSnapshot_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_CreateSystemSnapshot_args & rhs) const;
-  bool operator != (const InfinityService_CreateSystemSnapshot_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_CreateSystemSnapshot_args &) const;
 
-  bool operator < (const InfinityService_CreateSystemSnapshot_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_CreateSystemSnapshot_pargs {
- public:
+public:
+    virtual ~InfinityService_CreateSystemSnapshot_pargs() noexcept;
+    const CreateSystemSnapshotRequest *request;
 
-
-  virtual ~InfinityService_CreateSystemSnapshot_pargs() noexcept;
-  const CreateSystemSnapshotRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_CreateSystemSnapshot_result__isset {
-  _InfinityService_CreateSystemSnapshot_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_CreateSystemSnapshot_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_CreateSystemSnapshot_result__isset;
 
 class InfinityService_CreateSystemSnapshot_result {
- public:
+public:
+    InfinityService_CreateSystemSnapshot_result(const InfinityService_CreateSystemSnapshot_result &);
+    InfinityService_CreateSystemSnapshot_result &operator=(const InfinityService_CreateSystemSnapshot_result &);
+    InfinityService_CreateSystemSnapshot_result() noexcept;
 
-  InfinityService_CreateSystemSnapshot_result(const InfinityService_CreateSystemSnapshot_result&);
-  InfinityService_CreateSystemSnapshot_result& operator=(const InfinityService_CreateSystemSnapshot_result&);
-  InfinityService_CreateSystemSnapshot_result() noexcept;
+    virtual ~InfinityService_CreateSystemSnapshot_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_CreateSystemSnapshot_result() noexcept;
-  CommonResponse success;
+    _InfinityService_CreateSystemSnapshot_result__isset __isset;
 
-  _InfinityService_CreateSystemSnapshot_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_CreateSystemSnapshot_result &rhs) const;
+    bool operator!=(const InfinityService_CreateSystemSnapshot_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_CreateSystemSnapshot_result & rhs) const;
-  bool operator != (const InfinityService_CreateSystemSnapshot_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_CreateSystemSnapshot_result &) const;
 
-  bool operator < (const InfinityService_CreateSystemSnapshot_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_CreateSystemSnapshot_presult__isset {
-  _InfinityService_CreateSystemSnapshot_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_CreateSystemSnapshot_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_CreateSystemSnapshot_presult__isset;
 
 class InfinityService_CreateSystemSnapshot_presult {
- public:
+public:
+    virtual ~InfinityService_CreateSystemSnapshot_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_CreateSystemSnapshot_presult__isset __isset;
 
-  virtual ~InfinityService_CreateSystemSnapshot_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_CreateSystemSnapshot_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_RestoreSnapshot_args__isset {
-  _InfinityService_RestoreSnapshot_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_RestoreSnapshot_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_RestoreSnapshot_args__isset;
 
 class InfinityService_RestoreSnapshot_args {
- public:
+public:
+    InfinityService_RestoreSnapshot_args(const InfinityService_RestoreSnapshot_args &);
+    InfinityService_RestoreSnapshot_args &operator=(const InfinityService_RestoreSnapshot_args &);
+    InfinityService_RestoreSnapshot_args() noexcept;
 
-  InfinityService_RestoreSnapshot_args(const InfinityService_RestoreSnapshot_args&);
-  InfinityService_RestoreSnapshot_args& operator=(const InfinityService_RestoreSnapshot_args&);
-  InfinityService_RestoreSnapshot_args() noexcept;
+    virtual ~InfinityService_RestoreSnapshot_args() noexcept;
+    RestoreSnapshotRequest request;
 
-  virtual ~InfinityService_RestoreSnapshot_args() noexcept;
-  RestoreSnapshotRequest request;
+    _InfinityService_RestoreSnapshot_args__isset __isset;
 
-  _InfinityService_RestoreSnapshot_args__isset __isset;
+    void __set_request(const RestoreSnapshotRequest &val);
 
-  void __set_request(const RestoreSnapshotRequest& val);
+    bool operator==(const InfinityService_RestoreSnapshot_args &rhs) const;
+    bool operator!=(const InfinityService_RestoreSnapshot_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_RestoreSnapshot_args & rhs) const;
-  bool operator != (const InfinityService_RestoreSnapshot_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_RestoreSnapshot_args &) const;
 
-  bool operator < (const InfinityService_RestoreSnapshot_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_RestoreSnapshot_pargs {
- public:
+public:
+    virtual ~InfinityService_RestoreSnapshot_pargs() noexcept;
+    const RestoreSnapshotRequest *request;
 
-
-  virtual ~InfinityService_RestoreSnapshot_pargs() noexcept;
-  const RestoreSnapshotRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_RestoreSnapshot_result__isset {
-  _InfinityService_RestoreSnapshot_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_RestoreSnapshot_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_RestoreSnapshot_result__isset;
 
 class InfinityService_RestoreSnapshot_result {
- public:
+public:
+    InfinityService_RestoreSnapshot_result(const InfinityService_RestoreSnapshot_result &);
+    InfinityService_RestoreSnapshot_result &operator=(const InfinityService_RestoreSnapshot_result &);
+    InfinityService_RestoreSnapshot_result() noexcept;
 
-  InfinityService_RestoreSnapshot_result(const InfinityService_RestoreSnapshot_result&);
-  InfinityService_RestoreSnapshot_result& operator=(const InfinityService_RestoreSnapshot_result&);
-  InfinityService_RestoreSnapshot_result() noexcept;
+    virtual ~InfinityService_RestoreSnapshot_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_RestoreSnapshot_result() noexcept;
-  CommonResponse success;
+    _InfinityService_RestoreSnapshot_result__isset __isset;
 
-  _InfinityService_RestoreSnapshot_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_RestoreSnapshot_result &rhs) const;
+    bool operator!=(const InfinityService_RestoreSnapshot_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_RestoreSnapshot_result & rhs) const;
-  bool operator != (const InfinityService_RestoreSnapshot_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_RestoreSnapshot_result &) const;
 
-  bool operator < (const InfinityService_RestoreSnapshot_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_RestoreSnapshot_presult__isset {
-  _InfinityService_RestoreSnapshot_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_RestoreSnapshot_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_RestoreSnapshot_presult__isset;
 
 class InfinityService_RestoreSnapshot_presult {
- public:
+public:
+    virtual ~InfinityService_RestoreSnapshot_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_RestoreSnapshot_presult__isset __isset;
 
-  virtual ~InfinityService_RestoreSnapshot_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_RestoreSnapshot_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_ShowSnapshot_args__isset {
-  _InfinityService_ShowSnapshot_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_ShowSnapshot_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_ShowSnapshot_args__isset;
 
 class InfinityService_ShowSnapshot_args {
- public:
+public:
+    InfinityService_ShowSnapshot_args(const InfinityService_ShowSnapshot_args &);
+    InfinityService_ShowSnapshot_args &operator=(const InfinityService_ShowSnapshot_args &);
+    InfinityService_ShowSnapshot_args() noexcept;
 
-  InfinityService_ShowSnapshot_args(const InfinityService_ShowSnapshot_args&);
-  InfinityService_ShowSnapshot_args& operator=(const InfinityService_ShowSnapshot_args&);
-  InfinityService_ShowSnapshot_args() noexcept;
+    virtual ~InfinityService_ShowSnapshot_args() noexcept;
+    ShowSnapshotRequest request;
 
-  virtual ~InfinityService_ShowSnapshot_args() noexcept;
-  ShowSnapshotRequest request;
+    _InfinityService_ShowSnapshot_args__isset __isset;
 
-  _InfinityService_ShowSnapshot_args__isset __isset;
+    void __set_request(const ShowSnapshotRequest &val);
 
-  void __set_request(const ShowSnapshotRequest& val);
+    bool operator==(const InfinityService_ShowSnapshot_args &rhs) const;
+    bool operator!=(const InfinityService_ShowSnapshot_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowSnapshot_args & rhs) const;
-  bool operator != (const InfinityService_ShowSnapshot_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowSnapshot_args &) const;
 
-  bool operator < (const InfinityService_ShowSnapshot_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_ShowSnapshot_pargs {
- public:
+public:
+    virtual ~InfinityService_ShowSnapshot_pargs() noexcept;
+    const ShowSnapshotRequest *request;
 
-
-  virtual ~InfinityService_ShowSnapshot_pargs() noexcept;
-  const ShowSnapshotRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowSnapshot_result__isset {
-  _InfinityService_ShowSnapshot_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowSnapshot_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowSnapshot_result__isset;
 
 class InfinityService_ShowSnapshot_result {
- public:
+public:
+    InfinityService_ShowSnapshot_result(const InfinityService_ShowSnapshot_result &);
+    InfinityService_ShowSnapshot_result &operator=(const InfinityService_ShowSnapshot_result &);
+    InfinityService_ShowSnapshot_result() noexcept;
 
-  InfinityService_ShowSnapshot_result(const InfinityService_ShowSnapshot_result&);
-  InfinityService_ShowSnapshot_result& operator=(const InfinityService_ShowSnapshot_result&);
-  InfinityService_ShowSnapshot_result() noexcept;
+    virtual ~InfinityService_ShowSnapshot_result() noexcept;
+    ShowSnapshotResponse success;
 
-  virtual ~InfinityService_ShowSnapshot_result() noexcept;
-  ShowSnapshotResponse success;
+    _InfinityService_ShowSnapshot_result__isset __isset;
 
-  _InfinityService_ShowSnapshot_result__isset __isset;
+    void __set_success(const ShowSnapshotResponse &val);
 
-  void __set_success(const ShowSnapshotResponse& val);
+    bool operator==(const InfinityService_ShowSnapshot_result &rhs) const;
+    bool operator!=(const InfinityService_ShowSnapshot_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ShowSnapshot_result & rhs) const;
-  bool operator != (const InfinityService_ShowSnapshot_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ShowSnapshot_result &) const;
 
-  bool operator < (const InfinityService_ShowSnapshot_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ShowSnapshot_presult__isset {
-  _InfinityService_ShowSnapshot_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ShowSnapshot_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ShowSnapshot_presult__isset;
 
 class InfinityService_ShowSnapshot_presult {
- public:
+public:
+    virtual ~InfinityService_ShowSnapshot_presult() noexcept;
+    ShowSnapshotResponse *success;
 
+    _InfinityService_ShowSnapshot_presult__isset __isset;
 
-  virtual ~InfinityService_ShowSnapshot_presult() noexcept;
-  ShowSnapshotResponse* success;
-
-  _InfinityService_ShowSnapshot_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_ListSnapshots_args__isset {
-  _InfinityService_ListSnapshots_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_ListSnapshots_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_ListSnapshots_args__isset;
 
 class InfinityService_ListSnapshots_args {
- public:
+public:
+    InfinityService_ListSnapshots_args(const InfinityService_ListSnapshots_args &) noexcept;
+    InfinityService_ListSnapshots_args &operator=(const InfinityService_ListSnapshots_args &) noexcept;
+    InfinityService_ListSnapshots_args() noexcept;
 
-  InfinityService_ListSnapshots_args(const InfinityService_ListSnapshots_args&) noexcept;
-  InfinityService_ListSnapshots_args& operator=(const InfinityService_ListSnapshots_args&) noexcept;
-  InfinityService_ListSnapshots_args() noexcept;
+    virtual ~InfinityService_ListSnapshots_args() noexcept;
+    ListSnapshotsRequest request;
 
-  virtual ~InfinityService_ListSnapshots_args() noexcept;
-  ListSnapshotsRequest request;
+    _InfinityService_ListSnapshots_args__isset __isset;
 
-  _InfinityService_ListSnapshots_args__isset __isset;
+    void __set_request(const ListSnapshotsRequest &val);
 
-  void __set_request(const ListSnapshotsRequest& val);
+    bool operator==(const InfinityService_ListSnapshots_args &rhs) const;
+    bool operator!=(const InfinityService_ListSnapshots_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ListSnapshots_args & rhs) const;
-  bool operator != (const InfinityService_ListSnapshots_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ListSnapshots_args &) const;
 
-  bool operator < (const InfinityService_ListSnapshots_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_ListSnapshots_pargs {
- public:
+public:
+    virtual ~InfinityService_ListSnapshots_pargs() noexcept;
+    const ListSnapshotsRequest *request;
 
-
-  virtual ~InfinityService_ListSnapshots_pargs() noexcept;
-  const ListSnapshotsRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ListSnapshots_result__isset {
-  _InfinityService_ListSnapshots_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ListSnapshots_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ListSnapshots_result__isset;
 
 class InfinityService_ListSnapshots_result {
- public:
+public:
+    InfinityService_ListSnapshots_result(const InfinityService_ListSnapshots_result &);
+    InfinityService_ListSnapshots_result &operator=(const InfinityService_ListSnapshots_result &);
+    InfinityService_ListSnapshots_result() noexcept;
 
-  InfinityService_ListSnapshots_result(const InfinityService_ListSnapshots_result&);
-  InfinityService_ListSnapshots_result& operator=(const InfinityService_ListSnapshots_result&);
-  InfinityService_ListSnapshots_result() noexcept;
+    virtual ~InfinityService_ListSnapshots_result() noexcept;
+    ListSnapshotsResponse success;
 
-  virtual ~InfinityService_ListSnapshots_result() noexcept;
-  ListSnapshotsResponse success;
+    _InfinityService_ListSnapshots_result__isset __isset;
 
-  _InfinityService_ListSnapshots_result__isset __isset;
+    void __set_success(const ListSnapshotsResponse &val);
 
-  void __set_success(const ListSnapshotsResponse& val);
+    bool operator==(const InfinityService_ListSnapshots_result &rhs) const;
+    bool operator!=(const InfinityService_ListSnapshots_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_ListSnapshots_result & rhs) const;
-  bool operator != (const InfinityService_ListSnapshots_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_ListSnapshots_result &) const;
 
-  bool operator < (const InfinityService_ListSnapshots_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_ListSnapshots_presult__isset {
-  _InfinityService_ListSnapshots_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_ListSnapshots_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_ListSnapshots_presult__isset;
 
 class InfinityService_ListSnapshots_presult {
- public:
+public:
+    virtual ~InfinityService_ListSnapshots_presult() noexcept;
+    ListSnapshotsResponse *success;
 
+    _InfinityService_ListSnapshots_presult__isset __isset;
 
-  virtual ~InfinityService_ListSnapshots_presult() noexcept;
-  ListSnapshotsResponse* success;
-
-  _InfinityService_ListSnapshots_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 typedef struct _InfinityService_DropSnapshot_args__isset {
-  _InfinityService_DropSnapshot_args__isset() : request(false) {}
-  bool request :1;
+    _InfinityService_DropSnapshot_args__isset() : request(false) {}
+    bool request : 1;
 } _InfinityService_DropSnapshot_args__isset;
 
 class InfinityService_DropSnapshot_args {
- public:
+public:
+    InfinityService_DropSnapshot_args(const InfinityService_DropSnapshot_args &);
+    InfinityService_DropSnapshot_args &operator=(const InfinityService_DropSnapshot_args &);
+    InfinityService_DropSnapshot_args() noexcept;
 
-  InfinityService_DropSnapshot_args(const InfinityService_DropSnapshot_args&);
-  InfinityService_DropSnapshot_args& operator=(const InfinityService_DropSnapshot_args&);
-  InfinityService_DropSnapshot_args() noexcept;
+    virtual ~InfinityService_DropSnapshot_args() noexcept;
+    DropSnapshotRequest request;
 
-  virtual ~InfinityService_DropSnapshot_args() noexcept;
-  DropSnapshotRequest request;
+    _InfinityService_DropSnapshot_args__isset __isset;
 
-  _InfinityService_DropSnapshot_args__isset __isset;
+    void __set_request(const DropSnapshotRequest &val);
 
-  void __set_request(const DropSnapshotRequest& val);
+    bool operator==(const InfinityService_DropSnapshot_args &rhs) const;
+    bool operator!=(const InfinityService_DropSnapshot_args &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_DropSnapshot_args & rhs) const;
-  bool operator != (const InfinityService_DropSnapshot_args &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_DropSnapshot_args &) const;
 
-  bool operator < (const InfinityService_DropSnapshot_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
-
 class InfinityService_DropSnapshot_pargs {
- public:
+public:
+    virtual ~InfinityService_DropSnapshot_pargs() noexcept;
+    const DropSnapshotRequest *request;
 
-
-  virtual ~InfinityService_DropSnapshot_pargs() noexcept;
-  const DropSnapshotRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_DropSnapshot_result__isset {
-  _InfinityService_DropSnapshot_result__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_DropSnapshot_result__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_DropSnapshot_result__isset;
 
 class InfinityService_DropSnapshot_result {
- public:
+public:
+    InfinityService_DropSnapshot_result(const InfinityService_DropSnapshot_result &);
+    InfinityService_DropSnapshot_result &operator=(const InfinityService_DropSnapshot_result &);
+    InfinityService_DropSnapshot_result() noexcept;
 
-  InfinityService_DropSnapshot_result(const InfinityService_DropSnapshot_result&);
-  InfinityService_DropSnapshot_result& operator=(const InfinityService_DropSnapshot_result&);
-  InfinityService_DropSnapshot_result() noexcept;
+    virtual ~InfinityService_DropSnapshot_result() noexcept;
+    CommonResponse success;
 
-  virtual ~InfinityService_DropSnapshot_result() noexcept;
-  CommonResponse success;
+    _InfinityService_DropSnapshot_result__isset __isset;
 
-  _InfinityService_DropSnapshot_result__isset __isset;
+    void __set_success(const CommonResponse &val);
 
-  void __set_success(const CommonResponse& val);
+    bool operator==(const InfinityService_DropSnapshot_result &rhs) const;
+    bool operator!=(const InfinityService_DropSnapshot_result &rhs) const { return !(*this == rhs); }
 
-  bool operator == (const InfinityService_DropSnapshot_result & rhs) const;
-  bool operator != (const InfinityService_DropSnapshot_result &rhs) const {
-    return !(*this == rhs);
-  }
+    bool operator<(const InfinityService_DropSnapshot_result &) const;
 
-  bool operator < (const InfinityService_DropSnapshot_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
 };
 
 typedef struct _InfinityService_DropSnapshot_presult__isset {
-  _InfinityService_DropSnapshot_presult__isset() : success(false) {}
-  bool success :1;
+    _InfinityService_DropSnapshot_presult__isset() : success(false) {}
+    bool success : 1;
 } _InfinityService_DropSnapshot_presult__isset;
 
 class InfinityService_DropSnapshot_presult {
- public:
+public:
+    virtual ~InfinityService_DropSnapshot_presult() noexcept;
+    CommonResponse *success;
 
+    _InfinityService_DropSnapshot_presult__isset __isset;
 
-  virtual ~InfinityService_DropSnapshot_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_DropSnapshot_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
 class InfinityServiceClient : virtual public InfinityServiceIf {
- public:
-  InfinityServiceClient(std::shared_ptr< ::apache::thrift::protocol::TProtocol> prot) {
-    setProtocol(prot);
-  }
-  InfinityServiceClient(std::shared_ptr< ::apache::thrift::protocol::TProtocol> iprot, std::shared_ptr< ::apache::thrift::protocol::TProtocol> oprot) {
-    setProtocol(iprot,oprot);
-  }
- private:
-  void setProtocol(std::shared_ptr< ::apache::thrift::protocol::TProtocol> prot) {
-  setProtocol(prot,prot);
-  }
-  void setProtocol(std::shared_ptr< ::apache::thrift::protocol::TProtocol> iprot, std::shared_ptr< ::apache::thrift::protocol::TProtocol> oprot) {
-    piprot_=iprot;
-    poprot_=oprot;
-    iprot_ = iprot.get();
-    oprot_ = oprot.get();
-  }
- public:
-  std::shared_ptr< ::apache::thrift::protocol::TProtocol> getInputProtocol() {
-    return piprot_;
-  }
-  std::shared_ptr< ::apache::thrift::protocol::TProtocol> getOutputProtocol() {
-    return poprot_;
-  }
-  void Connect(CommonResponse& _return, const ConnectRequest& request) override;
-  void send_Connect(const ConnectRequest& request);
-  void recv_Connect(CommonResponse& _return);
-  void Disconnect(CommonResponse& _return, const CommonRequest& request) override;
-  void send_Disconnect(const CommonRequest& request);
-  void recv_Disconnect(CommonResponse& _return);
-  void CreateDatabase(CommonResponse& _return, const CreateDatabaseRequest& request) override;
-  void send_CreateDatabase(const CreateDatabaseRequest& request);
-  void recv_CreateDatabase(CommonResponse& _return);
-  void DropDatabase(CommonResponse& _return, const DropDatabaseRequest& request) override;
-  void send_DropDatabase(const DropDatabaseRequest& request);
-  void recv_DropDatabase(CommonResponse& _return);
-  void CreateTable(CommonResponse& _return, const CreateTableRequest& request) override;
-  void send_CreateTable(const CreateTableRequest& request);
-  void recv_CreateTable(CommonResponse& _return);
-  void DropTable(CommonResponse& _return, const DropTableRequest& request) override;
-  void send_DropTable(const DropTableRequest& request);
-  void recv_DropTable(CommonResponse& _return);
-  void Insert(CommonResponse& _return, const InsertRequest& request) override;
-  void send_Insert(const InsertRequest& request);
-  void recv_Insert(CommonResponse& _return);
-  void Import(CommonResponse& _return, const ImportRequest& request) override;
-  void send_Import(const ImportRequest& request);
-  void recv_Import(CommonResponse& _return);
-  void Export(CommonResponse& _return, const ExportRequest& request) override;
-  void send_Export(const ExportRequest& request);
-  void recv_Export(CommonResponse& _return);
-  void Select(SelectResponse& _return, const SelectRequest& request) override;
-  void send_Select(const SelectRequest& request);
-  void recv_Select(SelectResponse& _return);
-  void Explain(SelectResponse& _return, const ExplainRequest& request) override;
-  void send_Explain(const ExplainRequest& request);
-  void recv_Explain(SelectResponse& _return);
-  void Delete(DeleteResponse& _return, const DeleteRequest& request) override;
-  void send_Delete(const DeleteRequest& request);
-  void recv_Delete(DeleteResponse& _return);
-  void Update(CommonResponse& _return, const UpdateRequest& request) override;
-  void send_Update(const UpdateRequest& request);
-  void recv_Update(CommonResponse& _return);
-  void ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request) override;
-  void send_ListDatabase(const ListDatabaseRequest& request);
-  void recv_ListDatabase(ListDatabaseResponse& _return);
-  void ListTable(ListTableResponse& _return, const ListTableRequest& request) override;
-  void send_ListTable(const ListTableRequest& request);
-  void recv_ListTable(ListTableResponse& _return);
-  void ListIndex(ListIndexResponse& _return, const ListIndexRequest& request) override;
-  void send_ListIndex(const ListIndexRequest& request);
-  void recv_ListIndex(ListIndexResponse& _return);
-  void ShowTable(ShowTableResponse& _return, const ShowTableRequest& request) override;
-  void send_ShowTable(const ShowTableRequest& request);
-  void recv_ShowTable(ShowTableResponse& _return);
-  void ShowColumns(SelectResponse& _return, const ShowColumnsRequest& request) override;
-  void send_ShowColumns(const ShowColumnsRequest& request);
-  void recv_ShowColumns(SelectResponse& _return);
-  void ShowDatabase(ShowDatabaseResponse& _return, const ShowDatabaseRequest& request) override;
-  void send_ShowDatabase(const ShowDatabaseRequest& request);
-  void recv_ShowDatabase(ShowDatabaseResponse& _return);
-  void ShowSegments(SelectResponse& _return, const ShowSegmentsRequest& request) override;
-  void send_ShowSegments(const ShowSegmentsRequest& request);
-  void recv_ShowSegments(SelectResponse& _return);
-  void ShowSegment(ShowSegmentResponse& _return, const ShowSegmentRequest& request) override;
-  void send_ShowSegment(const ShowSegmentRequest& request);
-  void recv_ShowSegment(ShowSegmentResponse& _return);
-  void ShowBlocks(SelectResponse& _return, const ShowBlocksRequest& request) override;
-  void send_ShowBlocks(const ShowBlocksRequest& request);
-  void recv_ShowBlocks(SelectResponse& _return);
-  void ShowBlock(ShowBlockResponse& _return, const ShowBlockRequest& request) override;
-  void send_ShowBlock(const ShowBlockRequest& request);
-  void recv_ShowBlock(ShowBlockResponse& _return);
-  void ShowBlockColumn(ShowBlockColumnResponse& _return, const ShowBlockColumnRequest& request) override;
-  void send_ShowBlockColumn(const ShowBlockColumnRequest& request);
-  void recv_ShowBlockColumn(ShowBlockColumnResponse& _return);
-  void ShowCurrentNode(ShowCurrentNodeResponse& _return, const ShowCurrentNodeRequest& request) override;
-  void send_ShowCurrentNode(const ShowCurrentNodeRequest& request);
-  void recv_ShowCurrentNode(ShowCurrentNodeResponse& _return);
-  void GetDatabase(CommonResponse& _return, const GetDatabaseRequest& request) override;
-  void send_GetDatabase(const GetDatabaseRequest& request);
-  void recv_GetDatabase(CommonResponse& _return);
-  void GetTable(CommonResponse& _return, const GetTableRequest& request) override;
-  void send_GetTable(const GetTableRequest& request);
-  void recv_GetTable(CommonResponse& _return);
-  void CreateIndex(CommonResponse& _return, const CreateIndexRequest& request) override;
-  void send_CreateIndex(const CreateIndexRequest& request);
-  void recv_CreateIndex(CommonResponse& _return);
-  void DropIndex(CommonResponse& _return, const DropIndexRequest& request) override;
-  void send_DropIndex(const DropIndexRequest& request);
-  void recv_DropIndex(CommonResponse& _return);
-  void ShowIndex(ShowIndexResponse& _return, const ShowIndexRequest& request) override;
-  void send_ShowIndex(const ShowIndexRequest& request);
-  void recv_ShowIndex(ShowIndexResponse& _return);
-  void Optimize(CommonResponse& _return, const OptimizeRequest& request) override;
-  void send_Optimize(const OptimizeRequest& request);
-  void recv_Optimize(CommonResponse& _return);
-  void AddColumns(CommonResponse& _return, const AddColumnsRequest& request) override;
-  void send_AddColumns(const AddColumnsRequest& request);
-  void recv_AddColumns(CommonResponse& _return);
-  void DropColumns(CommonResponse& _return, const DropColumnsRequest& request) override;
-  void send_DropColumns(const DropColumnsRequest& request);
-  void recv_DropColumns(CommonResponse& _return);
-  void Cleanup(CommonResponse& _return, const CommonRequest& request) override;
-  void send_Cleanup(const CommonRequest& request);
-  void recv_Cleanup(CommonResponse& _return);
-  void DumpIndex(CommonResponse& _return, const DumpIndexRequest& request) override;
-  void send_DumpIndex(const DumpIndexRequest& request);
-  void recv_DumpIndex(CommonResponse& _return);
-  void Command(CommonResponse& _return, const CommandRequest& request) override;
-  void send_Command(const CommandRequest& request);
-  void recv_Command(CommonResponse& _return);
-  void Flush(CommonResponse& _return, const FlushRequest& request) override;
-  void send_Flush(const FlushRequest& request);
-  void recv_Flush(CommonResponse& _return);
-  void Compact(CommonResponse& _return, const CompactRequest& request) override;
-  void send_Compact(const CompactRequest& request);
-  void recv_Compact(CommonResponse& _return);
-  void CreateTableSnapshot(CommonResponse& _return, const CreateTableSnapshotRequest& request) override;
-  void send_CreateTableSnapshot(const CreateTableSnapshotRequest& request);
-  void recv_CreateTableSnapshot(CommonResponse& _return);
-  void CreateDatabaseSnapshot(CommonResponse& _return, const CreateDatabaseSnapshotRequest& request) override;
-  void send_CreateDatabaseSnapshot(const CreateDatabaseSnapshotRequest& request);
-  void recv_CreateDatabaseSnapshot(CommonResponse& _return);
-  void CreateSystemSnapshot(CommonResponse& _return, const CreateSystemSnapshotRequest& request) override;
-  void send_CreateSystemSnapshot(const CreateSystemSnapshotRequest& request);
-  void recv_CreateSystemSnapshot(CommonResponse& _return);
-  void RestoreSnapshot(CommonResponse& _return, const RestoreSnapshotRequest& request) override;
-  void send_RestoreSnapshot(const RestoreSnapshotRequest& request);
-  void recv_RestoreSnapshot(CommonResponse& _return);
-  void ShowSnapshot(ShowSnapshotResponse& _return, const ShowSnapshotRequest& request) override;
-  void send_ShowSnapshot(const ShowSnapshotRequest& request);
-  void recv_ShowSnapshot(ShowSnapshotResponse& _return);
-  void ListSnapshots(ListSnapshotsResponse& _return, const ListSnapshotsRequest& request) override;
-  void send_ListSnapshots(const ListSnapshotsRequest& request);
-  void recv_ListSnapshots(ListSnapshotsResponse& _return);
-  void DropSnapshot(CommonResponse& _return, const DropSnapshotRequest& request) override;
-  void send_DropSnapshot(const DropSnapshotRequest& request);
-  void recv_DropSnapshot(CommonResponse& _return);
- protected:
-  std::shared_ptr< ::apache::thrift::protocol::TProtocol> piprot_;
-  std::shared_ptr< ::apache::thrift::protocol::TProtocol> poprot_;
-  ::apache::thrift::protocol::TProtocol* iprot_;
-  ::apache::thrift::protocol::TProtocol* oprot_;
+public:
+    InfinityServiceClient(std::shared_ptr<::apache::thrift::protocol::TProtocol> prot) { setProtocol(prot); }
+    InfinityServiceClient(std::shared_ptr<::apache::thrift::protocol::TProtocol> iprot,
+                          std::shared_ptr<::apache::thrift::protocol::TProtocol> oprot) {
+        setProtocol(iprot, oprot);
+    }
+
+private:
+    void setProtocol(std::shared_ptr<::apache::thrift::protocol::TProtocol> prot) { setProtocol(prot, prot); }
+    void setProtocol(std::shared_ptr<::apache::thrift::protocol::TProtocol> iprot, std::shared_ptr<::apache::thrift::protocol::TProtocol> oprot) {
+        piprot_ = iprot;
+        poprot_ = oprot;
+        iprot_ = iprot.get();
+        oprot_ = oprot.get();
+    }
+
+public:
+    std::shared_ptr<::apache::thrift::protocol::TProtocol> getInputProtocol() { return piprot_; }
+    std::shared_ptr<::apache::thrift::protocol::TProtocol> getOutputProtocol() { return poprot_; }
+    void Connect(CommonResponse &_return, const ConnectRequest &request) override;
+    void send_Connect(const ConnectRequest &request);
+    void recv_Connect(CommonResponse &_return);
+    void Disconnect(CommonResponse &_return, const CommonRequest &request) override;
+    void send_Disconnect(const CommonRequest &request);
+    void recv_Disconnect(CommonResponse &_return);
+    void CreateDatabase(CommonResponse &_return, const CreateDatabaseRequest &request) override;
+    void send_CreateDatabase(const CreateDatabaseRequest &request);
+    void recv_CreateDatabase(CommonResponse &_return);
+    void DropDatabase(CommonResponse &_return, const DropDatabaseRequest &request) override;
+    void send_DropDatabase(const DropDatabaseRequest &request);
+    void recv_DropDatabase(CommonResponse &_return);
+    void CreateTable(CommonResponse &_return, const CreateTableRequest &request) override;
+    void send_CreateTable(const CreateTableRequest &request);
+    void recv_CreateTable(CommonResponse &_return);
+    void DropTable(CommonResponse &_return, const DropTableRequest &request) override;
+    void send_DropTable(const DropTableRequest &request);
+    void recv_DropTable(CommonResponse &_return);
+    void RenameTable(CommonResponse &_return, const RenameTableRequest &request) override;
+    void send_RenameTable(const RenameTableRequest &request);
+    void recv_RenameTable(CommonResponse &_return);
+    void Insert(CommonResponse &_return, const InsertRequest &request) override;
+    void send_Insert(const InsertRequest &request);
+    void recv_Insert(CommonResponse &_return);
+    void Import(CommonResponse &_return, const ImportRequest &request) override;
+    void send_Import(const ImportRequest &request);
+    void recv_Import(CommonResponse &_return);
+    void Export(CommonResponse &_return, const ExportRequest &request) override;
+    void send_Export(const ExportRequest &request);
+    void recv_Export(CommonResponse &_return);
+    void Select(SelectResponse &_return, const SelectRequest &request) override;
+    void send_Select(const SelectRequest &request);
+    void recv_Select(SelectResponse &_return);
+    void Explain(SelectResponse &_return, const ExplainRequest &request) override;
+    void send_Explain(const ExplainRequest &request);
+    void recv_Explain(SelectResponse &_return);
+    void Delete(DeleteResponse &_return, const DeleteRequest &request) override;
+    void send_Delete(const DeleteRequest &request);
+    void recv_Delete(DeleteResponse &_return);
+    void Update(CommonResponse &_return, const UpdateRequest &request) override;
+    void send_Update(const UpdateRequest &request);
+    void recv_Update(CommonResponse &_return);
+    void ListDatabase(ListDatabaseResponse &_return, const ListDatabaseRequest &request) override;
+    void send_ListDatabase(const ListDatabaseRequest &request);
+    void recv_ListDatabase(ListDatabaseResponse &_return);
+    void ListTable(ListTableResponse &_return, const ListTableRequest &request) override;
+    void send_ListTable(const ListTableRequest &request);
+    void recv_ListTable(ListTableResponse &_return);
+    void ListIndex(ListIndexResponse &_return, const ListIndexRequest &request) override;
+    void send_ListIndex(const ListIndexRequest &request);
+    void recv_ListIndex(ListIndexResponse &_return);
+    void ShowTable(ShowTableResponse &_return, const ShowTableRequest &request) override;
+    void send_ShowTable(const ShowTableRequest &request);
+    void recv_ShowTable(ShowTableResponse &_return);
+    void ShowColumns(SelectResponse &_return, const ShowColumnsRequest &request) override;
+    void send_ShowColumns(const ShowColumnsRequest &request);
+    void recv_ShowColumns(SelectResponse &_return);
+    void ShowDatabase(ShowDatabaseResponse &_return, const ShowDatabaseRequest &request) override;
+    void send_ShowDatabase(const ShowDatabaseRequest &request);
+    void recv_ShowDatabase(ShowDatabaseResponse &_return);
+    void ShowSegments(SelectResponse &_return, const ShowSegmentsRequest &request) override;
+    void send_ShowSegments(const ShowSegmentsRequest &request);
+    void recv_ShowSegments(SelectResponse &_return);
+    void ShowSegment(ShowSegmentResponse &_return, const ShowSegmentRequest &request) override;
+    void send_ShowSegment(const ShowSegmentRequest &request);
+    void recv_ShowSegment(ShowSegmentResponse &_return);
+    void ShowBlocks(SelectResponse &_return, const ShowBlocksRequest &request) override;
+    void send_ShowBlocks(const ShowBlocksRequest &request);
+    void recv_ShowBlocks(SelectResponse &_return);
+    void ShowBlock(ShowBlockResponse &_return, const ShowBlockRequest &request) override;
+    void send_ShowBlock(const ShowBlockRequest &request);
+    void recv_ShowBlock(ShowBlockResponse &_return);
+    void ShowBlockColumn(ShowBlockColumnResponse &_return, const ShowBlockColumnRequest &request) override;
+    void send_ShowBlockColumn(const ShowBlockColumnRequest &request);
+    void recv_ShowBlockColumn(ShowBlockColumnResponse &_return);
+    void ShowCurrentNode(ShowCurrentNodeResponse &_return, const ShowCurrentNodeRequest &request) override;
+    void send_ShowCurrentNode(const ShowCurrentNodeRequest &request);
+    void recv_ShowCurrentNode(ShowCurrentNodeResponse &_return);
+    void GetDatabase(CommonResponse &_return, const GetDatabaseRequest &request) override;
+    void send_GetDatabase(const GetDatabaseRequest &request);
+    void recv_GetDatabase(CommonResponse &_return);
+    void GetTable(CommonResponse &_return, const GetTableRequest &request) override;
+    void send_GetTable(const GetTableRequest &request);
+    void recv_GetTable(CommonResponse &_return);
+    void CreateIndex(CommonResponse &_return, const CreateIndexRequest &request) override;
+    void send_CreateIndex(const CreateIndexRequest &request);
+    void recv_CreateIndex(CommonResponse &_return);
+    void DropIndex(CommonResponse &_return, const DropIndexRequest &request) override;
+    void send_DropIndex(const DropIndexRequest &request);
+    void recv_DropIndex(CommonResponse &_return);
+    void ShowIndex(ShowIndexResponse &_return, const ShowIndexRequest &request) override;
+    void send_ShowIndex(const ShowIndexRequest &request);
+    void recv_ShowIndex(ShowIndexResponse &_return);
+    void Optimize(CommonResponse &_return, const OptimizeRequest &request) override;
+    void send_Optimize(const OptimizeRequest &request);
+    void recv_Optimize(CommonResponse &_return);
+    void AddColumns(CommonResponse &_return, const AddColumnsRequest &request) override;
+    void send_AddColumns(const AddColumnsRequest &request);
+    void recv_AddColumns(CommonResponse &_return);
+    void DropColumns(CommonResponse &_return, const DropColumnsRequest &request) override;
+    void send_DropColumns(const DropColumnsRequest &request);
+    void recv_DropColumns(CommonResponse &_return);
+    void Cleanup(CommonResponse &_return, const CommonRequest &request) override;
+    void send_Cleanup(const CommonRequest &request);
+    void recv_Cleanup(CommonResponse &_return);
+    void DumpIndex(CommonResponse &_return, const DumpIndexRequest &request) override;
+    void send_DumpIndex(const DumpIndexRequest &request);
+    void recv_DumpIndex(CommonResponse &_return);
+    void Command(CommonResponse &_return, const CommandRequest &request) override;
+    void send_Command(const CommandRequest &request);
+    void recv_Command(CommonResponse &_return);
+    void Flush(CommonResponse &_return, const FlushRequest &request) override;
+    void send_Flush(const FlushRequest &request);
+    void recv_Flush(CommonResponse &_return);
+    void Compact(CommonResponse &_return, const CompactRequest &request) override;
+    void send_Compact(const CompactRequest &request);
+    void recv_Compact(CommonResponse &_return);
+    void CreateTableSnapshot(CommonResponse &_return, const CreateTableSnapshotRequest &request) override;
+    void send_CreateTableSnapshot(const CreateTableSnapshotRequest &request);
+    void recv_CreateTableSnapshot(CommonResponse &_return);
+    void CreateDatabaseSnapshot(CommonResponse &_return, const CreateDatabaseSnapshotRequest &request) override;
+    void send_CreateDatabaseSnapshot(const CreateDatabaseSnapshotRequest &request);
+    void recv_CreateDatabaseSnapshot(CommonResponse &_return);
+    void CreateSystemSnapshot(CommonResponse &_return, const CreateSystemSnapshotRequest &request) override;
+    void send_CreateSystemSnapshot(const CreateSystemSnapshotRequest &request);
+    void recv_CreateSystemSnapshot(CommonResponse &_return);
+    void RestoreSnapshot(CommonResponse &_return, const RestoreSnapshotRequest &request) override;
+    void send_RestoreSnapshot(const RestoreSnapshotRequest &request);
+    void recv_RestoreSnapshot(CommonResponse &_return);
+    void ShowSnapshot(ShowSnapshotResponse &_return, const ShowSnapshotRequest &request) override;
+    void send_ShowSnapshot(const ShowSnapshotRequest &request);
+    void recv_ShowSnapshot(ShowSnapshotResponse &_return);
+    void ListSnapshots(ListSnapshotsResponse &_return, const ListSnapshotsRequest &request) override;
+    void send_ListSnapshots(const ListSnapshotsRequest &request);
+    void recv_ListSnapshots(ListSnapshotsResponse &_return);
+    void DropSnapshot(CommonResponse &_return, const DropSnapshotRequest &request) override;
+    void send_DropSnapshot(const DropSnapshotRequest &request);
+    void recv_DropSnapshot(CommonResponse &_return);
+
+protected:
+    std::shared_ptr<::apache::thrift::protocol::TProtocol> piprot_;
+    std::shared_ptr<::apache::thrift::protocol::TProtocol> poprot_;
+    ::apache::thrift::protocol::TProtocol *iprot_;
+    ::apache::thrift::protocol::TProtocol *oprot_;
 };
 
 class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
- protected:
-  ::std::shared_ptr<InfinityServiceIf> iface_;
-  virtual bool dispatchCall(::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, const std::string& fname, int32_t seqid, void* callContext) override;
- private:
-  typedef  void (InfinityServiceProcessor::*ProcessFunction)(int32_t, ::apache::thrift::protocol::TProtocol*, ::apache::thrift::protocol::TProtocol*, void*);
-  typedef std::map<std::string, ProcessFunction> ProcessMap;
-  ProcessMap processMap_;
-  void process_Connect(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_Disconnect(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_CreateDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_DropDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_CreateTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_DropTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_Insert(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_Import(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_Export(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_Select(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_Explain(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_Delete(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_Update(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_ListDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_ListTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_ListIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_ShowTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_ShowColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_ShowDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_ShowSegments(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_ShowSegment(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_ShowBlocks(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_ShowBlock(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_ShowBlockColumn(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_ShowCurrentNode(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_GetDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_GetTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_CreateIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_DropIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_ShowIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_Optimize(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_AddColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_DropColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_Cleanup(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_DumpIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_Command(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_Flush(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_Compact(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_CreateTableSnapshot(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_CreateDatabaseSnapshot(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_CreateSystemSnapshot(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_RestoreSnapshot(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_ShowSnapshot(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_ListSnapshots(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_DropSnapshot(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
- public:
-  InfinityServiceProcessor(::std::shared_ptr<InfinityServiceIf> iface) :
-    iface_(iface) {
-    processMap_["Connect"] = &InfinityServiceProcessor::process_Connect;
-    processMap_["Disconnect"] = &InfinityServiceProcessor::process_Disconnect;
-    processMap_["CreateDatabase"] = &InfinityServiceProcessor::process_CreateDatabase;
-    processMap_["DropDatabase"] = &InfinityServiceProcessor::process_DropDatabase;
-    processMap_["CreateTable"] = &InfinityServiceProcessor::process_CreateTable;
-    processMap_["DropTable"] = &InfinityServiceProcessor::process_DropTable;
-    processMap_["Insert"] = &InfinityServiceProcessor::process_Insert;
-    processMap_["Import"] = &InfinityServiceProcessor::process_Import;
-    processMap_["Export"] = &InfinityServiceProcessor::process_Export;
-    processMap_["Select"] = &InfinityServiceProcessor::process_Select;
-    processMap_["Explain"] = &InfinityServiceProcessor::process_Explain;
-    processMap_["Delete"] = &InfinityServiceProcessor::process_Delete;
-    processMap_["Update"] = &InfinityServiceProcessor::process_Update;
-    processMap_["ListDatabase"] = &InfinityServiceProcessor::process_ListDatabase;
-    processMap_["ListTable"] = &InfinityServiceProcessor::process_ListTable;
-    processMap_["ListIndex"] = &InfinityServiceProcessor::process_ListIndex;
-    processMap_["ShowTable"] = &InfinityServiceProcessor::process_ShowTable;
-    processMap_["ShowColumns"] = &InfinityServiceProcessor::process_ShowColumns;
-    processMap_["ShowDatabase"] = &InfinityServiceProcessor::process_ShowDatabase;
-    processMap_["ShowSegments"] = &InfinityServiceProcessor::process_ShowSegments;
-    processMap_["ShowSegment"] = &InfinityServiceProcessor::process_ShowSegment;
-    processMap_["ShowBlocks"] = &InfinityServiceProcessor::process_ShowBlocks;
-    processMap_["ShowBlock"] = &InfinityServiceProcessor::process_ShowBlock;
-    processMap_["ShowBlockColumn"] = &InfinityServiceProcessor::process_ShowBlockColumn;
-    processMap_["ShowCurrentNode"] = &InfinityServiceProcessor::process_ShowCurrentNode;
-    processMap_["GetDatabase"] = &InfinityServiceProcessor::process_GetDatabase;
-    processMap_["GetTable"] = &InfinityServiceProcessor::process_GetTable;
-    processMap_["CreateIndex"] = &InfinityServiceProcessor::process_CreateIndex;
-    processMap_["DropIndex"] = &InfinityServiceProcessor::process_DropIndex;
-    processMap_["ShowIndex"] = &InfinityServiceProcessor::process_ShowIndex;
-    processMap_["Optimize"] = &InfinityServiceProcessor::process_Optimize;
-    processMap_["AddColumns"] = &InfinityServiceProcessor::process_AddColumns;
-    processMap_["DropColumns"] = &InfinityServiceProcessor::process_DropColumns;
-    processMap_["Cleanup"] = &InfinityServiceProcessor::process_Cleanup;
-    processMap_["DumpIndex"] = &InfinityServiceProcessor::process_DumpIndex;
-    processMap_["Command"] = &InfinityServiceProcessor::process_Command;
-    processMap_["Flush"] = &InfinityServiceProcessor::process_Flush;
-    processMap_["Compact"] = &InfinityServiceProcessor::process_Compact;
-    processMap_["CreateTableSnapshot"] = &InfinityServiceProcessor::process_CreateTableSnapshot;
-    processMap_["CreateDatabaseSnapshot"] = &InfinityServiceProcessor::process_CreateDatabaseSnapshot;
-    processMap_["CreateSystemSnapshot"] = &InfinityServiceProcessor::process_CreateSystemSnapshot;
-    processMap_["RestoreSnapshot"] = &InfinityServiceProcessor::process_RestoreSnapshot;
-    processMap_["ShowSnapshot"] = &InfinityServiceProcessor::process_ShowSnapshot;
-    processMap_["ListSnapshots"] = &InfinityServiceProcessor::process_ListSnapshots;
-    processMap_["DropSnapshot"] = &InfinityServiceProcessor::process_DropSnapshot;
-  }
+protected:
+    ::std::shared_ptr<InfinityServiceIf> iface_;
+    virtual bool dispatchCall(::apache::thrift::protocol::TProtocol *iprot,
+                              ::apache::thrift::protocol::TProtocol *oprot,
+                              const std::string &fname,
+                              int32_t seqid,
+                              void *callContext) override;
 
-  virtual ~InfinityServiceProcessor() {}
+private:
+    typedef void (InfinityServiceProcessor::*ProcessFunction)(int32_t,
+                                                              ::apache::thrift::protocol::TProtocol *,
+                                                              ::apache::thrift::protocol::TProtocol *,
+                                                              void *);
+    typedef std::map<std::string, ProcessFunction> ProcessMap;
+    ProcessMap processMap_;
+    void
+    process_Connect(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_Disconnect(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void process_CreateDatabase(int32_t seqid,
+                                ::apache::thrift::protocol::TProtocol *iprot,
+                                ::apache::thrift::protocol::TProtocol *oprot,
+                                void *callContext);
+    void process_DropDatabase(int32_t seqid,
+                              ::apache::thrift::protocol::TProtocol *iprot,
+                              ::apache::thrift::protocol::TProtocol *oprot,
+                              void *callContext);
+    void
+    process_CreateTable(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_DropTable(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_RenameTable(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void process_Insert(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void process_Import(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void process_Export(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void process_Select(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_Explain(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void process_Delete(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void process_Update(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void process_ListDatabase(int32_t seqid,
+                              ::apache::thrift::protocol::TProtocol *iprot,
+                              ::apache::thrift::protocol::TProtocol *oprot,
+                              void *callContext);
+    void
+    process_ListTable(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_ListIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_ShowTable(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_ShowColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void process_ShowDatabase(int32_t seqid,
+                              ::apache::thrift::protocol::TProtocol *iprot,
+                              ::apache::thrift::protocol::TProtocol *oprot,
+                              void *callContext);
+    void process_ShowSegments(int32_t seqid,
+                              ::apache::thrift::protocol::TProtocol *iprot,
+                              ::apache::thrift::protocol::TProtocol *oprot,
+                              void *callContext);
+    void
+    process_ShowSegment(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_ShowBlocks(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_ShowBlock(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void process_ShowBlockColumn(int32_t seqid,
+                                 ::apache::thrift::protocol::TProtocol *iprot,
+                                 ::apache::thrift::protocol::TProtocol *oprot,
+                                 void *callContext);
+    void process_ShowCurrentNode(int32_t seqid,
+                                 ::apache::thrift::protocol::TProtocol *iprot,
+                                 ::apache::thrift::protocol::TProtocol *oprot,
+                                 void *callContext);
+    void
+    process_GetDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_GetTable(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_CreateIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_DropIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_ShowIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_Optimize(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_AddColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_DropColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_Cleanup(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_DumpIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_Command(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void process_Flush(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_Compact(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void process_CreateTableSnapshot(int32_t seqid,
+                                     ::apache::thrift::protocol::TProtocol *iprot,
+                                     ::apache::thrift::protocol::TProtocol *oprot,
+                                     void *callContext);
+    void process_CreateDatabaseSnapshot(int32_t seqid,
+                                        ::apache::thrift::protocol::TProtocol *iprot,
+                                        ::apache::thrift::protocol::TProtocol *oprot,
+                                        void *callContext);
+    void process_CreateSystemSnapshot(int32_t seqid,
+                                      ::apache::thrift::protocol::TProtocol *iprot,
+                                      ::apache::thrift::protocol::TProtocol *oprot,
+                                      void *callContext);
+    void process_RestoreSnapshot(int32_t seqid,
+                                 ::apache::thrift::protocol::TProtocol *iprot,
+                                 ::apache::thrift::protocol::TProtocol *oprot,
+                                 void *callContext);
+    void process_ShowSnapshot(int32_t seqid,
+                              ::apache::thrift::protocol::TProtocol *iprot,
+                              ::apache::thrift::protocol::TProtocol *oprot,
+                              void *callContext);
+    void process_ListSnapshots(int32_t seqid,
+                               ::apache::thrift::protocol::TProtocol *iprot,
+                               ::apache::thrift::protocol::TProtocol *oprot,
+                               void *callContext);
+    void process_DropSnapshot(int32_t seqid,
+                              ::apache::thrift::protocol::TProtocol *iprot,
+                              ::apache::thrift::protocol::TProtocol *oprot,
+                              void *callContext);
+
+public:
+    InfinityServiceProcessor(::std::shared_ptr<InfinityServiceIf> iface) : iface_(iface) {
+        processMap_["Connect"] = &InfinityServiceProcessor::process_Connect;
+        processMap_["Disconnect"] = &InfinityServiceProcessor::process_Disconnect;
+        processMap_["CreateDatabase"] = &InfinityServiceProcessor::process_CreateDatabase;
+        processMap_["DropDatabase"] = &InfinityServiceProcessor::process_DropDatabase;
+        processMap_["CreateTable"] = &InfinityServiceProcessor::process_CreateTable;
+        processMap_["DropTable"] = &InfinityServiceProcessor::process_DropTable;
+        processMap_["RenameTable"] = &InfinityServiceProcessor::process_RenameTable;
+        processMap_["Insert"] = &InfinityServiceProcessor::process_Insert;
+        processMap_["Import"] = &InfinityServiceProcessor::process_Import;
+        processMap_["Export"] = &InfinityServiceProcessor::process_Export;
+        processMap_["Select"] = &InfinityServiceProcessor::process_Select;
+        processMap_["Explain"] = &InfinityServiceProcessor::process_Explain;
+        processMap_["Delete"] = &InfinityServiceProcessor::process_Delete;
+        processMap_["Update"] = &InfinityServiceProcessor::process_Update;
+        processMap_["ListDatabase"] = &InfinityServiceProcessor::process_ListDatabase;
+        processMap_["ListTable"] = &InfinityServiceProcessor::process_ListTable;
+        processMap_["ListIndex"] = &InfinityServiceProcessor::process_ListIndex;
+        processMap_["ShowTable"] = &InfinityServiceProcessor::process_ShowTable;
+        processMap_["ShowColumns"] = &InfinityServiceProcessor::process_ShowColumns;
+        processMap_["ShowDatabase"] = &InfinityServiceProcessor::process_ShowDatabase;
+        processMap_["ShowSegments"] = &InfinityServiceProcessor::process_ShowSegments;
+        processMap_["ShowSegment"] = &InfinityServiceProcessor::process_ShowSegment;
+        processMap_["ShowBlocks"] = &InfinityServiceProcessor::process_ShowBlocks;
+        processMap_["ShowBlock"] = &InfinityServiceProcessor::process_ShowBlock;
+        processMap_["ShowBlockColumn"] = &InfinityServiceProcessor::process_ShowBlockColumn;
+        processMap_["ShowCurrentNode"] = &InfinityServiceProcessor::process_ShowCurrentNode;
+        processMap_["GetDatabase"] = &InfinityServiceProcessor::process_GetDatabase;
+        processMap_["GetTable"] = &InfinityServiceProcessor::process_GetTable;
+        processMap_["CreateIndex"] = &InfinityServiceProcessor::process_CreateIndex;
+        processMap_["DropIndex"] = &InfinityServiceProcessor::process_DropIndex;
+        processMap_["ShowIndex"] = &InfinityServiceProcessor::process_ShowIndex;
+        processMap_["Optimize"] = &InfinityServiceProcessor::process_Optimize;
+        processMap_["AddColumns"] = &InfinityServiceProcessor::process_AddColumns;
+        processMap_["DropColumns"] = &InfinityServiceProcessor::process_DropColumns;
+        processMap_["Cleanup"] = &InfinityServiceProcessor::process_Cleanup;
+        processMap_["DumpIndex"] = &InfinityServiceProcessor::process_DumpIndex;
+        processMap_["Command"] = &InfinityServiceProcessor::process_Command;
+        processMap_["Flush"] = &InfinityServiceProcessor::process_Flush;
+        processMap_["Compact"] = &InfinityServiceProcessor::process_Compact;
+        processMap_["CreateTableSnapshot"] = &InfinityServiceProcessor::process_CreateTableSnapshot;
+        processMap_["CreateDatabaseSnapshot"] = &InfinityServiceProcessor::process_CreateDatabaseSnapshot;
+        processMap_["CreateSystemSnapshot"] = &InfinityServiceProcessor::process_CreateSystemSnapshot;
+        processMap_["RestoreSnapshot"] = &InfinityServiceProcessor::process_RestoreSnapshot;
+        processMap_["ShowSnapshot"] = &InfinityServiceProcessor::process_ShowSnapshot;
+        processMap_["ListSnapshots"] = &InfinityServiceProcessor::process_ListSnapshots;
+        processMap_["DropSnapshot"] = &InfinityServiceProcessor::process_DropSnapshot;
+    }
+
+    virtual ~InfinityServiceProcessor() {}
 };
 
 class InfinityServiceProcessorFactory : public ::apache::thrift::TProcessorFactory {
- public:
-  InfinityServiceProcessorFactory(const ::std::shared_ptr< InfinityServiceIfFactory >& handlerFactory) noexcept :
-      handlerFactory_(handlerFactory) {}
+public:
+    InfinityServiceProcessorFactory(const ::std::shared_ptr<InfinityServiceIfFactory> &handlerFactory) noexcept : handlerFactory_(handlerFactory) {}
 
-  ::std::shared_ptr< ::apache::thrift::TProcessor > getProcessor(const ::apache::thrift::TConnectionInfo& connInfo) override;
+    ::std::shared_ptr<::apache::thrift::TProcessor> getProcessor(const ::apache::thrift::TConnectionInfo &connInfo) override;
 
- protected:
-  ::std::shared_ptr< InfinityServiceIfFactory > handlerFactory_;
+protected:
+    ::std::shared_ptr<InfinityServiceIfFactory> handlerFactory_;
 };
 
 class InfinityServiceMultiface : virtual public InfinityServiceIf {
- public:
-  InfinityServiceMultiface(std::vector<std::shared_ptr<InfinityServiceIf> >& ifaces) : ifaces_(ifaces) {
-  }
-  virtual ~InfinityServiceMultiface() {}
- protected:
-  std::vector<std::shared_ptr<InfinityServiceIf> > ifaces_;
-  InfinityServiceMultiface() {}
-  void add(::std::shared_ptr<InfinityServiceIf> iface) {
-    ifaces_.push_back(iface);
-  }
- public:
-  void Connect(CommonResponse& _return, const ConnectRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->Connect(_return, request);
-    }
-    ifaces_[i]->Connect(_return, request);
-    return;
-  }
+public:
+    InfinityServiceMultiface(std::vector<std::shared_ptr<InfinityServiceIf>> &ifaces) : ifaces_(ifaces) {}
+    virtual ~InfinityServiceMultiface() {}
 
-  void Disconnect(CommonResponse& _return, const CommonRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->Disconnect(_return, request);
-    }
-    ifaces_[i]->Disconnect(_return, request);
-    return;
-  }
+protected:
+    std::vector<std::shared_ptr<InfinityServiceIf>> ifaces_;
+    InfinityServiceMultiface() {}
+    void add(::std::shared_ptr<InfinityServiceIf> iface) { ifaces_.push_back(iface); }
 
-  void CreateDatabase(CommonResponse& _return, const CreateDatabaseRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->CreateDatabase(_return, request);
+public:
+    void Connect(CommonResponse &_return, const ConnectRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->Connect(_return, request);
+        }
+        ifaces_[i]->Connect(_return, request);
+        return;
     }
-    ifaces_[i]->CreateDatabase(_return, request);
-    return;
-  }
 
-  void DropDatabase(CommonResponse& _return, const DropDatabaseRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->DropDatabase(_return, request);
+    void Disconnect(CommonResponse &_return, const CommonRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->Disconnect(_return, request);
+        }
+        ifaces_[i]->Disconnect(_return, request);
+        return;
     }
-    ifaces_[i]->DropDatabase(_return, request);
-    return;
-  }
 
-  void CreateTable(CommonResponse& _return, const CreateTableRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->CreateTable(_return, request);
+    void CreateDatabase(CommonResponse &_return, const CreateDatabaseRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->CreateDatabase(_return, request);
+        }
+        ifaces_[i]->CreateDatabase(_return, request);
+        return;
     }
-    ifaces_[i]->CreateTable(_return, request);
-    return;
-  }
 
-  void DropTable(CommonResponse& _return, const DropTableRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->DropTable(_return, request);
+    void DropDatabase(CommonResponse &_return, const DropDatabaseRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->DropDatabase(_return, request);
+        }
+        ifaces_[i]->DropDatabase(_return, request);
+        return;
     }
-    ifaces_[i]->DropTable(_return, request);
-    return;
-  }
 
-  void Insert(CommonResponse& _return, const InsertRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->Insert(_return, request);
+    void CreateTable(CommonResponse &_return, const CreateTableRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->CreateTable(_return, request);
+        }
+        ifaces_[i]->CreateTable(_return, request);
+        return;
     }
-    ifaces_[i]->Insert(_return, request);
-    return;
-  }
 
-  void Import(CommonResponse& _return, const ImportRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->Import(_return, request);
+    void DropTable(CommonResponse &_return, const DropTableRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->DropTable(_return, request);
+        }
+        ifaces_[i]->DropTable(_return, request);
+        return;
     }
-    ifaces_[i]->Import(_return, request);
-    return;
-  }
 
-  void Export(CommonResponse& _return, const ExportRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->Export(_return, request);
+    void RenameTable(CommonResponse &_return, const RenameTableRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->RenameTable(_return, request);
+        }
+        ifaces_[i]->RenameTable(_return, request);
+        return;
     }
-    ifaces_[i]->Export(_return, request);
-    return;
-  }
 
-  void Select(SelectResponse& _return, const SelectRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->Select(_return, request);
+    void Insert(CommonResponse &_return, const InsertRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->Insert(_return, request);
+        }
+        ifaces_[i]->Insert(_return, request);
+        return;
     }
-    ifaces_[i]->Select(_return, request);
-    return;
-  }
 
-  void Explain(SelectResponse& _return, const ExplainRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->Explain(_return, request);
+    void Import(CommonResponse &_return, const ImportRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->Import(_return, request);
+        }
+        ifaces_[i]->Import(_return, request);
+        return;
     }
-    ifaces_[i]->Explain(_return, request);
-    return;
-  }
 
-  void Delete(DeleteResponse& _return, const DeleteRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->Delete(_return, request);
+    void Export(CommonResponse &_return, const ExportRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->Export(_return, request);
+        }
+        ifaces_[i]->Export(_return, request);
+        return;
     }
-    ifaces_[i]->Delete(_return, request);
-    return;
-  }
 
-  void Update(CommonResponse& _return, const UpdateRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->Update(_return, request);
+    void Select(SelectResponse &_return, const SelectRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->Select(_return, request);
+        }
+        ifaces_[i]->Select(_return, request);
+        return;
     }
-    ifaces_[i]->Update(_return, request);
-    return;
-  }
 
-  void ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->ListDatabase(_return, request);
+    void Explain(SelectResponse &_return, const ExplainRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->Explain(_return, request);
+        }
+        ifaces_[i]->Explain(_return, request);
+        return;
     }
-    ifaces_[i]->ListDatabase(_return, request);
-    return;
-  }
 
-  void ListTable(ListTableResponse& _return, const ListTableRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->ListTable(_return, request);
+    void Delete(DeleteResponse &_return, const DeleteRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->Delete(_return, request);
+        }
+        ifaces_[i]->Delete(_return, request);
+        return;
     }
-    ifaces_[i]->ListTable(_return, request);
-    return;
-  }
 
-  void ListIndex(ListIndexResponse& _return, const ListIndexRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->ListIndex(_return, request);
+    void Update(CommonResponse &_return, const UpdateRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->Update(_return, request);
+        }
+        ifaces_[i]->Update(_return, request);
+        return;
     }
-    ifaces_[i]->ListIndex(_return, request);
-    return;
-  }
 
-  void ShowTable(ShowTableResponse& _return, const ShowTableRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->ShowTable(_return, request);
+    void ListDatabase(ListDatabaseResponse &_return, const ListDatabaseRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->ListDatabase(_return, request);
+        }
+        ifaces_[i]->ListDatabase(_return, request);
+        return;
     }
-    ifaces_[i]->ShowTable(_return, request);
-    return;
-  }
 
-  void ShowColumns(SelectResponse& _return, const ShowColumnsRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->ShowColumns(_return, request);
+    void ListTable(ListTableResponse &_return, const ListTableRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->ListTable(_return, request);
+        }
+        ifaces_[i]->ListTable(_return, request);
+        return;
     }
-    ifaces_[i]->ShowColumns(_return, request);
-    return;
-  }
 
-  void ShowDatabase(ShowDatabaseResponse& _return, const ShowDatabaseRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->ShowDatabase(_return, request);
+    void ListIndex(ListIndexResponse &_return, const ListIndexRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->ListIndex(_return, request);
+        }
+        ifaces_[i]->ListIndex(_return, request);
+        return;
     }
-    ifaces_[i]->ShowDatabase(_return, request);
-    return;
-  }
 
-  void ShowSegments(SelectResponse& _return, const ShowSegmentsRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->ShowSegments(_return, request);
+    void ShowTable(ShowTableResponse &_return, const ShowTableRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->ShowTable(_return, request);
+        }
+        ifaces_[i]->ShowTable(_return, request);
+        return;
     }
-    ifaces_[i]->ShowSegments(_return, request);
-    return;
-  }
 
-  void ShowSegment(ShowSegmentResponse& _return, const ShowSegmentRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->ShowSegment(_return, request);
+    void ShowColumns(SelectResponse &_return, const ShowColumnsRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->ShowColumns(_return, request);
+        }
+        ifaces_[i]->ShowColumns(_return, request);
+        return;
     }
-    ifaces_[i]->ShowSegment(_return, request);
-    return;
-  }
 
-  void ShowBlocks(SelectResponse& _return, const ShowBlocksRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->ShowBlocks(_return, request);
+    void ShowDatabase(ShowDatabaseResponse &_return, const ShowDatabaseRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->ShowDatabase(_return, request);
+        }
+        ifaces_[i]->ShowDatabase(_return, request);
+        return;
     }
-    ifaces_[i]->ShowBlocks(_return, request);
-    return;
-  }
 
-  void ShowBlock(ShowBlockResponse& _return, const ShowBlockRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->ShowBlock(_return, request);
+    void ShowSegments(SelectResponse &_return, const ShowSegmentsRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->ShowSegments(_return, request);
+        }
+        ifaces_[i]->ShowSegments(_return, request);
+        return;
     }
-    ifaces_[i]->ShowBlock(_return, request);
-    return;
-  }
 
-  void ShowBlockColumn(ShowBlockColumnResponse& _return, const ShowBlockColumnRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->ShowBlockColumn(_return, request);
+    void ShowSegment(ShowSegmentResponse &_return, const ShowSegmentRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->ShowSegment(_return, request);
+        }
+        ifaces_[i]->ShowSegment(_return, request);
+        return;
     }
-    ifaces_[i]->ShowBlockColumn(_return, request);
-    return;
-  }
 
-  void ShowCurrentNode(ShowCurrentNodeResponse& _return, const ShowCurrentNodeRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->ShowCurrentNode(_return, request);
+    void ShowBlocks(SelectResponse &_return, const ShowBlocksRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->ShowBlocks(_return, request);
+        }
+        ifaces_[i]->ShowBlocks(_return, request);
+        return;
     }
-    ifaces_[i]->ShowCurrentNode(_return, request);
-    return;
-  }
 
-  void GetDatabase(CommonResponse& _return, const GetDatabaseRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->GetDatabase(_return, request);
+    void ShowBlock(ShowBlockResponse &_return, const ShowBlockRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->ShowBlock(_return, request);
+        }
+        ifaces_[i]->ShowBlock(_return, request);
+        return;
     }
-    ifaces_[i]->GetDatabase(_return, request);
-    return;
-  }
 
-  void GetTable(CommonResponse& _return, const GetTableRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->GetTable(_return, request);
+    void ShowBlockColumn(ShowBlockColumnResponse &_return, const ShowBlockColumnRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->ShowBlockColumn(_return, request);
+        }
+        ifaces_[i]->ShowBlockColumn(_return, request);
+        return;
     }
-    ifaces_[i]->GetTable(_return, request);
-    return;
-  }
 
-  void CreateIndex(CommonResponse& _return, const CreateIndexRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->CreateIndex(_return, request);
+    void ShowCurrentNode(ShowCurrentNodeResponse &_return, const ShowCurrentNodeRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->ShowCurrentNode(_return, request);
+        }
+        ifaces_[i]->ShowCurrentNode(_return, request);
+        return;
     }
-    ifaces_[i]->CreateIndex(_return, request);
-    return;
-  }
 
-  void DropIndex(CommonResponse& _return, const DropIndexRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->DropIndex(_return, request);
+    void GetDatabase(CommonResponse &_return, const GetDatabaseRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->GetDatabase(_return, request);
+        }
+        ifaces_[i]->GetDatabase(_return, request);
+        return;
     }
-    ifaces_[i]->DropIndex(_return, request);
-    return;
-  }
 
-  void ShowIndex(ShowIndexResponse& _return, const ShowIndexRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->ShowIndex(_return, request);
+    void GetTable(CommonResponse &_return, const GetTableRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->GetTable(_return, request);
+        }
+        ifaces_[i]->GetTable(_return, request);
+        return;
     }
-    ifaces_[i]->ShowIndex(_return, request);
-    return;
-  }
 
-  void Optimize(CommonResponse& _return, const OptimizeRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->Optimize(_return, request);
+    void CreateIndex(CommonResponse &_return, const CreateIndexRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->CreateIndex(_return, request);
+        }
+        ifaces_[i]->CreateIndex(_return, request);
+        return;
     }
-    ifaces_[i]->Optimize(_return, request);
-    return;
-  }
 
-  void AddColumns(CommonResponse& _return, const AddColumnsRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->AddColumns(_return, request);
+    void DropIndex(CommonResponse &_return, const DropIndexRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->DropIndex(_return, request);
+        }
+        ifaces_[i]->DropIndex(_return, request);
+        return;
     }
-    ifaces_[i]->AddColumns(_return, request);
-    return;
-  }
 
-  void DropColumns(CommonResponse& _return, const DropColumnsRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->DropColumns(_return, request);
+    void ShowIndex(ShowIndexResponse &_return, const ShowIndexRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->ShowIndex(_return, request);
+        }
+        ifaces_[i]->ShowIndex(_return, request);
+        return;
     }
-    ifaces_[i]->DropColumns(_return, request);
-    return;
-  }
 
-  void Cleanup(CommonResponse& _return, const CommonRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->Cleanup(_return, request);
+    void Optimize(CommonResponse &_return, const OptimizeRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->Optimize(_return, request);
+        }
+        ifaces_[i]->Optimize(_return, request);
+        return;
     }
-    ifaces_[i]->Cleanup(_return, request);
-    return;
-  }
 
-  void DumpIndex(CommonResponse& _return, const DumpIndexRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->DumpIndex(_return, request);
+    void AddColumns(CommonResponse &_return, const AddColumnsRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->AddColumns(_return, request);
+        }
+        ifaces_[i]->AddColumns(_return, request);
+        return;
     }
-    ifaces_[i]->DumpIndex(_return, request);
-    return;
-  }
 
-  void Command(CommonResponse& _return, const CommandRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->Command(_return, request);
+    void DropColumns(CommonResponse &_return, const DropColumnsRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->DropColumns(_return, request);
+        }
+        ifaces_[i]->DropColumns(_return, request);
+        return;
     }
-    ifaces_[i]->Command(_return, request);
-    return;
-  }
 
-  void Flush(CommonResponse& _return, const FlushRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->Flush(_return, request);
+    void Cleanup(CommonResponse &_return, const CommonRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->Cleanup(_return, request);
+        }
+        ifaces_[i]->Cleanup(_return, request);
+        return;
     }
-    ifaces_[i]->Flush(_return, request);
-    return;
-  }
 
-  void Compact(CommonResponse& _return, const CompactRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->Compact(_return, request);
+    void DumpIndex(CommonResponse &_return, const DumpIndexRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->DumpIndex(_return, request);
+        }
+        ifaces_[i]->DumpIndex(_return, request);
+        return;
     }
-    ifaces_[i]->Compact(_return, request);
-    return;
-  }
 
-  void CreateTableSnapshot(CommonResponse& _return, const CreateTableSnapshotRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->CreateTableSnapshot(_return, request);
+    void Command(CommonResponse &_return, const CommandRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->Command(_return, request);
+        }
+        ifaces_[i]->Command(_return, request);
+        return;
     }
-    ifaces_[i]->CreateTableSnapshot(_return, request);
-    return;
-  }
 
-  void CreateDatabaseSnapshot(CommonResponse& _return, const CreateDatabaseSnapshotRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->CreateDatabaseSnapshot(_return, request);
+    void Flush(CommonResponse &_return, const FlushRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->Flush(_return, request);
+        }
+        ifaces_[i]->Flush(_return, request);
+        return;
     }
-    ifaces_[i]->CreateDatabaseSnapshot(_return, request);
-    return;
-  }
 
-  void CreateSystemSnapshot(CommonResponse& _return, const CreateSystemSnapshotRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->CreateSystemSnapshot(_return, request);
+    void Compact(CommonResponse &_return, const CompactRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->Compact(_return, request);
+        }
+        ifaces_[i]->Compact(_return, request);
+        return;
     }
-    ifaces_[i]->CreateSystemSnapshot(_return, request);
-    return;
-  }
 
-  void RestoreSnapshot(CommonResponse& _return, const RestoreSnapshotRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->RestoreSnapshot(_return, request);
+    void CreateTableSnapshot(CommonResponse &_return, const CreateTableSnapshotRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->CreateTableSnapshot(_return, request);
+        }
+        ifaces_[i]->CreateTableSnapshot(_return, request);
+        return;
     }
-    ifaces_[i]->RestoreSnapshot(_return, request);
-    return;
-  }
 
-  void ShowSnapshot(ShowSnapshotResponse& _return, const ShowSnapshotRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->ShowSnapshot(_return, request);
+    void CreateDatabaseSnapshot(CommonResponse &_return, const CreateDatabaseSnapshotRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->CreateDatabaseSnapshot(_return, request);
+        }
+        ifaces_[i]->CreateDatabaseSnapshot(_return, request);
+        return;
     }
-    ifaces_[i]->ShowSnapshot(_return, request);
-    return;
-  }
 
-  void ListSnapshots(ListSnapshotsResponse& _return, const ListSnapshotsRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->ListSnapshots(_return, request);
+    void CreateSystemSnapshot(CommonResponse &_return, const CreateSystemSnapshotRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->CreateSystemSnapshot(_return, request);
+        }
+        ifaces_[i]->CreateSystemSnapshot(_return, request);
+        return;
     }
-    ifaces_[i]->ListSnapshots(_return, request);
-    return;
-  }
 
-  void DropSnapshot(CommonResponse& _return, const DropSnapshotRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->DropSnapshot(_return, request);
+    void RestoreSnapshot(CommonResponse &_return, const RestoreSnapshotRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->RestoreSnapshot(_return, request);
+        }
+        ifaces_[i]->RestoreSnapshot(_return, request);
+        return;
     }
-    ifaces_[i]->DropSnapshot(_return, request);
-    return;
-  }
 
+    void ShowSnapshot(ShowSnapshotResponse &_return, const ShowSnapshotRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->ShowSnapshot(_return, request);
+        }
+        ifaces_[i]->ShowSnapshot(_return, request);
+        return;
+    }
+
+    void ListSnapshots(ListSnapshotsResponse &_return, const ListSnapshotsRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->ListSnapshots(_return, request);
+        }
+        ifaces_[i]->ListSnapshots(_return, request);
+        return;
+    }
+
+    void DropSnapshot(CommonResponse &_return, const DropSnapshotRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->DropSnapshot(_return, request);
+        }
+        ifaces_[i]->DropSnapshot(_return, request);
+        return;
+    }
 };
 
 // The 'concurrent' client is a thread safe client that correctly handles
 // out of order responses.  It is slower than the regular client, so should
 // only be used when you need to share a connection among multiple threads
 class InfinityServiceConcurrentClient : virtual public InfinityServiceIf {
- public:
-  InfinityServiceConcurrentClient(std::shared_ptr< ::apache::thrift::protocol::TProtocol> prot, std::shared_ptr< ::apache::thrift::async::TConcurrentClientSyncInfo> sync) : sync_(sync)
-{
-    setProtocol(prot);
-  }
-  InfinityServiceConcurrentClient(std::shared_ptr< ::apache::thrift::protocol::TProtocol> iprot, std::shared_ptr< ::apache::thrift::protocol::TProtocol> oprot, std::shared_ptr< ::apache::thrift::async::TConcurrentClientSyncInfo> sync) : sync_(sync)
-{
-    setProtocol(iprot,oprot);
-  }
- private:
-  void setProtocol(std::shared_ptr< ::apache::thrift::protocol::TProtocol> prot) {
-  setProtocol(prot,prot);
-  }
-  void setProtocol(std::shared_ptr< ::apache::thrift::protocol::TProtocol> iprot, std::shared_ptr< ::apache::thrift::protocol::TProtocol> oprot) {
-    piprot_=iprot;
-    poprot_=oprot;
-    iprot_ = iprot.get();
-    oprot_ = oprot.get();
-  }
- public:
-  std::shared_ptr< ::apache::thrift::protocol::TProtocol> getInputProtocol() {
-    return piprot_;
-  }
-  std::shared_ptr< ::apache::thrift::protocol::TProtocol> getOutputProtocol() {
-    return poprot_;
-  }
-  void Connect(CommonResponse& _return, const ConnectRequest& request) override;
-  int32_t send_Connect(const ConnectRequest& request);
-  void recv_Connect(CommonResponse& _return, const int32_t seqid);
-  void Disconnect(CommonResponse& _return, const CommonRequest& request) override;
-  int32_t send_Disconnect(const CommonRequest& request);
-  void recv_Disconnect(CommonResponse& _return, const int32_t seqid);
-  void CreateDatabase(CommonResponse& _return, const CreateDatabaseRequest& request) override;
-  int32_t send_CreateDatabase(const CreateDatabaseRequest& request);
-  void recv_CreateDatabase(CommonResponse& _return, const int32_t seqid);
-  void DropDatabase(CommonResponse& _return, const DropDatabaseRequest& request) override;
-  int32_t send_DropDatabase(const DropDatabaseRequest& request);
-  void recv_DropDatabase(CommonResponse& _return, const int32_t seqid);
-  void CreateTable(CommonResponse& _return, const CreateTableRequest& request) override;
-  int32_t send_CreateTable(const CreateTableRequest& request);
-  void recv_CreateTable(CommonResponse& _return, const int32_t seqid);
-  void DropTable(CommonResponse& _return, const DropTableRequest& request) override;
-  int32_t send_DropTable(const DropTableRequest& request);
-  void recv_DropTable(CommonResponse& _return, const int32_t seqid);
-  void Insert(CommonResponse& _return, const InsertRequest& request) override;
-  int32_t send_Insert(const InsertRequest& request);
-  void recv_Insert(CommonResponse& _return, const int32_t seqid);
-  void Import(CommonResponse& _return, const ImportRequest& request) override;
-  int32_t send_Import(const ImportRequest& request);
-  void recv_Import(CommonResponse& _return, const int32_t seqid);
-  void Export(CommonResponse& _return, const ExportRequest& request) override;
-  int32_t send_Export(const ExportRequest& request);
-  void recv_Export(CommonResponse& _return, const int32_t seqid);
-  void Select(SelectResponse& _return, const SelectRequest& request) override;
-  int32_t send_Select(const SelectRequest& request);
-  void recv_Select(SelectResponse& _return, const int32_t seqid);
-  void Explain(SelectResponse& _return, const ExplainRequest& request) override;
-  int32_t send_Explain(const ExplainRequest& request);
-  void recv_Explain(SelectResponse& _return, const int32_t seqid);
-  void Delete(DeleteResponse& _return, const DeleteRequest& request) override;
-  int32_t send_Delete(const DeleteRequest& request);
-  void recv_Delete(DeleteResponse& _return, const int32_t seqid);
-  void Update(CommonResponse& _return, const UpdateRequest& request) override;
-  int32_t send_Update(const UpdateRequest& request);
-  void recv_Update(CommonResponse& _return, const int32_t seqid);
-  void ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request) override;
-  int32_t send_ListDatabase(const ListDatabaseRequest& request);
-  void recv_ListDatabase(ListDatabaseResponse& _return, const int32_t seqid);
-  void ListTable(ListTableResponse& _return, const ListTableRequest& request) override;
-  int32_t send_ListTable(const ListTableRequest& request);
-  void recv_ListTable(ListTableResponse& _return, const int32_t seqid);
-  void ListIndex(ListIndexResponse& _return, const ListIndexRequest& request) override;
-  int32_t send_ListIndex(const ListIndexRequest& request);
-  void recv_ListIndex(ListIndexResponse& _return, const int32_t seqid);
-  void ShowTable(ShowTableResponse& _return, const ShowTableRequest& request) override;
-  int32_t send_ShowTable(const ShowTableRequest& request);
-  void recv_ShowTable(ShowTableResponse& _return, const int32_t seqid);
-  void ShowColumns(SelectResponse& _return, const ShowColumnsRequest& request) override;
-  int32_t send_ShowColumns(const ShowColumnsRequest& request);
-  void recv_ShowColumns(SelectResponse& _return, const int32_t seqid);
-  void ShowDatabase(ShowDatabaseResponse& _return, const ShowDatabaseRequest& request) override;
-  int32_t send_ShowDatabase(const ShowDatabaseRequest& request);
-  void recv_ShowDatabase(ShowDatabaseResponse& _return, const int32_t seqid);
-  void ShowSegments(SelectResponse& _return, const ShowSegmentsRequest& request) override;
-  int32_t send_ShowSegments(const ShowSegmentsRequest& request);
-  void recv_ShowSegments(SelectResponse& _return, const int32_t seqid);
-  void ShowSegment(ShowSegmentResponse& _return, const ShowSegmentRequest& request) override;
-  int32_t send_ShowSegment(const ShowSegmentRequest& request);
-  void recv_ShowSegment(ShowSegmentResponse& _return, const int32_t seqid);
-  void ShowBlocks(SelectResponse& _return, const ShowBlocksRequest& request) override;
-  int32_t send_ShowBlocks(const ShowBlocksRequest& request);
-  void recv_ShowBlocks(SelectResponse& _return, const int32_t seqid);
-  void ShowBlock(ShowBlockResponse& _return, const ShowBlockRequest& request) override;
-  int32_t send_ShowBlock(const ShowBlockRequest& request);
-  void recv_ShowBlock(ShowBlockResponse& _return, const int32_t seqid);
-  void ShowBlockColumn(ShowBlockColumnResponse& _return, const ShowBlockColumnRequest& request) override;
-  int32_t send_ShowBlockColumn(const ShowBlockColumnRequest& request);
-  void recv_ShowBlockColumn(ShowBlockColumnResponse& _return, const int32_t seqid);
-  void ShowCurrentNode(ShowCurrentNodeResponse& _return, const ShowCurrentNodeRequest& request) override;
-  int32_t send_ShowCurrentNode(const ShowCurrentNodeRequest& request);
-  void recv_ShowCurrentNode(ShowCurrentNodeResponse& _return, const int32_t seqid);
-  void GetDatabase(CommonResponse& _return, const GetDatabaseRequest& request) override;
-  int32_t send_GetDatabase(const GetDatabaseRequest& request);
-  void recv_GetDatabase(CommonResponse& _return, const int32_t seqid);
-  void GetTable(CommonResponse& _return, const GetTableRequest& request) override;
-  int32_t send_GetTable(const GetTableRequest& request);
-  void recv_GetTable(CommonResponse& _return, const int32_t seqid);
-  void CreateIndex(CommonResponse& _return, const CreateIndexRequest& request) override;
-  int32_t send_CreateIndex(const CreateIndexRequest& request);
-  void recv_CreateIndex(CommonResponse& _return, const int32_t seqid);
-  void DropIndex(CommonResponse& _return, const DropIndexRequest& request) override;
-  int32_t send_DropIndex(const DropIndexRequest& request);
-  void recv_DropIndex(CommonResponse& _return, const int32_t seqid);
-  void ShowIndex(ShowIndexResponse& _return, const ShowIndexRequest& request) override;
-  int32_t send_ShowIndex(const ShowIndexRequest& request);
-  void recv_ShowIndex(ShowIndexResponse& _return, const int32_t seqid);
-  void Optimize(CommonResponse& _return, const OptimizeRequest& request) override;
-  int32_t send_Optimize(const OptimizeRequest& request);
-  void recv_Optimize(CommonResponse& _return, const int32_t seqid);
-  void AddColumns(CommonResponse& _return, const AddColumnsRequest& request) override;
-  int32_t send_AddColumns(const AddColumnsRequest& request);
-  void recv_AddColumns(CommonResponse& _return, const int32_t seqid);
-  void DropColumns(CommonResponse& _return, const DropColumnsRequest& request) override;
-  int32_t send_DropColumns(const DropColumnsRequest& request);
-  void recv_DropColumns(CommonResponse& _return, const int32_t seqid);
-  void Cleanup(CommonResponse& _return, const CommonRequest& request) override;
-  int32_t send_Cleanup(const CommonRequest& request);
-  void recv_Cleanup(CommonResponse& _return, const int32_t seqid);
-  void DumpIndex(CommonResponse& _return, const DumpIndexRequest& request) override;
-  int32_t send_DumpIndex(const DumpIndexRequest& request);
-  void recv_DumpIndex(CommonResponse& _return, const int32_t seqid);
-  void Command(CommonResponse& _return, const CommandRequest& request) override;
-  int32_t send_Command(const CommandRequest& request);
-  void recv_Command(CommonResponse& _return, const int32_t seqid);
-  void Flush(CommonResponse& _return, const FlushRequest& request) override;
-  int32_t send_Flush(const FlushRequest& request);
-  void recv_Flush(CommonResponse& _return, const int32_t seqid);
-  void Compact(CommonResponse& _return, const CompactRequest& request) override;
-  int32_t send_Compact(const CompactRequest& request);
-  void recv_Compact(CommonResponse& _return, const int32_t seqid);
-  void CreateTableSnapshot(CommonResponse& _return, const CreateTableSnapshotRequest& request) override;
-  int32_t send_CreateTableSnapshot(const CreateTableSnapshotRequest& request);
-  void recv_CreateTableSnapshot(CommonResponse& _return, const int32_t seqid);
-  void CreateDatabaseSnapshot(CommonResponse& _return, const CreateDatabaseSnapshotRequest& request) override;
-  int32_t send_CreateDatabaseSnapshot(const CreateDatabaseSnapshotRequest& request);
-  void recv_CreateDatabaseSnapshot(CommonResponse& _return, const int32_t seqid);
-  void CreateSystemSnapshot(CommonResponse& _return, const CreateSystemSnapshotRequest& request) override;
-  int32_t send_CreateSystemSnapshot(const CreateSystemSnapshotRequest& request);
-  void recv_CreateSystemSnapshot(CommonResponse& _return, const int32_t seqid);
-  void RestoreSnapshot(CommonResponse& _return, const RestoreSnapshotRequest& request) override;
-  int32_t send_RestoreSnapshot(const RestoreSnapshotRequest& request);
-  void recv_RestoreSnapshot(CommonResponse& _return, const int32_t seqid);
-  void ShowSnapshot(ShowSnapshotResponse& _return, const ShowSnapshotRequest& request) override;
-  int32_t send_ShowSnapshot(const ShowSnapshotRequest& request);
-  void recv_ShowSnapshot(ShowSnapshotResponse& _return, const int32_t seqid);
-  void ListSnapshots(ListSnapshotsResponse& _return, const ListSnapshotsRequest& request) override;
-  int32_t send_ListSnapshots(const ListSnapshotsRequest& request);
-  void recv_ListSnapshots(ListSnapshotsResponse& _return, const int32_t seqid);
-  void DropSnapshot(CommonResponse& _return, const DropSnapshotRequest& request) override;
-  int32_t send_DropSnapshot(const DropSnapshotRequest& request);
-  void recv_DropSnapshot(CommonResponse& _return, const int32_t seqid);
- protected:
-  std::shared_ptr< ::apache::thrift::protocol::TProtocol> piprot_;
-  std::shared_ptr< ::apache::thrift::protocol::TProtocol> poprot_;
-  ::apache::thrift::protocol::TProtocol* iprot_;
-  ::apache::thrift::protocol::TProtocol* oprot_;
-  std::shared_ptr< ::apache::thrift::async::TConcurrentClientSyncInfo> sync_;
+public:
+    InfinityServiceConcurrentClient(std::shared_ptr<::apache::thrift::protocol::TProtocol> prot,
+                                    std::shared_ptr<::apache::thrift::async::TConcurrentClientSyncInfo> sync)
+        : sync_(sync) {
+        setProtocol(prot);
+    }
+    InfinityServiceConcurrentClient(std::shared_ptr<::apache::thrift::protocol::TProtocol> iprot,
+                                    std::shared_ptr<::apache::thrift::protocol::TProtocol> oprot,
+                                    std::shared_ptr<::apache::thrift::async::TConcurrentClientSyncInfo> sync)
+        : sync_(sync) {
+        setProtocol(iprot, oprot);
+    }
+
+private:
+    void setProtocol(std::shared_ptr<::apache::thrift::protocol::TProtocol> prot) { setProtocol(prot, prot); }
+    void setProtocol(std::shared_ptr<::apache::thrift::protocol::TProtocol> iprot, std::shared_ptr<::apache::thrift::protocol::TProtocol> oprot) {
+        piprot_ = iprot;
+        poprot_ = oprot;
+        iprot_ = iprot.get();
+        oprot_ = oprot.get();
+    }
+
+public:
+    std::shared_ptr<::apache::thrift::protocol::TProtocol> getInputProtocol() { return piprot_; }
+    std::shared_ptr<::apache::thrift::protocol::TProtocol> getOutputProtocol() { return poprot_; }
+    void Connect(CommonResponse &_return, const ConnectRequest &request) override;
+    int32_t send_Connect(const ConnectRequest &request);
+    void recv_Connect(CommonResponse &_return, const int32_t seqid);
+    void Disconnect(CommonResponse &_return, const CommonRequest &request) override;
+    int32_t send_Disconnect(const CommonRequest &request);
+    void recv_Disconnect(CommonResponse &_return, const int32_t seqid);
+    void CreateDatabase(CommonResponse &_return, const CreateDatabaseRequest &request) override;
+    int32_t send_CreateDatabase(const CreateDatabaseRequest &request);
+    void recv_CreateDatabase(CommonResponse &_return, const int32_t seqid);
+    void DropDatabase(CommonResponse &_return, const DropDatabaseRequest &request) override;
+    int32_t send_DropDatabase(const DropDatabaseRequest &request);
+    void recv_DropDatabase(CommonResponse &_return, const int32_t seqid);
+    void CreateTable(CommonResponse &_return, const CreateTableRequest &request) override;
+    int32_t send_CreateTable(const CreateTableRequest &request);
+    void recv_CreateTable(CommonResponse &_return, const int32_t seqid);
+    void DropTable(CommonResponse &_return, const DropTableRequest &request) override;
+    int32_t send_DropTable(const DropTableRequest &request);
+    void recv_DropTable(CommonResponse &_return, const int32_t seqid);
+    void RenameTable(CommonResponse &_return, const RenameTableRequest &request) override;
+    int32_t send_RenameTable(const RenameTableRequest &request);
+    void recv_RenameTable(CommonResponse &_return, const int32_t seqid);
+    void Insert(CommonResponse &_return, const InsertRequest &request) override;
+    int32_t send_Insert(const InsertRequest &request);
+    void recv_Insert(CommonResponse &_return, const int32_t seqid);
+    void Import(CommonResponse &_return, const ImportRequest &request) override;
+    int32_t send_Import(const ImportRequest &request);
+    void recv_Import(CommonResponse &_return, const int32_t seqid);
+    void Export(CommonResponse &_return, const ExportRequest &request) override;
+    int32_t send_Export(const ExportRequest &request);
+    void recv_Export(CommonResponse &_return, const int32_t seqid);
+    void Select(SelectResponse &_return, const SelectRequest &request) override;
+    int32_t send_Select(const SelectRequest &request);
+    void recv_Select(SelectResponse &_return, const int32_t seqid);
+    void Explain(SelectResponse &_return, const ExplainRequest &request) override;
+    int32_t send_Explain(const ExplainRequest &request);
+    void recv_Explain(SelectResponse &_return, const int32_t seqid);
+    void Delete(DeleteResponse &_return, const DeleteRequest &request) override;
+    int32_t send_Delete(const DeleteRequest &request);
+    void recv_Delete(DeleteResponse &_return, const int32_t seqid);
+    void Update(CommonResponse &_return, const UpdateRequest &request) override;
+    int32_t send_Update(const UpdateRequest &request);
+    void recv_Update(CommonResponse &_return, const int32_t seqid);
+    void ListDatabase(ListDatabaseResponse &_return, const ListDatabaseRequest &request) override;
+    int32_t send_ListDatabase(const ListDatabaseRequest &request);
+    void recv_ListDatabase(ListDatabaseResponse &_return, const int32_t seqid);
+    void ListTable(ListTableResponse &_return, const ListTableRequest &request) override;
+    int32_t send_ListTable(const ListTableRequest &request);
+    void recv_ListTable(ListTableResponse &_return, const int32_t seqid);
+    void ListIndex(ListIndexResponse &_return, const ListIndexRequest &request) override;
+    int32_t send_ListIndex(const ListIndexRequest &request);
+    void recv_ListIndex(ListIndexResponse &_return, const int32_t seqid);
+    void ShowTable(ShowTableResponse &_return, const ShowTableRequest &request) override;
+    int32_t send_ShowTable(const ShowTableRequest &request);
+    void recv_ShowTable(ShowTableResponse &_return, const int32_t seqid);
+    void ShowColumns(SelectResponse &_return, const ShowColumnsRequest &request) override;
+    int32_t send_ShowColumns(const ShowColumnsRequest &request);
+    void recv_ShowColumns(SelectResponse &_return, const int32_t seqid);
+    void ShowDatabase(ShowDatabaseResponse &_return, const ShowDatabaseRequest &request) override;
+    int32_t send_ShowDatabase(const ShowDatabaseRequest &request);
+    void recv_ShowDatabase(ShowDatabaseResponse &_return, const int32_t seqid);
+    void ShowSegments(SelectResponse &_return, const ShowSegmentsRequest &request) override;
+    int32_t send_ShowSegments(const ShowSegmentsRequest &request);
+    void recv_ShowSegments(SelectResponse &_return, const int32_t seqid);
+    void ShowSegment(ShowSegmentResponse &_return, const ShowSegmentRequest &request) override;
+    int32_t send_ShowSegment(const ShowSegmentRequest &request);
+    void recv_ShowSegment(ShowSegmentResponse &_return, const int32_t seqid);
+    void ShowBlocks(SelectResponse &_return, const ShowBlocksRequest &request) override;
+    int32_t send_ShowBlocks(const ShowBlocksRequest &request);
+    void recv_ShowBlocks(SelectResponse &_return, const int32_t seqid);
+    void ShowBlock(ShowBlockResponse &_return, const ShowBlockRequest &request) override;
+    int32_t send_ShowBlock(const ShowBlockRequest &request);
+    void recv_ShowBlock(ShowBlockResponse &_return, const int32_t seqid);
+    void ShowBlockColumn(ShowBlockColumnResponse &_return, const ShowBlockColumnRequest &request) override;
+    int32_t send_ShowBlockColumn(const ShowBlockColumnRequest &request);
+    void recv_ShowBlockColumn(ShowBlockColumnResponse &_return, const int32_t seqid);
+    void ShowCurrentNode(ShowCurrentNodeResponse &_return, const ShowCurrentNodeRequest &request) override;
+    int32_t send_ShowCurrentNode(const ShowCurrentNodeRequest &request);
+    void recv_ShowCurrentNode(ShowCurrentNodeResponse &_return, const int32_t seqid);
+    void GetDatabase(CommonResponse &_return, const GetDatabaseRequest &request) override;
+    int32_t send_GetDatabase(const GetDatabaseRequest &request);
+    void recv_GetDatabase(CommonResponse &_return, const int32_t seqid);
+    void GetTable(CommonResponse &_return, const GetTableRequest &request) override;
+    int32_t send_GetTable(const GetTableRequest &request);
+    void recv_GetTable(CommonResponse &_return, const int32_t seqid);
+    void CreateIndex(CommonResponse &_return, const CreateIndexRequest &request) override;
+    int32_t send_CreateIndex(const CreateIndexRequest &request);
+    void recv_CreateIndex(CommonResponse &_return, const int32_t seqid);
+    void DropIndex(CommonResponse &_return, const DropIndexRequest &request) override;
+    int32_t send_DropIndex(const DropIndexRequest &request);
+    void recv_DropIndex(CommonResponse &_return, const int32_t seqid);
+    void ShowIndex(ShowIndexResponse &_return, const ShowIndexRequest &request) override;
+    int32_t send_ShowIndex(const ShowIndexRequest &request);
+    void recv_ShowIndex(ShowIndexResponse &_return, const int32_t seqid);
+    void Optimize(CommonResponse &_return, const OptimizeRequest &request) override;
+    int32_t send_Optimize(const OptimizeRequest &request);
+    void recv_Optimize(CommonResponse &_return, const int32_t seqid);
+    void AddColumns(CommonResponse &_return, const AddColumnsRequest &request) override;
+    int32_t send_AddColumns(const AddColumnsRequest &request);
+    void recv_AddColumns(CommonResponse &_return, const int32_t seqid);
+    void DropColumns(CommonResponse &_return, const DropColumnsRequest &request) override;
+    int32_t send_DropColumns(const DropColumnsRequest &request);
+    void recv_DropColumns(CommonResponse &_return, const int32_t seqid);
+    void Cleanup(CommonResponse &_return, const CommonRequest &request) override;
+    int32_t send_Cleanup(const CommonRequest &request);
+    void recv_Cleanup(CommonResponse &_return, const int32_t seqid);
+    void DumpIndex(CommonResponse &_return, const DumpIndexRequest &request) override;
+    int32_t send_DumpIndex(const DumpIndexRequest &request);
+    void recv_DumpIndex(CommonResponse &_return, const int32_t seqid);
+    void Command(CommonResponse &_return, const CommandRequest &request) override;
+    int32_t send_Command(const CommandRequest &request);
+    void recv_Command(CommonResponse &_return, const int32_t seqid);
+    void Flush(CommonResponse &_return, const FlushRequest &request) override;
+    int32_t send_Flush(const FlushRequest &request);
+    void recv_Flush(CommonResponse &_return, const int32_t seqid);
+    void Compact(CommonResponse &_return, const CompactRequest &request) override;
+    int32_t send_Compact(const CompactRequest &request);
+    void recv_Compact(CommonResponse &_return, const int32_t seqid);
+    void CreateTableSnapshot(CommonResponse &_return, const CreateTableSnapshotRequest &request) override;
+    int32_t send_CreateTableSnapshot(const CreateTableSnapshotRequest &request);
+    void recv_CreateTableSnapshot(CommonResponse &_return, const int32_t seqid);
+    void CreateDatabaseSnapshot(CommonResponse &_return, const CreateDatabaseSnapshotRequest &request) override;
+    int32_t send_CreateDatabaseSnapshot(const CreateDatabaseSnapshotRequest &request);
+    void recv_CreateDatabaseSnapshot(CommonResponse &_return, const int32_t seqid);
+    void CreateSystemSnapshot(CommonResponse &_return, const CreateSystemSnapshotRequest &request) override;
+    int32_t send_CreateSystemSnapshot(const CreateSystemSnapshotRequest &request);
+    void recv_CreateSystemSnapshot(CommonResponse &_return, const int32_t seqid);
+    void RestoreSnapshot(CommonResponse &_return, const RestoreSnapshotRequest &request) override;
+    int32_t send_RestoreSnapshot(const RestoreSnapshotRequest &request);
+    void recv_RestoreSnapshot(CommonResponse &_return, const int32_t seqid);
+    void ShowSnapshot(ShowSnapshotResponse &_return, const ShowSnapshotRequest &request) override;
+    int32_t send_ShowSnapshot(const ShowSnapshotRequest &request);
+    void recv_ShowSnapshot(ShowSnapshotResponse &_return, const int32_t seqid);
+    void ListSnapshots(ListSnapshotsResponse &_return, const ListSnapshotsRequest &request) override;
+    int32_t send_ListSnapshots(const ListSnapshotsRequest &request);
+    void recv_ListSnapshots(ListSnapshotsResponse &_return, const int32_t seqid);
+    void DropSnapshot(CommonResponse &_return, const DropSnapshotRequest &request) override;
+    int32_t send_DropSnapshot(const DropSnapshotRequest &request);
+    void recv_DropSnapshot(CommonResponse &_return, const int32_t seqid);
+
+protected:
+    std::shared_ptr<::apache::thrift::protocol::TProtocol> piprot_;
+    std::shared_ptr<::apache::thrift::protocol::TProtocol> poprot_;
+    ::apache::thrift::protocol::TProtocol *iprot_;
+    ::apache::thrift::protocol::TProtocol *oprot_;
+    std::shared_ptr<::apache::thrift::async::TConcurrentClientSyncInfo> sync_;
 };
 
 #ifdef _MSC_VER
-  #pragma warning( pop )
+#pragma warning(pop)
 #endif
 
-} // namespace
+} // namespace infinity_thrift_rpc
 
 #endif
