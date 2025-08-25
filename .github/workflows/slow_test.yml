@@ -213,8 +213,8 @@ jobs:
         if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_PYTEST_PARALLEL == 'true' }} # always run this step even if previous steps failed
         run: |
           failure="${{ steps.run_py_tests.outcome == 'failure' || steps.stop_py_tests.outcome == 'failure' }}"
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
-          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=release.log --stderror_path=release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /var/infinity/log && tar -cvf /infinity/infinity.log.tar *"
+          sudo python3 scripts/collect_log.py --log_path=infinity.log.tar --stdout_path=release.log --stderror_path=release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Build debug version no thread sanitizer
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
