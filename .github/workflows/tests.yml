@@ -77,7 +77,7 @@ jobs:
     #    needs: debug_clang_format
     outputs:
       BUILD_IP: ${{ steps.get_ip.outputs.BUILD_IP }}
-      CONTAINER_NAME: ${{ steps.get_ip.outputs.CONTAINER_NAME }}
+      CONTAINER_NAME: ${{ steps.start.outputs.CONTAINER_NAME }}
     steps:
       - name: Show PR labels
         if: ${{ !cancelled() && !failure() }}
