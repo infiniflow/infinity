@@ -186,17 +186,6 @@ jobs:
           echo "Build ip is: ${BUILD_IP}"
           echo "Container name is: ${CONTAINER_NAME}"
 
-#      - name: ssh to remote server
-#        uses: appleboy/ssh-action@v1.2.2
-#        with:
-#          host: 172.17.0.1
-#          username: infiniflow
-#          # password: ${{ secrets.PASSWORD }}
-#          password: infiniflow
-#          envs: CONTAINER_NAME, BUILD_IP
-#          script: |
-#            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-#            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
         with:
@@ -208,6 +197,18 @@ jobs:
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
             scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+
+      - name: ssh to remote server
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: 172.17.0.1
+          username: infiniflow
+          # password: ${{ secrets.PASSWORD }}
+          password: infiniflow
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/
+            scp infiniflow@172.17.0.1:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
 #            TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
 #            echo "TEST_CONTAINER=${TEST_CONTAINER}" >> $GITHUB_ENV
