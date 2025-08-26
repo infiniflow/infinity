@@ -74,6 +74,15 @@ statement ok
 SHOW TABLE tb1 COLUMNS;
 
 statement ok
+SHOW TABLE tb1 SEGMENTS;
+
+statement ok
+SHOW TABLE tb1 SEGMENT 0;
+
+statement ok
+SHOW TABLE tb1 SEGMENT 0 BLOCKS;
+
+statement ok
 SHOW TABLE tb1 SEGMENT 0 BLOCK 0;
 
 statement ok
@@ -111,6 +120,9 @@ SHOW TABLE tb1 INDEX idx4;
 
 statement ok
 SHOW TABLE tb1 INDEX idx5;
+
+statement ok
+SHOW TABLE tb1 INDEX idx1 SEGMENT 0;
 
 statement ok
 SHOW TABLE tb1 INDEX idx1 SEGMENT 0 CHUNK 0;
