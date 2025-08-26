@@ -174,7 +174,7 @@ public:
     RabitqVecStoreMetaBase(This &&other)
         : origin_dim_(std::exchange(other.origin_dim_, 0)), rom_(std::move(other.rom_)), centroid_(std::move(other.centroid_)),
           dim_(std::exchange(other.dim_, 0)), compress_data_size_(std::exchange(other.compress_data_size_, 0)),
-          compress_query_size_(std::exchange(other.compress_data_size_, 0)), rot_centroid_(std::move(other.rot_centroid_)) {}
+          compress_query_size_(std::exchange(other.compress_query_size_, 0)), rot_centroid_(std::move(other.rot_centroid_)) {}
     RabitqVecStoreMetaBase &operator=(This &&other) {
         if (this != &other) {
             origin_dim_ = std::exchange(other.origin_dim_, 0);
@@ -387,8 +387,9 @@ private:
     }
 
 public:
-    RabitqVecStoreMeta() = delete;
+    RabitqVecStoreMeta() = default;
     static This Make(size_t origin_dim) { return This(origin_dim); }
+    static This Make(size_t origin_dim, bool normalize) { return This(origin_dim); }
 
     static This Load(LocalFileHandle &file_handle) {
         size_t origin_dim;
@@ -463,7 +464,7 @@ private:
     }
 
 public:
-    RabitqVecStoreMeta() = delete;
+    RabitqVecStoreMeta() = default;
 
     static This LoadFromPtr(const char *&ptr) {
         size_t origin_dim = ReadBufAdv<size_t>(ptr);
@@ -525,7 +526,7 @@ private:
     RabitqVecStoreInner(size_t max_vec_num, const Meta &meta) { this->ptr_ = std::make_unique<char[]>(max_vec_num * meta.compress_data_size()); }
 
 public:
-    RabitqVecStoreInner() = delete;
+    RabitqVecStoreInner() = default;
 
     static This Make(size_t max_vec_num, const Meta &meta, size_t &mem_usage) {
         auto ret = This(max_vec_num, meta);
@@ -565,7 +566,7 @@ private:
     RabitqVecStoreInner(const char *ptr) { this->ptr_ = ptr; }
 
 public:
-    RabitqVecStoreInner() = delete;
+    RabitqVecStoreInner() = default;
 
     static This LoadFromPtr(const char *&ptr, size_t cur_vec_num, const Meta &meta) {
         const char *p = ptr;
