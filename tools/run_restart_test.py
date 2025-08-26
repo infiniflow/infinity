@@ -7,34 +7,16 @@ python_executable = sys.executable
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Python restart test for infinity")
-    parser.add_argument(
-        "--infinity_path",
-        type=str,
-        default="./build/Debug/src/infinity",
-    )
-    parser.add_argument(
-        "--slow",
-        type=bool,
-        default=False,
-    )
-    parser.add_argument(
-        "--test_case",
-        type=str,
-        required=False,
-    )
-    parser.add_argument(
-        "--loop",
-        type=int,
-        required=False,
-    )
-
+    parser.add_argument("--infinity_path", type=str, default="./build/Debug/src/infinity")
+    parser.add_argument("--slow", type=bool, default=False)
+    parser.add_argument("--test_case", type=str, required=False)
+    parser.add_argument("--loop", type=int, required=False)
     args = parser.parse_args()
     infinity_path = args.infinity_path
     slow = args.slow
 
     current_path = os.getcwd()
     python_test_dir = current_path + "/python"
-
     test_case = ""
     if args.test_case:
         test_case = f"{python_test_dir}/restart_test/{args.test_case}"
