@@ -28,6 +28,7 @@ import :new_catalog;
 import :fast_rough_filter;
 import :kv_utility;
 import :snapshot_info;
+import :meta_cache;
 
 import std;
 import third_party;
@@ -242,13 +243,35 @@ Status SegmentMeta::LoadNextBlockID() {
 // }
 
 Status SegmentMeta::LoadFirstDeleteTS() {
+    if (first_delete_ts_.has_value()) {
+        return Status::OK();
+    }
+
     std::string first_delete_ts_key = GetSegmentTag("first_delete_ts");
+
+    std::shared_ptr<MetaTableCache> table_cache{};
+    u64 db_id = table_meta_.db_id();
+    const std::string &table_name = table_meta_.table_name();
+    MetaCache *meta_cache = table_meta_.meta_cache();
+    table_cache = meta_cache->GetTable(db_id, table_name, begin_ts_);
+    if (table_cache.get() != nullptr) {
+        auto tag_value = table_cache->get_segment_tag(segment_id_, first_delete_ts_key);
+        if (tag_value.has_value()) {
+            first_delete_ts_ = tag_value;
+            return Status::OK();
+        }
+    }
+
     std::string first_delete_ts_str;
     Status status = kv_instance_.Get(first_delete_ts_key, first_delete_ts_str);
     if (!status.ok()) {
         return status;
     }
     first_delete_ts_ = std::stoull(first_delete_ts_str);
+
+    if (table_cache.get() != nullptr) {
+        table_cache->set_segment_tag(segment_id_, first_delete_ts_key, *first_delete_ts_);
+    }
     return Status::OK();
 }
 

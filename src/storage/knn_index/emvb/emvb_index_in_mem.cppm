@@ -30,6 +30,7 @@ class ColumnVector;
 class BufferObj;
 class KVInstance;
 struct ChunkIndexMetaInfo;
+class MetaCache;
 
 using EMVBInMemQueryResultType = std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>>;
 
@@ -77,7 +78,7 @@ public:
 
     u32 GetRowCount() const;
 
-    void Insert(const ColumnVector &col, u32 row_offset, u32 row_count, KVInstance &kv_instance, TxnTimeStamp begin_ts);
+    void Insert(const ColumnVector &col, u32 row_offset, u32 row_count, KVInstance &kv_instance, TxnTimeStamp begin_ts, MetaCache *meta_cache);
 
     void Dump(BufferObj *buffer_obj);
 

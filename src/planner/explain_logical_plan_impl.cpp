@@ -2177,6 +2177,34 @@ ExplainLogicalPlan::Explain(const LogicalShow *show_node, std::shared_ptr<std::v
             result->emplace_back(std::make_shared<std::string>(show_str));
             break;
         }
+        case ShowStmtType::kListCaches: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> LIST CACHES ";
+            } else {
+                show_str = "LIST CACHES ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+            break;
+        }
+        case ShowStmtType::kShowCache: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> SHOW CACHE ";
+            } else {
+                show_str = "SHOW CACHE ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+            break;
+        }
     }
     return Status::OK();
 }

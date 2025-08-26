@@ -72,7 +72,6 @@ struct NewTxnCompactState {
     NewTxnCompactState() = default;
 
     static Status Make(TableMeeta &table_meta, TxnTimeStamp commit_ts, NewTxnCompactState &state, SegmentID segment_id) {
-        // Status status = NewCatalog::AddNewSegment1(table_meta, commit_ts, state.new_segment_meta_);
         Status status = NewCatalog::AddNewSegmentWithID(table_meta, commit_ts, state.new_segment_meta_, segment_id);
         if (!status.ok()) {
             return status;
@@ -120,7 +119,7 @@ struct NewTxnCompactState {
 
         for (size_t i = 0; i < column_cnt_; ++i) {
             ColumnMeta column_meta(i, *block_meta_);
-            status = NewCatalog::GetColumnVector(column_meta, 0, ColumnVectorMode::kReadWrite, column_vectors_[i]);
+            status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), 0, ColumnVectorMode::kReadWrite, column_vectors_[i]);
             if (!status.ok()) {
                 return status;
             }
@@ -142,7 +141,7 @@ struct NewTxnCompactState {
                     return status;
                 }
 
-                auto [data_size, status2] = column_meta.GetColumnSize(cur_block_row_cnt_);
+                auto [data_size, status2] = column_meta.GetColumnSize(cur_block_row_cnt_, column_meta.get_column_def());
                 if (!status2.ok()) {
                     return status;
                 }
@@ -197,7 +196,6 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
 
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
-    // status = NewCatalog::AddNewSegment1(table_meta, fake_commit_ts, segment_meta);
     u64 db_id = std::stoull(table_meta.db_id_str());
     u64 table_id = std::stoull(table_meta.table_id_str());
     SystemCache *system_cache = txn_mgr_->GetSystemCachePtr();
@@ -296,7 +294,7 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
             //     }
             // }
 
-            auto [data_size, status2] = column_meta.GetColumnSize(row_cnt);
+            auto [data_size, status2] = column_meta.GetColumnSize(row_cnt, column_meta.get_column_def());
             if (!status2.ok()) {
                 return status;
             }
@@ -367,7 +365,7 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
     for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
         const std::string &index_id_str = (*index_id_strs_ptr)[i];
         const std::string &index_name = (*index_names_ptr)[i];
-        TableIndexMeeta table_index_meta(index_id_str, table_meta);
+        TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta);
 
         for (size_t segment_idx = 0; segment_idx < segment_count; ++segment_idx) {
             size_t segment_row_cnt = segment_row_cnts[segment_idx];
@@ -703,6 +701,13 @@ Status NewTxn::Compact(const std::string &db_name, const std::string &table_name
         return status;
     }
 
+    std::vector<std::string> *index_id_strs_ptr = nullptr;
+    std::vector<std::string> *index_name_ptr = nullptr;
+    status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+
     {
         // Put the data into local txn store
         if (base_txn_store_ != nullptr) {
@@ -742,6 +747,8 @@ Status NewTxn::Compact(const std::string &db_name, const std::string &table_name
                                                                  db_meta->db_id_str(),
                                                                  table_name,
                                                                  table_meta.table_id_str(),
+                                                                 *index_name_ptr,
+                                                                 *index_id_strs_ptr,
                                                                  std::move(segment_infos),
                                                                  std::move(deprecated_segment_ids));
         wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(compact_command));
@@ -751,13 +758,6 @@ Status NewTxn::Compact(const std::string &db_name, const std::string &table_name
         if (!status.ok()) {
             return status;
         }
-    }
-
-    std::vector<std::string> *index_id_strs_ptr = nullptr;
-    std::vector<std::string> *index_name_ptr = nullptr;
-    status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_ptr);
-    if (!status.ok()) {
-        return status;
     }
 
     CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
@@ -773,7 +773,7 @@ Status NewTxn::Compact(const std::string &db_name, const std::string &table_name
     for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
         const std::string &index_id_str = (*index_id_strs_ptr)[i];
         const std::string &index_name = (*index_name_ptr)[i];
-        TableIndexMeeta table_index_meta(index_id_str, table_meta);
+        TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta);
 
         status = this->PopulateIndex(db_name,
                                      table_name,
@@ -961,7 +961,7 @@ Status
 NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t append_rows, const ColumnVector &column_vector, size_t source_offset) {
     ColumnVector dest_vec;
     {
-        Status status = NewCatalog::GetColumnVector(column_meta, dest_offset, ColumnVectorMode::kReadWrite, dest_vec);
+        Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), dest_offset, ColumnVectorMode::kReadWrite, dest_vec);
         if (!status.ok()) {
             return status;
         }
@@ -975,7 +975,7 @@ NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t appen
         return status;
     }
 
-    auto [data_size, status2] = column_meta.GetColumnSize(dest_vec.Size());
+    auto [data_size, status2] = column_meta.GetColumnSize(dest_vec.Size(), column_meta.get_column_def());
     if (!status2.ok()) {
         return status;
     }
@@ -1104,7 +1104,11 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
     for (size_t column_id = 0; column_id < column_cnt; ++column_id) {
         ColumnMeta column_meta(column_id, block_meta);
 
-        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorMode::kReadOnly, column_vectors[column_id]);
+        status = NewCatalog::GetColumnVector(column_meta,
+                                             column_meta.get_column_def(),
+                                             block_row_cnt,
+                                             ColumnVectorMode::kReadOnly,
+                                             column_vectors[column_id]);
         if (!status.ok()) {
             return status;
         }
@@ -1159,7 +1163,8 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
     return Status::OK();
 }
 
-Status NewTxn::AddColumnsData(TableMeeta &table_meta, const std::vector<std::shared_ptr<ColumnDef>> &column_defs) {
+Status
+NewTxn::AddColumnsData(TableMeeta &table_meta, const std::vector<std::shared_ptr<ColumnDef>> &column_defs, const std::vector<u32> &column_idx_list) {
     Status status;
     std::vector<SegmentID> *segment_ids_ptr = nullptr;
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
@@ -1200,7 +1205,7 @@ Status NewTxn::AddColumnsData(TableMeeta &table_meta, const std::vector<std::sha
 
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta);
-        status = this->AddColumnsDataInSegment(segment_meta, column_defs, default_values);
+        status = this->AddColumnsDataInSegment(segment_meta, column_defs, column_idx_list, default_values);
         if (!status.ok()) {
             return status;
         }
@@ -1210,7 +1215,9 @@ Status NewTxn::AddColumnsData(TableMeeta &table_meta, const std::vector<std::sha
 
 Status NewTxn::AddColumnsDataInSegment(SegmentMeta &segment_meta,
                                        const std::vector<std::shared_ptr<ColumnDef>> &column_defs,
+                                       const std::vector<u32> &column_idx_list,
                                        const std::vector<Value> &default_values) {
+
     auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
         return status;
@@ -1218,7 +1225,7 @@ Status NewTxn::AddColumnsDataInSegment(SegmentMeta &segment_meta,
 
     for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, segment_meta);
-        status = this->AddColumnsDataInBlock(block_meta, column_defs, default_values);
+        status = this->AddColumnsDataInBlock(block_meta, column_defs, column_idx_list, default_values);
         if (!status.ok()) {
             return status;
         }
@@ -1228,34 +1235,29 @@ Status NewTxn::AddColumnsDataInSegment(SegmentMeta &segment_meta,
 
 Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
                                      const std::vector<std::shared_ptr<ColumnDef>> &column_defs,
+                                     const std::vector<u32> &column_idx_list,
                                      const std::vector<Value> &default_values) {
     // auto [block_row_count, status] = block_meta.GetRowCnt();
     auto [block_row_count, status] = block_meta.GetRowCnt1();
     if (!status.ok()) {
         return status;
     }
-    size_t old_column_cnt = 0;
-    {
-        auto [all_column_defs, col_status] = block_meta.segment_meta().table_meta().GetColumnDefs();
-        if (!col_status.ok()) {
-            return col_status;
-        }
-        old_column_cnt = all_column_defs->size() - column_defs.size();
-    }
+
     LOG_TRACE("NewTxn::AddColumnsDataInBlock begin");
-    for (size_t i = 0; i < column_defs.size(); ++i) {
-        size_t column_idx = old_column_cnt + i;
-        // const std::shared_ptr<ColumnDef> &column_def = column_defs[column_idx];
+    size_t new_column_count = column_defs.size();
+    for (size_t i = 0; i < new_column_count; ++i) {
+        size_t column_idx = column_idx_list[i];
+        const std::shared_ptr<ColumnDef> &column_def = column_defs[i];
         const Value &default_value = default_values[i];
 
         std::optional<ColumnMeta> column_meta;
-        status = NewCatalog::AddNewBlockColumn(block_meta, column_idx, column_meta);
+        status = NewCatalog::AddNewBlockColumn(block_meta, column_idx, column_def, column_meta);
         if (!status.ok()) {
             return status;
         }
 
         ColumnVector column_vector;
-        status = NewCatalog::GetColumnVector(*column_meta, 0 /*row_count*/, ColumnVectorMode::kReadWrite, column_vector);
+        status = NewCatalog::GetColumnVector(*column_meta, column_def, 0 /*row_count*/, ColumnVectorMode::kReadWrite, column_vector);
         if (!status.ok()) {
             return status;
         }
@@ -1266,12 +1268,12 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
 
         BufferObj *buffer_obj = nullptr;
         BufferObj *outline_buffer_obj = nullptr;
-        Status status = column_meta->GetColumnBuffer(buffer_obj, outline_buffer_obj);
+        status = column_meta->GetColumnBuffer(buffer_obj, outline_buffer_obj);
         if (!status.ok()) {
             return status;
         }
 
-        auto [data_size, status2] = column_meta->GetColumnSize(column_vector.Size());
+        auto [data_size, status2] = column_meta->GetColumnSize(column_vector.Size(), column_def);
         if (!status2.ok()) {
             return status;
         }
@@ -1533,7 +1535,8 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
         }
         for (size_t i = 0; i < index_id_strs->size(); ++i) {
             const std::string &index_id_str = (*index_id_strs)[i];
-            table_index_metas.push_back(std::make_shared<TableIndexMeeta>(index_id_str, table_meta));
+            const std::string &index_name_str = (*index_name_strs)[i];
+            table_index_metas.push_back(std::make_shared<TableIndexMeeta>(index_id_str, index_name_str, table_meta));
         }
     }
 
@@ -1757,12 +1760,17 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
     }
     {
         std::vector<std::string> *index_id_strs_ptr = nullptr;
-        status = table_meta.GetIndexIDs(index_id_strs_ptr);
+        std::vector<std::string> *index_name_strs_ptr = nullptr;
+        status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
         if (!status.ok()) {
             return status;
         }
-        for (const std::string &index_id_str : *index_id_strs_ptr) {
-            TableIndexMeeta table_index_meta(index_id_str, table_meta);
+        size_t index_count = index_id_strs_ptr->size();
+        for (size_t idx = 0; idx < index_count; ++idx) {
+            const std::string &index_id_str = index_id_strs_ptr->at(idx);
+            const std::string &index_name_str = index_name_strs_ptr->at(idx);
+
+            TableIndexMeeta table_index_meta(index_id_str, index_name_str, table_meta);
             std::vector<SegmentID> *segment_ids_ptr = nullptr;
             std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
             if (!status.ok()) {

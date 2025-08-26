@@ -112,6 +112,10 @@ std::string ToString(ShowStmtType type) {
             return "List snapshots";
         case ShowStmtType::kShowSnapshot:
             return "Show snapshot";
+        case ShowStmtType::kListCaches:
+            return "List caches";
+        case ShowStmtType::kShowCache:
+            return "Show cache";
         case ShowStmtType::kInvalid: {
             UnrecoverableError("Invalid chunk scan type");
         }

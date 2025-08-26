@@ -37,11 +37,13 @@ public:
 
     size_t column_idx() const { return column_idx_; }
 
+    std::shared_ptr<ColumnDef> get_column_def() const;
+
     Status GetChunkOffset(size_t &chunk_offset);
 
     Status SetChunkOffset(size_t chunk_offset);
 
-    Status InitSet();
+    Status InitSet(const std::shared_ptr<ColumnDef> &col_def);
 
     Status LoadSet();
 
@@ -53,7 +55,7 @@ public:
 
     std::tuple<std::shared_ptr<ColumnDef>, Status> GetColumnDef() const;
 
-    std::tuple<size_t, Status> GetColumnSize(size_t row_cnt) const;
+    std::tuple<size_t, Status> GetColumnSize(size_t row_cnt, const std::shared_ptr<ColumnDef> &col_def) const;
 
     Status FilePaths(std::vector<std::string> &paths);
 

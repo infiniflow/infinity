@@ -40,6 +40,12 @@ namespace infinity {
 ColumnMeta::ColumnMeta(size_t column_idx, BlockMeta &block_meta)
     : kv_instance_(block_meta.kv_instance()), block_meta_(block_meta), column_idx_(column_idx) {}
 
+std::shared_ptr<ColumnDef> ColumnMeta::get_column_def() const {
+    auto [column_defs_ptr, status] = block_meta_.segment_meta().table_meta().GetColumnDefs();
+    std::shared_ptr<ColumnDef> &column_def = column_defs_ptr->at(column_idx_);
+    return column_def;
+}
+
 Status ColumnMeta::GetChunkOffset(size_t &chunk_offset) {
     if (!chunk_offset_) {
         Status status = LoadChunkOffset();
@@ -61,22 +67,13 @@ Status ColumnMeta::SetChunkOffset(size_t chunk_offset) {
     return Status::OK();
 }
 
-Status ColumnMeta::InitSet() {
+Status ColumnMeta::InitSet(const std::shared_ptr<ColumnDef> &col_def) {
     // Status status = SetChunkOffset(0);
     // if (!status.ok()) {
     //     return status;
     // }
 
     Status status;
-    std::shared_ptr<ColumnDef> col_def;
-    {
-        std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs_ptr;
-        std::tie(column_defs_ptr, status) = block_meta_.segment_meta().table_meta().GetColumnDefs();
-        if (!status.ok()) {
-            return status;
-        }
-        col_def = (*column_defs_ptr)[column_idx_];
-    }
     ColumnID column_id = col_def->id();
 
     std::shared_ptr<std::string> block_dir_ptr = block_meta_.GetBlockDir();
@@ -283,11 +280,7 @@ std::tuple<std::shared_ptr<ColumnDef>, Status> ColumnMeta::GetColumnDef() const 
     return {(*column_defs_ptr)[column_idx_], Status::OK()};
 }
 
-std::tuple<size_t, Status> ColumnMeta::GetColumnSize(size_t row_cnt) const {
-    auto [col_def, status2] = GetColumnDef();
-    if (!status2.ok()) {
-        return {0, status2};
-    }
+std::tuple<size_t, Status> ColumnMeta::GetColumnSize(size_t row_cnt, const std::shared_ptr<ColumnDef> &col_def) const {
 
     size_t total_data_size = 0;
     if (col_def->type()->type() == LogicalType::kBoolean) {

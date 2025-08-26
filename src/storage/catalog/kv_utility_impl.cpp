@@ -35,12 +35,12 @@ import third_party;
 
 namespace infinity {
 
-std::vector<SegmentID> GetTableSegments(KVInstance *kv_instance,
-                                        const std::string &db_id_str,
-                                        const std::string &table_id_str,
-                                        TxnTimeStamp begin_ts,
-                                        TxnTimeStamp commit_ts) {
-    std::vector<SegmentID> segment_ids;
+std::shared_ptr<std::vector<SegmentID>> GetTableSegments(KVInstance *kv_instance,
+                                                         const std::string &db_id_str,
+                                                         const std::string &table_id_str,
+                                                         TxnTimeStamp begin_ts,
+                                                         TxnTimeStamp commit_ts) {
+    std::shared_ptr<std::vector<SegmentID>> segment_ids = std::make_shared<std::vector<SegmentID>>();
 
     std::string segment_id_prefix = KeyEncode::CatalogTableSegmentKeyPrefix(db_id_str, table_id_str);
     auto iter = kv_instance->GetIterator();
@@ -58,11 +58,11 @@ std::vector<SegmentID> GetTableSegments(KVInstance *kv_instance,
         kv_instance->Get(KeyEncode::DropSegmentKey(db_id_str, table_id_str, segment_id), drop_segment_ts);
 
         if (drop_segment_ts.empty() || (std::stoull(drop_segment_ts) > begin_ts && std::stoull(drop_segment_ts) != commit_ts)) {
-            segment_ids.push_back(segment_id);
+            segment_ids->push_back(segment_id);
         }
         iter->Next();
     }
-    std::sort(segment_ids.begin(), segment_ids.end());
+    std::sort(segment_ids->begin(), segment_ids->end());
     return segment_ids;
 }
 

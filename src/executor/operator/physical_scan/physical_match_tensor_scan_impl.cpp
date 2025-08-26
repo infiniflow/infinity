@@ -193,7 +193,8 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
             LOG_TRACE("Try to find an index to use");
             for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
                 const std::string &index_id_str = (*index_id_strs_ptr)[i];
-                auto table_index_meta = std::make_unique<TableIndexMeeta>(index_id_str, *table_meta);
+                const std::string &index_name_str = (*index_names_ptr)[i];
+                auto table_index_meta = std::make_unique<TableIndexMeeta>(index_id_str, index_name_str, *table_meta);
 
                 std::shared_ptr<IndexBase> index_base;
                 std::tie(index_base, status) = table_index_meta->GetIndexBase();
@@ -221,7 +222,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                 RecoverableError(std::move(status));
             }
             const std::string &index_id_str = (*index_id_strs_ptr)[iter - index_names_ptr->begin()];
-            auto table_index_meta = std::make_unique<TableIndexMeeta>(index_id_str, *table_meta);
+            auto table_index_meta = std::make_unique<TableIndexMeeta>(index_id_str, src_match_tensor_expr_->index_name_, *table_meta);
 
             std::shared_ptr<IndexBase> index_base;
             std::tie(index_base, status) = table_index_meta->GetIndexBase();
@@ -397,7 +398,11 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                          }
                                          ColumnMeta column_meta(this->search_column_id_, block_meta);
                                          ColumnVector column_vector;
-                                         status = NewCatalog::GetColumnVector(column_meta, row_to_read, ColumnVectorMode::kReadOnly, column_vector);
+                                         status = NewCatalog::GetColumnVector(column_meta,
+                                                                              column_meta.get_column_def(),
+                                                                              row_to_read,
+                                                                              ColumnVectorMode::kReadOnly,
+                                                                              column_vector);
                                          if (!status.ok()) {
                                              UnrecoverableError(status.message());
                                          }
@@ -462,7 +467,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             }
             ColumnMeta column_meta(this->search_column_id_, *block_meta);
             ColumnVector column_vector;
-            status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, column_vector);
+            status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, column_vector);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -971,7 +976,7 @@ void GetRerankerScore(std::vector<MatchTensorRerankDoc> &rerank_docs,
         if (!status.ok()) {
             UnrecoverableError("GetRowCnt1 failed!");
         }
-        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorMode::kReadOnly, column_vec);
+        status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), block_row_cnt, ColumnVectorMode::kReadOnly, column_vec);
         if (!status.ok()) {
             UnrecoverableError("GetRowCnt1 failed!");
         }
