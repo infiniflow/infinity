@@ -128,20 +128,17 @@ jobs:
       - name: SSH to host server
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
-        env:
-          CONTAINER_NAME: ${{ steps.start.outputs.CONTAINER_NAME }}
-          RUNNER_NAME: ${{ steps.start.outputs.RUNNER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
           password: infiniflow
           capture_stdout: true
-          envs: CONTAINER_NAME, RUNNER_NAME
+          envs: BUILDER_CONTAINER, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             hostname -I | awk '{print $1}'
-            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            cp /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            cp /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            mkdir -p /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/infinity /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/test_main /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
 
       - name: Remove build container
         if: always()
@@ -209,7 +206,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_OUTPUT
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_OUTPUT
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
@@ -217,17 +214,14 @@ jobs:
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
-        env:
-          TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-          BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
           password: infiniflow
-          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
-            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -313,7 +307,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_OUTPUT
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_OUTPUT
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
@@ -321,17 +315,14 @@ jobs:
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
-        env:
-          TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-          BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
           password: infiniflow
-          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
-            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/test_main /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/ 
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/test_main ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/ 
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -400,7 +391,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_OUTPUT
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_OUTPUT
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
@@ -408,17 +399,14 @@ jobs:
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
-        env:
-          TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-          BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
           password: infiniflow
-          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
-            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -499,7 +487,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_OUTPUT
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_OUTPUT
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
@@ -507,17 +495,14 @@ jobs:
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
-        env:
-          TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-          BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
           password: infiniflow
-          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
-            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -602,7 +587,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_OUTPUT
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_OUTPUT
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
@@ -610,17 +595,14 @@ jobs:
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
-        env:
-          TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-          BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
           password: infiniflow
-          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
-            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/ 
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/ 
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -707,7 +689,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_OUTPUT
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_OUTPUT
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
@@ -715,17 +697,14 @@ jobs:
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
-        env:
-          TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-          BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
           password: infiniflow
-          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
-            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -821,34 +800,25 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\"
-          cd /infinity && cmake --build /infinity/cmake-build-release --target test_main"
-
-      #      - name: Destroy builder container
-      #        if: always()  # always run this step even if previous steps failed
-      #        run: |
-      #          if [ -n "${BUILDER_CONTAINER}" ]; then
-      #            sudo docker rm -f -v ${BUILDER_CONTAINER}
-      #          fi
+          cd /infinity && cmake --build /infinity/cmake-build-release --target test_main knn_import_benchmark knn_query_benchmark"
 
       - name: SSH to host server
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
-        env:
-          CONTAINER_NAME: ${{ steps.start.outputs.CONTAINER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
           password: infiniflow
           capture_stdout: true
-          envs: CONTAINER_NAME, RUNNER_NAME
+          envs: CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             hostname -I | awk '{print $1}'
             echo "${CONTAINER_NAME}"
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            cp /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            cp /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            cp /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/knn_query_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            cp /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/knn_import_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/knn_query_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/knn_import_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
 
       - name: Remove build container
         if: always()
@@ -916,7 +886,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_OUTPUT
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_OUTPUT
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
@@ -924,17 +894,14 @@ jobs:
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
-        env:
-          TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-          BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
           password: infiniflow
-          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
-            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/ 
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/ 
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -1020,7 +987,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_OUTPUT
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_OUTPUT
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
@@ -1028,17 +995,14 @@ jobs:
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
-        env:
-          TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-          BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
           password: infiniflow
-          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
-            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/test_main /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/test_main ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/
 
       - name: Unit test release version
         if: ${{ !cancelled() && !failure() }}
@@ -1107,7 +1071,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_OUTPUT
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_OUTPUT
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
@@ -1115,17 +1079,14 @@ jobs:
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
-        env:
-          TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-          BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
           password: infiniflow
-          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
-            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -1210,7 +1171,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_OUTPUT
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_OUTPUT
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
@@ -1314,7 +1275,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_OUTPUT
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_OUTPUT
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
@@ -1322,17 +1283,14 @@ jobs:
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
-        env:
-          TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-          BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
           password: infiniflow
-          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
-            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -1418,7 +1376,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_OUTPUT
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_OUTPUT
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
@@ -1426,17 +1384,14 @@ jobs:
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
-        env:
-          TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-          BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
           password: infiniflow
-          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
-            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -1544,7 +1499,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_OUTPUT
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_OUTPUT
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
@@ -1559,10 +1514,10 @@ jobs:
           host: 172.17.0.1
           username: infiniflow
           password: infiniflow
-          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
-            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
