@@ -19,6 +19,8 @@ module;
 module infinity_core:ut.test_rabitq;
 
 import :ut.base_test;
+import :data_store;
+import :vec_store_type;
 import :rabitq_vec_store;
 import :dist_func_l2;
 
@@ -279,85 +281,27 @@ TEST_F(RabitqTest, test_compress) {
 
 TEST_F(RabitqTest, test_distance) {
     using namespace infinity;
-    using RabitqVecStoreMeta = RabitqVecStoreMeta<DataType, true>;
-    using RabitqVecStoreInner = RabitqVecStoreInner<DataType, true>;
-    using StoreType = RabitqVecStoreMeta::StoreType;
-    using QueryType = RabitqVecStoreMeta::QueryType;
-    using StoreType = RabitqVecStoreMeta::StoreType;
-    using QueryType = RabitqVecStoreMeta::QueryType;
-    using DistanceType = RabitqVecStoreMeta::DistanceType;
-    using MetaType = RabitqVecStoreMeta::MetaType;
+    using VecStoreType = RabitqL2VecStoreType<DataType>;
+    using DataStore = DataStore<VecStoreType, LabelType>;
+    using Distance = VecStoreType::Distance;
     constexpr size_t query_vec_n = 100;
     constexpr size_t recall_at = 1;
     constexpr size_t topk = 10;
+    auto SIMDFuncL2 = GetSIMD_FUNCTIONS().L2Distance_func_ptr_;
+    Distance distance;
 
     // generate data
-    auto data = std::make_unique<float[]>(dim_ * vec_n_);
+    auto data = std::make_unique<DataType[]>(dim_ * vec_n_);
     std::default_random_engine rng;
-    std::uniform_real_distribution<float> distrib_real(100, 200);
+    std::uniform_real_distribution<DataType> distrib_real(100, 200);
     for (size_t i = 0; i < dim_ * vec_n_; ++i) {
         data[i] = distrib_real(rng);
     }
+
+    // Init DataStore
     auto iter = DenseVectorIter<DataType, LabelType>(data.get(), dim_, vec_n_);
-
-    // Init meta
-    RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
-    meta.Optimize(DenseVectorIter(iter), 0);
-
-    // Compress data
-    size_t mem_usage = 0;
-    RabitqVecStoreInner inner = RabitqVecStoreInner::Make(vec_n_, meta, mem_usage);
-    size_t insert_n = 0;
-    for (auto val = iter.Next(); val; val = iter.Next()) {
-        const auto &[embedding, offset] = val.value();
-        inner.SetVec(insert_n++, embedding, meta, mem_usage);
-    }
-    std::cout << "Insert num = " << insert_n << std::endl;
-    ASSERT_EQ(insert_n, vec_n_);
-
-    auto l2_distance_sqr = [&](const DataType *query, const DataType *data, size_t dim) {
-        DistanceType res = 0;
-        for (size_t d = 0; d < dim; ++d) {
-            res += (data[d] - query[d]) * (data[d] - query[d]);
-        }
-        return res;
-    };
-
-    auto estimate_l2_distance_sqr = [&](const QueryType &query, const StoreType &data) {
-        // estimate <x, q>
-        DistanceType ip_estimate = MetaType::IpDistanceBetweenQueryAndBinaryCode(query->query_compress_vec_, data->compress_vec_, meta.dim());
-        DistanceType ip_recover =
-            MetaType::RecoverIpDistance(ip_estimate, meta.dim(), data->sum_, query->query_sum_, query->query_lower_bound_, query->query_delta_);
-
-        // estimate <o, q>
-        DataType error = data->error_;
-        if (MetaType::IsApproxZero(error)) {
-            error = error > 0 ? 1 : -1;
-        }
-        ip_recover = ip_recover / error;
-
-        // estimate ||o_r, q_r||^2
-        DistanceType res = MetaType::RecoverL2DistanceSqr(ip_recover, data->norm_, query->query_norm_);
-
-        // estimate other metric
-        if (metric_type_ == MetricType::kMetricCosine) {
-            if (MetaType::IsApproxZero(data->raw_norm_) || MetaType::IsApproxZero(query->query_raw_norm_)) {
-                res = 1;
-            } else {
-                res = 1 - (query->query_raw_norm_ * query->query_raw_norm_ + data->raw_norm_ * data->raw_norm_ - res) * 0.5f /
-                              (query->query_raw_norm_ * data->raw_norm_);
-            }
-        }
-        if (metric_type_ == MetricType::kMetricInnerProduct) {
-            if (MetaType::IsApproxZero(data->raw_norm_) || MetaType::IsApproxZero(query->query_raw_norm_)) {
-                res = 1;
-            } else {
-                res = 1 - (query->query_raw_norm_ * query->query_raw_norm_ + data->raw_norm_ * data->raw_norm_ - res) * 0.5f;
-            }
-        }
-
-        return res;
-    };
+    auto rabitq_store = DataStore::Make(vec_n_, 1, dim_, 0, 0);
+    auto [start_i, end_i] = rabitq_store.OptAddVec(std::move(iter));
 
     class MaxHeap {
     public:
@@ -381,7 +325,7 @@ TEST_F(RabitqTest, test_distance) {
             return ids;
         }
 
-        void push(LabelType id, DistanceType dist) {
+        void push(LabelType id, DataType dist) {
             if (pq_.size() < max_size_) {
                 pq_.emplace(dist, id);
                 return;
@@ -392,13 +336,13 @@ TEST_F(RabitqTest, test_distance) {
             }
         }
 
-        std::pair<DistanceType, LabelType> top() { return pq_.top(); }
+        std::pair<DataType, LabelType> top() { return pq_.top(); }
         void pop() { pq_.pop(); }
         size_t size() { return pq_.size(); }
 
     private:
         size_t max_size_;
-        std::priority_queue<std::pair<DistanceType, LabelType>> pq_;
+        std::priority_queue<std::pair<DataType, LabelType>> pq_;
     };
 
     // Compute recall
@@ -409,19 +353,18 @@ TEST_F(RabitqTest, test_distance) {
         for (size_t d = 0; d < dim_; ++d) {
             query[d] = distrib_real(rng);
         }
-        auto query_code = meta.MakeQuery(query.get());
+        auto rabitq_query = rabitq_store.MakeQuery(query.get());
 
         // Compute recall
         MaxHeap truth_heap(recall_at);
         MaxHeap rabitq_heap(topk);
-        for (LabelType id = 0; id < vec_n_; ++id) {
+        for (LabelType id = start_i; id < end_i; ++id) {
             // Compute truth distance
-            auto truth_dis = l2_distance_sqr(query.get(), data.get() + id * dim_, dim_);
+            auto truth_dis = SIMDFuncL2(query.get(), data.get() + id * dim_, dim_);
             truth_heap.push(id, truth_dis);
 
             // Estimate l2 distance by rabitq
-            auto vec = inner.GetVec(id, meta);
-            auto estimate_dis = estimate_l2_distance_sqr(query_code, vec);
+            auto estimate_dis = distance(rabitq_query, id, rabitq_store);
             rabitq_heap.push(id, estimate_dis);
 
             // output

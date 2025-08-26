@@ -294,13 +294,17 @@ public:
             size_t cur_vec_num = this->cur_vec_num();
             auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
             if (chunk_num > 0) {
-                std::vector<std::pair<VecStoreInner *, size_t>> vec_inners;
-                for (size_t i = 0; i < chunk_num; ++i) {
-                    size_t chunk_size = (i < chunk_num - 1) ? chunk_size_ : last_chunk_size;
-                    vec_inners.emplace_back(inners_[i].vec_store_inner(), chunk_size);
-                }
                 Iterator query_iter_copy = query_iter;
-                this->vec_store_meta_.template Optimize<LabelType, Iterator>(std::move(query_iter_copy), vec_inners, mem_usage);
+                if constexpr (VecStoreT::HasDecompress) {
+                    std::vector<std::pair<VecStoreInner *, size_t>> vec_inners;
+                    for (size_t i = 0; i < chunk_num; ++i) {
+                        size_t chunk_size = (i < chunk_num - 1) ? chunk_size_ : last_chunk_size;
+                        vec_inners.emplace_back(inners_[i].vec_store_inner(), chunk_size);
+                    }
+                    this->vec_store_meta_.template Optimize<LabelType, Iterator>(std::move(query_iter_copy), vec_inners, mem_usage);
+                } else {
+                    this->vec_store_meta_.Optimize(std::move(query_iter_copy), (chunk_num - 1) * chunk_size_ + last_chunk_size);
+                }
             }
             mem_usage_.fetch_add(mem_usage);
         }
