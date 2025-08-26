@@ -211,7 +211,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity 
 
       - name: Start test container
         id: start
@@ -315,7 +315,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main
+            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main
 
       - name: Start test container
         id: start
@@ -402,7 +402,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -501,7 +501,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -604,7 +604,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -708,7 +708,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -774,7 +774,7 @@ jobs:
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-    runs-on: [ "self-hosted", "benchmark" ]
+    runs-on: [ "self-hosted", "debug" ]
     #    needs: debug_clang_format
     outputs:
       BUILD_IP: ${{ steps.get_ip.outputs.BUILD_IP }}
@@ -917,7 +917,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -1021,7 +1021,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main
+            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main
 
       - name: Start test container
         id: start
@@ -1108,7 +1108,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -1211,7 +1211,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -1315,7 +1315,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -1419,7 +1419,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -1543,7 +1543,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            scp infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -1622,6 +1622,131 @@ jobs:
           if [ -n "${MINIO_CONTAINER}" ]; then
             sudo docker rm -f -v ${MINIO_CONTAINER}
           fi
+
+#  release_benchmark:
+#    name: release_minio_parallel_test
+#    # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
+#    # https://github.com/orgs/community/discussions/26261
+#    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
+#    runs-on: [ "self-hosted", "benchmark" ]
+#    needs: release_configure_and_build
+#    outputs:
+#      BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
+#      TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
+#    env:
+#      BUILD_IP: ${{needs.release_configure_and_build.outputs.BUILD_IP}}
+#      CONTAINER_NAME: ${{needs.release_configure_and_build.outputs.CONTAINER_NAME}}
+#    steps:
+#      - name: Show PR labels
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          echo "Workflow triggered by ${{ github.event_name }}"
+#          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+#            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
+#          fi
+#
+#      - name: Ensure workspace ownership
+#        if: ${{ !cancelled() && !failure() }}
+#        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+#
+#      - name: Check out code
+#        if: ${{ !cancelled() && !failure() }}
+#        uses: actions/checkout@v5
+#        with:
+#          fetch-depth: 0
+#          fetch-tags: false
+#
+#      - name: Download artifacts
+#        uses: appleboy/ssh-action@v1.2.2
+#        if: ${{ !cancelled() && !failure() }}
+#        with:
+#          host: 172.17.0.1
+#          username: infiniflow
+#          # password: ${{ secrets.PASSWORD }}
+#          password: infiniflow
+#          envs: CONTAINER_NAME, BUILD_IP
+#          script: |
+#            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+#            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+#
+#      - name: Start test container
+#        id: start
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+#          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_OUTPUT
+#          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+#          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_OUTPUT
+#          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+#          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+#
+#      - name: SSH to host server
+#        id: ssh
+#        uses: appleboy/ssh-action@v1.2.2
+#        if: ${{ !cancelled() && !failure() }}
+#        env:
+#          TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
+#          BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
+#        with:
+#          host: 172.17.0.1
+#          username: infiniflow
+#          password: infiniflow
+#          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
+#          script: |
+#            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
+#            docker cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${TEST_CONTAINER_NAME}:/infinity/cmake-build-release/src/infinity
+#
+#      - name: Install pysdk
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf
+#          cd /infinity/
+#          pip3 uninstall -y infinity-sdk
+#          pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+#
+#      - name: Start infinity release version
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          # Run a command in the background
+#          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
+#          rm -fr /var/infinity
+#          cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_debug.log 2> parallel_test_debug_error.log" &
+#
+#      - name: Prepare sift dataset
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
+#          echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
+#          sudo chmod +x ./tools/ci_tools/check_benchmark_result.py && sudo mkdir -p test/data/benchmark && sudo ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark/sift1M test/data/benchmark/sift_1m
+#
+#      - name: Golden benchmark sift
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          if [[ -f "${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log" ]]; then
+#              echo "golden benchmark result already exists!"
+#              exit 0
+#          fi
+#          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat ${RUNNER_WORKSPACE_PREFIX}/benchmark/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
+#          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=sift --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp && \
+#          echo "1 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log && \
+#          echo "8 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log
+#
+#      - name: Latest benchmark sift
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml && \
+#          ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=sift --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp --config_path=db_tmp/infinity_conf.toml && \
+#          echo "1 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_1_thread.log && \
+#          echo "8 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_8_threads.log && \
+#          ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log benchmark_sift_1_thread.log && \
+#          ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log benchmark_sift_8_threads.log
+#
+#      - name: Destroy builder container
+#        if: always()  # always run this step even if previous steps failed
+#        run: |
+#          if [ -n "${TEST_CONTAINER_NAME}" ]; then
+#            sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+#          fi
 
 #
 #      - name: Start infinity release version
