@@ -67,12 +67,60 @@ public:
 public:
     using DataType = f32;
     using LabelType = i64;
-    using AlignType = u8;
+    using VecStoreType = RabitqL2VecStoreType<DataType>;
+    using DataStore = DataStore<VecStoreType, LabelType>;
+    using Distance = VecStoreType::Distance;
+
+    const std::string file_dir_ = GetFullTmpDir();
 
     static constexpr size_t dim_ = 128;
     static constexpr size_t vec_n_ = 8192;
-    const std::string file_dir_ = GetFullTmpDir();
-    MetricType metric_type_ = MetricType::kMetricL2;
+    static constexpr size_t query_vec_n_ = 100;
+    static constexpr size_t recall_at_ = 1;
+    static constexpr size_t topk_ = 10;
+};
+
+template <typename DataType, typename LabelType>
+class MaxHeap {
+public:
+    MaxHeap(size_t max_size) : max_size_(max_size) {}
+
+    std::vector<LabelType> TransfromIdsVec() {
+        std::vector<LabelType> ids;
+        while (pq_.size()) {
+            ids.push_back(pq_.top().second);
+            pq_.pop();
+        }
+        return ids;
+    }
+
+    std::set<LabelType> TransfromIdsSet() {
+        std::set<LabelType> ids;
+        while (pq_.size()) {
+            ids.insert(pq_.top().second);
+            pq_.pop();
+        }
+        return ids;
+    }
+
+    void push(LabelType id, DataType dist) {
+        if (pq_.size() < max_size_) {
+            pq_.emplace(dist, id);
+            return;
+        }
+        if (dist < pq_.top().first) {
+            pq_.pop();
+            pq_.emplace(dist, id);
+        }
+    }
+
+    std::pair<DataType, LabelType> top() { return pq_.top(); }
+    void pop() { pq_.pop(); }
+    size_t size() { return pq_.size(); }
+
+private:
+    size_t max_size_;
+    std::priority_queue<std::pair<DataType, LabelType>> pq_;
 };
 
 TEST_F(RabitqTest, test_simple) {
@@ -109,7 +157,8 @@ TEST_F(RabitqTest, test_simple) {
         }
 
         RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
-        meta.Optimize(DenseVectorIter(iter), 0);
+        size_t mem_usage = 0;
+        meta.Optimize<LabelType>(DenseVectorIter(iter), {}, mem_usage);
         meta.Dump(std::cout);
         const DataType *rom = meta.rom();
         const DataType *centroid = meta.centroid();
@@ -197,7 +246,8 @@ TEST_F(RabitqTest, test_simple) {
         RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
         for (auto split_iter : iters) {
             size_t row_count = split_iter.GetRowCount();
-            meta.Optimize(split_iter, 0);
+            size_t mem_usage = 0;
+            meta.Optimize<LabelType>(split_iter, {}, mem_usage);
             RabitqVecStoreInner inner = RabitqVecStoreInner::Make(row_count, meta, inner_size);
             LOG_INFO(fmt::format("split_iter: mem_usage {}", inner_size));
         }
@@ -205,16 +255,22 @@ TEST_F(RabitqTest, test_simple) {
 
         const DataType *centroid = meta.centroid();
         for (int d = 0; d < dim_; ++d) {
-            ASSERT_LT(std::fabs(centroid[d] - truth_centroid[d]), truth_centroid[d] * 0.05);
+            std::cout << fmt::format("d: {}, truth centroid: {}, latest centroid: {}, loss: {}",
+                                     d,
+                                     truth_centroid[d],
+                                     centroid[d],
+                                     std::fabs(centroid[d] - truth_centroid[d]) / truth_centroid[d])
+                      << std::endl;
+            EXPECT_LT(std::fabs(centroid[d] - truth_centroid[d]), truth_centroid[d] * 0.015);
         }
     }
 }
 
 TEST_F(RabitqTest, test_compress) {
     using namespace infinity;
-    using RabitqVecStoreMeta = RabitqVecStoreMeta<DataType, true>;
-    using RabitqVecStoreInner = RabitqVecStoreInner<DataType, true>;
-    using MetaType = RabitqVecStoreMeta::MetaType;
+    using RabitqVecStoreMeta = VecStoreType::Meta<true>;
+    using RabitqVecStoreInner = VecStoreType::Inner<true>;
+    using MetaType = VecStoreType::MetaType;
     constexpr size_t align_size = MetaType::align_size_;
 
     // generate dataset
@@ -232,11 +288,12 @@ TEST_F(RabitqTest, test_compress) {
 
     // Init meta
     RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
-    meta.Optimize(DenseVectorIter(iter), 0);
+    size_t mem_usage = 0;
+    meta.Optimize<LabelType>(DenseVectorIter(iter), {}, mem_usage);
     meta.Dump(std::cout);
 
     // Compress data
-    size_t mem_usage = 0;
+    mem_usage = 0;
     RabitqVecStoreInner inner = RabitqVecStoreInner::Make(vec_n_, meta, mem_usage);
     size_t insert_n = 0;
     for (auto val = iter.Next(); val; val = iter.Next()) {
@@ -281,12 +338,6 @@ TEST_F(RabitqTest, test_compress) {
 
 TEST_F(RabitqTest, test_distance) {
     using namespace infinity;
-    using VecStoreType = RabitqL2VecStoreType<DataType>;
-    using DataStore = DataStore<VecStoreType, LabelType>;
-    using Distance = VecStoreType::Distance;
-    constexpr size_t query_vec_n = 100;
-    constexpr size_t recall_at = 1;
-    constexpr size_t topk = 10;
     auto SIMDFuncL2 = GetSIMD_FUNCTIONS().L2Distance_func_ptr_;
     Distance distance;
 
@@ -303,51 +354,9 @@ TEST_F(RabitqTest, test_distance) {
     auto rabitq_store = DataStore::Make(vec_n_, 1, dim_, 0, 0);
     auto [start_i, end_i] = rabitq_store.OptAddVec(std::move(iter));
 
-    class MaxHeap {
-    public:
-        MaxHeap(size_t max_size) : max_size_(max_size) {}
-
-        std::vector<LabelType> TransfromIdsVec() {
-            std::vector<LabelType> ids;
-            while (pq_.size()) {
-                ids.push_back(pq_.top().second);
-                pq_.pop();
-            }
-            return ids;
-        }
-
-        std::set<LabelType> TransfromIdsSet() {
-            std::set<LabelType> ids;
-            while (pq_.size()) {
-                ids.insert(pq_.top().second);
-                pq_.pop();
-            }
-            return ids;
-        }
-
-        void push(LabelType id, DataType dist) {
-            if (pq_.size() < max_size_) {
-                pq_.emplace(dist, id);
-                return;
-            }
-            if (dist < pq_.top().first) {
-                pq_.pop();
-                pq_.emplace(dist, id);
-            }
-        }
-
-        std::pair<DataType, LabelType> top() { return pq_.top(); }
-        void pop() { pq_.pop(); }
-        size_t size() { return pq_.size(); }
-
-    private:
-        size_t max_size_;
-        std::priority_queue<std::pair<DataType, LabelType>> pq_;
-    };
-
     // Compute recall
     size_t cnt = 0;
-    for (size_t i = 0; i < query_vec_n; ++i) {
+    for (size_t i = 0; i < query_vec_n_; ++i) {
         // generate query
         auto query = std::make_unique<float[]>(dim_);
         for (size_t d = 0; d < dim_; ++d) {
@@ -356,8 +365,8 @@ TEST_F(RabitqTest, test_distance) {
         auto rabitq_query = rabitq_store.MakeQuery(query.get());
 
         // Compute recall
-        MaxHeap truth_heap(recall_at);
-        MaxHeap rabitq_heap(topk);
+        MaxHeap<DataType, LabelType> truth_heap(recall_at_);
+        MaxHeap<DataType, LabelType> rabitq_heap(topk_);
         for (LabelType id = start_i; id < end_i; ++id) {
             // Compute truth distance
             auto truth_dis = SIMDFuncL2(query.get(), data.get() + id * dim_, dim_);
@@ -388,7 +397,7 @@ TEST_F(RabitqTest, test_distance) {
         }
         std::cout << std::endl;
     }
-    f32 recall = 1.0f * cnt / (query_vec_n * recall_at);
+    f32 recall = 1.0f * cnt / (query_vec_n_ * recall_at_);
     std::cout << "Recall@1 = " << recall << std::endl;
     ASSERT_GE(recall, 0.9);
 }

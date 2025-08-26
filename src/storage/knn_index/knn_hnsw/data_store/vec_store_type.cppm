@@ -144,7 +144,6 @@ public:
     using Distance = std::conditional_t<LSG, LVQCosLSGDist<DataType, CompressType, LVQCacheType>, LVQCosDist<DataType, CompressType>>;
 
     static constexpr bool HasOptimize = true;
-    static constexpr bool HasDecompress = true;
 
     template <typename CompressType>
     static constexpr LVQCosVecStoreType<DataType, CompressType, LSG> ToLVQ() {
@@ -169,7 +168,6 @@ public:
     using Distance = std::conditional_t<LSG, LVQL2LSGDist<DataType, CompressType, LVQCacheType>, LVQL2Dist<DataType, CompressType>>;
 
     static constexpr bool HasOptimize = true;
-    static constexpr bool HasDecompress = true;
 
     template <typename CompressType>
     static constexpr LVQL2VecStoreType<DataType, CompressType, LSG> ToLVQ() {
@@ -194,7 +192,6 @@ public:
     using Distance = std::conditional_t<LSG, LVQIPLSGDist<DataType, CompressType, LVQCacheType>, LVQIPDist<DataType, CompressType>>;
 
     static constexpr bool HasOptimize = true;
-    static constexpr bool HasDecompress = true;
 
     template <typename CompressType>
     static constexpr LVQIPVecStoreType<DataType, CompressType, LSG> ToLVQ() {
@@ -217,7 +214,6 @@ public:
     using Distance = RabitqCosDist<DataType>;
 
     static constexpr bool HasOptimize = true;
-    static constexpr bool HasDecompress = false;
 };
 
 export template <typename DataT>
@@ -235,7 +231,6 @@ public:
     using Distance = RabitqL2Dist<DataType>;
 
     static constexpr bool HasOptimize = true;
-    static constexpr bool HasDecompress = false;
 };
 
 export template <typename DataT>
@@ -253,7 +248,6 @@ public:
     using Distance = RabitqIPDist<DataType>;
 
     static constexpr bool HasOptimize = true;
-    static constexpr bool HasDecompress = false;
 };
 
 } // namespace infinity
