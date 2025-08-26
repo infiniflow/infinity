@@ -102,8 +102,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "test=${BUILDER_CONTAINER}" >> $GITHUB_OUTPUT
           echo "CONTAINER_NAME=${BUILDER_CONTAINER}" >> $GITHUB_OUTPUT
+          echo "RUNNER_NAME=${RUNNER_NAME}" >> $GITHUB_OUTPUT
           CPUS=${CPUS:-$(nproc)}
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
           echo "CPUS=${CPUS}" >> $GITHUB_ENV
@@ -130,6 +130,7 @@ jobs:
         uses: appleboy/ssh-action@v1.2.2
         env:
           CONTAINER_NAME: ${{ steps.start.outputs.CONTAINER_NAME }}
+          RUNNER_NAME: ${{ steps.start.outputs.RUNNER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
@@ -138,7 +139,6 @@ jobs:
           envs: CONTAINER_NAME
           script: |
             hostname -I | awk '{print $1}'
-            echo "${CONTAINER_NAME}"
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
             cp /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
             cp /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
