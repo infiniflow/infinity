@@ -351,6 +351,30 @@ public:
     const DataType *centroid() const { return centroid_.get(); }
 
 protected:
+    void DecompressCode(StoreType src, DataType *dest, const DataType *rot_centroid) {
+        DataType inv_sqrt_d_ = 1.0f / std::sqrt(dim_);
+
+        // 1.Init
+        std::vector<DataType> rot_src(dim_, 0);
+
+        // 2.Decode to real-valued vector
+        for (size_t d = 0; d < dim_; ++d) {
+            bool bit = (src->compress_vec_[d / 8] >> (d % 8)) & 1;
+            rot_src[d] = bit ? inv_sqrt_d_ : -inv_sqrt_d_;
+        }
+
+        // 3.Recover real-valued vector to rot_src vector
+        for (size_t d = 0; d < dim_; d++) {
+            rot_src[d] = rot_src[d] * src->norm_ + rot_centroid[d];
+        }
+
+        // 4.Inverse random projection
+        matrixA_multiply_transpose_matrixB_output_to_C(rot_src.data(), rom_.get(), 1, dim_, dim_, dest);
+    }
+
+    void DecompressCode(StoreType src, DataType *dest) { DecompressCode(src, dest, rot_centroid_.get()); }
+
+protected:
     size_t origin_dim_;
     ArrayPtr<DataType, OwnMem> rom_;      // Random orthogonal matrix
     ArrayPtr<DataType, OwnMem> centroid_; // Centroid of all vector in DataStore
@@ -414,18 +438,29 @@ public:
         return meta;
     }
 
-    template <typename Iterator>
-    void Optimize(Iterator &&query_iter, size_t cur_vec_num) {
-        DataType *centroid = this->centroid_.get();
+    template <typename LabelType, DataIteratorConcept<const DataType *, LabelType> Iterator>
+    void Optimize(Iterator &&query_iter, const std::vector<std::pair<Inner *, size_t>> &inners, size_t &mem_usage) {
         size_t dim = this->dim_;
-        for (size_t i = 0; i < dim; ++i) {
-            centroid[i] *= cur_vec_num;
+        // Decompress old vector
+        auto new_centroid = std::make_unique<DataType[]>(dim);
+        auto temp_decompress = std::make_unique<DataType[]>(dim);
+        size_t cur_vec_num = 0;
+        for (const auto [inner, size] : inners) {
+            for (size_t i = 0; i < size; ++i) {
+                this->DecompressCode(inner->GetVec(i, *this), temp_decompress.get());
+                for (size_t j = 0; j < dim; ++j) {
+                    new_centroid[j] += temp_decompress[j];
+                }
+            }
+            cur_vec_num += size;
         }
+
+        // Add new vector
         while (true) {
             if (auto ret = query_iter.Next(); ret) {
                 auto &[vec, _] = *ret;
                 for (size_t i = 0; i < dim; ++i) {
-                    centroid[i] += vec[i];
+                    new_centroid[i] += vec[i];
                 }
                 ++cur_vec_num;
             } else {
@@ -433,9 +468,22 @@ public:
             }
         }
         for (size_t i = 0; i < dim; ++i) {
-            centroid[i] /= cur_vec_num;
+            new_centroid[i] /= cur_vec_num;
         }
-        matrixA_multiply_matrixB_output_to_C(this->centroid_.get(), this->rom_.get(), 1, dim, dim, this->rot_centroid_.get());
+
+        // Save rot_centroid
+        auto new_rot_centroid = std::make_unique<DataType[]>(dim);
+        matrixA_multiply_matrixB_output_to_C(new_centroid.get(), this->rom_.get(), 1, dim, dim, new_rot_centroid.get());
+        new_centroid = this->centroid_.exchange(std::move(new_centroid));
+        new_rot_centroid = this->rot_centroid_.exchange(std::move(new_rot_centroid));
+
+        // Update old vector code
+        for (auto [inner, size] : inners) {
+            for (size_t i = 0; i < size; ++i) {
+                this->DecompressCode(inner->GetVec(i, *this), temp_decompress.get(), new_rot_centroid.get());
+                inner->SetVec(i, temp_decompress.get(), *this, mem_usage);
+            }
+        }
     }
 };
 
