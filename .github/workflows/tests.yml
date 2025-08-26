@@ -143,10 +143,9 @@ jobs:
             cp /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
             cp /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
 
-      - name: Stop build container
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          docker stop ${CONTAINER_NAME}
+      - name: Remove build container
+        if: always()
+        run: sudo docker rm -f -v ${BUILDER_CONTAINER}
 
       - name: Get host ip
         id: get_ip
@@ -156,10 +155,6 @@ jobs:
           echo "Build ip is: ${BUILD_IP}"
           echo "BUILD_IP=${BUILD_IP}" >> ${GITHUB_OUTPUT}
           echo "pwd=${PWD}"
-
-      - name: Remove build container
-        if: always()
-        run: sudo docker rm -f -v ${CONTAINER_NAME}
 
   debug_sqllogical_test:
     name: debug_sqllogical_test
@@ -845,7 +840,7 @@ jobs:
           username: infiniflow
           password: infiniflow
           capture_stdout: true
-          envs: CONTAINER_NAME
+          envs: CONTAINER_NAME, RUNNER_NAME
           script: |
             hostname -I | awk '{print $1}'
             echo "${CONTAINER_NAME}"
@@ -857,7 +852,7 @@ jobs:
 
       - name: Remove build container
         if: always()
-        run: sudo docker rm -f -v ${CONTAINER_NAME}
+        run: sudo docker rm -f -v ${BUILDER_CONTAINER}
 
       - name: Get host ip
         id: get_ip
