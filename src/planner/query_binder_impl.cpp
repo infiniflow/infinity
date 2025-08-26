@@ -437,12 +437,12 @@ std::shared_ptr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_co
     }
     auto table_meta = std::make_shared<TableMeeta>(tmp_table_meta->db_id_str(),
                                                    tmp_table_meta->table_id_str(),
+                                                   tmp_table_meta->table_name(),
                                                    tmp_table_meta->kv_instance(),
                                                    tmp_table_meta->begin_ts(),
                                                    tmp_table_meta->commit_ts(),
                                                    meta_cache);
     table_info = std::make_shared<TableInfo>();
-    table_meta->SetTableName(table_name);
     status = table_meta->GetTableInfo(*table_info);
     if (!status.ok()) {
         RecoverableError(status);

@@ -1085,6 +1085,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, std::shared_p
     }
     auto table_meta = std::make_shared<TableMeeta>(tmp_table_meta->db_id_str(),
                                                    tmp_table_meta->table_id_str(),
+                                                   tmp_table_meta->table_name(),
                                                    tmp_table_meta->kv_instance(),
                                                    tmp_table_meta->begin_ts(),
                                                    tmp_table_meta->commit_ts(),
