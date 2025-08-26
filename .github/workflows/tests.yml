@@ -789,15 +789,14 @@ jobs:
           username: infiniflow
           password: infiniflow
           capture_stdout: true
-          envs: CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
+          envs: BUILDER_CONTAINER, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             hostname -I | awk '{print $1}'
-            echo "${CONTAINER_NAME}"
-            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
-            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
-            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/local_infinity/knn_query_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
-            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/local_infinity/knn_import_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
+            mkdir -p /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/infinity /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}/
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/test_main /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}/
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/local_infinity/knn_query_benchmark /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}/
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/local_infinity/knn_import_benchmark /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}/
 
       - name: Get host ip
         id: get_ip
