@@ -633,7 +633,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, std::s
                                                                             column_name,
                                                                             create_table_info->column_defs_[idx]->constraints_,
                                                                             column_comment,
-                                                                            std::move(create_table_info->column_defs_[idx]->default_expr_));
+                                                                            create_table_info->column_defs_[idx]->default_expr_);
         columns.emplace_back(column_def);
     }
 
@@ -811,7 +811,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
     //        UnrecoverableError("Creating index only support single column now.");
     //    }
 
-    std::shared_ptr<std::string> index_name = std::make_shared<std::string>(std::move(create_index_info->index_name_));
+    std::shared_ptr<std::string> index_name = std::make_shared<std::string>(create_index_info->index_name_);
     std::unique_ptr<QueryBinder> query_binder_ptr = std::make_unique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
 
@@ -1303,9 +1303,8 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, std::shared_ptr<Bin
                 }
             }
 
-            this->logical_plan_ = std::make_shared<LogicalRenameTable>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                       table_info,
-                                                                       std::move(rename_table_statement->new_table_name_));
+            this->logical_plan_ =
+                std::make_shared<LogicalRenameTable>(bind_context_ptr->GetNewLogicalNodeId(), table_info, rename_table_statement->new_table_name_);
             break;
         }
         case AlterStatementType::kAddColumns: {
@@ -1968,11 +1967,12 @@ Status LogicalPlanner::BuildFlushBuffer(const FlushStatement *, std::shared_ptr<
 
 Status LogicalPlanner::BuildOptimize(OptimizeStatement *statement, std::shared_ptr<BindContext> &bind_context_ptr) {
     BindSchemaName(statement->schema_name_);
-    std::shared_ptr<LogicalNode> logical_optimize = std::make_shared<LogicalOptimize>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                                      statement->schema_name_,
-                                                                                      statement->table_name_,
-                                                                                      std::move(statement->index_name_),
-                                                                                      std::move(statement->opt_params_));
+    std::shared_ptr<LogicalNode> logical_optimize =
+        std::make_shared<LogicalOptimize>(bind_context_ptr->GetNewLogicalNodeId(),
+                                          statement->schema_name_,
+                                          statement->table_name_,
+                                          statement->index_name_,
+                                          std::move(statement->opt_params_)); // Can't be rerun the txn, since the options are moved.
     this->logical_plan_ = logical_optimize;
     return Status::OK();
 }
