@@ -102,7 +102,7 @@ TEST_F(RabitqTest, test_simple) {
 
         for (int i = 0; i < 20; ++i) {
             RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
-            bool is_rom = CheckOrthogonalMatrix(meta.rom(), meta.align_dim());
+            bool is_rom = CheckOrthogonalMatrix(meta.rom(), meta.dim());
             ASSERT_EQ(is_rom, true);
         }
 
@@ -250,7 +250,7 @@ TEST_F(RabitqTest, test_compress) {
         std::cout << ", compress_vec_ =";
         auto code = vec->compress_vec_;
         size_t sum = 0;
-        for (size_t d = 0; d < meta.align_dim(); ++d) {
+        for (size_t d = 0; d < meta.dim(); ++d) {
             bool c_i = code[d / align_size] >> (align_size - 1 - d % align_size) & 1;
             sum += c_i;
             if (d % align_size == 0) {
@@ -271,7 +271,7 @@ TEST_F(RabitqTest, test_compress) {
                              query_code->query_lower_bound_,
                              query_code->query_delta_);
     std::cout << ", query_compress_vec_ =";
-    for (size_t d = 0; d < meta.align_dim(); ++d) {
+    for (size_t d = 0; d < meta.dim(); ++d) {
         std::cout << " " << (i32)query_code->query_compress_vec_[d];
     }
     std::cout << std::endl;
@@ -325,9 +325,9 @@ TEST_F(RabitqTest, test_distance) {
 
     auto estimate_l2_distance_sqr = [&](const QueryType &query, const StoreType &data) {
         // estimate <x, q>
-        DistanceType ip_estimate = MetaType::IpDistanceBetweenQueryAndBinaryCode(query->query_compress_vec_, data->compress_vec_, meta.align_dim());
+        DistanceType ip_estimate = MetaType::IpDistanceBetweenQueryAndBinaryCode(query->query_compress_vec_, data->compress_vec_, meta.dim());
         DistanceType ip_recover =
-            MetaType::RecoverIpDistance(ip_estimate, meta.align_dim(), data->sum_, query->query_sum_, query->query_lower_bound_, query->query_delta_);
+            MetaType::RecoverIpDistance(ip_estimate, meta.dim(), data->sum_, query->query_sum_, query->query_lower_bound_, query->query_delta_);
 
         // estimate <o, q>
         DataType error = data->error_;
