@@ -799,8 +799,8 @@ jobs:
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
             cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
             cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/knn_query_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/knn_import_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/local_infinity/knn_query_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/local_infinity/knn_import_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
 
       - name: Remove build container
         if: always()
@@ -1596,8 +1596,8 @@ jobs:
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/benchmark
-            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/knn_query_benchmark ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/
-            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/knn_import_benchmark ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/knn_query_benchmark ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/local_infinity/
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/knn_import_benchmark ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/local_infinity/
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
