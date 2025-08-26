@@ -520,6 +520,36 @@ public:
     }
 };
 
+class RenameTableHandler final : public HttpRequestHandler {
+public:
+    std::shared_ptr<OutgoingResponse> handle(const std::shared_ptr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        std::string database_name = request->getPathVariable("database_name");
+        std::string table_name = request->getPathVariable("table_name");
+        std::string body_info = request->readBodyToString();
+        simdjson::padded_string json_pad(body_info);
+        simdjson::parser parser;
+        simdjson::document doc = parser.iterate(json_pad);
+        std::string new_table_name = doc["new_table_name"].get<std::string>();
+
+        auto result = infinity->RenameTable(database_name, table_name, new_table_name);
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 class DropTableHandler final : public HttpRequestHandler {
 public:
     std::shared_ptr<OutgoingResponse> handle(const std::shared_ptr<IncomingRequest> &request) final {
@@ -4115,6 +4145,7 @@ std::thread HTTPServer::Start(const std::string &ip_address, u16 port) {
     // table
     router->route("GET", "/databases/{database_name}/tables", std::make_shared<ListTableHandler>());
     router->route("POST", "/databases/{database_name}/tables/{table_name}", std::make_shared<CreateTableHandler>());
+    router->route("POST", "/databases/{database_name}/tables/{table_name}/rename", std::make_shared<RenameTableHandler>());
     router->route("DELETE", "/databases/{database_name}/tables/{table_name}", std::make_shared<DropTableHandler>());
     router->route("GET", "/databases/{database_name}/tables/{table_name}", std::make_shared<ShowTableHandler>());
     router->route("GET", "/databases/{database_name}/table/{table_name}", std::make_shared<ExportTableHandler>()); // Export table

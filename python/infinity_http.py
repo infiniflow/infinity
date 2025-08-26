@@ -553,6 +553,15 @@ class table_http:
         self.database_name = database_name
         self.table_name = table_name
 
+    def rename(self, new_table_name):
+        check_valid_name(new_table_name)
+        url = f"databases/{self.database_name}/tables/{self.table_name}/rename"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = self.net.set_up_data([], {"new_table_name": new_table_name})
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
+        return database_result()
+
     def show_columns(self):
         url = f"databases/{self.database_name}/tables/{self.table_name}/columns"
         h = self.net.set_up_header(["accept"])
@@ -648,8 +657,9 @@ class table_http:
         r = self.net.request(url, "get", h)
         self.net.raise_exception(r)
         r_json = r.json()
+        index_type = r_json.get("index_type", "")
         index_comment = r_json.get("index_comment", "")
-        return database_result(index_comment=index_comment)
+        return database_result(index_type=index_type, index_comment=index_comment)
 
     def list_indexes(self):
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes"
@@ -661,8 +671,8 @@ class table_http:
         exists = r_json.get("indexes", None)
         if exists is not None:
             for t in r_json["indexes"]:
-                index_list.append(t)
-        return database_result(index_list=index_list)
+                index_list.append(t["index_name"])
+        return database_result(index_names=index_list)
 
     def dump_index(self, index_name):
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
@@ -699,7 +709,7 @@ class table_http:
                             "target_dimension": fde_obj.target_dimension
                         }
                     elif isinstance(value[key],
-                                  np.ndarray):  # trans np array to list since http api can not parse np array
+                                    np.ndarray):  # trans np array to list since http api can not parse np array
                         value[key] = value[key].tolist()
                     elif isinstance(value[key], list):
                         for idx in range(len(value[key])):
@@ -1215,17 +1225,18 @@ class table_http_result:
 
 @dataclass
 class database_result():
-    def __init__(self, list=[], database_name: str = "", error_code=ErrorCode.OK, columns=[], index_list=[],
-                 node_name="", node_role="", node_status="", index_comment=None, deleted_rows=0, data={}, nodes=[],
-                 error_msg="", snapshots=[]):
+    def __init__(self, list=[], database_name: str = "", error_code=ErrorCode.OK, columns=[], index_names=[],
+                 node_name="", node_role="", node_status="", index_type=None, index_comment=None, deleted_rows=0,
+                 data={}, nodes=[], error_msg="", snapshots=[]):
         self.db_names = list
         self.database_name = database_name  # get database
         self.error_code = error_code
         self.columns = columns
-        self.index_list = index_list
+        self.index_names = index_names
         self.node_name = node_name
         self.node_role = node_role
         self.node_status = node_status
+        self.index_type = index_type
         self.index_comment = index_comment
         self.deleted_rows = deleted_rows
         self.data = data

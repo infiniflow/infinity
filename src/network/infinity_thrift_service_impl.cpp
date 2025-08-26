@@ -298,6 +298,17 @@ void InfinityThriftService::DropTable(infinity_thrift_rpc::CommonResponse &respo
     ProcessQueryResult(response, result);
 }
 
+void InfinityThriftService::RenameTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::RenameTableRequest &request) {
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+
+    auto result = infinity->RenameTable(request.db_name, request.table_name, request.new_table_name);
+    ProcessQueryResult(response, result);
+}
+
 void InfinityThriftService::Insert(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::InsertRequest &request) {
     auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
     if (!infinity_status.ok()) {
@@ -1375,23 +1386,6 @@ void InfinityThriftService::ShowColumns(infinity_thrift_rpc::SelectResponse &res
     }
 }
 
-void InfinityThriftService::ShowTables(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowTablesRequest &request) {
-    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
-    if (!infinity_status.ok()) {
-        ProcessStatus(response, infinity_status);
-        return;
-    }
-
-    const QueryResult result = infinity->ShowTables(request.db_name);
-    if (result.IsOk()) {
-        auto &columns = response.column_fields;
-        columns.resize(result.result_table_->ColumnCount());
-        ProcessDataBlocks(result, response, columns);
-    } else {
-        ProcessQueryResult(response, result);
-    }
-}
-
 void InfinityThriftService::GetDatabase(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::GetDatabaseRequest &request) {
     auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
     if (!infinity_status.ok()) {
@@ -1957,6 +1951,9 @@ std::shared_ptr<DataType> InfinityThriftService::GetColumnTypeFromProto(const in
         case infinity_thrift_rpc::LogicType::Embedding: {
             const auto embedding_type = GetEmbeddingDataTypeFromProto(type.physical_type.embedding_type.element_type);
             if (embedding_type == EmbeddingDataType::kElemInvalid) {
+                return std::make_shared<infinity::DataType>(infinity::LogicalType::kInvalid);
+            }
+            if (type.physical_type.embedding_type.dimension <= 0) {
                 return std::make_shared<infinity::DataType>(infinity::LogicalType::kInvalid);
             }
             auto embedding_info = EmbeddingInfo::Make(embedding_type, type.physical_type.embedding_type.dimension);

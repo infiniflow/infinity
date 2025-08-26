@@ -642,6 +642,7 @@ size_t InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCo
             // Use actual query embedding dimension if available (for FDE functions), otherwise use KnnExpression dimension
             i64 actual_dimension =
                 knn_scan_operator->real_query_embedding_dimension_ > 0 ? knn_scan_operator->real_query_embedding_dimension_ : knn_expr->dimension_;
+            size_t query_count = actual_dimension / knn_scan_operator->column_embedding_dimension_;
             serial_materialize_fragment_ctx->knn_scan_shared_data_ =
                 std::make_unique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
                                                     std::move(knn_scan_operator->block_metas_),
@@ -650,7 +651,7 @@ size_t InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCo
                                                     std::move(knn_expr->opt_params_),
                                                     knn_expr->topn_,
                                                     actual_dimension,
-                                                    1,
+                                                    query_count,
                                                     knn_scan_operator->real_knn_query_embedding_ptr_,
                                                     knn_scan_operator->real_knn_query_elem_type_,
                                                     knn_expr->distance_type_);
@@ -661,6 +662,7 @@ size_t InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCo
             // Use actual query embedding dimension if available (for FDE functions), otherwise use KnnExpression dimension
             i64 actual_dimension =
                 knn_scan_operator->real_query_embedding_dimension_ > 0 ? knn_scan_operator->real_query_embedding_dimension_ : knn_expr->dimension_;
+            size_t query_count = actual_dimension / knn_scan_operator->column_embedding_dimension_;
             parallel_materialize_fragment_ctx->knn_scan_shared_data_ =
                 std::make_unique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
                                                     std::move(knn_scan_operator->block_metas_),
@@ -669,7 +671,7 @@ size_t InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCo
                                                     std::move(knn_expr->opt_params_),
                                                     knn_expr->topn_,
                                                     actual_dimension,
-                                                    1,
+                                                    query_count,
                                                     knn_scan_operator->real_knn_query_embedding_ptr_,
                                                     knn_scan_operator->real_knn_query_elem_type_,
                                                     knn_expr->distance_type_);

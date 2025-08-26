@@ -42,7 +42,7 @@ public:
                       std::unique_ptr<std::vector<std::shared_ptr<SegmentIndexMeta>>> segment_index_metas,
                       std::vector<InitParameter> opt_params,
                       i64 topk,
-                      i64 dimension,
+                      i64 query_dimension,
                       i64 query_embedding_count,
                       void *query_embedding,
                       EmbeddingDataType elem_type,
@@ -59,7 +59,7 @@ public:
 
     const std::vector<InitParameter> opt_params_{};
     const i64 topk_;
-    const i64 dimension_;
+    const i64 query_dimension_;
     const u64 query_count_;
     void *const query_embedding_;
     const EmbeddingDataType query_elem_type_{EmbeddingDataType::kElemInvalid};

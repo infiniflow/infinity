@@ -1287,6 +1287,20 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, std::shared_ptr<Bin
     switch (statement->type_) {
         case AlterStatementType::kRenameTable: {
             auto *rename_table_statement = static_cast<RenameTableStatement *>(statement);
+
+            auto new_table_name = rename_table_statement->new_table_name_;
+            switch (IdentifierValidation(new_table_name)) {
+                case IdentifierValidationStatus::kOk:
+                    break;
+                case IdentifierValidationStatus::kEmpty:
+                    return Status::EmptyTableName();
+                case IdentifierValidationStatus::kExceedLimit:
+                    return Status::ExceedTableNameLength(new_table_name.length());
+                case IdentifierValidationStatus::kInvalidName: {
+                    return Status::InvalidTableName(new_table_name);
+                }
+            }
+
             this->logical_plan_ = std::make_shared<LogicalRenameTable>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                        table_info,
                                                                        std::move(rename_table_statement->new_table_name_));
