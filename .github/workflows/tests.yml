@@ -140,10 +140,6 @@ jobs:
             cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/infinity /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
             cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/test_main /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
 
-      - name: Remove build container
-        if: always()
-        run: sudo docker rm -f -v ${BUILDER_CONTAINER}
-
       - name: Get host ip
         id: get_ip
         if: ${{ !cancelled() && !failure() }}
@@ -152,6 +148,14 @@ jobs:
           echo "Build ip is: ${BUILD_IP}"
           echo "BUILD_IP=${BUILD_IP}" >> ${GITHUB_OUTPUT}
           echo "pwd=${PWD}"
+
+      - name: Stop build container
+        if: always()
+        run: sudo docker stop ${BUILDER_CONTAINER}
+
+      - name: Remove build container
+        if: always()
+        run: sudo docker rm -f -v ${BUILDER_CONTAINER}
 
   debug_sqllogical_test:
     name: debug_sqllogical_test
@@ -802,10 +806,6 @@ jobs:
             cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/local_infinity/knn_query_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
             cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/local_infinity/knn_import_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
 
-      - name: Remove build container
-        if: always()
-        run: sudo docker rm -f -v ${BUILDER_CONTAINER}
-
       - name: Get host ip
         id: get_ip
         if: ${{ !cancelled() && !failure() }}
@@ -814,6 +814,14 @@ jobs:
           echo "Build ip is: ${BUILD_IP}"
           echo "BUILD_IP=${BUILD_IP}" >> ${GITHUB_OUTPUT}
           echo "pwd=${PWD}"
+
+      - name: Stop build container
+        if: always()
+        run: sudo docker stop ${BUILDER_CONTAINER}
+
+      - name: Remove build container
+        if: always()
+        run: sudo docker rm -f -v ${BUILDER_CONTAINER}
 
   release_sqllogical_test:
     name: release_sqllogical_test
@@ -1528,7 +1536,7 @@ jobs:
         run: sudo docker rm -f -v ${MINIO_CONTAINER}
 
   release_benchmark:
-    name: release_minio_parallel_test
+    name: release_benchmark
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
