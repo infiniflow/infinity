@@ -211,7 +211,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity 
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity 
 
       - name: Start test container
         id: start
@@ -315,7 +315,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main
 
       - name: Start test container
         id: start
@@ -402,7 +402,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -501,7 +501,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -604,7 +604,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -708,7 +708,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -917,7 +917,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -1021,7 +1021,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main
 
       - name: Start test container
         id: start
@@ -1108,7 +1108,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -1211,7 +1211,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -1315,7 +1315,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -1419,7 +1419,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -1463,7 +1463,9 @@ jobs:
           MINIO_DIR=~/minio_data_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> $GITHUB_ENV
           echo "MINIO_DIR=${MINIO_DIR}" >> $GITHUB_ENV
-          sudo docker rm -f -v ${MINIO_CONTAINER} && sudo rm -fr ${MINIO_DIR} && sudo mkdir ${MINIO_DIR} && sudo docker run -d --net=container:${BUILDER_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_DIR}:/data    quay.io/minio/minio server /data --console-address ":9006" --address ":9005" && sleep 5s
+          sudo mkdir ${MINIO_DIR}
+          sudo docker run -d --net=container:${BUILDER_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_DIR}:/data    quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          sleep 5s
           if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
               echo "Minio container is not running"
               exit 1
@@ -1543,7 +1545,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: Start test container
         id: start
@@ -1587,7 +1589,9 @@ jobs:
           MINIO_DIR=~/minio_data_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> $GITHUB_ENV
           echo "MINIO_DIR=${MINIO_DIR}" >> $GITHUB_ENV
-          sudo docker rm -f -v ${MINIO_CONTAINER} && sudo rm -fr ${MINIO_DIR} && sudo mkdir ${MINIO_DIR} && sudo docker run -d --net=container:${BUILDER_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_DIR}:/data    quay.io/minio/minio server /data --console-address ":9006" --address ":9005" && sleep 5s
+          sudo mkdir ${MINIO_DIR}
+          sudo docker run -d --net=container:${BUILDER_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_DIR}:/data    quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          sleep 5s
           if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
               echo "Minio container is not running"
               exit 1
@@ -1667,7 +1671,7 @@ jobs:
 #          envs: CONTAINER_NAME, BUILD_IP
 #          script: |
 #            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-#            rsync -av infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+#            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 #
 #      - name: Start test container
 #        id: start
