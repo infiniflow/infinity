@@ -301,7 +301,7 @@ TEST_P(TestTxnCleanup, cleanup_with_drop_db) {
     validity_function_ = [this] {
         { // check drop db
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("get db"), TransactionType::kRead);
-            std::optional<DBMeeta> db_meta;
+            std::shared_ptr<DBMeeta> db_meta;
             TxnTimeStamp db_create_ts;
             auto status = txn->GetDBMeta(*db_name_, db_meta, db_create_ts);
             EXPECT_FALSE(status.ok());
@@ -330,8 +330,8 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_table) {
     validity_function_ = [this] {
         { // check drop table
             auto txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kRead);
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
+            std::shared_ptr<DBMeeta> db_meta;
+            std::shared_ptr<TableMeeta> table_meta;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_FALSE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
@@ -364,8 +364,8 @@ TEST_P(TestTxnCleanup, cleanup_and_add_columns) {
     validity_function_ = [this] {
         { // check add column
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("get column"), TransactionType::kRead);
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
+            std::shared_ptr<DBMeeta> db_meta;
+            std::shared_ptr<TableMeeta> table_meta;
             std::string table_key;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
@@ -412,8 +412,8 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_columns) {
         { // check drop column
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kRead);
 
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
+            std::shared_ptr<DBMeeta> db_meta;
+            std::shared_ptr<TableMeeta> table_meta;
             std::string table_key;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
@@ -457,8 +457,8 @@ TEST_P(TestTxnCleanup, cleanup_and_rename_table) {
     validity_function_ = [&, this] {
         { // check rename table
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kRead);
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
+            std::shared_ptr<DBMeeta> db_meta;
+            std::shared_ptr<TableMeeta> table_meta;
             auto status = txn->GetTableMeta(*db_name_, *new_table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
@@ -493,8 +493,8 @@ TEST_P(TestTxnCleanup, cleanup_and_compact) {
     validity_function_ = [this] {
         { // check clean & compact
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("get segment"), TransactionType::kRead);
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
+            std::shared_ptr<DBMeeta> db_meta;
+            std::shared_ptr<TableMeeta> table_meta;
             auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
@@ -530,8 +530,8 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_index) {
         {
             // check drop index
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("get index"), TransactionType::kRead);
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
+            std::shared_ptr<DBMeeta> db_meta;
+            std::shared_ptr<TableMeeta> table_meta;
             std::string table_key;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
@@ -597,9 +597,9 @@ TEST_P(TestTxnCleanup, cleanup_and_optimize_index) {
         { // check optimize index
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
             size_t block_row_cnt = 2;
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
-            std::optional<TableIndexMeeta> table_index_meta;
+            std::shared_ptr<DBMeeta> db_meta;
+            std::shared_ptr<TableMeeta> table_meta;
+            std::shared_ptr<TableIndexMeeta> table_index_meta;
             std::string table_key;
             std::string index_key;
             Status status =
@@ -661,8 +661,8 @@ TEST_P(TestTxnCleanup, cleanup_and_append) {
             // check append
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
 
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
+            std::shared_ptr<DBMeeta> db_meta;
+            std::shared_ptr<TableMeeta> table_meta;
             auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
@@ -727,8 +727,8 @@ TEST_P(TestTxnCleanup, cleanup_and_delete) {
         {
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
 
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
+            std::shared_ptr<DBMeeta> db_meta;
+            std::shared_ptr<TableMeeta> table_meta;
             auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
@@ -797,8 +797,8 @@ TEST_P(TestTxnCleanup, cleanup_and_update) {
         { // check update
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
 
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
+            std::shared_ptr<DBMeeta> db_meta;
+            std::shared_ptr<TableMeeta> table_meta;
             auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
@@ -849,9 +849,9 @@ TEST_P(TestTxnCleanup, cleanup_and_dump_index) {
     validity_function_ = [&, this] {
         { // check dump index
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
-            std::optional<TableIndexMeeta> table_index_meta;
+            std::shared_ptr<DBMeeta> db_meta;
+            std::shared_ptr<TableMeeta> table_meta;
+            std::shared_ptr<TableIndexMeeta> table_index_meta;
             std::string table_key;
             std::string index_key;
             auto status =

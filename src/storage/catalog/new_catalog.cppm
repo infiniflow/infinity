@@ -250,7 +250,7 @@ public:
                            TxnTimeStamp commit_ts,
                            const std::string &db_name,
                            const std::string *db_comment,
-                           std::optional<DBMeeta> &db_meta);
+                           std::shared_ptr<DBMeeta> &db_meta);
 
     static Status CleanDB(DBMeeta &db_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
@@ -259,7 +259,7 @@ public:
                               TxnTimeStamp begin_ts,
                               TxnTimeStamp commit_ts,
                               const std::shared_ptr<TableDef> &table_def,
-                              std::optional<TableMeeta> &table_meta);
+                              std::shared_ptr<TableMeeta> &table_meta);
 
     static Status CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 

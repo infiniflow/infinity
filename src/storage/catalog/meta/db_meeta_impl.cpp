@@ -32,7 +32,7 @@ import third_party;
 
 namespace infinity {
 
-DBMeeta::DBMeeta(std::string db_id_str, NewTxn *txn) : db_id_str_(std::move(db_id_str)), txn_(txn) {
+DBMeeta::DBMeeta(const std::string &db_id_str, const std::string &db_name, NewTxn *txn) : db_id_str_(db_id_str), db_name_(db_name), txn_(txn) {
     if (txn == nullptr) {
         UnrecoverableError("Null txn pointer");
     }
@@ -41,8 +41,8 @@ DBMeeta::DBMeeta(std::string db_id_str, NewTxn *txn) : db_id_str_(std::move(db_i
     meta_cache_ = txn_->txn_mgr()->storage()->meta_cache();
 }
 
-DBMeeta::DBMeeta(std::string db_id_str, KVInstance *kv_instance, MetaCache *meta_cache)
-    : db_id_str_(std::move(db_id_str)), txn_begin_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance}, meta_cache_(meta_cache) {}
+DBMeeta::DBMeeta(const std::string &db_id_str, const std::string &db_name, KVInstance *kv_instance, MetaCache *meta_cache)
+    : db_id_str_(db_id_str), db_name_(db_name), txn_begin_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance}, meta_cache_(meta_cache) {}
 
 const std::string &DBMeeta::db_id_str() const { return db_id_str_; }
 

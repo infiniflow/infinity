@@ -282,8 +282,8 @@ TEST_P(TxnReplayExceptionTest, test_replay_import) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::optional<DBMeeta> db_meta;
-        std::optional<TableMeeta> table_meta;
+        std::shared_ptr<DBMeeta> db_meta;
+        std::shared_ptr<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
@@ -377,9 +377,9 @@ TEST_P(TxnReplayExceptionTest, test_replay_import) {
         auto check_index = [&](const std::string &index_name) {
             auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kNormal);
 
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
-            std::optional<TableIndexMeeta> table_index_meta;
+            std::shared_ptr<DBMeeta> db_meta;
+            std::shared_ptr<TableMeeta> table_meta;
+            std::shared_ptr<TableIndexMeeta> table_index_meta;
             std::string table_key;
             std::string index_key;
             Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -484,8 +484,8 @@ TEST_P(TxnReplayExceptionTest, test_replay_compact) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::optional<DBMeeta> db_meta;
-        std::optional<TableMeeta> table_meta;
+        std::shared_ptr<DBMeeta> db_meta;
+        std::shared_ptr<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
