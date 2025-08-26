@@ -27,8 +27,8 @@ class MetaTableCache;
 
 export class DBMeeta {
 public:
-    DBMeeta(std::string db_id_str, NewTxn *txn);
-    DBMeeta(std::string db_id_str, KVInstance *kv_instance, MetaCache *meta_cache);
+    DBMeeta(const std::string &db_id_str, const std::string &db_name, NewTxn *txn);
+    DBMeeta(const std::string &db_id_str, const std::string &db_name, KVInstance *kv_instance, MetaCache *meta_cache);
 
     const std::string &db_id_str() const;
 
@@ -47,9 +47,6 @@ public:
     std::tuple<std::string, Status> GetNextTableID();
 
     Status SetNextTableID(const std::string &table_id_str);
-
-    std::string GetDBName() const { return db_name_; }
-    void SetDBName(const std::string &db_name) { db_name_ = db_name; }
 
     MetaCache *meta_cache() const;
 

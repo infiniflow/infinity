@@ -286,7 +286,7 @@ Status NewTxn::OptimizeAllIndexes() {
         const std::string &db_id_str = (*db_id_strs_ptr)[i];
         const std::string &db_name = (*db_names_ptr)[i];
 
-        DBMeeta db_meta(db_id_str, this);
+        DBMeeta db_meta(db_id_str, db_name, this);
         std::vector<std::string> *table_id_strs_ptr = nullptr;
         std::vector<std::string> *table_names_ptr = nullptr;
         status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);

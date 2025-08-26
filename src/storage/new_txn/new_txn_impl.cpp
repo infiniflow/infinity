@@ -1735,8 +1735,9 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
 
     std::vector<std::string> *db_id_strs_ptr;
+    std::vector<std::string> *db_names_ptr;
     CatalogMeta catalog_meta(this);
-    status = catalog_meta.GetDBIDs(db_id_strs_ptr);
+    status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
     if (!status.ok()) {
         return status;
     }
@@ -1748,8 +1749,12 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     }
     base_txn_store_ = std::make_shared<CheckpointTxnStore>();
     auto *txn_store = static_cast<CheckpointTxnStore *>(base_txn_store_.get());
-    for (const std::string &db_id_str : *db_id_strs_ptr) {
-        DBMeeta db_meta(db_id_str, this);
+
+    size_t db_count = db_id_strs_ptr->size();
+    for (size_t idx = 0; idx < db_count; ++idx) {
+        const std::string &db_id_str = db_id_strs_ptr->at(idx);
+        const std::string &db_name = db_names_ptr->at(idx);
+        DBMeeta db_meta(db_id_str, db_name, this);
         status = this->CheckpointDB(db_meta, option, txn_store);
         if (!status.ok()) {
             return status;
@@ -2316,11 +2321,10 @@ Status NewTxn::GetDBMeta(const std::string &db_name, std::optional<DBMeeta> &db_
     if (!status.ok()) {
         return status;
     }
-    db_meta.emplace(db_id_str, this);
+    db_meta.emplace(db_id_str, db_name, this);
     if (db_key_ptr) {
         *db_key_ptr = db_key;
     }
-    db_meta->SetDBName(db_name);
     return Status::OK();
 }
 
@@ -2637,13 +2641,17 @@ Status NewTxn::PrepareCommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_
 
 Status NewTxn::PrepareCommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd) {
     std::vector<std::string> *db_id_strs_ptr;
+    std::vector<std::string> *db_names_ptr;
     CatalogMeta catalog_meta(this);
-    Status status = catalog_meta.GetDBIDs(db_id_strs_ptr);
+    Status status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
     if (!status.ok()) {
         return status;
     }
-    for (const std::string &db_id_str : *db_id_strs_ptr) {
-        DBMeeta db_meta(db_id_str, this);
+    size_t db_count = db_id_strs_ptr->size();
+    for (size_t idx = 0; idx < db_count; ++idx) {
+        const std::string &db_id_str = db_id_strs_ptr->at(idx);
+        const std::string &db_name = db_names_ptr->at(idx);
+        DBMeeta db_meta(db_id_str, db_name, this);
         status = this->CommitCheckpointDB(db_meta, checkpoint_cmd);
         if (!status.ok()) {
             return status;
@@ -5437,7 +5445,7 @@ Status NewTxn::CleanupInner(const std::vector<std::unique_ptr<MetaKey>> &metas) 
                     return status;
                 }
 
-                DBMeeta db_meta(db_meta_key->db_id_str_, this);
+                DBMeeta db_meta(db_meta_key->db_id_str_, db_meta_key->db_name_, this);
                 status = NewCatalog::CleanDB(db_meta, begin_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
@@ -6252,14 +6260,18 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
     DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
 
     std::vector<std::string> *db_id_strs_ptr;
+    std::vector<std::string> *db_names_ptr;
     CatalogMeta catalog_meta(this);
-    status = catalog_meta.GetDBIDs(db_id_strs_ptr);
+    status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
     if (!status.ok()) {
         return status;
     }
 
-    for (const std::string &db_id_str : *db_id_strs_ptr) {
-        DBMeeta db_meta(db_id_str, this);
+    size_t db_count = db_id_strs_ptr->size();
+    for (size_t idx = 0; idx < db_count; ++idx) {
+        const std::string &db_id_str = db_id_strs_ptr->at(idx);
+        const std::string &db_name = db_names_ptr->at(idx);
+        DBMeeta db_meta(db_id_str, db_name, this);
         status = this->CheckpointDB(db_meta, option, txn_store);
         if (!status.ok()) {
             return status;
