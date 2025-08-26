@@ -21,51 +21,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  #  debug_clang_format:
-  #    name: debug_clang_format
-  #    # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
-  #    # https://github.com/orgs/community/discussions/26261
-  #    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-  #    runs-on: [ "self-hosted", "debug" ]
-  #    steps:
-  #      - name: Check format of changed C/C++ files
-  #        if: ${{ !cancelled() && !failure() }}
-  #        run: |
-  #          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
-  #            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} \
-  #              | grep -E '\.(cpp|h|hpp|cppm)$' \
-  #              | grep -v 'third_party/' \
-  #              | grep -v 'build/' \
-  #              | grep -v 'network/' \
-  #              | grep -v 'parser/' || true)
-  #
-  #            if [ -n "$CHANGED_FILES" ]; then
-  #              echo "Check format of changed C/C++ files with clang-format-20"
-  #
-  #              readarray -t files <<< "$CHANGED_FILES"
-  #              HAS_ERROR=0
-  #
-  #              for file in "${files[@]}"; do
-  #                if [ -f "$file" ]; then
-  #                  echo "Checking formatting: $file"
-  #                  sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity; clang-format-20 $file > ${file}.formatted; diff $file ${file}.formatted 2>/dev/null"
-  #                  if [ $? -ne 0 ]; then
-  #                    echo "❌ $file needs formatting"
-  #                    HAS_ERROR=1
-  #                  else
-  #                    echo "✅ $file is properly formatted"
-  #                  fi
-  #                  rm -f "${file}.formatted"
-  #                fi
-  #              done
-  #
-  #              if [ $HAS_ERROR -ne 0 ]; then
-  #                exit 1
-  #              fi
-  #            else
-  #              echo "No C++ files changed"
-  #            fi
-  #          fi
+#    code_quality_analyze:
+#      name: code_quality_analyze
+#      # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
+#      # https://github.com/orgs/community/discussions/26261
+#      if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
+#      runs-on: [ "self-hosted", "debug" ]
+#      steps:
+#        - name: Check format of changed C/C++ files
+#          if: ${{ !cancelled() && !failure() }}
+#          run: |
+#            if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+#              CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} \
+#                | grep -E '\.(cpp|h|hpp|cppm)$' \
+#                | grep -v 'third_party/' \
+#                | grep -v 'network/' \
+#                | grep -v 'parser/' || true)
+#
+#              if [ -n "$CHANGED_FILES" ]; then
+#                echo "Check format of changed C/C++ files with clang-format-20"
+#
+#                readarray -t files <<< "$CHANGED_FILES"
+#                HAS_ERROR=0
+#
+#                for file in "${files[@]}"; do
+#                  if [ -f "$file" ]; then
+#                    echo "Checking formatting: $file"
+#                    sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity; clang-format-20 $file > ${file}.formatted; diff $file ${file}.formatted 2>/dev/null"
+#                    if [ $? -ne 0 ]; then
+#                      echo "❌ $file needs formatting"
+#                      HAS_ERROR=1
+#                    else
+#                      echo "✅ $file is properly formatted"
+#                    fi
+#                    rm -f "${file}.formatted"
+#                  fi
+#                done
+#
+#                if [ $HAS_ERROR -ne 0 ]; then
+#                  exit 1
+#                fi
+#              else
+#                echo "No C++ files changed"
+#              fi
+#            fi
 
   debug_configure_and_build:
     name: debug_configure_and_build
@@ -126,14 +125,6 @@ jobs:
           sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\"
           cd /infinity && cmake --build /infinity/cmake-build-debug --target test_main"
 
-
-      #      - name: Destroy builder container
-      #        if: always()  # always run this step even if previous steps failed
-      #        run: |
-      #          if [ -n "${BUILDER_CONTAINER}" ]; then
-      #            sudo docker rm -f -v ${BUILDER_CONTAINER}
-      #          fi
-
       - name: SSH to host server
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
@@ -149,8 +140,13 @@ jobs:
             hostname -I | awk '{print $1}'
             echo "${CONTAINER_NAME}"
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            docker cp ${CONTAINER_NAME}:/infinity/cmake-build-debug/src/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            docker cp ${CONTAINER_NAME}:/infinity/cmake-build-debug/src/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            cp /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            cp /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+
+      - name: Stop build container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          docker stop ${CONTAINER_NAME}
 
       - name: Get host ip
         id: get_ip
@@ -160,6 +156,10 @@ jobs:
           echo "Build ip is: ${BUILD_IP}"
           echo "BUILD_IP=${BUILD_IP}" >> ${GITHUB_OUTPUT}
           echo "pwd=${PWD}"
+
+      - name: Remove build container
+        if: always()
+        run: sudo docker rm -f -v ${CONTAINER_NAME}
 
   debug_sqllogical_test:
     name: debug_sqllogical_test
@@ -193,12 +193,6 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: false
-
-      - name: Get container name
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "Build ip is: ${BUILD_IP}"
-          echo "Container name is: ${CONTAINER_NAME}"
 
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
@@ -238,7 +232,7 @@ jobs:
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
-            docker cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${TEST_CONTAINER_NAME}:/infinity/cmake-build-debug/src/infinity 
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -342,7 +336,7 @@ jobs:
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
-            docker cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/test_main ${TEST_CONTAINER_NAME}:/infinity/cmake-build-debug/src/test_main 
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/test_main /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/ 
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -429,7 +423,7 @@ jobs:
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
-            docker cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${TEST_CONTAINER_NAME}:/infinity/cmake-build-debug/src/infinity 
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -528,7 +522,7 @@ jobs:
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
-            docker cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${TEST_CONTAINER_NAME}:/infinity/cmake-build-debug/src/infinity 
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -631,7 +625,7 @@ jobs:
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
-            docker cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${TEST_CONTAINER_NAME}:/infinity/cmake-build-debug/src/infinity 
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/ 
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -670,7 +664,8 @@ jobs:
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
-    needs: debug_configure_and_build
+    needs:
+      - debug_configure_and_build
     outputs:
       BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
       TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
@@ -735,7 +730,7 @@ jobs:
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
-            docker cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${TEST_CONTAINER_NAME}:/infinity/cmake-build-debug/src/infinity 
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -855,8 +850,14 @@ jobs:
             hostname -I | awk '{print $1}'
             echo "${CONTAINER_NAME}"
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            docker cp ${CONTAINER_NAME}:/infinity/cmake-build-release/src/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            docker cp ${CONTAINER_NAME}:/infinity/cmake-build-release/src/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            cp /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            cp /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            cp /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/knn_query_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            cp /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/knn_import_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+
+      - name: Remove build container
+        if: always()
+        run: sudo docker rm -f -v ${CONTAINER_NAME}
 
       - name: Get host ip
         id: get_ip
@@ -900,12 +901,6 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Get container name
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "Build ip is: ${BUILD_IP}"
-          echo "Container name is: ${CONTAINER_NAME}"
-
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
@@ -944,7 +939,7 @@ jobs:
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
-            docker cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${TEST_CONTAINER_NAME}:/infinity/cmake-build-release/src/infinity 
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/ 
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -1048,7 +1043,7 @@ jobs:
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
-            docker cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/test_main ${TEST_CONTAINER_NAME}:/infinity/cmake-build-release/src/test_main 
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/test_main /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/
 
       - name: Unit test release version
         if: ${{ !cancelled() && !failure() }}
@@ -1135,7 +1130,7 @@ jobs:
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
-            docker cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${TEST_CONTAINER_NAME}:/infinity/cmake-build-release/src/infinity 
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -1238,7 +1233,7 @@ jobs:
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
-            docker cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${TEST_CONTAINER_NAME}:/infinity/cmake-build-release/src/infinity 
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -1342,7 +1337,7 @@ jobs:
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
-            docker cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${TEST_CONTAINER_NAME}:/infinity/cmake-build-release/src/infinity 
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -1446,7 +1441,7 @@ jobs:
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
-            docker cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${TEST_CONTAINER_NAME}:/infinity/cmake-build-release/src/infinity 
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -1572,7 +1567,7 @@ jobs:
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
-            docker cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${TEST_CONTAINER_NAME}:/infinity/cmake-build-release/src/infinity 
+            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -1698,7 +1693,7 @@ jobs:
 #          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME
 #          script: |
 #            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
-#            docker cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${TEST_CONTAINER_NAME}:/infinity/cmake-build-release/src/infinity
+#            cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity /home/infiniflow/runners_work/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/
 #
 #      - name: Install pysdk
 #        if: ${{ !cancelled() && !failure() }}
