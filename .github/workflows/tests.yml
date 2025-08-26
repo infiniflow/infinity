@@ -817,8 +817,8 @@ jobs:
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
             cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
             cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/knn_query_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/knn_import_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/knn_query_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/knn_import_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
 
       - name: Remove build container
         if: always()
@@ -1409,7 +1409,7 @@ jobs:
           echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> $GITHUB_ENV
           echo "MINIO_DIR=${MINIO_DIR}" >> $GITHUB_ENV
           sudo mkdir ${MINIO_DIR}
-          sudo docker run -d --net=container:${BUILDER_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_DIR}:/data    quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          sudo docker run -d --net=container:${TEST_CONTAINER_NAME} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_DIR}:/data    quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
           sleep 5s
           if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
               echo "Minio container is not running"
@@ -1535,7 +1535,7 @@ jobs:
           echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> $GITHUB_ENV
           echo "MINIO_DIR=${MINIO_DIR}" >> $GITHUB_ENV
           sudo mkdir ${MINIO_DIR}
-          sudo docker run -d --net=container:${BUILDER_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_DIR}:/data    quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          sudo docker run -d --net=container:${TEST_CONTAINER_NAME} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_DIR}:/data    quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
           sleep 5s
           if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
               echo "Minio container is not running"
