@@ -136,7 +136,7 @@ jobs:
           username: infiniflow
           password: infiniflow
           capture_stdout: true
-          envs: CONTAINER_NAME
+          envs: CONTAINER_NAME, RUNNER_NAME
           script: |
             hostname -I | awk '{print $1}'
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
