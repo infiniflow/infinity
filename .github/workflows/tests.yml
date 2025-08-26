@@ -859,7 +859,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
 
       - name: Start test container
         id: start
@@ -1132,7 +1132,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
 
       - name: Start test container
         id: start
@@ -1148,9 +1148,6 @@ jobs:
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
-        env:
-          TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-          BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
@@ -1461,9 +1458,6 @@ jobs:
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
-        env:
-          TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-          BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
         with:
           host: 172.17.0.1
           username: infiniflow
@@ -1587,7 +1581,7 @@ jobs:
           password: infiniflow
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
-            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/benchmark
+            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/benchmark/local_infinity/
             sudo cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/knn_query_benchmark ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/local_infinity/
             sudo cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/knn_import_benchmark ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/local_infinity/
 
