@@ -117,8 +117,8 @@ TEST_P(RepeatReplayTest, append) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kRead);
         Status status;
 
-        std::optional<DBMeeta> db_meta;
-        std::optional<TableMeeta> table_meta;
+        std::shared_ptr<DBMeeta> db_meta;
+        std::shared_ptr<TableMeeta> table_meta;
         status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 

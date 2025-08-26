@@ -450,28 +450,31 @@ private:
     void CheckTxn(const std::string &db_name);
 
 public:
-    Status GetDBMeta(const std::string &db_name, std::optional<DBMeeta> &db_meta, TxnTimeStamp &db_create_ts, std::string *db_key = nullptr);
+    Status GetDBMeta(const std::string &db_name, std::shared_ptr<DBMeeta> &db_meta, TxnTimeStamp &db_create_ts, std::string *db_key = nullptr);
 
     Status GetTableMeta(const std::string &db_name,
                         const std::string &table_name,
-                        std::optional<DBMeeta> &db_meta,
-                        std::optional<TableMeeta> &table_meta,
+                        std::shared_ptr<DBMeeta> &db_meta,
+                        std::shared_ptr<TableMeeta> &table_meta,
                         std::string *table_key = nullptr);
 
-    Status GetTableMeta(const std::string &table_name, DBMeeta &db_meta, std::optional<TableMeeta> &table_meta, std::string *table_key = nullptr);
+    Status GetTableMeta(const std::string &table_name,
+                        std::shared_ptr<DBMeeta> &db_meta,
+                        std::shared_ptr<TableMeeta> &table_meta,
+                        std::string *table_key = nullptr);
 
     Status GetTableIndexMeta(const std::string &db_name,
                              const std::string &table_name,
                              const std::string &index_name,
-                             std::optional<DBMeeta> &db_meta,
-                             std::optional<TableMeeta> &table_meta,
-                             std::optional<TableIndexMeeta> &table_index_meta,
+                             std::shared_ptr<DBMeeta> &db_meta,
+                             std::shared_ptr<TableMeeta> &table_meta,
+                             std::shared_ptr<TableIndexMeeta> &table_index_meta,
                              std::string *table_key,
                              std::string *index_key);
 
     Status GetTableIndexMeta(const std::string &index_name,
                              TableMeeta &table_meta,
-                             std::optional<TableIndexMeeta> &table_index_meta,
+                             std::shared_ptr<TableIndexMeeta> &table_index_meta,
                              std::string *index_key = nullptr);
 
 private:
