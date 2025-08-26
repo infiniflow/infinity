@@ -72,8 +72,8 @@ jobs:
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-    runs-on: [ "self-hosted", "debug" ]
-    needs: code_quality_analyze
+    runs-on: [ "self-hosted", "infinity-build" ]
+#    needs: code_quality_analyze
     outputs:
       BUILD_IP: ${{ steps.get_ip.outputs.BUILD_IP }}
       CONTAINER_NAME: ${{ steps.start.outputs.CONTAINER_NAME }}
@@ -723,8 +723,8 @@ jobs:
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-    runs-on: [ "self-hosted", "debug" ]
-    needs: code_quality_analyze
+    runs-on: [ "self-hosted", "infinity-build" ]
+#    needs: code_quality_analyze
     outputs:
       BUILD_IP: ${{ steps.get_ip.outputs.BUILD_IP }}
       CONTAINER_NAME: ${{ steps.start.outputs.CONTAINER_NAME }}
@@ -794,10 +794,10 @@ jobs:
             hostname -I | awk '{print $1}'
             echo "${CONTAINER_NAME}"
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/local_infinity/knn_query_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/local_infinity/knn_import_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/src/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/local_infinity/knn_query_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-release/benchmark/local_infinity/knn_import_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
 
       - name: Get host ip
         id: get_ip
@@ -821,7 +821,7 @@ jobs:
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-    runs-on: [ "self-hosted", "debug" ]
+    runs-on: [ "self-hosted", "infinity-test" ]
     needs: release_configure_and_build
     outputs:
       BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
@@ -918,7 +918,7 @@ jobs:
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-    runs-on: [ "self-hosted", "debug" ]
+    runs-on: [ "self-hosted", "infinity-test" ]
     needs: release_configure_and_build
     outputs:
       BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
@@ -998,7 +998,7 @@ jobs:
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-    runs-on: [ "self-hosted", "debug" ]
+    runs-on: [ "self-hosted", "infinity-test" ]
     needs: release_configure_and_build
     outputs:
       BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
@@ -1094,7 +1094,7 @@ jobs:
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-    runs-on: [ "self-hosted", "debug" ]
+    runs-on: [ "self-hosted", "infinity-test" ]
     needs: release_configure_and_build
     outputs:
       BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
@@ -1194,7 +1194,7 @@ jobs:
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-    runs-on: [ "self-hosted", "debug" ]
+    runs-on: [ "self-hosted", "infinity-test" ]
     needs: release_configure_and_build
     outputs:
       BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
@@ -1291,7 +1291,7 @@ jobs:
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-    runs-on: [ "self-hosted", "debug" ]
+    runs-on: [ "self-hosted", "infinity-test" ]
     needs: release_configure_and_build
     outputs:
       BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
@@ -1407,7 +1407,7 @@ jobs:
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-    runs-on: [ "self-hosted", "debug" ]
+    runs-on: [ "self-hosted", "infinity-test" ]
     needs: release_configure_and_build
     outputs:
       BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
