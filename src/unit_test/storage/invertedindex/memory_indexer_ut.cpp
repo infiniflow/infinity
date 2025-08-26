@@ -71,9 +71,9 @@ protected:
     optionflag_t flag_{OPTION_FLAG_ALL};
     std::vector<std::string> wiki_paragraphs_;
     std::vector<ExpectedPosting> expected_postings_;
-    std::optional<DBMeeta> db_meta_;
-    std::optional<TableMeeta> table_meta_;
-    std::optional<TableIndexMeeta> index_meta_;
+    std::shared_ptr<DBMeeta> db_meta_;
+    std::shared_ptr<TableMeeta> table_meta_;
+    std::shared_ptr<TableIndexMeeta> index_meta_;
 
 public:
     void SetUp() override {

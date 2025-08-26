@@ -84,9 +84,9 @@ Status NewTxn::DumpMemIndex(const std::string &db_name, const std::string &table
 
     Status status;
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
-    std::optional<TableIndexMeeta> table_index_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<TableIndexMeeta> table_index_meta;
     std::string table_key;
     std::string index_key;
     status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -160,9 +160,9 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
                             RowID begin_row_id) {
     Status status;
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
-    std::optional<TableIndexMeeta> table_index_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<TableIndexMeeta> table_index_meta;
     std::string table_key;
     std::string index_key;
     status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -240,9 +240,9 @@ Status NewTxn::CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
 
     ChunkID chunk_id = dump_index_cmd->chunk_infos_[0].chunk_id_;
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
-    std::optional<TableIndexMeeta> table_index_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<TableIndexMeeta> table_index_meta;
     std::string table_key;
     std::string index_key;
     status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -293,9 +293,9 @@ Status NewTxn::OptimizeAllIndexes() {
         if (!status.ok()) {
             return status;
         }
-        for (size_t i = 0; i < table_id_strs_ptr->size(); ++i) {
-            // const std::string &table_id_str = (*table_id_strs_ptr)[i];
-            const std::string &table_name = (*table_names_ptr)[i];
+        for (size_t idx = 0; idx < table_id_strs_ptr->size(); ++idx) {
+            // const std::string &table_id_str = (*table_id_strs_ptr)[idx];
+            const std::string &table_name = (*table_names_ptr)[idx];
 
             status = this->OptimizeTableIndexes(db_name, table_name);
             if (!status.ok()) {
@@ -308,8 +308,8 @@ Status NewTxn::OptimizeAllIndexes() {
 }
 
 Status NewTxn::OptimizeTableIndexes(const std::string &db_name, const std::string &table_name) {
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     std::string table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
     if (!status.ok()) {
@@ -349,9 +349,9 @@ Status NewTxn::OptimizeIndex(const std::string &db_name, const std::string &tabl
 
     Status status = Status::OK();
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta_opt;
-    std::optional<TableIndexMeeta> table_index_meta_opt;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta_opt;
+    std::shared_ptr<TableIndexMeeta> table_index_meta_opt;
     std::string table_key;
     std::string index_key;
     status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta_opt, table_index_meta_opt, &table_key, &index_key);
@@ -573,9 +573,9 @@ Status NewTxn::OptimizeIndexByParams(const std::string &db_name,
                                      std::vector<std::unique_ptr<InitParameter>> raw_params) {
     Status status = Status::OK();
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta_opt;
-    std::optional<TableIndexMeeta> table_index_meta_opt;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta_opt;
+    std::shared_ptr<TableIndexMeeta> table_index_meta_opt;
     std::string table_key;
     std::string index_key;
     status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta_opt, table_index_meta_opt, &table_key, &index_key);
@@ -667,8 +667,8 @@ Status NewTxn::OptimizeIndexByParams(const std::string &db_name,
 }
 
 Status NewTxn::ListIndex(const std::string &db_name, const std::string &table_name, std::vector<std::string> &index_names) {
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -1044,9 +1044,9 @@ Status NewTxn::PopulateIndex(const std::string &db_name,
 
 Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     Status status;
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
-    std::optional<TableIndexMeeta> table_index_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<TableIndexMeeta> table_index_meta;
     std::string table_key;
     std::string index_key;
     status = GetTableIndexMeta(dump_index_cmd->db_name_,
@@ -2041,8 +2041,8 @@ Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
 }
 
 Status NewTxn::GetFullTextIndexReader(const std::string &db_name, const std::string &table_name, std::shared_ptr<IndexReader> &index_reader) {
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -2266,9 +2266,9 @@ Status NewTxn::ManualDumpIndex(const std::string &db_name, const std::string &ta
     Status status;
 
     // 1. Get table and index metadata
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
-    std::optional<TableIndexMeeta> table_index_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<TableIndexMeeta> table_index_meta;
     std::string table_key;
     std::string index_key;
     status = GetTableMeta(db_name, table_name, db_meta, table_meta);

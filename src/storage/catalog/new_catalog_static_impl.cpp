@@ -470,7 +470,7 @@ Status NewCatalog::AddNewDB(NewTxn *txn,
                             TxnTimeStamp commit_ts,
                             const std::string &db_name,
                             const std::string *db_comment,
-                            std::optional<DBMeeta> &db_meta) {
+                            std::shared_ptr<DBMeeta> &db_meta) {
     KVInstance *kv_instance = txn->kv_instance();
 
     std::string db_key = KeyEncode::CatalogDbKey(db_name, commit_ts);
@@ -479,7 +479,7 @@ Status NewCatalog::AddNewDB(NewTxn *txn,
         return status;
     }
 
-    db_meta.emplace(db_id_str, db_name, txn);
+    db_meta = std::make_shared<DBMeeta>(db_id_str, db_name, txn);
     status = db_meta->InitSet(db_comment);
     if (!status.ok()) {
         return status;
@@ -522,7 +522,7 @@ Status NewCatalog::AddNewTable(DBMeeta &db_meta,
                                TxnTimeStamp begin_ts,
                                TxnTimeStamp commit_ts,
                                const std::shared_ptr<TableDef> &table_def,
-                               std::optional<TableMeeta> &table_meta) {
+                               std::shared_ptr<TableMeeta> &table_meta) {
     // Create table a key value pair
     KVInstance *kv_instance = db_meta.kv_instance();
     std::string table_key = KeyEncode::CatalogTableKey(db_meta.db_id_str(), *table_def->table_name(), commit_ts);
@@ -531,7 +531,7 @@ Status NewCatalog::AddNewTable(DBMeeta &db_meta,
         return status;
     }
 
-    table_meta.emplace(db_meta.db_id_str(), table_id_str, kv_instance, begin_ts, commit_ts, db_meta.meta_cache());
+    table_meta = std::make_shared<TableMeeta>(db_meta.db_id_str(), table_id_str, kv_instance, begin_ts, commit_ts, db_meta.meta_cache());
     status = table_meta->InitSet(table_def);
     if (!status.ok()) {
         return status;
