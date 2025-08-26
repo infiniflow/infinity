@@ -211,7 +211,8 @@ TEST_F(RabitqTest, test_compress) {
     using namespace infinity;
     using RabitqVecStoreMeta = RabitqVecStoreMeta<DataType, true>;
     using RabitqVecStoreInner = RabitqVecStoreInner<DataType, true>;
-    constexpr size_t align_size = RabitqVecStoreMeta::align_size_;
+    using MetaType = RabitqVecStoreMeta::MetaType;
+    constexpr size_t align_size = MetaType::align_size_;
 
     // generate dataset
     auto data = std::make_unique<float[]>(dim_ * vec_n_);
@@ -285,7 +286,8 @@ TEST_F(RabitqTest, test_distance) {
     using QueryType = RabitqVecStoreMeta::QueryType;
     using DistanceType = RabitqVecStoreMeta::DistanceType;
     using CompressType = RabitqVecStoreMeta::CompressType;
-    constexpr size_t align_size = RabitqVecStoreMeta::align_size_;
+    using MetaType = RabitqVecStoreMeta::MetaType;
+    constexpr size_t align_size = MetaType::align_size_;
     constexpr size_t query_vec_n = 100;
     constexpr size_t recall_at = 1;
     constexpr size_t topk = 10;
@@ -358,7 +360,7 @@ TEST_F(RabitqTest, test_distance) {
 
         // estimate <o, q>
         DataType error = data->error_;
-        if (RabitqVecStoreMeta::IsApproxZero(error)) {
+        if (MetaType::IsApproxZero(error)) {
             error = error > 0 ? 1 : -1;
         }
         ip_recover = ip_recover / error;
@@ -368,7 +370,7 @@ TEST_F(RabitqTest, test_distance) {
 
         // estimate other metric
         if (metric_type_ == MetricType::kMetricCosine) {
-            if (RabitqVecStoreMeta::IsApproxZero(data->raw_norm_) || RabitqVecStoreMeta::IsApproxZero(query->query_raw_norm_)) {
+            if (MetaType::IsApproxZero(data->raw_norm_) || MetaType::IsApproxZero(query->query_raw_norm_)) {
                 res = 1;
             } else {
                 res = 1 - (query->query_raw_norm_ * query->query_raw_norm_ + data->raw_norm_ * data->raw_norm_ - res) * 0.5f /
@@ -376,7 +378,7 @@ TEST_F(RabitqTest, test_distance) {
             }
         }
         if (metric_type_ == MetricType::kMetricInnerProduct) {
-            if (RabitqVecStoreMeta::IsApproxZero(data->raw_norm_) || RabitqVecStoreMeta::IsApproxZero(query->query_raw_norm_)) {
+            if (MetaType::IsApproxZero(data->raw_norm_) || MetaType::IsApproxZero(query->query_raw_norm_)) {
                 res = 1;
             } else {
                 res = 1 - (query->query_raw_norm_ * query->query_raw_norm_ + data->raw_norm_ * data->raw_norm_ - res) * 0.5f;
