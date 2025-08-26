@@ -287,7 +287,8 @@ TEST_F(RabitqTest, test_distance) {
     using CompressType = RabitqVecStoreMeta::CompressType;
     constexpr size_t align_size = RabitqVecStoreMeta::align_size_;
     constexpr size_t query_vec_n = 100;
-    constexpr size_t topk = 100;
+    constexpr size_t recall_at = 1;
+    constexpr size_t topk = 10;
 
     // generate data
     auto data = std::make_unique<float[]>(dim_ * vec_n_);
@@ -310,6 +311,7 @@ TEST_F(RabitqTest, test_distance) {
         const auto &[embedding, offset] = val.value();
         inner.SetVec(insert_n++, embedding, meta, mem_usage);
     }
+    std::cout << "Insert num = " << insert_n << std::endl;
     ASSERT_EQ(insert_n, vec_n_);
 
     auto l2_distance_sqr = [&](const DataType *query, const DataType *data, size_t dim) {
@@ -319,8 +321,6 @@ TEST_F(RabitqTest, test_distance) {
         }
         return res;
     };
-
-    auto is_approx_zero = [&](auto num) { return num < RabitqVecStoreMeta::tolerance_; };
 
     auto ip_distance_between_compress_and_bincode = [&](const AlignType *query, const CompressType *data, size_t align_dim) {
         DistanceType ip_estimate = 0;
@@ -332,13 +332,13 @@ TEST_F(RabitqTest, test_distance) {
         return ip_estimate;
     };
 
-    auto recover_ip_distance = [&](f32 ip_dist, f32 dim, f32 base_sum, f32 query_sum, f32 lower_bound, f32 delta) {
+    auto recover_ip_distance = [&](f32 ip_dist, f32 align_dim_, f32 base_sum, f32 query_sum, f32 lower_bound, f32 delta) {
         // RaBitQ equation: estimate <\bar{x}, \bar{q}>
-        f32 inv_sqrt_d = 1 / std::sqrt(dim);
+        f32 inv_sqrt_d = 1 / std::sqrt(align_dim_);
         f32 p1 = inv_sqrt_d * 2 * delta * ip_dist;
         f32 p2 = inv_sqrt_d * 2 * lower_bound * base_sum;
         f32 p3 = inv_sqrt_d * delta * query_sum;
-        f32 p4 = dim * inv_sqrt_d * lower_bound;
+        f32 p4 = align_dim_ * inv_sqrt_d * lower_bound;
         return p1 + p2 - p3 - p4;
     };
 
@@ -354,19 +354,21 @@ TEST_F(RabitqTest, test_distance) {
         // estimate <x, q>
         DistanceType ip_estimate = ip_distance_between_compress_and_bincode(query->query_compress_vec_, data->compress_vec_, meta.align_dim());
         DistanceType ip_recover =
-            recover_ip_distance(ip_estimate, dim_, data->sum_, query->query_sum_, query->query_lower_bound_, query->query_delta_);
+            recover_ip_distance(ip_estimate, meta.align_dim(), data->sum_, query->query_sum_, query->query_lower_bound_, query->query_delta_);
+
+        // estimate <o, q>
         DataType error = data->error_;
-        if (is_approx_zero(error)) {
+        if (RabitqVecStoreMeta::IsApproxZero(error)) {
             error = error > 0 ? 1 : -1;
         }
         ip_recover = ip_recover / error;
 
-        // estimate <o, q>
+        // estimate ||o_r, q_r||^2
         DistanceType res = recover_l2_distance_sqr(ip_recover, data->norm_, query->query_norm_);
 
         // estimate other metric
         if (metric_type_ == MetricType::kMetricCosine) {
-            if (is_approx_zero(data->raw_norm_) || is_approx_zero(query->query_raw_norm_)) {
+            if (RabitqVecStoreMeta::IsApproxZero(data->raw_norm_) || RabitqVecStoreMeta::IsApproxZero(query->query_raw_norm_)) {
                 res = 1;
             } else {
                 res = 1 - (query->query_raw_norm_ * query->query_raw_norm_ + data->raw_norm_ * data->raw_norm_ - res) * 0.5f /
@@ -374,7 +376,7 @@ TEST_F(RabitqTest, test_distance) {
             }
         }
         if (metric_type_ == MetricType::kMetricInnerProduct) {
-            if (is_approx_zero(data->raw_norm_) || is_approx_zero(query->query_raw_norm_)) {
+            if (RabitqVecStoreMeta::IsApproxZero(data->raw_norm_) || RabitqVecStoreMeta::IsApproxZero(query->query_raw_norm_)) {
                 res = 1;
             } else {
                 res = 1 - (query->query_raw_norm_ * query->query_raw_norm_ + data->raw_norm_ * data->raw_norm_ - res) * 0.5f;
@@ -387,6 +389,24 @@ TEST_F(RabitqTest, test_distance) {
     class MaxHeap {
     public:
         MaxHeap(size_t max_size) : max_size_(max_size) {}
+
+        std::vector<LabelType> TransfromIdsVec() {
+            std::vector<LabelType> ids;
+            while (pq_.size()) {
+                ids.push_back(pq_.top().second);
+                pq_.pop();
+            }
+            return ids;
+        }
+
+        std::set<LabelType> TransfromIdsSet() {
+            std::set<LabelType> ids;
+            while (pq_.size()) {
+                ids.insert(pq_.top().second);
+                pq_.pop();
+            }
+            return ids;
+        }
 
         void push(LabelType id, DistanceType dist) {
             if (pq_.size() < max_size_) {
@@ -419,7 +439,7 @@ TEST_F(RabitqTest, test_distance) {
         auto query_code = meta.MakeQuery(query.get());
 
         // Compute recall
-        MaxHeap truth_heap(1);
+        MaxHeap truth_heap(recall_at);
         MaxHeap rabitq_heap(topk);
         for (LabelType id = 0; id < vec_n_; ++id) {
             // Compute truth distance
@@ -435,16 +455,24 @@ TEST_F(RabitqTest, test_distance) {
             // std::cout << fmt::format("id: {}, truth distance: {:.2f}, estimate distance: {:.2f}", id, truth_dis, estimate_dis) << std::endl;
         }
 
-        LabelType gt_id = truth_heap.top().second;
-        while (rabitq_heap.size()) {
-            LabelType id = rabitq_heap.top().second;
-            rabitq_heap.pop();
-            if (id == gt_id) {
+        std::set<LabelType> gt = truth_heap.TransfromIdsSet();
+        std::vector<LabelType> ids = rabitq_heap.TransfromIdsVec();
+        for (LabelType id : ids) {
+            if (gt.contains(id)) {
                 ++cnt;
-                break;
             }
         }
+        std::cout << "gt:";
+        for (LabelType id : gt) {
+            std::cout << " " << id;
+        }
+        std::cout << ", ids:";
+        for (LabelType id : ids) {
+            std::cout << " " << id;
+        }
+        std::cout << std::endl;
     }
-    f32 recall = cnt / query_vec_n;
+    f32 recall = 1.0f * cnt / (query_vec_n * recall_at);
+    std::cout << "Recall@1 = " << recall << std::endl;
     ASSERT_GE(recall, 0.9);
 }
