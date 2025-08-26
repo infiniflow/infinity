@@ -20,6 +20,7 @@ module infinity_core:ut.test_rabitq;
 
 import :ut.base_test;
 import :rabitq_vec_store;
+import :dist_func_l2;
 
 using namespace infinity;
 
@@ -285,9 +286,7 @@ TEST_F(RabitqTest, test_distance) {
     using StoreType = RabitqVecStoreMeta::StoreType;
     using QueryType = RabitqVecStoreMeta::QueryType;
     using DistanceType = RabitqVecStoreMeta::DistanceType;
-    using CompressType = RabitqVecStoreMeta::CompressType;
     using MetaType = RabitqVecStoreMeta::MetaType;
-    constexpr size_t align_size = MetaType::align_size_;
     constexpr size_t query_vec_n = 100;
     constexpr size_t recall_at = 1;
     constexpr size_t topk = 10;
@@ -324,39 +323,11 @@ TEST_F(RabitqTest, test_distance) {
         return res;
     };
 
-    auto ip_distance_between_compress_and_bincode = [&](const AlignType *query, const CompressType *data, size_t align_dim) {
-        DistanceType ip_estimate = 0;
-        for (size_t d = 0; d < align_dim; ++d) {
-            if ((data[d / align_size] >> (d % align_size)) & 1) {
-                ip_estimate += static_cast<DistanceType>(query[d]);
-            }
-        }
-        return ip_estimate;
-    };
-
-    auto recover_ip_distance = [&](f32 ip_dist, f32 align_dim_, f32 base_sum, f32 query_sum, f32 lower_bound, f32 delta) {
-        // RaBitQ equation: estimate <\bar{x}, \bar{q}>
-        f32 inv_sqrt_d = 1 / std::sqrt(align_dim_);
-        f32 p1 = inv_sqrt_d * 2 * delta * ip_dist;
-        f32 p2 = inv_sqrt_d * 2 * lower_bound * base_sum;
-        f32 p3 = inv_sqrt_d * delta * query_sum;
-        f32 p4 = align_dim_ * inv_sqrt_d * lower_bound;
-        return p1 + p2 - p3 - p4;
-    };
-
-    auto recover_l2_distance_sqr = [&](f32 ip_dist, f32 base_norm, f32 query_norm) {
-        // RaBitQ equation: estimate <\bar{o}, \bar{q}>
-        float p1 = base_norm * base_norm;
-        float p2 = query_norm * query_norm;
-        float p3 = 2 * base_norm * query_norm * ip_dist;
-        return p1 + p2 - p3;
-    };
-
     auto estimate_l2_distance_sqr = [&](const QueryType &query, const StoreType &data) {
         // estimate <x, q>
-        DistanceType ip_estimate = ip_distance_between_compress_and_bincode(query->query_compress_vec_, data->compress_vec_, meta.align_dim());
+        DistanceType ip_estimate = MetaType::IpDistanceBetweenQueryAndBinaryCode(query->query_compress_vec_, data->compress_vec_, meta.align_dim());
         DistanceType ip_recover =
-            recover_ip_distance(ip_estimate, meta.align_dim(), data->sum_, query->query_sum_, query->query_lower_bound_, query->query_delta_);
+            MetaType::RecoverIpDistance(ip_estimate, meta.align_dim(), data->sum_, query->query_sum_, query->query_lower_bound_, query->query_delta_);
 
         // estimate <o, q>
         DataType error = data->error_;
@@ -366,7 +337,7 @@ TEST_F(RabitqTest, test_distance) {
         ip_recover = ip_recover / error;
 
         // estimate ||o_r, q_r||^2
-        DistanceType res = recover_l2_distance_sqr(ip_recover, data->norm_, query->query_norm_);
+        DistanceType res = MetaType::RecoverL2DistanceSqr(ip_recover, data->norm_, query->query_norm_);
 
         // estimate other metric
         if (metric_type_ == MetricType::kMetricCosine) {

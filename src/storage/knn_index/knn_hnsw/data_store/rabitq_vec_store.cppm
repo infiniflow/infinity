@@ -116,6 +116,40 @@ public:
     constexpr static size_t align_size_ = sizeof(AlignType) * 8;                                                                         // 8 for u8
     constexpr static size_t compress_bucket_size_ = std::numeric_limits<CompressType>::max() - std::numeric_limits<CompressType>::min(); // 255 for u8
     static bool IsApproxZero(auto num) { return std::fabs(num) < tolerance_; }
+
+    static DistanceType IpDistanceBetweenQueryAndBinaryCode(const auto *query, const CompressType *data, size_t align_dim) {
+        // RaBitQ equation: estimate <\bar{x_b}, \bar{q_u}>
+        DistanceType ip_estimate = 0;
+        for (size_t d = 0; d < align_dim; ++d) {
+            if ((data[d / align_size_] >> (d % align_size_)) & 1) {
+                ip_estimate += static_cast<DistanceType>(query[d]);
+            }
+        }
+        return ip_estimate;
+    };
+
+    static DistanceType RecoverIpDistance(DistanceType ip_xb_qu,
+                                          DistanceType align_dim_,
+                                          DistanceType base_sum,
+                                          DistanceType query_sum,
+                                          DistanceType lower_bound,
+                                          DistanceType delta) {
+        // RaBitQ equation: estimate <\bar{x}, \bar{q}>
+        DistanceType inv_sqrt_d = 1 / std::sqrt(align_dim_);
+        DistanceType p1 = inv_sqrt_d * 2 * delta * ip_xb_qu;
+        DistanceType p2 = inv_sqrt_d * 2 * lower_bound * base_sum;
+        DistanceType p3 = inv_sqrt_d * delta * query_sum;
+        DistanceType p4 = align_dim_ * inv_sqrt_d * lower_bound;
+        return p1 + p2 - p3 - p4;
+    };
+
+    static DistanceType RecoverL2DistanceSqr(DistanceType ip_o_q, DistanceType base_norm, DistanceType query_norm) {
+        // RaBitQ equation: estimate <\bar{o}, \bar{q}>
+        DistanceType p1 = base_norm * base_norm;
+        DistanceType p2 = query_norm * query_norm;
+        DistanceType p3 = 2 * base_norm * query_norm * ip_o_q;
+        return p1 + p2 - p3;
+    };
 };
 
 template <typename DataType, bool OwnMem>
