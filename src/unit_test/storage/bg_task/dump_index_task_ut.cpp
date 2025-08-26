@@ -111,7 +111,7 @@ TEST_P(DumpMemIndexTaskTest, DISABLED_row_cnt_exceed_memindex_capacity) {
     }
 
     // Wait for the mem index dump in background to finish
-    sleep(1);
+    sleep(2);
 
     // Check chunk index after first mem index dump
     {
@@ -146,7 +146,7 @@ TEST_P(DumpMemIndexTaskTest, DISABLED_row_cnt_exceed_memindex_capacity) {
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
         {
             ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-            auto status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
+            status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_info_ptr->base_row_id_, RowID(segment_id, 0));
             EXPECT_EQ(chunk_info_ptr->row_cnt_, 8192 * 8);
@@ -197,7 +197,7 @@ TEST_P(DumpMemIndexTaskTest, DISABLED_row_cnt_exceed_memindex_capacity) {
         {
             ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
             ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-            auto status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
+            status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_info_ptr->base_row_id_, RowID(segment_id, 8192 * 8));
             EXPECT_EQ(chunk_info_ptr->row_cnt_, 8192 * 8);

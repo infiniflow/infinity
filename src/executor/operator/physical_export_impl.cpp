@@ -317,8 +317,11 @@ size_t PhysicalExport::ExportToFileInner(QueryContext *query_context,
                     }
                     default: {
                         ColumnMeta column_meta(select_column_idx, *block_meta);
-                        Status status =
-                            NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, column_vectors[block_column_idx]);
+                        Status status = NewCatalog::GetColumnVector(column_meta,
+                                                                    column_meta.get_column_def(),
+                                                                    block_row_count,
+                                                                    ColumnVectorMode::kReadOnly,
+                                                                    column_vectors[block_column_idx]);
                         if (!status.ok()) {
                             UnrecoverableError("Failed to get column vector");
                         }
@@ -436,7 +439,11 @@ size_t PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperator
             }
             ColumnMeta column_meta(exported_column_idx, *block_meta);
             ColumnVector exported_column_vector;
-            status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, exported_column_vector);
+            status = NewCatalog::GetColumnVector(column_meta,
+                                                 column_meta.get_column_def(),
+                                                 block_row_count,
+                                                 ColumnVectorMode::kReadOnly,
+                                                 exported_column_vector);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -610,8 +617,11 @@ size_t PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperat
                     }
                     default: {
                         ColumnMeta column_meta(select_column_idx, *block_meta);
-                        Status status =
-                            NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, column_vectors[block_column_idx]);
+                        Status status = NewCatalog::GetColumnVector(column_meta,
+                                                                    column_meta.get_column_def(),
+                                                                    block_row_count,
+                                                                    ColumnVectorMode::kReadOnly,
+                                                                    column_vectors[block_column_idx]);
                         if (!status.ok()) {
                             RecoverableError(status);
                         }

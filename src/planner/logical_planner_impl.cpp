@@ -633,7 +633,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, std::s
                                                                             column_name,
                                                                             create_table_info->column_defs_[idx]->constraints_,
                                                                             column_comment,
-                                                                            std::move(create_table_info->column_defs_[idx]->default_expr_));
+                                                                            create_table_info->column_defs_[idx]->default_expr_);
         columns.emplace_back(column_def);
     }
 
@@ -811,7 +811,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
     //        UnrecoverableError("Creating index only support single column now.");
     //    }
 
-    std::shared_ptr<std::string> index_name = std::make_shared<std::string>(std::move(create_index_info->index_name_));
+    std::shared_ptr<std::string> index_name = std::make_shared<std::string>(create_index_info->index_name_);
     std::unique_ptr<QueryBinder> query_binder_ptr = std::make_unique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
 
@@ -1076,6 +1076,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, std::shared_p
     std::shared_ptr<TableInfo> table_info;
     Status status;
     NewTxn *new_txn = query_context_ptr_->GetNewTxn();
+    MetaCache *meta_cache = query_context_ptr_->storage()->meta_cache();
     std::optional<DBMeeta> db_meta;
     std::optional<TableMeeta> tmp_table_meta;
     status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, tmp_table_meta);
@@ -1086,7 +1087,8 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, std::shared_p
                                                    tmp_table_meta->table_id_str(),
                                                    tmp_table_meta->kv_instance(),
                                                    tmp_table_meta->begin_ts(),
-                                                   tmp_table_meta->commit_ts());
+                                                   tmp_table_meta->commit_ts(),
+                                                   meta_cache);
     table_info = std::make_shared<TableInfo>();
     status = table_meta->GetTableInfo(*table_info);
     if (!status.ok()) {
@@ -1301,9 +1303,8 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, std::shared_ptr<Bin
                 }
             }
 
-            this->logical_plan_ = std::make_shared<LogicalRenameTable>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                       table_info,
-                                                                       std::move(rename_table_statement->new_table_name_));
+            this->logical_plan_ =
+                std::make_shared<LogicalRenameTable>(bind_context_ptr->GetNewLogicalNodeId(), table_info, rename_table_statement->new_table_name_);
             break;
         }
         case AlterStatementType::kAddColumns: {
@@ -1880,6 +1881,40 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, std::shared_ptr<BindC
                                                                 statement->function_name_);
             break;
         }
+        case ShowStmtType::kListCaches: {
+            this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                ShowStmtType::kListCaches,
+                                                                "",
+                                                                "",
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt);
+            break;
+        }
+        case ShowStmtType::kShowCache: {
+            this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                ShowStmtType::kShowCache,
+                                                                "",
+                                                                "",
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt);
+            break;
+        }
         default: {
             UnrecoverableError("Unexpected show statement type.");
         }
@@ -1932,11 +1967,12 @@ Status LogicalPlanner::BuildFlushBuffer(const FlushStatement *, std::shared_ptr<
 
 Status LogicalPlanner::BuildOptimize(OptimizeStatement *statement, std::shared_ptr<BindContext> &bind_context_ptr) {
     BindSchemaName(statement->schema_name_);
-    std::shared_ptr<LogicalNode> logical_optimize = std::make_shared<LogicalOptimize>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                                      statement->schema_name_,
-                                                                                      statement->table_name_,
-                                                                                      std::move(statement->index_name_),
-                                                                                      std::move(statement->opt_params_));
+    std::shared_ptr<LogicalNode> logical_optimize =
+        std::make_shared<LogicalOptimize>(bind_context_ptr->GetNewLogicalNodeId(),
+                                          statement->schema_name_,
+                                          statement->table_name_,
+                                          statement->index_name_,
+                                          std::move(statement->opt_params_)); // Can't be rerun the txn, since the options are moved.
     this->logical_plan_ = logical_optimize;
     return Status::OK();
 }

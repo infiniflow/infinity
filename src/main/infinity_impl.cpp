@@ -1423,6 +1423,28 @@ QueryResult Infinity::ListSnapshots() {
     return result;
 }
 
+QueryResult Infinity::ListCaches() {
+    std::unique_ptr<QueryContext> query_context_ptr;
+    GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
+
+    auto show_statement = std::make_unique<ShowStatement>();
+    show_statement->show_type_ = ShowStmtType::kListCaches;
+
+    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
+    return result;
+}
+
+QueryResult Infinity::ShowCache() {
+    std::unique_ptr<QueryContext> query_context_ptr;
+    GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
+
+    auto show_statement = std::make_unique<ShowStatement>();
+    show_statement->show_type_ = ShowStmtType::kShowCache;
+
+    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
+    return result;
+}
+
 QueryResult Infinity::AdminShowLogs() {
     std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);

@@ -382,10 +382,7 @@ void SystemCache::AddNewDbCache(const std::string &db_name, u64 db_id) {
 
 void SystemCache::DropDbCache(u64 db_id) {
     std::unique_lock lock(cache_mtx_);
-    //    LOG_TRACE(fmt::format("Dropping db cache with id: {} db_cache_size: {}, db_name_size: {}",
-    //                         db_id,
-    //                         db_cache_map_.size(),
-    //                         db_name_map_.size()));
+    // LOG_TRACE(fmt::format("Dropping db cache with id: {} db_cache_size: {}, db_name_size: {}", db_id, db_cache_map_.size(), db_name_map_.size()));
     auto cache_iter = db_cache_map_.find(db_id);
     if (cache_iter == db_cache_map_.end()) {
         LOG_ERROR(fmt::format("Db cache with id: {} not found", db_id));
