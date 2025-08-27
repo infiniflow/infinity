@@ -1502,7 +1502,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         id: run_minio_parallel_test_release
         run: |
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
           python3 tools/run_parallel_test.py"
           sleep 1s
 
