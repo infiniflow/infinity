@@ -77,6 +77,9 @@ jobs:
     outputs:
       BUILD_IP: ${{ steps.get_ip.outputs.BUILD_IP }}
       CONTAINER_NAME: ${{ steps.start.outputs.CONTAINER_NAME }}
+    env:
+      USERNAME: ${USERNAME}
+      PASSWORD: ${PASSWORD}
     steps:
       - name: Show PR labels
         if: ${{ !cancelled() && !failure() }}
@@ -134,8 +137,8 @@ jobs:
         with:
           host: 172.17.0.1
           envs: BUILDER_CONTAINER, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX, USERNAME, PASSWORD
-          username: ${{ USERNAME }}
-          password: ${{ PASSWORD }}
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
           capture_stdout: true
           script: |
             hostname -I | awk '{print $1}'
