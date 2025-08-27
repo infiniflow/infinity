@@ -247,6 +247,7 @@ public:
             DataType x_i = ((bin_src[d / align_size] >> (d % align_size)) & 1) ? inv_sqrt_d : -inv_sqrt_d;
             error += x_i * rot_src[d];
         }
+        error = MetaType::IsApproxZero(error) ? 0.8 : error;
 
         // 7.store data in dest
         dest->raw_norm_ = raw_norm;

@@ -238,15 +238,8 @@ private:
         DistanceType ip_recover =
             MetaType::RecoverIpDistance(ip_estimate, dim, base->sum_, query->query_sum_, query->query_lower_bound_, query->query_delta_);
 
-        // estimate <o, q>
-        DataType error = base->error_;
-        if (MetaType::IsApproxZero(error)) {
-            error = error > 0 ? 1 : -1;
-        }
-        ip_recover = ip_recover / error;
-
         // estimate ||o_r, q_r||^2
-        return MetaType::RecoverL2DistanceSqr(ip_recover, base->norm_, query->query_norm_);
+        return MetaType::RecoverL2DistanceSqr(ip_recover / base->error_, base->norm_, query->query_norm_);
     }
 };
 
