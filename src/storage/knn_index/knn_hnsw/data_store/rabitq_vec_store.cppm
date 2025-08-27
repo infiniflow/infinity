@@ -117,7 +117,7 @@ public:
     constexpr static size_t compress_bucket_size_ = std::numeric_limits<CompressType>::max() - std::numeric_limits<CompressType>::min(); // 255 for u8
     static bool IsApproxZero(auto num) { return std::fabs(num) < tolerance_; }
 
-    static inline DistanceType IpDistanceBetweenQueryAndBinaryCode(const auto *query, const CompressType *data, size_t dim) {
+    static inline DistanceType IpDistanceBetweenQueryAndBinaryCode(const CompressType *query, const AlignType *data, size_t dim) {
         // RaBitQ equation: estimate <\bar{x_b}, \bar{q_u}>
         DistanceType ip_estimate = 0;
         for (size_t d = 0; d < dim; ++d) {
