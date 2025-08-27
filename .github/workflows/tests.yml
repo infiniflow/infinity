@@ -133,10 +133,10 @@ jobs:
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: 172.17.0.1
-          username: ${env.USERNAME}
-          password: ${env.PASSWORD}
+          username: ${USERNAME}
+          password: ${PASSWORD}
           capture_stdout: true
-          envs: BUILDER_CONTAINER, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
+          envs: BUILDER_CONTAINER, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX, USERNAME, PASSWORD
           script: |
             hostname -I | awk '{print $1}'
 #            mkdir -p /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
