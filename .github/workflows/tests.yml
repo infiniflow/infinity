@@ -98,6 +98,11 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
+      - name: Checkout PR HEAD commit
+        run: |
+          git fetch origin ${{ github.event.pull_request.head.ref }}:${{ github.event.pull_request.head.ref }}
+          git checkout ${{ github.event.pull_request.head.ref }}
+
 #      - name: Start builder container
 #        id: start
 #        if: ${{ !cancelled() && !failure() }}
