@@ -9,7 +9,7 @@ on:
     paths-ignore:
       - 'docs/**'
       - '*.md'
-  pull_request_target:
+  pull_request:
     types: [ opened, synchronize, reopened, labeled ]
     paths-ignore:
       - 'docs/**'
@@ -677,8 +677,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: ${{ secrets.USERNAME }}
-          password: ${{ secrets.PASSWORD }}
+          username: ${USERNAME}
+          password: ${PASSWORD}
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
