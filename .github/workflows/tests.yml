@@ -133,8 +133,8 @@ jobs:
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: 172.17.0.1
-          username: ${USERNAME}
-          password: ${PASSWORD}
+          username: ${env.USERNAME}
+          password: ${env.PASSWORD}
           capture_stdout: true
           envs: BUILDER_CONTAINER, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX, USERNAME, PASSWORD
           script: |
