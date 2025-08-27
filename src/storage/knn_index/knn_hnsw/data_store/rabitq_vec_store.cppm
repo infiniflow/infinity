@@ -117,7 +117,7 @@ public:
     constexpr static size_t compress_bucket_size_ = std::numeric_limits<CompressType>::max() - std::numeric_limits<CompressType>::min(); // 255 for u8
     static bool IsApproxZero(auto num) { return std::fabs(num) < tolerance_; }
 
-    static DistanceType IpDistanceBetweenQueryAndBinaryCode(const auto *query, const CompressType *data, size_t dim) {
+    static inline DistanceType IpDistanceBetweenQueryAndBinaryCode(const auto *query, const CompressType *data, size_t dim) {
         // RaBitQ equation: estimate <\bar{x_b}, \bar{q_u}>
         DistanceType ip_estimate = 0;
         for (size_t d = 0; d < dim; ++d) {
@@ -128,12 +128,12 @@ public:
         return ip_estimate;
     };
 
-    static DistanceType RecoverIpDistance(DistanceType ip_xb_qu,
-                                          DistanceType dim_,
-                                          DistanceType base_sum,
-                                          DistanceType query_sum,
-                                          DistanceType lower_bound,
-                                          DistanceType delta) {
+    static inline DistanceType RecoverIpDistance(DistanceType ip_xb_qu,
+                                                 DistanceType dim_,
+                                                 DistanceType base_sum,
+                                                 DistanceType query_sum,
+                                                 DistanceType lower_bound,
+                                                 DistanceType delta) {
         // RaBitQ equation: estimate <\bar{x}, \bar{q}>
         DistanceType inv_sqrt_d = 1 / std::sqrt(dim_);
         DistanceType p1 = inv_sqrt_d * 2 * delta * ip_xb_qu;
@@ -143,7 +143,7 @@ public:
         return p1 + p2 - p3 - p4;
     };
 
-    static DistanceType RecoverL2DistanceSqr(DistanceType ip_o_q, DistanceType base_norm, DistanceType query_norm) {
+    static inline DistanceType RecoverL2DistanceSqr(DistanceType ip_o_q, DistanceType base_norm, DistanceType query_norm) {
         // RaBitQ equation: estimate <\bar{o}, \bar{q}>
         DistanceType p1 = base_norm * base_norm;
         DistanceType p2 = query_norm * query_norm;
