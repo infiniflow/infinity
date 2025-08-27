@@ -9,11 +9,17 @@ on:
     paths-ignore:
       - 'docs/**'
       - '*.md'
-  pull_request:
-    types: [ labeled ]
-    paths-ignore:
-      - 'docs/**'
-      - '*.md'
+#  pull_request:
+#    types: [ labeled ]
+#    paths-ignore:
+#      - 'docs/**'
+#      - '*.md'
+        
+  workflow_dispatch: # 允许在GitHub网页或通过API手动触发
+    inputs:
+      pr_number:
+        description: 'The number of the Pull Request from the fork'
+        required: true
 
 # https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
@@ -97,11 +103,6 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: false
-
-      - name: Checkout PR HEAD commit
-        run: |
-          git fetch origin ${{ github.event.pull_request.head.ref }}:${{ github.event.pull_request.head.ref }}
-          git checkout ${{ github.event.pull_request.head.ref }}
 
 #      - name: Start builder container
 #        id: start
