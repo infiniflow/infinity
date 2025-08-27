@@ -130,8 +130,8 @@ jobs:
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: 172.17.0.1
-          username: infiniflow
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           capture_stdout: true
           envs: BUILDER_CONTAINER, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
@@ -195,9 +195,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          # password: ${{ secrets.PASSWORD }}
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
@@ -219,8 +218,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
@@ -292,9 +291,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          # password: ${{ secrets.PASSWORD }}
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
@@ -316,8 +314,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
@@ -372,9 +370,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          # password: ${{ secrets.PASSWORD }}
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
@@ -396,8 +393,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
@@ -464,9 +461,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          # password: ${{ secrets.PASSWORD }}
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
@@ -488,8 +484,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
@@ -560,9 +556,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          # password: ${{ secrets.PASSWORD }}
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
@@ -584,8 +579,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
@@ -658,9 +653,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          # password: ${{ secrets.PASSWORD }}
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
@@ -682,8 +676,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
@@ -786,8 +780,8 @@ jobs:
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: 172.17.0.1
-          username: infiniflow
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           capture_stdout: true
           envs: BUILDER_CONTAINER, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
@@ -853,9 +847,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          # password: ${{ secrets.PASSWORD }}
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
@@ -877,8 +870,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
@@ -950,9 +943,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          # password: ${{ secrets.PASSWORD }}
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
@@ -974,8 +966,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
@@ -1030,9 +1022,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          # password: ${{ secrets.PASSWORD }}
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
@@ -1054,8 +1045,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
@@ -1126,9 +1117,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          # password: ${{ secrets.PASSWORD }}
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
@@ -1150,8 +1140,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
@@ -1223,9 +1213,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          # password: ${{ secrets.PASSWORD }}
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
@@ -1247,8 +1236,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
@@ -1320,9 +1309,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          # password: ${{ secrets.PASSWORD }}
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
@@ -1344,8 +1332,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
@@ -1436,9 +1424,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          # password: ${{ secrets.PASSWORD }}
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
@@ -1460,8 +1447,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
             sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-release/src
@@ -1552,9 +1539,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         with:
           host: 172.17.0.1
-          username: infiniflow
-          # password: ${{ secrets.PASSWORD }}
-          password: infiniflow
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
