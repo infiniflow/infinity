@@ -10,7 +10,7 @@ on:
       - 'docs/**'
       - '*.md'
   pull_request_target:
-    types: [ opened, synchronize, reopened, labeled ]
+#    types: [ opened, synchronize, reopened, labeled ]
     paths-ignore:
       - 'docs/**'
       - '*.md'
