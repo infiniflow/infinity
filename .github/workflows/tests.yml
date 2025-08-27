@@ -113,44 +113,45 @@ jobs:
           sudo docker rm -f -v ${BUILDER_CONTAINER}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity --cpus ${CPUS} infiniflow/infinity_builder:ubuntu20_clang20
 
-#      - name: Configure debug version
-#        if: ${{ !cancelled() && !failure() }}
-#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOLS:STRING=link=8 -S /infinity -B /infinity/cmake-build-debug"
-#
-#      - name: Build debug version
-#        if: ${{ !cancelled() && !failure() }}
-#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && cmake --build /infinity/cmake-build-debug --target infinity"
-#
-#      - name: Build unit test
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\"
-#          cd /infinity && cmake --build /infinity/cmake-build-debug --target test_main"
+      - name: Configure debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOLS:STRING=link=8 -S /infinity -B /infinity/cmake-build-debug"
+
+      - name: Build debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && cmake --build /infinity/cmake-build-debug --target infinity"
+
+      - name: Build unit test
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\"
+          cd /infinity && cmake --build /infinity/cmake-build-debug --target test_main"
 
       - name: SSH to host server
         id: ssh
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: 172.17.0.1
-          envs: BUILDER_CONTAINER, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX, USERNAME, PASSWORD
+          envs: BUILDER_CONTAINER, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
+          # stupid solution
           username: ${{ env.USERNAME }}
           password: ${{ env.PASSWORD }}
           capture_stdout: true
           script: |
             hostname -I | awk '{print $1}'
-#            mkdir -p /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
-#            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/infinity /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
-#            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/test_main /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
+            mkdir -p /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/infinity /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
+            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/test_main /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
 
-#      - name: Get host ip
-#        id: get_ip
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          read -r BUILD_IP _ <<< "${{ steps.ssh.outputs.stdout }}"
-#          echo "Build ip is: ${BUILD_IP}"
-#          echo "BUILD_IP=${BUILD_IP}" >> ${GITHUB_OUTPUT}
-#          echo "pwd=${PWD}"
-#
+      - name: Get host ip
+        id: get_ip
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          read -r BUILD_IP _ <<< "${{ steps.ssh.outputs.stdout }}"
+          echo "Build ip is: ${BUILD_IP}"
+          echo "BUILD_IP=${BUILD_IP}" >> ${GITHUB_OUTPUT}
+          echo "pwd=${PWD}"
+
       - name: Stop build container
         if: always()
         run: sudo docker stop ${BUILDER_CONTAINER}
