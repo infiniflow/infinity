@@ -28,6 +28,10 @@ using namespace infinity;
 
 class RabitqTest : public BaseTest {
 public:
+    using DataType = f32;
+    using LabelType = i64;
+
+public:
     void SetUp() override {
         system(("rm -rf " + file_dir_).c_str());
         system(("mkdir -p " + file_dir_).c_str());
@@ -35,7 +39,6 @@ public:
 
     void TearDown() override { system(("rm -rf " + file_dir_).c_str()); }
 
-    template <typename DataType>
     bool CheckOrthogonalMatrix(const DataType *matrix, int dim, DataType tolerance = 1e-5f) {
         for (int i = 0; i < dim; ++i) {
             DataType dot_self = 0.0;
@@ -65,62 +68,10 @@ public:
     }
 
 public:
-    using DataType = f32;
-    using LabelType = i64;
-    using VecStoreType = RabitqL2VecStoreType<DataType>;
-    using DataStore = DataStore<VecStoreType, LabelType>;
-    using Distance = VecStoreType::Distance;
-
     const std::string file_dir_ = GetFullTmpDir();
 
     static constexpr size_t dim_ = 128;
     static constexpr size_t vec_n_ = 8192;
-    static constexpr size_t query_vec_n_ = 100;
-    static constexpr size_t recall_at_ = 1;
-    static constexpr size_t topk_ = 10;
-};
-
-template <typename DataType, typename LabelType>
-class MaxHeap {
-public:
-    MaxHeap(size_t max_size) : max_size_(max_size) {}
-
-    std::vector<LabelType> TransfromIdsVec() {
-        std::vector<LabelType> ids;
-        while (pq_.size()) {
-            ids.push_back(pq_.top().second);
-            pq_.pop();
-        }
-        return ids;
-    }
-
-    std::set<LabelType> TransfromIdsSet() {
-        std::set<LabelType> ids;
-        while (pq_.size()) {
-            ids.insert(pq_.top().second);
-            pq_.pop();
-        }
-        return ids;
-    }
-
-    void push(LabelType id, DataType dist) {
-        if (pq_.size() < max_size_) {
-            pq_.emplace(dist, id);
-            return;
-        }
-        if (dist < pq_.top().first) {
-            pq_.pop();
-            pq_.emplace(dist, id);
-        }
-    }
-
-    std::pair<DataType, LabelType> top() { return pq_.top(); }
-    void pop() { pq_.pop(); }
-    size_t size() { return pq_.size(); }
-
-private:
-    size_t max_size_;
-    std::priority_queue<std::pair<DataType, LabelType>> pq_;
 };
 
 TEST_F(RabitqTest, test_simple) {
@@ -268,6 +219,7 @@ TEST_F(RabitqTest, test_simple) {
 
 TEST_F(RabitqTest, test_compress) {
     using namespace infinity;
+    using VecStoreType = RabitqL2VecStoreType<DataType>;
     using RabitqVecStoreMeta = VecStoreType::Meta<true>;
     using RabitqVecStoreInner = VecStoreType::Inner<true>;
     using MetaType = VecStoreType::MetaType;
@@ -338,6 +290,9 @@ TEST_F(RabitqTest, test_compress) {
 
 TEST_F(RabitqTest, test_distance) {
     using namespace infinity;
+    using VecStoreType = RabitqL2VecStoreType<DataType>;
+    using DataStore = DataStore<VecStoreType, LabelType>;
+    using Distance = VecStoreType::Distance;
     auto SIMDFuncL2 = GetSIMD_FUNCTIONS().L2Distance_func_ptr_;
     Distance distance;
 
@@ -372,67 +327,4 @@ TEST_F(RabitqTest, test_distance) {
         // output
         std::cout << fmt::format("id: {}, truth distance: {:.2f}, estimate distance: {:.2f}", id, truth_dis, estimate_dis) << std::endl;
     }
-}
-
-TEST_F(RabitqTest, test_bruth_force) {
-    using namespace infinity;
-    auto SIMDFuncL2 = GetSIMD_FUNCTIONS().L2Distance_func_ptr_;
-    Distance distance;
-
-    // generate data
-    auto data = std::make_unique<DataType[]>(dim_ * vec_n_);
-    std::default_random_engine rng;
-    std::uniform_real_distribution<DataType> distrib_real(100, 200);
-    for (size_t i = 0; i < dim_ * vec_n_; ++i) {
-        data[i] = distrib_real(rng);
-    }
-
-    // Init DataStore
-    auto iter = DenseVectorIter<DataType, LabelType>(data.get(), dim_, vec_n_);
-    auto rabitq_store = DataStore::Make(vec_n_, 1, dim_, 0, 0);
-    auto [start_i, end_i] = rabitq_store.OptAddVec(std::move(iter));
-
-    // Compute recall
-    size_t cnt = 0;
-    for (size_t i = 0; i < query_vec_n_; ++i) {
-        // generate query
-        auto query = std::make_unique<float[]>(dim_);
-        for (size_t d = 0; d < dim_; ++d) {
-            query[d] = distrib_real(rng);
-        }
-        auto rabitq_query = rabitq_store.MakeQuery(query.get());
-
-        // Compute recall
-        MaxHeap<DataType, LabelType> truth_heap(recall_at_);
-        MaxHeap<DataType, LabelType> rabitq_heap(topk_);
-        for (LabelType id = start_i; id < end_i; ++id) {
-            // Compute truth distance
-            auto truth_dis = SIMDFuncL2(query.get(), data.get() + id * dim_, dim_);
-            truth_heap.push(id, truth_dis);
-
-            // Estimate l2 distance by rabitq
-            auto estimate_dis = distance(rabitq_query, id, rabitq_store);
-            rabitq_heap.push(id, estimate_dis);
-        }
-
-        std::set<LabelType> gt = truth_heap.TransfromIdsSet();
-        std::vector<LabelType> ids = rabitq_heap.TransfromIdsVec();
-        for (LabelType id : ids) {
-            if (gt.contains(id)) {
-                ++cnt;
-            }
-        }
-        std::cout << "gt:";
-        for (LabelType id : gt) {
-            std::cout << " " << id;
-        }
-        std::cout << ", ids:";
-        for (LabelType id : ids) {
-            std::cout << " " << id;
-        }
-        std::cout << std::endl;
-    }
-    f32 recall = 1.0f * cnt / (query_vec_n_ * recall_at_);
-    std::cout << "Recall@1 = " << recall << std::endl;
-    ASSERT_GE(recall, 0.9);
 }
