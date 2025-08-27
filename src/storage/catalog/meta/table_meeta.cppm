@@ -38,12 +38,13 @@ public:
     // TableMeeta(const std::string &db_id_str, const std::string &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts, UsageEnum usage);
     TableMeeta(const std::string &db_id_str,
                const std::string &table_id_str,
+               const std::string &table_name,
                KVInstance *kv_instance,
                TxnTimeStamp begin_ts,
                TxnTimeStamp commit_ts,
                MetaCache *meta_cache);
 
-    TableMeeta(const std::string &db_id_str, const std::string &table_id_str, NewTxn *txn);
+    TableMeeta(const std::string &db_id_str, const std::string &table_id_str, const std::string &table_name, NewTxn *txn);
 
     TxnTimeStamp begin_ts() const { return begin_ts_; }
     TxnTimeStamp commit_ts() const { return commit_ts_; }
@@ -134,8 +135,6 @@ public:
     std::tuple<size_t, Status> GetTableRowCount();
 
     MetaCache *meta_cache() const;
-
-    void SetTableName(const std::string &table_name);
 
     const std::string &table_name() const;
 

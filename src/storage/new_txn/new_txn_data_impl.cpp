@@ -1471,9 +1471,10 @@ Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const std::string &db_id_str = import_cmd->db_id_;
     const std::string &table_id_str = import_cmd->table_id_;
+    const std::string &table_name = import_cmd->table_name_;
 
     WalSegmentInfo &segment_info = import_cmd->segment_info_;
-    TableMeeta table_meta(db_id_str, table_id_str, this);
+    TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
 
     status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);
@@ -1513,7 +1514,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     const std::string &db_id_str = append_cmd->db_id_;
     const std::string &table_id_str = append_cmd->table_id_;
     TxnTimeStamp commit_ts = CommitTS();
-    TableMeeta table_meta(db_id_str, table_id_str, this);
+    TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
     table_meta.SetDBTableName(db_name, table_name);
     std::optional<SegmentMeta> segment_meta;
     std::optional<BlockMeta> block_meta;
@@ -1634,8 +1635,9 @@ Status NewTxn::PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const std::string &db_id_str = delete_cmd->db_id_;
     const std::string &table_id_str = delete_cmd->table_id_;
+    const std::string &table_name = delete_cmd->table_name_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, this);
+    TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
 
     std::optional<SegmentMeta> segment_meta;
     std::optional<BlockMeta> block_meta;
@@ -1685,8 +1687,9 @@ Status NewTxn::PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd) {
 Status NewTxn::RollbackDelete(const DeleteTxnStore *delete_txn_store) {
     const std::string &db_id_str = delete_txn_store->db_id_str_;
     const std::string &table_id_str = delete_txn_store->table_id_str_;
+    const std::string &table_name = delete_txn_store->table_name_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, this);
+    TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
 
     std::optional<SegmentMeta> segment_meta;
     std::optional<BlockMeta> block_meta;
@@ -1718,6 +1721,7 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
     Status status;
     const std::string &db_id_str = compact_cmd->db_id_;
     const std::string &table_id_str = compact_cmd->table_id_;
+    const std::string &table_name = compact_cmd->table_name_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     std::vector<WalSegmentInfo> &segment_infos = compact_cmd->new_segment_infos_;
@@ -1730,7 +1734,7 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
     WalSegmentInfo &segment_info = segment_infos[0];
     std::vector<SegmentID> new_segment_ids{segment_info.segment_id_};
 
-    TableMeeta table_meta(db_id_str, table_id_str, this);
+    TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
 
     status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);

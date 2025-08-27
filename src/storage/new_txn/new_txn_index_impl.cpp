@@ -2067,7 +2067,7 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     std::string &index_id_str = create_index_cmd->index_id_;
     std::shared_ptr<IndexBase> &index_base = create_index_cmd->index_base_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, this);
+    TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
     std::shared_ptr<TableIndexMeeta> table_index_meta_ptr;
     Status status = new_catalog_->AddNewTableIndex(table_meta, index_id_str, commit_ts, index_base, table_index_meta_ptr);
     if (!status.ok()) {
@@ -2130,6 +2130,7 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
 Status NewTxn::PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
     const std::string &db_id_str = drop_index_cmd->db_id_;
     const std::string &table_id_str = drop_index_cmd->table_id_;
+    const std::string &table_name = drop_index_cmd->table_name_;
     const std::string &index_id_str = drop_index_cmd->index_id_;
     const std::string &index_name = drop_index_cmd->index_name_;
     const std::string &index_key = drop_index_cmd->index_key_;
@@ -2140,7 +2141,7 @@ Status NewTxn::PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
     auto ts_str = std::to_string(commit_ts);
     kv_instance_->Put(KeyEncode::DropTableIndexKey(db_id_str, table_id_str, drop_index_cmd->index_name_, create_ts, index_id_str), ts_str);
 
-    TableMeeta table_meta(db_id_str, table_id_str, this);
+    TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
     TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta);
     std::shared_ptr<IndexBase> index_base;
     Status status;
@@ -2165,11 +2166,12 @@ Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, K
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const std::string &db_id_str = dump_index_cmd->db_id_;
     const std::string &table_id_str = dump_index_cmd->table_id_;
+    const std::string &table_name = dump_index_cmd->table_name_;
     const std::string &index_id_str = dump_index_cmd->index_id_;
     const std::string &index_name = dump_index_cmd->index_name_;
     SegmentID segment_id = dump_index_cmd->segment_id_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, this);
+    TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
 
     TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta);
 
