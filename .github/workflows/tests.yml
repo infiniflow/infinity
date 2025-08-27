@@ -21,56 +21,56 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-#  code_quality_analyze:
-#    name: code_quality_analyze
-#    # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
-#    # https://github.com/orgs/community/discussions/26261
-#    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-#    runs-on: [ "self-hosted", "debug" ]
-#    steps:
-#      - name: Check format of changed C/C++ files
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
-#            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} \
-#              | grep -E '\.(cpp|h|hpp|cppm)$' \
-#              | grep -v 'third_party/' \
-#              | grep -v 'network/' \
-#              | grep -v 'parser/' || true)
-#
-#            if [ -n "$CHANGED_FILES" ]; then
-#              echo "Check format of changed C/C++ files with clang-format-20"
-#
-#              readarray -t files <<< "$CHANGED_FILES"
-#              HAS_ERROR=0
-#
-#              for file in "${files[@]}"; do
-#                if [ -f "$file" ]; then
-#                  echo "Checking formatting: $file"
-#                  sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity; clang-format-20 $file > ${file}.formatted; diff $file ${file}.formatted 2>/dev/null"
-#                  if [ $? -ne 0 ]; then
-#                    echo "❌ $file needs formatting"
-#                    HAS_ERROR=1
-#                  else
-#                    echo "✅ $file is properly formatted"
-#                  fi
-#                  rm -f "${file}.formatted"
-#                fi
-#              done
-#
-#              if [ $HAS_ERROR -ne 0 ]; then
-#                exit 1
-#              fi
-#            else
-#              echo "No C++ files changed"
-#            fi
-#          fi
+  code_quality_analyze:
+    name: code_quality_analyze
+    # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
+    # https://github.com/orgs/community/discussions/26261
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
+    runs-on: [ "self-hosted", "infinity-test" ]
+    steps:
+      - name: Check format of changed C/C++ files
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} \
+              | grep -E '\.(cpp|h|hpp|cppm)$' \
+              | grep -v 'third_party/' \
+              | grep -v 'network/' \
+              | grep -v 'parser/' || true)
+
+            if [ -n "$CHANGED_FILES" ]; then
+              echo "Check format of changed C/C++ files with clang-format-20"
+
+              readarray -t files <<< "$CHANGED_FILES"
+              HAS_ERROR=0
+
+              for file in "${files[@]}"; do
+                if [ -f "$file" ]; then
+                  echo "Checking formatting: $file"
+                  sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity; clang-format-20 $file > ${file}.formatted; diff $file ${file}.formatted 2>/dev/null"
+                  if [ $? -ne 0 ]; then
+                    echo "❌ $file needs formatting"
+                    HAS_ERROR=1
+                  else
+                    echo "✅ $file is properly formatted"
+                  fi
+                  rm -f "${file}.formatted"
+                fi
+              done
+
+              if [ $HAS_ERROR -ne 0 ]; then
+                exit 1
+              fi
+            else
+              echo "No C++ files changed"
+            fi
+          fi
 
   debug_configure_and_build:
     name: debug_configure_and_build
     if: ${{ github.event_name != 'pull_request_target' || contains(github.event.pull_request_target.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-build" ]
-#    needs: code_quality_analyze
+    needs: code_quality_analyze
     outputs:
       BUILD_IP: ${{ steps.get_ip.outputs.BUILD_IP }}
       CONTAINER_NAME: ${{ steps.start.outputs.CONTAINER_NAME }}
@@ -115,17 +115,17 @@ jobs:
 
       - name: Configure debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOLS:STRING=link=8 -S /infinity -B /infinity/cmake-build-debug"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -S /infinity -B /infinity/cmake-build-debug"
 
       - name: Build debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && cmake --build /infinity/cmake-build-debug --target infinity"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && cmake --build /infinity/cmake-build-debug -j --target infinity"
 
       - name: Build unit test
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\"
-          cd /infinity && cmake --build /infinity/cmake-build-debug --target test_main"
+          cd /infinity && cmake --build /infinity/cmake-build-debug -j --target test_main"
 
       - name: SSH to host server
         id: ssh
@@ -165,7 +165,7 @@ jobs:
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-    runs-on: [ "self-hosted", "infinity-test" ]
+    runs-on: [ "self-hosted", "infinity-build" ]
     needs: debug_configure_and_build
     outputs:
       BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
@@ -193,7 +193,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Start test container
+      - name: Prepare env variable
         id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -202,8 +202,24 @@ jobs:
           echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Prepare data dir
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME
+          script: |
+            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
+
+      - name: Start test container
+#        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
@@ -215,7 +231,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: SSH to host server
         id: ssh
@@ -243,7 +259,6 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-          mkdir /var/infinity
           cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > sqllogictest_debug.log 2> sqllogictest_debug_error.log" &
 
       - name: Run sqllogictest debug version
@@ -313,7 +328,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: SSH to host server
         id: ssh
@@ -394,7 +409,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: SSH to host server
         id: ssh
@@ -487,7 +502,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: SSH to host server
         id: ssh
@@ -584,7 +599,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: SSH to host server
         id: ssh
@@ -683,7 +698,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: SSH to host server
         id: ssh
@@ -733,7 +748,7 @@ jobs:
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-build" ]
-#    needs: code_quality_analyze
+    needs: code_quality_analyze
     outputs:
       BUILD_IP: ${{ steps.get_ip.outputs.BUILD_IP }}
       CONTAINER_NAME: ${{ steps.start.outputs.CONTAINER_NAME }}
@@ -778,19 +793,19 @@ jobs:
           sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\"
           cd /infinity && rm -fr cmake-build-release
           mkdir -p cmake-build-release
-          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_JOB_POOLS:STRING=link=8 -S /infinity -B /infinity/cmake-build-release"
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -S /infinity -B /infinity/cmake-build-release"
 
       - name: Build release version
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity
-          cmake --build /infinity/cmake-build-release --target infinity"
+          cmake --build /infinity/cmake-build-release -j --target infinity"
 
       - name: Build unit test
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\"
-          cd /infinity && cmake --build /infinity/cmake-build-release --target test_main knn_import_benchmark knn_query_benchmark"
+          cd /infinity && cmake --build /infinity/cmake-build-release -j --target test_main knn_import_benchmark knn_query_benchmark"
 
       - name: SSH to host server
         id: ssh
@@ -831,7 +846,7 @@ jobs:
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-    runs-on: [ "self-hosted", "infinity-test" ]
+    runs-on: [ "self-hosted", "infinity-build" ]
     needs: release_configure_and_build
     outputs:
       BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
