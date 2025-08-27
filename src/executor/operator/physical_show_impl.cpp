@@ -68,6 +68,7 @@ import :new_txn_manager;
 import :kv_store;
 import :meta_tree;
 import :meta_cache;
+import :block_version;
 
 import std;
 import show_statement;
@@ -2173,14 +2174,36 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
                 block_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_block_dir));
             } else {
                 std::vector<std::string> &paths = block_info->files_;
+                status = Status::OK();
+                size_t file_size = 0;
                 size_t block_size = 0;
+
                 for (const std::string &path : paths) {
-                    auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
+                    std::tie(file_size, status) = query_context->persistence_manager()->GetFileSize(path);
                     if (!status.ok()) {
-                        RecoverableError(status);
+                        break;
                     }
                     block_size += file_size;
                 }
+
+                // If version file is not found in persistence manager, try to get the buffer object from buffer manager.
+                if (!status.ok()) {
+                    block_size = 0;
+                    BufferObj *buffer_obj = nullptr;
+                    BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+
+                    for (const std::string &path : paths) {
+                        std::string version_filepath = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), path);
+                        buffer_obj = buffer_manager->GetBufferObject(version_filepath);
+                        if (buffer_obj != nullptr) {
+                            auto file_size = buffer_obj->GetBufferSize();
+                            block_size += file_size;
+                        } else {
+                            RecoverableError(status);
+                        }
+                    }
+                }
+
                 block_size_str = Utility::FormatByteSize(block_size);
             }
             Value value = Value::MakeVarchar(block_size_str);

@@ -3,6 +3,9 @@
 # group: [ddl, test_index_comment]
 
 statement ok
+SET CONFIG CHECKPOINT_INTERVAL 0;
+
+statement ok
 DROP TABLE IF EXISTS sqllogic_test_index_comment;
 
 statement ok
@@ -30,3 +33,6 @@ DROP INDEX IF EXISTS idx1 ON sqllogic_test_index_comment;
 
 statement ok
 DROP TABLE sqllogic_test_index_comment;
+
+statement ok
+SET CONFIG CHECKPOINT_INTERVAL 30;
