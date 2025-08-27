@@ -71,7 +71,7 @@ jobs:
     #    id: builder_job
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-build" ]
 #    needs: code_quality_analyze
     outputs:
@@ -88,13 +88,8 @@ jobs:
 
       - name: Ensure workspace ownership
         if: ${{ !cancelled() && !failure() }}
-        with:
-          USERNAME: ${{ secrets.USERNAME }}
-          PASSWORD: ${{ secrets.PASSWORD }}
         run: |
           echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
-          echo ${USERNAME}
-          echo ${PASSWORD}
 
       - name: Check out code
         if: ${{ !cancelled() && !failure() }}
@@ -136,8 +131,8 @@ jobs:
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: 172.17.0.1
-          username: ${USERNAME}
-          password: ${PASSWORD}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           capture_stdout: true
           envs: BUILDER_CONTAINER, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
           script: |
