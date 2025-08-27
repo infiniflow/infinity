@@ -193,18 +193,6 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Download artifacts
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME, BUILD_IP
-          script: |
-            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
-
       - name: Start test container
         id: start
         if: ${{ !cancelled() && !failure() }}
@@ -216,6 +204,18 @@ jobs:
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Download artifacts
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
 
       - name: SSH to host server
         id: ssh
@@ -291,18 +291,6 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Download artifacts
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME, BUILD_IP
-          script: |
-            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
-
       - name: Start test container
         id: start
         if: ${{ !cancelled() && !failure() }}
@@ -314,6 +302,18 @@ jobs:
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Download artifacts
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
 
       - name: SSH to host server
         id: ssh
@@ -372,18 +372,6 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Download artifacts
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME, BUILD_IP
-          script: |
-            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
-
       - name: Start test container
         id: start
         if: ${{ !cancelled() && !failure() }}
@@ -395,6 +383,18 @@ jobs:
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Download artifacts
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
 
       - name: SSH to host server
         id: ssh
@@ -465,18 +465,6 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Download artifacts
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME, BUILD_IP
-          script: |
-            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
-
       - name: Start test container
         id: start
         if: ${{ !cancelled() && !failure() }}
@@ -488,6 +476,18 @@ jobs:
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Download artifacts
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
 
       - name: SSH to host server
         id: ssh
@@ -562,6 +562,17 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
+      - name: Start test container
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
+          echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
@@ -574,18 +585,6 @@ jobs:
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
             rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
-
-      - name: Start test container
-        id: start
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
-          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
-          echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
-          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: SSH to host server
         id: ssh
@@ -662,18 +661,6 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Download artifacts
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME, BUILD_IP
-          script: |
-            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
-
       - name: Start test container
         id: start
         if: ${{ !cancelled() && !failure() }}
@@ -685,6 +672,18 @@ jobs:
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Download artifacts
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
 
       - name: SSH to host server
         id: ssh
@@ -860,18 +859,6 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Download artifacts
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME, BUILD_IP
-          script: |
-            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
-
       - name: Start test container
         id: start
         if: ${{ !cancelled() && !failure() }}
@@ -883,6 +870,18 @@ jobs:
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Download artifacts
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
 
       - name: SSH to host server
         id: ssh
@@ -958,18 +957,6 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Download artifacts
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME, BUILD_IP
-          script: |
-            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
-
       - name: Start test container
         id: start
         if: ${{ !cancelled() && !failure() }}
@@ -981,6 +968,18 @@ jobs:
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Download artifacts
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
 
       - name: SSH to host server
         id: ssh
@@ -1039,18 +1038,6 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Download artifacts
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME, BUILD_IP
-          script: |
-            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
-
       - name: Start test container
         id: start
         if: ${{ !cancelled() && !failure() }}
@@ -1062,6 +1049,18 @@ jobs:
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Download artifacts
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
 
       - name: SSH to host server
         id: ssh
@@ -1136,18 +1135,6 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Download artifacts
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME, BUILD_IP
-          script: |
-            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
-
       - name: Start test container
         id: start
         if: ${{ !cancelled() && !failure() }}
@@ -1159,6 +1146,18 @@ jobs:
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Download artifacts
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
 
       - name: SSH to host server
         id: ssh
@@ -1234,18 +1233,6 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Download artifacts
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME, BUILD_IP
-          script: |
-            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
-
       - name: Start test container
         id: start
         if: ${{ !cancelled() && !failure() }}
@@ -1257,6 +1244,18 @@ jobs:
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Download artifacts
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
 
       - name: SSH to host server
         id: ssh
@@ -1332,18 +1331,6 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Download artifacts
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME, BUILD_IP
-          script: |
-            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
-
       - name: Start test container
         id: start
         if: ${{ !cancelled() && !failure() }}
@@ -1355,6 +1342,18 @@ jobs:
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Download artifacts
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
 
       - name: SSH to host server
         id: ssh
@@ -1449,18 +1448,6 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Download artifacts
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME, BUILD_IP
-          script: |
-            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
-
       - name: Start test container
         id: start
         if: ${{ !cancelled() && !failure() }}
@@ -1472,6 +1459,18 @@ jobs:
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Download artifacts
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
+            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
 
       - name: SSH to host server
         id: ssh
@@ -1566,6 +1565,18 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
+      - name: Start test container
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
+          echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
@@ -1579,18 +1590,6 @@ jobs:
             rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
             rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/knn_query_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
             rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/knn_import_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
-
-      - name: Start test container
-        id: start
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
-          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
-          echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
-          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: SSH to host server
         id: ssh
