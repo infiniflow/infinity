@@ -208,7 +208,7 @@ public:
     using AlignType = typename MetaType::AlignType;
 
 private:
-    using SIMDFuncType = i32 (*)(const CompressType *, const CompressType *, size_t);
+    using SIMDFuncType = i32 (*)(const CompressType *, const AlignType *, size_t);
 
     SIMDFuncType SIMDFunc = nullptr;
 
