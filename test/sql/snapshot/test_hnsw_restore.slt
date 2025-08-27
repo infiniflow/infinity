@@ -3,6 +3,9 @@
 # group: [ddl, test_hnsw]
 
 statement ok
+SET CONFIG CHECKPOINT_INTERVAL 0;
+
+statement ok
 DROP TABLE IF EXISTS sqllogic_test_hnsw;
 
 # Expecting IDENTIFIER or PRIMARY or UNIQUE
@@ -58,3 +61,6 @@ DROP TABLE sqllogic_test_hnsw;
 
 statement ok
 DROP SNAPSHOT sqllogic_test_hnsw_backup;
+
+statement ok
+SET CONFIG CHECKPOINT_INTERVAL 30;
