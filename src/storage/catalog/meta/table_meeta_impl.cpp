@@ -48,18 +48,19 @@ namespace infinity {
 
 TableMeeta::TableMeeta(const std::string &db_id_str,
                        const std::string &table_id_str,
+                       const std::string &table_name,
                        KVInstance *kv_instance,
                        TxnTimeStamp begin_ts,
                        TxnTimeStamp commit_ts,
                        MetaCache *meta_cache)
     : begin_ts_(begin_ts), commit_ts_(commit_ts), kv_instance_(kv_instance), meta_cache_(meta_cache), db_id_str_(db_id_str),
-      table_id_str_(table_id_str) {
+      table_id_str_(table_id_str), table_name_(table_name) {
     db_id_ = std::stoull(db_id_str);
     table_id_ = std::stoull(table_id_str);
 }
 
-TableMeeta::TableMeeta(const std::string &db_id_str, const std::string &table_id_str, NewTxn *txn)
-    : txn_(txn), db_id_str_(db_id_str), table_id_str_(table_id_str) {
+TableMeeta::TableMeeta(const std::string &db_id_str, const std::string &table_id_str, const std::string &table_name, NewTxn *txn)
+    : txn_(txn), db_id_str_(db_id_str), table_id_str_(table_id_str), table_name_(table_name) {
     if (txn == nullptr) {
         UnrecoverableError("Null txn pointer");
     }
@@ -341,7 +342,7 @@ Status TableMeeta::LoadSet() {
         if (index_def->index_type_ == IndexType::kFullText) {
             NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
             std::string ft_index_cache_key = GetTableTag("ft_index_cache");
-            auto ft_index_cache = std::make_shared<TableIndexReaderCache>(db_id_str_, table_id_str_);
+            auto ft_index_cache = std::make_shared<TableIndexReaderCache>(db_id_str_, table_id_str_, table_name_);
             status = new_catalog->AddFtIndexCache(std::move(ft_index_cache_key), std::move(ft_index_cache));
             LOG_DEBUG(fmt::format("Add ft index cache for table: {}, commit ts: {}", table_id_str_, commit_ts_));
             if (!status.ok()) {
@@ -536,7 +537,7 @@ Status TableMeeta::GetFtIndexCache(std::shared_ptr<TableIndexReaderCache> &ft_in
     std::string ft_index_cache_key = GetTableTag("ft_index_cache");
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
 
-    ft_index_cache = std::make_shared<TableIndexReaderCache>(db_id_str_, table_id_str_);
+    ft_index_cache = std::make_shared<TableIndexReaderCache>(db_id_str_, table_id_str_, table_name_);
     Status status = new_catalog->GetFtIndexCache(ft_index_cache_key, ft_index_cache);
     if (!status.ok()) {
         return status;
@@ -557,7 +558,7 @@ Status TableMeeta::RemoveFtIndexCache() {
 Status TableMeeta::InvalidateFtIndexCache() {
     std::string ft_index_cache_key = GetTableTag("ft_index_cache");
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    std::shared_ptr<TableIndexReaderCache> ft_index_cache = std::make_shared<TableIndexReaderCache>(db_id_str_, table_id_str_);
+    std::shared_ptr<TableIndexReaderCache> ft_index_cache = std::make_shared<TableIndexReaderCache>(db_id_str_, table_id_str_, table_name_);
     Status status = new_catalog->GetFtIndexCache(ft_index_cache_key, ft_index_cache);
     if (!status.ok()) {
         if (status.code() == ErrorCode::kCatalogError) {
@@ -1127,8 +1128,6 @@ std::tuple<size_t, Status> TableMeeta::GetTableRowCount() {
 }
 
 MetaCache *TableMeeta::meta_cache() const { return meta_cache_; }
-
-void TableMeeta::SetTableName(const std::string &table_name) { table_name_ = table_name; }
 
 const std::string &TableMeeta::table_name() const { return table_name_; }
 
