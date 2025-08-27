@@ -68,9 +68,6 @@ jobs:
 
   debug_configure_and_build:
     name: debug_configure_and_build
-    #    id: builder_job
-    # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
-    # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request_target' || contains(github.event.pull_request_target.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-build" ]
 #    needs: code_quality_analyze
@@ -78,8 +75,8 @@ jobs:
       BUILD_IP: ${{ steps.get_ip.outputs.BUILD_IP }}
       CONTAINER_NAME: ${{ steps.start.outputs.CONTAINER_NAME }}
     env:
-      USERNAME: ${USERNAME}
-      PASSWORD: ${PASSWORD}
+      USERNAME: ${{ env.USERNAME }}
+      PASSWORD: ${{ env.PASSWORD }}
     steps:
       - name: Show PR labels
         if: ${{ !cancelled() && !failure() }}
