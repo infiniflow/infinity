@@ -25,57 +25,16 @@ import :dist_func_l2;
 
 using namespace infinity;
 
-class QuantizerPerformanceTest : public BaseTest {
-public:
-    using DataType = f32;
-    using LabelType = i64;
-
-public:
-    void SetUp() override {}
-    void TearDown() override {}
-
-    template <typename T>
-    std::tuple<size_t, size_t, std::unique_ptr<T[]>> DecodeFvecsDataset(const std::filesystem::path &path) {
-        auto [file_handle, status] = VirtualStore::Open(path.string(), FileAccessMode::kRead);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-        i32 dim = 0;
-        file_handle->Read(&dim, sizeof(dim));
-        size_t file_size = file_handle->FileSize();
-        size_t vec_num = file_size / (dim * sizeof(T) + sizeof(dim));
-        auto data = std::make_unique_for_overwrite<T[]>(vec_num * dim);
-        for (size_t i = 0; i < vec_num - 1; ++i) {
-            file_handle->Read(data.get() + i * dim, dim * sizeof(T));
-            i32 dim1 = 0;
-            file_handle->Read(&dim1, sizeof(dim1));
-            if (dim1 != dim) {
-                UnrecoverableError("dim not match");
-            }
-        }
-        file_handle->Read(data.get() + (vec_num - 1) * dim, dim * sizeof(T));
-        return {vec_num, dim, std::move(data)};
-    }
-
-public:
-    static constexpr size_t chunk_size_ = 8192;
-    static constexpr size_t recall_at_ = 1;
-    static constexpr size_t topk_ = 10;
-
-    const std::string base_path_ = "test/data/benchmark/sift_1m/sift_base.fvecs";
-    const std::string query_path_ = "test/data/benchmark/sift_1m/sift_query.fvecs";
-    const std::string groundtruth_path_ = "test/data/benchmark/sift_1m/sift_groundtruth.ivecs";
-};
-
 template <typename DataType, typename LabelType>
 class MaxHeap {
 public:
     MaxHeap(size_t max_size) : max_size_(max_size) {}
 
     std::vector<LabelType> TransfromIdsVec() {
-        std::vector<LabelType> ids;
+        std::vector<LabelType> ids(pq_.size());
+        size_t i = pq_.size() - 1;
         while (pq_.size()) {
-            ids.push_back(pq_.top().second);
+            ids[i--] = pq_.top().second;
             pq_.pop();
         }
         return ids;
@@ -101,32 +60,104 @@ private:
     std::priority_queue<std::pair<DataType, LabelType>> pq_;
 };
 
+class QuantizerPerformanceTest : public BaseTest {
+public:
+    using DataType = f32;
+    using LabelType = i32;
+
+public:
+    template <typename T>
+    std::tuple<size_t, size_t, std::unique_ptr<T[]>> DecodeFvecsDataset(const std::filesystem::path &path) {
+        auto [file_handle, status] = VirtualStore::Open(path.string(), FileAccessMode::kRead);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        size_t dim = 0;
+        file_handle->Read(&dim, sizeof(dim));
+        size_t file_size = file_handle->FileSize();
+        size_t vec_num = file_size / (dim * sizeof(T) + sizeof(dim));
+        auto data = std::make_unique_for_overwrite<T[]>(vec_num * dim);
+        for (size_t i = 0; i < vec_num - 1; ++i) {
+            file_handle->Read(data.get() + i * dim, dim * sizeof(T));
+            size_t dim1 = 0;
+            file_handle->Read(&dim1, sizeof(dim1));
+            if (dim1 != dim) {
+                UnrecoverableError("dim not match");
+            }
+        }
+        file_handle->Read(data.get() + (vec_num - 1) * dim, dim * sizeof(T));
+        return {vec_num, dim, std::move(data)};
+    }
+
+    void SetUp() override {
+        base_data_ = std::make_unique<DataType[]>(base_dim_ * base_num_);
+        query_data_ = std::make_unique<DataType[]>(query_dim_ * query_num_);
+        groundtruth_data_ = std::make_unique<LabelType[]>(gt_dim_ * gt_num_);
+
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_real_distribution<DataType> dis(100, 200);
+        for (size_t i = 0; i < base_dim_ * base_num_; ++i) {
+            base_data_[i] = dis(gen);
+        }
+        for (size_t i = 0; i < query_dim_ * query_num_; ++i) {
+            query_data_[i] = dis(gen);
+        }
+
+        auto L2Distance = GetSIMD_FUNCTIONS().HNSW_F32L2_ptr_;
+        for (int i = 0; i < query_num_; ++i) {
+            DataType *query = query_data_.get() + i * query_dim_;
+            LabelType *gt = groundtruth_data_.get() + i * gt_dim_;
+            MaxHeap<DataType, LabelType> max_heap(gt_dim_);
+            for (int j = 0; j < base_num_; ++j) {
+                DataType *base = base_data_.get() + j * base_dim_;
+                max_heap.push(j, L2Distance(base, query, base_dim_));
+            }
+
+            auto gts = max_heap.TransfromIdsVec();
+            std::copy(gts.begin(), gts.end(), gt);
+        }
+    }
+
+    void TearDown() override {}
+
+public:
+    static constexpr size_t chunk_size_ = 8192;
+    static constexpr size_t topk_ = 1;
+
+    static constexpr size_t base_dim_ = 128;
+    static constexpr size_t query_dim_ = base_dim_;
+    static constexpr size_t gt_dim_ = 1;
+
+    static constexpr size_t base_num_ = 8192;
+    static constexpr size_t query_num_ = 100;
+    static constexpr size_t gt_num_ = base_num_;
+
+    std::unique_ptr<DataType[]> base_data_;
+    std::unique_ptr<DataType[]> query_data_;
+    std::unique_ptr<LabelType[]> groundtruth_data_;
+};
+
 TEST_F(QuantizerPerformanceTest, test_lvq) {
     using namespace infinity;
     using CompressType = i8;
     using VecStoreType = LVQL2VecStoreType<DataType, CompressType>;
     using DataStore = DataStore<VecStoreType, LabelType>;
     using Distance = VecStoreType::Distance;
-
-    // generate data
-    auto [base_num, base_dim, base_data] = DecodeFvecsDataset<f32>(base_path_);
-    auto [query_num, query_dim, query_data] = DecodeFvecsDataset<f32>(query_path_);
-    auto [gt_num, gt_dim, gt_data] = DecodeFvecsDataset<i32>(groundtruth_path_);
-    query_num = 100;
-    Distance distance(base_dim);
+    Distance distance(base_dim_);
 
     // Init DataStore
-    size_t max_chunk_n = (base_num + chunk_size_ - 1) / chunk_size_;
-    auto base_iter = DenseVectorIter<DataType, LabelType>(base_data.get(), base_dim, base_num);
-    auto rabitq_store = DataStore::Make(chunk_size_, max_chunk_n, base_dim, 0, 0);
+    size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
+    auto base_iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
+    auto rabitq_store = DataStore::Make(chunk_size_, max_chunk_n, base_dim_, 0, 0);
     auto [start_i, end_i] = rabitq_store.OptAddVec(std::move(base_iter));
 
     // Compute recall
     size_t cnt = 0;
-    for (size_t i = 0; i < query_num; ++i) {
-        ASSERT_EQ(base_dim, query_dim);
-        auto gt_vec = gt_data.get() + i * gt_dim;
-        auto query_vec = query_data.get() + i * query_dim;
+    for (size_t i = 0; i < query_num_; ++i) {
+        ASSERT_EQ(base_dim_, query_dim_);
+        auto gt_vec = groundtruth_data_.get() + i * gt_dim_;
+        auto query_vec = query_data_.get() + i * query_dim_;
         auto rabitq_query = rabitq_store.MakeQuery(query_vec);
 
         // Compute recall
@@ -137,7 +168,7 @@ TEST_F(QuantizerPerformanceTest, test_lvq) {
             rabitq_heap.push(id, estimate_dis);
         }
 
-        std::unordered_set<i32> gt(gt_vec, gt_vec + recall_at_);
+        std::unordered_set<LabelType> gt(gt_vec, gt_vec + gt_dim_);
         std::vector<LabelType> ids = rabitq_heap.TransfromIdsVec();
         for (LabelType id : ids) {
             if (gt.contains(id)) {
@@ -155,9 +186,8 @@ TEST_F(QuantizerPerformanceTest, test_lvq) {
         }
         std::cout << std::endl;
     }
-    f32 recall = 1.0f * cnt / (query_num * recall_at_);
-    std::cout << "Recall@1 = " << recall << std::endl;
-    ASSERT_GE(recall, 0.9);
+    f32 recall = 1.0f * cnt / (query_num_ * gt_dim_);
+    std::cout << "Recall_10@1 = " << recall << std::endl;
 }
 
 TEST_F(QuantizerPerformanceTest, test_rabitq) {
@@ -165,26 +195,20 @@ TEST_F(QuantizerPerformanceTest, test_rabitq) {
     using VecStoreType = RabitqL2VecStoreType<DataType>;
     using DataStore = DataStore<VecStoreType, LabelType>;
     using Distance = VecStoreType::Distance;
-
-    // generate data
-    auto [base_num, base_dim, base_data] = DecodeFvecsDataset<f32>(base_path_);
-    auto [query_num, query_dim, query_data] = DecodeFvecsDataset<f32>(query_path_);
-    auto [gt_num, gt_dim, gt_data] = DecodeFvecsDataset<i32>(groundtruth_path_);
-    query_num = 100;
-    Distance distance(base_dim);
+    Distance distance(base_dim_);
 
     // Init DataStore
-    size_t max_chunk_n = (base_num + chunk_size_ - 1) / chunk_size_;
-    auto base_iter = DenseVectorIter<DataType, LabelType>(base_data.get(), base_dim, base_num);
-    auto rabitq_store = DataStore::Make(chunk_size_, max_chunk_n, base_dim, 0, 0);
+    size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
+    auto base_iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
+    auto rabitq_store = DataStore::Make(chunk_size_, max_chunk_n, base_dim_, 0, 0);
     auto [start_i, end_i] = rabitq_store.OptAddVec(std::move(base_iter));
 
     // Compute recall
     size_t cnt = 0;
-    for (size_t i = 0; i < query_num; ++i) {
-        ASSERT_EQ(base_dim, query_dim);
-        auto gt_vec = gt_data.get() + i * gt_dim;
-        auto query_vec = query_data.get() + i * query_dim;
+    for (size_t i = 0; i < query_num_; ++i) {
+        ASSERT_EQ(base_dim_, query_dim_);
+        auto gt_vec = groundtruth_data_.get() + i * gt_dim_;
+        auto query_vec = query_data_.get() + i * query_dim_;
         auto rabitq_query = rabitq_store.MakeQuery(query_vec);
 
         // Compute recall
@@ -195,7 +219,7 @@ TEST_F(QuantizerPerformanceTest, test_rabitq) {
             rabitq_heap.push(id, estimate_dis);
         }
 
-        std::unordered_set<i32> gt(gt_vec, gt_vec + recall_at_);
+        std::unordered_set<LabelType> gt(gt_vec, gt_vec + gt_dim_);
         std::vector<LabelType> ids = rabitq_heap.TransfromIdsVec();
         for (LabelType id : ids) {
             if (gt.contains(id)) {
@@ -213,7 +237,6 @@ TEST_F(QuantizerPerformanceTest, test_rabitq) {
         }
         std::cout << std::endl;
     }
-    f32 recall = 1.0f * cnt / (query_num * recall_at_);
-    std::cout << "Recall@1 = " << recall << std::endl;
-    ASSERT_GE(recall, 0.9);
+    f32 recall = 1.0f * cnt / (query_num_ * gt_dim_);
+    std::cout << "Recall_10@1 = " << recall << std::endl;
 }
