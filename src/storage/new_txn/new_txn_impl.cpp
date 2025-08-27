@@ -192,7 +192,7 @@ Status NewTxn::CreateDatabase(const std::string &db_name, ConflictType conflict_
         return Status(status.code(), std::make_unique<std::string>(fmt::format("Fail to fetch next database id, {}", status.message())));
     }
 
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (status.ok()) {
@@ -283,7 +283,7 @@ Status NewTxn::DropDatabase(const std::string &db_name, ConflictType conflict_ty
 
     this->CheckTxnStatus();
 
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
@@ -352,7 +352,7 @@ Status NewTxn::ReplayDropDb(WalCmdDropDatabaseV2 *drop_db_cmd, TxnTimeStamp comm
 std::tuple<std::shared_ptr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const std::string &db_name) {
     this->CheckTxnStatus();
 
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
@@ -391,8 +391,8 @@ Status NewTxn::GetTables(const std::string &db_name, std::vector<std::shared_ptr
         return status;
     }
     for (const std::string &table_name : table_names) {
-        std::optional<DBMeeta> db_meta;
-        std::optional<TableMeeta> table_meta;
+        std::shared_ptr<DBMeeta> db_meta;
+        std::shared_ptr<TableMeeta> table_meta;
         status = GetTableMeta(db_name, table_name, db_meta, table_meta);
         if (!status.ok()) {
             return status;
@@ -420,7 +420,7 @@ Status NewTxn::CreateTable(const std::string &db_name, const std::shared_ptr<Tab
 
     this->CheckTxn(db_name);
 
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
@@ -503,7 +503,7 @@ Status NewTxn::ReplayCreateTable(WalCmdCreateTableV2 *create_table_cmd, TxnTimeS
     }
 
     // Get db meta to set next table id
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     status = GetDBMeta(create_table_cmd->db_name_, db_meta, db_create_ts);
 
@@ -545,7 +545,7 @@ Status NewTxn::DropTable(const std::string &db_name, const std::string &table_na
 
     this->CheckTxnStatus();
 
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
@@ -638,7 +638,7 @@ Status NewTxn::RenameTable(const std::string &db_name, const std::string &old_ta
     this->CheckTxnStatus();
     this->CheckTxn(db_name);
 
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
@@ -733,8 +733,8 @@ Status NewTxn::ReplayRenameTable(WalCmdRenameTableV2 *rename_table_cmd, TxnTimeS
 
 Status NewTxn::AddColumns(const std::string &db_name, const std::string &table_name, const std::vector<std::shared_ptr<ColumnDef>> &column_defs) {
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     std::string table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
     if (!status.ok()) {
@@ -791,8 +791,8 @@ Status NewTxn::AddColumns(const std::string &db_name, const std::string &table_n
 Status NewTxn::ReplayAddColumns(WalCmdAddColumnsV2 *add_columns_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     // This implementation might have error, since not check the column id and create timestamp
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     std::string table_key;
     Status status = GetTableMeta(add_columns_cmd->db_name_, add_columns_cmd->table_name_, db_meta, table_meta, &table_key);
     if (!status.ok()) {
@@ -852,8 +852,8 @@ Status NewTxn::DropColumns(const std::string &db_name, const std::string &table_
         }
     }
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     std::string table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
     if (!status.ok()) {
@@ -940,8 +940,8 @@ Status NewTxn::ReplayDropColumns(WalCmdDropColumnsV2 *drop_columns_cmd, TxnTimeS
     const std::string &db_name = drop_columns_cmd->db_name_;
     const std::string &table_name = drop_columns_cmd->table_name_;
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -997,7 +997,7 @@ Status NewTxn::ReplayDropColumns(WalCmdDropColumnsV2 *drop_columns_cmd, TxnTimeS
 }
 
 Status NewTxn::ListTable(const std::string &db_name, std::vector<std::string> &table_names) {
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
@@ -1029,8 +1029,8 @@ Status NewTxn::CreateIndex(const std::string &db_name,
 
     this->CheckTxn(db_name);
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     std::string table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
     if (!status.ok()) {
@@ -1159,8 +1159,8 @@ Status NewTxn::DropIndexByName(const std::string &db_name, const std::string &ta
 
     this->CheckTxnStatus();
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     std::string table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
     if (!status.ok()) {
@@ -1281,8 +1281,8 @@ std::tuple<std::shared_ptr<TableInfo>, Status> NewTxn::GetTableInfo(const std::s
     table_info->db_name_ = std::make_shared<std::string>(db_name);
     table_info->table_name_ = std::make_shared<std::string>(table_name);
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return {nullptr, status};
@@ -1300,9 +1300,9 @@ std::tuple<std::shared_ptr<TableInfo>, Status> NewTxn::GetTableInfo(const std::s
 
 std::tuple<std::shared_ptr<TableIndexInfo>, Status>
 NewTxn::GetTableIndexInfo(const std::string &db_name, const std::string &table_name, const std::string &index_name) {
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
-    std::optional<TableIndexMeeta> table_index_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<TableIndexMeeta> table_index_meta;
     std::string table_key;
     std::string index_key;
     Status status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -1317,9 +1317,9 @@ NewTxn::GetTableIndexInfo(const std::string &db_name, const std::string &table_n
 
 std::tuple<std::shared_ptr<SegmentIndexInfo>, Status>
 NewTxn::GetSegmentIndexInfo(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id) {
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
-    std::optional<TableIndexMeeta> table_index_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<TableIndexMeeta> table_index_meta;
     std::string table_key;
     std::string index_key;
     Status status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -1337,9 +1337,9 @@ std::tuple<std::shared_ptr<ChunkIndexMetaInfo>, Status> NewTxn::GetChunkIndexInf
                                                                                   const std::string &index_name,
                                                                                   SegmentID segment_id,
                                                                                   ChunkID chunk_id) {
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
-    std::optional<TableIndexMeeta> table_index_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<TableIndexMeeta> table_index_meta;
     std::string table_key;
     std::string index_key;
     Status status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -1373,8 +1373,8 @@ std::tuple<std::shared_ptr<ChunkIndexMetaInfo>, Status> NewTxn::GetChunkIndexInf
 std::tuple<std::shared_ptr<SegmentInfo>, Status>
 NewTxn::GetSegmentInfo(const std::string &db_name, const std::string &table_name, SegmentID segment_id) {
     std::shared_ptr<SegmentInfo> segment_info = std::make_shared<SegmentInfo>();
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return {nullptr, status};
@@ -1383,7 +1383,7 @@ NewTxn::GetSegmentInfo(const std::string &db_name, const std::string &table_name
     if (!status.ok()) {
         return {nullptr, status};
     }
-    SegmentMeta segment_meta(segment_id, table_meta.value());
+    SegmentMeta segment_meta(segment_id, *table_meta);
     std::tie(segment_info, status) = segment_meta.GetSegmentInfo();
     if (!status.ok()) {
         return {nullptr, status};
@@ -1393,8 +1393,8 @@ NewTxn::GetSegmentInfo(const std::string &db_name, const std::string &table_name
 
 std::tuple<std::vector<std::shared_ptr<SegmentInfo>>, Status> NewTxn::GetSegmentsInfo(const std::string &db_name, const std::string &table_name) {
     std::vector<std::shared_ptr<SegmentInfo>> segment_info_list;
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     std::vector<SegmentID> *segment_ids_ptr = nullptr;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
@@ -1405,7 +1405,7 @@ std::tuple<std::vector<std::shared_ptr<SegmentInfo>>, Status> NewTxn::GetSegment
         return {segment_info_list, status};
     }
     for (SegmentID segment_id : *segment_ids_ptr) {
-        SegmentMeta segment_meta(segment_id, table_meta.value());
+        SegmentMeta segment_meta(segment_id, *table_meta);
         auto segment_info = std::make_shared<SegmentInfo>();
         std::tie(segment_info, status) = segment_meta.GetSegmentInfo();
         if (!status.ok()) {
@@ -1419,13 +1419,13 @@ std::tuple<std::vector<std::shared_ptr<SegmentInfo>>, Status> NewTxn::GetSegment
 std::tuple<std::shared_ptr<BlockInfo>, Status>
 NewTxn::GetBlockInfo(const std::string &db_name, const std::string &table_name, SegmentID segment_id, BlockID block_id) {
     std::shared_ptr<SegmentInfo> segment_info = std::make_shared<SegmentInfo>();
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return {nullptr, status};
     }
-    SegmentMeta segment_meta(segment_id, table_meta.value());
+    SegmentMeta segment_meta(segment_id, *table_meta);
     BlockMeta block_meta(block_id, segment_meta);
     return block_meta.GetBlockInfo();
 }
@@ -1434,13 +1434,13 @@ std::tuple<std::vector<std::shared_ptr<BlockInfo>>, Status>
 NewTxn::GetBlocksInfo(const std::string &db_name, const std::string &table_name, SegmentID segment_id) {
     std::vector<std::shared_ptr<BlockInfo>> block_info_list;
     std::shared_ptr<SegmentInfo> segment_info = std::make_shared<SegmentInfo>();
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return {block_info_list, status};
     }
-    SegmentMeta segment_meta(segment_id, table_meta.value());
+    SegmentMeta segment_meta(segment_id, *table_meta);
     std::vector<BlockID> *block_ids_ptr = nullptr;
     std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
@@ -1461,13 +1461,13 @@ NewTxn::GetBlocksInfo(const std::string &db_name, const std::string &table_name,
 std::tuple<std::shared_ptr<BlockColumnInfo>, Status>
 NewTxn::GetBlockColumnInfo(const std::string &db_name, const std::string &table_name, SegmentID segment_id, BlockID block_id, ColumnID column_id) {
     std::shared_ptr<SegmentInfo> segment_info = std::make_shared<SegmentInfo>();
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return {nullptr, status};
     }
-    SegmentMeta segment_meta(segment_id, table_meta.value());
+    SegmentMeta segment_meta(segment_id, *table_meta);
     BlockMeta block_meta(block_id, segment_meta);
     return block_meta.GetBlockColumnInfo(column_id);
 }
@@ -1480,9 +1480,9 @@ Status NewTxn::CreateTableSnapshot(const std::string &db_name, const std::string
     std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
 
     // First, get the meta info of the table
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta_opt;
-    std::optional<SegmentMeta> segment_meta_opt;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta_opt;
+    std::shared_ptr<SegmentMeta> segment_meta_opt;
     std::string table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
 
@@ -1503,7 +1503,7 @@ Status NewTxn::CreateTableSnapshot(const std::string &db_name, const std::string
 std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSnapshotInfo(const std::string &db_name) {
     this->CheckTxn(db_name);
     std::shared_ptr<DatabaseSnapshotInfo> database_snapshot_info;
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
@@ -1525,8 +1525,8 @@ std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSna
     // database_snapshot_info->db_comment_ = *db_comment;
     database_snapshot_info->db_next_table_id_str_ = std::to_string(std::stoull(table_ids_ptr->back()) + 1);
     for (size_t i = 0; i < table_ids_ptr->size(); i++) {
-        std::optional<TableMeeta> table_meta;
-        status = GetTableMeta(table_names_ptr->at(i), *db_meta, table_meta);
+        std::shared_ptr<TableMeeta> table_meta;
+        status = GetTableMeta(table_names_ptr->at(i), db_meta, table_meta);
         if (!status.ok()) {
             return {nullptr, status};
         }
@@ -1546,7 +1546,7 @@ Status NewTxn::RestoreTableSnapshot(const std::string &db_name, const std::share
     const std::string &table_name = table_snapshot_info->table_name_;
     this->CheckTxn(db_name);
 
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
@@ -1625,7 +1625,7 @@ Status NewTxn::RestoreDatabaseSnapshot(const std::shared_ptr<DatabaseSnapshotInf
     this->SetTxnType(TransactionType::kRestoreDatabase);
     const std::string &db_name = database_snapshot_info->db_name_;
 
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (status.ok()) {
@@ -1735,8 +1735,9 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
 
     std::vector<std::string> *db_id_strs_ptr;
+    std::vector<std::string> *db_names_ptr;
     CatalogMeta catalog_meta(this);
-    status = catalog_meta.GetDBIDs(db_id_strs_ptr);
+    status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
     if (!status.ok()) {
         return status;
     }
@@ -1748,8 +1749,12 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     }
     base_txn_store_ = std::make_shared<CheckpointTxnStore>();
     auto *txn_store = static_cast<CheckpointTxnStore *>(base_txn_store_.get());
-    for (const std::string &db_id_str : *db_id_strs_ptr) {
-        DBMeeta db_meta(db_id_str, this);
+
+    size_t db_count = db_id_strs_ptr->size();
+    for (size_t idx = 0; idx < db_count; ++idx) {
+        const std::string &db_id_str = db_id_strs_ptr->at(idx);
+        const std::string &db_name = db_names_ptr->at(idx);
+        DBMeeta db_meta(db_id_str, db_name, this);
         status = this->CheckpointDB(db_meta, option, txn_store);
         if (!status.ok()) {
             return status;
@@ -1777,14 +1782,18 @@ Status NewTxn::ReplayCheckpoint(WalCmdCheckpointV2 *optimize_cmd, TxnTimeStamp c
 
 Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store) {
     std::vector<std::string> *table_id_strs_ptr;
-    Status status = db_meta.GetTableIDs(table_id_strs_ptr);
+    std::vector<std::string> *table_names_ptr;
+    Status status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
     if (!status.ok()) {
         return status;
     }
 
-    LOG_DEBUG(fmt::format("checkpoint ts {}, db id {}, got {} tables.", option.checkpoint_ts_, db_meta.db_id_str(), table_id_strs_ptr->size()));
-    for (const std::string &table_id_str : *table_id_strs_ptr) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, this);
+    size_t table_count = table_id_strs_ptr->size();
+    LOG_DEBUG(fmt::format("checkpoint ts {}, db id {}, got {} tables.", option.checkpoint_ts_, db_meta.db_id_str(), table_count));
+    for (size_t idx = 0; idx < table_count; ++idx) {
+        const std::string &table_id_str = table_id_strs_ptr->at(idx);
+        const std::string &table_name = table_names_ptr->at(idx);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, table_name, this);
         status = this->CheckpointTable(table_meta, option, ckp_txn_store);
         if (!status.ok()) {
             return status;
@@ -2308,7 +2317,7 @@ Status NewTxn::PrepareCommit() {
     return Status::OK();
 }
 
-Status NewTxn::GetDBMeta(const std::string &db_name, std::optional<DBMeeta> &db_meta, TxnTimeStamp &db_create_ts, std::string *db_key_ptr) {
+Status NewTxn::GetDBMeta(const std::string &db_name, std::shared_ptr<DBMeeta> &db_meta, TxnTimeStamp &db_create_ts, std::string *db_key_ptr) {
     CatalogMeta catalog_meta(this);
     std::string db_key;
     std::string db_id_str;
@@ -2316,18 +2325,17 @@ Status NewTxn::GetDBMeta(const std::string &db_name, std::optional<DBMeeta> &db_
     if (!status.ok()) {
         return status;
     }
-    db_meta.emplace(db_id_str, this);
+    db_meta = std::make_shared<DBMeeta>(db_id_str, db_name, this);
     if (db_key_ptr) {
         *db_key_ptr = db_key;
     }
-    db_meta->SetDBName(db_name);
     return Status::OK();
 }
 
 Status NewTxn::GetTableMeta(const std::string &db_name,
                             const std::string &table_name,
-                            std::optional<DBMeeta> &db_meta,
-                            std::optional<TableMeeta> &table_meta,
+                            std::shared_ptr<DBMeeta> &db_meta,
+                            std::shared_ptr<TableMeeta> &table_meta,
                             std::string *table_key_ptr) {
 
     Status status;
@@ -2336,36 +2344,38 @@ Status NewTxn::GetTableMeta(const std::string &db_name,
     if (!status.ok()) {
         return status;
     }
-    status = GetTableMeta(table_name, *db_meta, table_meta, table_key_ptr);
+    status = GetTableMeta(table_name, db_meta, table_meta, table_key_ptr);
     if (!status.ok()) {
         return status;
     }
     return Status::OK();
 }
 
-Status NewTxn::GetTableMeta(const std::string &table_name, DBMeeta &db_meta, std::optional<TableMeeta> &table_meta, std::string *table_key_ptr) {
+Status NewTxn::GetTableMeta(const std::string &table_name,
+                            std::shared_ptr<DBMeeta> &db_meta,
+                            std::shared_ptr<TableMeeta> &table_meta,
+                            std::string *table_key_ptr) {
     std::string table_key;
     std::string table_id_str;
     TxnTimeStamp create_table_ts;
-    Status status = db_meta.GetTableID(table_name, table_key, table_id_str, create_table_ts);
+    Status status = db_meta->GetTableID(table_name, table_key, table_id_str, create_table_ts);
     if (!status.ok()) {
         return status;
     }
     LOG_DEBUG(fmt::format("GetTableMeta: txn_id: {} table_id: {}", TxnID(), table_id_str));
-    table_meta.emplace(db_meta.db_id_str(), table_id_str, this);
+    table_meta = std::make_shared<TableMeeta>(db_meta->db_id_str(), table_id_str, table_name, this);
     if (table_key_ptr) {
         *table_key_ptr = table_key;
     }
-    table_meta->SetTableName(table_name);
     return Status::OK();
 }
 
 Status NewTxn::GetTableIndexMeta(const std::string &db_name,
                                  const std::string &table_name,
                                  const std::string &index_name,
-                                 std::optional<DBMeeta> &db_meta,
-                                 std::optional<TableMeeta> &table_meta,
-                                 std::optional<TableIndexMeeta> &table_index_meta,
+                                 std::shared_ptr<DBMeeta> &db_meta,
+                                 std::shared_ptr<TableMeeta> &table_meta,
+                                 std::shared_ptr<TableIndexMeeta> &table_index_meta,
                                  std::string *table_key_ptr,
                                  std::string *index_key_ptr) {
     Status status;
@@ -2374,7 +2384,7 @@ Status NewTxn::GetTableIndexMeta(const std::string &db_name,
     if (!status.ok()) {
         return status;
     }
-    status = GetTableMeta(table_name, *db_meta, table_meta, table_key_ptr);
+    status = GetTableMeta(table_name, db_meta, table_meta, table_key_ptr);
     if (!status.ok()) {
         return status;
     }
@@ -2387,7 +2397,7 @@ Status NewTxn::GetTableIndexMeta(const std::string &db_name,
 
 Status NewTxn::GetTableIndexMeta(const std::string &index_name,
                                  TableMeeta &table_meta,
-                                 std::optional<TableIndexMeeta> &table_index_meta,
+                                 std::shared_ptr<TableIndexMeeta> &table_index_meta,
                                  std::string *index_key_ptr) {
     std::string index_key;
     std::string index_id_str;
@@ -2396,7 +2406,7 @@ Status NewTxn::GetTableIndexMeta(const std::string &index_name,
     if (!status.ok()) {
         return status;
     }
-    table_index_meta.emplace(index_id_str, index_name, table_meta);
+    table_index_meta = std::make_shared<TableIndexMeeta>(index_id_str, index_name, table_meta);
     if (index_key_ptr) {
         *index_key_ptr = index_key;
     }
@@ -2469,7 +2479,7 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
 //
 //    CreateDBTxnStore *txn_store = static_cast<CreateDBTxnStore *>(base_txn_store_.get());
 //    std::string db_id_str = std::to_string(txn_store->db_id_);
-//    std::optional<DBMeeta> db_meta;
+//    std::shared_ptr<DBMeeta> db_meta;
 //    Status status = NewCatalog::AddNewDB(kv_instance_.get(), db_id_str, commit_ts, txn_store->db_name_, txn_store->comment_ptr_.get(), db_meta);
 //    if (!status.ok()) {
 //        UnrecoverableError(status.message());
@@ -2484,7 +2494,7 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
 Status NewTxn::PrepareCommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     const std::string *db_comment = create_db_cmd->db_comment_.empty() ? nullptr : &create_db_cmd->db_comment_;
     Status status = NewCatalog::AddNewDB(this, create_db_cmd->db_id_, commit_ts, create_db_cmd->db_name_, db_comment, db_meta);
     if (!status.ok()) {
@@ -2496,7 +2506,7 @@ Status NewTxn::PrepareCommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd
 Status NewTxn::PrepareCommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd) {
 
     std::string db_key;
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp create_db_ts;
     Status status = GetDBMeta(drop_db_cmd->db_name_, db_meta, create_db_ts, &db_key);
     if (!status.ok()) {
@@ -2520,14 +2530,14 @@ Status NewTxn::PrepareCommitCreateTable(const WalCmdCreateTableV2 *create_table_
     const std::string &db_name = create_table_cmd->db_name_;
 
     // Get database ID
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
 
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     status = NewCatalog::AddNewTable(*db_meta, create_table_cmd->table_id_, begin_ts, commit_ts, create_table_cmd->table_def_, table_meta);
     if (!status.ok()) {
         return status;
@@ -2576,8 +2586,8 @@ Status NewTxn::PrepareCommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd
     const std::string &db_name = add_columns_cmd->db_name_;
     const std::string &table_name = add_columns_cmd->table_name_;
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -2611,8 +2621,8 @@ Status NewTxn::PrepareCommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_
     const std::string &db_name = drop_columns_cmd->db_name_;
     const std::string &table_name = drop_columns_cmd->table_name_;
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -2637,13 +2647,17 @@ Status NewTxn::PrepareCommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_
 
 Status NewTxn::PrepareCommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd) {
     std::vector<std::string> *db_id_strs_ptr;
+    std::vector<std::string> *db_names_ptr;
     CatalogMeta catalog_meta(this);
-    Status status = catalog_meta.GetDBIDs(db_id_strs_ptr);
+    Status status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
     if (!status.ok()) {
         return status;
     }
-    for (const std::string &db_id_str : *db_id_strs_ptr) {
-        DBMeeta db_meta(db_id_str, this);
+    size_t db_count = db_id_strs_ptr->size();
+    for (size_t idx = 0; idx < db_count; ++idx) {
+        const std::string &db_id_str = db_id_strs_ptr->at(idx);
+        const std::string &db_name = db_names_ptr->at(idx);
+        DBMeeta db_meta(db_id_str, db_name, this);
         status = this->CommitCheckpointDB(db_meta, checkpoint_cmd);
         if (!status.ok()) {
             return status;
@@ -2654,13 +2668,17 @@ Status NewTxn::PrepareCommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd)
 
 Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd) {
     std::vector<std::string> *table_id_strs_ptr;
-    Status status = db_meta.GetTableIDs(table_id_strs_ptr);
+    std::vector<std::string> *table_names_ptr;
+    Status status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
     if (!status.ok()) {
         return status;
     }
 
-    for (const std::string &table_id_str : *table_id_strs_ptr) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, this);
+    size_t table_count = table_id_strs_ptr->size();
+    for (size_t idx = 0; idx < table_count; ++idx) {
+        const std::string &table_id_str = table_id_strs_ptr->at(idx);
+        const std::string &table_name = table_names_ptr->at(idx);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, table_name, this);
         status = this->CommitCheckpointTable(table_meta, checkpoint_cmd);
         if (!status.ok()) {
             return status;
@@ -2674,7 +2692,7 @@ Status NewTxn::PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapsho
     const std::string &db_name = restore_table_snapshot_cmd->db_name_;
 
     // Get database ID
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
@@ -2693,7 +2711,7 @@ Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restor
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     Status status;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     if (!is_link_files) {
         status = NewCatalog::AddNewTable(db_meta,
                                          restore_table_snapshot_cmd->table_id_,
@@ -2706,7 +2724,8 @@ Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restor
             return status;
         }
     } else {
-        table_meta.emplace(db_meta.db_id_str(), restore_table_snapshot_cmd->table_id_, this);
+        table_meta =
+            std::make_shared<TableMeeta>(db_meta.db_id_str(), restore_table_snapshot_cmd->table_id_, restore_table_snapshot_cmd->table_name_, this);
     }
 
     // restore metadata of the table
@@ -2733,7 +2752,7 @@ Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restor
 Status NewTxn::PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     const std::string *db_comment = restore_database_snapshot_cmd->db_comment_.empty() ? nullptr : &restore_database_snapshot_cmd->db_comment_;
     Status status = NewCatalog::AddNewDB(this,
                                          restore_database_snapshot_cmd->db_id_str_,
@@ -5094,6 +5113,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             CreateIndexTxnStore *create_index_txn_store = static_cast<CreateIndexTxnStore *>(base_txn_store_.get());
             TableMeeta table_meta(create_index_txn_store->db_id_str_,
                                   create_index_txn_store->table_id_str_,
+                                  create_index_txn_store->table_name_,
                                   kv_instance_.get(),
                                   abort_ts,
                                   MAX_TIMESTAMP,
@@ -5124,9 +5144,9 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         case TransactionType::kDumpMemIndex: {
             DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
 
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
-            std::optional<TableIndexMeeta> table_index_meta;
+            std::shared_ptr<DBMeeta> db_meta;
+            std::shared_ptr<TableMeeta> table_meta;
+            std::shared_ptr<TableIndexMeeta> table_index_meta;
             std::string table_key;
             std::string index_key;
             Status status = this->GetTableIndexMeta(dump_index_txn_store->db_name_,
@@ -5437,7 +5457,7 @@ Status NewTxn::CleanupInner(const std::vector<std::unique_ptr<MetaKey>> &metas) 
                     return status;
                 }
 
-                DBMeeta db_meta(db_meta_key->db_id_str_, this);
+                DBMeeta db_meta(db_meta_key->db_id_str_, db_meta_key->db_name_, this);
                 status = NewCatalog::CleanDB(db_meta, begin_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
@@ -5453,7 +5473,13 @@ Status NewTxn::CleanupInner(const std::vector<std::unique_ptr<MetaKey>> &metas) 
                 if (!status.ok()) {
                     return status;
                 }
-                TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP, meta_cache);
+                TableMeeta table_meta(table_meta_key->db_id_str_,
+                                      table_meta_key->table_id_str_,
+                                      table_meta_key->table_name_,
+                                      kv_instance,
+                                      begin_ts,
+                                      MAX_TIMESTAMP,
+                                      meta_cache);
                 status = NewCatalog::CleanTable(table_meta, begin_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
@@ -5473,12 +5499,8 @@ Status NewTxn::CleanupInner(const std::vector<std::unique_ptr<MetaKey>> &metas) 
             }
             case MetaType::kSegment: {
                 auto *segment_meta_key = static_cast<SegmentMetaKey *>(meta.get());
-                TableMeeta table_meta(segment_meta_key->db_id_str_,
-                                      segment_meta_key->table_id_str_,
-                                      kv_instance,
-                                      begin_ts,
-                                      MAX_TIMESTAMP,
-                                      meta_cache);
+                TableMeeta
+                    table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, "", kv_instance, begin_ts, MAX_TIMESTAMP, meta_cache);
                 Status status = table_meta.RemoveSegmentIDs1({segment_meta_key->segment_id_});
                 if (!status.ok()) {
                     return status;
@@ -5493,7 +5515,8 @@ Status NewTxn::CleanupInner(const std::vector<std::unique_ptr<MetaKey>> &metas) 
             }
             case MetaType::kBlock: {
                 auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
-                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP, meta_cache);
+                TableMeeta
+                    table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, "", kv_instance, begin_ts, MAX_TIMESTAMP, meta_cache);
                 SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
                 Status status = NewCatalog::CleanBlock(block_meta, UsageFlag::kOther);
@@ -5516,7 +5539,8 @@ Status NewTxn::CleanupInner(const std::vector<std::unique_ptr<MetaKey>> &metas) 
             }
             case MetaType::kBlockColumn: {
                 auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
-                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP, meta_cache);
+                TableMeeta
+                    table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, "", kv_instance, begin_ts, MAX_TIMESTAMP, meta_cache);
                 SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
                 ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
@@ -5539,6 +5563,7 @@ Status NewTxn::CleanupInner(const std::vector<std::unique_ptr<MetaKey>> &metas) 
 
                 TableMeeta table_meta(table_index_meta_key->db_id_str_,
                                       table_index_meta_key->table_id_str_,
+                                      "",
                                       kv_instance,
                                       begin_ts,
                                       MAX_TIMESTAMP,
@@ -5557,6 +5582,7 @@ Status NewTxn::CleanupInner(const std::vector<std::unique_ptr<MetaKey>> &metas) 
                 auto *segment_index_meta_key = static_cast<SegmentIndexMetaKey *>(meta.get());
                 TableMeeta table_meta(segment_index_meta_key->db_id_str_,
                                       segment_index_meta_key->table_id_str_,
+                                      "",
                                       kv_instance,
                                       begin_ts,
                                       MAX_TIMESTAMP,
@@ -5573,6 +5599,7 @@ Status NewTxn::CleanupInner(const std::vector<std::unique_ptr<MetaKey>> &metas) 
                 auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
                 TableMeeta table_meta(chunk_index_meta_key->db_id_str_,
                                       chunk_index_meta_key->table_id_str_,
+                                      "",
                                       kv_instance,
                                       begin_ts,
                                       MAX_TIMESTAMP,
@@ -5689,8 +5716,8 @@ Status NewTxn::ReplayWalCmd(const std::shared_ptr<WalCmd> &command, TxnTimeStamp
         case WalCommandType::APPEND_V2: {
             auto *append_cmd = static_cast<WalCmdAppendV2 *>(command.get());
 
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
+            std::shared_ptr<DBMeeta> db_meta;
+            std::shared_ptr<TableMeeta> table_meta;
             std::string table_key;
             Status status = GetTableMeta(append_cmd->db_name_, append_cmd->table_name_, db_meta, table_meta, &table_key);
             if (!status.ok()) {
@@ -5776,7 +5803,7 @@ Status NewTxn::ReplayWalCmd(const std::shared_ptr<WalCmd> &command, TxnTimeStamp
 }
 
 Status NewTxn::GetDBFilePaths(const std::string &db_name, std::vector<std::string> &file_paths) {
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
@@ -5788,8 +5815,8 @@ Status NewTxn::GetDBFilePaths(const std::string &db_name, std::vector<std::strin
 }
 
 Status NewTxn::GetTableFilePaths(const std::string &db_name, const std::string &table_name, std::vector<std::string> &file_paths) {
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -5800,8 +5827,8 @@ Status NewTxn::GetTableFilePaths(const std::string &db_name, const std::string &
 
 Status
 NewTxn::GetSegmentFilePaths(const std::string &db_name, const std::string &table_name, SegmentID segment_id, std::vector<std::string> &file_paths) {
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -5816,8 +5843,8 @@ Status NewTxn::GetBlockFilePaths(const std::string &db_name,
                                  SegmentID segment_id,
                                  BlockID block_id,
                                  std::vector<std::string> &file_paths) {
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -5833,8 +5860,8 @@ Status NewTxn::GetBlockColumnFilePaths(const std::string &db_name,
                                        BlockID block_id,
                                        ColumnID column_id,
                                        std::vector<std::string> &file_paths) {
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -5849,8 +5876,8 @@ Status NewTxn::GetColumnFilePaths(const std::string &db_name,
                                   const std::string &table_name,
                                   const std::string &column_name,
                                   std::vector<std::string> &file_paths) {
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -5879,9 +5906,9 @@ Status NewTxn::GetTableIndexFilePaths(const std::string &db_name,
                                       const std::string &table_name,
                                       const std::string &index_name,
                                       std::vector<std::string> &file_paths) {
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
-    std::optional<TableIndexMeeta> table_index_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<TableIndexMeeta> table_index_meta;
     std::string table_key;
     std::string index_key;
     Status status = this->GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -5896,9 +5923,9 @@ Status NewTxn::GetSegmentIndexFilepaths(const std::string &db_name,
                                         const std::string &index_name,
                                         SegmentID segment_id,
                                         std::vector<std::string> &file_paths) {
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
-    std::optional<TableIndexMeeta> table_index_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<TableIndexMeeta> table_index_meta;
     std::string table_key;
     std::string index_key;
     Status status = this->GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -5915,9 +5942,9 @@ Status NewTxn::GetChunkIndexFilePaths(const std::string &db_name,
                                       SegmentID segment_id,
                                       ChunkID chunk_id,
                                       std::vector<std::string> &file_paths) {
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
-    std::optional<TableIndexMeeta> table_index_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<TableIndexMeeta> table_index_meta;
     std::string table_key;
     std::string index_key;
     Status status = this->GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -6141,7 +6168,7 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     }
 
     // if exist proceed
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
@@ -6195,8 +6222,8 @@ Status NewTxn::CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create
     ManualDumpIndex(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_);
 
     // create a new snapshot
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = GetTableMeta(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -6252,14 +6279,18 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
     DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
 
     std::vector<std::string> *db_id_strs_ptr;
+    std::vector<std::string> *db_names_ptr;
     CatalogMeta catalog_meta(this);
-    status = catalog_meta.GetDBIDs(db_id_strs_ptr);
+    status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
     if (!status.ok()) {
         return status;
     }
 
-    for (const std::string &db_id_str : *db_id_strs_ptr) {
-        DBMeeta db_meta(db_id_str, this);
+    size_t db_count = db_id_strs_ptr->size();
+    for (size_t idx = 0; idx < db_count; ++idx) {
+        const std::string &db_id_str = db_id_strs_ptr->at(idx);
+        const std::string &db_name = db_names_ptr->at(idx);
+        DBMeeta db_meta(db_id_str, db_name, this);
         status = this->CheckpointDB(db_meta, option, txn_store);
         if (!status.ok()) {
             return status;

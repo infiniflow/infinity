@@ -239,7 +239,7 @@ std::shared_ptr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) 
     index_reader->column_index_readers_ =
         std::make_shared<FlatHashMap<u64, std::shared_ptr<std::map<std::string, std::shared_ptr<ColumnIndexReader>>>, detail::Hash<u64>>>();
 
-    TableMeeta table_meta(db_id_str_, table_id_str_, txn);
+    TableMeeta table_meta(db_id_str_, table_id_str_, table_name_, txn);
     std::vector<std::string> *index_id_strs = nullptr;
     std::vector<std::string> *index_name_strs = nullptr;
     {
