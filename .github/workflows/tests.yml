@@ -9,11 +9,11 @@ on:
     paths-ignore:
       - 'docs/**'
       - '*.md'
-#  pull_request:
-#    types: [ opened, synchronize, reopened, labeled ]
-#    paths-ignore:
-#      - 'docs/**'
-#      - '*.md'
+  pull_request:
+    types: [ labeled ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
 
 # https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
