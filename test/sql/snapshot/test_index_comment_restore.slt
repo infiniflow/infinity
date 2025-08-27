@@ -3,6 +3,9 @@
 # group: [ddl, test_index_comment]
 
 statement ok
+SET CONFIG CHECKPOINT_INTERVAL 0;
+
+statement ok
 DROP TABLE IF EXISTS sqllogic_test_index_comment;
 
 statement ok
@@ -57,3 +60,6 @@ DROP SNAPSHOT sqllogic_test_index_comment_backup;
 
 statement error
 DROP SNAPSHOT sqllogic_test_index_comment_backup;
+
+statement ok
+SET CONFIG CHECKPOINT_INTERVAL 30;

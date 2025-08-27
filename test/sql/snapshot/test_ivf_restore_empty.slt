@@ -3,6 +3,9 @@
 # group: [ddl, test_ivf]
 
 statement ok
+SET CONFIG CHECKPOINT_INTERVAL 0;
+
+statement ok
 DROP TABLE IF EXISTS test_ivf;
 
 # Expecting IDENTIFIER or PRIMARY or UNIQUE
@@ -48,3 +51,6 @@ DROP SNAPSHOT empty_test_ivf_backup;
 
 statement error
 DROP SNAPSHOT empty_test_ivf_backup;
+
+statement ok
+SET CONFIG CHECKPOINT_INTERVAL 30;
