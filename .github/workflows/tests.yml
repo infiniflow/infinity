@@ -91,7 +91,10 @@ jobs:
 
       - name: Ensure workspace ownership
         if: ${{ !cancelled() && !failure() }}
-        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+        run: |
+          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          echo ${USERNAME}
+          echo ${PASSWORD}
 
       - name: Check out code
         if: ${{ !cancelled() && !failure() }}
