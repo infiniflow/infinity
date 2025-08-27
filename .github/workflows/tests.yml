@@ -134,8 +134,8 @@ jobs:
         with:
           host: 172.17.0.1
           envs: BUILDER_CONTAINER, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX, USERNAME, PASSWORD
-          username: ${USERNAME}
-          password: ${PASSWORD}
+          username: ${{ USERNAME }}
+          password: ${{ PASSWORD }}
           capture_stdout: true
           script: |
             hostname -I | awk '{print $1}'
