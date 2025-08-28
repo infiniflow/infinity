@@ -1372,8 +1372,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "
-            mv /infinity/http_remote_release /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log/http_remote_release.log &&
-            mv /infinity/http_remote_release_error /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log/http_remote_release_error.log"
+            mv /infinity/http_remote_release.log /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log/http_remote_release.log &&
+            mv /infinity/http_remote_release_error.log /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log/http_remote_release_error.log"
 
       - name: Remove test container
         if: always()  # always run this step even if previous steps failed
