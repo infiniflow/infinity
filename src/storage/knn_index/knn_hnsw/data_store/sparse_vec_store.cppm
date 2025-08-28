@@ -151,6 +151,8 @@ public:
         return SparseVecRef(vec.nnz_, vec.indices_.get(), vec.data_.get());
     }
 
+    SparseVecRef GetVecToQuery(size_t idx, const Meta &meta) const { return GetVec(idx, meta); }
+
     void Prefetch(size_t idx, const Meta &meta) const {
         const SparseVecEle &vec = vecs_[idx];
         _mm_prefetch((const char *)vec.indices_.get(), _MM_HINT_T0);
