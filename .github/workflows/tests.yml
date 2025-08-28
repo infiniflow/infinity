@@ -992,7 +992,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log
-            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c \ 
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c \
               "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: Start test container
@@ -1115,7 +1115,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log
-            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c \
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/ut_lock -c \
               "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: Start test container
