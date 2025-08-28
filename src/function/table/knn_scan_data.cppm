@@ -42,7 +42,7 @@ public:
                       std::unique_ptr<std::vector<std::shared_ptr<SegmentIndexMeta>>> segment_index_metas,
                       std::vector<InitParameter> opt_params,
                       i64 topk,
-                      i64 dimension,
+                      i64 query_dimension,
                       i64 query_embedding_count,
                       void *query_embedding,
                       EmbeddingDataType elem_type,
@@ -58,8 +58,8 @@ public:
     std::unique_ptr<std::vector<std::shared_ptr<SegmentIndexMeta>>> segment_index_metas_{};
 
     const std::vector<InitParameter> opt_params_{};
-    const i64 topk_;
-    const i64 dimension_;
+    i64 topk_{};
+    const i64 query_dimension_;
     const u64 query_count_;
     void *const query_embedding_;
     const EmbeddingDataType query_elem_type_{EmbeddingDataType::kElemInvalid};
@@ -140,6 +140,8 @@ public:
     bool execute_block_scan_job_ = false;
 
     std::unique_ptr<MergeKnnBase> merge_knn_base_{};
+    // merge_heap for HNSW scan. For multivector maxsim, query_count could be larger than 1.
+    std::unique_ptr<MergeKnnBase> merge_knn_base_hnsw_{};
     std::unique_ptr<KnnDistanceBase1> knn_distance_{};
 
     std::shared_ptr<ExpressionState> filter_state_{};

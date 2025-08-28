@@ -67,14 +67,14 @@ Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const std::st
     // Start timing for overall snapshot restoration
     // auto snapshot_restoration_start = std::chrono::high_resolution_clock::now();
 
-    std::optional<DBMeeta> db_meta;
+    std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = txn_ptr->GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
 
-    if (!db_meta.has_value()) {
+    if (db_meta.get() == nullptr) {
         return Status::NotFound("DB not found");
     }
     std::string snapshot_dir = query_context->global_config()->SnapshotDir();

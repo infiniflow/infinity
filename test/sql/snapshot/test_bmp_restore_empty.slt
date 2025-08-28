@@ -1,4 +1,7 @@
 statement ok
+SET CONFIG CHECKPOINT_INTERVAL 0;
+
+statement ok
 DROP TABLE IF EXISTS sqllogic_test_bmp;
 
 statement ok
@@ -49,3 +52,6 @@ DROP SNAPSHOT sqllogic_test_bmp_backup;
 
 statement error
 DROP SNAPSHOT sqllogic_test_bmp_backup;
+
+statement ok
+SET CONFIG CHECKPOINT_INTERVAL 30;

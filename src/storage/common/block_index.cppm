@@ -44,7 +44,7 @@ public:
 
     ~BlockIndex();
 
-    void NewInit(std::unique_ptr<TableMeeta> table_meta);
+    void NewInit(const std::shared_ptr<TableMeeta> &table_meta);
 
     size_t BlockCount() const;
 
@@ -60,7 +60,7 @@ public:
 
 public:
     std::vector<std::shared_ptr<TableIndexMeeta>> table_index_meta_map_;
-    std::unique_ptr<TableMeeta> table_meta_;
+    std::shared_ptr<TableMeeta> table_meta_;
     std::map<SegmentID, NewSegmentSnapshot> new_segment_block_index_;
 };
 

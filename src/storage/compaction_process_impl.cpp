@@ -153,8 +153,8 @@ void CompactionProcessor::NewDoCompact() {
             }
         });
 
-        std::optional<DBMeeta> db_meta;
-        std::optional<TableMeeta> table_meta;
+        std::shared_ptr<DBMeeta> db_meta;
+        std::shared_ptr<TableMeeta> table_meta;
         status = new_txn_shared->GetTableMeta(db_name, table_name, db_meta, table_meta);
         if (!status.ok()) {
             return;
@@ -215,8 +215,8 @@ Status CompactionProcessor::NewManualCompact(const std::string &db_name, const s
     auto *new_txn =
         new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kNormal);
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -288,6 +288,7 @@ void CompactionProcessor::NewScanAndOptimize() {
                                                     fmt::join(store_entry.deprecate_chunks_, ","),
                                                     fmt::join(chunk_ids, ","));
 
+                LOG_DEBUG(task_text);
                 bg_task_info->task_info_list_.emplace_back(task_text);
                 if (commit_status.ok()) {
                     bg_task_info->status_list_.emplace_back("OK");

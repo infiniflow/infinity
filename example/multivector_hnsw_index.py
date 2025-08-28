@@ -13,12 +13,15 @@
 # limitations under the License.
 
 '''
-This example is about connecting to the local infinity instance, creating table, inserting data, creating hnsw index on multivector column, and searching data
+This example is about connecting to the local infinity instance, creating table, inserting data, 
+creating hnsw index on multivector column, and searching data with both brute force and HNSW methods
 '''
 
 import infinity
 import sys
-import time
+import numpy as np
+import polars as pl
+from polars.testing import assert_frame_equal as pl_assert_frame_equal
 
 try:
     # Use infinity_embedded module to open a local directory
@@ -30,6 +33,46 @@ try:
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
 
+    # generate normalized vectors
+    def generate_normalized_vectors(shape, dtype=np.float32):
+        x = np.random.randn(*shape).astype(dtype)
+        x /= np.linalg.norm(x, axis=1, keepdims=True)  # L2 normalize
+        return x
+
+    # calculate maxsim between two multivectors
+    def maxsim(query_multivec: np.ndarray, data_multivec: np.ndarray) -> float:
+        maxsim_sum = 0.0
+        for i in range(query_multivec.shape[0]):
+            maxsim = -float('inf')
+            for j in range(data_multivec.shape[0]):
+                sim = float(np.dot(query_multivec[i], data_multivec[j]))
+                if sim > maxsim:
+                    maxsim = sim
+            maxsim_sum += maxsim
+        return maxsim_sum
+
+    # Generate test data
+    row_count = 32
+    embedding_dimension = 4
+    topK = 3
+    
+    # Generate query multivector
+    query_multivector = generate_normalized_vectors((2, embedding_dimension))
+    
+    # Generate data multivectors
+    data_multivec = [generate_normalized_vectors((3, embedding_dimension)) for i in range(row_count)]
+    
+    # Calculate maxsims and create expected result
+    maxsims = [(i, maxsim(query_multivector, data_multivec[i])) for i in range(row_count)]
+    maxsims.sort(key=lambda x: x[1], reverse=True)
+    print("Max similarities:", maxsims)
+    topK_maxsims = maxsims[:topK]
+    
+    # Convert list of tuples to dictionary format for Polars DataFrame
+    topK_res = pl.DataFrame({"c1": [item[0] for item in topK_maxsims], "SIMILARITY": [item[1] for item in topK_maxsims]})
+    # Cast SIMILARITY column to float32
+    topK_res = topK_res.with_columns(pl.col("SIMILARITY").cast(pl.Float32))
+
     # Drop my_table if it already exists
     db_instance.drop_table("my_table", infinity.common.ConflictType.Ignore)
 
@@ -40,53 +83,41 @@ try:
         "c2": {"type": "multivector,4,float"},
     })
 
-    # Insert 4 rows
-    table_instance.insert([
-        {
-            "c1": 2,
-            "c2": [[0.1, 0.2, 0.3, -0.2], [0.2, 0.1, 0.3, 0.4]]
-        }]
-    )
+    # Insert data
+    for i in range(row_count):
+        table_instance.insert([{
+            "c1": i,
+            "c2": data_multivec[i],
+        }])
 
-    table_instance.insert([
-        {
-            "c1": 4,
-            "c2": [[0.2, 0.1, 0.3, 0.4], [0.2, 0.1, 0.2, 0.4]]
-        }]
-    )
-
-    table_instance.insert([
-        {
-            "c1": 6,
-            "c2": [[0.3, 0.2, 0.1, 0.4], [0.4, 0.3, 0.2, 0.1]]
-        }]
-    )
-
-    table_instance.insert([
-        {
-            "c1": 8,
-            "c2": [[0.4, 0.3, 0.2, 0.1], [0.2, -0.1, 0.2, 0.1]]
-        }]
-    )
+    # Brute force search
+    brute_force_res, extra_result = table_instance.output(["c1", "SIMILARITY()"]).match_dense(
+        "c2", query_multivector.flatten(), "float", "ip", topK).to_pl()
+    print("Brute force result:")
+    print(brute_force_res)
+    
+    # Compare brute force result with expected result
+    pl_assert_frame_equal(brute_force_res, topK_res)
 
     # Create a hnsw index on the table
-    # "CREATE INDEX index1 ON my_table (c2) USING HNSW WITH (M = 16, ef_construction = 200, metric = l2)"
+    # "CREATE INDEX index1 ON my_table (c2) USING HNSW WITH (M = 16, ef_construction = 200, metric = ip)"
     table_instance.create_index("index1",
                                 infinity.index.IndexInfo("c2",
                                                          infinity.index.IndexType.Hnsw,
                                                          {
                                                              "m": "16",
                                                              "ef_construction": "200",
-                                                             "metric": "l2"
+                                                             "metric": "ip"
                                                          }), infinity.common.ConflictType.Error)
 
     # Search with hnsw index
-    # "SELECT c1 FROM my_table SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3)"
-    res, extra_result = table_instance.output(["c1"]).match_dense(
-        "c2", [0.3, 0.3, 0.2, 0.2], "float", "l2", 3).to_pl()
-    print(res)
-    if extra_result is not None:
-        print(extra_result)
+    hnsw_res, extra_result = table_instance.output(["c1", "SIMILARITY()"]).match_dense(
+        "c2", query_multivector.flatten(), "float", "ip", topK).to_pl()
+    print("HNSW result:")
+    print(hnsw_res)
+    
+    # Compare HNSW result with brute force result
+    pl_assert_frame_equal(brute_force_res, hnsw_res)
 
     infinity_instance.disconnect()
 

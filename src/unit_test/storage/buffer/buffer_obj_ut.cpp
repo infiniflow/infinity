@@ -417,9 +417,9 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
 
         auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
 
-        std::optional<DBMeeta> db_meta;
-        std::optional<TableMeeta> table_meta;
-        std::optional<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeeta> db_meta;
+        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<TableIndexMeeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         std::vector<std::string> index_names;
@@ -521,8 +521,8 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
         auto begin_ts = txn->BeginTS();
         auto commit_ts = txn->CommitTS();
 
-        std::optional<DBMeeta> db_meta;
-        std::optional<TableMeeta> table_meta;
+        std::shared_ptr<DBMeeta> db_meta;
+        std::shared_ptr<TableMeeta> table_meta;
         auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
@@ -567,7 +567,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 for (size_t row_id = 0; row_id < kImportSize; ++row_id) {
@@ -654,8 +654,8 @@ TEST_F(BufferObjTest, DISABLED_test_multiple_threads_read) {
             auto begin_ts = txn->BeginTS();
             auto commit_ts = txn->CommitTS();
 
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
+            std::shared_ptr<DBMeeta> db_meta;
+            std::shared_ptr<TableMeeta> table_meta;
             auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
@@ -700,7 +700,7 @@ TEST_F(BufferObjTest, DISABLED_test_multiple_threads_read) {
                     ColumnMeta column_meta(column_idx, block_meta);
                     ColumnVector col;
 
-                    status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                    status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
                     EXPECT_TRUE(status.ok());
 
                     for (size_t row_id = 0; row_id < kImportSize; ++row_id) {

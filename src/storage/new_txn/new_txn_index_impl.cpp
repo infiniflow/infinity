@@ -84,9 +84,9 @@ Status NewTxn::DumpMemIndex(const std::string &db_name, const std::string &table
 
     Status status;
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
-    std::optional<TableIndexMeeta> table_index_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<TableIndexMeeta> table_index_meta;
     std::string table_key;
     std::string index_key;
     status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -160,9 +160,9 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
                             RowID begin_row_id) {
     Status status;
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
-    std::optional<TableIndexMeeta> table_index_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<TableIndexMeeta> table_index_meta;
     std::string table_key;
     std::string index_key;
     status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -240,9 +240,9 @@ Status NewTxn::CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
 
     ChunkID chunk_id = dump_index_cmd->chunk_infos_[0].chunk_id_;
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
-    std::optional<TableIndexMeeta> table_index_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<TableIndexMeeta> table_index_meta;
     std::string table_key;
     std::string index_key;
     status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -286,16 +286,16 @@ Status NewTxn::OptimizeAllIndexes() {
         const std::string &db_id_str = (*db_id_strs_ptr)[i];
         const std::string &db_name = (*db_names_ptr)[i];
 
-        DBMeeta db_meta(db_id_str, this);
+        DBMeeta db_meta(db_id_str, db_name, this);
         std::vector<std::string> *table_id_strs_ptr = nullptr;
         std::vector<std::string> *table_names_ptr = nullptr;
         status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
         if (!status.ok()) {
             return status;
         }
-        for (size_t i = 0; i < table_id_strs_ptr->size(); ++i) {
-            // const std::string &table_id_str = (*table_id_strs_ptr)[i];
-            const std::string &table_name = (*table_names_ptr)[i];
+        for (size_t idx = 0; idx < table_id_strs_ptr->size(); ++idx) {
+            // const std::string &table_id_str = (*table_id_strs_ptr)[idx];
+            const std::string &table_name = (*table_names_ptr)[idx];
 
             status = this->OptimizeTableIndexes(db_name, table_name);
             if (!status.ok()) {
@@ -308,8 +308,8 @@ Status NewTxn::OptimizeAllIndexes() {
 }
 
 Status NewTxn::OptimizeTableIndexes(const std::string &db_name, const std::string &table_name) {
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     std::string table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
     if (!status.ok()) {
@@ -325,7 +325,7 @@ Status NewTxn::OptimizeTableIndexes(const std::string &db_name, const std::strin
     for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
         const std::string &index_id_str = (*index_id_strs_ptr)[i];
         const std::string &index_name = (*index_names_ptr)[i];
-        TableIndexMeeta table_index_meta(index_id_str, *table_meta);
+        TableIndexMeeta table_index_meta(index_id_str, index_name, *table_meta);
 
         std::vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
@@ -349,9 +349,9 @@ Status NewTxn::OptimizeIndex(const std::string &db_name, const std::string &tabl
 
     Status status = Status::OK();
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta_opt;
-    std::optional<TableIndexMeeta> table_index_meta_opt;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta_opt;
+    std::shared_ptr<TableIndexMeeta> table_index_meta_opt;
     std::string table_key;
     std::string index_key;
     status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta_opt, table_index_meta_opt, &table_key, &index_key);
@@ -573,9 +573,9 @@ Status NewTxn::OptimizeIndexByParams(const std::string &db_name,
                                      std::vector<std::unique_ptr<InitParameter>> raw_params) {
     Status status = Status::OK();
 
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta_opt;
-    std::optional<TableIndexMeeta> table_index_meta_opt;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta_opt;
+    std::shared_ptr<TableIndexMeeta> table_index_meta_opt;
     std::string table_key;
     std::string index_key;
     status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta_opt, table_index_meta_opt, &table_key, &index_key);
@@ -667,8 +667,8 @@ Status NewTxn::OptimizeIndexByParams(const std::string &db_name,
 }
 
 Status NewTxn::ListIndex(const std::string &db_name, const std::string &table_name, std::vector<std::string> &index_names) {
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -705,7 +705,8 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const std::pair<Ro
     auto append_in_column = [&]() {
         ColumnVector col;
         {
-            Status status = NewCatalog::GetColumnVector(*column_meta, cur_offset + cur_row_cnt, ColumnVectorMode::kReadOnly, col);
+            Status status =
+                NewCatalog::GetColumnVector(*column_meta, column_meta->get_column_def(), cur_offset + cur_row_cnt, ColumnVectorMode::kReadOnly, col);
             if (!status.ok()) {
                 return status;
             }
@@ -850,7 +851,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 if (!status.ok()) {
                     return status;
                 }
-                memory_hnsw_index = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def, true /*trace*/);
+                memory_hnsw_index = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def);
                 mem_index->SetHnswIndex(memory_hnsw_index);
             } else {
                 memory_hnsw_index = mem_index->GetHnswIndex();
@@ -875,19 +876,20 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
         }
         case IndexType::kEMVB: {
             std::shared_ptr<EMVBIndexInMem> memory_emvb_index;
+            TableMeeta &table_meta = segment_index_meta.table_index_meta().table_meta();
             if (is_null) {
                 auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
                 if (!status.ok()) {
                     return status;
                 }
                 memory_emvb_index = EMVBIndexInMem::NewEMVBIndexInMem(index_base, column_def, base_row_id);
-                TableMeeta &table_meta = segment_index_meta.table_index_meta().table_meta();
                 memory_emvb_index->SetSegmentID(table_meta.db_id_str(), table_meta.table_id_str(), segment_index_meta.segment_id());
                 mem_index->SetEMVBIndex(memory_emvb_index);
             } else {
                 memory_emvb_index = mem_index->GetEMVBIndex();
             }
-            memory_emvb_index->Insert(col, offset, row_cnt, segment_index_meta.kv_instance(), begin_ts);
+            MetaCache *meta_cache = table_meta.meta_cache();
+            memory_emvb_index->Insert(col, offset, row_cnt, segment_index_meta.kv_instance(), begin_ts, meta_cache);
             break;
         }
         default: {
@@ -1042,9 +1044,9 @@ Status NewTxn::PopulateIndex(const std::string &db_name,
 
 Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     Status status;
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
-    std::optional<TableIndexMeeta> table_index_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<TableIndexMeeta> table_index_meta;
     std::string table_key;
     std::string index_key;
     status = GetTableIndexMeta(dump_index_cmd->db_name_,
@@ -1246,7 +1248,7 @@ Status NewTxn::InitSegmentIndex(SegmentIndexMeta &segment_index_meta, SegmentMet
                     BlockMeta block_meta(block_id, segment_meta);
                     ColumnMeta column_meta(column_id, block_meta);
                     ColumnVector col;
-                    status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, col);
+                    status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
                     if (!status.ok()) {
                         return status;
                     }
@@ -1257,7 +1259,7 @@ Status NewTxn::InitSegmentIndex(SegmentIndexMeta &segment_index_meta, SegmentMet
                     // Make memory index
                     std::shared_ptr<HnswIndexInMem> memory_hnsw_index;
                     if (mem_index->IsNull()) {
-                        memory_hnsw_index = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def, true /*trace*/);
+                        memory_hnsw_index = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def);
                         mem_index->SetHnswIndex(memory_hnsw_index);
                     } else {
                         memory_hnsw_index = mem_index->GetHnswIndex();
@@ -1285,7 +1287,7 @@ Status NewTxn::InitSegmentIndex(SegmentIndexMeta &segment_index_meta, SegmentMet
                     BlockMeta block_meta(block_id, segment_meta);
                     ColumnMeta column_meta(column_id, block_meta);
                     ColumnVector col;
-                    status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, col);
+                    status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
                     if (!status.ok()) {
                         return status;
                     }
@@ -1318,7 +1320,7 @@ Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentM
         size_t row_cnt = block_id == block_ids->back() ? segment_row_cnt - block_capacity * (block_ids->size() - 1) : block_capacity;
 
         ColumnVector col;
-        status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, col);
+        status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
         if (!status.ok()) {
             return status;
         }
@@ -1369,7 +1371,7 @@ Status NewTxn::PopulateFtIndexInner(std::shared_ptr<IndexBase> index_base,
         size_t row_cnt = block_id == block_ids_ptr->back() ? segment_row_cnt - block_capacity * (block_ids_ptr->size() - 1) : block_capacity;
 
         ColumnVector col;
-        status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, col);
+        status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
         if (!status.ok()) {
             return status;
         }
@@ -1601,7 +1603,7 @@ Status NewTxn::OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
             size_t row_cnt = std::min(block_row_cnt, size_t(total_row_cnt));
             total_row_cnt -= row_cnt;
             ColumnVector col;
-            status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, col);
+            status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
             if (!status.ok()) {
                 return status;
             }
@@ -1625,7 +1627,7 @@ Status NewTxn::OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
             size_t row_cnt = std::min(block_row_cnt, size_t(total_row_cnt));
             total_row_cnt -= row_cnt;
             ColumnVector col;
-            status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, col);
+            status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
             if (!status.ok()) {
                 return status;
             }
@@ -2039,8 +2041,8 @@ Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
 }
 
 Status NewTxn::GetFullTextIndexReader(const std::string &db_name, const std::string &table_name, std::shared_ptr<IndexReader> &index_reader) {
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
@@ -2062,15 +2064,15 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     std::string db_id_str = create_index_cmd->db_id_;
     std::string table_id_str = create_index_cmd->table_id_;
     std::string table_key = create_index_cmd->table_key_;
-    std::string index_id_str = create_index_cmd->index_id_;
+    std::string &index_id_str = create_index_cmd->index_id_;
+    std::shared_ptr<IndexBase> &index_base = create_index_cmd->index_base_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, this);
-    std::optional<TableIndexMeeta> table_index_meta_opt;
-    Status status = new_catalog_->AddNewTableIndex(table_meta, index_id_str, commit_ts, create_index_cmd->index_base_, table_index_meta_opt);
+    TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
+    std::shared_ptr<TableIndexMeeta> table_index_meta_ptr;
+    Status status = new_catalog_->AddNewTableIndex(table_meta, index_id_str, commit_ts, index_base, table_index_meta_ptr);
     if (!status.ok()) {
         return status;
     }
-    TableIndexMeeta &table_index_meta = *table_index_meta_opt;
 
     std::vector<SegmentID> *segment_ids_ptr = nullptr;
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
@@ -2093,7 +2095,8 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     } else {
         for (SegmentID segment_id : *segment_ids_ptr) {
             SegmentMeta segment_meta(segment_id, table_meta);
-            auto [segment_row_cnt, status] = segment_meta.GetRowCnt1();
+            size_t segment_row_cnt = 0;
+            std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
             if (!status.ok()) {
                 return status;
             }
@@ -2101,7 +2104,7 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
                                          table_name,
                                          index_name,
                                          table_key,
-                                         table_index_meta,
+                                         *table_index_meta_ptr,
                                          segment_meta,
                                          segment_row_cnt,
                                          DumpIndexCause::kCreateIndex,
@@ -2113,7 +2116,7 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     }
     if (create_index_cmd->index_base_->index_type_ == IndexType::kFullText) {
         // Invalidate existing fulltext index cache
-        Status status = table_meta.InvalidateFtIndexCache();
+        status = table_meta.InvalidateFtIndexCache();
         if (!status.ok()) {
             return status;
         }
@@ -2127,7 +2130,9 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
 Status NewTxn::PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
     const std::string &db_id_str = drop_index_cmd->db_id_;
     const std::string &table_id_str = drop_index_cmd->table_id_;
+    const std::string &table_name = drop_index_cmd->table_name_;
     const std::string &index_id_str = drop_index_cmd->index_id_;
+    const std::string &index_name = drop_index_cmd->index_name_;
     const std::string &index_key = drop_index_cmd->index_key_;
     const TxnTimeStamp create_ts = infinity::GetTimestampFromKey(index_key);
 
@@ -2136,8 +2141,8 @@ Status NewTxn::PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
     auto ts_str = std::to_string(commit_ts);
     kv_instance_->Put(KeyEncode::DropTableIndexKey(db_id_str, table_id_str, drop_index_cmd->index_name_, create_ts, index_id_str), ts_str);
 
-    TableMeeta table_meta(db_id_str, table_id_str, this);
-    TableIndexMeeta table_index_meta(index_id_str, table_meta);
+    TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
+    TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta);
     std::shared_ptr<IndexBase> index_base;
     Status status;
     std::tie(index_base, status) = table_index_meta.GetIndexBase();
@@ -2161,13 +2166,14 @@ Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, K
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const std::string &db_id_str = dump_index_cmd->db_id_;
     const std::string &table_id_str = dump_index_cmd->table_id_;
+    const std::string &table_name = dump_index_cmd->table_name_;
     const std::string &index_id_str = dump_index_cmd->index_id_;
+    const std::string &index_name = dump_index_cmd->index_name_;
     SegmentID segment_id = dump_index_cmd->segment_id_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, this);
+    TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
 
-    const std::string &index_id_str_ = dump_index_cmd->index_id_;
-    TableIndexMeeta table_index_meta(index_id_str_, table_meta);
+    TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta);
 
     auto [index_base, status] = table_index_meta.GetIndexBase();
     if (!status.ok()) {
@@ -2195,7 +2201,8 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const std
         if (index_id > max_index_id) {
             max_index_id = index_id;
         }
-        std::optional<TableIndexMeeta> table_index_meta;
+        const std::string &index_name = *(index_cmd.index_base_->index_name_);
+        std::shared_ptr<TableIndexMeeta> table_index_meta;
         if (!is_link_files) {
             status = new_catalog_->AddNewTableIndex(table_meta,
                                                     index_cmd.index_id_,
@@ -2206,7 +2213,7 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const std
                 return status;
             }
         } else {
-            table_index_meta.emplace(index_cmd.index_id_, table_meta);
+            table_index_meta = std::make_shared<TableIndexMeeta>(index_cmd.index_id_, index_name, table_meta);
         }
 
         for (const auto &segment_index : index_cmd.segment_index_infos_) {
@@ -2261,9 +2268,9 @@ Status NewTxn::ManualDumpIndex(const std::string &db_name, const std::string &ta
     Status status;
 
     // 1. Get table and index metadata
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> table_meta;
-    std::optional<TableIndexMeeta> table_index_meta;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<TableIndexMeeta> table_index_meta;
     std::string table_key;
     std::string index_key;
     status = GetTableMeta(db_name, table_name, db_meta, table_meta);
@@ -2277,8 +2284,11 @@ Status NewTxn::ManualDumpIndex(const std::string &db_name, const std::string &ta
     if (!status.ok()) {
         return status;
     }
-    for (const auto &index_id : *index_ids_ptr) {
-        TableIndexMeeta table_index_meta(index_id, *table_meta);
+    size_t index_count = index_ids_ptr->size();
+    for (size_t i = 0; i < index_count; ++i) {
+        const std::string &index_id_str = (*index_ids_ptr)[i];
+        const std::string &index_name_str = (*index_names_ptr)[i];
+        TableIndexMeeta table_index_meta(index_id_str, index_name_str, *table_meta);
 
         // 2. Get all segment IDs for this index
         std::vector<SegmentID> *segment_ids_ptr = nullptr;

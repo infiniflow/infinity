@@ -769,6 +769,14 @@ ExplainAST::BuildShow(const ShowStatement *show_statement, std::shared_ptr<std::
             result->emplace_back(std::make_shared<std::string>("SHOW SNAPSHOT"));
             break;
         }
+        case ShowStmtType::kListCaches: {
+            result->emplace_back(std::make_shared<std::string>("LIST CACHES"));
+            break;
+        }
+        case ShowStmtType::kShowCache: {
+            result->emplace_back(std::make_shared<std::string>("SHOW CACHE"));
+            break;
+        }
         case ShowStmtType::kInvalid: {
             UnrecoverableError("Invalid show statement type");
         }

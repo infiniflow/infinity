@@ -151,8 +151,10 @@ void MockWalFile(const std::string &wal_file_path, const std::string &ckp_file_p
         auto entry = std::make_shared<WalEntry>();
         std::vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
         std::vector<SegmentID> deprecated_segment_ids{0, 1, 2};
+        std::vector<std::string> names;
+        std::vector<std::string> ids;
         entry->cmds_.push_back(
-            std::make_shared<WalCmdCompactV2>("db1", "2", "tbl1", "1", std::move(new_segment_infos), std::move(deprecated_segment_ids)));
+            std::make_shared<WalCmdCompactV2>("db1", "2", "tbl1", "1", names, ids, std::move(new_segment_infos), std::move(deprecated_segment_ids)));
         entry->commit_ts_ = 5;
         i32 expect_size = entry->GetSizeInBytes();
         std::vector<char> buf(expect_size);
@@ -365,9 +367,11 @@ TEST_F(WalEntryTest, ReadWriteV2) {
     }
     entry->cmds_.push_back(std::make_shared<WalCmdCheckpointV2>(int64_t(123)));
     {
+        std::vector<std::string> names;
+        std::vector<std::string> ids;
         std::vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
         entry->cmds_.push_back(
-            std::make_shared<WalCmdCompactV2>("db1", "1", "tbl1", "2", std::move(new_segment_infos), std::vector<SegmentID>{0, 1, 2}));
+            std::make_shared<WalCmdCompactV2>("db1", "1", "tbl1", "2", names, ids, std::move(new_segment_infos), std::vector<SegmentID>{0, 1, 2}));
     }
     {
         WalChunkIndexInfo info;
@@ -385,6 +389,7 @@ TEST_F(WalEntryTest, ReadWriteV2) {
         entry->cmds_.push_back(std::make_shared<WalCmdRenameTableV2>("db1", "1", "tbl1", "2", "tbl2", "old_table_key"));
     }
     {
+        std::vector<u32> column_idx_list;
         std::vector<std::shared_ptr<ColumnDef>> column_defs;
         std::set<ConstraintType> constraints;
 
@@ -398,7 +403,11 @@ TEST_F(WalEntryTest, ReadWriteV2) {
 
         column_defs.push_back(column_def3);
         column_defs.push_back(column_def4);
-        entry->cmds_.push_back(std::make_shared<WalCmdAddColumnsV2>("db1", "1", "tbl1", "2", std::move(column_defs), "table_key"));
+
+        column_idx_list.push_back(3);
+        column_idx_list.push_back(4);
+        entry->cmds_.push_back(
+            std::make_shared<WalCmdAddColumnsV2>("db1", "1", "tbl1", "2", std::move(column_idx_list), std::move(column_defs), "table_key"));
     }
     {
         std::vector<std::string> column_names;

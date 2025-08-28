@@ -104,7 +104,8 @@ void MemIndexTracer::DumpDone(std::shared_ptr<MemIndex> mem_index) {
 
 std::vector<std::shared_ptr<DumpMemIndexTask>> MemIndexTracer::MakeDumpTask() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    std::shared_ptr<NewTxn> new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("Dump index"), TransactionType::kNormal);
+    std::shared_ptr<NewTxn> new_txn_shared =
+        new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("Get all mem indexes"), TransactionType::kNormal);
 
     std::vector<std::shared_ptr<MemIndexDetail>> mem_index_details = GetAllMemIndexes(new_txn_shared.get());
     // Generate dump task for all EMVB index and at most one non-EMVB index
@@ -184,6 +185,7 @@ std::vector<std::shared_ptr<MemIndexDetail>> BGMemIndexTracer::GetAllMemIndexes(
         detail->table_name_ = mem_index_id.table_name_;
         detail->index_name_ = mem_index_id.index_name_;
         detail->segment_id_ = mem_index_id.segment_id_;
+        detail->begin_row_id_ = mem_index->GetBeginRowID();
         if (!detail->is_emvb_index_) {
             MemIndexTracerInfo info = base_mem_index->GetInfo();
             detail->mem_used_ = info.mem_used_;

@@ -116,7 +116,7 @@ public:
 
     QueryResult DropTable(const std::string &db_name, const std::string &table_name, const DropTableOptions &drop_table_options);
 
-    QueryResult ListTables(const std::string &db_name);
+    QueryResult RenameTable(const std::string &db_name, const std::string &table_name, const std::string &new_table_name);
 
     QueryResult ShowTable(const std::string &db_name, const std::string &table_name);
 
@@ -188,6 +188,8 @@ public:
     QueryResult ShowMemoryObjects();
     QueryResult ShowMemoryAllocations();
     QueryResult ShowFunction(const std::string &function_name);
+    QueryResult ListCaches();
+    QueryResult ShowCache();
 
     QueryResult Insert(const std::string &db_name, const std::string &table_name, std::vector<InsertRowExpr *> *&insert_rows);
 

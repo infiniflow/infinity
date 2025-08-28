@@ -44,15 +44,15 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
         slt_file.write("query I\n")
         slt_file.write(
-            "SELECT * FROM {} limit {} offset {};\n".format(table_name, limit, offset))
+            "SELECT * FROM {} order by c1 limit {} offset {};\n".format(table_name, limit, offset))
         slt_file.write("----\n")
 
-        for _ in range(row_n):
-            limit_file.write("0,0")
+        for i in range(row_n):
+            limit_file.write(f"{i},0")
             limit_file.write("\n")
 
-        for _ in range(limit):
-            slt_file.write("0 0")
+        for i in range(limit):
+            slt_file.write(f"{offset + i} 0")
             slt_file.write("\n")
 
         slt_file.write("\n")

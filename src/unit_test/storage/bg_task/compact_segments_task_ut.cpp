@@ -106,8 +106,8 @@ TEST_P(CompactTaskTest, DISABLED_bg_compact) {
 
         // Check if the segment count has been reduced
         auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
-        std::optional<DBMeeta> db_meta;
-        std::optional<TableMeeta> table_meta;
+        std::shared_ptr<DBMeeta> db_meta;
+        std::shared_ptr<TableMeeta> table_meta;
         auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 

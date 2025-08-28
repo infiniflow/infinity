@@ -123,15 +123,15 @@ TEST_P(TestTxnAlter, add_column0) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::optional<DBMeeta> db_meta;
-        std::optional<TableMeeta> table_meta;
+        std::shared_ptr<DBMeeta> db_meta;
+        std::shared_ptr<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
         auto check_column = [&](ColumnMeta &column_meta, const Value &v, size_t row_count) {
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             for (size_t i = 0; i < row_count; ++i) {
@@ -252,15 +252,15 @@ TEST_P(TestTxnAlter, drop_column0) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::optional<DBMeeta> db_meta;
-        std::optional<TableMeeta> table_meta;
+        std::shared_ptr<DBMeeta> db_meta;
+        std::shared_ptr<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
         auto check_column = [&](ColumnMeta &column_meta, const Value &v, size_t row_count) {
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             for (size_t i = 0; i < row_count; ++i) {

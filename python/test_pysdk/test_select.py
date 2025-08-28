@@ -436,9 +436,8 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('a',), 'c2': ('a',)}).astype(
             {'c1': dtype('O'), 'c2': dtype('O')}))
 
-        # TODO NotImplement Error: Not implement: varchar > varchar
-        # res, extra_result = table_obj.output(["c1"]).filter("c1 > 'a' and c2 < 'c'").to_df()
-        # pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('b',)}).astype({'c1': dtype('O')}))
+        res, extra_result = table_obj.output(["c1"]).filter("c1 > 'a' and c2 < 'c'").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('b',)}).astype({'c1': dtype('O')}))
         res = db_obj.drop_table("test_select_varchar" + suffix)
         assert res.error_code == ErrorCode.OK
 

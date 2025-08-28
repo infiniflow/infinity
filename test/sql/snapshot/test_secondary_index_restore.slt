@@ -1,4 +1,7 @@
 statement ok
+SET CONFIG CHECKPOINT_INTERVAL 0;
+
+statement ok
 DROP TABLE IF EXISTS test_secondary_index;
 
 statement ok
@@ -46,3 +49,6 @@ DROP SNAPSHOT secondary_index_backup;
 
 statement error
 DROP SNAPSHOT secondary_index_backup;
+
+statement ok
+SET CONFIG CHECKPOINT_INTERVAL 30;

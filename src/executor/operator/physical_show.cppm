@@ -158,6 +158,10 @@ private:
 
     void ExecuteShowSnapshot(QueryContext *query_context, ShowOperatorState *operator_state);
 
+    void ExecuteListCaches(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowCache(QueryContext *query_context, ShowOperatorState *operator_state);
+
 private:
     ShowStmtType show_type_{ShowStmtType::kInvalid};
     std::string db_name_{};

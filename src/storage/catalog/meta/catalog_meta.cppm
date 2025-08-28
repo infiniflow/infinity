@@ -20,11 +20,12 @@ namespace infinity {
 
 class KVInstance;
 class NewTxn;
+class MetaCache;
 
 export class CatalogMeta {
 public:
     CatalogMeta(NewTxn *txn);
-    CatalogMeta(KVInstance *kv_instance);
+    CatalogMeta(KVInstance *kv_instance, MetaCache *meta_cache);
 
     Status GetDBID(const std::string &db_name, std::string &db_key, std::string &db_id, TxnTimeStamp &create_ts);
 
@@ -37,6 +38,7 @@ private:
     NewTxn *txn_{};
     TxnTimeStamp read_ts_{};
     KVInstance *kv_instance_{};
+    MetaCache *meta_cache_{};
 
     std::optional<std::vector<std::string>> db_id_strs_;
     std::optional<std::vector<std::string>> db_names_;

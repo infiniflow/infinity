@@ -217,8 +217,8 @@ std::tuple<BufferObj *, Status> BlockMeta::GetVersionBuffer() {
         std::string version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ + "/" + std::string(BlockVersion::PATH);
         version_buffer_ = buffer_mgr->GetBufferObject(version_filepath);
         if (version_buffer_ == nullptr) {
-            auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-            new_txn_mgr->PrintAllDroppedKeys();
+            // auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+            // new_txn_mgr->PrintAllDroppedKeys();
             return {nullptr, Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath))};
         }
     }

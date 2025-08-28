@@ -428,17 +428,12 @@ std::shared_ptr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_co
     std::shared_ptr<TableInfo> table_info;
     Status status;
     NewTxn *new_txn = query_context->GetNewTxn();
-    std::optional<DBMeeta> db_meta;
-    std::optional<TableMeeta> tmp_table_meta;
-    status = new_txn->GetTableMeta(db_name, table_name, db_meta, tmp_table_meta);
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
+    status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         RecoverableError(status);
     }
-    auto table_meta = std::make_unique<TableMeeta>(tmp_table_meta->db_id_str(),
-                                                   tmp_table_meta->table_id_str(),
-                                                   tmp_table_meta->kv_instance(),
-                                                   tmp_table_meta->begin_ts(),
-                                                   tmp_table_meta->commit_ts());
     table_info = std::make_shared<TableInfo>();
     status = table_meta->GetTableInfo(*table_info);
     if (!status.ok()) {
@@ -473,7 +468,7 @@ std::shared_ptr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_co
 
     std::shared_ptr<BlockIndex> block_index;
     block_index = std::make_shared<BlockIndex>();
-    block_index->NewInit(std::move(table_meta));
+    block_index->NewInit(table_meta);
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     auto table_ref = std::make_shared<BaseTableRef>(table_info, std::move(columns), block_index, alias, table_index, names_ptr, types_ptr);

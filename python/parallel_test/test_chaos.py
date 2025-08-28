@@ -239,54 +239,54 @@ def updata(table_obj):
         pass
 
 
-def create_snapshot(db_obj, thread_id):
-    """Create a snapshot of the chaos_test table"""
-    global snapshot_stats
-    try:
-        snapshot_name = f"chaos_snapshot_{thread_id}_{random.randint(1, 1000)}"
-        res = db_obj.create_table_snapshot(snapshot_name, "chaos_test")
-        if res.error_code == ErrorCode.OK:
-            with snapshot_stats_lock:
-                snapshot_stats['create_success'] += 1
-        else:
-            with snapshot_stats_lock:
-                snapshot_stats['create_failed'] += 1
-    except Exception as e:
-        with snapshot_stats_lock:
-            snapshot_stats['create_failed'] += 1
-
-
-def restore_snapshot(db_obj, thread_id):
-    """Restore a table from snapshot"""
-    global snapshot_stats
-    try:
-        # List available snapshots
-        snapshots_res = db_obj.get_infinity_obj().list_snapshots()
-        if snapshots_res.error_code == ErrorCode.OK and snapshots_res.snapshots:
-            # Pick a random snapshot
-            snapshot = random.choice(snapshots_res.snapshots)
-            snapshot_name = snapshot.name
-            
-            # Drop the current table if it exists
-            try:
-                db_obj.drop_table("chaos_test", ConflictType.Ignore)
-            except:
-                pass
-            
-            # Restore from snapshot
-            res = db_obj.restore_table_snapshot(snapshot_name)
-            if res.error_code == ErrorCode.OK:
-                with snapshot_stats_lock:
-                    snapshot_stats['restore_success'] += 1
-            else:
-                with snapshot_stats_lock:
-                    snapshot_stats['restore_failed'] += 1
-        else:
-            with snapshot_stats_lock:
-                snapshot_stats['restore_failed'] += 1
-    except Exception as e:
-        with snapshot_stats_lock:
-            snapshot_stats['restore_failed'] += 1
+# def create_snapshot(db_obj, thread_id):
+#     """Create a snapshot of the chaos_test table"""
+#     global snapshot_stats
+#     try:
+#         snapshot_name = f"chaos_snapshot_{thread_id}_{random.randint(1, 1000)}"
+#         res = db_obj.create_table_snapshot(snapshot_name, "chaos_test")
+#         if res.error_code == ErrorCode.OK:
+#             with snapshot_stats_lock:
+#                 snapshot_stats['create_success'] += 1
+#         else:
+#             with snapshot_stats_lock:
+#                 snapshot_stats['create_failed'] += 1
+#     except Exception as e:
+#         with snapshot_stats_lock:
+#             snapshot_stats['create_failed'] += 1
+#
+#
+# def restore_snapshot(db_obj, thread_id):
+#     """Restore a table from snapshot"""
+#     global snapshot_stats
+#     try:
+#         # List available snapshots
+#         snapshots_res = db_obj.get_infinity_obj().list_snapshots()
+#         if snapshots_res.error_code == ErrorCode.OK and snapshots_res.snapshots:
+#             # Pick a random snapshot
+#             snapshot = random.choice(snapshots_res.snapshots)
+#             snapshot_name = snapshot.name
+#
+#             # Drop the current table if it exists
+#             try:
+#                 db_obj.drop_table("chaos_test", ConflictType.Ignore)
+#             except:
+#                 pass
+#
+#             # Restore from snapshot
+#             res = db_obj.restore_table_snapshot(snapshot_name)
+#             if res.error_code == ErrorCode.OK:
+#                 with snapshot_stats_lock:
+#                     snapshot_stats['restore_success'] += 1
+#             else:
+#                 with snapshot_stats_lock:
+#                     snapshot_stats['restore_failed'] += 1
+#         else:
+#             with snapshot_stats_lock:
+#                 snapshot_stats['restore_failed'] += 1
+#     except Exception as e:
+#         with snapshot_stats_lock:
+#             snapshot_stats['restore_failed'] += 1
 
 
 def drop_table(db_obj, thread_id):
@@ -319,31 +319,32 @@ def random_exec(connection_pool: ConnectionPool, data, end_time, thread_id):
     while time.time() < end_time:
         # Calculate elapsed time
         elapsed_time = time.time() - start_time
-        rand_v = random.randint(0, 5)
+        # rand_v = random.randint(0, 5)
+        rand_v = random.randint(0, 4)
 
         
         try:
-            try:
-                table_obj = db_obj.get_table("chaos_test")
-            except:
+            # try:
+            table_obj = db_obj.get_table("chaos_test")
+            # except:
                 # Table doesn't exist, try to restore from snapshot
-                snapshots_res = infinity_obj.list_snapshots()
-                if snapshots_res.error_code == ErrorCode.OK and snapshots_res.snapshots:
-                    # Pick a random snapshot to restore from
-                    snapshot = random.choice(snapshots_res.snapshots)
-                    snapshot_name = snapshot.name
-                    
-                    # Restore from snapshot
-                    res = db_obj.restore_table_snapshot(snapshot_name)
-                    if res.error_code == ErrorCode.OK:
-                        with snapshot_stats_lock:
-                            snapshot_stats['restore_success'] += 1
-                        table_obj = db_obj.get_table("chaos_test")
-                    else:
-                        with snapshot_stats_lock:
-                            snapshot_stats['restore_failed'] += 1
-                        connection_pool.release_conn(infinity_obj)
-                        return
+                # snapshots_res = infinity_obj.list_snapshots()
+                # if snapshots_res.error_code == ErrorCode.OK and snapshots_res.snapshots:
+                #     # Pick a random snapshot to restore from
+                #     snapshot = random.choice(snapshots_res.snapshots)
+                #     snapshot_name = snapshot.name
+                #
+                #     # Restore from snapshot
+                #     res = db_obj.restore_table_snapshot(snapshot_name)
+                #     if res.error_code == ErrorCode.OK:
+                #         with snapshot_stats_lock:
+                #             snapshot_stats['restore_success'] += 1
+                #         table_obj = db_obj.get_table("chaos_test")
+                #     else:
+                #         with snapshot_stats_lock:
+                #             snapshot_stats['restore_failed'] += 1
+                #         connection_pool.release_conn(infinity_obj)
+                #         return
 
             if rand_v == 0:
                 insert(table_obj, data)
@@ -360,22 +361,22 @@ def random_exec(connection_pool: ConnectionPool, data, end_time, thread_id):
             elif rand_v == 4:
                 search_vector(table_obj)
                 time.sleep(0.01)
-            elif rand_v == 5:  # Only in first 10 seconds
-                # Combined operation: create snapshot then drop table
-                if(elapsed_time <= 20):
-                    # First create snapshot
-                    snapshot_name = f"chaos_snapshot_{thread_id}_{random.randint(1, 1000)}"
-                    res = db_obj.create_table_snapshot(snapshot_name, "chaos_test")
-                    if res.error_code == ErrorCode.OK:
-                        with snapshot_stats_lock:
-                            snapshot_stats['create_success'] += 1
-                        # Only drop table if snapshot creation succeeded
-                        drop_table(db_obj, thread_id)
-                    else:
-                        with snapshot_stats_lock:
-                            snapshot_stats['create_failed'] += 1
-                else:
-                    drop_table(db_obj, thread_id)
+            # elif rand_v == 5:  # Only in first 10 seconds
+            #     # Combined operation: create snapshot then drop table
+            #     if(elapsed_time <= 20):
+            #         # First create snapshot
+            #         snapshot_name = f"chaos_snapshot_{thread_id}_{random.randint(1, 1000)}"
+            #         res = db_obj.create_table_snapshot(snapshot_name, "chaos_test")
+            #         if res.error_code == ErrorCode.OK:
+            #             with snapshot_stats_lock:
+            #                 snapshot_stats['create_success'] += 1
+            #             # Only drop table if snapshot creation succeeded
+            #             drop_table(db_obj, thread_id)
+            #         else:
+            #             with snapshot_stats_lock:
+            #                 snapshot_stats['create_failed'] += 1
+            #     else:
+            #         drop_table(db_obj, thread_id)
         except Exception as e:
             # If any operation fails, try to get the table object again
             try:

@@ -38,10 +38,6 @@ class Database(ABC):
         pass  # implement get table logic here
 
     @abstractmethod
-    def show_tables(self):
-        pass
-
-    @abstractmethod
     def create_table_snapshot(self, snapshot_name: str, table_name: str):
         pass
 

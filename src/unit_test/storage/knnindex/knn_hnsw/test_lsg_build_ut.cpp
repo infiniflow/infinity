@@ -159,7 +159,7 @@ TEST_F(LSGBuildTest, test1) {
     hnsw_index->InsertSampleVecs(iter);
     hnsw_index->InsertLSAvg(iter, element_size);
     hnsw_index->SetLSGParam();
-    hnsw_index->InsertVecs(std::move(iter), kDefaultHnswInsertConfig, false);
+    hnsw_index->InsertVecs(std::move(iter), kDefaultHnswInsertConfig);
 
     u32 correct_count = 0;
     i32 topk = 1;

@@ -254,9 +254,9 @@ TEST_P(TestTxnReplayIndex, DISABLED_test_replay_append_with_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("check index {}", index_name)), TransactionType::kNormal);
 
         Status status;
-        std::optional<DBMeeta> db_meta;
-        std::optional<TableMeeta> table_meta;
-        std::optional<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeeta> db_meta;
+        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<TableIndexMeeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -372,9 +372,9 @@ TEST_P(TestTxnReplayIndex, DISABLED_test_replay_append_with_index) {
     auto check_index2 = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("check merged index {}", index_name)), TransactionType::kNormal);
 
-        std::optional<DBMeeta> db_meta;
-        std::optional<TableMeeta> table_meta;
-        std::optional<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeeta> db_meta;
+        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<TableIndexMeeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -640,9 +640,9 @@ TEST_P(TestTxnReplayIndex, DISABLED_test_populate_index) {
     auto check_index = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("check index {}", index_name)), TransactionType::kNormal);
 
-        std::optional<DBMeeta> db_meta;
-        std::optional<TableMeeta> table_meta;
-        std::optional<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeeta> db_meta;
+        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<TableIndexMeeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);

@@ -298,6 +298,17 @@ void InfinityThriftService::DropTable(infinity_thrift_rpc::CommonResponse &respo
     ProcessQueryResult(response, result);
 }
 
+void InfinityThriftService::RenameTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::RenameTableRequest &request) {
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+
+    auto result = infinity->RenameTable(request.db_name, request.table_name, request.new_table_name);
+    ProcessQueryResult(response, result);
+}
+
 void InfinityThriftService::Insert(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::InsertRequest &request) {
     auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
     if (!infinity_status.ok()) {
@@ -1244,7 +1255,7 @@ void InfinityThriftService::ListTable(infinity_thrift_rpc::ListTableResponse &re
         return;
     }
 
-    auto result = infinity->ListTables(request.db_name);
+    auto result = infinity->ShowTables(request.db_name);
     if (result.IsOk()) {
         for (auto &data_block : result.result_table_->data_blocks_) {
             auto row_count = data_block->row_count();
@@ -1312,7 +1323,7 @@ void InfinityThriftService::ShowTable(infinity_thrift_rpc::ShowTableResponse &re
     if (result.IsOk()) {
         std::shared_ptr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
-        if (row_count != 7) {
+        if (row_count != 6) {
             UnrecoverableError("ShowTable: query result is invalid.");
         }
 
@@ -1352,12 +1363,6 @@ void InfinityThriftService::ShowTable(infinity_thrift_rpc::ShowTableResponse &re
             response.segment_count = std::stol(value.GetVarchar());
         }
 
-        {
-            // row count
-            Value value = data_block->GetValue(1, 6);
-            response.row_count = std::stol(value.GetVarchar());
-        }
-
         response.__set_error_code((i64)(result.ErrorCode()));
     } else {
         ProcessQueryResult(response, result);
@@ -1372,23 +1377,6 @@ void InfinityThriftService::ShowColumns(infinity_thrift_rpc::SelectResponse &res
     }
 
     const QueryResult result = infinity->ShowColumns(request.db_name, request.table_name);
-    if (result.IsOk()) {
-        auto &columns = response.column_fields;
-        columns.resize(result.result_table_->ColumnCount());
-        ProcessDataBlocks(result, response, columns);
-    } else {
-        ProcessQueryResult(response, result);
-    }
-}
-
-void InfinityThriftService::ShowTables(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowTablesRequest &request) {
-    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
-    if (!infinity_status.ok()) {
-        ProcessStatus(response, infinity_status);
-        return;
-    }
-
-    const QueryResult result = infinity->ShowTables(request.db_name);
     if (result.IsOk()) {
         auto &columns = response.column_fields;
         columns.resize(result.result_table_->ColumnCount());
@@ -1963,6 +1951,9 @@ std::shared_ptr<DataType> InfinityThriftService::GetColumnTypeFromProto(const in
         case infinity_thrift_rpc::LogicType::Embedding: {
             const auto embedding_type = GetEmbeddingDataTypeFromProto(type.physical_type.embedding_type.element_type);
             if (embedding_type == EmbeddingDataType::kElemInvalid) {
+                return std::make_shared<infinity::DataType>(infinity::LogicalType::kInvalid);
+            }
+            if (type.physical_type.embedding_type.dimension <= 0) {
                 return std::make_shared<infinity::DataType>(infinity::LogicalType::kInvalid);
             }
             auto embedding_info = EmbeddingInfo::Make(embedding_type, type.physical_type.embedding_type.dimension);

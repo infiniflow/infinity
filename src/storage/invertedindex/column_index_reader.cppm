@@ -129,7 +129,8 @@ export struct IndexReader {
 
 export class TableIndexReaderCache {
 public:
-    TableIndexReaderCache(std::string db_id_str, std::string table_id_str) : db_id_str_(db_id_str), table_id_str_(table_id_str) {}
+    TableIndexReaderCache(const std::string &db_id_str, const std::string &table_id_str, const std::string &table_name)
+        : db_id_str_(db_id_str), table_id_str_(table_id_str), table_name_(table_name) {}
 
     std::shared_ptr<IndexReader> GetIndexReader(NewTxn *txn);
 
@@ -140,6 +141,7 @@ private:
     std::mutex mutex_;
     std::string db_id_str_;
     std::string table_id_str_;
+    std::string table_name_;
 
     TxnTimeStamp cache_ts_ = UNCOMMIT_TS;
     std::shared_ptr<FlatHashMap<u64, std::shared_ptr<std::map<std::string, std::shared_ptr<ColumnIndexReader>>>, detail::Hash<u64>>>

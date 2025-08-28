@@ -29,24 +29,18 @@ types_array = [
     "vector, 3, float"
 ]
 
-types_array_int = [
-    # int
-    "int", "int8", "int16", "int32", "int64", "integer",
-]
-
 types_example_array = [
     # int
     1, 127, 32767, 2147483647, pow(2, 63) - 1, 10,
     # pow(2, 127) - 1,
     # float
-    # float(1.1), np.float32(1/3), np.double(1/3), np.float64(1/3),
+    float(1.1), np.float32(1/3), np.double(1/3), np.float64(1/3),
     # string
-    # "^789$ test insert varchar",
+    "^789$ test insert varchar",
     # bool
-    # True,
+    True,
     # vector
-    # np.array([1.1, 2.2, 3.3]),
-    # [1, 2, 3]
+    np.array([1.1, 2.2, 3.3]),
 ]
 
 # db_name, table_name, index_name, column_name

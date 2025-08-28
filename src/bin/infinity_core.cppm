@@ -698,6 +698,6 @@ export import :buffer_reader;
 export import :system_info;
 export import :fixed_dimensional_encoding;
 export import :rcu_multimap;
+export import :meta_cache;
 export import :infinity_type;
-
 export import third_party;

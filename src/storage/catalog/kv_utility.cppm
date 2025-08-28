@@ -23,11 +23,11 @@ namespace infinity {
 class KVInstance;
 class IndexBase;
 
-export std::vector<SegmentID> GetTableSegments(KVInstance *kv_instance,
-                                               const std::string &db_id_str,
-                                               const std::string &table_id_str,
-                                               TxnTimeStamp begin_ts,
-                                               TxnTimeStamp commit_ts);
+export std::shared_ptr<std::vector<SegmentID>> GetTableSegments(KVInstance *kv_instance,
+                                                                const std::string &db_id_str,
+                                                                const std::string &table_id_str,
+                                                                TxnTimeStamp begin_ts,
+                                                                TxnTimeStamp commit_ts);
 
 export std::vector<SegmentID> GetTableIndexSegments(KVInstance *kv_instance,
                                                     const std::string &db_id_str,

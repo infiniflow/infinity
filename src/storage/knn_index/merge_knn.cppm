@@ -141,6 +141,8 @@ public:
 
     RowID *GetIDsByIdx(u64 idx) const;
 
+    std::vector<RowID> GetUniqueIDs() const;
+
     i64 total_input_count() const { return total_count_; }
 
 private:
@@ -303,6 +305,21 @@ RowID *MergeKnn<QueryElemType, C, DistType>::GetIDsByIdx(u64 idx) const {
         UnrecoverableError("Query index exceeds the limit");
     }
     return idx_array_.get() + idx * this->topk_;
+}
+
+template <typename QueryElemType, template <typename, typename> typename C, typename DistType>
+std::vector<RowID> MergeKnn<QueryElemType, C, DistType>::GetUniqueIDs() const {
+    std::set<RowID> unique_ids;
+    std::vector<RowID> unique_ids_vec;
+    for (u64 i = 0; i < this->query_count_; ++i) {
+        RowID *idx_array = idx_array_.get() + i * this->topk_;
+        for (u16 j = 0; j < result_handler_->GetSize(i); ++j) {
+            unique_ids.insert(idx_array[j]);
+        }
+    }
+    unique_ids_vec.reserve(unique_ids.size());
+    unique_ids_vec.insert(unique_ids_vec.end(), unique_ids.begin(), unique_ids.end());
+    return unique_ids_vec;
 }
 
 } // namespace infinity

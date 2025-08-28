@@ -65,6 +65,15 @@ class RemoteTable():
 
         return wrapper
 
+    @name_validity_check("new_table_name", "Table")
+    def rename(self, new_table_name: str):
+        res = self._conn.rename_table(db_name=self._db_name, table_name=self._table_name, new_table_name=new_table_name)
+        if res.error_code == ErrorCode.OK:
+            self._table_name = new_table_name
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+
     @name_validity_check("index_name", "Index")
     def create_index(self, index_name: str, index_info: IndexInfo,
                      conflict_type: ConflictType = ConflictType.Error, index_comment=""):
@@ -126,7 +135,7 @@ class RemoteTable():
             return res
         else:
             raise InfinityException(res.error_code, res.error_msg)
-        
+
     def dump_index(self, index_name: str):
         res = self._conn.dump_index(db_name=self._db_name, table_name=self._table_name, index_name=index_name)
         if res.error_code == ErrorCode.OK:
@@ -416,7 +425,7 @@ class RemoteTable():
     def offset(self, offset: Optional[int]):
         self.query_builder.offset(offset)
         return self
-    
+
     def group_by(self, group_by_expr_list: Optional[List[str]] | Optional[str]):
         if group_by_expr_list is None:
             return self

@@ -126,8 +126,8 @@ TEST_P(TestTxnColumn, test_add_columns) {
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
 
-        std::optional<DBMeeta> db_meta;
-        std::optional<TableMeeta> table_meta;
+        std::shared_ptr<DBMeeta> db_meta;
+        std::shared_ptr<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
@@ -147,7 +147,7 @@ TEST_P(TestTxnColumn, test_add_columns) {
         ColumnMeta column_meta(1, block_meta);
 
         ColumnVector col;
-        status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+        status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
         EXPECT_TRUE(status.ok());
 
         for (u32 i = 0; i < row_count; ++i) {

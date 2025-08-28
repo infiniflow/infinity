@@ -65,8 +65,6 @@ class TestInfinity:
                                  ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # select_res = table.query_builder().output(["*"]).to_df()
-        # print(select_res)
         # Create a query builder
         query_builder = InfinityThriftQueryBuilder(table)
         query_builder.output(["num", "body"])
@@ -93,7 +91,8 @@ class TestInfinity:
         table_obj = db_obj.create_table(
             "test_query_builder", {"c1": {"type": "int"}}, ConflictType.Error)
         query_builder = table_obj.query_builder
-        query_builder.output(["*"]).to_df()
+        res = query_builder.output(["*"]).to_df()
+        print(res)
 
         res = db_obj.drop_table("test_query_builder", ConflictType.Error)
         assert res.error_code == ErrorCode.OK

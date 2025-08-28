@@ -170,32 +170,32 @@ message(STATUS "Found oatpp include directories: ${OATPP_INCLUDE_DIRS}")
 include_directories(${OATPP_INCLUDE_DIRS})
 message(STATUS "Using vcpkg toolchain - automatic package discovery enabled")
 
-if (NOT CI)
-    # https://youtrack.jetbrains.com/issue/CPP-39632/import-std-CLion-cant-resolve-module-std-in-case-of-clang
-    add_library(unused_std_target STATIC)
 
-    # just tmp solution
-    set(LIBSTDCXX_MODULE_FILE_PATH_SUFFIX
-            include/c++/15/bits
-            include/c++/15.2.0/bits
-    )
+# https://youtrack.jetbrains.com/issue/CPP-39632/import-std-CLion-cant-resolve-module-std-in-case-of-clang
+add_library(unused_std_target STATIC)
 
-    find_file(LIBSTDCXX_MODULE_FILE
-            NAMES std.cc
-            PATHS ${GCC_SEARCH_ROOTS}
-            PATH_SUFFIXES include/c++/15/bits
-            REQUIRED
-    )
+# just tmp solution
+set(LIBSTDCXX_MODULE_FILE_PATH_SUFFIX
+        include/c++/15/bits
+        include/c++/15.2.0/bits
+)
 
-    get_filename_component(LIBSTDCXX_MODULE_FILE_DIR ${LIBSTDCXX_MODULE_FILE} DIRECTORY)
+find_file(LIBSTDCXX_MODULE_FILE
+        NAMES std.cc
+        PATHS ${GCC_SEARCH_ROOTS}
+        PATH_SUFFIXES ${LIBSTDCXX_MODULE_FILE_PATH_SUFFIX}
+        REQUIRED
+)
 
-    target_sources(unused_std_target
-            PRIVATE
-            FILE_SET CXX_MODULES
-            BASE_DIRS ${LIBSTDCXX_MODULE_FILE_DIR}
-            FILES ${LIBSTDCXX_MODULE_FILE_DIR}/std.cc ${LIBSTDCXX_MODULE_FILE_DIR}/std.compat.cc
-    )
-endif ()
+get_filename_component(LIBSTDCXX_MODULE_FILE_DIR ${LIBSTDCXX_MODULE_FILE} DIRECTORY)
+
+target_sources(unused_std_target
+        PRIVATE
+        FILE_SET CXX_MODULES
+        BASE_DIRS ${LIBSTDCXX_MODULE_FILE_DIR}
+        FILES ${LIBSTDCXX_MODULE_FILE_DIR}/std.cc ${LIBSTDCXX_MODULE_FILE_DIR}/std.compat.cc
+)
+
 
 # Get current system time and print the build time
 execute_process(COMMAND "date" +"%Y-%m-%d %H:%M.%S" OUTPUT_VARIABLE CURRENT_SYS_TIME)

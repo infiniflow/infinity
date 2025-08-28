@@ -45,7 +45,6 @@ export struct TableInfo {
     std::shared_ptr<std::string> table_full_dir_{};
     i64 column_count_{};
     i64 segment_count_{};
-    i64 row_count_{};
     TxnTimeStamp max_commit_ts_{UNCOMMIT_TS};
     std::vector<std::shared_ptr<ColumnDef>> column_defs_{};
     std::string db_id_{};
@@ -108,6 +107,7 @@ export struct BlockColumnInfo {
 export struct TableDetail {
     std::shared_ptr<std::string> db_name_{};
     std::shared_ptr<std::string> table_name_{};
+    std::shared_ptr<std::string> table_id_{};
     std::shared_ptr<std::string> table_comment_{};
     i64 column_count_{};
     i64 row_count_{};

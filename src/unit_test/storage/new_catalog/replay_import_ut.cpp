@@ -120,8 +120,8 @@ TEST_P(TestTxnReplayImport, test_import0) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::optional<DBMeeta> db_meta;
-        std::optional<TableMeeta> table_meta;
+        std::shared_ptr<DBMeeta> db_meta;
+        std::shared_ptr<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
@@ -150,7 +150,7 @@ TEST_P(TestTxnReplayImport, test_import0) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
@@ -163,7 +163,7 @@ TEST_P(TestTxnReplayImport, test_import0) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
@@ -283,9 +283,9 @@ TEST_P(TestTxnReplayImport, test_import_with_index) {
     auto check_index = [&](const std::string &index_name) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kNormal);
 
-        std::optional<DBMeeta> db_meta;
-        std::optional<TableMeeta> table_meta;
-        std::optional<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeeta> db_meta;
+        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<TableIndexMeeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);

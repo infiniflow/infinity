@@ -127,7 +127,7 @@ TEST_F(InfinityTest, test1) {
         result = infinity->CreateTable("default_db", "table1", column_defs, std::vector<TableConstraint *>(), create_table_opts);
         EXPECT_TRUE(result.IsOk());
 
-        result = infinity->ListTables("default_db");
+        result = infinity->ShowTables("default_db");
         std::shared_ptr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         Value value = data_block->GetValue(1, 0);
@@ -140,7 +140,7 @@ TEST_F(InfinityTest, test1) {
         DropTableOptions drop_table_opts;
         result = infinity->DropTable("default_db", "table1", drop_table_opts);
         EXPECT_TRUE(result.IsOk());
-        result = infinity->ListTables("default_db");
+        result = infinity->ShowTables("default_db");
         data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 0);
 

@@ -33,6 +33,7 @@ import :txn_allocator_task;
 import :storage;
 import :catalog_cache;
 import :base_txn_store;
+import :meta_cache;
 
 import std;
 import third_party;
@@ -115,8 +116,9 @@ std::shared_ptr<NewTxn> NewTxnManager::BeginTxnShared(std::unique_ptr<std::strin
             LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", begin_ts));
             ckp_begin_ts_ = begin_ts;
         } else {
-            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing, not start this txn",
+            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new txn: {} checkpoint start at {} will do nothing, not start this txn",
                                  ckp_begin_ts_,
+                                 new_txn_id,
                                  begin_ts));
             return nullptr;
         }
@@ -231,6 +233,21 @@ bool NewTxnManager::CheckConflict1(NewTxn *txn, std::string &conflict_reason, bo
 
     std::vector<std::shared_ptr<NewTxn>> check_txns = GetCheckCandidateTxns(txn);
     LOG_DEBUG(fmt::format("CheckConflict1:: Txn {} check conflict with check_txns {}", txn->TxnID(), check_txns.size()));
+
+    // For read-only txn check if previous txn is writable txn. If so, remove the items to cache.
+    if ((txn->GetTxnStore() == nullptr && !txn->IsReplay()) or txn->txn_type() == TxnType::kReadOnly) {
+        for (const auto &check_txn : check_txns) {
+            if ((check_txn->GetTxnStore() == nullptr && !check_txn->IsReplay()) or check_txn->txn_type() == TxnType::kReadOnly) {
+                // Read only txn
+                continue;
+            } else {
+                // Writable Txn
+                txn->ResetMetaCache();
+                break;
+            }
+        }
+    }
+
     for (std::shared_ptr<NewTxn> &check_txn : check_txns) {
         if (txn->CheckConflictTxnStores(check_txn, conflict_reason, retry_query)) {
             return true;
@@ -427,11 +444,39 @@ void NewTxnManager::CommitBottom(NewTxn *txn) {
 }
 
 void NewTxnManager::CommitKVInstance(NewTxn *txn) {
-    Status status = txn->kv_instance_->Commit();
-    if (!status.ok()) {
-        UnrecoverableError(fmt::format("Commit kv_instance: {}", status.message()));
-    }
+    // Generate meta cache items
+    txn->GetTxnStore();
+
     TxnTimeStamp commit_ts = txn->CommitTS();
+    // Put meta cache items with kv_instance
+    WalEntry *wal_entry = txn->GetWALEntry();
+    std::vector<std::shared_ptr<EraseBaseCache>> items_to_erase;
+    for (const auto &cmd : wal_entry->cmds_) {
+        std::vector<std::shared_ptr<EraseBaseCache>> items_to_erase_part = cmd->ToCachedMeta(commit_ts);
+        items_to_erase.insert(items_to_erase.end(), items_to_erase_part.begin(), items_to_erase_part.end());
+    }
+
+    MetaCache *meta_cache_ptr = this->storage_->meta_cache();
+    Status status = meta_cache_ptr->Erase(items_to_erase, txn->kv_instance_.get(), commit_ts);
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Put cache: {}", status.message()));
+    }
+
+    //    BaseTxnStore *base_txn_store = txn->GetTxnStore();
+    //    if (base_txn_store != nullptr) {
+    //        std::vector<std::shared_ptr<EraseBaseCache>> items_to_erase = txn->GetTxnStore()->ToCachedMeta(commit_ts);
+    //        MetaCache *meta_cache_ptr = this->storage_->meta_cache();
+    //        Status status = meta_cache_ptr->Erase(items_to_erase, txn->kv_instance_.get());
+    //        if (!status.ok()) {
+    //            UnrecoverableError(fmt::format("Put cache: {}", status.message()));
+    //        }
+    //    } else {
+    //        Status status = txn->kv_instance_->Commit();
+    //        if (!status.ok()) {
+    //            UnrecoverableError(fmt::format("Commit kv_instance: {}", status.message()));
+    //        }
+    //    }
+
     TxnTimeStamp kv_commit_ts;
     {
         std::lock_guard guard(locker_);
@@ -616,47 +661,41 @@ void NewTxnManager::CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp be
 }
 
 void NewTxnManager::PrintAllKeyValue() const {
-    fmt::print("All store key and value:\n");
-    fmt::print("{}\n", kv_store_->ToString());
-    fmt::print(" --------------\n");
+    std::println("All store key and value: ");
+    std::println("{}", kv_store_->ToString());
+    std::println(" -------------- ");
 }
 
 void NewTxnManager::PrintPMKeyValue() const {
-    std::cout << std::string("Persistence Manager keys and values: ") << std::endl;
-
+    LOG_TRACE("Persistence Manager keys and values: ");
     // Get all key-value pairs from the KV store
     std::vector<std::pair<std::string, std::string>> all_key_values = kv_store_->GetAllKeyValue();
 
     for (const auto &[key, value] : all_key_values) {
         // Check if the key is a PM key by looking for "pm|" prefix
         if (key.find("pm|") == 0) {
-            std::cout << "PM Key: " << key << " -> Value: " << value << std::endl;
+            LOG_TRACE(fmt::format("PM key: {}, value: {}", key, value));
         }
     }
-    std::cout << std::string(" -------------- ") << std::endl;
+    LOG_TRACE("------------------------------------");
 }
 
 void NewTxnManager::PrintAllDroppedKeys() const {
-    std::cout << std::string("All dropped keys: ") << std::endl;
-
+    LOG_TRACE("All dropped keys: ");
     // Get all key-value pairs from the KV store
     std::vector<std::pair<std::string, std::string>> all_key_values = kv_store_->GetAllKeyValue();
 
     for (const auto &[key, value] : all_key_values) {
         // Check if the key is a dropped key by looking for "drop|" prefix
         if (key.find("drop|") == 0) {
-            std::cout << "Dropped Key: " << key << " -> Value: " << value << std::endl;
-            std::cout << " -------------- " << std::endl;
+            LOG_TRACE(fmt::format("Dropped key: {}, value: {}", key, value));
         }
     }
+    LOG_TRACE("------------------------------------");
 }
 
 size_t NewTxnManager::KeyValueNum() const { return kv_store_->KeyValueNum(); }
 
-//
-//
-//
-//
 std::vector<std::shared_ptr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(NewTxn *this_txn) {
 
     TxnTimeStamp this_begin_ts = this_txn->BeginTS();

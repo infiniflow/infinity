@@ -1,0 +1,30 @@
+statement ok
+DROP TABLE IF EXISTS table1;
+
+statement ok
+DROP TABLE IF EXISTS table2;
+
+statement ok
+CREATE TABLE table1 (column1 INT, column2 INT);
+
+statement ok
+INSERT INTO table1 VALUES (1, 2);
+
+query I
+SELECT * FROM table1;
+----
+1 2
+
+statement ok
+ALTER TABLE table1 RENAME TO table2;
+
+statement error
+SELECT * FROM table1;
+
+query I
+SELECT * FROM table2;
+----
+1 2
+
+statement ok
+DROP TABLE table2;
