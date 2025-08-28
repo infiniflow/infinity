@@ -813,7 +813,15 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &pa
         // The dimension will be validated at execution time when the function is evaluated
         if (!parsed_knn_expr.query_embedding_expr_) {
             // Traditional array case - validate dimension
-            if (static_cast<i64>(embedding_info->Dimension()) != parsed_knn_expr.dimension_) {
+            bool is_multi_vector = expr_ptr->Type().type() == LogicalType::kMultiVector;
+            if (is_multi_vector) {
+                if (parsed_knn_expr.dimension_ % static_cast<i64>(embedding_info->Dimension()) != 0) {
+                    RecoverableError(
+                        Status::SyntaxError(fmt::format("Query embedding with dimension: {} is not a multiple of column embedding dimension: {}",
+                                                        parsed_knn_expr.dimension_,
+                                                        embedding_info->Dimension())));
+                }
+            } else if (static_cast<i64>(embedding_info->Dimension()) != parsed_knn_expr.dimension_) {
                 RecoverableError(Status::SyntaxError(fmt::format("Query embedding with dimension: {} which doesn't not matched with {}",
                                                                  parsed_knn_expr.dimension_,
                                                                  embedding_info->Dimension())));

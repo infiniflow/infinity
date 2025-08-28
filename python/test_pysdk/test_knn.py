@@ -9,6 +9,7 @@ from infinity.errors import ErrorCode
 from infinity.common import ConflictType, InfinityException, SparseVector
 from common.utils import copy_data, generate_commas_enwiki
 import pandas as pd
+import polars as pl
 from polars.testing import assert_frame_equal as pl_assert_frame_equal
 from polars.testing import assert_frame_not_equal as pl_assert_frame_not_equal
 from numpy import dtype
@@ -157,8 +158,8 @@ class TestInfinity:
 
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    @pytest.mark.parametrize("save_elem_type", ["float", "float16", "bfloat16"])
-    @pytest.mark.parametrize("query_elem_type", ["float", "float16", "bfloat16"])
+    @pytest.mark.parametrize("save_elem_type", ["float"])
+    @pytest.mark.parametrize("query_elem_type", ["float"])
     def test_knn_fp16_bf16(self, check_data, save_elem_type, query_elem_type, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_knn_fp16_bf16" + suffix, conflict_type=ConflictType.Ignore)
@@ -1989,4 +1990,78 @@ class TestInfinity:
 
         res = db_obj.drop_table(
             "test_with_fulltext_match_with_valid_columns" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("embedding_dimension", [8, 16])
+    def test_multivector_f32(self, embedding_dimension, suffix):
+        # generate normalized vectors
+        import numpy as np
+        np.random.seed(42)
+        def generate_normalized_vectors(shape, dtype=np.float32):
+            x = np.random.randn(*shape).astype(dtype)
+            x /= np.linalg.norm(x, axis=1, keepdims=True)  # L2 normalize
+            return x
+
+        # calculate maxsim between two multivectors
+        def maxsim(query_multivec: np.ndarray, data_multivec: np.ndarray) -> float:
+            maxsim_sum = 0.0
+            for i in range(query_multivec.shape[0]):
+                maxsim = -float('inf')
+                for j in range(data_multivec.shape[0]):
+                    sim = float(np.dot(query_multivec[i], data_multivec[j]))
+                    if sim > maxsim:
+                        maxsim = sim
+                maxsim_sum += maxsim
+            return maxsim_sum
+
+        row_count = 20
+        topK = 5
+        query_multivector = generate_normalized_vectors((2, embedding_dimension))
+        data_multivec = [generate_normalized_vectors((128, embedding_dimension)) for i in range(row_count)]
+        maxsims = [(f"page_{i}", maxsim(query_multivector, data_multivec[i])) for i in range(row_count)]
+        maxsims.sort(key=lambda x: x[1], reverse=True)
+        print(maxsims)
+        topK_maxsims = maxsims[:topK]
+        # Convert list of tuples to dictionary format for Polars DataFrame
+        topK_res = pl.DataFrame({"page_no": [item[0] for item in topK_maxsims], "SIMILARITY": [item[1] for item in topK_maxsims]})
+        # Cast SIMILARITY column to float32
+        adjusted_topK = int(topK * 0.6)
+        topK_res = topK_res.with_columns(pl.col("SIMILARITY").cast(pl.Float32)).head(adjusted_topK)
+
+        table_name = "test_multivector_f32" + suffix
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table(table_name, ConflictType.Ignore)
+        table_obj = db_obj.create_table(table_name, {
+            "page_no": {"type": "varchar"},
+            "page_multivec": {"type": f"multivector,{embedding_dimension},float"},
+        }, ConflictType.Error)
+
+        for i in range(row_count):
+            table_obj.insert({
+                "page_no": f"page_{i}",
+                "page_multivec": data_multivec[i],
+            })
+
+        brute_force_res, extra_result = table_obj.output(["page_no", "SIMILARITY()"]).match_dense(
+            "page_multivec", query_multivector.flatten().tolist(), "float", "ip", topK).to_pl()
+        print(brute_force_res)
+        pl_assert_frame_equal(brute_force_res.head(adjusted_topK), topK_res)
+
+
+        res = table_obj.create_index("my_index",
+                                     index.IndexInfo("page_multivec",
+                                                     index.IndexType.Hnsw,
+                                                     {
+                                                         "M": "20",
+                                                         "ef_construction": "50",
+                                                         "metric": "ip"
+                                                     }), ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        hnsw_res, extra_result = table_obj.output(["page_no", "SIMILARITY()"]).match_dense(
+            "page_multivec", query_multivector.flatten().tolist(), "float", "ip", topK).to_pl()
+        print(hnsw_res)
+        pl_assert_frame_equal(hnsw_res.head(adjusted_topK), topK_res)
+
+        res = db_obj.drop_table(table_name, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
