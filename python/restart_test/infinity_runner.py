@@ -124,7 +124,7 @@ class InfinityRunner:
                 if infinity_obj is not None:
                     if isinstance(e, InfinityException):
                         if e.error_code == ErrorCode.INFINITY_IS_INITING:
-                            self.logger.info("wait infinity starting")
+                            self.logger.info("Connection: wait infinity starting")
                         else:
                             raise e
                     else:
@@ -132,15 +132,17 @@ class InfinityRunner:
                 else:
                     self.logger.warn(str(e))
                 sleep_time = 1 * (i + 1)
-                self.logger.info(f"Retrying connection attempt {i + 1} after {sleep_time} seconds.")
                 time.sleep(sleep_time)
+                current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                self.logger.info(
+                    f"Connection: retrying connection attempt {i + 1} after {sleep_time} seconds, at {current_time}.")
         else:
-            raise Exception(f"Cannot connect to infinity after {try_n} retries.")
-        self.logger.info("Connected to infinity.")
+            raise Exception(f"Connection: cannot connect to infinity after {try_n} retries.")
+        self.logger.info("Connection: connected to infinity.")
         return infinity_obj
 
     def connect_pool(self, uri: str):
-        try_n = 10
+        try_n = 15
         infinity_pool = None
         for i in range(try_n):
             try:
@@ -154,7 +156,7 @@ class InfinityRunner:
                 if infinity_pool is not None:
                     if isinstance(e, InfinityException):
                         if e.error_code == ErrorCode.INFINITY_IS_INITING:
-                            self.logger.info("wait infinity starting")
+                            self.logger.info("Connection pool: wait infinity starting")
                         else:
                             raise e
                     else:
@@ -162,18 +164,21 @@ class InfinityRunner:
                 else:
                     self.logger.warn(str(e))
                 sleep_time = 1 * (i + 1)
-                self.logger.info(f"Retrying connection attempt {i + 1} after {sleep_time} seconds.")
                 time.sleep(sleep_time)
+                current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                self.logger.info(
+                    f"Connection pool: retrying connection attempt {i + 1} after {sleep_time} seconds, at {current_time}.")
         else:
-            raise Exception(f"Cannot connect to infinity after {try_n} retries.")
-        self.logger.info("Connected to infinity.")
+            raise Exception(f"Connection pool: cannot connect to infinity after {try_n} retries.")
+        self.logger.info("Connection pool: connected to infinity.")
         return infinity_pool
-
 
 
 '''
 This decorator is used to run a test function with an infinity connection object.
 '''
+
+
 def infinity_runner_decorator_factory(
         config_path: str | None,
         uri: str,
@@ -210,6 +215,8 @@ def infinity_runner_decorator_factory(
 '''
 This decorator is used to run a test function with an infinity ConnectionPool object.
 '''
+
+
 def infinity_runner_decorator_factory2(
         config_path: str | None,
         uri: str,

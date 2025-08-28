@@ -97,6 +97,8 @@ public:
 
     void DropTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropTableRequest &request) final;
 
+    void RenameTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::RenameTableRequest &request) final;
+
     void Insert(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::InsertRequest &request) final;
 
     std::tuple<CopyFileType, Status> GetCopyFileType(infinity_thrift_rpc::CopyFileType::type copy_file_type);
@@ -132,8 +134,6 @@ public:
     void ShowTable(infinity_thrift_rpc::ShowTableResponse &response, const infinity_thrift_rpc::ShowTableRequest &request) final;
 
     void ShowColumns(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowColumnsRequest &request) final;
-
-    void ShowTables(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowTablesRequest &request) final;
 
     void ShowSegments(infinity_thrift_rpc::SelectResponse &_return, const infinity_thrift_rpc::ShowSegmentsRequest &request) final;
 

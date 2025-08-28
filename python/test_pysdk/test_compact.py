@@ -65,6 +65,10 @@ class TestInfinity:
         res = table_obj.import_data(test_csv_dir)
         assert res.error_code == ErrorCode.OK
 
+        res = table_obj.show_segments()
+        print(res)
+        assert len(res) == 4
+
         res, extra_result = table_obj.output(["count(*)"]).to_pl()
         assert res.height == 1 and res.width == 1 and res.item(0, 0) == 12
 
@@ -75,7 +79,8 @@ class TestInfinity:
         if res.error_code != ErrorCode.OK:
             sleep(2)
 
-        assert len(table_obj.show_segments()) == 1
+        res = table_obj.show_segments()
+        assert len(res) == 1
 
         res, extra_result = table_obj.output(["count(*)"]).to_pl()
         assert res.height == 1 and res.width == 1 and res.item(0, 0) == 12

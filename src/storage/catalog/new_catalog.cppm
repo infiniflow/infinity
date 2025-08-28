@@ -59,6 +59,7 @@ class DbCache;
 class SystemCache;
 class FunctionSet;
 class SpecialFunction;
+class MetaCache;
 
 enum class ColumnVectorMode;
 
@@ -236,7 +237,7 @@ private:
     std::atomic<TxnTimeStamp> last_cleanup_ts_{0};
 
 public:
-    static Status InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts);
+    static Status InitCatalog(MetaCache *meta_cache, KVInstance *kv_instance, TxnTimeStamp checkpoint_ts);
 
     static Status MemIndexRecover(NewTxn *txn);
 
@@ -249,7 +250,7 @@ public:
                            TxnTimeStamp commit_ts,
                            const std::string &db_name,
                            const std::string *db_comment,
-                           std::optional<DBMeeta> &db_meta);
+                           std::shared_ptr<DBMeeta> &db_meta);
 
     static Status CleanDB(DBMeeta &db_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
@@ -258,7 +259,7 @@ public:
                               TxnTimeStamp begin_ts,
                               TxnTimeStamp commit_ts,
                               const std::shared_ptr<TableDef> &table_def,
-                              std::optional<TableMeeta> &table_meta);
+                              std::shared_ptr<TableMeeta> &table_meta);
 
     static Status CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
@@ -266,13 +267,9 @@ public:
                             const std::string &index_id_str,
                             TxnTimeStamp commit_ts,
                             const std::shared_ptr<IndexBase> &index_base,
-                            std::optional<TableIndexMeeta> &table_index_meta);
+                            std::shared_ptr<TableIndexMeeta> &table_index_meta);
 
     static Status CleanTableIndex(TableIndexMeeta &table_index_meta, UsageFlag usage_flag);
-
-    // static Status AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, std::optional<SegmentMeta> &segment_meta);
-
-    static Status AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts, std::optional<SegmentMeta> &segment_meta);
 
     static Status AddNewSegmentWithID(TableMeeta &table_meta, TxnTimeStamp commit_ts, std::optional<SegmentMeta> &segment_meta, SegmentID segment_id);
 
@@ -296,7 +293,8 @@ public:
 
     static Status CleanBlock(BlockMeta &block_meta, UsageFlag usage_flag);
 
-    static Status AddNewBlockColumn(BlockMeta &block_meta, size_t column_idx, std::optional<ColumnMeta> &column_meta);
+    static Status
+    AddNewBlockColumn(BlockMeta &block_meta, size_t column_idx, const std::shared_ptr<ColumnDef> &column_def, std::optional<ColumnMeta> &column_meta);
 
     static Status
     AddNewBlockColumnForTransform(BlockMeta &block_meta, size_t column_idx, std::optional<ColumnMeta> &column_meta, TxnTimeStamp commit_ts);
@@ -339,7 +337,11 @@ public:
 
     static Status CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UsageFlag usage_flag);
 
-    static Status GetColumnVector(ColumnMeta &column_meta, size_t row_count, const ColumnVectorMode &tipe, ColumnVector &column_vector);
+    static Status GetColumnVector(ColumnMeta &column_meta,
+                                  const std::shared_ptr<ColumnDef> &col_def,
+                                  size_t row_count,
+                                  const ColumnVectorMode &tipe,
+                                  ColumnVector &column_vector);
 
     static Status GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, NewTxnGetVisibleRangeState &state);
 

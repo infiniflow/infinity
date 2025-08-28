@@ -103,9 +103,9 @@ TEST_P(TestTxnIndex, index_test1) {
         auto *txn3_1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get index"), TransactionType::kNormal);
         std::shared_ptr<IndexBase> index_def1;
 
-        std::optional<DBMeeta> db_meta;
-        std::optional<TableMeeta> table_meta;
-        std::optional<TableIndexMeeta> index_meta;
+        std::shared_ptr<DBMeeta> db_meta;
+        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<TableIndexMeeta> index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn3_1->GetTableIndexMeta(*db_name, *table_name, *index_name, db_meta, table_meta, index_meta, &table_key, &index_key);

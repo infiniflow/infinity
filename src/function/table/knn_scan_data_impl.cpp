@@ -55,13 +55,13 @@ KnnScanSharedData::KnnScanSharedData(std::shared_ptr<BaseTableRef> table_ref,
                                      std::unique_ptr<std::vector<std::shared_ptr<SegmentIndexMeta>>> segment_index_metas,
                                      std::vector<InitParameter> opt_params,
                                      i64 topk,
-                                     i64 dimension,
+                                     i64 query_dimension,
                                      i64 query_embedding_count,
                                      void *query_embedding,
                                      EmbeddingDataType elem_type,
                                      KnnDistanceType knn_distance_type)
     : table_ref_(table_ref), block_metas_(std::move(block_metas)), table_index_meta_(std::move(table_index_meta)),
-      segment_index_metas_(std::move(segment_index_metas)), opt_params_(std::move(opt_params)), topk_(topk), dimension_(dimension),
+      segment_index_metas_(std::move(segment_index_metas)), opt_params_(std::move(opt_params)), topk_(topk), query_dimension_(query_dimension),
       query_count_(query_embedding_count), query_embedding_(query_embedding), query_elem_type_(elem_type), knn_distance_type_(knn_distance_type) {}
 
 KnnScanSharedData::~KnnScanSharedData() = default;
@@ -202,6 +202,13 @@ void KnnDistance1<i8, f32>::InitKnnDistance1(KnnDistanceType dist_type) {
 KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData *shared_data, u32 current_parallel_idx, bool execute_block_scan_job)
     : knn_scan_shared_data_(shared_data), task_id_(current_parallel_idx), execute_block_scan_job_(execute_block_scan_job) {
     merge_knn_base_ = MergeKnnBase::Make(knn_scan_shared_data_);
+
+    // Use bigger topK for multivector HNSW retrieve
+    i64 hnsw_topk = 10 * knn_scan_shared_data_->topk_;
+    std::swap(knn_scan_shared_data_->topk_, hnsw_topk);
+    merge_knn_base_hnsw_ = MergeKnnBase::Make(knn_scan_shared_data_);
+    std::swap(knn_scan_shared_data_->topk_, hnsw_topk);
+
     knn_distance_ = KnnDistanceBase1::Make(knn_scan_shared_data_->query_elem_type_, knn_scan_shared_data_->knn_distance_type_);
 }
 

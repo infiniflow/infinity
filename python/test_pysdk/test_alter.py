@@ -237,8 +237,8 @@ class TestInfinity:
 
         table_obj.insert([{"c1": 1, "c2": 2, "c3": "test"}])
 
-        # res = table_obj.drop_columns("c3")
-        # assert res.error_code == infinity.ErrorCode.NOT_SUPPORTED
+        res = table_obj.drop_columns("c3")
+        assert res.error_code == infinity.ErrorCode.NOT_SUPPORTED
 
         res = table_obj.drop_columns("c2")
         assert res.error_code == infinity.ErrorCode.OK

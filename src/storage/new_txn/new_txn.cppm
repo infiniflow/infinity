@@ -116,6 +116,7 @@ struct BlockColumnInfo;
 struct TableDetail;
 struct CheckpointTxnStore;
 struct MetaKey;
+struct MetaBaseCache;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -287,8 +288,6 @@ public:
 
     Status RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const std::vector<WalCmdCreateIndexV2> &index_cmds, bool is_link_files = false);
 
-    Status DropTableSnapShot(const std::string &db_name, const std::string &table_name);
-
     std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> GetDatabaseSnapshotInfo(const std::string &db_name);
 
     Status RestoreDatabaseSnapshot(const std::shared_ptr<DatabaseSnapshotInfo> &database_snapshot_info);
@@ -391,6 +390,8 @@ public:
 
     TransactionType GetTxnType() const;
 
+    TxnType txn_type() const;
+
     bool NeedToAllocate() const;
 
     void SetTxnType(TransactionType type);
@@ -449,28 +450,31 @@ private:
     void CheckTxn(const std::string &db_name);
 
 public:
-    Status GetDBMeta(const std::string &db_name, std::optional<DBMeeta> &db_meta, TxnTimeStamp &db_create_ts, std::string *db_key = nullptr);
+    Status GetDBMeta(const std::string &db_name, std::shared_ptr<DBMeeta> &db_meta, TxnTimeStamp &db_create_ts, std::string *db_key = nullptr);
 
     Status GetTableMeta(const std::string &db_name,
                         const std::string &table_name,
-                        std::optional<DBMeeta> &db_meta,
-                        std::optional<TableMeeta> &table_meta,
+                        std::shared_ptr<DBMeeta> &db_meta,
+                        std::shared_ptr<TableMeeta> &table_meta,
                         std::string *table_key = nullptr);
 
-    Status GetTableMeta(const std::string &table_name, DBMeeta &db_meta, std::optional<TableMeeta> &table_meta, std::string *table_key = nullptr);
+    Status GetTableMeta(const std::string &table_name,
+                        std::shared_ptr<DBMeeta> &db_meta,
+                        std::shared_ptr<TableMeeta> &table_meta,
+                        std::string *table_key = nullptr);
 
     Status GetTableIndexMeta(const std::string &db_name,
                              const std::string &table_name,
                              const std::string &index_name,
-                             std::optional<DBMeeta> &db_meta,
-                             std::optional<TableMeeta> &table_meta,
-                             std::optional<TableIndexMeeta> &table_index_meta,
+                             std::shared_ptr<DBMeeta> &db_meta,
+                             std::shared_ptr<TableMeeta> &table_meta,
+                             std::shared_ptr<TableIndexMeeta> &table_index_meta,
                              std::string *table_key,
                              std::string *index_key);
 
     Status GetTableIndexMeta(const std::string &index_name,
                              TableMeeta &table_meta,
-                             std::optional<TableIndexMeeta> &table_index_meta,
+                             std::shared_ptr<TableIndexMeeta> &table_index_meta,
                              std::string *index_key = nullptr);
 
 private:
@@ -489,14 +493,17 @@ private:
 
     Status CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_state);
 
-    Status AddColumnsData(TableMeeta &table_meta, const std::vector<std::shared_ptr<ColumnDef>> &column_defs);
+    Status
+    AddColumnsData(TableMeeta &table_meta, const std::vector<std::shared_ptr<ColumnDef>> &column_defs, const std::vector<u32> &column_idx_list);
 
     Status AddColumnsDataInSegment(SegmentMeta &segment_meta,
                                    const std::vector<std::shared_ptr<ColumnDef>> &column_defs,
+                                   const std::vector<u32> &column_idx_list,
                                    const std::vector<Value> &default_values);
 
     Status AddColumnsDataInBlock(BlockMeta &block_meta,
                                  const std::vector<std::shared_ptr<ColumnDef>> &column_defs,
+                                 const std::vector<u32> &column_idx_list,
                                  const std::vector<Value> &default_values);
 
     Status DropColumnsData(TableMeeta &table_meta, const std::vector<ColumnID> &column_ids);
@@ -702,6 +709,10 @@ public:
     const std::vector<std::unique_ptr<std::binary_semaphore>> &semas() const;
     void AddMetaKeyForBufferObject(std::unique_ptr<MetaKey> object_meta_key);
 
+    void AddMetaCache(const std::shared_ptr<MetaBaseCache> &meta_base_cache);
+    void ResetMetaCache();
+    void SaveMetaCache();
+
 private:
     // Reference to external class
     NewTxnManager *txn_mgr_{};
@@ -746,6 +757,9 @@ private:
 
     // Use for commit and rollback
     std::vector<std::unique_ptr<std::binary_semaphore>> semas_{};
+
+    // Meta cache
+    std::vector<std::shared_ptr<MetaBaseCache>> meta_cache_items_{}; // cache item to store
 
 private:
     std::shared_ptr<TxnContext> txn_context_ptr_{};

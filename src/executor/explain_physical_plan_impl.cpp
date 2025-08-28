@@ -1930,6 +1930,42 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node,
             result->emplace_back(std::make_shared<std::string>(output_columns_str));
             break;
         }
+        case ShowStmtType::kListCaches: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> SHOW CACHES ";
+            } else {
+                show_str = "SHOW CACHES ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+
+            std::string output_columns_str = std::string(intent_size, ' ');
+            output_columns_str += " - output columns: [type, name, commit_ts, detail]";
+            result->emplace_back(std::make_shared<std::string>(output_columns_str));
+            break;
+        }
+        case ShowStmtType::kShowCache: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> SHOW CACHE ";
+            } else {
+                show_str = "SHOW CACHE ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+
+            std::string output_columns_str = std::string(intent_size, ' ');
+            output_columns_str += " - output columns: [cache_type, number, request_count, hit_count, hit_rate]";
+            result->emplace_back(std::make_shared<std::string>(output_columns_str));
+            break;
+        }
         case ShowStmtType::kInvalid: {
             UnrecoverableError("Invalid show type");
         }

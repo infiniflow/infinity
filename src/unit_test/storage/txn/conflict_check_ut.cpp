@@ -110,8 +110,8 @@ protected:
     void CheckRowCnt(const std::string &db_name, const std::string &table_name, size_t expected_row_cnt) {
         auto *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("Check row count"), TransactionType::kNormal);
 
-        std::optional<DBMeeta> db_meta;
-        std::optional<TableMeeta> table_meta;
+        std::shared_ptr<DBMeeta> db_meta;
+        std::shared_ptr<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
         auto [row_cnt, status2] = table_meta->GetTableRowCount();

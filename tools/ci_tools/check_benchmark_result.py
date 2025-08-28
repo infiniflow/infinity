@@ -47,7 +47,7 @@ def main():
         sys.exit(0)
     else:
         print("benchmark result is unacceptable")
-        sys.exit(0)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -476,8 +476,8 @@ TEST_P(WalReplayTest, wal_replay_append) {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
             Status status;
 
-            std::optional<DBMeeta> db_meta;
-            std::optional<TableMeeta> table_meta;
+            std::shared_ptr<DBMeeta> db_meta;
+            std::shared_ptr<TableMeeta> table_meta;
             status = txn->GetTableMeta("default_db", "tbl4", db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
@@ -495,7 +495,8 @@ TEST_P(WalReplayTest, wal_replay_append) {
                 auto check_column = [&](ColumnID column_id, const Value &v) {
                     ColumnMeta column_meta(column_id, block_meta);
                     ColumnVector col1;
-                    status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, col1);
+                    status =
+                        NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), block_row_count, ColumnVectorMode::kReadOnly, col1);
                     EXPECT_TRUE(status.ok());
 
                     for (u32 i = 0; i < block_row_count; ++i) {
@@ -691,8 +692,8 @@ TEST_P(WalReplayTest, wal_replay_import) {
                 auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
                 Status status;
 
-                std::optional<DBMeeta> db_meta;
-                std::optional<TableMeeta> table_meta;
+                std::shared_ptr<DBMeeta> db_meta;
+                std::shared_ptr<TableMeeta> table_meta;
                 status = txn->GetTableMeta("default_db", "tbl3", db_meta, table_meta);
                 EXPECT_TRUE(status.ok());
 
@@ -710,7 +711,11 @@ TEST_P(WalReplayTest, wal_replay_import) {
                     auto check_column = [&](ColumnID column_id, const Value &v) {
                         ColumnMeta column_meta(column_id, block_meta);
                         ColumnVector col1;
-                        status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, col1);
+                        status = NewCatalog::GetColumnVector(column_meta,
+                                                             column_meta.get_column_def(),
+                                                             block_row_count,
+                                                             ColumnVectorMode::kReadOnly,
+                                                             col1);
                         EXPECT_TRUE(status.ok());
 
                         for (u32 i = 0; i < block_row_count; ++i) {

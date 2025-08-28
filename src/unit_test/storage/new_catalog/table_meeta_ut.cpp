@@ -31,6 +31,7 @@ import :txn_state;
 import :segment_meta;
 import :table_meeta;
 import :block_meta;
+import :meta_cache;
 
 import column_def;
 import data_type;
@@ -50,7 +51,9 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
 
     Status status;
 
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    Storage *storage = infinity::InfinityContext::instance().storage();
+    NewTxnManager *new_txn_mgr = storage->new_txn_manager();
+    MetaCache *meta_cache = storage->meta_cache();
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -93,7 +96,13 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
     EXPECT_TRUE(get_status.ok());
 
     std::unique_ptr<KVInstance> kv_instance = infinity::InfinityContext::instance().storage()->KVInstance();
-    TableMeeta table_meta(table_info->db_id_, table_info->table_id_, kv_instance.get(), txn2->BeginTS(), txn2->CommitTS());
+    TableMeeta table_meta(table_info->db_id_,
+                          table_info->table_id_,
+                          *table_info->table_name_,
+                          kv_instance.get(),
+                          txn2->BeginTS(),
+                          txn2->CommitTS(),
+                          meta_cache);
 
     {
         {

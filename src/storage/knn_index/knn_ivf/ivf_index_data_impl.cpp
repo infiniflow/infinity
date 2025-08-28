@@ -74,7 +74,7 @@ private:
             }
 
             ColumnMeta column_meta(column_id_, block_meta);
-            status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, cur_column_vector_);
+            status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, cur_column_vector_);
             if (!status.ok()) {
                 UnrecoverableError("Get column vector failed");
             }

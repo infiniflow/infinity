@@ -3,8 +3,16 @@
 # group: [explain]
 
 
-statement ok
+query I
 explain CREATE TABLE explain1 (i INTEGER);
+----
+ CREATE TABLE (2)
+  - database name: default_db
+  - table name: explain1
+  - columns: [i Integer default Null]
+  - conflict type: Issue error
+  - output columns: [OK]
+
 
 statement error
 explain SELECT * FROM explain1;
@@ -13,8 +21,16 @@ explain SELECT * FROM explain1;
 statement ok
 CREATE TABLE explain1 (i INTEGER);
 
-statement ok
+query I
 explain SELECT * FROM explain1;
+----
+ PROJECT (3)
+  - table index: #4
+  - expressions: [i (#0)]
+ -> TABLE SCAN (2)
+    - table name: explain1(default_db.explain1)
+    - table index: #1
+    - output_columns: [i, __rowid]
 
 query I
 COPY explain1 FROM '/var/infinity/test_data/one.csv' WITH ( DELIMITER ',', FORMAT CSV);
