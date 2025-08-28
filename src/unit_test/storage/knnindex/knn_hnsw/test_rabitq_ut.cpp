@@ -112,11 +112,13 @@ TEST_F(RabitqTest, test_simple) {
         meta.Optimize<LabelType>(DenseVectorIter(iter), {}, mem_usage);
         meta.Dump(std::cout);
         const DataType *rom = meta.rom();
-        const DataType *centroid = meta.centroid();
+        const DataType *rot_centroid = meta.rot_centroid();
+        auto centroid = std::make_unique<DataType[]>(dim_);
+        matrixA_multiply_transpose_matrixB_output_to_C(rot_centroid, rom, 1, meta.dim(), meta.dim(), centroid.get());
         write_rom = std::make_unique<DataType[]>(dim_ * dim_);
         std::copy(rom, rom + dim_ * dim_, write_rom.get());
         for (int d = 0; d < dim_; ++d) {
-            ASSERT_EQ(centroid[d], truth_centroid[d]);
+            EXPECT_LT(std::fabs(centroid[d] - truth_centroid[d]), std::fabs(truth_centroid[d]) * 1e-5);
         }
 
         RabitqVecStoreInner inner = RabitqVecStoreInner::Make(vec_n_, meta, write_mem);
@@ -142,14 +144,16 @@ TEST_F(RabitqTest, test_simple) {
 
         RabitqVecStoreMeta meta = RabitqVecStoreMeta::Load(*file_handle);
         const DataType *rom = meta.rom();
-        const DataType *centroid = meta.centroid();
+        const DataType *rot_centroid = meta.rot_centroid();
+        auto centroid = std::make_unique<DataType[]>(dim_);
+        matrixA_multiply_transpose_matrixB_output_to_C(rot_centroid, rom, 1, meta.dim(), meta.dim(), centroid.get());
         for (int i = 0; i < dim_; ++i) {
             for (int j = 0; j < dim_; ++j) {
                 ASSERT_EQ(rom[i * dim_ + j], write_rom[i * dim_ + j]);
             }
         }
         for (int d = 0; d < dim_; ++d) {
-            ASSERT_EQ(centroid[d], truth_centroid[d]);
+            EXPECT_LT(std::fabs(centroid[d] - truth_centroid[d]), std::fabs(truth_centroid[d]) * 1e-5);
         }
 
         size_t mem_usage = 0;
@@ -172,14 +176,16 @@ TEST_F(RabitqTest, test_simple) {
 
         RabitqVecStoreMeta meta = RabitqVecStoreMeta::LoadFromPtr(ptr);
         const DataType *rom = meta.rom();
-        const DataType *centroid = meta.centroid();
+        const DataType *rot_centroid = meta.rot_centroid();
+        auto centroid = std::make_unique<DataType[]>(dim_);
+        matrixA_multiply_transpose_matrixB_output_to_C(rot_centroid, rom, 1, meta.dim(), meta.dim(), centroid.get());
         for (int i = 0; i < dim_; ++i) {
             for (int j = 0; j < dim_; ++j) {
                 ASSERT_EQ(rom[i * dim_ + j], write_rom[i * dim_ + j]);
             }
         }
         for (int d = 0; d < dim_; ++d) {
-            ASSERT_EQ(centroid[d], truth_centroid[d]);
+            EXPECT_LT(std::fabs(centroid[d] - truth_centroid[d]), std::fabs(truth_centroid[d]) * 1e-5);
         }
 
         RabitqVecStoreInner inner = RabitqVecStoreInner::LoadFromPtr(ptr, 0, meta);
@@ -204,7 +210,10 @@ TEST_F(RabitqTest, test_simple) {
         }
         ASSERT_EQ(inner_size, write_mem);
 
-        const DataType *centroid = meta.centroid();
+        const DataType *rom = meta.rom();
+        const DataType *rot_centroid = meta.rot_centroid();
+        auto centroid = std::make_unique<DataType[]>(dim_);
+        matrixA_multiply_transpose_matrixB_output_to_C(rot_centroid, rom, 1, meta.dim(), meta.dim(), centroid.get());
         for (int d = 0; d < dim_; ++d) {
             std::cout << fmt::format("d: {}, truth centroid: {}, latest centroid: {}, loss: {}",
                                      d,
@@ -212,7 +221,7 @@ TEST_F(RabitqTest, test_simple) {
                                      centroid[d],
                                      std::fabs(centroid[d] - truth_centroid[d]) / truth_centroid[d])
                       << std::endl;
-            EXPECT_LT(std::fabs(centroid[d] - truth_centroid[d]), truth_centroid[d] * 0.015);
+            EXPECT_LT(std::fabs(centroid[d] - truth_centroid[d]), std::fabs(truth_centroid[d]) * 0.015);
         }
     }
 }
