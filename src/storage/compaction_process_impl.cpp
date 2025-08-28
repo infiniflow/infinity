@@ -288,6 +288,7 @@ void CompactionProcessor::NewScanAndOptimize() {
                                                     fmt::join(store_entry.deprecate_chunks_, ","),
                                                     fmt::join(chunk_ids, ","));
 
+                LOG_DEBUG(task_text);
                 bg_task_info->task_info_list_.emplace_back(task_text);
                 if (commit_status.ok()) {
                     bg_task_info->status_list_.emplace_back("OK");
