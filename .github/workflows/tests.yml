@@ -1320,19 +1320,18 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log
-            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c \
               "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ
-            -v $PWD:/infinity
-            -v /var/infinity/${CONTAINER_NAME}/:/var/infinity
-            -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity:/infinity/cmake-build-release/src/infinity
-            -v /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log:/infinity_log/
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ \
+            -v $PWD:/infinity \
+            -v /var/infinity/${CONTAINER_NAME}/:/var/infinity \
+            -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity:/infinity/cmake-build-release/src/infinity \
+            -v /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log:/infinity_log/ \
             infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: SSH to host server to start test task
@@ -1350,29 +1349,30 @@ jobs:
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf
-          cd /infinity/
-          pip3 uninstall -y infinity-sdk
-          pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf &&
+            cd /infinity/ &&
+            pip3 uninstall -y infinity-sdk &&
+            pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
 
       - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ &&
             cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > http_remote_debug.log 2> http_remote_debug_error.log" &
 
       - name: Run HTTP infinity test release version
         if: ${{ !cancelled() && !failure() }}
         id: run_http_remote_debug
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ &&
             LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_http_api.py"
           sleep 1s
 
       - name: Collect infinity log
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mv /infinity/http_remote_release /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log/http_remote_release.log &&
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "
+            mv /infinity/http_remote_release /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log/http_remote_release.log &&
             mv /infinity/http_remote_release_error /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log/http_remote_release_error.log"
 
       - name: Remove test container
