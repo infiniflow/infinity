@@ -172,18 +172,17 @@ public:
 public:
     RabitqVecStoreMetaBase() : origin_dim_(0), dim_(0), compress_data_size_(0), compress_query_size_(0) {}
     RabitqVecStoreMetaBase(This &&other)
-        : origin_dim_(std::exchange(other.origin_dim_, 0)), rom_(std::move(other.rom_)), centroid_(std::move(other.centroid_)),
+        : origin_dim_(std::exchange(other.origin_dim_, 0)), rom_(std::move(other.rom_)), rot_centroid_(std::move(other.rot_centroid_)),
           dim_(std::exchange(other.dim_, 0)), compress_data_size_(std::exchange(other.compress_data_size_, 0)),
-          compress_query_size_(std::exchange(other.compress_query_size_, 0)), rot_centroid_(std::move(other.rot_centroid_)) {}
+          compress_query_size_(std::exchange(other.compress_query_size_, 0)) {}
     RabitqVecStoreMetaBase &operator=(This &&other) {
         if (this != &other) {
             origin_dim_ = std::exchange(other.origin_dim_, 0);
             rom_ = std::move(other.rom_);
-            centroid_ = std::move(other.centroid_);
+            rot_centroid_ = std::move(other.rot_centroid_);
             dim_ = std::exchange(other.dim_, 0);
             compress_data_size_ = std::exchange(other.compress_data_size_, 0);
             compress_query_size_ = std::exchange(other.compress_query_size_, 0);
-            rot_centroid_ = std::move(other.rot_centroid_);
         }
         return *this;
     }
@@ -191,7 +190,7 @@ public:
     void Save(LocalFileHandle &file_handle) const {
         file_handle.Append(&origin_dim_, sizeof(origin_dim_));
         file_handle.Append(rom_.get(), sizeof(DataType) * dim_ * dim_);
-        file_handle.Append(centroid_.get(), sizeof(DataType) * dim_);
+        file_handle.Append(rot_centroid_.get(), sizeof(DataType) * dim_);
     }
 
     QueryType MakeQuery(const DataType *vec) const {
@@ -328,12 +327,6 @@ public:
             os << std::endl;
         }
 
-        os << "centroid: ";
-        for (size_t i = 0; i < dim_; ++i) {
-            os << centroid_[i] << " ";
-        }
-        os << std::endl;
-
         os << "rot_centroid: ";
         for (size_t i = 0; i < dim_; ++i) {
             os << rot_centroid_[i] << " ";
@@ -349,7 +342,7 @@ public:
     size_t compress_data_size() const { return compress_data_size_; }
     size_t compress_query_size() const { return compress_query_size_; }
     const DataType *rom() const { return rom_.get(); }
-    const DataType *centroid() const { return centroid_.get(); }
+    const DataType *rot_centroid() const { return rot_centroid_.get(); }
 
 protected:
     void DecompressCode(StoreType src, DataType *dest, const DataType *rot_centroid) {
@@ -377,13 +370,12 @@ protected:
 
 protected:
     size_t origin_dim_;
-    ArrayPtr<DataType, OwnMem> rom_;      // Random orthogonal matrix
-    ArrayPtr<DataType, OwnMem> centroid_; // Centroid of all vector in DataStore
+    ArrayPtr<DataType, OwnMem> rom_;          // Random orthogonal matrix
+    ArrayPtr<DataType, OwnMem> rot_centroid_; // Rotation centroid of all vector in DataStore
 
     size_t dim_;
     size_t compress_data_size_;
     size_t compress_query_size_;
-    ArrayPtr<DataType, true> rot_centroid_;
 };
 
 export template <typename DataType, bool OwnMem>
@@ -404,11 +396,10 @@ private:
         size_t dim = AlignUp(origin_dim, MetaType::align_size_);
         this->dim_ = dim;
         this->rom_ = std::make_unique<DataType[]>(dim * dim);
-        this->centroid_ = std::make_unique<DataType[]>(dim);
+        this->rot_centroid_ = std::make_unique<DataType[]>(dim);
         GenerateRandomOrthogonalMatrix<DataType>(this->rom_.get(), this->dim_);
         this->compress_data_size_ = sizeof(StoreData) + dim / MetaType::align_size_;
         this->compress_query_size_ = sizeof(QueryData) + dim * sizeof(CompressType);
-        this->rot_centroid_ = std::make_unique<DataType[]>(dim);
     }
 
 public:
@@ -422,8 +413,7 @@ public:
         This meta(origin_dim);
         size_t dim = meta.dim_;
         file_handle.Read(meta.rom_.get(), dim * dim * sizeof(DataType));
-        file_handle.Read(meta.centroid_.get(), dim * sizeof(DataType));
-        matrixA_multiply_matrixB_output_to_C(meta.centroid_.get(), meta.rom_.get(), 1, dim, dim, meta.rot_centroid_.get());
+        file_handle.Read(meta.rot_centroid_.get(), dim * sizeof(DataType));
         return meta;
     }
 
@@ -433,9 +423,8 @@ public:
         size_t dim = meta.dim_;
         std::memcpy(meta.rom_.get(), ptr, dim * dim * sizeof(DataType));
         ptr += dim * dim * sizeof(DataType);
-        std::memcpy(meta.centroid_.get(), ptr, dim * sizeof(DataType));
+        std::memcpy(meta.rot_centroid_.get(), ptr, dim * sizeof(DataType));
         ptr += dim * sizeof(DataType);
-        matrixA_multiply_matrixB_output_to_C(meta.centroid_.get(), meta.rom_.get(), 1, dim, dim, meta.rot_centroid_.get());
         return meta;
     }
 
@@ -475,7 +464,6 @@ public:
         // Save rot_centroid
         auto new_rot_centroid = std::make_unique<DataType[]>(dim);
         matrixA_multiply_matrixB_output_to_C(new_centroid.get(), this->rom_.get(), 1, dim, dim, new_rot_centroid.get());
-        new_centroid = this->centroid_.exchange(std::move(new_centroid));
         new_rot_centroid = this->rot_centroid_.exchange(std::move(new_rot_centroid));
 
         // Update old vector code
@@ -500,16 +488,14 @@ public:
     using CompressType = typename Base::CompressType;
 
 private:
-    RabitqVecStoreMeta(size_t origin_dim, DataType *rom, DataType *centroid) {
+    RabitqVecStoreMeta(size_t origin_dim, DataType *rom, DataType *rot_centroid) {
         this->origin_dim_ = origin_dim;
         this->rom_ = rom;
-        this->centroid_ = centroid;
+        this->rot_centroid_ = rot_centroid;
         size_t dim = AlignUp(origin_dim, MetaType::align_size_);
         this->dim_ = dim;
         this->compress_data_size_ = sizeof(StoreData) + dim / MetaType::align_size_;
         this->compress_query_size_ = sizeof(QueryData) + dim * sizeof(CompressType);
-        this->rot_centroid_ = std::make_unique<DataType[]>(dim);
-        matrixA_multiply_matrixB_output_to_C(centroid, rom, 1, dim, dim, this->rot_centroid_.get());
     }
 
 public:
@@ -520,9 +506,9 @@ public:
         size_t dim = AlignUp(origin_dim, MetaType::align_size_);
         auto *rom = reinterpret_cast<DataType *>(const_cast<char *>(ptr));
         ptr += dim * dim * sizeof(DataType);
-        auto *centroid = reinterpret_cast<DataType *>(const_cast<char *>(ptr));
+        auto *rot_centroid = reinterpret_cast<DataType *>(const_cast<char *>(ptr));
         ptr += dim * sizeof(DataType);
-        return This(origin_dim, rom, centroid);
+        return This(origin_dim, rom, rot_centroid);
     }
 };
 
