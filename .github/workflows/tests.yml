@@ -920,10 +920,11 @@ jobs:
       - name: Prepare artifacts
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "mv /infinity/cmake-build-release/src/infinity /infinity_artifact/ &&
-            mv /infinity/cmake-build-release/src/test_main /infinity_artifact/ &&
-            mv /infinity/cmake-build-release/benchmark/local_infinity/knn_query_benchmark /infinity_artifact/ &&
-            mv /infinity/cmake-build-release/benchmark/local_infinity/knn_import_benchmark /infinity_artifact/"
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "mv /infinity/cmake-build-release/src/infinity /infinity_artifact/"
+#            mv /infinity/cmake-build-release/src/test_main /infinity_artifact/ &&
+#            mv /infinity/cmake-build-release/benchmark/local_infinity/knn_query_benchmark /infinity_artifact/ &&
+#            mv /infinity/cmake-build-release/benchmark/local_infinity/knn_import_benchmark /infinity_artifact/
+
 
       - name: Stop build container
         if: always()
@@ -1031,7 +1032,7 @@ jobs:
 #        run: |
 #          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
 #          mkdir /var/infinity
-#          cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > sqllogictest_debug.log 2> sqllogictest_debug_error.log" &
+#          cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > sqllogictest_release.log 2> sqllogictest_release_error.log" &
 #
 #      - name: Run sqllogictest release version
 #        if: ${{ !cancelled() && !failure() }}
@@ -1137,7 +1138,7 @@ jobs:
 #        id: run_unit_test_debug
 #        run: |
 #          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-#            ASAN_OPTIONS=detect_leaks=0 cmake-build-release/src/test_main > unittest_debug.log 2> unittest_debug_error.log"
+#            ASAN_OPTIONS=detect_leaks=0 cmake-build-release/src/test_main > unittest_release.log 2> unittest_release_error.log"
 #
 #      - name: Remove test container
 #        if: always()  # always run this step even if previous steps failed
@@ -1242,7 +1243,7 @@ jobs:
 #        if: ${{ !cancelled() && !failure() }}
 #        run: |
 #          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-#            cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > pysdk_remote_debug.log 2> pysdk_remote_debug_error.log" &
+#            cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > pysdk_remote_release.log 2> pysdk_remote_release_error.log" &
 #
 #      - name: Run pysdk remote infinity test release version
 #        if: ${{ !cancelled() && !failure() }}
@@ -1372,8 +1373,8 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "
-            mv /infinity/http_remote_release.log /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log/http_remote_release.log &&
-            mv /infinity/http_remote_release_error.log /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log/http_remote_release_error.log"
+            mv /infinity/http_remote_release.log /infinity_log/http_remote_release.log &&
+            mv /infinity/http_remote_release_error.log /infinity_log/http_remote_release_error.log"
 
       - name: Remove test container
         if: always()  # always run this step even if previous steps failed
@@ -1478,7 +1479,7 @@ jobs:
 #        if: ${{ !cancelled() && !failure() }}
 #        run: |
 #          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-#            cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_debug.log 2> parallel_test_debug_error.log" &
+#            cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_release.log 2> parallel_test_release_error.log" &
 #
 #      - name: Run pysdk parallel test release version
 #        if: ${{ !cancelled() && !failure() }}
@@ -1606,7 +1607,7 @@ jobs:
 #        if: ${{ !cancelled() && !failure() }}
 #        run: |
 #          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-#            cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_debug.log 2> parallel_test_debug_error.log" &
+#            cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_release.log 2> parallel_test_release_error.log" &
 #
 #      - name: Run minio pysdk remote test
 #        if: ${{ !cancelled() && !failure() }}
@@ -1739,7 +1740,7 @@ jobs:
 #        if: ${{ !cancelled() && !failure() }}
 #        run: |
 #          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-#            cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_debug.log 2> parallel_test_debug_error.log" &
+#            cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_release.log 2> parallel_test_release_error.log" &
 #
 #      - name: Run minio parallel test
 #        if: ${{ !cancelled() && !failure() }}
