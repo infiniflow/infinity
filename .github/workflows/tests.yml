@@ -892,9 +892,9 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS}
-            -v $PWD:/infinity
-            -v /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}/:/infinity_artifact
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} \
+            -v $PWD:/infinity \
+            -v /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}/:/infinity_artifact \
             --cpus ${CPUS} infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Configure release version
