@@ -325,6 +325,11 @@ public:
         return inner.GetVec(idx, this->vec_store_meta_);
     }
 
+    typename VecStoreT::QueryType GetVecToQuery(size_t vec_i) const {
+        const auto &[inner, idx] = GetInner(vec_i);
+        return inner.GetVecToQuery(idx, this->vec_store_meta_);
+    }
+
     // Graph store
     void AddVertex(VertexType vec_i, i32 layer_n) {
         auto [inner, idx] = GetInner(vec_i);
@@ -562,6 +567,10 @@ public:
 
     // vec store
     typename VecStoreT::StoreType GetVec(VertexType vec_i, const VecStoreMeta &meta) const { return vec_store_inner_.GetVec(vec_i, meta); }
+
+    typename VecStoreT::QueryType GetVecToQuery(VertexType vec_i, const VecStoreMeta &meta) const {
+        return vec_store_inner_.GetVecToQuery(vec_i, meta);
+    }
 
     void PrefetchVec(VertexType vec_i, const VecStoreMeta &meta) const { vec_store_inner_.Prefetch(vec_i, meta); }
 

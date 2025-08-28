@@ -84,7 +84,9 @@ public:
         {
             auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
             auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
-            hnsw_index->InsertVecs(std::move(iter));
+            HnswInsertConfig config{true};
+            hnsw_index->InsertVecs(std::move(iter), config);
+            // hnsw_index->Dump(std::cout);
 
             test_func(hnsw_index);
 
@@ -411,5 +413,16 @@ TEST_F(HnswAlgTest, test7) {
 TEST_F(HnswAlgTest, test8) {
     using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
     using HnswLoad = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT, false>;
+    TestLoad<Hnsw, HnswLoad>();
+}
+
+TEST_F(HnswAlgTest, test_rabitq_1) {
+    using Hnsw = KnnHnsw<RabitqL2VecStoreType<float>, LabelT>;
+    TestSimple<Hnsw>();
+}
+
+TEST_F(HnswAlgTest, test_rabitq_2) {
+    using Hnsw = KnnHnsw<RabitqL2VecStoreType<float>, LabelT>;
+    using HnswLoad = KnnHnsw<RabitqL2VecStoreType<float>, LabelT, false>;
     TestLoad<Hnsw, HnswLoad>();
 }
