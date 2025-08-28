@@ -413,7 +413,8 @@ Status NewCatalog::GetAllMemIndexes(NewTxn *txn, std::vector<std::shared_ptr<Mem
             for (SegmentID segment_id : *index_segment_ids_ptr) {
                 SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
                 std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-                if (mem_index == nullptr) {
+                if (mem_index == nullptr || mem_index->IsDumping() ||
+                    (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
                     continue;
                 }
                 mem_indexes.push_back(mem_index);

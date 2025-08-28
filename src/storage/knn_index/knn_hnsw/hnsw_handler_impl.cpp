@@ -497,23 +497,23 @@ HnswIndexInMem::~HnswIndexInMem() {
     if (own_memory_ && hnsw_handler_ != nullptr) {
         delete hnsw_handler_;
     }
-    if (trace_) {
-        auto *storage = InfinityContext::instance().storage();
-        if (storage == nullptr) {
-            return;
-        }
-        auto *memindex_tracer = storage->memindex_tracer();
-        if (memindex_tracer != nullptr) {
-            memindex_tracer->DecreaseMemUsed(mem_usage);
-        }
+
+    auto *storage = InfinityContext::instance().storage();
+    if (storage == nullptr) {
+        return;
+    }
+    auto *memindex_tracer = storage->memindex_tracer();
+    if (memindex_tracer != nullptr) {
+        memindex_tracer->DecreaseMemUsed(mem_usage);
     }
 }
 
-std::unique_ptr<HnswIndexInMem>
-HnswIndexInMem::Make(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool trace) {
-    auto memidx = std::make_unique<HnswIndexInMem>(begin_row_id, index_base, column_def, trace);
-    if (trace) {
-        auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
+std::unique_ptr<HnswIndexInMem> HnswIndexInMem::Make(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def) {
+    auto memidx = std::make_unique<HnswIndexInMem>(begin_row_id, index_base, column_def);
+
+    auto *storage = InfinityContext::instance().storage();
+    if (storage != nullptr) {
+        auto *memindex_tracer = storage->memindex_tracer();
         if (memindex_tracer != nullptr) {
             memindex_tracer->IncreaseMemoryUsage(memidx->hnsw_handler_->MemUsage());
         }
@@ -521,11 +521,13 @@ HnswIndexInMem::Make(RowID begin_row_id, const IndexBase *index_base, std::share
     return memidx;
 }
 
-std::unique_ptr<HnswIndexInMem> HnswIndexInMem::Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool trace) {
+std::unique_ptr<HnswIndexInMem> HnswIndexInMem::Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def) {
     RowID begin_row_id{0, 0};
-    auto memidx = std::make_unique<HnswIndexInMem>(begin_row_id, index_base, column_def, trace);
-    if (trace) {
-        auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
+    auto memidx = std::make_unique<HnswIndexInMem>(begin_row_id, index_base, column_def);
+
+    auto *storage = InfinityContext::instance().storage();
+    if (storage != nullptr) {
+        auto *memindex_tracer = storage->memindex_tracer();
         if (memindex_tracer != nullptr) {
             memindex_tracer->IncreaseMemoryUsage(memidx->hnsw_handler_->MemUsage());
         }
@@ -549,11 +551,10 @@ void HnswIndexInMem::InsertVecs(SegmentOffset block_offset,
                                 const HnswInsertConfig &config) {
     size_t mem_usage = hnsw_handler_->InsertVecs(block_offset, col, offset, row_count, config, kBuildBucketSize);
     row_count_ += row_count;
-    this->IncreaseMemoryUsageBase(mem_usage);
+    IncreaseMemoryUsageBase(mem_usage);
 }
 
 void HnswIndexInMem::Dump(BufferObj *buffer_obj, size_t *dump_size_ptr) {
-    trace_ = false;
     if (dump_size_ptr != nullptr) {
         size_t dump_size = hnsw_handler_->MemUsage();
         *dump_size_ptr = dump_size;
