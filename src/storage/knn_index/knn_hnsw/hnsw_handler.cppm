@@ -301,17 +301,16 @@ export using HnswHandlerPtr = HnswHandler *;
 export struct HnswIndexInMem : public BaseMemIndex {
 public:
     HnswIndexInMem() : hnsw_handler_(nullptr) {}
-    HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool trace)
-        : begin_row_id_(begin_row_id), hnsw_handler_(HnswHandler::Make(index_base, column_def).release()), trace_(trace), own_memory_(true) {}
+    HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def)
+        : begin_row_id_(begin_row_id), hnsw_handler_(HnswHandler::Make(index_base, column_def).release()), own_memory_(true) {}
     HnswIndexInMem(const HnswIndexInMem &) = delete;
     HnswIndexInMem &operator=(const HnswIndexInMem &) = delete;
     virtual ~HnswIndexInMem();
 
 public:
-    static std::unique_ptr<HnswIndexInMem>
-    Make(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool trace = false);
+    static std::unique_ptr<HnswIndexInMem> Make(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def);
 
-    static std::unique_ptr<HnswIndexInMem> Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool trace = false);
+    static std::unique_ptr<HnswIndexInMem> Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def);
 
 public:
     void InsertVecs(SegmentOffset block_offset,
@@ -321,12 +320,10 @@ public:
                     const HnswInsertConfig &config = kDefaultHnswInsertConfig);
 
     template <typename Iter>
-    void InsertVecs(Iter iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig, bool trace = true) {
+    void InsertVecs(Iter iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
         size_t mem_usage = hnsw_handler_->InsertVecs(std::move(iter), config, kBuildBucketSize);
         row_count_ += iter.GetRowCount();
-        if (trace) {
-            IncreaseMemoryUsageBase(mem_usage);
-        }
+        IncreaseMemoryUsageBase(mem_usage);
     }
 
     void Dump(BufferObj *buffer_obj, size_t *dump_size_ptr = nullptr);
@@ -365,7 +362,6 @@ private:
     RowID begin_row_id_ = {};
     size_t row_count_ = 0;
     HnswHandlerPtr hnsw_handler_;
-    bool trace_{};
     bool own_memory_{};
     BufferHandle chunk_handle_{};
 };

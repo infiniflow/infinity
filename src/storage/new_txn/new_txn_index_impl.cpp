@@ -851,7 +851,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 if (!status.ok()) {
                     return status;
                 }
-                memory_hnsw_index = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def, true /*trace*/);
+                memory_hnsw_index = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def);
                 mem_index->SetHnswIndex(memory_hnsw_index);
             } else {
                 memory_hnsw_index = mem_index->GetHnswIndex();
@@ -1259,7 +1259,7 @@ Status NewTxn::InitSegmentIndex(SegmentIndexMeta &segment_index_meta, SegmentMet
                     // Make memory index
                     std::shared_ptr<HnswIndexInMem> memory_hnsw_index;
                     if (mem_index->IsNull()) {
-                        memory_hnsw_index = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def, true /*trace*/);
+                        memory_hnsw_index = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def);
                         mem_index->SetHnswIndex(memory_hnsw_index);
                     } else {
                         memory_hnsw_index = mem_index->GetHnswIndex();
