@@ -1880,18 +1880,21 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log
-            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c \
-              "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
-            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c \
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/benchmark_query_lock -c \
               "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/knn_query_benchmark/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
-            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c \
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/benchmark_import_lock -c \
               "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/knn_import_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ \
+            -v $PWD:/infinity \
+            -v /var/infinity/${CONTAINER_NAME}/:/var/infinity \
+            -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/knn_query_benchmark:/infinity/cmake-build-release/benchmark/local_infinity/knn_query_benchmark \
+            -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/knn_import_benchmark:/infinity/cmake-build-release/benchmark/local_infinity/knn_import_benchmark \
+            infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: SSH to host server
         id: ssh
