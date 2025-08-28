@@ -202,6 +202,13 @@ void KnnDistance1<i8, f32>::InitKnnDistance1(KnnDistanceType dist_type) {
 KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData *shared_data, u32 current_parallel_idx, bool execute_block_scan_job)
     : knn_scan_shared_data_(shared_data), task_id_(current_parallel_idx), execute_block_scan_job_(execute_block_scan_job) {
     merge_knn_base_ = MergeKnnBase::Make(knn_scan_shared_data_);
+
+    // Use bigger topK for multivector HNSW retrieve
+    i64 hnsw_topk = 10 * knn_scan_shared_data_->topk_;
+    std::swap(knn_scan_shared_data_->topk_, hnsw_topk);
+    merge_knn_base_hnsw_ = MergeKnnBase::Make(knn_scan_shared_data_);
+    std::swap(knn_scan_shared_data_->topk_, hnsw_topk);
+
     knn_distance_ = KnnDistanceBase1::Make(knn_scan_shared_data_->query_elem_type_, knn_scan_shared_data_->knn_distance_type_);
 }
 

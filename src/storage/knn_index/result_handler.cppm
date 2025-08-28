@@ -97,11 +97,15 @@ public:
 
     ~HeapResultHandler() = default;
 
-    void Begin(size_t i) {}
+    void Begin(size_t i) { sizes[i] = 0; }
 
-    void Begin(size_t i_start, size_t i_end) {}
+    void Begin(size_t i_start, size_t i_end) {
+        for (size_t i = i_start; i < i_end; ++i) {
+            sizes[i] = 0;
+        }
+    }
 
-    void Begin() {}
+    void Begin() { ReInitialize(); }
 
     [[nodiscard]] DistType GetDistance0(size_t q_id) const { return distance_ptr[q_id * top_k]; }
 
@@ -201,7 +205,7 @@ public:
     }
 
     void End(size_t q_id) {
-        u32 &size = sizes[q_id];
+        u32 size = sizes[q_id];
         DistType *distance = distance_ptr + q_id * top_k - 1;
         ID *id = id_ptr + q_id * top_k - 1;
         if (size < top_k) {
@@ -216,7 +220,6 @@ public:
             --size;
             HeapifyDown<Compare>(distance, id, size, 1);
         }
-        size = 0;
     }
 
     void End(size_t i_start, size_t i_end) {
@@ -262,7 +265,7 @@ public:
 
     void Begin(size_t i_start, size_t i_end) { std::fill(distance_ptr + i_start, distance_ptr + i_end, Compare::InitialValue()); }
 
-    void Begin() { std::fill_n(distance_ptr, n_queries, Compare::InitialValue()); }
+    void Begin() { ReInitialize(); }
 
     void ReInitialize() { std::fill_n(distance_ptr, n_queries, Compare::InitialValue()); }
 
@@ -445,7 +448,7 @@ public:
 
     ~ReservoirResultHandler() = default;
 
-    void Begin() {}
+    void Begin() { ReInitialize(); }
 
     void ReInitialize() {
         std::fill(sizes.begin(), sizes.end(), 0);
