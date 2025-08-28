@@ -108,6 +108,7 @@ public:
 export template <typename DataT, typename IndexT>
 class SparseIPVecStoreType {
 public:
+    using This = SparseIPVecStoreType<DataT, IndexT>;
     using DataType = DataT;
     using CompressType = void;
     template <bool OwnMem>
@@ -122,7 +123,7 @@ public:
     static constexpr bool HasOptimize = false;
 
     template <typename CompressType>
-    static constexpr SparseIPVecStoreType<DataType, IndexT> ToLVQ() {
+    static constexpr This ToLVQ() {
         return {};
     }
 };
@@ -130,6 +131,7 @@ public:
 export template <typename DataT, typename CompressT, bool LSG = false>
 class LVQCosVecStoreType {
 public:
+    using This = LVQCosVecStoreType<DataT, CompressT, LSG>;
     using DataType = DataT;
     using CompressType = CompressT;
     using LVQCacheType = LVQCosCache<DataType, CompressType>;
@@ -146,7 +148,7 @@ public:
     static constexpr bool HasOptimize = true;
 
     template <typename CompressType>
-    static constexpr LVQCosVecStoreType<DataType, CompressType, LSG> ToLVQ() {
+    static constexpr This ToLVQ() {
         return {};
     }
 };
@@ -154,6 +156,7 @@ public:
 export template <typename DataT, typename CompressT, bool LSG = false>
 class LVQL2VecStoreType {
 public:
+    using This = LVQL2VecStoreType<DataT, CompressT, LSG>;
     using DataType = DataT;
     using CompressType = CompressT;
     using LVQCacheType = LVQL2Cache<DataType, CompressType>;
@@ -170,7 +173,7 @@ public:
     static constexpr bool HasOptimize = true;
 
     template <typename CompressType>
-    static constexpr LVQL2VecStoreType<DataType, CompressType, LSG> ToLVQ() {
+    static constexpr This ToLVQ() {
         return {};
     }
 };
@@ -178,6 +181,7 @@ public:
 export template <typename DataT, typename CompressT, bool LSG = false>
 class LVQIPVecStoreType {
 public:
+    using This = LVQIPVecStoreType<DataT, CompressT, LSG>;
     using DataType = DataT;
     using CompressType = CompressT;
     using LVQCacheType = LVQIPCache<DataType, CompressType>;
@@ -194,7 +198,7 @@ public:
     static constexpr bool HasOptimize = true;
 
     template <typename CompressType>
-    static constexpr LVQIPVecStoreType<DataType, CompressType, LSG> ToLVQ() {
+    static constexpr This ToLVQ() {
         return {};
     }
 };
@@ -202,6 +206,7 @@ public:
 export template <typename DataT>
 class RabitqCosVecStoreType {
 public:
+    using This = RabitqCosVecStoreType<DataT>;
     using DataType = DataT;
     template <bool OwnMem>
     using Meta = RabitqVecStoreMeta<DataType, OwnMem>;
@@ -214,11 +219,17 @@ public:
     using Distance = RabitqCosDist<DataType>;
 
     static constexpr bool HasOptimize = true;
+
+    template <typename CompressType>
+    static constexpr This ToLVQ() {
+        return {};
+    }
 };
 
 export template <typename DataT>
 class RabitqL2VecStoreType {
 public:
+    using This = RabitqL2VecStoreType<DataT>;
     using DataType = DataT;
     template <bool OwnMem>
     using Meta = RabitqVecStoreMeta<DataType, OwnMem>;
@@ -231,11 +242,17 @@ public:
     using Distance = RabitqL2Dist<DataType>;
 
     static constexpr bool HasOptimize = true;
+
+    template <typename CompressType>
+    static constexpr This ToLVQ() {
+        return {};
+    }
 };
 
 export template <typename DataT>
 class RabitqIPVecStoreType {
 public:
+    using This = RabitqIPVecStoreType<DataT>;
     using DataType = DataT;
     template <bool OwnMem>
     using Meta = RabitqVecStoreMeta<DataType, OwnMem>;
@@ -248,6 +265,11 @@ public:
     using Distance = RabitqIPDist<DataType>;
 
     static constexpr bool HasOptimize = true;
+
+    template <typename CompressType>
+    static constexpr This ToLVQ() {
+        return {};
+    }
 };
 
 } // namespace infinity

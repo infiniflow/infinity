@@ -208,8 +208,7 @@ public:
         std::vector<DataType> align_src(dim_, 0);
         std::copy(src, src + origin_dim_, align_src.begin());
         std::vector<DataType> rot_src(dim_, 0);
-        auto bin_src = std::make_unique<AlignType[]>(bin_code_size);
-        memset(bin_src.get(), 0, bin_code_size); // 1 dim -> 1 bit
+        auto bin_src = std::make_unique<AlignType[]>(bin_code_size); // 1 dim -> 1 bit
 
         // 2.Compute raw vector Norm for IP or Cos distance
         DataType raw_norm = 0;
@@ -344,8 +343,8 @@ public:
     const DataType *rom() const { return rom_.get(); }
     const DataType *rot_centroid() const { return rot_centroid_.get(); }
 
-protected:
-    void DecompressCode(StoreType src, DataType *dest, const DataType *rot_centroid) {
+public:
+    void DecompressCode(const StoreType &src, DataType *dest, const DataType *rot_centroid) const {
         DataType inv_sqrt_d_ = 1.0f / std::sqrt(dim_);
 
         // 1.Init
@@ -366,7 +365,7 @@ protected:
         matrixA_multiply_transpose_matrixB_output_to_C(rot_src.data(), rom_.get(), 1, dim_, dim_, dest);
     }
 
-    void DecompressCode(StoreType src, DataType *dest) { DecompressCode(src, dest, rot_centroid_.get()); }
+    void DecompressCode(const StoreType &src, DataType *dest) const { DecompressCode(src, dest, rot_centroid_.get()); }
 
 protected:
     size_t origin_dim_;
@@ -519,7 +518,9 @@ class RabitqVecStoreInnerBase {
 public:
     using This = RabitqVecStoreInnerBase<DataType, OwnMem>;
     using Meta = RabitqVecStoreMetaBase<DataType, OwnMem>;
+    using MetaType = typename Meta::MetaType;
     using StoreType = typename Meta::StoreType;
+    using QueryType = typename Meta::QueryType;
 
 public:
     RabitqVecStoreInnerBase() = default;
@@ -544,7 +545,30 @@ public:
 
     StoreType GetVec(size_t idx, const Meta &meta) const { return reinterpret_cast<StoreType>(ptr_.get() + idx * meta.compress_data_size()); }
 
+    QueryType GetVecToQuery(size_t idx, const Meta &meta) const {
+        auto query = std::make_unique<DataType[]>(meta.dim());
+        meta.DecompressCode(GetVec(idx, meta), query.get());
+        return meta.MakeQuery(query.get());
+    }
+
     void Prefetch(VertexType vec_i, const Meta &meta) const { _mm_prefetch(reinterpret_cast<const char *>(GetVec(vec_i, meta)), _MM_HINT_T0); }
+
+    void Dump(std::ostream &os, size_t offset, size_t chunk_size, const Meta &meta) const {
+        for (int i = 0; i < (int)chunk_size; ++i) {
+            os << "vec " << i << "(" << offset + i << "): ";
+            StoreType vec = GetVec(i, meta);
+            os << "raw_norm: " << vec->raw_norm_ << ", norm: " << vec->norm_ << ", sum: " << vec->sum_ << ", error: " << vec->error_ << std::endl;
+            os << "compress_vec:";
+            for (size_t d = 0; d < meta.dim(); ++d) {
+                bool c_i = vec->compress_vec_[d / MetaType::align_size_] >> (MetaType::align_size_ - 1 - d % MetaType::align_size_) & 1;
+                if (d % MetaType::align_size_ == 0) {
+                    os << " ";
+                }
+                os << c_i;
+            }
+            os << std::endl;
+        }
+    }
 
 protected:
     ArrayPtr<char, OwnMem> ptr_;
@@ -553,6 +577,7 @@ protected:
 export template <typename DataType, bool OwnMem>
 class RabitqVecStoreInner : public RabitqVecStoreInnerBase<DataType, OwnMem> {
 public:
+    using Base = RabitqVecStoreInnerBase<DataType, OwnMem>;
     using This = RabitqVecStoreInner<DataType, OwnMem>;
     using Meta = RabitqVecStoreMetaBase<DataType, OwnMem>;
     using StoreData = typename Meta::StoreData;
@@ -594,6 +619,7 @@ private:
 export template <typename DataType>
 class RabitqVecStoreInner<DataType, false> : public RabitqVecStoreInnerBase<DataType, false> {
 public:
+    using Base = RabitqVecStoreInnerBase<DataType, false>;
     using This = RabitqVecStoreInner<DataType, false>;
     using Meta = RabitqVecStoreMetaBase<DataType, false>;
 
