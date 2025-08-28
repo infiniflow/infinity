@@ -917,7 +917,7 @@ jobs:
       - name: Prepare artifacts
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "mv /infinity/cmake-build-release/src/infinity /infinity_artifact/
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "mv /infinity/cmake-build-release/src/infinity /infinity_artifact/ &&
             mv /infinity/cmake-build-release/src/test_main /infinity_artifact/ &&
             mv /infinity/cmake-build-release/benchmark/local_infinity/knn_query_benchmark /infinity_artifact/ &&
             mv /infinity/cmake-build-release/benchmark/local_infinity/knn_import_benchmark /infinity_artifact/"
