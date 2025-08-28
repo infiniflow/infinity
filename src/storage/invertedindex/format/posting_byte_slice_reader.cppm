@@ -80,7 +80,13 @@ bool PostingByteSliceReader::Decode(T *buffer, size_t count, size_t &decode_coun
 
     if (byte_slice_reader_.Tell() >= byte_slice_size) {
         size_t buffer_size = posting_byte_slice_->GetBufferSize();
-        assert(buffer_size <= count);
+
+        // Runtime bounds check instead of just assertion
+        if (buffer_size > count) {
+            assert(false); // Should never happen
+            decode_count = 0;
+            return false;
+        }
 
         const PostingBuffer &posting_buffer = posting_byte_slice_->GetBuffer();
         const T *src = posting_buffer.GetRowTyped<T>(current_value->location_);
