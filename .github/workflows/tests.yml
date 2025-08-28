@@ -330,7 +330,6 @@ jobs:
             sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
 
       - name: Start test container
-        id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
@@ -429,7 +428,6 @@ jobs:
             sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
 
       - name: Start test container
-        id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
@@ -542,7 +540,6 @@ jobs:
             sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
 
       - name: Start test container
-        id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
@@ -657,7 +654,6 @@ jobs:
             sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
 
       - name: Start test container
-        id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
@@ -773,7 +769,6 @@ jobs:
             sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
 
       - name: Start test container
-        id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
@@ -988,7 +983,6 @@ jobs:
             sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
 
       - name: Start test container
-        id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
@@ -1104,7 +1098,6 @@ jobs:
             sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
 
       - name: Start test container
-        id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
@@ -1203,7 +1196,6 @@ jobs:
             sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
 
       - name: Start test container
-        id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
@@ -1318,7 +1310,6 @@ jobs:
             sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
 
       - name: Start test container
-        id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
@@ -1433,7 +1424,6 @@ jobs:
             sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
 
       - name: Start test container
-        id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
@@ -1548,7 +1538,6 @@ jobs:
             sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
 
       - name: Start test container
-        id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
@@ -1683,7 +1672,6 @@ jobs:
             sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
 
       - name: Start test container
-        id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
@@ -1818,7 +1806,6 @@ jobs:
             sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
 
       - name: Start test container
-        id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
