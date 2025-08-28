@@ -266,12 +266,14 @@ jobs:
         id: run_tests_debug
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-          LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py"
+            LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py"
           sleep 1s
 
       - name: Remove test container
         if: always()  # always run this step even if previous steps failed
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
 
   debug_unit_test:
     name: debug_unit_test
@@ -306,7 +308,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Start test container
+      - name: Prepare env variable
         id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -315,8 +317,24 @@ jobs:
           echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Prepare data dir
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME
+          script: |
+            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
+
+      - name: Start test container
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
@@ -347,12 +365,14 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         id: run_unit_test_debug
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mkdir -p /var/infinity
-          cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main > unittest_debug.log 2> unittest_debug_error.log"
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
+            ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main > unittest_debug.log 2> unittest_debug_error.log"
 
       - name: Remove test container
         if: always()  # always run this step even if previous steps failed
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
 
   debug_restart_test:
     name: debug_restart_test
@@ -387,7 +407,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Start test container
+      - name: Prepare env variable
         id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -396,8 +416,24 @@ jobs:
           echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Prepare data dir
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME
+          script: |
+            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
+
+      - name: Start test container
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
@@ -441,11 +477,15 @@ jobs:
       - name: Run restart test
         if: ${{ !cancelled() && !failure() }}
         id: run_restart_test
-        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity"
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
+            python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity"
 
       - name: Remove test container
         if: always()  # always run this step even if previous steps failed
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${CONTAINER_NAME}/          
 
   debug_pysdk_remote_test:
     name: debug_pysdk_remote_test
@@ -480,7 +520,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Start test container
+      - name: Prepare env variable
         id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -489,8 +529,24 @@ jobs:
           echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Prepare data dir
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME
+          script: |
+            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
+
+      - name: Start test container
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
@@ -530,19 +586,21 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-          rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > pysdk_remote_debug.log 2> pysdk_remote_debug_error.log" &
+            cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > pysdk_remote_debug.log 2> pysdk_remote_debug_error.log" &
 
       - name: Run pysdk remote infinity test debug version
         if: ${{ !cancelled() && !failure() }}
         id: run_pysdk_remote_debug
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-          LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pysdk_remote_infinity_test.py"
+            LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pysdk_remote_infinity_test.py"
           sleep 1s
 
       - name: Remove test container
         if: always()  # always run this step even if previous steps failed
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
 
   debug_http_test:
     name: debug_http_test
@@ -577,7 +635,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Start test container
+      - name: Prepare env variable
         id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -586,8 +644,24 @@ jobs:
           echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Prepare data dir
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME
+          script: |
+            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
+
+      - name: Start test container
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
@@ -627,20 +701,21 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-          rm -fr /var/infinity
-          cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > http_remote_debug.log 2> http_remote_debug_error.log" &
+            cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > http_remote_debug.log 2> http_remote_debug_error.log" &
 
       - name: Run HTTP infinity test debug version
         if: ${{ !cancelled() && !failure() }}
         id: run_http_remote_debug
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-          LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_http_api.py"
+            LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_http_api.py"
           sleep 1s
 
       - name: Remove test container
         if: always()  # always run this step even if previous steps failed
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
 
   debug_pysdk_parallel_test:
     name: debug_pysdk_parallel_test
@@ -676,7 +751,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Start test container
+      - name: Prepare env variable
         id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -685,8 +760,24 @@ jobs:
           echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Prepare data dir
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME
+          script: |
+            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
+
+      - name: Start test container
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
@@ -726,20 +817,21 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-          rm -fr /var/infinity
-          cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_debug.log 2> parallel_test_debug_error.log" &
+            cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_debug.log 2> parallel_test_debug_error.log" &
 
       - name: Run pysdk parallel test debug version
         if: ${{ !cancelled() && !failure() }}
         id: run_parallel_test_debug
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-          LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_parallel_test.py"
+            LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_parallel_test.py"
           sleep 1s
 
       - name: Remove test container
         if: always()
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
 
   release_configure_and_build:
     name: release_configure_and_build
@@ -874,7 +966,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Start test container
+      - name: Prepare env variable
         id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -883,8 +975,24 @@ jobs:
           echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Prepare data dir
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME
+          script: |
+            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
+
+      - name: Start test container
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
@@ -896,7 +1004,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: SSH to host server
         id: ssh
@@ -932,12 +1040,14 @@ jobs:
         id: run_tests_debug
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-          LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py"
+            LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py"
           sleep 1s
 
       - name: Remove test container
         if: always()  # always run this step even if previous steps failed
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
 
   release_unit_test:
     name: release_unit_test
@@ -972,7 +1082,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Start test container
+      - name: Prepare env variable
         id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -981,8 +1091,24 @@ jobs:
           echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Prepare data dir
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME
+          script: |
+            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
+
+      - name: Start test container
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
@@ -994,7 +1120,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: SSH to host server
         id: ssh
@@ -1013,12 +1139,14 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         id: run_unit_test_debug
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mkdir -p /var/infinity
-          cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-release/src/test_main > unittest_debug.log 2> unittest_debug_error.log"
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
+            ASAN_OPTIONS=detect_leaks=0 cmake-build-release/src/test_main > unittest_debug.log 2> unittest_debug_error.log"
 
       - name: Remove test container
         if: always()  # always run this step even if previous steps failed
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
 
   release_pysdk_remote_test:
     name: release_pysdk_remote_test
@@ -1053,7 +1181,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Start test container
+      - name: Prepare env variable
         id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -1062,8 +1190,24 @@ jobs:
           echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Prepare data dir
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME
+          script: |
+            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
+
+      - name: Start test container
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
@@ -1075,7 +1219,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: SSH to host server
         id: ssh
@@ -1103,7 +1247,7 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-          rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > pysdk_remote_debug.log 2> pysdk_remote_debug_error.log" &
+            cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > pysdk_remote_debug.log 2> pysdk_remote_debug_error.log" &
 
       - name: Run pysdk remote infinity test release version
         if: ${{ !cancelled() && !failure() }}
@@ -1115,7 +1259,9 @@ jobs:
 
       - name: Remove builder container
         if: always()  # always run this step even if previous steps failed
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
 
   release_http_test:
     name: release_http_test
@@ -1150,7 +1296,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Start test container
+      - name: Prepare env variable
         id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -1159,8 +1305,24 @@ jobs:
           echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Prepare data dir
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME
+          script: |
+            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
+
+      - name: Start test container
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
@@ -1172,7 +1334,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: SSH to host server
         id: ssh
@@ -1200,20 +1362,21 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-          rm -fr /var/infinity
-          cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > http_remote_debug.log 2> http_remote_debug_error.log" &
+            cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > http_remote_debug.log 2> http_remote_debug_error.log" &
 
       - name: Run HTTP infinity test release version
         if: ${{ !cancelled() && !failure() }}
         id: run_http_remote_debug
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-          LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_http_api.py"
+            LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_http_api.py"
           sleep 1s
 
       - name: Remove test container
         if: always()  # always run this step even if previous steps failed
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
 
   release_pysdk_parallel_test:
     name: release_pysdk_parallel_test
@@ -1248,7 +1411,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Start test container
+      - name: Prepare env variable
         id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -1257,8 +1420,24 @@ jobs:
           echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Prepare data dir
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME
+          script: |
+            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
+
+      - name: Start test container
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
@@ -1270,7 +1449,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: SSH to host server
         id: ssh
@@ -1298,20 +1477,21 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-          rm -fr /var/infinity
-          cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_debug.log 2> parallel_test_debug_error.log" &
+            cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_debug.log 2> parallel_test_debug_error.log" &
 
       - name: Run pysdk parallel test release version
         if: ${{ !cancelled() && !failure() }}
         id: run_parallel_test_debug
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-          LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_parallel_test.py"
+            LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_parallel_test.py"
           sleep 1s
 
       - name: Remove test container
         if: always()  # always run this step even if previous steps failed
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
 
   release_minio_pysdk_remote_test:
     name: release_minio_pysdk_remote_test
@@ -1346,7 +1526,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Start test container
+      - name: Prepare env variable
         id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -1355,8 +1535,24 @@ jobs:
           echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Prepare data dir
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME
+          script: |
+            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
+
+      - name: Start test container
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
@@ -1368,7 +1564,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: SSH to host server
         id: ssh
@@ -1411,24 +1607,26 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-          rm -fr /var/infinity
-          cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_debug.log 2> parallel_test_debug_error.log" &
+            cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_debug.log 2> parallel_test_debug_error.log" &
 
       - name: Run minio pysdk remote test
         if: ${{ !cancelled() && !failure() }}
         id: run_minio_pysdk_remote_release
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-          python3 tools/run_pysdk_remote_infinity_test.py"
+            python3 tools/run_pysdk_remote_infinity_test.py"
           sleep 1s
 
       - name: Remove test container
         if: always()  # always run this step even if previous steps failed
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
 
       - name: Remove minio container
         if: always()  # always run this step even if previous steps failed
-        run: sudo docker rm -f -v ${MINIO_CONTAINER}
+        run: |
+          sudo docker rm -f -v ${MINIO_CONTAINER}
 
   release_minio_parallel_test:
     name: release_minio_parallel_test
@@ -1463,7 +1661,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Start test container
+      - name: Prepare env variable
         id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -1472,8 +1670,24 @@ jobs:
           echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Prepare data dir
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME
+          script: |
+            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
+
+      - name: Start test container
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
@@ -1485,7 +1699,7 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: SSH to host server
         id: ssh
@@ -1528,8 +1742,7 @@ jobs:
         run: |
           # Run a command in the background
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-          rm -fr /var/infinity
-          cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_debug.log 2> parallel_test_debug_error.log" &
+            cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_debug.log 2> parallel_test_debug_error.log" &
 
       - name: Run minio parallel test
         if: ${{ !cancelled() && !failure() }}
@@ -1541,11 +1754,14 @@ jobs:
 
       - name: Remove test container
         if: always()  # always run this step even if previous steps failed
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
 
       - name: Remove minio container
         if: always()  # always run this step even if previous steps failed
-        run: sudo docker rm -f -v ${MINIO_CONTAINER}
+        run: |
+          sudo docker rm -f -v ${MINIO_CONTAINER}
 
   release_benchmark:
     name: release_benchmark
@@ -1580,7 +1796,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
 
-      - name: Start test container
+      - name: Prepare env variable
         id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -1589,8 +1805,24 @@ jobs:
           echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Prepare data dir
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME
+          script: |
+            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
+
+      - name: Start test container
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
@@ -1602,9 +1834,9 @@ jobs:
           envs: CONTAINER_NAME, BUILD_IP
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/knn_query_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
-            rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/knn_import_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/knn_query_benchmark/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/knn_import_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: SSH to host server
         id: ssh
@@ -1661,4 +1893,6 @@ jobs:
 
       - name: Remove test container
         if: always()  # always run this step even if previous steps failed
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
