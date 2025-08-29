@@ -3469,6 +3469,16 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListSnapshotsResp
     }
 }
 
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowConfigResponse &response,
+                                          const Status &status,
+                                          const std::string_view error_header) {
+    response.__set_error_code((i64)(status.code()));
+    if (!status.ok()) {
+        response.__set_error_msg(status.message());
+        LOG_ERROR(fmt::format("{}: {}", error_header, status.message()));
+    }
+}
+
 void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::CommonResponse &response,
                                                const QueryResult &result,
                                                const std::string_view error_header) {
@@ -3717,6 +3727,26 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListSnapshot
     }
 }
 
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowCurrentNodeResponse &response,
+                                               const QueryResult &result,
+                                               const std::string_view error_header) {
+    response.__set_error_code((i64)(result.ErrorCode()));
+    if (!result.IsOk()) {
+        response.__set_error_msg(result.ErrorStr());
+        LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+    }
+}
+
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowConfigResponse &response,
+                                               const QueryResult &result,
+                                               const std::string_view error_header) {
+    response.__set_error_code((i64)(result.ErrorCode()));
+    if (!result.IsOk()) {
+        response.__set_error_msg(result.ErrorStr());
+        LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+    }
+}
+
 // Snapshot operations
 void InfinityThriftService::CreateTableSnapshot(infinity_thrift_rpc::CommonResponse &response,
                                                 const infinity_thrift_rpc::CreateTableSnapshotRequest &request) {
@@ -3865,13 +3895,69 @@ void InfinityThriftService::CreateSystemSnapshot(infinity_thrift_rpc::CommonResp
     }
 }
 
-void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowCurrentNodeResponse &response,
-                                               const QueryResult &result,
-                                               const std::string_view error_header) {
-    response.__set_error_code((i64)(result.ErrorCode()));
-    if (!result.IsOk()) {
-        response.__set_error_msg(result.ErrorStr());
-        LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+void InfinityThriftService::SetConfig(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::SetConfigRequest &request) {
+    auto [infinity, status] = GetInfinityBySessionID(request.session_id);
+    if (!status.ok()) {
+        ProcessStatus(response, status);
+        return;
+    }
+
+    QueryResult result;
+    if (request.config_value.__isset.string_value) {
+        result = infinity->SetVariableOrConfig(request.config_name, request.config_value.string_value, SetScope::kConfig);
+    } else if (request.config_value.__isset.int_value) {
+        result = infinity->SetVariableOrConfig(request.config_name, request.config_value.int_value, SetScope::kConfig);
+    } else if (request.config_value.__isset.bool_value) {
+        result = infinity->SetVariableOrConfig(request.config_name, request.config_value.bool_value, SetScope::kConfig);
+    } else if (request.config_value.__isset.double_value) {
+        result = infinity->SetVariableOrConfig(request.config_name, request.config_value.double_value, SetScope::kConfig);
+    } else {
+        UnrecoverableError("SetConfig: unsupported config value type.");
+    }
+
+    if (result.IsOk()) {
+        response.__set_error_code((i64)(result.ErrorCode()));
+    } else {
+        ProcessQueryResult(response, result, "SetConfig");
+    }
+}
+
+void InfinityThriftService::ShowConfig(infinity_thrift_rpc::ShowConfigResponse &response, const infinity_thrift_rpc::ShowConfigRequest &request) {
+    auto [infinity, status] = GetInfinityBySessionID(request.session_id);
+    if (!status.ok()) {
+        ProcessStatus(response, status);
+        return;
+    }
+
+    auto result = infinity->ShowConfig(request.config_name);
+    if (result.IsOk()) {
+        response.config_name = request.config_name;
+        std::shared_ptr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+        auto row_count = data_block->row_count();
+        if (row_count != 1) {
+            UnrecoverableError("ShowConfig: query result is invalid.");
+        }
+
+        Value value = data_block->GetValue(0, 0);
+        if (value.type().type() == LogicalType::kVarchar) {
+            response.config_value.string_value = value.GetVarchar();
+            response.config_value.__isset.string_value = true;
+        } else if (value.type().type() == LogicalType::kBigInt) {
+            response.config_value.int_value = value.value_.big_int;
+            response.config_value.__isset.int_value = true;
+        } else if (value.type().type() == LogicalType::kBoolean) {
+            response.config_value.bool_value = value.value_.boolean;
+            response.config_value.__isset.bool_value = true;
+        } else if (value.type().type() == LogicalType::kDouble) {
+            response.config_value.double_value = value.value_.float64;
+            response.config_value.__isset.double_value = true;
+        } else {
+            UnrecoverableError("ShowConfig: unsupported config value type.");
+        }
+
+        response.__set_error_code((i64)(result.ErrorCode()));
+    } else {
+        ProcessQueryResult(response, result);
     }
 }
 

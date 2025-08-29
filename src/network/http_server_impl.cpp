@@ -2418,8 +2418,17 @@ public:
             json_response["error_code"] = 0;
             DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
             Value value = data_block->GetValue(0, 0);
-            const std::string &variable_value = value.ToString();
-            json_response[config_name] = variable_value;
+            if (value.type().type() == LogicalType::kVarchar) {
+                json_response[config_name] = value.GetVarchar();
+            } else if (value.type().type() == LogicalType::kBigInt) {
+                json_response[config_name] = value.value_.big_int;
+            } else if (value.type().type() == LogicalType::kBoolean) {
+                json_response[config_name] = value.value_.boolean;
+            } else if (value.type().type() == LogicalType::kDouble) {
+                json_response[config_name] = value.value_.float64;
+            } else {
+                UnrecoverableError("ShowConfig: unsupported config value type.");
+            }
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();

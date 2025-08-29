@@ -22,6 +22,16 @@ from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.db import RemoteDatabase
 from infinity.remote_thrift.utils import name_validity_check, select_res_to_polars
 from infinity.common import ConflictType, InfinityException
+from typing import Any
+from dataclasses import dataclass
+
+
+@dataclass
+class ConfigResponse:
+    error_code: int
+    error_msg: str
+    config_name: str
+    config_value: Any
 
 
 class RemoteThriftInfinityConnection(InfinityConnection, ABC):
@@ -105,7 +115,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
             return res
         else:
             raise InfinityException(res.error_code, res.error_msg)
-        
+
     def optimize(self, db_name: str, table_name: str, optimize_opt: ttypes.OptimizeOptions):
         res = self._client.optimize(db_name, table_name, optimize_opt)
         if res.error_code == ErrorCode.OK:
@@ -136,56 +146,85 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
             return res
         else:
             raise InfinityException(res.error_code, res.error_msg)
-        
+
     def create_database_snapshot(self, snapshot_name: str, db_name: str):
         res = self._client.create_database_snapshot(snapshot_name=snapshot_name, db_name=db_name)
         if res.error_code == ErrorCode.OK:
             return res
         else:
             raise InfinityException(res.error_code, res.error_msg)
-        
+
     def restore_database_snapshot(self, snapshot_name: str):
         res = self._client.restore_snapshot(snapshot_name=snapshot_name, scope="database")
         if res.error_code == ErrorCode.OK:
             return res
         else:
             raise InfinityException(res.error_code, res.error_msg)
-        
+
     def create_system_snapshot(self, snapshot_name: str):
         res = self._client.create_system_snapshot(snapshot_name=snapshot_name)
         if res.error_code == ErrorCode.OK:
             return res
         else:
             raise InfinityException(res.error_code, res.error_msg)
-        
+
     def restore_system_snapshot(self, snapshot_name: str):
         res = self._client.restore_snapshot(snapshot_name=snapshot_name, scope="system")
         if res.error_code == ErrorCode.OK:
             return res
         else:
             raise InfinityException(res.error_code, res.error_msg)
-        
+
     def list_snapshots(self):
         res = self._client.list_snapshots()
         if res.error_code == ErrorCode.OK:
             return res
         else:
             raise InfinityException(res.error_code, res.error_msg)
-        
+
     def show_snapshot(self, snapshot_name: str):
         res = self._client.show_snapshot(snapshot_name=snapshot_name)
         if res.error_code == ErrorCode.OK:
             return res
         else:
             raise InfinityException(res.error_code, res.error_msg)
-    
+
     def drop_snapshot(self, snapshot_name: str):
         res = self._client.drop_snapshot(snapshot_name=snapshot_name)
         if res.error_code == ErrorCode.OK:
             return res
         else:
             raise InfinityException(res.error_code, res.error_msg)
-        
+
+    def set_config(self, config_name: str, config_value: Any):
+        res = self._client.set_config(config_name, config_value)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+
+    def show_config(self, config_name: str):
+        res = self._client.show_config(config_name)
+        if res.error_code == ErrorCode.OK:
+            if res.config_value.string_value is not None:
+                config_value = res.config_value.string_value
+            elif res.config_value.int_value is not None:
+                config_value = res.config_value.int_value
+            elif res.config_value.bool_value is not None:
+                config_value = res.config_value.bool_value
+            elif res.config_value.double_value is not None:
+                config_value = res.config_value.double_value
+            else:
+                config_value = None
+
+            return ConfigResponse(
+                error_code=res.error_code,
+                error_msg=res.error_msg,
+                config_name=res.config_name,
+                config_value=config_value
+            )
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
 
     @property
     def client(self):
