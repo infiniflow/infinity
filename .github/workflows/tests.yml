@@ -131,7 +131,7 @@ jobs:
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ \
-            -v $PWD:/infinity
+            -v $PWD:/infinity \
             -v /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}/:/infinity_artifact \
             infiniflow/infinity_builder:ubuntu20_clang20
 
@@ -168,7 +168,7 @@ jobs:
   debug_sqllogical_test:
     name: debug_sqllogical_test
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-    runs-on: [ "self-hosted", "infinity-build" ]
+    runs-on: [ "self-hosted", "benchmark" ]
     needs: debug_configure_and_build
     outputs:
       BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
@@ -945,7 +945,7 @@ jobs:
   release_sqllogical_test:
     name: release_sqllogical_test
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-    runs-on: [ "self-hosted", "infinity-build" ]
+    runs-on: [ "self-hosted", "benchmark" ]
     needs: release_configure_and_build
     outputs:
       BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
