@@ -1813,6 +1813,8 @@ jobs:
               "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/knn_query_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
             flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/benchmark_import_lock -c \
               "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/knn_import_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
+            sudo chmod u+x /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/knn_query_benchmark
+            sudo chmod u+x /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/knn_import_benchmark
 
       - name: Prepare data dir & Start test container
         if: ${{ !cancelled() && !failure() }}
