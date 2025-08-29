@@ -971,17 +971,6 @@ jobs:
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
 
-      - name: Prepare data dir
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME
-          script: |
-            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
-
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
@@ -995,13 +984,14 @@ jobs:
             flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c \
               "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
-      - name: Start test container
+      - name: Prepare data dir & Start test container
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo mkdir -p /var/infinity/${TEST_CONTAINER_NAME}/
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ \
             -v $PWD:/infinity \
-            -v /var/infinity/${CONTAINER_NAME}/:/var/infinity \
+            -v /var/infinity/${TEST_CONTAINER_NAME}/:/var/infinity \
             -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity:/infinity/cmake-build-release/src/infinity \
             -v /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log:/infinity_log/ \
             infiniflow/infinity_builder:ubuntu20_clang20
@@ -1094,17 +1084,6 @@ jobs:
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
 
-      - name: Prepare data dir
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME
-          script: |
-            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
-
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
@@ -1118,13 +1097,14 @@ jobs:
             flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/ut_lock -c \
               "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
-      - name: Start test container
+      - name: Prepare data dir & Start test container
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo mkdir -p /var/infinity/${TEST_CONTAINER_NAME}/
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ \
             -v $PWD:/infinity \
-            -v /var/infinity/${CONTAINER_NAME}/:/var/infinity \
+            -v /var/infinity/${TEST_CONTAINER_NAME}/:/var/infinity \
             -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/test_main:/infinity/cmake-build-release/src/test_main \
             -v /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log:/infinity_log/ \
             infiniflow/infinity_builder:ubuntu20_clang20
@@ -1202,17 +1182,6 @@ jobs:
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
 
-      - name: Prepare data dir
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME
-          script: |
-            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
-
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
@@ -1226,13 +1195,14 @@ jobs:
             flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c \
               "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
-      - name: Start test container
+      - name: Prepare data dir & Start test container
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo mkdir -p /var/infinity/${TEST_CONTAINER_NAME}/
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ \
             -v $PWD:/infinity \
-            -v /var/infinity/${CONTAINER_NAME}/:/var/infinity \
+            -v /var/infinity/${TEST_CONTAINER_NAME}/:/var/infinity \
             -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity:/infinity/cmake-build-release/src/infinity \
             -v /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log:/infinity_log/ \
             infiniflow/infinity_builder:ubuntu20_clang20
@@ -1325,17 +1295,6 @@ jobs:
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
 
-      - name: Prepare data dir
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME
-          script: |
-            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
-
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
@@ -1349,13 +1308,14 @@ jobs:
             flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c \
               "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
-      - name: Start test container
+      - name: Prepare data dir & Start test container
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo mkdir -p /var/infinity/${TEST_CONTAINER_NAME}/
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ \
             -v $PWD:/infinity \
-            -v /var/infinity/${CONTAINER_NAME}/:/var/infinity \
+            -v /var/infinity/${TEST_CONTAINER_NAME}/:/var/infinity \
             -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity:/infinity/cmake-build-release/src/infinity \
             -v /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log:/infinity_log/ \
             infiniflow/infinity_builder:ubuntu20_clang20
@@ -1448,17 +1408,6 @@ jobs:
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
 
-      - name: Prepare data dir
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME
-          script: |
-            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
-
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
@@ -1472,13 +1421,14 @@ jobs:
             flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c \
               "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
-      - name: Start test container
+      - name: Prepare data dir & Start test container
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo mkdir -p /var/infinity/${TEST_CONTAINER_NAME}/
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ \
             -v $PWD:/infinity \
-            -v /var/infinity/${CONTAINER_NAME}/:/var/infinity \
+            -v /var/infinity/${TEST_CONTAINER_NAME}/:/var/infinity \
             -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity:/infinity/cmake-build-release/src/infinity \
             -v /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log:/infinity_log/ \
             infiniflow/infinity_builder:ubuntu20_clang20
@@ -1573,17 +1523,6 @@ jobs:
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
 
-      - name: Prepare data dir
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME
-          script: |
-            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
-
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
@@ -1597,13 +1536,14 @@ jobs:
             flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c \
               "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
-      - name: Start test container
+      - name: Prepare data dir & Start test container
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo mkdir -p /var/infinity/${TEST_CONTAINER_NAME}/
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ \
             -v $PWD:/infinity \
-            -v /var/infinity/${CONTAINER_NAME}/:/var/infinity \
+            -v /var/infinity/${TEST_CONTAINER_NAME}/:/var/infinity \
             -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity:/infinity/cmake-build-release/src/infinity \
             -v /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log:/infinity_log/ \
             infiniflow/infinity_builder:ubuntu20_clang20
@@ -1716,17 +1656,6 @@ jobs:
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
 
-      - name: Prepare data dir
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME
-          script: |
-            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
-
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
@@ -1740,13 +1669,14 @@ jobs:
             flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c \
               "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
-      - name: Start test container
+      - name: Prepare data dir & Start test container
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo mkdir -p /var/infinity/${TEST_CONTAINER_NAME}/
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ \
             -v $PWD:/infinity \
-            -v /var/infinity/${CONTAINER_NAME}/:/var/infinity \
+            -v /var/infinity/${TEST_CONTAINER_NAME}/:/var/infinity \
             -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity:/infinity/cmake-build-release/src/infinity \
             -v /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log:/infinity_log/ \
             infiniflow/infinity_builder:ubuntu20_clang20
@@ -1859,17 +1789,6 @@ jobs:
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
 
-      - name: Prepare data dir
-        uses: appleboy/ssh-action@v1.2.2
-        if: ${{ !cancelled() && !failure() }}
-        with:
-          host: 172.17.0.1
-          username: ${{ env.USERNAME }}
-          password: ${{ env.PASSWORD }}
-          envs: CONTAINER_NAME
-          script: |
-            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
-
       - name: Download artifacts
         uses: appleboy/ssh-action@v1.2.2
         if: ${{ !cancelled() && !failure() }}
@@ -1885,13 +1804,14 @@ jobs:
             flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/benchmark_import_lock -c \
               "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/knn_import_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
-      - name: Start test container
+      - name: Prepare data dir & Start test container
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo mkdir -p /var/infinity/${TEST_CONTAINER_NAME}/
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ \
             -v $PWD:/infinity \
-            -v /var/infinity/${CONTAINER_NAME}/:/var/infinity \
+            -v /var/infinity/${TEST_CONTAINER_NAME}/:/var/infinity \
             -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/knn_query_benchmark:/infinity/cmake-build-release/benchmark/local_infinity/knn_query_benchmark \
             -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/knn_import_benchmark:/infinity/cmake-build-release/benchmark/local_infinity/knn_import_benchmark \
             infiniflow/infinity_builder:ubuntu20_clang20
