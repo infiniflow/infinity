@@ -127,7 +127,6 @@ jobs:
           echo "BUILD_IP=${BUILD_IP}" >> ${GITHUB_OUTPUT}
 
       - name: Start builder container
-        id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
