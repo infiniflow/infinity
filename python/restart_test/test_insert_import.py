@@ -74,13 +74,13 @@ class TestInsertImport:
                         else:
                             cur_n = total_n
                         cur_n += insert_batch_size
-                        logger.debug(f"{write_i}. insert {insert_batch_size} data, cur_n: {cur_n}")
+                        logger.debug(f"insert NO {write_i}. insert {insert_batch_size} data, cur_n: {cur_n} / {total_n}")
                     else:
                         abs_import_file = os.path.abspath(import_file)
                         last_n = import_size
                         table_obj.import_data(abs_import_file, import_options)
                         cur_n += import_size
-                        logger.debug(f"{write_i}. import {import_size} data, cur_n: {cur_n}")
+                        logger.debug(f"import NO {write_i}. import {import_size} data, cur_n: {cur_n} / {total_n}")
                     write_i += 1
                 except Exception as e:
                     logger.debug(f"insert/import {if_import} error at {cur_n}")
@@ -89,6 +89,7 @@ class TestInsertImport:
                             error = True
                             raise e
                     break
+            logger.debug("insert and import finished")
 
         shutdown_time = 0
 
@@ -271,6 +272,8 @@ class TestInsertImport:
 
         part1()
 
+        infinity_runner.logger.debug(f"Finish create table and index")
+
         self.insert_import_inner(
             infinity_runner,
             total_n,
@@ -282,9 +285,13 @@ class TestInsertImport:
             import_options,
         )
 
+        infinity_runner.logger.debug(f"Finish insert and import data")
+
         @decorator
         def part2(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
             db_obj.drop_table("test_insert", ConflictType.Error)
 
         part2()
+
+        infinity_runner.logger.debug(f"Finish drop table")
