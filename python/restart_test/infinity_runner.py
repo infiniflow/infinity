@@ -114,7 +114,9 @@ class InfinityRunner:
     def connect(self, uri: str):
         try_n = 15
         infinity_obj = None
-        for i in range(try_n):
+        count = 0
+        while True:
+            error = None
             try:
                 if infinity_obj is None:
                     infinity_obj = infinity.connect(uri, self.logger)
@@ -125,19 +127,25 @@ class InfinityRunner:
                     if isinstance(e, InfinityException):
                         if e.error_code == ErrorCode.INFINITY_IS_INITING:
                             self.logger.info("Connection: wait infinity starting")
+                            error = ErrorCode.INFINITY_IS_INITING
                         else:
                             raise e
                     else:
                         raise e
                 else:
                     self.logger.warn(str(e))
-                sleep_time = 1 * (i + 1)
+                sleep_time = 1 * (count + 1)
                 time.sleep(sleep_time)
                 current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
                 self.logger.info(
-                    f"Connection: retrying connection attempt {i + 1} after {sleep_time} seconds, at {current_time}.")
-        else:
-            raise Exception(f"Connection: cannot connect to infinity after {try_n} retries.")
+                    f"Connection: retrying connection attempt {count + 1} after {sleep_time} seconds, at {current_time}.")
+            count += 1
+            if error == ErrorCode.INFINITY_IS_INITING:
+                continue
+            else:
+                if count > try_n:
+                    raise Exception(f"Connection: cannot connect to infinity after {try_n} retries.")
+
         self.logger.info("Connection: connected to infinity.")
         return infinity_obj
 
