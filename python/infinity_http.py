@@ -301,13 +301,21 @@ class infinity_http:
         self.net.raise_exception(r)
         return r.json()
 
-    def set_config(self, config: dict):
+    def set_config(self, config_name: str, config_value: any):
         url = "configs"
+        config = dict({config_name: config_value})
         h = self.net.set_up_header(["accept", "content-type"])
         d = self.net.set_up_data([], config)
         r = self.net.request(url, "post", h, d)
         self.net.raise_exception(r)
         return database_result()
+
+    def show_config(self, config_name: str):
+        url = f"configs/{config_name}"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h, {})
+        self.net.raise_exception(r)
+        return database_result(config_value=r.json()[config_name])
 
     def show_admin_variables(self):
         url = "admin/variables"
@@ -1227,7 +1235,7 @@ class table_http_result:
 class database_result():
     def __init__(self, list=[], database_name: str = "", error_code=ErrorCode.OK, columns=[], index_names=[],
                  node_name="", node_role="", node_status="", index_type=None, index_comment=None, deleted_rows=0,
-                 data={}, nodes=[], error_msg="", snapshots=[]):
+                 data={}, nodes=[], error_msg="", snapshots=[], config_value: Any = None):
         self.db_names = list
         self.database_name = database_name  # get database
         self.error_code = error_code
@@ -1243,6 +1251,7 @@ class database_result():
         self.nodes = nodes
         self.error_msg = error_msg
         self.snapshots = snapshots
+        self.config_value = config_value
 
 
 list_tables_result = namedtuple('list_tables_result', [

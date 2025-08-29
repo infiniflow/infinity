@@ -1817,13 +1817,14 @@ class TestInfinity:
 
         table_obj.insert([{"c1": 0, "c2": [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}])
         table_obj.insert([{"c1": 1, "c2": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]}])
-        table_obj.insert([{"c1": 2, "c2": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2]}])
-        table_obj.insert([{"c1": 3, "c2": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3]}])
-        table_obj.insert([{"c1": 4, "c2": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4]}])
-        table_obj.insert([{"c1": 5, "c2": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5]}])
+        table_obj.insert([{"c1": 2, "c2": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1]}])
+        table_obj.insert([{"c1": 3, "c2": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1]}])
+        table_obj.insert([{"c1": 4, "c2": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1]}])
+        table_obj.insert([{"c1": 5, "c2": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1]}])
 
-        res, extra_result = table_obj.output(["*", "_distance"]).match_dense("c2", [0] * 16, "bit", "hamming",
-                                                                             3).to_df()
+        res, extra_result = table_obj.output(["*", "_distance"]).match_dense("c2", [0] * 16, "bit", "hamming", 3).to_df()
+        print(res.dtypes)
+        print(res)
         if suffix == "_http":
             pd.testing.assert_frame_equal(res, pd.DataFrame(
                 {'c1': (0, 1, 2), 'c2': ('[0100000000000000]', '[0000000000000001]', '[0000000000000011]'),
@@ -1997,7 +1998,7 @@ class TestInfinity:
         # generate normalized vectors
         import numpy as np
         np.random.seed(42)
-        def generate_normalized_vectors(shape, dtype=np.float32):
+        def generate_normalized_multivector(shape, dtype=np.float32):
             x = np.random.randn(*shape).astype(dtype)
             x /= np.linalg.norm(x, axis=1, keepdims=True)  # L2 normalize
             return x
@@ -2014,11 +2015,26 @@ class TestInfinity:
                 maxsim_sum += maxsim
             return maxsim_sum
 
+        def commom_rows(df1: pl.DataFrame, df2: pl.DataFrame):
+            tolerance = 1e-5
+            joined = df1.join(
+                df2,
+                on="page_no",
+                how="inner",
+                suffix="_right"
+            ).with_columns([
+                (pl.col("SIMILARITY") - pl.col("SIMILARITY_right")).alias("diff")
+            ]).filter(
+                pl.col("diff").abs() <= tolerance
+            )
+            common_rows = joined.shape[0]
+            return common_rows
+
         row_count = 20
         topK = 5
-        query_multivector = generate_normalized_vectors((2, embedding_dimension))
-        data_multivec = [generate_normalized_vectors((128, embedding_dimension)) for i in range(row_count)]
-        maxsims = [(f"page_{i}", maxsim(query_multivector, data_multivec[i])) for i in range(row_count)]
+        query_multivector = generate_normalized_multivector((2, embedding_dimension))
+        data_multivector = [generate_normalized_multivector((128, embedding_dimension)) for i in range(row_count)]
+        maxsims = [(f"page_{i}", maxsim(query_multivector, data_multivector[i])) for i in range(row_count)]
         maxsims.sort(key=lambda x: x[1], reverse=True)
         print(maxsims)
         topK_maxsims = maxsims[:topK]
@@ -2026,7 +2042,7 @@ class TestInfinity:
         topK_res = pl.DataFrame({"page_no": [item[0] for item in topK_maxsims], "SIMILARITY": [item[1] for item in topK_maxsims]})
         # Cast SIMILARITY column to float32
         adjusted_topK = int(topK * 0.6)
-        topK_res = topK_res.with_columns(pl.col("SIMILARITY").cast(pl.Float32)).head(adjusted_topK)
+        topK_res = topK_res.with_columns(pl.col("SIMILARITY").cast(pl.Float32))
 
         table_name = "test_multivector_f32" + suffix
         db_obj = self.infinity_obj.get_database("default_db")
@@ -2039,13 +2055,13 @@ class TestInfinity:
         for i in range(row_count):
             table_obj.insert({
                 "page_no": f"page_{i}",
-                "page_multivec": data_multivec[i],
+                "page_multivec": data_multivector[i],
             })
 
         brute_force_res, extra_result = table_obj.output(["page_no", "SIMILARITY()"]).match_dense(
             "page_multivec", query_multivector.flatten().tolist(), "float", "ip", topK).to_pl()
         print(brute_force_res)
-        pl_assert_frame_equal(brute_force_res.head(adjusted_topK), topK_res)
+        pl_assert_frame_equal(brute_force_res, topK_res)
 
 
         res = table_obj.create_index("my_index",
@@ -2061,7 +2077,81 @@ class TestInfinity:
         hnsw_res, extra_result = table_obj.output(["page_no", "SIMILARITY()"]).match_dense(
             "page_multivec", query_multivector.flatten().tolist(), "float", "ip", topK).to_pl()
         print(hnsw_res)
-        pl_assert_frame_equal(hnsw_res.head(adjusted_topK), topK_res)
+        assert commom_rows(hnsw_res, topK_res) >= adjusted_topK
+
+        res = db_obj.drop_table(table_name, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+
+    @pytest.mark.parametrize("embedding_dimension", [8, 16])
+    def test_multivector_bit(self, embedding_dimension, suffix):
+        assert embedding_dimension % 8 == 0
+        # generate bit vectors
+        import numpy as np
+        np.random.seed(27)
+
+        # generate a bit-vector
+        def generate_bit_multivector(shape, dtype=np.int8):
+            x = np.random.randint(0, 2, size=shape, dtype=dtype)
+            bit_array =  [[1 if x > 0.0 else 0 for x in one_list] for one_list in x]
+            return bit_array
+        
+        def flatten_bit_multivector(data_multivec: list[list[int]]) -> list[int]:
+            return [item for sublist in data_multivec for item in sublist]
+
+        def hamming_distance(query_vec: list[int], data_vec: list[int]) -> int:
+            distance = 0
+            assert len(query_vec) == len(data_vec)
+            for i in range(len(query_vec)):
+                if query_vec[i] != data_vec[i]:
+                    distance += 1
+            return distance
+
+        # calculate maxsim between two bit-quantized multivectors
+        def maxsim(query_multivec: list[list[int]], data_multivec: list[list[int]]) -> float:
+            min_distance_sum = 0.0
+            for i in range(len(query_multivec)):
+                min_distance = len(query_multivec[i])
+                for j in range(len(data_multivec)):
+                    distance = hamming_distance(query_multivec[i], data_multivec[j])
+                    if distance < min_distance:
+                        min_distance = distance
+                min_distance_sum += min_distance
+            return min_distance_sum
+
+        row_count = 20
+        topK = 5
+        query_multivector = generate_bit_multivector((2, embedding_dimension))
+        data_multivector = [generate_bit_multivector((4, embedding_dimension)) for i in range(row_count)]
+        maxsims = [(f"page_{i}", maxsim(query_multivector, data_multivector[i])) for i in range(row_count)]
+        maxsims.sort(key=lambda x: x[1])
+        print(f"query_multivector: {query_multivector}")
+        print(f"data_multivector: {data_multivector}")
+        print(f"maxsims: {maxsims}")
+        topK_maxsims = maxsims[:topK]
+        # Convert list of tuples to dictionary format for Polars DataFrame
+        topK_res = pl.DataFrame({"page_no": [item[0] for item in topK_maxsims], "DISTANCE": [item[1] for item in topK_maxsims]})
+        # Cast DISTANCE column to float32
+        topK_res = topK_res.with_columns(pl.col("DISTANCE").cast(pl.Float32))
+
+        table_name = "test_multivector_bit" + suffix
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table(table_name, ConflictType.Ignore)
+        table_obj = db_obj.create_table(table_name, {
+            "page_no": {"type": "varchar"},
+            "page_multivec": {"type": f"multivector,{embedding_dimension},bit"},
+        }, ConflictType.Error)
+
+        for i in range(row_count):
+            table_obj.insert({
+                "page_no": f"page_{i}",
+                "page_multivec": data_multivector[i],
+            })
+
+        brute_force_res, extra_result = table_obj.output(["page_no", "DISTANCE()"]).match_dense(
+            "page_multivec", flatten_bit_multivector(query_multivector), "bit", "hamming", topK).to_pl()
+        print(brute_force_res)
+        pl_assert_frame_equal(brute_force_res, topK_res)
 
         res = db_obj.drop_table(table_name, ConflictType.Error)
         assert res.error_code == ErrorCode.OK

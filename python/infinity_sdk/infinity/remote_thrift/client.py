@@ -25,6 +25,7 @@ from infinity.remote_thrift.infinity_thrift_rpc import *
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.errors import ErrorCode
 from infinity.common import InfinityException
+from typing import Any
 
 TRY_TIMES = 10
 
@@ -458,3 +459,25 @@ class ThriftInfinityClient:
     def drop_snapshot(self, snapshot_name: str):
         return self.client.DropSnapshot(DropSnapshotRequest(session_id=self.session_id,
                                                             snapshot_name=snapshot_name))
+
+    @retry_wrapper
+    def set_config(self, config_name: str, config_value: any):
+        if isinstance(config_value, str):
+            value = ConfigValue(string_value=config_value)
+        elif isinstance(config_value, int):
+            value = ConfigValue(int_value=config_value)
+        elif isinstance(config_value, bool):
+            value = ConfigValue(bool_value=config_value)
+        elif isinstance(config_value, double):
+            value = ConfigValue(double_value=config_value)
+        else:
+            raise ValueError(f"Unsupported type: {type(config_value)}")
+
+        return self.client.SetConfig(SetConfigRequest(session_id=self.session_id,
+                                                      config_name=config_name,
+                                                      config_value=value))
+
+    @retry_wrapper
+    def show_config(self, config_name: str):
+        return self.client.ShowConfig(ShowConfigRequest(session_id=self.session_id,
+                                                        config_name=config_name))

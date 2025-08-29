@@ -526,7 +526,8 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
     auto merge_heap = dynamic_cast<MergeKnn<ColumnDataType, C, DistanceDataType> *>(knn_scan_function_data->merge_knn_base_.get());
     auto knn_query_ptr = static_cast<const ColumnDataType *>(knn_scan_shared_data->query_embedding_);
     const auto query_count = knn_scan_shared_data->query_count_;
-    const auto embedding_dim = column_embedding_dimension_;
+    const auto embedding_dim =
+        knn_scan_shared_data->query_elem_type_ == EmbeddingDataType::kElemBit ? (column_embedding_dimension_ >> 3) : column_embedding_dimension_;
     if (!dist_func || !merge_heap) {
         const auto err = "Invalid dynamic cast";
         LOG_ERROR(err);
@@ -759,12 +760,7 @@ struct BruteForceBlockScan<LogicalType::kEmbedding, ColumnDataType, C, DistanceD
                         const BlockOffset row_count,
                         const Bitmask &bitmask) {
         const ColumnDataType *target_ptr = reinterpret_cast<const ColumnDataType *>(column_vector.data());
-        if (auto *embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
-            embedding_info->Type() == EmbeddingDataType::kElemBit) {
-            merge_heap->Search(knn_query_ptr, target_ptr, embedding_dim / 8, dist_func->dist_func_, row_count, segment_id, block_id, bitmask);
-        } else {
-            merge_heap->Search(knn_query_ptr, target_ptr, embedding_dim, dist_func->dist_func_, row_count, segment_id, block_id, bitmask);
-        }
+        merge_heap->Search(knn_query_ptr, target_ptr, embedding_dim, dist_func->dist_func_, row_count, segment_id, block_id, bitmask);
     }
 };
 
