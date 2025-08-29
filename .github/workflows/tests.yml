@@ -272,7 +272,7 @@ jobs:
 #        if: always()
 #        run: |
 #          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-#          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
+#          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
 #
 #  debug_unit_test:
 #    name: debug_unit_test
@@ -370,7 +370,7 @@ jobs:
 #        if: always()
 #        run: |
 #          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-#          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
+#          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
 #
 #  debug_restart_test:
 #    name: debug_restart_test
@@ -482,7 +482,7 @@ jobs:
 #        if: always()
 #        run: |
 #          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-#          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
+#          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
 #
 #  debug_pysdk_remote_test:
 #    name: debug_pysdk_remote_test
@@ -595,7 +595,7 @@ jobs:
 #        if: always()
 #        run: |
 #          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-#          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
+#          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
 #
 #  debug_http_test:
 #    name: debug_http_test
@@ -708,7 +708,7 @@ jobs:
 #        if: always()
 #        run: |
 #          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-#          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
+#          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
 #
 #  debug_pysdk_parallel_test:
 #    name: debug_pysdk_parallel_test
@@ -822,7 +822,7 @@ jobs:
 #        if: always()
 #        run: |
 #          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-#          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
+#          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
 
   release_configure_and_build:
     name: release_configure_and_build
@@ -1031,7 +1031,7 @@ jobs:
           sleep 1s
 
       - name: Collect infinity log
-        if: ${{ !cancelled() && !failure() }}
+        if: ${{ !cancelled() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/sqllogictest_release.log /infinity_log/sqllogictest_release.log &&
@@ -1041,7 +1041,7 @@ jobs:
         if: always()
         run: |
           sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
+          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
 
   release_unit_test:
     name: release_unit_test
@@ -1129,7 +1129,7 @@ jobs:
             ASAN_OPTIONS=detect_leaks=0 cmake-build-release/src/test_main > unittest_release.log 2> unittest_release_error.log"
 
       - name: Collect infinity log
-        if: ${{ !cancelled() && !failure() }}
+        if: ${{ !cancelled() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/unittest_release.log /infinity_log/unittest_release.log &&
@@ -1139,7 +1139,7 @@ jobs:
         if: always()
         run: |
           sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
+          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
 
   release_pysdk_remote_test:
     name: release_pysdk_remote_test
@@ -1242,7 +1242,7 @@ jobs:
           sleep 1s
 
       - name: Collect infinity log
-        if: ${{ !cancelled() && !failure() }}
+        if: ${{ !cancelled() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/pysdk_remote_release.log /infinity_log/pysdk_remote_release.log &&
@@ -1252,7 +1252,7 @@ jobs:
         if: always()
         run: |
           sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
+          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
 
   release_http_test:
     name: release_http_test
@@ -1355,7 +1355,7 @@ jobs:
           sleep 1s
 
       - name: Collect infinity log
-        if: ${{ !cancelled() && !failure() }}
+        if: ${{ !cancelled() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/http_remote_release.log /infinity_log/http_remote_release.log &&
@@ -1365,7 +1365,7 @@ jobs:
         if: always()
         run: |
           sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
+          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
 
   release_pysdk_parallel_test:
     name: release_pysdk_parallel_test
@@ -1468,7 +1468,7 @@ jobs:
           sleep 1s
 
       - name: Collect infinity log
-        if: ${{ !cancelled() && !failure() }}
+        if: ${{ !cancelled() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/parallel_test_release.log /infinity_log/parallel_test_release.log &&
@@ -1478,7 +1478,7 @@ jobs:
         if: always()
         run: |
           sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
+          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
 
   release_minio_pysdk_remote_test:
     name: release_minio_pysdk_remote_test
@@ -1598,7 +1598,7 @@ jobs:
           sleep 1s
 
       - name: Collect infinity log
-        if: ${{ !cancelled() && !failure() }}
+        if: ${{ !cancelled() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/parallel_test_release.log /infinity_log/parallel_test_release.log &&
@@ -1608,7 +1608,7 @@ jobs:
         if: always()
         run: |
           sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
+          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
 
       - name: Remove minio container
         if: always()
@@ -1731,7 +1731,7 @@ jobs:
           sleep 1s
 
       - name: Collect infinity log
-        if: ${{ !cancelled() && !failure() }}
+        if: ${{ !cancelled() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/parallel_test_release.log /infinity_log/parallel_test_release.log &&
@@ -1741,7 +1741,7 @@ jobs:
         if: always()
         run: |
           sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
+          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
 
       - name: Remove minio container
         if: always()
@@ -1861,9 +1861,9 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           rm -fr $PWD/db_tmp && mkdir -p $PWD/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml
-          ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=sift --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp --config_path=db_tmp/infinity_conf.toml
-          echo "1 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_1_thread.log
-          echo "8 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_8_threads.log
+          sudo ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=sift --dataset_dir=$PWD/test/data --infinity_dir=$PWD/db_tmp --config_path=db_tmp/infinity_conf.toml
+          echo "1 50" | sudo ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_1_thread.log
+          echo "8 50" | sudo ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_8_threads.log
           ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log benchmark_sift_1_thread.log
           ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log benchmark_sift_8_threads.log
 
@@ -1871,4 +1871,4 @@ jobs:
         if: always()
         run: |
           sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-          sudo rm -rf /var/infinity/${CONTAINER_NAME}/
+          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
