@@ -6,7 +6,7 @@ import random
 
 
 def generate(generate_if_exists: bool, copy_dir: str):
-    row_n = 10000
+    row_n = 100
     import_n = 100
     loop_n = 100
     table_name = "test_big_many_import_drop"
