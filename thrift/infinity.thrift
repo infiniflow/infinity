@@ -828,6 +828,31 @@ struct DropSnapshotRequest {
 2: string snapshot_name,
 }
 
+union ConfigValue {
+1: string string_value,
+2: i64 int_value,
+3: bool bool_value,
+4: double double_value,
+}
+
+struct SetConfigRequest {
+1: i64 session_id,
+2: string config_name,
+3: ConfigValue config_value,
+}
+
+struct ShowConfigRequest {
+1: i64 session_id,
+2: string config_name,
+}
+
+struct ShowConfigResponse {
+1: i64 error_code,
+2: string error_msg,
+3: string config_name,
+4: ConfigValue config_value,
+}
+
 // Service
 service InfinityService {
 CommonResponse Connect(1:ConnectRequest request),
@@ -892,5 +917,8 @@ CommonResponse RestoreSnapshot(1: RestoreSnapshotRequest request),
 ShowSnapshotResponse ShowSnapshot(1: ShowSnapshotRequest request),
 ListSnapshotsResponse ListSnapshots(1: ListSnapshotsRequest request),
 CommonResponse DropSnapshot(1: DropSnapshotRequest request),
+
+CommonResponse SetConfig(1: SetConfigRequest request),
+ShowConfigResponse ShowConfig(1: ShowConfigRequest request),
 
 }
