@@ -23,8 +23,6 @@ concurrency:
 jobs:
   code_quality_analyze:
     name: code_quality_analyze
-    # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
-    # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     steps:
@@ -66,763 +64,780 @@ jobs:
             fi
           fi
 
-#  debug_configure_and_build:
-#    name: debug_configure_and_build
-#    if: ${{ github.event_name != 'pull_request_target' || contains(github.event.pull_request_target.labels.*.name, 'ci') }}
-#    runs-on: [ "self-hosted", "infinity-build" ]
-#    needs: code_quality_analyze
-#    outputs:
-#      BUILD_IP: ${{ steps.get_ip.outputs.BUILD_IP }}
-#      CONTAINER_NAME: ${{ steps.start.outputs.CONTAINER_NAME }}
-#    steps:
-#      - name: Show PR labels
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          echo "Workflow triggered by ${{ github.event_name }}"
-#          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
-#            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
-#          fi
-#
-#      - name: Ensure workspace ownership
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
-#          echo ${USERNAME}
-#          echo ${PASSWORD}
-#
-#      - name: Check out code
-#        if: ${{ !cancelled() && !failure() }}
-#        uses: actions/checkout@v5
-#        with:
-#          fetch-depth: 0
-#          fetch-tags: false
-#
-#      - name: Start builder container
+  debug_configure_and_build:
+    name: debug_configure_and_build
+    if: ${{ github.event_name != 'pull_request_target' || contains(github.event.pull_request_target.labels.*.name, 'ci') }}
+    runs-on: [ "self-hosted", "infinity-build" ]
+    needs: code_quality_analyze
+    outputs:
+      BUILD_IP: ${{ steps.get_ip.outputs.BUILD_IP }}
+      CONTAINER_NAME: ${{ steps.start.outputs.CONTAINER_NAME }}
+    steps:
+      - name: Show PR labels
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "Workflow triggered by ${{ github.event_name }}"
+          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
+          fi
+
+      - name: Ensure workspace ownership
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+
+      - name: Check out code
+        if: ${{ !cancelled() && !failure() }}
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: false
+
+      - name: Prepare env variable
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "CONTAINER_NAME=${BUILDER_CONTAINER}" >> $GITHUB_OUTPUT
+          echo "RUNNER_NAME=${RUNNER_NAME}" >> $GITHUB_OUTPUT
+          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
+          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
+          echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: SSH to host server
+        id: ssh
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: 172.17.0.1
+          envs: BUILDER_CONTAINER, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
+          # stupid solution
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          capture_stdout: true
+          script: |
+            hostname -I | awk '{print $1}'
+            mkdir -p /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
+
+      - name: Get host ip
+        id: get_ip
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          read -r BUILD_IP _ <<< "${{ steps.ssh.outputs.stdout }}"
+          echo "Build ip is: ${BUILD_IP}"
+          echo "BUILD_IP=${BUILD_IP}" >> ${GITHUB_OUTPUT}
+
+      - name: Start builder container
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ \
+            -v $PWD:/infinity
+            -v /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}/:/infinity_artifact \
+            infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Configure debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -S /infinity -B /infinity/cmake-build-debug"
+
+      - name: Build debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && cmake --build /infinity/cmake-build-debug -j --target infinity"
+
+      - name: Build unit test
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\"
+            cd /infinity && cmake --build /infinity/cmake-build-debug -j --target test_main"
+
+      - name: Prepare artifacts
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "mv /infinity/cmake-build-debug/src/infinity /infinity_artifact/ &&
+            mv /infinity/cmake-build-debug/src/test_main /infinity_artifact/"
+
+      - name: Stop build container
+        if: always()
+        run: sudo docker stop ${BUILDER_CONTAINER}
+
+      - name: Remove build container
+        if: always()
+        run: sudo docker rm -f -v ${BUILDER_CONTAINER}
+
+  debug_sqllogical_test:
+    name: debug_sqllogical_test
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
+    runs-on: [ "self-hosted", "infinity-build" ]
+    needs: debug_configure_and_build
+    outputs:
+      BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
+      TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
+    env:
+      BUILD_IP: ${{needs.debug_configure_and_build.outputs.BUILD_IP}}
+      CONTAINER_NAME: ${{needs.debug_configure_and_build.outputs.CONTAINER_NAME}}
+    steps:
+      - name: Show PR labels
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "Workflow triggered by ${{ github.event_name }}"
+          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
+          fi
+
+      - name: Ensure workspace ownership
+        if: ${{ !cancelled() && !failure() }}
+        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+
+      - name: Check out code
+        if: ${{ !cancelled() && !failure() }}
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: false
+
+      - name: Prepare env variable
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
+          echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Download artifacts
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
+
+      - name: Prepare data dir & Start test container
 #        id: start
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-#          echo "CONTAINER_NAME=${BUILDER_CONTAINER}" >> $GITHUB_OUTPUT
-#          echo "RUNNER_NAME=${RUNNER_NAME}" >> $GITHUB_OUTPUT
-#          CPUS=${CPUS:-$(nproc)}
-#          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
-#          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
-#          echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
-#          echo "CPUS=${CPUS}" >> $GITHUB_ENV
-#          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-#          sudo docker rm -f -v ${BUILDER_CONTAINER}
-#          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity --cpus ${CPUS} infiniflow/infinity_builder:ubuntu20_clang20
-#
-#      - name: Configure debug version
-#        if: ${{ !cancelled() && !failure() }}
-#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -S /infinity -B /infinity/cmake-build-debug"
-#
-#      - name: Build debug version
-#        if: ${{ !cancelled() && !failure() }}
-#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && cmake --build /infinity/cmake-build-debug -j --target infinity"
-#
-#      - name: Build unit test
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\"
-#          cd /infinity && cmake --build /infinity/cmake-build-debug -j --target test_main"
-#
-#      - name: SSH to host server
-#        id: ssh
-#        uses: appleboy/ssh-action@v1.2.2
-#        with:
-#          host: 172.17.0.1
-#          envs: BUILDER_CONTAINER, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
-#          # stupid solution
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          capture_stdout: true
-#          script: |
-#            hostname -I | awk '{print $1}'
-#            mkdir -p /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
-#            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/infinity /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
-#            cp ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/test_main /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}
-#
-#      - name: Get host ip
-#        id: get_ip
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          read -r BUILD_IP _ <<< "${{ steps.ssh.outputs.stdout }}"
-#          echo "Build ip is: ${BUILD_IP}"
-#          echo "BUILD_IP=${BUILD_IP}" >> ${GITHUB_OUTPUT}
-#          echo "pwd=${PWD}"
-#
-#      - name: Stop build container
-#        if: always()
-#        run: sudo docker stop ${BUILDER_CONTAINER}
-#
-#      - name: Remove build container
-#        if: always()
-#        run: sudo docker rm -f -v ${BUILDER_CONTAINER}
-#
-#  debug_sqllogical_test:
-#    name: debug_sqllogical_test
-#    # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
-#    # https://github.com/orgs/community/discussions/26261
-#    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-#    runs-on: [ "self-hosted", "infinity-build" ]
-#    needs: debug_configure_and_build
-#    outputs:
-#      BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
-#      TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-#    env:
-#      BUILD_IP: ${{needs.debug_configure_and_build.outputs.BUILD_IP}}
-#      CONTAINER_NAME: ${{needs.debug_configure_and_build.outputs.CONTAINER_NAME}}
-#    steps:
-#      - name: Show PR labels
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          echo "Workflow triggered by ${{ github.event_name }}"
-#          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
-#            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
-#          fi
-#
-#      - name: Ensure workspace ownership
-#        if: ${{ !cancelled() && !failure() }}
-#        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
-#
-#      - name: Check out code
-#        if: ${{ !cancelled() && !failure() }}
-#        uses: actions/checkout@v5
-#        with:
-#          fetch-depth: 0
-#          fetch-tags: false
-#
-#      - name: Prepare env variable
-#        id: start
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-#          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-#          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
-#          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
-#          echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
-#
-#      - name: Prepare data dir
-#        uses: appleboy/ssh-action@v1.2.2
-#        if: ${{ !cancelled() && !failure() }}
-#        with:
-#          host: 172.17.0.1
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          envs: CONTAINER_NAME
-#          script: |
-#            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
-#
-#      - name: Start test container
-##        id: start
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-#          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
-#
-#      - name: Download artifacts
-#        uses: appleboy/ssh-action@v1.2.2
-#        if: ${{ !cancelled() && !failure() }}
-#        with:
-#          host: 172.17.0.1
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          envs: CONTAINER_NAME, BUILD_IP
-#          script: |
-#            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log
-#            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
-#
-#      - name: SSH to host server
-#        id: ssh
-#        uses: appleboy/ssh-action@v1.2.2
-#        if: ${{ !cancelled() && !failure() }}
-#        with:
-#          host: 172.17.0.1
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
-#          script: |
-#            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
-#            sudo cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
-#
-#      - name: Install pysdk
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf
-#          cd /infinity/
-#          pip3 uninstall -y infinity-sdk
-#          pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
-#
-#      - name: Start infinity debug version
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-#            cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > sqllogictest_debug.log 2> sqllogictest_debug_error.log" &
-#
-#      - name: Run sqllogictest debug version
-#        if: ${{ !cancelled() && !failure() }}
-#        id: run_tests_debug
-#        run: |
-#          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-#            LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py"
-#          sleep 1s
-#
-#      - name: Remove test container
-#        if: always()
-#        run: |
-#          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-#          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
-#
-#  debug_unit_test:
-#    name: debug_unit_test
-#    # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
-#    # https://github.com/orgs/community/discussions/26261
-#    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-#    runs-on: [ "self-hosted", "infinity-test" ]
-#    needs: debug_configure_and_build
-#    outputs:
-#      BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
-#      TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-#    env:
-#      BUILD_IP: ${{needs.debug_configure_and_build.outputs.BUILD_IP}}
-#      CONTAINER_NAME: ${{needs.debug_configure_and_build.outputs.CONTAINER_NAME}}
-#    steps:
-#      - name: Show PR labels
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          echo "Workflow triggered by ${{ github.event_name }}"
-#          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
-#            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
-#          fi
-#
-#      - name: Ensure workspace ownership
-#        if: ${{ !cancelled() && !failure() }}
-#        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
-#
-#      - name: Check out code
-#        if: ${{ !cancelled() && !failure() }}
-#        uses: actions/checkout@v5
-#        with:
-#          fetch-depth: 0
-#          fetch-tags: false
-#
-#      - name: Prepare env variable
-#        id: start
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-#          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-#          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
-#          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
-#          echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
-#
-#      - name: Prepare data dir
-#        uses: appleboy/ssh-action@v1.2.2
-#        if: ${{ !cancelled() && !failure() }}
-#        with:
-#          host: 172.17.0.1
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          envs: CONTAINER_NAME
-#          script: |
-#            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
-#
-#      - name: Start test container
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-#          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
-#
-#      - name: Download artifacts
-#        uses: appleboy/ssh-action@v1.2.2
-#        if: ${{ !cancelled() && !failure() }}
-#        with:
-#          host: 172.17.0.1
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          envs: CONTAINER_NAME, BUILD_IP
-#          script: |
-#            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log
-#            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
-#
-#      - name: SSH to host server
-#        id: ssh
-#        uses: appleboy/ssh-action@v1.2.2
-#        if: ${{ !cancelled() && !failure() }}
-#        with:
-#          host: 172.17.0.1
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
-#          script: |
-#            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
-#            sudo cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/test_main ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
-#
-#      - name: Unit test debug version
-#        if: ${{ !cancelled() && !failure() }}
-#        id: run_unit_test_debug
-#        run: |
-#          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-#            ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main > unittest_debug.log 2> unittest_debug_error.log"
-#
-#      - name: Remove test container
-#        if: always()
-#        run: |
-#          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-#          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
-#
-#  debug_restart_test:
-#    name: debug_restart_test
-#    # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
-#    # https://github.com/orgs/community/discussions/26261
-#    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-#    runs-on: [ "self-hosted", "infinity-test" ]
-#    needs: debug_configure_and_build
-#    outputs:
-#      BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
-#      TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-#    env:
-#      BUILD_IP: ${{needs.debug_configure_and_build.outputs.BUILD_IP}}
-#      CONTAINER_NAME: ${{needs.debug_configure_and_build.outputs.CONTAINER_NAME}}
-#    steps:
-#      - name: Show PR labels
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          echo "Workflow triggered by ${{ github.event_name }}"
-#          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
-#            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
-#          fi
-#
-#      - name: Ensure workspace ownership
-#        if: ${{ !cancelled() && !failure() }}
-#        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
-#
-#      - name: Check out code
-#        if: ${{ !cancelled() && !failure() }}
-#        uses: actions/checkout@v5
-#        with:
-#          fetch-depth: 0
-#          fetch-tags: false
-#
-#      - name: Prepare env variable
-#        id: start
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-#          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-#          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
-#          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
-#          echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
-#
-#      - name: Prepare data dir
-#        uses: appleboy/ssh-action@v1.2.2
-#        if: ${{ !cancelled() && !failure() }}
-#        with:
-#          host: 172.17.0.1
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          envs: CONTAINER_NAME
-#          script: |
-#            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
-#
-#      - name: Start test container
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-#          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
-#
-#      - name: Download artifacts
-#        uses: appleboy/ssh-action@v1.2.2
-#        if: ${{ !cancelled() && !failure() }}
-#        with:
-#          host: 172.17.0.1
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          envs: CONTAINER_NAME, BUILD_IP
-#          script: |
-#            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log
-#            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
-#
-#      - name: SSH to host server
-#        id: ssh
-#        uses: appleboy/ssh-action@v1.2.2
-#        if: ${{ !cancelled() && !failure() }}
-#        with:
-#          host: 172.17.0.1
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
-#          script: |
-#            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
-#            sudo cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
-#
-#      - name: Install pysdk
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf
-#          cd /infinity/
-#          pip3 uninstall -y infinity-sdk
-#          pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
-#
-#      - name: Prepare restart test data
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
-#          echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
-#
-#      - name: Run restart test
-#        if: ${{ !cancelled() && !failure() }}
-#        id: run_restart_test
-#        run: |
-#          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-#            python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity"
-#
-#      - name: Remove test container
-#        if: always()
-#        run: |
-#          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-#          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
-#
-#  debug_pysdk_remote_test:
-#    name: debug_pysdk_remote_test
-#    # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
-#    # https://github.com/orgs/community/discussions/26261
-#    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-#    runs-on: [ "self-hosted", "infinity-test" ]
-#    needs: debug_configure_and_build
-#    outputs:
-#      BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
-#      TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-#    env:
-#      BUILD_IP: ${{needs.debug_configure_and_build.outputs.BUILD_IP}}
-#      CONTAINER_NAME: ${{needs.debug_configure_and_build.outputs.CONTAINER_NAME}}
-#    steps:
-#      - name: Show PR labels
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          echo "Workflow triggered by ${{ github.event_name }}"
-#          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
-#            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
-#          fi
-#
-#      - name: Ensure workspace ownership
-#        if: ${{ !cancelled() && !failure() }}
-#        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
-#
-#      - name: Check out code
-#        if: ${{ !cancelled() && !failure() }}
-#        uses: actions/checkout@v5
-#        with:
-#          fetch-depth: 0
-#          fetch-tags: false
-#
-#      - name: Prepare env variable
-#        id: start
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-#          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-#          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
-#          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
-#          echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
-#
-#      - name: Prepare data dir
-#        uses: appleboy/ssh-action@v1.2.2
-#        if: ${{ !cancelled() && !failure() }}
-#        with:
-#          host: 172.17.0.1
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          envs: CONTAINER_NAME
-#          script: |
-#            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
-#
-#      - name: Start test container
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-#          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
-#
-#      - name: Download artifacts
-#        uses: appleboy/ssh-action@v1.2.2
-#        if: ${{ !cancelled() && !failure() }}
-#        with:
-#          host: 172.17.0.1
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          envs: CONTAINER_NAME, BUILD_IP
-#          script: |
-#            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log
-#            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
-#
-#      - name: SSH to host server
-#        id: ssh
-#        uses: appleboy/ssh-action@v1.2.2
-#        if: ${{ !cancelled() && !failure() }}
-#        with:
-#          host: 172.17.0.1
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
-#          script: |
-#            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
-#            sudo cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
-#
-#      - name: Install pysdk
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf
-#          cd /infinity/
-#          pip3 uninstall -y infinity-sdk
-#          pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
-#
-#      - name: Start infinity debug version
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-#            cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > pysdk_remote_debug.log 2> pysdk_remote_debug_error.log" &
-#
-#      - name: Run pysdk remote infinity test debug version
-#        if: ${{ !cancelled() && !failure() }}
-#        id: run_pysdk_remote_debug
-#        run: |
-#          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-#            LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pysdk_remote_infinity_test.py"
-#          sleep 1s
-#
-#      - name: Remove test container
-#        if: always()
-#        run: |
-#          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-#          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
-#
-#  debug_http_test:
-#    name: debug_http_test
-#    # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
-#    # https://github.com/orgs/community/discussions/26261
-#    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-#    runs-on: [ "self-hosted", "infinity-test" ]
-#    needs: debug_configure_and_build
-#    outputs:
-#      BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
-#      TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-#    env:
-#      BUILD_IP: ${{needs.debug_configure_and_build.outputs.BUILD_IP}}
-#      CONTAINER_NAME: ${{needs.debug_configure_and_build.outputs.CONTAINER_NAME}}
-#    steps:
-#      - name: Show PR labels
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          echo "Workflow triggered by ${{ github.event_name }}"
-#          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
-#            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
-#          fi
-#
-#      - name: Ensure workspace ownership
-#        if: ${{ !cancelled() && !failure() }}
-#        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
-#
-#      - name: Check out code
-#        if: ${{ !cancelled() && !failure() }}
-#        uses: actions/checkout@v5
-#        with:
-#          fetch-depth: 0
-#          fetch-tags: false
-#
-#      - name: Prepare env variable
-#        id: start
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-#          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-#          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
-#          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
-#          echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
-#
-#      - name: Prepare data dir
-#        uses: appleboy/ssh-action@v1.2.2
-#        if: ${{ !cancelled() && !failure() }}
-#        with:
-#          host: 172.17.0.1
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          envs: CONTAINER_NAME
-#          script: |
-#            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
-#
-#      - name: Start test container
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-#          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
-#
-#      - name: Download artifacts
-#        uses: appleboy/ssh-action@v1.2.2
-#        if: ${{ !cancelled() && !failure() }}
-#        with:
-#          host: 172.17.0.1
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          envs: CONTAINER_NAME, BUILD_IP
-#          script: |
-#            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log
-#            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
-#
-#      - name: SSH to host server
-#        id: ssh
-#        uses: appleboy/ssh-action@v1.2.2
-#        if: ${{ !cancelled() && !failure() }}
-#        with:
-#          host: 172.17.0.1
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
-#          script: |
-#            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
-#            sudo cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
-#
-#      - name: Install pysdk
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf
-#          cd /infinity/
-#          pip3 uninstall -y infinity-sdk
-#          pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
-#
-#      - name: Start infinity debug version
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-#            cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > http_remote_debug.log 2> http_remote_debug_error.log" &
-#
-#      - name: Run HTTP infinity test debug version
-#        if: ${{ !cancelled() && !failure() }}
-#        id: run_http_remote_debug
-#        run: |
-#          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-#            LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_http_api.py"
-#          sleep 1s
-#
-#      - name: Remove test container
-#        if: always()
-#        run: |
-#          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-#          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
-#
-#  debug_pysdk_parallel_test:
-#    name: debug_pysdk_parallel_test
-#    # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
-#    # https://github.com/orgs/community/discussions/26261
-#    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-#    runs-on: [ "self-hosted", "infinity-test" ]
-#    needs:
-#      - debug_configure_and_build
-#    outputs:
-#      BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
-#      TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
-#    env:
-#      BUILD_IP: ${{needs.debug_configure_and_build.outputs.BUILD_IP}}
-#      CONTAINER_NAME: ${{needs.debug_configure_and_build.outputs.CONTAINER_NAME}}
-#    steps:
-#      - name: Show PR labels
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          echo "Workflow triggered by ${{ github.event_name }}"
-#          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
-#            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
-#          fi
-#
-#      - name: Ensure workspace ownership
-#        if: ${{ !cancelled() && !failure() }}
-#        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
-#
-#      - name: Check out code
-#        if: ${{ !cancelled() && !failure() }}
-#        uses: actions/checkout@v5
-#        with:
-#          fetch-depth: 0
-#          fetch-tags: false
-#
-#      - name: Prepare env variable
-#        id: start
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-#          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
-#          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
-#          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
-#          echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
-#
-#      - name: Prepare data dir
-#        uses: appleboy/ssh-action@v1.2.2
-#        if: ${{ !cancelled() && !failure() }}
-#        with:
-#          host: 172.17.0.1
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          envs: CONTAINER_NAME
-#          script: |
-#            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
-#
-#      - name: Start test container
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-#          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v /var/infinity/${CONTAINER_NAME}/:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
-#
-#      - name: Download artifacts
-#        uses: appleboy/ssh-action@v1.2.2
-#        if: ${{ !cancelled() && !failure() }}
-#        with:
-#          host: 172.17.0.1
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          envs: CONTAINER_NAME, BUILD_IP
-#          script: |
-#            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log
-#            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
-#
-#      - name: SSH to host server
-#        id: ssh
-#        uses: appleboy/ssh-action@v1.2.2
-#        if: ${{ !cancelled() && !failure() }}
-#        with:
-#          host: 172.17.0.1
-#          username: ${{ env.USERNAME }}
-#          password: ${{ env.PASSWORD }}
-#          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
-#          script: |
-#            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
-#            sudo cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
-#
-#      - name: Install pysdk
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf
-#          cd /infinity/
-#          pip3 uninstall -y infinity-sdk
-#          pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
-#
-#      - name: Start infinity debug version
-#        if: ${{ !cancelled() && !failure() }}
-#        run: |
-#          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-#            cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_debug.log 2> parallel_test_debug_error.log" &
-#
-#      - name: Run pysdk parallel test debug version
-#        if: ${{ !cancelled() && !failure() }}
-#        id: run_parallel_test_debug
-#        run: |
-#          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
-#            LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_parallel_test.py"
-#          sleep 1s
-#
-#      - name: Remove test container
-#        if: always()
-#        run: |
-#          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
-#          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo mkdir -p /var/infinity/${TEST_CONTAINER_NAME}/
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ \
+            -v $PWD:/infinity \
+            -v /var/infinity/${TEST_CONTAINER_NAME}/:/var/infinity \
+            -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity:/infinity/cmake-build-debug/src/infinity \
+            -v /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log:/infinity_log/ \
+            infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: SSH to host server
+        id: ssh
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
+          script: |
+            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
+
+      - name: Install pysdk
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf &&
+            cd /infinity/ &&
+            pip3 uninstall -y infinity-sdk &&
+            pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+
+      - name: Start infinity debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ &&
+            cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > sqllogictest_debug.log 2> sqllogictest_debug_error.log" &
+
+      - name: Run sqllogictest debug version
+        if: ${{ !cancelled() && !failure() }}
+        id: run_tests_debug
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ &&
+            LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py"
+          sleep 1s
+
+      - name: Collect infinity log
+        if: ${{ !cancelled() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
+            "mv /infinity/sqllogictest_debug.log /infinity_log/sqllogictest_debug.log &&
+            mv /infinity/sqllogictest_debug_error.log /infinity_log/sqllogictest_debug_error.log"
+
+      - name: Remove test container
+        if: always()
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
+
+  debug_unit_test:
+    name: debug_unit_test
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
+    runs-on: [ "self-hosted", "infinity-test" ]
+    needs: debug_configure_and_build
+    outputs:
+      BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
+      TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
+    env:
+      BUILD_IP: ${{needs.debug_configure_and_build.outputs.BUILD_IP}}
+      CONTAINER_NAME: ${{needs.debug_configure_and_build.outputs.CONTAINER_NAME}}
+    steps:
+      - name: Show PR labels
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "Workflow triggered by ${{ github.event_name }}"
+          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
+          fi
+
+      - name: Ensure workspace ownership
+        if: ${{ !cancelled() && !failure() }}
+        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+
+      - name: Check out code
+        if: ${{ !cancelled() && !failure() }}
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: false
+
+      - name: Prepare env variable
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
+          echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Download artifacts
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c \
+              "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/test_main /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
+
+      - name: Prepare data dir & Start test container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo mkdir -p /var/infinity/${TEST_CONTAINER_NAME}/
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ \
+            -v $PWD:/infinity \
+            -v /var/infinity/${TEST_CONTAINER_NAME}/:/var/infinity \
+            -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/test_main:/infinity/cmake-build-debug/src/test_main \
+            -v /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log:/infinity_log/ \
+            infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: SSH to host server to start test task
+        id: ssh
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
+          script: |
+            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
+
+      - name: Unit test debug version
+        if: ${{ !cancelled() && !failure() }}
+        id: run_unit_test_debug
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ &&
+            ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main > unittest_debug.log 2> unittest_debug_error.log"
+
+      - name: Collect infinity log
+        if: ${{ !cancelled() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
+            "mv /infinity/unittest_debug.log /infinity_log/unittest_debug.log &&
+            mv /infinity/unittest_debug_error.log /infinity_log/unittest_debug_error.log"
+
+      - name: Remove test container
+        if: always()
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
+
+  debug_restart_test:
+    name: debug_restart_test
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
+    runs-on: [ "self-hosted", "infinity-test" ]
+    needs: debug_configure_and_build
+    outputs:
+      BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
+      TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
+    env:
+      BUILD_IP: ${{needs.debug_configure_and_build.outputs.BUILD_IP}}
+      CONTAINER_NAME: ${{needs.debug_configure_and_build.outputs.CONTAINER_NAME}}
+    steps:
+      - name: Show PR labels
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "Workflow triggered by ${{ github.event_name }}"
+          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
+          fi
+
+      - name: Ensure workspace ownership
+        if: ${{ !cancelled() && !failure() }}
+        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+
+      - name: Check out code
+        if: ${{ !cancelled() && !failure() }}
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: false
+
+      - name: Prepare env variable
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
+          echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Prepare data dir
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME
+          script: |
+            sudo mkdir -p /var/infinity/${CONTAINER_NAME}/
+
+      - name: Download artifacts
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c \
+              "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
+
+      - name: Start test container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo mkdir -p /var/infinity/${TEST_CONTAINER_NAME}/
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ \
+            -v $PWD:/infinity \
+            -v /var/infinity/${TEST_CONTAINER_NAME}/:/var/infinity \
+            -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity:/infinity/cmake-build-debug/src/infinity \
+            -v /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log:/infinity_log/ \
+            infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: SSH to host server
+        id: ssh
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
+          script: |
+            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
+
+      - name: Install pysdk
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf &&
+              cd /infinity/ &&
+              pip3 uninstall -y infinity-sdk &&
+              pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+
+      - name: Prepare restart test data
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
+          echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
+
+      - name: Run restart test
+        if: ${{ !cancelled() && !failure() }}
+        id: run_restart_test
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ &&
+            python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity"
+
+      - name: Collect infinity log
+        if: ${{ !cancelled() }}
+        run: |
+          sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-debug/src/infinity --output_dir=/infinity_log --failure=${failure}
+
+      - name: Remove test container
+        if: always()
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
+
+  debug_pysdk_remote_test:
+    name: debug_pysdk_remote_test
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
+    runs-on: [ "self-hosted", "infinity-test" ]
+    needs: debug_configure_and_build
+    outputs:
+      BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
+      TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
+    env:
+      BUILD_IP: ${{needs.debug_configure_and_build.outputs.BUILD_IP}}
+      CONTAINER_NAME: ${{needs.debug_configure_and_build.outputs.CONTAINER_NAME}}
+    steps:
+      - name: Show PR labels
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "Workflow triggered by ${{ github.event_name }}"
+          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
+          fi
+
+      - name: Ensure workspace ownership
+        if: ${{ !cancelled() && !failure() }}
+        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+
+      - name: Check out code
+        if: ${{ !cancelled() && !failure() }}
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: false
+
+      - name: Prepare env variable
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
+          echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Download artifacts
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
+
+      - name: Prepare data dir & Start test container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo mkdir -p /var/infinity/${TEST_CONTAINER_NAME}/
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ \
+            -v $PWD:/infinity \
+            -v /var/infinity/${TEST_CONTAINER_NAME}/:/var/infinity \
+            -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity:/infinity/cmake-build-debug/src/infinity \
+            -v /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log:/infinity_log/ \
+            infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: SSH to host server
+        id: ssh
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
+          script: |
+            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
+
+      - name: Install pysdk
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf &&
+            cd /infinity/ &&
+            pip3 uninstall -y infinity-sdk &&
+            pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+
+      - name: Start infinity debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ &&
+            cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > pysdk_remote_debug.log 2> pysdk_remote_debug_error.log" &
+
+      - name: Run pysdk remote infinity test debug version
+        if: ${{ !cancelled() && !failure() }}
+        id: run_pysdk_remote_debug
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ &&
+            LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pysdk_remote_infinity_test.py"
+          sleep 1s
+
+      - name: Collect infinity log
+        if: ${{ !cancelled() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
+            "mv /infinity/pysdk_remote_debug.log /infinity_log/pysdk_remote_debug.log &&
+            mv /infinity/pysdk_remote_debug_error.log /infinity_log/pysdk_remote_debug_error.log"
+
+      - name: Remove test container
+        if: always()
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
+
+  debug_http_test:
+    name: debug_http_test
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
+    runs-on: [ "self-hosted", "infinity-test" ]
+    needs: debug_configure_and_build
+    outputs:
+      BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
+      TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
+    env:
+      BUILD_IP: ${{needs.debug_configure_and_build.outputs.BUILD_IP}}
+      CONTAINER_NAME: ${{needs.debug_configure_and_build.outputs.CONTAINER_NAME}}
+    steps:
+      - name: Show PR labels
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "Workflow triggered by ${{ github.event_name }}"
+          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
+          fi
+
+      - name: Ensure workspace ownership
+        if: ${{ !cancelled() && !failure() }}
+        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+
+      - name: Check out code
+        if: ${{ !cancelled() && !failure() }}
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: false
+
+      - name: Prepare env variable
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
+          echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Download artifacts
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c \
+              "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
+
+      - name: Prepare data dir & Start test container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo mkdir -p /var/infinity/${TEST_CONTAINER_NAME}/
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ \
+            -v $PWD:/infinity \
+            -v /var/infinity/${TEST_CONTAINER_NAME}/:/var/infinity \
+            -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity:/infinity/cmake-build-debug/src/infinity \
+            -v /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log:/infinity_log/ \
+            infiniflow/infinity_builder:ubuntu20_clang20
+
+
+      - name: SSH to host server
+        id: ssh
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
+          script: |
+            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
+            sudo cp /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity ${RUNNER_WORKSPACE_PREFIX}/${RUNNER_NAME}/infinity/infinity/cmake-build-debug/src/
+
+      - name: Install pysdk
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf
+          cd /infinity/
+          pip3 uninstall -y infinity-sdk
+          pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+
+      - name: Start infinity debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
+            cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > http_remote_debug.log 2> http_remote_debug_error.log" &
+
+      - name: Run HTTP infinity test debug version
+        if: ${{ !cancelled() && !failure() }}
+        id: run_http_remote_debug
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
+            LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_http_api.py"
+          sleep 1s
+
+      - name: Collect infinity log
+        if: ${{ !cancelled() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
+            "mv /infinity/http_remote_debug.log /infinity_log/http_remote_debug.log &&
+            mv /infinity/http_remote_debug_error.log /infinity_log/http_remote_debug_error.log"
+
+      - name: Remove test container
+        if: always()
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
+
+  debug_pysdk_parallel_test:
+    name: debug_pysdk_parallel_test
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
+    runs-on: [ "self-hosted", "infinity-test" ]
+    needs:
+      - debug_configure_and_build
+    outputs:
+      BUILD_CONTAINER_NAME: ${{ steps.start.outputs.BUILD_CONTAINER_NAME }}
+      TEST_CONTAINER_NAME: ${{ steps.start.outputs.TEST_CONTAINER_NAME }}
+    env:
+      BUILD_IP: ${{needs.debug_configure_and_build.outputs.BUILD_IP}}
+      CONTAINER_NAME: ${{needs.debug_configure_and_build.outputs.CONTAINER_NAME}}
+    steps:
+      - name: Show PR labels
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "Workflow triggered by ${{ github.event_name }}"
+          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
+          fi
+
+      - name: Ensure workspace ownership
+        if: ${{ !cancelled() && !failure() }}
+        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+
+      - name: Check out code
+        if: ${{ !cancelled() && !failure() }}
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: false
+
+      - name: Prepare env variable
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "BUILD_CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
+          echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
+
+      - name: Download artifacts
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: CONTAINER_NAME, BUILD_IP
+          script: |
+            mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log
+            flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c \
+              "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
+
+      - name: Prepare data dir & Start test container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo mkdir -p /var/infinity/${TEST_CONTAINER_NAME}/
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ \
+            -v $PWD:/infinity \
+            -v /var/infinity/${TEST_CONTAINER_NAME}/:/var/infinity \
+            -v /home/infiniflow/artifacts/infinity/${BUILD_CONTAINER_NAME}/infinity:/infinity/cmake-build-debug/src/infinity \
+            -v /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log:/infinity_log/ \
+            infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: SSH to host server
+        id: ssh
+        uses: appleboy/ssh-action@v1.2.2
+        if: ${{ !cancelled() && !failure() }}
+        with:
+          host: 172.17.0.1
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
+          envs: TEST_CONTAINER_NAME, BUILD_CONTAINER_NAME, RUNNER_NAME, RUNNER_WORKSPACE_PREFIX
+          script: |
+            sudo docker exec ${TEST_CONTAINER_NAME} mkdir -p /infinity/cmake-build-debug/src
+
+      - name: Install pysdk
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf
+          cd /infinity/
+          pip3 uninstall -y infinity-sdk
+          pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+
+      - name: Start infinity debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ &&
+            cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_debug.log 2> parallel_test_debug_error.log" &
+
+      - name: Run pysdk parallel test debug version
+        if: ${{ !cancelled() && !failure() }}
+        id: run_parallel_test_debug
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/
+            LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_parallel_test.py"
+          sleep 1s
+
+      - name: Collect infinity log
+        if: ${{ !cancelled() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
+            "mv /infinity/parallel_test_debug.log /infinity_log/parallel_test_debug.log &&
+            mv /infinity/parallel_test_debug_error.log /infinity_log/parallel_test_debug_error.log"
+
+      - name: Remove test container
+        if: always()
+        run: |
+          sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+          sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
 
   release_configure_and_build:
     name: release_configure_and_build
@@ -858,11 +873,9 @@ jobs:
         run: |
           BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "CONTAINER_NAME=${BUILDER_CONTAINER}" >> $GITHUB_OUTPUT
-          CPUS=${CPUS:-$(nproc)}
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
           echo "USERNAME=${USERNAME}" >> $GITHUB_ENV
           echo "PASSWORD=${PASSWORD}" >> $GITHUB_ENV
-          echo "CPUS=${CPUS}" >> $GITHUB_ENV
 
       - name: SSH to host server
         id: ssh
@@ -892,7 +905,7 @@ jobs:
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} \
             -v $PWD:/infinity \
             -v /home/infiniflow/artifacts/infinity/${BUILDER_CONTAINER}/:/infinity_artifact \
-            --cpus ${CPUS} infiniflow/infinity_builder:ubuntu20_clang20
+            infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Configure release version
         if: ${{ !cancelled() && !failure() }}
@@ -1482,8 +1495,6 @@ jobs:
 
   release_minio_pysdk_remote_test:
     name: release_minio_pysdk_remote_test
-    # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
-    # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     needs: release_configure_and_build
@@ -1800,7 +1811,7 @@ jobs:
           script: |
             mkdir -p /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/log
             flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/benchmark_query_lock -c \
-              "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/knn_query_benchmark/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
+              "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/knn_query_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
             flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/benchmark_import_lock -c \
               "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/knn_import_benchmark /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
