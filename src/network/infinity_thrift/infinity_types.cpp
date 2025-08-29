@@ -17058,4 +17058,572 @@ void DropSnapshotRequest::printTo(std::ostream &out) const {
     out << ")";
 }
 
+ConfigValue::~ConfigValue() noexcept {}
+
+ConfigValue::ConfigValue() noexcept : string_value(), int_value(0), bool_value(0), double_value(0) {}
+
+void ConfigValue::__set_string_value(const std::string &val) {
+    this->string_value = val;
+    __isset.string_value = true;
+}
+
+void ConfigValue::__set_int_value(const int64_t val) {
+    this->int_value = val;
+    __isset.int_value = true;
+}
+
+void ConfigValue::__set_bool_value(const bool val) {
+    this->bool_value = val;
+    __isset.bool_value = true;
+}
+
+void ConfigValue::__set_double_value(const double val) {
+    this->double_value = val;
+    __isset.double_value = true;
+}
+std::ostream &operator<<(std::ostream &out, const ConfigValue &obj) {
+    obj.printTo(out);
+    return out;
+}
+
+uint32_t ConfigValue::read(::apache::thrift::protocol::TProtocol *iprot) {
+
+    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+    uint32_t xfer = 0;
+    std::string fname;
+    ::apache::thrift::protocol::TType ftype;
+    int16_t fid;
+
+    xfer += iprot->readStructBegin(fname);
+
+    using ::apache::thrift::protocol::TProtocolException;
+
+    while (true) {
+        xfer += iprot->readFieldBegin(fname, ftype, fid);
+        if (ftype == ::apache::thrift::protocol::T_STOP) {
+            break;
+        }
+        switch (fid) {
+            case 1:
+                if (ftype == ::apache::thrift::protocol::T_STRING) {
+                    xfer += iprot->readString(this->string_value);
+                    this->__isset.string_value = true;
+                } else {
+                    xfer += iprot->skip(ftype);
+                }
+                break;
+            case 2:
+                if (ftype == ::apache::thrift::protocol::T_I64) {
+                    xfer += iprot->readI64(this->int_value);
+                    this->__isset.int_value = true;
+                } else {
+                    xfer += iprot->skip(ftype);
+                }
+                break;
+            case 3:
+                if (ftype == ::apache::thrift::protocol::T_BOOL) {
+                    xfer += iprot->readBool(this->bool_value);
+                    this->__isset.bool_value = true;
+                } else {
+                    xfer += iprot->skip(ftype);
+                }
+                break;
+            case 4:
+                if (ftype == ::apache::thrift::protocol::T_DOUBLE) {
+                    xfer += iprot->readDouble(this->double_value);
+                    this->__isset.double_value = true;
+                } else {
+                    xfer += iprot->skip(ftype);
+                }
+                break;
+            default:
+                xfer += iprot->skip(ftype);
+                break;
+        }
+        xfer += iprot->readFieldEnd();
+    }
+
+    xfer += iprot->readStructEnd();
+
+    return xfer;
+}
+
+uint32_t ConfigValue::write(::apache::thrift::protocol::TProtocol *oprot) const {
+    uint32_t xfer = 0;
+    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+    xfer += oprot->writeStructBegin("ConfigValue");
+
+    if (this->__isset.string_value) {
+        xfer += oprot->writeFieldBegin("string_value", ::apache::thrift::protocol::T_STRING, 1);
+        xfer += oprot->writeString(this->string_value);
+        xfer += oprot->writeFieldEnd();
+    }
+    if (this->__isset.int_value) {
+        xfer += oprot->writeFieldBegin("int_value", ::apache::thrift::protocol::T_I64, 2);
+        xfer += oprot->writeI64(this->int_value);
+        xfer += oprot->writeFieldEnd();
+    }
+    if (this->__isset.bool_value) {
+        xfer += oprot->writeFieldBegin("bool_value", ::apache::thrift::protocol::T_BOOL, 3);
+        xfer += oprot->writeBool(this->bool_value);
+        xfer += oprot->writeFieldEnd();
+    }
+    if (this->__isset.double_value) {
+        xfer += oprot->writeFieldBegin("double_value", ::apache::thrift::protocol::T_DOUBLE, 4);
+        xfer += oprot->writeDouble(this->double_value);
+        xfer += oprot->writeFieldEnd();
+    }
+    xfer += oprot->writeFieldStop();
+    xfer += oprot->writeStructEnd();
+    return xfer;
+}
+
+void swap(ConfigValue &a, ConfigValue &b) {
+    using ::std::swap;
+    swap(a.string_value, b.string_value);
+    swap(a.int_value, b.int_value);
+    swap(a.bool_value, b.bool_value);
+    swap(a.double_value, b.double_value);
+    swap(a.__isset, b.__isset);
+}
+
+bool ConfigValue::operator==(const ConfigValue &rhs) const {
+    if (__isset.string_value != rhs.__isset.string_value)
+        return false;
+    else if (__isset.string_value && !(string_value == rhs.string_value))
+        return false;
+    if (__isset.int_value != rhs.__isset.int_value)
+        return false;
+    else if (__isset.int_value && !(int_value == rhs.int_value))
+        return false;
+    if (__isset.bool_value != rhs.__isset.bool_value)
+        return false;
+    else if (__isset.bool_value && !(bool_value == rhs.bool_value))
+        return false;
+    if (__isset.double_value != rhs.__isset.double_value)
+        return false;
+    else if (__isset.double_value && !(double_value == rhs.double_value))
+        return false;
+    return true;
+}
+
+ConfigValue::ConfigValue(const ConfigValue &other582) {
+    string_value = other582.string_value;
+    int_value = other582.int_value;
+    bool_value = other582.bool_value;
+    double_value = other582.double_value;
+    __isset = other582.__isset;
+}
+ConfigValue &ConfigValue::operator=(const ConfigValue &other583) {
+    string_value = other583.string_value;
+    int_value = other583.int_value;
+    bool_value = other583.bool_value;
+    double_value = other583.double_value;
+    __isset = other583.__isset;
+    return *this;
+}
+void ConfigValue::printTo(std::ostream &out) const {
+    using ::apache::thrift::to_string;
+    out << "ConfigValue(";
+    out << "string_value=";
+    (__isset.string_value ? (out << to_string(string_value)) : (out << "<null>"));
+    out << ", " << "int_value=";
+    (__isset.int_value ? (out << to_string(int_value)) : (out << "<null>"));
+    out << ", " << "bool_value=";
+    (__isset.bool_value ? (out << to_string(bool_value)) : (out << "<null>"));
+    out << ", " << "double_value=";
+    (__isset.double_value ? (out << to_string(double_value)) : (out << "<null>"));
+    out << ")";
+}
+
+SetConfigRequest::~SetConfigRequest() noexcept {}
+
+SetConfigRequest::SetConfigRequest() noexcept : session_id(0), config_name() {}
+
+void SetConfigRequest::__set_session_id(const int64_t val) { this->session_id = val; }
+
+void SetConfigRequest::__set_config_name(const std::string &val) { this->config_name = val; }
+
+void SetConfigRequest::__set_config_value(const ConfigValue &val) { this->config_value = val; }
+std::ostream &operator<<(std::ostream &out, const SetConfigRequest &obj) {
+    obj.printTo(out);
+    return out;
+}
+
+uint32_t SetConfigRequest::read(::apache::thrift::protocol::TProtocol *iprot) {
+
+    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+    uint32_t xfer = 0;
+    std::string fname;
+    ::apache::thrift::protocol::TType ftype;
+    int16_t fid;
+
+    xfer += iprot->readStructBegin(fname);
+
+    using ::apache::thrift::protocol::TProtocolException;
+
+    while (true) {
+        xfer += iprot->readFieldBegin(fname, ftype, fid);
+        if (ftype == ::apache::thrift::protocol::T_STOP) {
+            break;
+        }
+        switch (fid) {
+            case 1:
+                if (ftype == ::apache::thrift::protocol::T_I64) {
+                    xfer += iprot->readI64(this->session_id);
+                    this->__isset.session_id = true;
+                } else {
+                    xfer += iprot->skip(ftype);
+                }
+                break;
+            case 2:
+                if (ftype == ::apache::thrift::protocol::T_STRING) {
+                    xfer += iprot->readString(this->config_name);
+                    this->__isset.config_name = true;
+                } else {
+                    xfer += iprot->skip(ftype);
+                }
+                break;
+            case 3:
+                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+                    xfer += this->config_value.read(iprot);
+                    this->__isset.config_value = true;
+                } else {
+                    xfer += iprot->skip(ftype);
+                }
+                break;
+            default:
+                xfer += iprot->skip(ftype);
+                break;
+        }
+        xfer += iprot->readFieldEnd();
+    }
+
+    xfer += iprot->readStructEnd();
+
+    return xfer;
+}
+
+uint32_t SetConfigRequest::write(::apache::thrift::protocol::TProtocol *oprot) const {
+    uint32_t xfer = 0;
+    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+    xfer += oprot->writeStructBegin("SetConfigRequest");
+
+    xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+    xfer += oprot->writeI64(this->session_id);
+    xfer += oprot->writeFieldEnd();
+
+    xfer += oprot->writeFieldBegin("config_name", ::apache::thrift::protocol::T_STRING, 2);
+    xfer += oprot->writeString(this->config_name);
+    xfer += oprot->writeFieldEnd();
+
+    xfer += oprot->writeFieldBegin("config_value", ::apache::thrift::protocol::T_STRUCT, 3);
+    xfer += this->config_value.write(oprot);
+    xfer += oprot->writeFieldEnd();
+
+    xfer += oprot->writeFieldStop();
+    xfer += oprot->writeStructEnd();
+    return xfer;
+}
+
+void swap(SetConfigRequest &a, SetConfigRequest &b) {
+    using ::std::swap;
+    swap(a.session_id, b.session_id);
+    swap(a.config_name, b.config_name);
+    swap(a.config_value, b.config_value);
+    swap(a.__isset, b.__isset);
+}
+
+bool SetConfigRequest::operator==(const SetConfigRequest &rhs) const {
+    if (!(session_id == rhs.session_id))
+        return false;
+    if (!(config_name == rhs.config_name))
+        return false;
+    if (!(config_value == rhs.config_value))
+        return false;
+    return true;
+}
+
+SetConfigRequest::SetConfigRequest(const SetConfigRequest &other584) {
+    session_id = other584.session_id;
+    config_name = other584.config_name;
+    config_value = other584.config_value;
+    __isset = other584.__isset;
+}
+SetConfigRequest &SetConfigRequest::operator=(const SetConfigRequest &other585) {
+    session_id = other585.session_id;
+    config_name = other585.config_name;
+    config_value = other585.config_value;
+    __isset = other585.__isset;
+    return *this;
+}
+void SetConfigRequest::printTo(std::ostream &out) const {
+    using ::apache::thrift::to_string;
+    out << "SetConfigRequest(";
+    out << "session_id=" << to_string(session_id);
+    out << ", " << "config_name=" << to_string(config_name);
+    out << ", " << "config_value=" << to_string(config_value);
+    out << ")";
+}
+
+ShowConfigRequest::~ShowConfigRequest() noexcept {}
+
+ShowConfigRequest::ShowConfigRequest() noexcept : session_id(0), config_name() {}
+
+void ShowConfigRequest::__set_session_id(const int64_t val) { this->session_id = val; }
+
+void ShowConfigRequest::__set_config_name(const std::string &val) { this->config_name = val; }
+std::ostream &operator<<(std::ostream &out, const ShowConfigRequest &obj) {
+    obj.printTo(out);
+    return out;
+}
+
+uint32_t ShowConfigRequest::read(::apache::thrift::protocol::TProtocol *iprot) {
+
+    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+    uint32_t xfer = 0;
+    std::string fname;
+    ::apache::thrift::protocol::TType ftype;
+    int16_t fid;
+
+    xfer += iprot->readStructBegin(fname);
+
+    using ::apache::thrift::protocol::TProtocolException;
+
+    while (true) {
+        xfer += iprot->readFieldBegin(fname, ftype, fid);
+        if (ftype == ::apache::thrift::protocol::T_STOP) {
+            break;
+        }
+        switch (fid) {
+            case 1:
+                if (ftype == ::apache::thrift::protocol::T_I64) {
+                    xfer += iprot->readI64(this->session_id);
+                    this->__isset.session_id = true;
+                } else {
+                    xfer += iprot->skip(ftype);
+                }
+                break;
+            case 2:
+                if (ftype == ::apache::thrift::protocol::T_STRING) {
+                    xfer += iprot->readString(this->config_name);
+                    this->__isset.config_name = true;
+                } else {
+                    xfer += iprot->skip(ftype);
+                }
+                break;
+            default:
+                xfer += iprot->skip(ftype);
+                break;
+        }
+        xfer += iprot->readFieldEnd();
+    }
+
+    xfer += iprot->readStructEnd();
+
+    return xfer;
+}
+
+uint32_t ShowConfigRequest::write(::apache::thrift::protocol::TProtocol *oprot) const {
+    uint32_t xfer = 0;
+    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+    xfer += oprot->writeStructBegin("ShowConfigRequest");
+
+    xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+    xfer += oprot->writeI64(this->session_id);
+    xfer += oprot->writeFieldEnd();
+
+    xfer += oprot->writeFieldBegin("config_name", ::apache::thrift::protocol::T_STRING, 2);
+    xfer += oprot->writeString(this->config_name);
+    xfer += oprot->writeFieldEnd();
+
+    xfer += oprot->writeFieldStop();
+    xfer += oprot->writeStructEnd();
+    return xfer;
+}
+
+void swap(ShowConfigRequest &a, ShowConfigRequest &b) {
+    using ::std::swap;
+    swap(a.session_id, b.session_id);
+    swap(a.config_name, b.config_name);
+    swap(a.__isset, b.__isset);
+}
+
+bool ShowConfigRequest::operator==(const ShowConfigRequest &rhs) const {
+    if (!(session_id == rhs.session_id))
+        return false;
+    if (!(config_name == rhs.config_name))
+        return false;
+    return true;
+}
+
+ShowConfigRequest::ShowConfigRequest(const ShowConfigRequest &other586) {
+    session_id = other586.session_id;
+    config_name = other586.config_name;
+    __isset = other586.__isset;
+}
+ShowConfigRequest &ShowConfigRequest::operator=(const ShowConfigRequest &other587) {
+    session_id = other587.session_id;
+    config_name = other587.config_name;
+    __isset = other587.__isset;
+    return *this;
+}
+void ShowConfigRequest::printTo(std::ostream &out) const {
+    using ::apache::thrift::to_string;
+    out << "ShowConfigRequest(";
+    out << "session_id=" << to_string(session_id);
+    out << ", " << "config_name=" << to_string(config_name);
+    out << ")";
+}
+
+ShowConfigResponse::~ShowConfigResponse() noexcept {}
+
+ShowConfigResponse::ShowConfigResponse() noexcept : error_code(0), error_msg(), config_name() {}
+
+void ShowConfigResponse::__set_error_code(const int64_t val) { this->error_code = val; }
+
+void ShowConfigResponse::__set_error_msg(const std::string &val) { this->error_msg = val; }
+
+void ShowConfigResponse::__set_config_name(const std::string &val) { this->config_name = val; }
+
+void ShowConfigResponse::__set_config_value(const ConfigValue &val) { this->config_value = val; }
+std::ostream &operator<<(std::ostream &out, const ShowConfigResponse &obj) {
+    obj.printTo(out);
+    return out;
+}
+
+uint32_t ShowConfigResponse::read(::apache::thrift::protocol::TProtocol *iprot) {
+
+    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+    uint32_t xfer = 0;
+    std::string fname;
+    ::apache::thrift::protocol::TType ftype;
+    int16_t fid;
+
+    xfer += iprot->readStructBegin(fname);
+
+    using ::apache::thrift::protocol::TProtocolException;
+
+    while (true) {
+        xfer += iprot->readFieldBegin(fname, ftype, fid);
+        if (ftype == ::apache::thrift::protocol::T_STOP) {
+            break;
+        }
+        switch (fid) {
+            case 1:
+                if (ftype == ::apache::thrift::protocol::T_I64) {
+                    xfer += iprot->readI64(this->error_code);
+                    this->__isset.error_code = true;
+                } else {
+                    xfer += iprot->skip(ftype);
+                }
+                break;
+            case 2:
+                if (ftype == ::apache::thrift::protocol::T_STRING) {
+                    xfer += iprot->readString(this->error_msg);
+                    this->__isset.error_msg = true;
+                } else {
+                    xfer += iprot->skip(ftype);
+                }
+                break;
+            case 3:
+                if (ftype == ::apache::thrift::protocol::T_STRING) {
+                    xfer += iprot->readString(this->config_name);
+                    this->__isset.config_name = true;
+                } else {
+                    xfer += iprot->skip(ftype);
+                }
+                break;
+            case 4:
+                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+                    xfer += this->config_value.read(iprot);
+                    this->__isset.config_value = true;
+                } else {
+                    xfer += iprot->skip(ftype);
+                }
+                break;
+            default:
+                xfer += iprot->skip(ftype);
+                break;
+        }
+        xfer += iprot->readFieldEnd();
+    }
+
+    xfer += iprot->readStructEnd();
+
+    return xfer;
+}
+
+uint32_t ShowConfigResponse::write(::apache::thrift::protocol::TProtocol *oprot) const {
+    uint32_t xfer = 0;
+    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+    xfer += oprot->writeStructBegin("ShowConfigResponse");
+
+    xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 1);
+    xfer += oprot->writeI64(this->error_code);
+    xfer += oprot->writeFieldEnd();
+
+    xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
+    xfer += oprot->writeString(this->error_msg);
+    xfer += oprot->writeFieldEnd();
+
+    xfer += oprot->writeFieldBegin("config_name", ::apache::thrift::protocol::T_STRING, 3);
+    xfer += oprot->writeString(this->config_name);
+    xfer += oprot->writeFieldEnd();
+
+    xfer += oprot->writeFieldBegin("config_value", ::apache::thrift::protocol::T_STRUCT, 4);
+    xfer += this->config_value.write(oprot);
+    xfer += oprot->writeFieldEnd();
+
+    xfer += oprot->writeFieldStop();
+    xfer += oprot->writeStructEnd();
+    return xfer;
+}
+
+void swap(ShowConfigResponse &a, ShowConfigResponse &b) {
+    using ::std::swap;
+    swap(a.error_code, b.error_code);
+    swap(a.error_msg, b.error_msg);
+    swap(a.config_name, b.config_name);
+    swap(a.config_value, b.config_value);
+    swap(a.__isset, b.__isset);
+}
+
+bool ShowConfigResponse::operator==(const ShowConfigResponse &rhs) const {
+    if (!(error_code == rhs.error_code))
+        return false;
+    if (!(error_msg == rhs.error_msg))
+        return false;
+    if (!(config_name == rhs.config_name))
+        return false;
+    if (!(config_value == rhs.config_value))
+        return false;
+    return true;
+}
+
+ShowConfigResponse::ShowConfigResponse(const ShowConfigResponse &other588) {
+    error_code = other588.error_code;
+    error_msg = other588.error_msg;
+    config_name = other588.config_name;
+    config_value = other588.config_value;
+    __isset = other588.__isset;
+}
+ShowConfigResponse &ShowConfigResponse::operator=(const ShowConfigResponse &other589) {
+    error_code = other589.error_code;
+    error_msg = other589.error_msg;
+    config_name = other589.config_name;
+    config_value = other589.config_value;
+    __isset = other589.__isset;
+    return *this;
+}
+void ShowConfigResponse::printTo(std::ostream &out) const {
+    using ::apache::thrift::to_string;
+    out << "ShowConfigResponse(";
+    out << "error_code=" << to_string(error_code);
+    out << ", " << "error_msg=" << to_string(error_msg);
+    out << ", " << "config_name=" << to_string(config_name);
+    out << ", " << "config_value=" << to_string(config_value);
+    out << ")";
+}
+
 } // namespace infinity_thrift_rpc

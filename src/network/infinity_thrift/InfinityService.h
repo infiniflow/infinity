@@ -68,6 +68,8 @@ public:
     virtual void ShowSnapshot(ShowSnapshotResponse &_return, const ShowSnapshotRequest &request) = 0;
     virtual void ListSnapshots(ListSnapshotsResponse &_return, const ListSnapshotsRequest &request) = 0;
     virtual void DropSnapshot(CommonResponse &_return, const DropSnapshotRequest &request) = 0;
+    virtual void SetConfig(CommonResponse &_return, const SetConfigRequest &request) = 0;
+    virtual void ShowConfig(ShowConfigResponse &_return, const ShowConfigRequest &request) = 0;
 };
 
 class InfinityServiceIfFactory {
@@ -141,6 +143,8 @@ public:
     void ShowSnapshot(ShowSnapshotResponse & /* _return */, const ShowSnapshotRequest & /* request */) override { return; }
     void ListSnapshots(ListSnapshotsResponse & /* _return */, const ListSnapshotsRequest & /* request */) override { return; }
     void DropSnapshot(CommonResponse & /* _return */, const DropSnapshotRequest & /* request */) override { return; }
+    void SetConfig(CommonResponse & /* _return */, const SetConfigRequest & /* request */) override { return; }
+    void ShowConfig(ShowConfigResponse & /* _return */, const ShowConfigRequest & /* request */) override { return; }
 };
 
 typedef struct _InfinityService_Connect_args__isset {
@@ -3685,6 +3689,160 @@ public:
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
 };
 
+typedef struct _InfinityService_SetConfig_args__isset {
+    _InfinityService_SetConfig_args__isset() : request(false) {}
+    bool request : 1;
+} _InfinityService_SetConfig_args__isset;
+
+class InfinityService_SetConfig_args {
+public:
+    InfinityService_SetConfig_args(const InfinityService_SetConfig_args &);
+    InfinityService_SetConfig_args &operator=(const InfinityService_SetConfig_args &);
+    InfinityService_SetConfig_args() noexcept;
+
+    virtual ~InfinityService_SetConfig_args() noexcept;
+    SetConfigRequest request;
+
+    _InfinityService_SetConfig_args__isset __isset;
+
+    void __set_request(const SetConfigRequest &val);
+
+    bool operator==(const InfinityService_SetConfig_args &rhs) const;
+    bool operator!=(const InfinityService_SetConfig_args &rhs) const { return !(*this == rhs); }
+
+    bool operator<(const InfinityService_SetConfig_args &) const;
+
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
+};
+
+class InfinityService_SetConfig_pargs {
+public:
+    virtual ~InfinityService_SetConfig_pargs() noexcept;
+    const SetConfigRequest *request;
+
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
+};
+
+typedef struct _InfinityService_SetConfig_result__isset {
+    _InfinityService_SetConfig_result__isset() : success(false) {}
+    bool success : 1;
+} _InfinityService_SetConfig_result__isset;
+
+class InfinityService_SetConfig_result {
+public:
+    InfinityService_SetConfig_result(const InfinityService_SetConfig_result &);
+    InfinityService_SetConfig_result &operator=(const InfinityService_SetConfig_result &);
+    InfinityService_SetConfig_result() noexcept;
+
+    virtual ~InfinityService_SetConfig_result() noexcept;
+    CommonResponse success;
+
+    _InfinityService_SetConfig_result__isset __isset;
+
+    void __set_success(const CommonResponse &val);
+
+    bool operator==(const InfinityService_SetConfig_result &rhs) const;
+    bool operator!=(const InfinityService_SetConfig_result &rhs) const { return !(*this == rhs); }
+
+    bool operator<(const InfinityService_SetConfig_result &) const;
+
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
+};
+
+typedef struct _InfinityService_SetConfig_presult__isset {
+    _InfinityService_SetConfig_presult__isset() : success(false) {}
+    bool success : 1;
+} _InfinityService_SetConfig_presult__isset;
+
+class InfinityService_SetConfig_presult {
+public:
+    virtual ~InfinityService_SetConfig_presult() noexcept;
+    CommonResponse *success;
+
+    _InfinityService_SetConfig_presult__isset __isset;
+
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+};
+
+typedef struct _InfinityService_ShowConfig_args__isset {
+    _InfinityService_ShowConfig_args__isset() : request(false) {}
+    bool request : 1;
+} _InfinityService_ShowConfig_args__isset;
+
+class InfinityService_ShowConfig_args {
+public:
+    InfinityService_ShowConfig_args(const InfinityService_ShowConfig_args &);
+    InfinityService_ShowConfig_args &operator=(const InfinityService_ShowConfig_args &);
+    InfinityService_ShowConfig_args() noexcept;
+
+    virtual ~InfinityService_ShowConfig_args() noexcept;
+    ShowConfigRequest request;
+
+    _InfinityService_ShowConfig_args__isset __isset;
+
+    void __set_request(const ShowConfigRequest &val);
+
+    bool operator==(const InfinityService_ShowConfig_args &rhs) const;
+    bool operator!=(const InfinityService_ShowConfig_args &rhs) const { return !(*this == rhs); }
+
+    bool operator<(const InfinityService_ShowConfig_args &) const;
+
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
+};
+
+class InfinityService_ShowConfig_pargs {
+public:
+    virtual ~InfinityService_ShowConfig_pargs() noexcept;
+    const ShowConfigRequest *request;
+
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
+};
+
+typedef struct _InfinityService_ShowConfig_result__isset {
+    _InfinityService_ShowConfig_result__isset() : success(false) {}
+    bool success : 1;
+} _InfinityService_ShowConfig_result__isset;
+
+class InfinityService_ShowConfig_result {
+public:
+    InfinityService_ShowConfig_result(const InfinityService_ShowConfig_result &);
+    InfinityService_ShowConfig_result &operator=(const InfinityService_ShowConfig_result &);
+    InfinityService_ShowConfig_result() noexcept;
+
+    virtual ~InfinityService_ShowConfig_result() noexcept;
+    ShowConfigResponse success;
+
+    _InfinityService_ShowConfig_result__isset __isset;
+
+    void __set_success(const ShowConfigResponse &val);
+
+    bool operator==(const InfinityService_ShowConfig_result &rhs) const;
+    bool operator!=(const InfinityService_ShowConfig_result &rhs) const { return !(*this == rhs); }
+
+    bool operator<(const InfinityService_ShowConfig_result &) const;
+
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const;
+};
+
+typedef struct _InfinityService_ShowConfig_presult__isset {
+    _InfinityService_ShowConfig_presult__isset() : success(false) {}
+    bool success : 1;
+} _InfinityService_ShowConfig_presult__isset;
+
+class InfinityService_ShowConfig_presult {
+public:
+    virtual ~InfinityService_ShowConfig_presult() noexcept;
+    ShowConfigResponse *success;
+
+    _InfinityService_ShowConfig_presult__isset __isset;
+
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot);
+};
+
 class InfinityServiceClient : virtual public InfinityServiceIf {
 public:
     InfinityServiceClient(std::shared_ptr<::apache::thrift::protocol::TProtocol> prot) { setProtocol(prot); }
@@ -3843,6 +4001,12 @@ public:
     void DropSnapshot(CommonResponse &_return, const DropSnapshotRequest &request) override;
     void send_DropSnapshot(const DropSnapshotRequest &request);
     void recv_DropSnapshot(CommonResponse &_return);
+    void SetConfig(CommonResponse &_return, const SetConfigRequest &request) override;
+    void send_SetConfig(const SetConfigRequest &request);
+    void recv_SetConfig(CommonResponse &_return);
+    void ShowConfig(ShowConfigResponse &_return, const ShowConfigRequest &request) override;
+    void send_ShowConfig(const ShowConfigRequest &request);
+    void recv_ShowConfig(ShowConfigResponse &_return);
 
 protected:
     std::shared_ptr<::apache::thrift::protocol::TProtocol> piprot_;
@@ -3980,6 +4144,10 @@ private:
                               ::apache::thrift::protocol::TProtocol *iprot,
                               ::apache::thrift::protocol::TProtocol *oprot,
                               void *callContext);
+    void
+    process_SetConfig(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
+    void
+    process_ShowConfig(int32_t seqid, ::apache::thrift::protocol::TProtocol *iprot, ::apache::thrift::protocol::TProtocol *oprot, void *callContext);
 
 public:
     InfinityServiceProcessor(::std::shared_ptr<InfinityServiceIf> iface) : iface_(iface) {
@@ -4029,6 +4197,8 @@ public:
         processMap_["ShowSnapshot"] = &InfinityServiceProcessor::process_ShowSnapshot;
         processMap_["ListSnapshots"] = &InfinityServiceProcessor::process_ListSnapshots;
         processMap_["DropSnapshot"] = &InfinityServiceProcessor::process_DropSnapshot;
+        processMap_["SetConfig"] = &InfinityServiceProcessor::process_SetConfig;
+        processMap_["ShowConfig"] = &InfinityServiceProcessor::process_ShowConfig;
     }
 
     virtual ~InfinityServiceProcessor() {}
@@ -4514,6 +4684,26 @@ public:
         ifaces_[i]->DropSnapshot(_return, request);
         return;
     }
+
+    void SetConfig(CommonResponse &_return, const SetConfigRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->SetConfig(_return, request);
+        }
+        ifaces_[i]->SetConfig(_return, request);
+        return;
+    }
+
+    void ShowConfig(ShowConfigResponse &_return, const ShowConfigRequest &request) override {
+        size_t sz = ifaces_.size();
+        size_t i = 0;
+        for (; i < (sz - 1); ++i) {
+            ifaces_[i]->ShowConfig(_return, request);
+        }
+        ifaces_[i]->ShowConfig(_return, request);
+        return;
+    }
 };
 
 // The 'concurrent' client is a thread safe client that correctly handles
@@ -4683,6 +4873,12 @@ public:
     void DropSnapshot(CommonResponse &_return, const DropSnapshotRequest &request) override;
     int32_t send_DropSnapshot(const DropSnapshotRequest &request);
     void recv_DropSnapshot(CommonResponse &_return, const int32_t seqid);
+    void SetConfig(CommonResponse &_return, const SetConfigRequest &request) override;
+    int32_t send_SetConfig(const SetConfigRequest &request);
+    void recv_SetConfig(CommonResponse &_return, const int32_t seqid);
+    void ShowConfig(ShowConfigResponse &_return, const ShowConfigRequest &request) override;
+    int32_t send_ShowConfig(const ShowConfigRequest &request);
+    void recv_ShowConfig(ShowConfigResponse &_return, const int32_t seqid);
 
 protected:
     std::shared_ptr<::apache::thrift::protocol::TProtocol> piprot_;

@@ -299,9 +299,11 @@ QueryResult Infinity::SetVariableOrConfig(const std::string &name, std::string v
 
     std::string var_name = name;
     ToLower(var_name);
+    std::string var_value = value;
+    ToLower(var_value);
 
     std::unique_ptr<CommandStatement> command_statement = std::make_unique<CommandStatement>();
-    command_statement->command_info_ = std::make_unique<SetCmd>(scope, SetVarType::kString, var_name, value);
+    command_statement->command_info_ = std::make_unique<SetCmd>(scope, SetVarType::kString, var_name, var_value);
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
