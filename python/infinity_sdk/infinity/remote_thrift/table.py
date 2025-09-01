@@ -356,7 +356,9 @@ class RemoteTable():
 
     def update(self, cond: str, data: dict[str, Any]):
         # {"c1": 1, "c2": 1.1}
-        where_expr = traverse_conditions(condition(cond))
+        where_expr = None
+        if cond is not None:
+            where_expr = traverse_conditions(condition(cond))
         update_expr_array: list[ttypes.UpdateExpr] = []
         for column_name, value in data.items():
             constant_expression = get_remote_constant_expr_from_python_value(value)

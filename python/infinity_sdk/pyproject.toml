@@ -3,7 +3,7 @@ name = "infinity-sdk"
 version = "0.6.0.dev5"
 requires-python = ">=3.10"
 dependencies = [
-    "sqlglot>=11.7.0,<12.0.0",
+    "sqlglot>=26.0.1",
     "pydantic>=2.9.0,<3.0.0",
     "thrift>=0.20.0,<1.0.0",
     "setuptools>=75.2.0,<76.0.0",
