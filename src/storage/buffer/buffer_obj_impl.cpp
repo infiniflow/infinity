@@ -154,6 +154,7 @@ bool BufferObj::Free() {
     }
     switch (type_) {
         case BufferType::kTemp:
+            [[fallthrough]];
         case BufferType::kPersistent: {
             // do nothing
             break;
@@ -188,6 +189,7 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
                 status_ = BufferStatus::kUnloaded;
             }
             case BufferStatus::kLoaded:
+                [[fallthrough]];
             case BufferStatus::kUnloaded: {
                 LOG_TRACE(fmt::format("BufferObj::Save file: {}", GetFilename()));
                 bool all_save = file_worker_->WriteToFile(false, ctx);
@@ -203,9 +205,7 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
                 break;
             }
             default: {
-                std::unique_ptr<std::string> err_msg =
-                    std::make_unique<std::string>(fmt::format("Invalid buffer status: {}.", BufferStatusToString(status_)));
-                UnrecoverableError(*err_msg);
+                UnrecoverableError(fmt::format("Invalid buffer status: {}.", BufferStatusToString(status_)));
             }
         }
     } else if (type_ == BufferType::kTemp) {
