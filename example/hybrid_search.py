@@ -18,6 +18,7 @@ This example is to connect local infinity instance, create table, insert data, s
 
 import infinity
 import sys
+from infinity.table import ExplainType
 
 try:
     # open a local directory(default = "/var/infinity") or connect to server(default = NetworkAddress("127.0.0.1", 23817)) to store the data
@@ -88,6 +89,16 @@ try:
         infinity.index.IndexInfo("body", infinity.index.IndexType.FullText),
         infinity.common.ConflictType.Error,
     )
+
+    res, extra_result = table_instance.output(["num", "body", "vec", "year"]).filter("year < 2024").to_pl()
+    print(res)
+    if extra_result is not None:
+        print(extra_result)
+
+    res = table_instance.output(["count(*)"]).to_pl()
+    print(res)
+
+    print("============================")
 
     result, extra_result = (
         table_instance.output(

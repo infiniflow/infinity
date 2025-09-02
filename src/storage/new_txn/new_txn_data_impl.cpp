@@ -1466,7 +1466,6 @@ Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &o
 }
 
 Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
-    Status status;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const std::string &db_id_str = import_cmd->db_id_;
     const std::string &table_id_str = import_cmd->table_id_;
@@ -1476,7 +1475,7 @@ Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
     TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
 
-    status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);
+    Status status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);
     if (!status.ok()) {
         return status;
     }
