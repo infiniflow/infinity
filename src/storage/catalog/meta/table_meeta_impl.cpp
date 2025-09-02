@@ -650,7 +650,8 @@ Status TableMeeta::LoadColumnDefs() {
         return a->id_ < b->id_;
     });
     column_defs_ = std::move(column_defs);
-    if (table_cache.get() != nullptr) {
+    if (table_cache.get() != nullptr && txn_ != nullptr && begin_ts_ > txn_->txn_mgr()->LastKVCommitTS()) {
+        LOG_DEBUG(fmt::format("Set column defs to table cache, table_name: {}, column_defs size: {}", table_name_, column_defs_->size()));
         table_cache->set_columns(column_defs_);
     }
     return Status::OK();
@@ -730,7 +731,8 @@ Status TableMeeta::LoadIndexIDs() {
         }
     }
 
-    if (table_cache.get() != nullptr) {
+    if (table_cache.get() != nullptr && txn_ != nullptr && begin_ts_ > txn_->txn_mgr()->LastKVCommitTS()) {
+        LOG_DEBUG(fmt::format("Set index_ids to table cache, table_name: {}, index_ids size: {}", table_name_, index_ids_ptr->size()));
         table_cache->set_index_ids(index_ids_ptr, index_names_ptr);
     }
 
@@ -885,7 +887,8 @@ std::tuple<std::vector<SegmentID> *, Status> TableMeeta::GetSegmentIDs1() {
         segment_ids1_ = infinity::GetTableSegments(kv_instance_, db_id_str_, table_id_str_, begin_ts_, commit_ts_);
     }
 
-    if (table_cache.get() != nullptr) {
+    if (table_cache.get() != nullptr && txn_ != nullptr && begin_ts_ > txn_->txn_mgr()->LastKVCommitTS()) {
+        LOG_DEBUG(fmt::format("Set segments to table cache, table name: {}, segment_ids size: {}", table_name_, segment_ids1_->size()));
         table_cache->set_segments(segment_ids1_);
     }
 

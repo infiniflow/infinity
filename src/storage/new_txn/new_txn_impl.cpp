@@ -1969,7 +1969,7 @@ Status NewTxn::Commit() {
         TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(this);
         this->SetTxnCommitting(commit_ts);
         this->SetTxnCommitted();
-        this->SaveMetaCache(); // Load the meta used in this txn to cache.
+        txn_mgr_->SaveOrResetMetaCacheForReadTxn(this);
         LOG_TRACE(fmt::format("Commit READ txn: {}. begin ts: {}, Command: {}", txn_context_ptr_->txn_id_, BeginTS(), *GetTxnText()));
         return Status::OK();
     }
