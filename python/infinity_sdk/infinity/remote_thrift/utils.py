@@ -375,6 +375,10 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
             func_name = cons.key
             for arg in cons.args['expressions']:
                 arguments.append(parse_expr(arg))
+        elif isinstance(cons, exp.Length):
+            func_name = "char_length"
+            this_arg = parse_expr(cons.args['this'])
+            arguments.append(this_arg)
         else:
             func_name = cons.key
             for arg_key, arg_value in cons.arg_types.items():

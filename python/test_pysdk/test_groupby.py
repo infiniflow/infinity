@@ -202,10 +202,10 @@ class TestInfinity:
                     "abcdefghijklmnopqrstuvwx",
                     "abcdefghijklmnopqrstuvwxyz",
                 ],
-                "length(c3)": [3, 6, 9, 12, 15, 18, 21, 24, 26],
+                "char_length(c3)": [3, 6, 9, 12, 15, 18, 21, 24, 26],
                 "sum(c1)": [2, 4, 6, 2, 4, 6, 2, 4, 6],
             }
-        ).astype({"length(c3)": dtype("int32"), "sum(c1)": dtype("int64")})
+        ).astype({"char_length(c3)": dtype("int32"), "sum(c1)": dtype("int64")})
         pd.testing.assert_frame_equal(
             res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
             gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
