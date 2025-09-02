@@ -1502,14 +1502,13 @@ Status NewTxn::CreateTableSnapshot(const std::string &db_name, const std::string
 
 std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSnapshotInfo(const std::string &db_name) {
     this->CheckTxn(db_name);
-    std::shared_ptr<DatabaseSnapshotInfo> database_snapshot_info;
     std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return {nullptr, status};
     }
-    database_snapshot_info = std::make_shared<DatabaseSnapshotInfo>();
+    std::shared_ptr<DatabaseSnapshotInfo> database_snapshot_info = std::make_shared<DatabaseSnapshotInfo>();
     database_snapshot_info->db_name_ = db_name;
     database_snapshot_info->db_id_str_ = db_meta->db_id_str();
 
@@ -2338,9 +2337,8 @@ Status NewTxn::GetTableMeta(const std::string &db_name,
                             std::shared_ptr<TableMeeta> &table_meta,
                             std::string *table_key_ptr) {
 
-    Status status;
     TxnTimeStamp db_create_ts;
-    status = this->GetDBMeta(db_name, db_meta, db_create_ts);
+    Status status = this->GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -2378,9 +2376,8 @@ Status NewTxn::GetTableIndexMeta(const std::string &db_name,
                                  std::shared_ptr<TableIndexMeeta> &table_index_meta,
                                  std::string *table_key_ptr,
                                  std::string *index_key_ptr) {
-    Status status;
     TxnTimeStamp db_create_ts;
-    status = this->GetDBMeta(db_name, db_meta, db_create_ts);
+    Status status = this->GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -2794,7 +2791,7 @@ Status NewTxn::IncrLatestID(std::string &id_str, std::string_view id_name) const
     // return new_catalog_->IncrLatestID(id_str, id_name);
 }
 
-bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     // FIXME: We will store information for more operations in the base_txn_store_ in the future.
     if (base_txn_store_ == nullptr || previous_txn->base_txn_store_ == nullptr) {
         return false;
@@ -2866,7 +2863,7 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, std::string &cause, boo
     }
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictCmd(const WalCmd &cmd, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     switch (cmd.GetType()) {
         case WalCommandType::CREATE_DATABASE_V2: {
             return CheckConflictCmd(static_cast<const WalCmdCreateDatabaseV2 &>(cmd), previous_txn, cause, retry_query);
@@ -2911,7 +2908,7 @@ bool NewTxn::CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, std::stri
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = cmd.db_name_;
     const std::vector<std::shared_ptr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
     for (const std::shared_ptr<WalCmd> &wal_cmd : wal_cmds) {
@@ -2952,7 +2949,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previou
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdDropDatabaseV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictCmd(const WalCmdDropDatabaseV2 &cmd, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = cmd.db_name_;
     const std::vector<std::shared_ptr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
     for (const std::shared_ptr<WalCmd> &wal_cmd : wal_cmds) {
@@ -2986,7 +2983,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdDropDatabaseV2 &cmd, NewTxn *previous_
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
@@ -3022,7 +3019,7 @@ bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *pr
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
@@ -3058,7 +3055,7 @@ bool NewTxn::CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, New
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const DropDBTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const DropDBTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     bool conflict = false;
     //    LOG_TRACE(fmt::format("Txn: {}, current cmd: {}, previous txn: {}, previous cmd: {}",
@@ -3086,7 +3083,7 @@ bool NewTxn::CheckConflictTxnStore(const DropDBTxnStore &txn_store, NewTxn *prev
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictCmd(const WalCmdCreateTableV2 &cmd, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = cmd.db_name_;
     const std::shared_ptr<std::string> &table_name = cmd.table_def_->table_name();
     const std::vector<std::shared_ptr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
@@ -3137,7 +3134,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_t
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     const std::string &table_name = txn_store.table_name_;
     bool conflict = false;
@@ -3190,7 +3187,7 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn 
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const RestoreTableTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const RestoreTableTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     const std::string &table_name = txn_store.table_name_;
     bool conflict = false;
@@ -3254,7 +3251,7 @@ bool NewTxn::CheckConflictTxnStore(const RestoreTableTxnStore &txn_store, NewTxn
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = cmd.db_name_;
     const std::string &table_name = cmd.table_name_;
     std::set<SegmentID> segment_ids;
@@ -3332,7 +3329,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, s
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     const std::string &table_name = txn_store.table_name_;
     bool conflict = false;
@@ -3411,7 +3408,7 @@ bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *prev
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictCmd(const WalCmdImportV2 &cmd, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = cmd.db_name_;
     const std::string &table_name = cmd.table_name_;
     const std::vector<std::shared_ptr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
@@ -3468,7 +3465,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, s
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const ImportTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const ImportTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     const std::string &table_name = txn_store.table_name_;
     bool conflict = false;
@@ -3539,7 +3536,7 @@ bool NewTxn::CheckConflictTxnStore(const ImportTxnStore &txn_store, NewTxn *prev
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = cmd.db_name_;
     const std::string &table_name = cmd.table_name_;
     const std::vector<std::shared_ptr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
@@ -3596,7 +3593,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, NewTxn *previous_tx
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const AddColumnsTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const AddColumnsTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     const std::string &table_name = txn_store.table_name_;
     bool conflict = false;
@@ -3672,7 +3669,7 @@ bool NewTxn::CheckConflictTxnStore(const AddColumnsTxnStore &txn_store, NewTxn *
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = cmd.db_name_;
     const std::string &table_name = cmd.table_name_;
     const std::vector<std::shared_ptr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
@@ -3741,7 +3738,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_t
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const DropColumnsTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const DropColumnsTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     const std::string &table_name = txn_store.table_name_;
     bool conflict = false;
@@ -3834,7 +3831,7 @@ bool NewTxn::CheckConflictTxnStore(const DropColumnsTxnStore &txn_store, NewTxn 
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = cmd.db_name_;
     const std::string &table_name = cmd.table_name_;
     std::set<SegmentID> segment_ids;
@@ -3921,7 +3918,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, 
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const CompactTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     const std::string &table_name = txn_store.table_name_;
     const std::vector<SegmentID> &segment_ids = txn_store.deprecated_segment_ids_;
@@ -4024,7 +4021,7 @@ bool NewTxn::CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *pre
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = cmd.db_name_;
     const std::string &table_name = cmd.table_name_;
     const std::string &index_name = *cmd.index_base_->index_name_;
@@ -4100,7 +4097,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_t
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     const std::string &table_name = txn_store.table_name_;
     const std::string &index_name = *txn_store.index_base_->index_name_;
@@ -4190,7 +4187,7 @@ bool NewTxn::CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, NewTxn 
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const DropIndexTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const DropIndexTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     const std::string &table_name = txn_store.table_name_;
     const std::string &index_name = txn_store.index_name_;
@@ -4240,7 +4237,7 @@ bool NewTxn::CheckConflictTxnStore(const DropIndexTxnStore &txn_store, NewTxn *p
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = cmd.db_name_;
     const std::string &table_name = cmd.table_name_;
     if (cmd.dump_cause_ != DumpIndexCause::kOptimizeIndex)
@@ -4285,7 +4282,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictCmd(const WalCmdDeleteV2 &cmd, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = cmd.db_name_;
     const std::string &table_name = cmd.table_name_;
     for (std::shared_ptr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
@@ -4327,7 +4324,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, s
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdDropTableV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictCmd(const WalCmdDropTableV2 &cmd, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = cmd.db_name_;
     //    const std::string &table_name = cmd.table_name_;
     for (std::shared_ptr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
@@ -4353,7 +4350,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdDropTableV2 &cmd, NewTxn *previous_txn
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const DropTableTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const DropTableTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     const std::string &table_name = txn_store.table_name_;
     bool conflict = false;
@@ -4393,7 +4390,7 @@ bool NewTxn::CheckConflictTxnStore(const DropTableTxnStore &txn_store, NewTxn *p
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::vector<std::string> &db_names = txn_store.db_names_;
     const std::map<std::string, std::vector<std::string>> &table_names_in_db = txn_store.table_names_in_db_;
     bool conflict = false;
@@ -4553,7 +4550,7 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     const std::string &table_name = txn_store.table_name_;
     const std::string &index_name = txn_store.index_name_;
@@ -4602,7 +4599,7 @@ bool NewTxn::CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const DeleteTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     const std::string &table_name = txn_store.table_name_;
     bool conflict = false;
@@ -4672,7 +4669,7 @@ bool NewTxn::CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *prev
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const RenameTableTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const RenameTableTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     const std::string &table_name = txn_store.old_table_name_;
     const std::string &new_table_name = txn_store.new_table_name_;
@@ -4736,7 +4733,7 @@ bool NewTxn::CheckConflictTxnStore(const RenameTableTxnStore &txn_store, NewTxn 
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const UpdateTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     const std::string &table_name = txn_store.table_name_;
     std::set<SegmentID> segment_ids;
@@ -4844,7 +4841,7 @@ bool NewTxn::CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *prev
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const CreateTableSnapshotTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStore(const CreateTableSnapshotTxnStore &txn_store, const NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     retry_query = true;
     bool conflict = true;
     if (conflict) {

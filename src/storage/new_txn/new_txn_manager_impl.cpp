@@ -125,9 +125,9 @@ std::shared_ptr<NewTxn> NewTxnManager::BeginTxnShared(std::unique_ptr<std::strin
     }
 
     if (txn_text == nullptr) {
-        LOG_DEBUG(fmt::format("Begin new txn: {}, begin ts: {}, No command text", new_txn_id, begin_ts));
+        LOG_DEBUG(fmt::format("Begin new txn: {}, begin ts: {}, no command text", new_txn_id, begin_ts));
     } else {
-        LOG_DEBUG(fmt::format("Begin new txn: {}. begin ts: {}, Command: {}", new_txn_id, begin_ts, *txn_text));
+        LOG_DEBUG(fmt::format("Begin new txn: {}. begin ts: {}, command: {}", new_txn_id, begin_ts, *txn_text));
     }
 
     // Create txn instance
@@ -259,7 +259,7 @@ bool NewTxnManager::CheckConflict1(NewTxn *txn, std::string &conflict_reason, bo
 void NewTxnManager::SendToWAL(NewTxn *txn) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
-        UnrecoverableError("NewTxnManager is not running, cannot put wal entry");
+        UnrecoverableError("NewTxnManager is not running, can't write wal");
     }
     if (wal_mgr_ == nullptr) {
         UnrecoverableError("NewTxnManager is null");
@@ -339,15 +339,16 @@ size_t NewTxnManager::ActiveTxnCount() {
 
 std::vector<TxnInfo> NewTxnManager::GetTxnInfoArray() const {
     std::vector<TxnInfo> res;
+    {
+        std::unique_lock w_lock(locker_);
+        res.reserve(txn_map_.size());
 
-    std::unique_lock w_lock(locker_);
-    res.reserve(txn_map_.size());
-
-    for (const auto &txn_pair : txn_map_) {
-        TxnInfo txn_info;
-        txn_info.txn_id_ = txn_pair.first;
-        txn_info.txn_text_ = txn_pair.second->GetTxnText();
-        res.emplace_back(txn_info);
+        for (const auto &txn_pair : txn_map_) {
+            TxnInfo txn_info;
+            txn_info.txn_id_ = txn_pair.first;
+            txn_info.txn_text_ = txn_pair.second->GetTxnText();
+            res.emplace_back(txn_info);
+        }
     }
     return res;
 }
@@ -362,16 +363,18 @@ std::unique_ptr<TxnInfo> NewTxnManager::GetTxnInfoByID(TransactionID txn_id) con
 }
 
 std::vector<std::shared_ptr<TxnContext>> NewTxnManager::GetTxnContextHistories() const {
-    std::unique_lock w_lock(locker_);
     std::vector<std::shared_ptr<TxnContext>> txn_context_histories;
-    txn_context_histories.reserve(txn_context_histories_.size());
+    {
+        std::unique_lock w_lock(locker_);
+        txn_context_histories.reserve(txn_context_histories_.size());
 
-    for (const auto &context_ptr : txn_context_histories_) {
-        txn_context_histories.emplace_back(context_ptr);
-    }
+        for (const auto &context_ptr : txn_context_histories_) {
+            txn_context_histories.emplace_back(context_ptr);
+        }
 
-    for (const auto &ongoing_txn_pair : txn_map_) {
-        txn_context_histories.push_back(ongoing_txn_pair.second->txn_context());
+        for (const auto &ongoing_txn_pair : txn_map_) {
+            txn_context_histories.push_back(ongoing_txn_pair.second->txn_context());
+        }
     }
 
     return txn_context_histories;
@@ -445,11 +448,9 @@ void NewTxnManager::CommitBottom(NewTxn *txn) {
 
 void NewTxnManager::CommitKVInstance(NewTxn *txn) {
     // Generate meta cache items
-    txn->GetTxnStore();
-
     TxnTimeStamp commit_ts = txn->CommitTS();
     // Put meta cache items with kv_instance
-    WalEntry *wal_entry = txn->GetWALEntry();
+    const WalEntry *wal_entry = txn->GetWALEntry();
     std::vector<std::shared_ptr<EraseBaseCache>> items_to_erase;
     for (const auto &cmd : wal_entry->cmds_) {
         std::vector<std::shared_ptr<EraseBaseCache>> items_to_erase_part = cmd->ToCachedMeta(commit_ts);
@@ -461,21 +462,6 @@ void NewTxnManager::CommitKVInstance(NewTxn *txn) {
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Put cache: {}", status.message()));
     }
-
-    //    BaseTxnStore *base_txn_store = txn->GetTxnStore();
-    //    if (base_txn_store != nullptr) {
-    //        std::vector<std::shared_ptr<EraseBaseCache>> items_to_erase = txn->GetTxnStore()->ToCachedMeta(commit_ts);
-    //        MetaCache *meta_cache_ptr = this->storage_->meta_cache();
-    //        Status status = meta_cache_ptr->Erase(items_to_erase, txn->kv_instance_.get());
-    //        if (!status.ok()) {
-    //            UnrecoverableError(fmt::format("Put cache: {}", status.message()));
-    //        }
-    //    } else {
-    //        Status status = txn->kv_instance_->Commit();
-    //        if (!status.ok()) {
-    //            UnrecoverableError(fmt::format("Commit kv_instance: {}", status.message()));
-    //        }
-    //    }
 
     TxnTimeStamp kv_commit_ts;
     {
