@@ -66,6 +66,11 @@ try:
     if extra_result is not None:
         print(extra_result)
 
+    res, extra_result = table_instance.output(["num", "body", "vec"]).filter("num = 1").to_pl()
+    print(res)
+    if extra_result is not None:
+        print(extra_result)
+
     res = table_instance.output(["num", "body", "vec"]).explain(ExplainType.Pipeline)
     print(res)
 
