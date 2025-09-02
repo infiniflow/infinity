@@ -154,6 +154,7 @@ bool BufferObj::Free() {
     }
     switch (type_) {
         case BufferType::kTemp:
+            [[fallthrough]];
         case BufferType::kPersistent: {
             // do nothing
             break;
@@ -188,10 +189,10 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
                 status_ = BufferStatus::kUnloaded;
             }
             case BufferStatus::kLoaded:
+                [[fallthrough]];
             case BufferStatus::kUnloaded: {
                 LOG_TRACE(fmt::format("BufferObj::Save file: {}", GetFilename()));
-                bool all_save = file_worker_->WriteToFile(false, ctx);
-                if (all_save) {
+                if ([[maybe_unused]] bool all_save = file_worker_->WriteToFile(false, ctx)) {
                     type_ = BufferType::kPersistent;
                 }
                 write = true;
@@ -203,9 +204,7 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
                 break;
             }
             default: {
-                std::unique_ptr<std::string> err_msg =
-                    std::make_unique<std::string>(fmt::format("Invalid buffer status: {}.", BufferStatusToString(status_)));
-                UnrecoverableError(*err_msg);
+                UnrecoverableError(fmt::format("Invalid buffer status: {}.", BufferStatusToString(status_)));
             }
         }
     } else if (type_ == BufferType::kTemp) {
@@ -329,8 +328,7 @@ void *BufferObj::GetMutPointer() {
     if (type_ == BufferType::kTemp) {
         buffer_mgr_->RemoveTemp(this);
     } else if (type_ == BufferType::kMmap) {
-        bool free_success = buffer_mgr_->RequestSpace(GetBufferSize());
-        if (!free_success) {
+        if (bool free_success = buffer_mgr_->RequestSpace(GetBufferSize()); !free_success) {
             UnrecoverableError("Out of memory.");
         }
         file_worker_->ReadFromFile(false);
