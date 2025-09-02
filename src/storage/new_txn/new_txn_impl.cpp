@@ -1703,7 +1703,8 @@ TxnTimeStamp NewTxn::GetCurrentCkpTS() const {
 }
 
 Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
-    if (auto txn_type = GetTxnType(); txn_type != TransactionType::kNewCheckpoint && txn_type != TransactionType::kCreateTableSnapshot) {
+    TransactionType txn_type = GetTxnType();
+    if (txn_type != TransactionType::kNewCheckpoint && txn_type != TransactionType::kCreateTableSnapshot) {
         UnrecoverableError(fmt::format("Expected transaction type is checkpoint or create table snapshot."));
     }
 
@@ -1760,7 +1761,8 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
         }
     }
 
-    if (auto *pm = InfinityContext::instance().persistence_manager(); pm != nullptr) {
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    if (pm != nullptr) {
         PersistResultHandler handler(pm);
         PersistWriteResult result = pm->CurrentObjFinalize(true);
         handler.HandleWriteResult(result);

@@ -192,7 +192,8 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
                 [[fallthrough]];
             case BufferStatus::kUnloaded: {
                 LOG_TRACE(fmt::format("BufferObj::Save file: {}", GetFilename()));
-                if ([[maybe_unused]] bool all_save = file_worker_->WriteToFile(false, ctx)) {
+                bool all_save = file_worker_->WriteToFile(false, ctx);
+                if (all_save) {
                     type_ = BufferType::kPersistent;
                 }
                 write = true;
@@ -328,7 +329,8 @@ void *BufferObj::GetMutPointer() {
     if (type_ == BufferType::kTemp) {
         buffer_mgr_->RemoveTemp(this);
     } else if (type_ == BufferType::kMmap) {
-        if (bool free_success = buffer_mgr_->RequestSpace(GetBufferSize()); !free_success) {
+        bool free_success = buffer_mgr_->RequestSpace(GetBufferSize());
+        if (!free_success) {
             UnrecoverableError("Out of memory.");
         }
         file_worker_->ReadFromFile(false);

@@ -428,14 +428,16 @@ void WalManager::FlushLogByReplication(const std::vector<std::string> &synced_lo
 }
 
 bool WalManager::SetCheckpointing() {
-    if (bool expect = false; checkpoint_in_progress_.compare_exchange_strong(expect, true)) {
+    bool expect = false;
+    if (checkpoint_in_progress_.compare_exchange_strong(expect, true)) {
         return true;
     }
     return false;
 }
 
 bool WalManager::UnsetCheckpoint() {
-    if (bool expect = true; checkpoint_in_progress_.compare_exchange_strong(expect, false)) {
+    bool expect = true;
+    if (checkpoint_in_progress_.compare_exchange_strong(expect, false)) {
         return true;
     }
     return false;
