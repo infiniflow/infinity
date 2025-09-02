@@ -202,10 +202,15 @@ std::unique_ptr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatem
     }
 
     // 7. GROUP BY
-    BuildGroupBy(query_context_ptr_, statement, bind_alias_proxy, bound_select_statement);
+    if (statement.group_by_list_ != nullptr) {
+        BuildGroupBy(query_context_ptr_, statement, bind_alias_proxy, bound_select_statement);
+    }
     // 8. WITH CUBE / WITH ROLLUP
     // 9. HAVING
-    BuildHaving(query_context_ptr_, statement, bind_alias_proxy, bound_select_statement);
+    // All having expr must appear in group by list or aggregate function list.
+    if (statement.group_by_list_ != nullptr && statement.having_expr_ != nullptr) {
+        BuildHaving(query_context_ptr_, statement, bind_alias_proxy, bound_select_statement);
+    }
 
     // 10. DISTINCT
     bound_select_statement->distinct_ = statement.select_distinct_;
@@ -825,47 +830,44 @@ void QueryBinder::BuildGroupBy(QueryContext *query_context,
                                const SelectStatement &select,
                                const std::shared_ptr<BindAliasProxy> &bind_alias_proxy,
                                std::unique_ptr<BoundSelectStatement> &select_statement) {
+
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->group_by_table_index_ = table_index;
-    bind_context_ptr_->group_by_table_name_ = "groupby" + std::to_string(table_index);
+    bind_context_ptr_->group_by_table_name_ = fmt::format("groupby_{}", table_index);
 
-    if (select.group_by_list_ != nullptr) {
-        // Start to bind GROUP BY clause
-        // Set group binder
-        auto group_binder = std::make_shared<GroupBinder>(query_context, bind_alias_proxy);
+    // Start to bind GROUP BY clause
+    // Set group binder
+    auto group_binder = std::make_shared<GroupBinder>(query_context, bind_alias_proxy);
 
-        // Reserve the group names used in GroupBinder::BuildExpression
-        size_t group_count = select.group_by_list_->size();
-        bind_context_ptr_->group_exprs_.reserve(group_count);
-        for (size_t idx = 0; idx < group_count; ++idx) {
-            // set group-by expression index
-            group_binder->group_by_expr_index = idx;
-            const ParsedExpr &expr = *(*select.group_by_list_)[idx];
+    // Reserve the group names used in GroupBinder::BuildExpression
+    size_t group_count = select.group_by_list_->size();
+    bind_context_ptr_->group_exprs_.reserve(group_count);
+    for (size_t idx = 0; idx < group_count; ++idx) {
+        // set group-by expression index
+        group_binder->group_by_expr_index = idx;
+        const ParsedExpr &expr = *(*select.group_by_list_)[idx];
 
-            // Call GroupBinder BuildExpression
-            std::shared_ptr<BaseExpression> group_by_expr = group_binder->Bind(expr, this->bind_context_ptr_.get(), 0, true);
-        }
-
-        select_statement->group_by_expressions_ = bind_context_ptr_->group_exprs_;
+        // Call GroupBinder BuildExpression
+        std::shared_ptr<BaseExpression> group_by_expr = group_binder->Bind(expr, this->bind_context_ptr_.get(), 0, true);
     }
+
+    select_statement->group_by_expressions_ = bind_context_ptr_->group_exprs_;
 }
 
 void QueryBinder::BuildHaving(QueryContext *query_context,
                               const SelectStatement &select,
                               const std::shared_ptr<BindAliasProxy> &bind_alias_proxy,
                               std::unique_ptr<BoundSelectStatement> &select_statement) {
+
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->aggregate_table_index_ = table_index;
-    bind_context_ptr_->aggregate_table_name_ = "aggregate" + std::to_string(table_index);
+    bind_context_ptr_->aggregate_table_name_ = fmt::format("aggregate_{}", table_index);
 
-    // All having expr must appear in group by list or aggregate function list.
-    if (select.group_by_list_ != nullptr && select.having_expr_ != nullptr) {
-        // Start to bind Having clause
-        // Set having binder
-        auto having_binder = std::make_shared<HavingBinder>(query_context, bind_alias_proxy);
-        std::shared_ptr<BaseExpression> having_expr = having_binder->Bind(*(select.having_expr_), bind_context_ptr_.get(), 0, true);
-        select_statement->having_expressions_ = SplitExpressionByDelimiter(having_expr, ConjunctionType::kAnd);
-    }
+    // Start to bind Having clause
+    // Set having binder
+    auto having_binder = std::make_shared<HavingBinder>(query_context, bind_alias_proxy);
+    std::shared_ptr<BaseExpression> having_expr = having_binder->Bind(*(select.having_expr_), bind_context_ptr_.get(), 0, true);
+    select_statement->having_expressions_ = SplitExpressionByDelimiter(having_expr, ConjunctionType::kAnd);
 }
 
 void QueryBinder::PushOrderByToProject(QueryContext *, const SelectStatement &statement) {
@@ -881,7 +883,7 @@ void QueryBinder::PushOrderByToProject(QueryContext *, const SelectStatement &st
 void QueryBinder::BuildSelectList(QueryContext *, std::unique_ptr<BoundSelectStatement> &bound_select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->project_table_index_ = table_index;
-    bind_context_ptr_->project_table_name_ = "project" + std::to_string(table_index);
+    bind_context_ptr_->project_table_name_ = fmt::format("project_{}", table_index);
 
     auto project_binder = std::make_shared<ProjectBinder>(query_context_ptr_, bound_select_statement.get());
 
