@@ -1449,8 +1449,7 @@ Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &o
             if (!flush_column or !flush_version) {
                 continue;
             } else {
-                std::shared_ptr<FlushDataEntry> flush_data_entry =
-                    std::make_shared<FlushDataEntry>(table_meta.db_id_str(), table_meta.table_id_str(), segment_id, block_id);
+                auto flush_data_entry = std::make_shared<FlushDataEntry>(table_meta.db_id_str(), table_meta.table_id_str(), segment_id, block_id);
                 if (flush_column && flush_version) {
                     flush_data_entry->to_flush_ = "data and version";
                 } else if (flush_column) {
@@ -1944,10 +1943,7 @@ Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
 }
 
 Status NewTxn::TryToMmap(BlockMeta &block_meta, TxnTimeStamp save_ts, bool *to_mmap_ptr) {
-    Status status;
-
-    size_t row_cnt;
-    std::tie(row_cnt, status) = block_meta.GetRowCnt1();
+    auto [row_cnt, status] = block_meta.GetRowCnt1();
     if (!status.ok()) {
         return status;
     }
