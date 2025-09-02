@@ -4,7 +4,7 @@
   "description": "The AI-native database built for LLM applications, providing incredibly fast hybrid search of dense vector, sparse vector, tensor (multi-vector), and full-text.",
   "homepage": "https://github.com/infiniflow/infinity",
   "license": "Apache-2.0",
-  "builtin-baseline": "333e0d58bc01544452394f483b5547ecb83af0e5",
+  "builtin-baseline": "0aab0c9daba727f6c02868b3bedc9e6fae079649",
   "dependencies": [
     "abseil",
     "arrow",

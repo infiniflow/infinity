@@ -470,6 +470,9 @@ using Logger = ::ROCKSDB_NAMESPACE::Logger;
 
 namespace rocksdb {
 export using ::rocksdb::DestroyDB;
+export using ::rocksdb::EventListener;
+export using ::rocksdb::DB;
+export using ::rocksdb::FlushJobInfo;
 }
 
 namespace re2 {

@@ -18,6 +18,7 @@ import :kv_store;
 import :status;
 import :rocksdb_merge_operator;
 import :logger;
+import :virtual_store;
 
 import third_party;
 
@@ -175,6 +176,46 @@ Status KVInstance::Rollback() {
     return Status::OK();
 }
 
+class FlushListener : public rocksdb::EventListener {
+public:
+    ~FlushListener() override = default;
+
+    // void OnFlushBegin(rocksdb::DB *db, const rocksdb::FlushJobInfo &info) override {
+    //
+    // }
+
+    void OnFlushCompleted(rocksdb::DB *db, const rocksdb::FlushJobInfo &info) override {
+        std::filesystem::path rocksdb_path{"/var/infinity/catalog/"};
+        std::set<std::string> sst_set;
+        for (const auto &entry : std::filesystem::recursive_directory_iterator{rocksdb_path}) {
+            if (entry.is_regular_file()) {
+                auto relative_path = std::filesystem::relative(entry.path(), rocksdb_path);
+                sst_set.emplace(relative_path.string());
+            }
+        }
+
+        std::set<std::string> s3_set;
+        // std::string prefix = "meta";
+        // for () {
+        //
+        // }
+
+        // for (auto &meta: s3_set) {
+        //     if (sst_set.contains(meta)) {
+        //         // delete from s3
+        //         // VirtualStore::s3_client_->RemoveObject(VirtualStore::bucket_, remove_task->object_name);
+        //     }
+        // }
+
+        for (auto &meta: sst_set) {
+            // if (!s3_set.contains(meta)) {
+                // upload to s3
+                VirtualStore::UploadObject("/var/infinity/catalog/" + meta, meta);
+            // }
+        }
+    }
+};
+
 Status KVStore::Init(const std::string &db_path) {
     db_path_ = db_path;
     options_.create_if_missing = true;
@@ -185,6 +226,8 @@ Status KVStore::Init(const std::string &db_path) {
     txn_options_.set_snapshot = true;
 
     write_options_.disableWAL = true;
+
+    options_.listeners.emplace_back(std::make_shared<FlushListener>());
 
     rocksdb::Status s = rocksdb::TransactionDB::Open(options_, txn_db_options_, db_path_, &transaction_db_);
     if (!s.ok()) {

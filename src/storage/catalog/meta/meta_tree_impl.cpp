@@ -156,7 +156,7 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                     continue;
                 }
 
-                MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
+                auto *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
                 auto &segment_map = table_object->segment_map_;
                 if (segment_map.contains(segment_key->segment_id_)) {
                     UnrecoverableError(fmt::format("Duplicate segment id: {}, idx: {}", segment_key->ToString(), idx));
@@ -184,7 +184,7 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                     // The Table is dropped
                     continue;
                 }
-                MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
+                auto *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
                 auto &tag_map = table_object->tag_map_;
                 tag_map.emplace(table_tag_key->tag_name_, meta_key);
                 break;
@@ -209,7 +209,7 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 }
 
                 auto table_index_object = std::make_shared<MetaTableIndexObject>(meta_key);
-                MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
+                auto *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
                 auto &index_map = table_object->index_map_;
                 index_map.emplace(table_index_meta_key->index_id_str_, table_index_object);
                 break;
@@ -233,7 +233,7 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                     continue;
                 }
 
-                MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
+                auto *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
                 auto &column_map = table_object->column_map_;
                 column_map.emplace(table_column_meta_key->column_name_, meta_key);
                 break;
@@ -266,7 +266,7 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                     continue;
                 }
 
-                MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
+                auto *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
                 auto &segment_map = table_object->segment_map_;
                 auto segment_iter = segment_map.find(block_key->segment_id_);
                 if (segment_iter == segment_map.end()) {
@@ -275,7 +275,7 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                     continue;
                 }
 
-                MetaSegmentObject *segment_object = static_cast<MetaSegmentObject *>(segment_iter->second.get());
+                auto *segment_object = static_cast<MetaSegmentObject *>(segment_iter->second.get());
                 auto block_object = std::make_shared<MetaBlockObject>(meta_key);
                 auto &block_map = segment_object->block_map_;
                 block_map.emplace(block_key->block_id_, block_object);
@@ -300,7 +300,7 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                     continue;
                 }
 
-                MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
+                auto *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
                 auto &segment_map = table_object->segment_map_;
                 auto segment_iter = segment_map.find(segment_tag->segment_id_);
                 if (segment_iter == segment_map.end()) {
@@ -309,7 +309,7 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                     continue;
                 }
 
-                MetaSegmentObject *segment_object = static_cast<MetaSegmentObject *>(segment_iter->second.get());
+                auto *segment_object = static_cast<MetaSegmentObject *>(segment_iter->second.get());
                 auto &tag_map = segment_object->tag_map_;
                 tag_map.emplace(segment_tag->tag_name_, meta_key);
                 break;
@@ -342,14 +342,14 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                     continue;
                 }
 
-                MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
+                auto *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
                 auto &segment_map = table_object->segment_map_;
                 auto segment_iter = segment_map.find(block_key->segment_id_);
                 if (segment_iter == segment_map.end()) {
                     UnrecoverableError(fmt::format("Segment not found: {}, idx: {}", block_key->ToString(), idx));
                 }
 
-                MetaSegmentObject *segment_object = static_cast<MetaSegmentObject *>(segment_iter->second.get());
+                auto *segment_object = static_cast<MetaSegmentObject *>(segment_iter->second.get());
                 auto block_object = std::make_shared<MetaBlockObject>(meta_key);
                 auto &block_map = segment_object->block_map_;
                 block_map.emplace(block_key->block_id_, block_object);
@@ -374,7 +374,7 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                     continue;
                 }
 
-                MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
+                auto *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
                 auto &segment_map = table_object->segment_map_;
                 auto segment_iter = segment_map.find(block_tag->segment_id_);
                 if (segment_iter == segment_map.end()) {
@@ -384,14 +384,14 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                     continue;
                 }
 
-                MetaSegmentObject *segment_object = static_cast<MetaSegmentObject *>(segment_iter->second.get());
+                auto *segment_object = static_cast<MetaSegmentObject *>(segment_iter->second.get());
                 auto &block_map = segment_object->block_map_;
                 auto block_iter = block_map.find(block_tag->block_id_);
                 if (block_iter == block_map.end()) {
                     UnrecoverableError(fmt::format("Block not found: {}, idx: {}", block_tag->ToString(), idx));
                 }
 
-                MetaBlockObject *block_object = static_cast<MetaBlockObject *>(block_iter->second.get());
+                auto *block_object = static_cast<MetaBlockObject *>(block_iter->second.get());
                 auto &tag_map = block_object->tag_map_;
                 tag_map.emplace(block_tag->tag_name_, meta_key);
                 break;
@@ -424,7 +424,7 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                     continue;
                 }
 
-                MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
+                auto *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
                 auto &index_map = table_object->index_map_;
                 auto table_index_iter = index_map.find(segment_index_key->index_id_str_);
                 if (table_index_iter == index_map.end()) {
@@ -434,7 +434,7 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                     continue;
                 }
 
-                MetaTableIndexObject *table_index_object = static_cast<MetaTableIndexObject *>(table_index_iter->second.get());
+                auto *table_index_object = static_cast<MetaTableIndexObject *>(table_index_iter->second.get());
                 auto segment_index_object = std::make_shared<MetaSegmentIndexObject>(meta_key);
                 table_index_object->segment_map_.emplace(segment_index_key->segment_id_, segment_index_object);
                 break;
@@ -458,7 +458,7 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                     continue;
                 }
 
-                MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
+                auto *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
                 auto &index_map = table_object->index_map_;
                 auto table_index_iter = index_map.find(table_index_tag_key->index_id_str_);
                 if (table_index_iter == index_map.end()) {
@@ -468,7 +468,7 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                     continue;
                 }
 
-                MetaTableIndexObject *table_index_object = static_cast<MetaTableIndexObject *>(table_index_iter->second.get());
+                auto *table_index_object = static_cast<MetaTableIndexObject *>(table_index_iter->second.get());
                 auto &tag_map = table_index_object->tag_map_;
                 tag_map.emplace(table_index_tag_key->tag_name_, meta_key);
                 break;
@@ -501,7 +501,7 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                     continue;
                 }
 
-                MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
+                auto *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
                 auto &index_map = table_object->index_map_;
                 auto table_index_iter = index_map.find(chunk_index_key->index_id_str_);
                 if (table_index_iter == index_map.end()) {
@@ -511,7 +511,7 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                     continue;
                 }
 
-                MetaTableIndexObject *table_index_object = static_cast<MetaTableIndexObject *>(table_index_iter->second.get());
+                auto *table_index_object = static_cast<MetaTableIndexObject *>(table_index_iter->second.get());
                 auto &segment_map = table_index_object->segment_map_;
                 auto segment_index_iter = segment_map.find(chunk_index_key->segment_id_);
                 if (segment_index_iter == segment_map.end()) {
@@ -520,7 +520,7 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                     continue;
                 }
 
-                MetaSegmentIndexObject *segment_index_object = static_cast<MetaSegmentIndexObject *>(segment_index_iter->second.get());
+                auto *segment_index_object = static_cast<MetaSegmentIndexObject *>(segment_index_iter->second.get());
                 auto &chunk_map = segment_index_object->chunk_map_;
                 chunk_map.emplace(chunk_index_key->chunk_id_, meta_key);
                 break;
