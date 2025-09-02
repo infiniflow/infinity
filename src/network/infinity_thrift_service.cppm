@@ -180,6 +180,10 @@ public:
 
     void RestoreSnapshot(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::RestoreSnapshotRequest &request) final;
 
+    void SetConfig(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::SetConfigRequest &request) final;
+
+    void ShowConfig(infinity_thrift_rpc::ShowConfigResponse &response, const infinity_thrift_rpc::ShowConfigRequest &request) final;
+
     template <typename T>
     static void HandleArrayTypeRecursively(std::string &output_str,
                                            const DataType &data_type,
@@ -337,6 +341,9 @@ private:
     static void
     ProcessStatus(infinity_thrift_rpc::ListSnapshotsResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
 
+    static void
+    ProcessStatus(infinity_thrift_rpc::ShowConfigResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
+
     static void ProcessQueryResult(infinity_thrift_rpc::CommonResponse &response,
                                    const QueryResult &result,
                                    const std::string_view error_header = ErrorMsgHeader);
@@ -394,6 +401,10 @@ private:
                                    const std::string_view error_header = ErrorMsgHeader);
 
     static void ProcessQueryResult(infinity_thrift_rpc::ListSnapshotsResponse &response,
+                                   const QueryResult &result,
+                                   const std::string_view error_header = ErrorMsgHeader);
+
+    static void ProcessQueryResult(infinity_thrift_rpc::ShowConfigResponse &response,
                                    const QueryResult &result,
                                    const std::string_view error_header = ErrorMsgHeader);
 };

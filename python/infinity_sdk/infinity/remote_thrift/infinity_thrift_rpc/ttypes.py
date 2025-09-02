@@ -10130,6 +10130,343 @@ class DropSnapshotRequest(object):
 
     def __ne__(self, other):
         return not (self == other)
+
+
+class ConfigValue(object):
+    """
+    Attributes:
+     - string_value
+     - int_value
+     - bool_value
+     - double_value
+
+    """
+    thrift_spec = None
+
+
+    def __init__(self, string_value = None, int_value = None, bool_value = None, double_value = None,):
+        self.string_value = string_value
+        self.int_value = int_value
+        self.bool_value = bool_value
+        self.double_value = double_value
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.string_value = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.I64:
+                    self.int_value = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.BOOL:
+                    self.bool_value = iprot.readBool()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.DOUBLE:
+                    self.double_value = iprot.readDouble()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        self.validate()
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ConfigValue')
+        if self.string_value is not None:
+            oprot.writeFieldBegin('string_value', TType.STRING, 1)
+            oprot.writeString(self.string_value.encode('utf-8') if sys.version_info[0] == 2 else self.string_value)
+            oprot.writeFieldEnd()
+        if self.int_value is not None:
+            oprot.writeFieldBegin('int_value', TType.I64, 2)
+            oprot.writeI64(self.int_value)
+            oprot.writeFieldEnd()
+        if self.bool_value is not None:
+            oprot.writeFieldBegin('bool_value', TType.BOOL, 3)
+            oprot.writeBool(self.bool_value)
+            oprot.writeFieldEnd()
+        if self.double_value is not None:
+            oprot.writeFieldBegin('double_value', TType.DOUBLE, 4)
+            oprot.writeDouble(self.double_value)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class SetConfigRequest(object):
+    """
+    Attributes:
+     - session_id
+     - config_name
+     - config_value
+
+    """
+    thrift_spec = None
+
+
+    def __init__(self, session_id = None, config_name = None, config_value = None,):
+        self.session_id = session_id
+        self.config_name = config_name
+        self.config_value = config_value
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.config_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRUCT:
+                    self.config_value = ConfigValue()
+                    self.config_value.read(iprot)
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        self.validate()
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('SetConfigRequest')
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 1)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        if self.config_name is not None:
+            oprot.writeFieldBegin('config_name', TType.STRING, 2)
+            oprot.writeString(self.config_name.encode('utf-8') if sys.version_info[0] == 2 else self.config_name)
+            oprot.writeFieldEnd()
+        if self.config_value is not None:
+            oprot.writeFieldBegin('config_value', TType.STRUCT, 3)
+            self.config_value.write(oprot)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ShowConfigRequest(object):
+    """
+    Attributes:
+     - session_id
+     - config_name
+
+    """
+    thrift_spec = None
+
+
+    def __init__(self, session_id = None, config_name = None,):
+        self.session_id = session_id
+        self.config_name = config_name
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.config_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        self.validate()
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowConfigRequest')
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 1)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        if self.config_name is not None:
+            oprot.writeFieldBegin('config_name', TType.STRING, 2)
+            oprot.writeString(self.config_name.encode('utf-8') if sys.version_info[0] == 2 else self.config_name)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ShowConfigResponse(object):
+    """
+    Attributes:
+     - error_code
+     - error_msg
+     - config_name
+     - config_value
+
+    """
+    thrift_spec = None
+
+
+    def __init__(self, error_code = None, error_msg = None, config_name = None, config_value = None,):
+        self.error_code = error_code
+        self.error_msg = error_msg
+        self.config_name = config_name
+        self.config_value = config_value
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.error_code = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.error_msg = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.config_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.STRUCT:
+                    self.config_value = ConfigValue()
+                    self.config_value.read(iprot)
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        self.validate()
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowConfigResponse')
+        if self.error_code is not None:
+            oprot.writeFieldBegin('error_code', TType.I64, 1)
+            oprot.writeI64(self.error_code)
+            oprot.writeFieldEnd()
+        if self.error_msg is not None:
+            oprot.writeFieldBegin('error_msg', TType.STRING, 2)
+            oprot.writeString(self.error_msg.encode('utf-8') if sys.version_info[0] == 2 else self.error_msg)
+            oprot.writeFieldEnd()
+        if self.config_name is not None:
+            oprot.writeFieldBegin('config_name', TType.STRING, 3)
+            oprot.writeString(self.config_name.encode('utf-8') if sys.version_info[0] == 2 else self.config_name)
+            oprot.writeFieldEnd()
+        if self.config_value is not None:
+            oprot.writeFieldBegin('config_value', TType.STRUCT, 4)
+            self.config_value.write(oprot)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
 all_structs.append(Property)
 Property.thrift_spec = (
     None,  # 0
@@ -10943,6 +11280,35 @@ DropSnapshotRequest.thrift_spec = (
     None,  # 0
     (1, TType.I64, 'session_id', None, None, ),  # 1
     (2, TType.STRING, 'snapshot_name', 'UTF8', None, ),  # 2
+)
+all_structs.append(ConfigValue)
+ConfigValue.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'string_value', 'UTF8', None, ),  # 1
+    (2, TType.I64, 'int_value', None, None, ),  # 2
+    (3, TType.BOOL, 'bool_value', None, None, ),  # 3
+    (4, TType.DOUBLE, 'double_value', None, None, ),  # 4
+)
+all_structs.append(SetConfigRequest)
+SetConfigRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'session_id', None, None, ),  # 1
+    (2, TType.STRING, 'config_name', 'UTF8', None, ),  # 2
+    (3, TType.STRUCT, 'config_value', [ConfigValue, None], None, ),  # 3
+)
+all_structs.append(ShowConfigRequest)
+ShowConfigRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'session_id', None, None, ),  # 1
+    (2, TType.STRING, 'config_name', 'UTF8', None, ),  # 2
+)
+all_structs.append(ShowConfigResponse)
+ShowConfigResponse.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'error_code', None, None, ),  # 1
+    (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
+    (3, TType.STRING, 'config_name', 'UTF8', None, ),  # 3
+    (4, TType.STRUCT, 'config_value', [ConfigValue, None], None, ),  # 4
 )
 fix_spec(all_structs)
 del all_structs

@@ -140,4 +140,7 @@ export using infinity_thrift_rpc::ListSnapshotsRequest;
 export using infinity_thrift_rpc::DropSnapshotRequest;
 export using infinity_thrift_rpc::ShowSnapshotResponse;
 export using infinity_thrift_rpc::ListSnapshotsResponse;
+export using infinity_thrift_rpc::SetConfigRequest;
+export using infinity_thrift_rpc::ShowConfigRequest;
+export using infinity_thrift_rpc::ShowConfigResponse;
 } // namespace infinity_thrift_rpc
