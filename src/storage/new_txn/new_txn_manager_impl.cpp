@@ -853,7 +853,7 @@ void NewTxnManager::RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, Ne
 
 void NewTxnManager::AddTaskInfo(std::shared_ptr<BGTaskInfo> task_info) {
     std::lock_guard<std::mutex> lock(task_lock_);
-    if (task_info_list_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+    if (task_info_list_.size() >= DEFAULT_TASK_HISTORY_SIZE) {
         task_info_list_.pop_front(); // Remove the oldest task info if the list exceeds the size limit
     }
     task_info_list_.push_back(std::move(task_info));

@@ -140,6 +140,7 @@ export {
     constexpr size_t DEFAULT_PROFILER_HISTORY_SIZE = 128;
 
     constexpr size_t DEFAULT_TXN_HISTORY_SIZE = 128;
+    constexpr size_t DEFAULT_TASK_HISTORY_SIZE = 128;
 
     // default emvb parameter
     constexpr u32 EMVB_CENTROID_NPROBE = 3;
