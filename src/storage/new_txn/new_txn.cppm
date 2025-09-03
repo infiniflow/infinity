@@ -533,19 +533,20 @@ private:
                                 SegmentIndexMeta &segment_index_meta,
                                 SegmentMeta &segment_meta,
                                 ColumnID column_id,
-                                size_t segment_row_cnt);
+                                size_t segment_row_cnt,
+                                std::vector<ChunkID> &new_chunk_ids);
 
     Status PopulateIvfIndexInner(std::shared_ptr<IndexBase> index_base,
                                  SegmentIndexMeta &segment_index_meta,
                                  SegmentMeta &segment_meta,
                                  std::shared_ptr<ColumnDef> column_def,
-                                 ChunkID &new_chunk_id);
+                                 std::vector<ChunkID> &new_chunk_ids);
 
     Status PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
                                   SegmentIndexMeta &segment_index_meta,
                                   SegmentMeta &segment_meta,
                                   std::shared_ptr<ColumnDef> column_def,
-                                  ChunkID &new_chunk_id);
+                                  std::vector<ChunkID> &new_chunk_ids);
 
     Status OptimizeFtIndex(std::shared_ptr<IndexBase> index_base,
                            SegmentIndexMeta &segment_index_meta,
