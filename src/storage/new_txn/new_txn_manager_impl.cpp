@@ -306,6 +306,7 @@ Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
             ckp_begin_ts_ = UNCOMMIT_TS;
         }
     }
+    CollectInfo(txn);
     CleanupTxn(txn);
     return status;
 }
@@ -328,6 +329,7 @@ Status NewTxnManager::RollBackTxn(NewTxn *txn) {
             std::lock_guard guard(locker_);
             ckp_begin_ts_ = UNCOMMIT_TS;
         }
+        CollectInfo(txn);
         CleanupTxn(txn);
     }
     return status;
@@ -875,6 +877,16 @@ void NewTxnManager::CollectInfo(NewTxn *txn) {
             if (txn->GetTxnState() == TxnState::kCommitted) {
                 compact_info->committed_ = true;
             }
+
+            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            if (base_txn_store != nullptr) {
+                CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store);
+                compact_info->deprecated_segment_ids_ = compact_txn_store->deprecated_segment_ids_;
+                compact_info->new_segment_id_ = compact_txn_store->new_segment_id_;
+                compact_info->table_id_ = compact_txn_store->table_id_;
+                compact_info->table_name_ = compact_txn_store->table_name_;
+            }
+
             this->AddCompactInfo(compact_info);
             break;
         }
@@ -946,6 +958,10 @@ void NewTxnManager::AddCheckpointInfo(std::shared_ptr<TxnCheckpointInfo> ckp_inf
 std::vector<std::shared_ptr<TxnCheckpointInfo>> NewTxnManager::GetCheckpointInfoList() const {
     std::vector<std::shared_ptr<TxnCheckpointInfo>> ckp_info_list;
     std::lock_guard<std::mutex> lock(checkpoint_info_lock_);
+    ckp_info_list.reserve(ckp_info_list_.size());
+    for (const auto &ckp_info : ckp_info_list_) {
+        ckp_info_list.push_back(ckp_info);
+    }
     return ckp_info_list;
 }
 
@@ -960,6 +976,10 @@ void NewTxnManager::AddCompactInfo(std::shared_ptr<TxnCompactInfo> compact_info)
 std::vector<std::shared_ptr<TxnCompactInfo>> NewTxnManager::GetCompactInfoList() const {
     std::vector<std::shared_ptr<TxnCompactInfo>> compact_info_list;
     std::lock_guard<std::mutex> lock(compact_info_lock_);
+    compact_info_list.reserve(compact_info_list_.size());
+    for (const auto &compact_info : compact_info_list_) {
+        compact_info_list.push_back(compact_info);
+    }
     return compact_info_list;
 }
 
@@ -974,6 +994,10 @@ void NewTxnManager::AddOptimizeInfo(std::shared_ptr<TxnOptimizeInfo> optimize_in
 std::vector<std::shared_ptr<TxnOptimizeInfo>> NewTxnManager::GetOptimizeInfoList() const {
     std::vector<std::shared_ptr<TxnOptimizeInfo>> optimize_info_list;
     std::lock_guard<std::mutex> lock(optimize_info_lock_);
+    optimize_info_list.reserve(optimize_info_list_.size());
+    for (const auto &optimize_info : optimize_info_list_) {
+        optimize_info_list.push_back(optimize_info);
+    }
     return optimize_info_list;
 }
 
@@ -988,6 +1012,10 @@ void NewTxnManager::AddImportInfo(std::shared_ptr<TxnImportInfo> import_info) {
 std::vector<std::shared_ptr<TxnImportInfo>> NewTxnManager::GetImportInfoList() const {
     std::vector<std::shared_ptr<TxnImportInfo>> import_info_list;
     std::lock_guard<std::mutex> lock(import_info_lock_);
+    import_info_list.reserve(import_info_list_.size());
+    for (const auto &import_info : import_info_list_) {
+        import_info_list.push_back(import_info);
+    }
     return import_info_list;
 }
 
@@ -1002,6 +1030,10 @@ void NewTxnManager::AddCleanInfo(std::shared_ptr<TxnCleanInfo> clean_info) {
 std::vector<std::shared_ptr<TxnCleanInfo>> NewTxnManager::GetCleanInfoList() const {
     std::vector<std::shared_ptr<TxnCleanInfo>> clean_info_list;
     std::lock_guard<std::mutex> lock(clean_info_lock_);
+    clean_info_list.reserve(clean_info_list_.size());
+    for (const auto &clean_info : clean_info_list_) {
+        clean_info_list.push_back(clean_info);
+    }
     return clean_info_list;
 }
 

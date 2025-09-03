@@ -113,7 +113,7 @@ void CompactionProcessor::NewDoCompact() {
 
     auto compact_table = [&](const std::string &db_name, const std::string &table_name, std::shared_ptr<BGTaskInfo> &bg_task_info) {
         auto new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>(fmt::format("compact table {}.{}", db_name, table_name)),
-                                                          TransactionType::kNormal);
+                                                          TransactionType::kCompact);
         LOG_INFO(fmt::format("Compact begin ts: {}", new_txn_shared->BeginTS()));
         Status status = Status::OK();
         DeferFn defer_fn([&] {

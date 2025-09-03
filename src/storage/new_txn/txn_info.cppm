@@ -36,6 +36,10 @@ export struct TxnCompactInfo {
     TxnTimeStamp begin_ts_;
     TxnTimeStamp commit_ts_;
     bool committed_{false};
+    std::vector<SegmentID> deprecated_segment_ids_;
+    SegmentID new_segment_id_;
+    u64 table_id_;
+    std::string table_name_;
 };
 
 export struct TxnOptimizeInfo {

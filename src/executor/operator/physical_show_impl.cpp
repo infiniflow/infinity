@@ -632,9 +632,9 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_names_->reserve(8);
             output_types_->reserve(8);
             output_names_->emplace_back("txn");
-            output_names_->emplace_back("begin");
-            output_names_->emplace_back("commit");
-            output_names_->emplace_back("result");
+            output_names_->emplace_back("begin_ts");
+            output_names_->emplace_back("commit_ts");
+            output_names_->emplace_back("committed");
             output_names_->emplace_back("table_name");
             output_names_->emplace_back("table_id");
             output_names_->emplace_back("segments");
@@ -642,11 +642,11 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bool_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(varchar_type);
-            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
             break;
         }
         case ShowStmtType::kListCheckpoint: {
@@ -677,7 +677,7 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_names_->emplace_back("txn");
             output_names_->emplace_back("begin");
             output_names_->emplace_back("commit");
-            output_names_->emplace_back("result");
+            output_names_->emplace_back("success");
             output_names_->emplace_back("table_name");
             output_names_->emplace_back("table_id");
             output_names_->emplace_back("segment_id");
@@ -686,7 +686,7 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bool_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
@@ -700,7 +700,7 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_names_->emplace_back("txn");
             output_names_->emplace_back("begin");
             output_names_->emplace_back("commit");
-            output_names_->emplace_back("result");
+            output_names_->emplace_back("success");
             output_names_->emplace_back("table_name");
             output_names_->emplace_back("table_id");
             output_names_->emplace_back("segment_id");
@@ -708,7 +708,7 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bool_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
@@ -6872,13 +6872,84 @@ void PhysicalShow::ExecuteShowCache(QueryContext *query_context, ShowOperatorSta
 }
 
 void PhysicalShow::ExecuteListCompact(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Storage *storage = query_context->storage();
-    MetaCache *meta_cache = storage->meta_cache();
-    std::vector<std::shared_ptr<MetaBaseCache>> cache_items = meta_cache->GetAllCacheItems();
+    NewTxnManager *txn_manager = query_context->storage()->new_txn_manager();
+    std::vector<std::shared_ptr<TxnCompactInfo>> txn_compact_info_list = txn_manager->GetCompactInfoList();
 
     output_block_ptr->Init(*output_types_);
+
+    size_t row_count = 0;
+    for (auto &txn_compact_info : txn_compact_info_list) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(*output_types_);
+        }
+
+        {
+            // txn
+            Value value = Value::MakeBigInt(txn_compact_info->txn_id_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // begin ts
+            Value value = Value::MakeBigInt(txn_compact_info->begin_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        {
+            // commit ts
+            Value value = Value::MakeBigInt(txn_compact_info->commit_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+
+        {
+            // committed
+            Value value = Value::MakeBool(txn_compact_info->committed_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        {
+            // table name
+            Value value = Value::MakeVarchar(txn_compact_info->table_name_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+        }
+
+        {
+            // table id
+            Value value = Value::MakeBigInt(txn_compact_info->table_id_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
+        }
+
+        {
+            // segment ids
+            std::string segment_ids_array = fmt::format("[{}]", fmt::join(txn_compact_info->deprecated_segment_ids_, ","));
+            Value value = Value::MakeVarchar(segment_ids_array);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[6]);
+        }
+
+        {
+            // new segment id
+            Value value = Value::MakeBigInt(txn_compact_info->new_segment_id_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[7]);
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
