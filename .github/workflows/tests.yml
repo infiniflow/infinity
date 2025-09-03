@@ -26,6 +26,20 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     steps:
+      - name: Prepare env variable
+        id: start
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          CHECK_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "CHECK_CONTAINER=${CHECK_CONTAINER}" >> $GITHUB_ENV
+
+      - name: Start builder container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${CHECK_CONTAINER} -e TZ=$TZ \
+            infiniflow/infinity_builder:ubuntu20_clang20
+
       - name: Check format of changed C/C++ files
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -45,7 +59,7 @@ jobs:
               for file in "${files[@]}"; do
                 if [ -f "$file" ]; then
                   echo "Checking formatting: $file"
-                  sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity; clang-format-20 $file > ${file}.formatted; diff $file ${file}.formatted 2>/dev/null"
+                  sudo docker exec ${CHECK_CONTAINER} bash -c "cd /infinity; clang-format-20 $file > ${file}.formatted; diff $file ${file}.formatted 2>/dev/null"
                   if [ $? -ne 0 ]; then
                     echo "❌ $file needs formatting"
                     HAS_ERROR=1
@@ -63,6 +77,14 @@ jobs:
               echo "No C++ files changed"
             fi
           fi
+
+      - name: Stop container
+        if: always()
+        run: sudo docker stop ${CHECK_CONTAINER}
+
+      - name: Remove container
+        if: always()
+        run: sudo docker rm -f -v ${CHECK_CONTAINER}
 
   debug_configure_and_build:
     name: debug_configure_and_build
