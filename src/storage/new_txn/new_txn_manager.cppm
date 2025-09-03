@@ -31,11 +31,12 @@ struct WalEntry;
 class SystemCache;
 struct TxnContext;
 struct BGTaskInfo;
-
-export struct TxnInfo {
-    TransactionID txn_id_;
-    std::shared_ptr<std::string> txn_text_;
-};
+struct TxnInfo;
+struct TxnCheckpointInfo;
+struct TxnCompactInfo;
+struct TxnOptimizeInfo;
+struct TxnImportInfo;
+struct TxnCleanInfo;
 
 export class NewTxnManager {
 public:
@@ -196,13 +197,45 @@ private:
     std::shared_ptr<TxnAllocator> txn_allocator_{};
 
 public:
+    void CollectInfo(NewTxn *txn);
+
     // Background task info list
     void AddTaskInfo(std::shared_ptr<BGTaskInfo> task_info);
     std::vector<std::shared_ptr<BGTaskInfo>> GetTaskInfoList() const;
 
+    void AddCheckpointInfo(std::shared_ptr<TxnCheckpointInfo> ckp_info);
+    std::vector<std::shared_ptr<TxnCheckpointInfo>> GetCheckpointInfoList() const;
+
+    void AddCompactInfo(std::shared_ptr<TxnCompactInfo> ckp_info);
+    std::vector<std::shared_ptr<TxnCompactInfo>> GetCompactInfoList() const;
+
+    void AddOptimizeInfo(std::shared_ptr<TxnOptimizeInfo> ckp_info);
+    std::vector<std::shared_ptr<TxnOptimizeInfo>> GetOptimizeInfoList() const;
+
+    void AddImportInfo(std::shared_ptr<TxnImportInfo> ckp_info);
+    std::vector<std::shared_ptr<TxnImportInfo>> GetImportInfoList() const;
+
+    void AddCleanInfo(std::shared_ptr<TxnCleanInfo> ckp_info);
+    std::vector<std::shared_ptr<TxnCleanInfo>> GetCleanInfoList() const;
+
 private:
     mutable std::mutex task_lock_{};
     std::deque<std::shared_ptr<BGTaskInfo>> task_info_list_{};
+
+    mutable std::mutex checkpoint_info_lock_{};
+    std::deque<std::shared_ptr<TxnCheckpointInfo>> ckp_info_list_{};
+
+    mutable std::mutex compact_info_lock_{};
+    std::deque<std::shared_ptr<TxnCompactInfo>> compact_info_list_{};
+
+    mutable std::mutex optimize_info_lock_{};
+    std::deque<std::shared_ptr<TxnOptimizeInfo>> optimize_info_list_{};
+
+    mutable std::mutex import_info_lock_{};
+    std::deque<std::shared_ptr<TxnImportInfo>> import_info_list_{};
+
+    mutable std::mutex clean_info_lock_{};
+    std::deque<std::shared_ptr<TxnCleanInfo>> clean_info_list_{};
 };
 
 } // namespace infinity

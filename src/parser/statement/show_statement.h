@@ -70,6 +70,13 @@ enum class ShowStmtType {
     kShowSnapshot,
     kListCaches,
     kShowCache,
+    kListCompact,
+    kListCheckpoint,
+    kShowCheckpoint,
+    kListOptimize,
+    kListImport,
+    kListClean,
+    kShowClean
 };
 
 class ShowStatement : public BaseStatement {

@@ -34,6 +34,7 @@ import :storage;
 import :catalog_cache;
 import :base_txn_store;
 import :meta_cache;
+import :txn_info;
 
 import std;
 import third_party;
@@ -851,6 +852,71 @@ void NewTxnManager::RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, Ne
     }
 }
 
+SystemCache *NewTxnManager::GetSystemCachePtr() const { return system_cache_.get(); }
+
+void NewTxnManager::CollectInfo(NewTxn *txn) {
+    switch (txn->GetTxnType()) {
+        case TransactionType::kCheckpoint: {
+            std::shared_ptr<TxnCheckpointInfo> ckp_info = std::make_shared<TxnCheckpointInfo>();
+            ckp_info->txn_id_ = txn->TxnID();
+            ckp_info->begin_ts_ = txn->BeginTS();
+            ckp_info->commit_ts_ = txn->CommitTS();
+            if (txn->GetTxnState() == TxnState::kCommitted) {
+                ckp_info->committed_ = true;
+            }
+            this->AddCheckpointInfo(ckp_info);
+            break;
+        }
+        case TransactionType::kCompact: {
+            std::shared_ptr<TxnCompactInfo> compact_info = std::make_shared<TxnCompactInfo>();
+            compact_info->txn_id_ = txn->TxnID();
+            compact_info->begin_ts_ = txn->BeginTS();
+            compact_info->commit_ts_ = txn->CommitTS();
+            if (txn->GetTxnState() == TxnState::kCommitted) {
+                compact_info->committed_ = true;
+            }
+            this->AddCompactInfo(compact_info);
+            break;
+        }
+        case TransactionType::kOptimizeIndex: {
+            std::shared_ptr<TxnOptimizeInfo> optimize_info = std::make_shared<TxnOptimizeInfo>();
+            optimize_info->txn_id_ = txn->TxnID();
+            optimize_info->begin_ts_ = txn->BeginTS();
+            optimize_info->commit_ts_ = txn->CommitTS();
+            if (txn->GetTxnState() == TxnState::kCommitted) {
+                optimize_info->committed_ = true;
+            }
+            this->AddOptimizeInfo(optimize_info);
+            break;
+        }
+        case TransactionType::kImport: {
+            std::shared_ptr<TxnImportInfo> import_info = std::make_shared<TxnImportInfo>();
+            import_info->txn_id_ = txn->TxnID();
+            import_info->begin_ts_ = txn->BeginTS();
+            import_info->commit_ts_ = txn->CommitTS();
+            if (txn->GetTxnState() == TxnState::kCommitted) {
+                import_info->committed_ = true;
+            }
+            this->AddImportInfo(import_info);
+            break;
+        }
+        case TransactionType::kCleanup: {
+            std::shared_ptr<TxnCleanInfo> clean_info = std::make_shared<TxnCleanInfo>();
+            clean_info->txn_id_ = txn->TxnID();
+            clean_info->begin_ts_ = txn->BeginTS();
+            clean_info->commit_ts_ = txn->CommitTS();
+            if (txn->GetTxnState() == TxnState::kCommitted) {
+                clean_info->committed_ = true;
+            }
+            this->AddCleanInfo(clean_info);
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+}
+
 void NewTxnManager::AddTaskInfo(std::shared_ptr<BGTaskInfo> task_info) {
     std::lock_guard<std::mutex> lock(task_lock_);
     if (task_info_list_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
@@ -869,6 +935,74 @@ std::vector<std::shared_ptr<BGTaskInfo>> NewTxnManager::GetTaskInfoList() const 
     return task_info_list;
 }
 
-SystemCache *NewTxnManager::GetSystemCachePtr() const { return system_cache_.get(); }
+void NewTxnManager::AddCheckpointInfo(std::shared_ptr<TxnCheckpointInfo> ckp_info) {
+    std::lock_guard<std::mutex> lock(checkpoint_info_lock_);
+    if (ckp_info_list_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+        ckp_info_list_.pop_front();
+    }
+    ckp_info_list_.push_back(std::move(ckp_info));
+}
+
+std::vector<std::shared_ptr<TxnCheckpointInfo>> NewTxnManager::GetCheckpointInfoList() const {
+    std::vector<std::shared_ptr<TxnCheckpointInfo>> ckp_info_list;
+    std::lock_guard<std::mutex> lock(checkpoint_info_lock_);
+    return ckp_info_list;
+}
+
+void NewTxnManager::AddCompactInfo(std::shared_ptr<TxnCompactInfo> compact_info) {
+    std::lock_guard<std::mutex> lock(compact_info_lock_);
+    if (compact_info_list_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+        compact_info_list_.pop_front();
+    }
+    compact_info_list_.push_back(std::move(compact_info));
+}
+
+std::vector<std::shared_ptr<TxnCompactInfo>> NewTxnManager::GetCompactInfoList() const {
+    std::vector<std::shared_ptr<TxnCompactInfo>> compact_info_list;
+    std::lock_guard<std::mutex> lock(compact_info_lock_);
+    return compact_info_list;
+}
+
+void NewTxnManager::AddOptimizeInfo(std::shared_ptr<TxnOptimizeInfo> optimize_info) {
+    std::lock_guard<std::mutex> lock(optimize_info_lock_);
+    if (optimize_info_list_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+        optimize_info_list_.pop_front();
+    }
+    optimize_info_list_.push_back(std::move(optimize_info));
+}
+
+std::vector<std::shared_ptr<TxnOptimizeInfo>> NewTxnManager::GetOptimizeInfoList() const {
+    std::vector<std::shared_ptr<TxnOptimizeInfo>> optimize_info_list;
+    std::lock_guard<std::mutex> lock(optimize_info_lock_);
+    return optimize_info_list;
+}
+
+void NewTxnManager::AddImportInfo(std::shared_ptr<TxnImportInfo> import_info) {
+    std::lock_guard<std::mutex> lock(import_info_lock_);
+    if (import_info_list_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+        import_info_list_.pop_front();
+    }
+    import_info_list_.push_back(std::move(import_info));
+}
+
+std::vector<std::shared_ptr<TxnImportInfo>> NewTxnManager::GetImportInfoList() const {
+    std::vector<std::shared_ptr<TxnImportInfo>> import_info_list;
+    std::lock_guard<std::mutex> lock(import_info_lock_);
+    return import_info_list;
+}
+
+void NewTxnManager::AddCleanInfo(std::shared_ptr<TxnCleanInfo> clean_info) {
+    std::lock_guard<std::mutex> lock(clean_info_lock_);
+    if (clean_info_list_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+        clean_info_list_.pop_front();
+    }
+    clean_info_list_.push_back(std::move(clean_info));
+}
+
+std::vector<std::shared_ptr<TxnCleanInfo>> NewTxnManager::GetCleanInfoList() const {
+    std::vector<std::shared_ptr<TxnCleanInfo>> clean_info_list;
+    std::lock_guard<std::mutex> lock(clean_info_lock_);
+    return clean_info_list;
+}
 
 } // namespace infinity

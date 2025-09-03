@@ -162,6 +162,20 @@ private:
 
     void ExecuteShowCache(QueryContext *query_context, ShowOperatorState *operator_state);
 
+    void ExecuteListCompact(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteListCheckpoint(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowCheckpoint(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteListOptimize(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteListImport(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteListClean(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowClean(QueryContext *query_context, ShowOperatorState *operator_state);
+
 private:
     ShowStmtType show_type_{ShowStmtType::kInvalid};
     std::string db_name_{};

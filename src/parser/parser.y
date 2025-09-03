@@ -411,7 +411,7 @@ struct SQL_LTYPE {
 %token USING SESSION GLOBAL OFF EXPORT CONFIGS CONFIG PROFILES VARIABLES VARIABLE LOGS CATALOGS CATALOG
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
 %token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE REMOVE SNAPSHOT SNAPSHOTS RECOVER RESTORE CACHES CACHE
-%token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION HISTORY CHECK CLEAN
+%token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION HISTORY CHECK CLEAN CHECKPOINT IMPORT
 
 %token NUMBER
 
@@ -2145,6 +2145,37 @@ show_statement: SHOW DATABASES {
      $$ = new infinity::ShowStatement();
      $$->show_type_ = infinity::ShowStmtType::kShowCache;
 }
+| SHOW COMPACT {
+     $$ = new infinity::ShowStatement();
+     $$->show_type_ = infinity::ShowStmtType::kListCompact;
+}
+| SHOW CHECKPOINT {
+     $$ = new infinity::ShowStatement();
+     $$->show_type_ = infinity::ShowStmtType::kListCheckpoint;
+}
+| SHOW CHECKPOINT LONG_VALUE {
+     $$ = new infinity::ShowStatement();
+     $$->show_type_ = infinity::ShowStmtType::kShowCheckpoint;
+     $$->txn_id_ = $3;
+}
+| SHOW OPTIMIZE {
+     $$ = new infinity::ShowStatement();
+     $$->show_type_ = infinity::ShowStmtType::kListOptimize;
+}
+| SHOW IMPORT {
+     $$ = new infinity::ShowStatement();
+     $$->show_type_ = infinity::ShowStmtType::kListImport;
+}
+| SHOW CLEAN {
+     $$ = new infinity::ShowStatement();
+     $$->show_type_ = infinity::ShowStmtType::kListClean;
+}
+| SHOW CLEAN LONG_VALUE {
+     $$ = new infinity::ShowStatement();
+     $$->show_type_ = infinity::ShowStmtType::kShowClean;
+     $$->txn_id_ = $3;
+}
+;
 
 /*
  * FLUSH STATEMENT

@@ -69,6 +69,7 @@ import :kv_store;
 import :meta_tree;
 import :meta_cache;
 import :block_version;
+import :txn_info;
 
 import std;
 import show_statement;
@@ -88,6 +89,7 @@ namespace infinity {
 void PhysicalShow::Init(QueryContext *query_context) {
     auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
     auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
+    auto bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
     auto double_type = std::make_shared<DataType>(LogicalType::kDouble);
 
     output_names_ = std::make_shared<std::vector<std::string>>();
@@ -626,6 +628,115 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_types_->emplace_back(double_type);
             break;
         }
+        case ShowStmtType::kListCompact: {
+            output_names_->reserve(8);
+            output_types_->reserve(8);
+            output_names_->emplace_back("txn");
+            output_names_->emplace_back("begin");
+            output_names_->emplace_back("commit");
+            output_names_->emplace_back("result");
+            output_names_->emplace_back("table_name");
+            output_names_->emplace_back("table_id");
+            output_names_->emplace_back("segments");
+            output_names_->emplace_back("new_segment");
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
+        case ShowStmtType::kListCheckpoint: {
+            output_names_->reserve(5);
+            output_types_->reserve(5);
+            output_names_->emplace_back("id");
+            output_names_->emplace_back("txn");
+            output_names_->emplace_back("begin");
+            output_names_->emplace_back("commit");
+            output_names_->emplace_back("success");
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bool_type);
+            break;
+        }
+        case ShowStmtType::kShowCheckpoint: {
+            output_names_->reserve(1);
+            output_types_->reserve(1);
+            output_names_->emplace_back("detail");
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
+        case ShowStmtType::kListOptimize: {
+            output_names_->reserve(9);
+            output_types_->reserve(9);
+            output_names_->emplace_back("txn");
+            output_names_->emplace_back("begin");
+            output_names_->emplace_back("commit");
+            output_names_->emplace_back("result");
+            output_names_->emplace_back("table_name");
+            output_names_->emplace_back("table_id");
+            output_names_->emplace_back("segment_id");
+            output_names_->emplace_back("chunks");
+            output_names_->emplace_back("new_chunk");
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
+        case ShowStmtType::kListImport: {
+            output_names_->reserve(8);
+            output_types_->reserve(8);
+            output_names_->emplace_back("txn");
+            output_names_->emplace_back("begin");
+            output_names_->emplace_back("commit");
+            output_names_->emplace_back("result");
+            output_names_->emplace_back("table_name");
+            output_names_->emplace_back("table_id");
+            output_names_->emplace_back("segment_id");
+            output_names_->emplace_back("row_count");
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            break;
+        }
+        case ShowStmtType::kListClean: {
+            output_names_->reserve(5);
+            output_types_->reserve(5);
+            output_names_->emplace_back("id");
+            output_names_->emplace_back("txn");
+            output_names_->emplace_back("begin");
+            output_names_->emplace_back("commit");
+            output_names_->emplace_back("success");
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bool_type);
+            break;
+        }
+        case ShowStmtType::kShowClean: {
+            output_names_->reserve(1);
+            output_types_->reserve(1);
+            output_names_->emplace_back("detail");
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Status status = Status::NotSupport("Not implemented show type");
             RecoverableError(status);
@@ -808,6 +919,34 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowStmtType::kShowCache: {
             ExecuteShowCache(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kListCompact: {
+            ExecuteListCompact(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kListCheckpoint: {
+            ExecuteListCheckpoint(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kShowCheckpoint: {
+            ExecuteShowCheckpoint(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kListOptimize: {
+            ExecuteListOptimize(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kListImport: {
+            ExecuteListImport(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kListClean: {
+            ExecuteListClean(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kShowClean: {
+            ExecuteShowClean(query_context, show_operator_state);
             break;
         }
         default: {
@@ -6730,7 +6869,97 @@ void PhysicalShow::ExecuteShowCache(QueryContext *query_context, ShowOperatorSta
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
-    return;
+}
+
+void PhysicalShow::ExecuteListCompact(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Storage *storage = query_context->storage();
+    MetaCache *meta_cache = storage->meta_cache();
+    std::vector<std::shared_ptr<MetaBaseCache>> cache_items = meta_cache->GetAllCacheItems();
+
+    output_block_ptr->Init(*output_types_);
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
+void PhysicalShow::ExecuteListCheckpoint(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Storage *storage = query_context->storage();
+    MetaCache *meta_cache = storage->meta_cache();
+    std::vector<std::shared_ptr<MetaBaseCache>> cache_items = meta_cache->GetAllCacheItems();
+
+    output_block_ptr->Init(*output_types_);
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
+void PhysicalShow::ExecuteShowCheckpoint(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Storage *storage = query_context->storage();
+    MetaCache *meta_cache = storage->meta_cache();
+    std::vector<std::shared_ptr<MetaBaseCache>> cache_items = meta_cache->GetAllCacheItems();
+
+    output_block_ptr->Init(*output_types_);
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
+void PhysicalShow::ExecuteListOptimize(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Storage *storage = query_context->storage();
+    MetaCache *meta_cache = storage->meta_cache();
+    std::vector<std::shared_ptr<MetaBaseCache>> cache_items = meta_cache->GetAllCacheItems();
+
+    output_block_ptr->Init(*output_types_);
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
+void PhysicalShow::ExecuteListImport(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Storage *storage = query_context->storage();
+    MetaCache *meta_cache = storage->meta_cache();
+    std::vector<std::shared_ptr<MetaBaseCache>> cache_items = meta_cache->GetAllCacheItems();
+
+    output_block_ptr->Init(*output_types_);
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
+void PhysicalShow::ExecuteListClean(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Storage *storage = query_context->storage();
+    MetaCache *meta_cache = storage->meta_cache();
+    std::vector<std::shared_ptr<MetaBaseCache>> cache_items = meta_cache->GetAllCacheItems();
+
+    output_block_ptr->Init(*output_types_);
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
+void PhysicalShow::ExecuteShowClean(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Storage *storage = query_context->storage();
+    MetaCache *meta_cache = storage->meta_cache();
+    std::vector<std::shared_ptr<MetaBaseCache>> cache_items = meta_cache->GetAllCacheItems();
+
+    output_block_ptr->Init(*output_types_);
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
 } // namespace infinity
