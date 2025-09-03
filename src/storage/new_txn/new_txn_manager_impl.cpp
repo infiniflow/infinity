@@ -254,8 +254,7 @@ void NewTxnManager::SaveOrResetMetaCacheForReadTxn(NewTxn *txn) {
             } else {
                 // Writable Txn
                 LOG_DEBUG(fmt::format("Reset meta cache and cache info for read txn {}", txn->TxnID()));
-                txn->ResetMetaCache();
-                txn->ResetCacheInfo();
+                txn->ResetMetaCacheAndCacheInfo();
                 all_read_txns = false;
                 break;
             }
@@ -263,8 +262,7 @@ void NewTxnManager::SaveOrResetMetaCacheForReadTxn(NewTxn *txn) {
 
         if (all_read_txns) {
             LOG_DEBUG(fmt::format("Save meta cache and cache info for read txn {}", txn->TxnID()));
-            txn->SaveMetaCache();
-            txn->SaveCacheInfo();
+            txn->SaveMetaCacheAndCacheInfo();
         }
     }
 }

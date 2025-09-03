@@ -360,16 +360,20 @@ private:
 public:
     explicit MetaCache(size_t capacity) : capacity_(capacity) {};
 
-    void Put(const std::vector<std::shared_ptr<MetaBaseCache>> &cache_items, TxnTimeStamp begin_ts);
+    void Put(const std::vector<std::shared_ptr<MetaBaseCache>> &cache_items,
+             const std::vector<std::shared_ptr<CacheInfo>> &cache_infos,
+             TxnTimeStamp begin_ts);
 
     Status Erase(const std::vector<std::shared_ptr<EraseBaseCache>> &cache_items, KVInstance *kv_instance, TxnTimeStamp commit_ts);
 
     Status PutOrErase(const std::vector<std::shared_ptr<MetaBaseCache>> &cache_items, KVInstance *kv_instance);
 
+    std::shared_ptr<MetaDbCache> GetDbNolock(const std::string &db_name, TxnTimeStamp begin_ts);
+    std::shared_ptr<MetaTableCache> GetTableNolock(u64 db_id, const std::string &table_name, TxnTimeStamp begin_ts);
+    std::shared_ptr<MetaIndexCache> GetIndexNolock(u64 db_id, u64 table_id, const std::string &index_name, TxnTimeStamp begin_ts);
+
     std::shared_ptr<MetaDbCache> GetDb(const std::string &db_name, TxnTimeStamp begin_ts);
-
     std::shared_ptr<MetaTableCache> GetTable(u64 db_id, const std::string &table_name, TxnTimeStamp begin_ts);
-
     std::shared_ptr<MetaIndexCache> GetIndex(u64 db_id, u64 table_id, const std::string &index_name, TxnTimeStamp begin_ts);
 
     CacheStatus GetCacheStatus(MetaCacheType type) const;

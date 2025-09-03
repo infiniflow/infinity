@@ -711,12 +711,9 @@ public:
     void AddMetaKeyForBufferObject(std::unique_ptr<MetaKey> object_meta_key);
 
     void AddMetaCache(const std::shared_ptr<MetaBaseCache> &meta_base_cache);
-    void ResetMetaCache();
-    void SaveMetaCache();
-
     void AddCacheInfo(const std::shared_ptr<CacheInfo> &cache_info);
-    void ResetCacheInfo();
-    void SaveCacheInfo();
+    void ResetMetaCacheAndCacheInfo();
+    void SaveMetaCacheAndCacheInfo();
 
 private:
     // Reference to external class

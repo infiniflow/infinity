@@ -6315,100 +6315,21 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
     return Status::OK();
 }
 
-void NewTxn::AddMetaCache(const std::shared_ptr<MetaBaseCache> &meta_base_cache) {
-    meta_cache_items_.emplace_back(meta_base_cache);
-    return;
-}
-
-void NewTxn::ResetMetaCache() { meta_cache_items_.clear(); }
-
-void NewTxn::SaveMetaCache() {
-    if (meta_cache_items_.empty()) {
-        return;
-    }
-    MetaCache *meta_cache_ptr = txn_mgr_->storage()->meta_cache();
-    meta_cache_ptr->Put(meta_cache_items_, this->BeginTS());
-}
+void NewTxn::AddMetaCache(const std::shared_ptr<MetaBaseCache> &meta_base_cache) { meta_cache_items_.emplace_back(meta_base_cache); }
 
 void NewTxn::AddCacheInfo(const std::shared_ptr<CacheInfo> &cache_info) { cache_infos_.emplace_back(cache_info); }
 
-void NewTxn::ResetCacheInfo() { cache_infos_.clear(); }
+void NewTxn::ResetMetaCacheAndCacheInfo() {
+    meta_cache_items_.clear();
+    cache_infos_.clear();
+}
 
-void NewTxn::SaveCacheInfo() {
-    MetaCache *meta_cache = txn_mgr_->storage()->meta_cache();
-    for (auto &cache_info : cache_infos_) {
-        switch (cache_info->cache_type_) {
-            case CacheType::kDb: {
-                DBCacheInfo *db_cache_info = static_cast<DBCacheInfo *>(cache_info.get());
-                std::shared_ptr<MetaDbCache> db_cache = meta_cache->GetDb(db_cache_info->db_name_, db_cache_info->begin_ts_);
-                switch (db_cache_info->info_type_) {
-                    case DBCacheInfoType::kComment: {
-                        DBCacheCommentInfo *db_cache_info = static_cast<DBCacheCommentInfo *>(cache_info.get());
-                        db_cache->set_comment(db_cache_info->comment_);
-                        break;
-                    }
-                    default: {
-                        UnrecoverableError("Invalid db cache info type");
-                    }
-                }
-                break;
-            }
-            case CacheType::kTable: {
-                TableCacheInfo *table_cache_info = static_cast<TableCacheInfo *>(cache_info.get());
-                std::shared_ptr<MetaTableCache> table_cache =
-                    meta_cache->GetTable(table_cache_info->db_id_, table_cache_info->table_name_, table_cache_info->begin_ts_);
-                switch (table_cache_info->info_type_) {
-                    case TableCacheInfoType::kIndex: {
-                        TableCacheIndexInfo *table_cache_index_info = static_cast<TableCacheIndexInfo *>(cache_info.get());
-                        table_cache->set_index_ids(table_cache_index_info->index_ids_ptr_, table_cache_index_info->index_names_ptr_);
-                        break;
-                    }
-                    case TableCacheInfoType::kColumn: {
-                        TableCacheColumnInfo *table_cache_column_info = static_cast<TableCacheColumnInfo *>(cache_info.get());
-                        table_cache->set_columns(table_cache_column_info->columns_ptr_);
-                        break;
-                    }
-                    case TableCacheInfoType::kSegment: {
-                        TableCacheSegmentInfo *table_cache_segment_info = static_cast<TableCacheSegmentInfo *>(cache_info.get());
-                        table_cache->set_segments(table_cache_segment_info->segments_);
-                        break;
-                    }
-                    case TableCacheInfoType::kSegmentTag: {
-                        TableCacheSegmentTagInfo *table_cache_segment_tag_info = static_cast<TableCacheSegmentTagInfo *>(cache_info.get());
-                        table_cache->set_segment_tag(table_cache_segment_tag_info->segment_id_,
-                                                     table_cache_segment_tag_info->tag_,
-                                                     table_cache_segment_tag_info->value_);
-                        break;
-                    }
-                    default: {
-                        UnrecoverableError("Invalid table cache info type");
-                    }
-                }
-                break;
-            }
-            case CacheType::kIndex: {
-                IndexCacheInfo *index_cache_info = static_cast<IndexCacheInfo *>(cache_info.get());
-                std::shared_ptr<MetaIndexCache> index_cache = meta_cache->GetIndex(index_cache_info->db_id_,
-                                                                                   index_cache_info->table_id_,
-                                                                                   index_cache_info->index_name_,
-                                                                                   index_cache_info->begin_ts_);
-                switch (index_cache_info->info_type_) {
-                    case IndexCacheInfoType::kIndexDef: {
-                        IndexCacheIndexDefInfo *index_cache_index_def_info = static_cast<IndexCacheIndexDefInfo *>(cache_info.get());
-                        index_cache->set_index_def(index_cache_index_def_info->index_def_);
-                        break;
-                    }
-                    default: {
-                        UnrecoverableError("Invalid index cache info type");
-                    }
-                }
-                break;
-            }
-            default: {
-                UnrecoverableError("Invalid cache type");
-            }
-        }
+void NewTxn::SaveMetaCacheAndCacheInfo() {
+    if (meta_cache_items_.empty() && cache_infos_.empty()) {
+        return;
     }
+    MetaCache *meta_cache_ptr = txn_mgr_->storage()->meta_cache();
+    meta_cache_ptr->Put(meta_cache_items_, cache_infos_, this->BeginTS());
 }
 
 } // namespace infinity
