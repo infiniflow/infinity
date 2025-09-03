@@ -19,6 +19,7 @@ module;
 module infinity_core:ut.test_quantizer_performance;
 
 import :ut.base_test;
+import :hnsw_alg;
 import :data_store;
 import :vec_store_type;
 import :dist_func_l2;
@@ -64,6 +65,7 @@ class QuantizerPerformanceTest : public BaseTest {
 public:
     using DataType = f32;
     using LabelType = i32;
+    using DistanceType = f32;
 
 private:
     template <typename T>
@@ -120,9 +122,21 @@ private:
     }
 
     void LoadSift1M() {
-        base_path_ = "test/data/benchmark/sift_1m/sift_base.fvecs";
-        query_path_ = "test/data/benchmark/sift_1m/sift_query.fvecs";
-        groundtruth_path_ = "test/data/benchmark/sift_1m/sift_groundtruth.ivecs";
+        base_path_ = "/data1/data/sift1M/sift1M_base.fvecs";
+        query_path_ = "/data1/data/sift1M/sift1M_query.fvecs";
+        groundtruth_path_ = "/data1/data/sift1M/sift1M_groundtruth.ivecs";
+
+        std::tie(base_num_, base_dim_, base_data_) = DecodeFvecsDataset<DataType>(base_path_);
+        std::tie(query_num_, query_dim_, query_data_) = DecodeFvecsDataset<DataType>(query_path_);
+        std::tie(gt_num_, gt_dim_, groundtruth_data_) = DecodeFvecsDataset<LabelType>(groundtruth_path_);
+
+        query_num_ = 100;
+    }
+
+    void LoadSift10K() {
+        base_path_ = "/data1/data/sift10K/sift10K_base.fvecs";
+        query_path_ = "/data1/data/sift10K/sift10K_query.fvecs";
+        groundtruth_path_ = "/data1/data/sift10K/sift10K_groundtruth.ivecs";
 
         std::tie(base_num_, base_dim_, base_data_) = DecodeFvecsDataset<DataType>(base_path_);
         std::tie(query_num_, query_dim_, query_data_) = DecodeFvecsDataset<DataType>(query_path_);
@@ -135,6 +149,7 @@ public:
     void SetUp() override {
         GenerateRandomDataset();
         // LoadSift1M();
+        // LoadSift10K();
     }
 
     void TearDown() override {}
@@ -142,13 +157,13 @@ public:
 public:
     size_t base_dim_ = 128;
     size_t query_dim_ = base_dim_;
-    size_t gt_dim_ = 1;
+    size_t gt_dim_ = 100;
 
     size_t base_num_ = 8192;
     size_t query_num_ = 100;
     size_t gt_num_ = base_num_;
 
-    size_t recall_at_ = 1;
+    size_t recall_at_ = 10;
     size_t topk_ = 10;
     size_t chunk_size_ = 8192;
 
@@ -262,4 +277,110 @@ TEST_F(QuantizerPerformanceTest, test_flat_rabitq) {
     }
     f32 recall = 1.0f * cnt / (query_num_ * recall_at_);
     std::cout << "Recall_10@1 = " << recall << std::endl;
+}
+
+TEST_F(QuantizerPerformanceTest, test_hnsw_lvq) {
+    using Hnsw = KnnHnsw<LVQL2VecStoreType<DataType, i8>, LabelType>;
+    size_t M = 16;
+    size_t ef_construction = 200;
+    size_t ef_search = 200;
+    size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
+
+    auto hnsw_index = Hnsw::Make(chunk_size_, max_chunk_n, base_dim_, M, ef_construction);
+    auto iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
+    auto t0 = std::chrono::high_resolution_clock::now();
+    hnsw_index->InsertVecs(std::move(iter));
+    auto t1 = std::chrono::high_resolution_clock::now();
+    double seconds = std::chrono::duration<double>(t1 - t0).count();
+    std::cout << "Build index use time: " << seconds << std::endl;
+
+    KnnSearchOption search_option{.ef_ = ef_search};
+    int correct = 0;
+    for (int i = 0; i < query_num_; ++i) {
+        const auto &query = query_data_.get() + i * query_dim_;
+        const auto &gt = groundtruth_data_.get() + i * gt_dim_;
+        auto result = hnsw_index->KnnSearchSorted(query, topk_, search_option);
+        result.resize(topk_);
+
+        std::unordered_set<LabelType> gt_set(gt, gt + recall_at_);
+        for (auto item : result) {
+            if (gt_set.contains(item.second)) {
+                ++correct;
+            }
+        }
+
+        std::cout << "query: " << i;
+        std::cout << ", gt:";
+        for (LabelType id : gt_set) {
+            std::cout << " " << id;
+        }
+        std::cout << ", ids:";
+        for (auto item : result) {
+            std::cout << " " << item.second;
+        }
+        std::cout << std::endl;
+    }
+    float correct_rate = float(correct) / query_num_ / recall_at_;
+    std::printf("correct rage: %f\n", correct_rate);
+    // EXPECT_GE(correct_rate, 0.9);
+}
+
+TEST_F(QuantizerPerformanceTest, test_hnsw_rabitq) {
+    using Hnsw = KnnHnsw<RabitqL2VecStoreType<DataType>, LabelType>;
+    size_t M = 16;
+    size_t ef_construction = 200;
+    size_t ef_search = 200;
+    size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
+
+    auto hnsw_index = Hnsw::Make(chunk_size_, max_chunk_n, base_dim_, M, ef_construction);
+    auto iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
+    auto t0 = std::chrono::high_resolution_clock::now();
+    hnsw_index->InsertVecs(std::move(iter), {true});
+    auto t1 = std::chrono::high_resolution_clock::now();
+    double seconds = std::chrono::duration<double>(t1 - t0).count();
+    std::cout << "Build index use time: " << seconds << std::endl;
+
+    KnnSearchOption search_option{.ef_ = ef_search};
+    auto KnnSearchSortedByFlat = [&](const auto &hnsw_index, const DataType *query) -> std::vector<std::pair<DistanceType, LabelType>> {
+        auto L2Distance = GetSIMD_FUNCTIONS().HNSW_F32L2_ptr_;
+        auto [result_n, d_ptr, v_ptr] = hnsw_index->KnnSearch(query, topk_, search_option);
+        std::vector<std::pair<DistanceType, LabelType>> result(result_n);
+        for (size_t i = 0; i < result_n; ++i) {
+            LabelType id = hnsw_index->GetLabel(v_ptr[i]);
+            const DataType *ori_vec = base_data_.get() + id * base_dim_;
+            DistanceType dis = L2Distance(query, ori_vec, base_dim_);
+            result[i] = {dis, id};
+        }
+        std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+        return result;
+    };
+
+    int correct = 0;
+    for (int i = 0; i < query_num_; ++i) {
+        const auto &query = query_data_.get() + i * query_dim_;
+        const auto &gt = groundtruth_data_.get() + i * gt_dim_;
+        auto result = KnnSearchSortedByFlat(hnsw_index, query);
+        result.resize(topk_);
+
+        std::unordered_set<LabelType> gt_set(gt, gt + recall_at_);
+        for (auto item : result) {
+            if (gt_set.contains(item.second)) {
+                ++correct;
+            }
+        }
+
+        std::cout << "query: " << i;
+        std::cout << ", gt:";
+        for (LabelType id : gt_set) {
+            std::cout << " " << id;
+        }
+        std::cout << ", ids:";
+        for (auto item : result) {
+            std::cout << " " << item.second;
+        }
+        std::cout << std::endl;
+    }
+    float correct_rate = float(correct) / query_num_ / recall_at_;
+    std::printf("correct rage: %f\n", correct_rate);
+    // EXPECT_GE(correct_rate, 0.9);
 }
