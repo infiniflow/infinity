@@ -117,6 +117,7 @@ struct TableDetail;
 struct CheckpointTxnStore;
 struct MetaKey;
 struct MetaBaseCache;
+struct CacheInfo;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -713,6 +714,10 @@ public:
     void ResetMetaCache();
     void SaveMetaCache();
 
+    void AddCacheInfo(const std::shared_ptr<CacheInfo> &cache_info);
+    void ResetCacheInfo();
+    void SaveCacheInfo();
+
 private:
     // Reference to external class
     NewTxnManager *txn_mgr_{};
@@ -760,6 +765,8 @@ private:
 
     // Meta cache
     std::vector<std::shared_ptr<MetaBaseCache>> meta_cache_items_{}; // cache item to store
+
+    std::vector<std::shared_ptr<CacheInfo>> cache_infos_{};
 
 private:
     std::shared_ptr<TxnContext> txn_context_ptr_{};

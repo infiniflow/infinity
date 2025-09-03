@@ -243,15 +243,28 @@ bool NewTxnManager::CheckConflict1(NewTxn *txn, std::string &conflict_reason, bo
 }
 
 void NewTxnManager::SaveOrResetMetaCacheForReadTxn(NewTxn *txn) {
-    // For read-only txn, if it begins after all committed write txns, save the items to meta cache.
-    // If it is conflicted with any committed write txn, reset the meta cache.
+    // For read-only txn check if previous txn is writable txn. If so, remove the items to cache.
     if ((txn->GetTxnStore() == nullptr && !txn->IsReplay()) or txn->txn_type() == TxnType::kReadOnly) {
-        if (txn->BeginTS() > LastKVCommitTS()) {
-            LOG_DEBUG(fmt::format("Save meta cache for read txn {}", txn->TxnID()));
+        std::vector<std::shared_ptr<NewTxn>> check_txns = GetCheckCandidateTxns(txn);
+        bool all_read_txns = true;
+        for (const auto &check_txn : check_txns) {
+            if ((check_txn->GetTxnStore() == nullptr && !check_txn->IsReplay()) or check_txn->txn_type() == TxnType::kReadOnly) {
+                // Read only txn
+                continue;
+            } else {
+                // Writable Txn
+                LOG_DEBUG(fmt::format("Reset meta cache and cache info for read txn {}", txn->TxnID()));
+                txn->ResetMetaCache();
+                txn->ResetCacheInfo();
+                all_read_txns = false;
+                break;
+            }
+        }
+
+        if (all_read_txns) {
+            LOG_DEBUG(fmt::format("Save meta cache and cache info for read txn {}", txn->TxnID()));
             txn->SaveMetaCache();
-        } else {
-            LOG_DEBUG(fmt::format("Reset meta cache for read txn {}", txn->TxnID()));
-            txn->ResetMetaCache();
+            txn->SaveCacheInfo();
         }
     }
 }
