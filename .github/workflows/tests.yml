@@ -368,7 +368,11 @@ jobs:
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/unittest_debug.log /infinity_log/unittest_debug.log &&
-            mv /infinity/unittest_debug_error.log /infinity_log/unittest_debug_error.log"
+            mv /infinity/unittest_debug_error.log /infinity_log/unittest_debug_error.log &&
+            echo 'ut debug log' &&
+            tail -n 100 /infinity_log/unittest_debug.log &&
+            echo 'ut debug error log' &&
+            tail -n 100 /infinity_log/unittest_debug_error.log"
 
       - name: Remove test container
         if: always()
@@ -1145,7 +1149,11 @@ jobs:
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/unittest_release.log /infinity_log/unittest_release.log &&
-            mv /infinity/unittest_release_error.log /infinity_log/unittest_release_error.log"
+            mv /infinity/unittest_release_error.log /infinity_log/unittest_release_error.log &&
+            echo 'ut release log' &&
+            tail -n 100 /infinity_log/unittest_release.log &&
+            echo 'ut release error log' &&
+            tail -n 100 /infinity_log/unittest_release_error.log"
 
       - name: Remove test container
         if: always()
