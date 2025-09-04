@@ -827,9 +827,10 @@ void QueryBinder::BuildGroupBy(QueryContext *query_context,
                                std::unique_ptr<BoundSelectStatement> &select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->group_by_table_index_ = table_index;
-    bind_context_ptr_->group_by_table_name_ = "groupby" + std::to_string(table_index);
-
     if (select.group_by_list_ != nullptr) {
+
+        bind_context_ptr_->group_by_table_name_ = fmt::format("groupby_{}", table_index);
+
         // Start to bind GROUP BY clause
         // Set group binder
         auto group_binder = std::make_shared<GroupBinder>(query_context, bind_alias_proxy);
@@ -856,10 +857,12 @@ void QueryBinder::BuildHaving(QueryContext *query_context,
                               std::unique_ptr<BoundSelectStatement> &select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->aggregate_table_index_ = table_index;
-    bind_context_ptr_->aggregate_table_name_ = "aggregate" + std::to_string(table_index);
 
     // All having expr must appear in group by list or aggregate function list.
     if (select.group_by_list_ != nullptr && select.having_expr_ != nullptr) {
+
+        bind_context_ptr_->aggregate_table_name_ = fmt::format("aggregate_{}", table_index);
+
         // Start to bind Having clause
         // Set having binder
         auto having_binder = std::make_shared<HavingBinder>(query_context, bind_alias_proxy);
@@ -881,7 +884,7 @@ void QueryBinder::PushOrderByToProject(QueryContext *, const SelectStatement &st
 void QueryBinder::BuildSelectList(QueryContext *, std::unique_ptr<BoundSelectStatement> &bound_select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->project_table_index_ = table_index;
-    bind_context_ptr_->project_table_name_ = "project" + std::to_string(table_index);
+    bind_context_ptr_->project_table_name_ = fmt::format("project_", table_index);
 
     auto project_binder = std::make_shared<ProjectBinder>(query_context_ptr_, bound_select_statement.get());
 
