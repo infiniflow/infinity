@@ -858,14 +858,24 @@ SystemCache *NewTxnManager::GetSystemCachePtr() const { return system_cache_.get
 
 void NewTxnManager::CollectInfo(NewTxn *txn) {
     switch (txn->GetTxnType()) {
-        case TransactionType::kCheckpoint: {
+        case TransactionType::kNewCheckpoint: {
             std::shared_ptr<TxnCheckpointInfo> ckp_info = std::make_shared<TxnCheckpointInfo>();
             ckp_info->txn_id_ = txn->TxnID();
             ckp_info->begin_ts_ = txn->BeginTS();
             ckp_info->commit_ts_ = txn->CommitTS();
+
             if (txn->GetTxnState() == TxnState::kCommitted) {
                 ckp_info->committed_ = true;
             }
+
+            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            CheckpointTxnStore *checkpoint_txn_store = static_cast<CheckpointTxnStore *>(base_txn_store);
+            ckp_info->auto_flush_ = checkpoint_txn_store->auto_check_point_;
+            ckp_info->checkpoint_ts_ = checkpoint_txn_store->max_commit_ts_;
+            if (!checkpoint_txn_store->entries_.empty()) {
+                ckp_info->entries_ = checkpoint_txn_store->entries_;
+            }
+
             this->AddCheckpointInfo(ckp_info);
             break;
         }
@@ -885,20 +895,50 @@ void NewTxnManager::CollectInfo(NewTxn *txn) {
                 compact_info->new_segment_id_ = compact_txn_store->new_segment_id_;
                 compact_info->table_id_ = compact_txn_store->table_id_;
                 compact_info->table_name_ = compact_txn_store->table_name_;
+                compact_info->table_id_ = compact_txn_store->db_id_;
+                compact_info->db_name_ = compact_info->db_name_;
             }
 
             this->AddCompactInfo(compact_info);
             break;
         }
         case TransactionType::kOptimizeIndex: {
-            std::shared_ptr<TxnOptimizeInfo> optimize_info = std::make_shared<TxnOptimizeInfo>();
-            optimize_info->txn_id_ = txn->TxnID();
-            optimize_info->begin_ts_ = txn->BeginTS();
-            optimize_info->commit_ts_ = txn->CommitTS();
-            if (txn->GetTxnState() == TxnState::kCommitted) {
-                optimize_info->committed_ = true;
+
+            auto txn_id = txn->TxnID();
+            auto begin_ts = txn->BeginTS();
+            auto commit_ts = txn->CommitTS();
+
+            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            if (base_txn_store == nullptr) {
+                std::shared_ptr<TxnOptimizeInfo> optimize_info = std::make_shared<TxnOptimizeInfo>();
+                optimize_info->txn_id_ = txn_id;
+                optimize_info->begin_ts_ = begin_ts;
+                optimize_info->commit_ts_ = commit_ts;
+                if (txn->GetTxnState() == TxnState::kCommitted) {
+                    optimize_info->committed_ = true;
+                }
+                this->AddOptimizeInfo(optimize_info);
+            } else {
+                OptimizeIndexTxnStore *optimize_index_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store);
+                for (const auto &optimize_index_entry : optimize_index_store->entries_) {
+                    std::shared_ptr<TxnOptimizeInfo> optimize_info = std::make_shared<TxnOptimizeInfo>();
+                    optimize_info->txn_id_ = txn_id;
+                    optimize_info->begin_ts_ = begin_ts;
+                    if (txn->GetTxnState() == TxnState::kCommitted) {
+                        optimize_info->committed_ = true;
+                    }
+                    optimize_info->db_id_ = optimize_index_entry.db_id_;
+                    optimize_info->db_name_ = optimize_index_entry.db_name_;
+                    optimize_info->table_id_ = optimize_index_entry.table_id_;
+                    optimize_info->table_name_ = optimize_index_entry.table_name_;
+                    optimize_info->segment_id_ = optimize_index_entry.segment_id_;
+                    optimize_info->deprecated_chunk_ids_ = optimize_index_entry.deprecate_chunks_;
+                    optimize_info->new_chunk_id_ = optimize_index_entry.new_chunk_infos_[0].chunk_id_;
+                    optimize_info->index_name_ = optimize_index_entry.index_name_;
+                    optimize_info->index_id_ = optimize_index_entry.index_id_;
+                    this->AddOptimizeInfo(optimize_info);
+                }
             }
-            this->AddOptimizeInfo(optimize_info);
             break;
         }
         case TransactionType::kImport: {

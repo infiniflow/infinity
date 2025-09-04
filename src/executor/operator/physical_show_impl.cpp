@@ -644,18 +644,22 @@ void PhysicalShow::Init(QueryContext *query_context) {
             break;
         }
         case ShowStmtType::kListCheckpoint: {
-            output_names_->reserve(5);
-            output_types_->reserve(5);
-            output_names_->emplace_back("id");
+            output_names_->reserve(7);
+            output_types_->reserve(7);
             output_names_->emplace_back("txn");
-            output_names_->emplace_back("begin");
-            output_names_->emplace_back("commit");
-            output_names_->emplace_back("success");
-            output_types_->emplace_back(bigint_type);
+            output_names_->emplace_back("begin_ts");
+            output_names_->emplace_back("commit_ts");
+            output_names_->emplace_back("committed");
+            output_names_->emplace_back("timestamp");
+            output_names_->emplace_back("type");
+            output_names_->emplace_back("brief");
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bool_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
             break;
         }
         case ShowStmtType::kShowCheckpoint: {
@@ -666,25 +670,17 @@ void PhysicalShow::Init(QueryContext *query_context) {
             break;
         }
         case ShowStmtType::kListOptimize: {
-            output_names_->reserve(9);
-            output_types_->reserve(9);
+            output_names_->reserve(5);
+            output_types_->reserve(5);
             output_names_->emplace_back("txn");
-            output_names_->emplace_back("begin");
-            output_names_->emplace_back("commit");
-            output_names_->emplace_back("success");
-            output_names_->emplace_back("table_name");
-            output_names_->emplace_back("table_id");
-            output_names_->emplace_back("segment_id");
-            output_names_->emplace_back("chunks");
-            output_names_->emplace_back("new_chunk");
+            output_names_->emplace_back("begin_ts");
+            output_names_->emplace_back("commit_ts");
+            output_names_->emplace_back("committed");
+            output_names_->emplace_back("detail");
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bool_type);
-            output_types_->emplace_back(varchar_type);
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             break;
         }
@@ -712,16 +708,16 @@ void PhysicalShow::Init(QueryContext *query_context) {
         case ShowStmtType::kListClean: {
             output_names_->reserve(5);
             output_types_->reserve(5);
-            output_names_->emplace_back("id");
             output_names_->emplace_back("txn");
-            output_names_->emplace_back("begin");
-            output_names_->emplace_back("commit");
-            output_names_->emplace_back("success");
-            output_types_->emplace_back(bigint_type);
+            output_names_->emplace_back("begin_ts");
+            output_names_->emplace_back("commit_ts");
+            output_names_->emplace_back("committed");
+            output_names_->emplace_back("brief");
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bool_type);
+            output_types_->emplace_back(varchar_type);
             break;
         }
         case ShowStmtType::kShowClean: {
@@ -6919,7 +6915,9 @@ void PhysicalShow::ExecuteListCompact(QueryContext *query_context, ShowOperatorS
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
             } else {
-                Value value = Value::MakeVarchar(fmt::format("{}({}), [{}]->[{}]",
+                Value value = Value::MakeVarchar(fmt::format("{}({}).{}({}), [{}]->[{}]",
+                                                             txn_compact_info->db_name_,
+                                                             txn_compact_info->db_id_,
                                                              txn_compact_info->table_name_,
                                                              txn_compact_info->table_id_,
                                                              fmt::join(txn_compact_info->deprecated_segment_ids_, ","),
@@ -6943,19 +6941,94 @@ void PhysicalShow::ExecuteListCompact(QueryContext *query_context, ShowOperatorS
 }
 
 void PhysicalShow::ExecuteListCheckpoint(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Storage *storage = query_context->storage();
-    MetaCache *meta_cache = storage->meta_cache();
-    std::vector<std::shared_ptr<MetaBaseCache>> cache_items = meta_cache->GetAllCacheItems();
+    NewTxnManager *txn_manager = query_context->storage()->new_txn_manager();
+    std::vector<std::shared_ptr<TxnCheckpointInfo>> txn_checkpoint_info_list = txn_manager->GetCheckpointInfoList();
 
     output_block_ptr->Init(*output_types_);
+
+    size_t row_count = 0;
+    for (auto &txn_checkpoint_info : txn_checkpoint_info_list) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(*output_types_);
+        }
+
+        if (!show_nullable_ && txn_checkpoint_info->entries_.empty()) {
+            // Don't show null item
+            continue;
+        }
+
+        {
+            // txn
+            Value value = Value::MakeBigInt(txn_checkpoint_info->txn_id_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // begin ts
+            Value value = Value::MakeBigInt(txn_checkpoint_info->begin_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        {
+            // commit ts
+            Value value = Value::MakeBigInt(txn_checkpoint_info->commit_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+
+        {
+            // committed
+            Value value = Value::MakeBool(txn_checkpoint_info->committed_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        {
+            // checkpoint ts
+            Value value = Value::MakeBigInt(txn_checkpoint_info->checkpoint_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+        }
+
+        {
+            // checkpoint type
+            Value value = Value::MakeVarchar(txn_checkpoint_info->auto_flush_ ? "auto" : "manual");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
+        }
+
+        {
+            // detail
+            if (txn_checkpoint_info->entries_.empty()) {
+                Value value = Value::MakeVarchar("null");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[6]);
+            } else {
+                Value value = Value::MakeVarchar(fmt::format("entries: {}", txn_checkpoint_info->entries_.size()));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[6]);
+            }
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
 void PhysicalShow::ExecuteShowCheckpoint(QueryContext *query_context, ShowOperatorState *operator_state) {
+
     auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Storage *storage = query_context->storage();
@@ -6969,14 +7042,82 @@ void PhysicalShow::ExecuteShowCheckpoint(QueryContext *query_context, ShowOperat
 }
 
 void PhysicalShow::ExecuteListOptimize(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Storage *storage = query_context->storage();
-    MetaCache *meta_cache = storage->meta_cache();
-    std::vector<std::shared_ptr<MetaBaseCache>> cache_items = meta_cache->GetAllCacheItems();
+    NewTxnManager *txn_manager = query_context->storage()->new_txn_manager();
+    std::vector<std::shared_ptr<TxnOptimizeInfo>> txn_optimize_info_list = txn_manager->GetOptimizeInfoList();
 
     output_block_ptr->Init(*output_types_);
 
+    size_t row_count = 0;
+    for (auto &txn_optimize_info : txn_optimize_info_list) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(*output_types_);
+        }
+
+        if (!show_nullable_ && txn_optimize_info->deprecated_chunk_ids_.empty()) {
+            // Don't show null item
+            continue;
+        }
+
+        {
+            // txn
+            Value value = Value::MakeBigInt(txn_optimize_info->txn_id_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // begin ts
+            Value value = Value::MakeBigInt(txn_optimize_info->begin_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        {
+            // commit ts
+            Value value = Value::MakeBigInt(txn_optimize_info->commit_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+
+        {
+            // committed
+            Value value = Value::MakeBool(txn_optimize_info->committed_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        {
+            // detail
+            if (txn_optimize_info->deprecated_chunk_ids_.empty()) {
+                Value value = Value::MakeVarchar("null");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+            } else {
+                Value value = Value::MakeVarchar(fmt::format("{}({}).{}({}).{}({}).{}, [{}]->[{}]",
+                                                             txn_optimize_info->db_name_,
+                                                             txn_optimize_info->db_id_,
+                                                             txn_optimize_info->table_name_,
+                                                             txn_optimize_info->table_id_,
+                                                             txn_optimize_info->index_name_,
+                                                             txn_optimize_info->index_id_,
+                                                             txn_optimize_info->segment_id_,
+                                                             fmt::join(txn_optimize_info->deprecated_chunk_ids_, ","),
+                                                             txn_optimize_info->new_chunk_id_));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+            }
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
 }

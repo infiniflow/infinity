@@ -19,6 +19,8 @@ import :infinity_type;
 
 namespace infinity {
 
+struct FlushDataEntry;
+
 export struct TxnInfo {
     TransactionID txn_id_;
     std::shared_ptr<std::string> txn_text_;
@@ -28,7 +30,10 @@ export struct TxnCheckpointInfo {
     TransactionID txn_id_;
     TxnTimeStamp begin_ts_;
     TxnTimeStamp commit_ts_;
+    TxnTimeStamp checkpoint_ts_;
     bool committed_{false};
+    bool auto_flush_{false};
+    std::vector<std::shared_ptr<FlushDataEntry>> entries_{};
 };
 
 export struct TxnCompactInfo {
@@ -40,6 +45,8 @@ export struct TxnCompactInfo {
     SegmentID new_segment_id_;
     u64 table_id_;
     std::string table_name_;
+    u64 db_id_;
+    std::string db_name_;
 };
 
 export struct TxnOptimizeInfo {
@@ -47,6 +54,15 @@ export struct TxnOptimizeInfo {
     TxnTimeStamp begin_ts_;
     TxnTimeStamp commit_ts_;
     bool committed_{false};
+    SegmentID segment_id_;
+    std::vector<ChunkID> deprecated_chunk_ids_;
+    ChunkID new_chunk_id_;
+    u64 table_id_;
+    std::string table_name_;
+    u64 db_id_;
+    std::string db_name_;
+    std::string index_name_;
+    u64 index_id_;
 };
 
 export struct TxnImportInfo {

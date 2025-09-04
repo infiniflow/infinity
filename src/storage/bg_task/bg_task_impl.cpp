@@ -37,7 +37,7 @@ namespace infinity {
 
 Status NewCheckpointTask::ExecuteWithinTxn() {
     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
-    Status status = new_txn_->Checkpoint(last_checkpoint_ts);
+    Status status = new_txn_->Checkpoint(last_checkpoint_ts, false);
     new_txn_->SetWalSize(wal_size_);
     return status;
 }
@@ -51,7 +51,7 @@ Status NewCheckpointTask::ExecuteWithNewTxn() {
     }
     new_txn_shared->SetWalSize(wal_size_);
     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
-    Status status = new_txn_shared->Checkpoint(last_checkpoint_ts);
+    Status status = new_txn_shared->Checkpoint(last_checkpoint_ts, true);
     if (status.ok()) {
         status = new_txn_mgr->CommitTxn(new_txn_shared.get());
 

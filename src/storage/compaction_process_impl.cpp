@@ -259,7 +259,7 @@ Status CompactionProcessor::NewManualCompact(const std::string &db_name, const s
 
 void CompactionProcessor::NewScanAndOptimize() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    auto new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
+    auto new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("optimize index"), TransactionType::kOptimizeIndex);
     LOG_INFO(fmt::format("Optimize all indexes begin ts: {}", new_txn_shared->BeginTS()));
 
     std::shared_ptr<BGTaskInfo> bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kNotifyOptimize);
