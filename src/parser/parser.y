@@ -2149,9 +2149,19 @@ show_statement: SHOW DATABASES {
      $$ = new infinity::ShowStatement();
      $$->show_type_ = infinity::ShowStmtType::kListCompact;
 }
+| SHOW COMPACT NOT NULLABLE {
+     $$ = new infinity::ShowStatement();
+     $$->show_type_ = infinity::ShowStmtType::kListCompact;
+     $$->show_nullable_ = false;
+}
 | SHOW CHECKPOINT {
      $$ = new infinity::ShowStatement();
      $$->show_type_ = infinity::ShowStmtType::kListCheckpoint;
+}
+| SHOW CHECKPOINT NOT NULLABLE {
+     $$ = new infinity::ShowStatement();
+     $$->show_type_ = infinity::ShowStmtType::kListCheckpoint;
+     $$->show_nullable_ = false;
 }
 | SHOW CHECKPOINT LONG_VALUE {
      $$ = new infinity::ShowStatement();
@@ -2162,6 +2172,11 @@ show_statement: SHOW DATABASES {
      $$ = new infinity::ShowStatement();
      $$->show_type_ = infinity::ShowStmtType::kListOptimize;
 }
+| SHOW OPTIMIZE NOT NULLABLE {
+     $$ = new infinity::ShowStatement();
+     $$->show_type_ = infinity::ShowStmtType::kListOptimize;
+     $$->show_nullable_ = false;
+}
 | SHOW IMPORT {
      $$ = new infinity::ShowStatement();
      $$->show_type_ = infinity::ShowStmtType::kListImport;
@@ -2169,6 +2184,11 @@ show_statement: SHOW DATABASES {
 | SHOW CLEAN {
      $$ = new infinity::ShowStatement();
      $$->show_type_ = infinity::ShowStmtType::kListClean;
+}
+| SHOW CLEAN NOT NULLABLE {
+     $$ = new infinity::ShowStatement();
+     $$->show_type_ = infinity::ShowStmtType::kListClean;
+     $$->show_nullable_ = false;
 }
 | SHOW CLEAN LONG_VALUE {
      $$ = new infinity::ShowStatement();

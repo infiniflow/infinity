@@ -100,6 +100,7 @@ public:
     std::optional<uint64_t> txn_id_{};
     std::string var_name_{};
     std::optional<std::string> snapshot_name_{};
+    bool show_nullable_{true};
 };
 
 } // namespace infinity

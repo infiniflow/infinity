@@ -1922,7 +1922,8 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, std::shared_ptr<BindC
                                                                 std::nullopt,
                                                                 std::nullopt,
                                                                 std::nullopt,
-                                                                std::nullopt);
+                                                                std::nullopt,
+                                                                statement->show_nullable_);
             break;
         }
         case ShowStmtType::kListCheckpoint: {
@@ -1939,7 +1940,8 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, std::shared_ptr<BindC
                                                                 std::nullopt,
                                                                 std::nullopt,
                                                                 statement->txn_id_,
-                                                                std::nullopt);
+                                                                std::nullopt,
+                                                                statement->show_nullable_);
             break;
         }
         case ShowStmtType::kShowCheckpoint: {
@@ -1973,7 +1975,8 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, std::shared_ptr<BindC
                                                                 std::nullopt,
                                                                 std::nullopt,
                                                                 std::nullopt,
-                                                                std::nullopt);
+                                                                std::nullopt,
+                                                                statement->show_nullable_);
             break;
         }
         case ShowStmtType::kListImport: {
@@ -2007,7 +2010,8 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, std::shared_ptr<BindC
                                                                 std::nullopt,
                                                                 std::nullopt,
                                                                 std::nullopt,
-                                                                std::nullopt);
+                                                                std::nullopt,
+                                                                statement->show_nullable_);
             break;
         }
         case ShowStmtType::kShowClean: {

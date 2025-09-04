@@ -49,11 +49,12 @@ public:
                           std::optional<u64> session_id,
                           std::optional<TransactionID> txn_id,
                           std::optional<std::string> function_name,
+                          bool show_nullable,
                           std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kShow, nullptr, nullptr, id, load_metas), show_type_(type), db_name_(std::move(db_name)),
           object_name_(std::move(object_name)), table_index_(table_index), file_path_(std::move(file_path)), segment_id_(segment_id),
           block_id_(block_id), chunk_id_(chunk_id), column_id_(column_id), index_name_(index_name), session_id_(session_id), txn_id_(txn_id),
-          function_name_(function_name) {}
+          function_name_(function_name), show_nullable_(show_nullable) {}
 
     ~PhysicalShow() override = default;
 
@@ -191,6 +192,7 @@ private:
     std::optional<u64> session_id_{};
     std::optional<TransactionID> txn_id_{};
     std::optional<std::string> function_name_{};
+    bool show_nullable_{true};
 
     std::shared_ptr<std::vector<std::string>> output_names_{};
     std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
