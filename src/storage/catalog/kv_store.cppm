@@ -96,7 +96,6 @@ private:
     rocksdb::TransactionOptions txn_options_;
     rocksdb::WriteOptions write_options_;
     rocksdb::ReadOptions read_options_;
-    std::vector<std::string> disk_options_names_;
 };
 
 } // namespace infinity

@@ -178,42 +178,6 @@ Status KVInstance::Rollback() {
     return Status::OK();
 }
 
-void SomeFunction(rocksdb::DB *db) {
-    std::vector<std::string> local_live_files;
-    uint64_t manifest_file_size{};
-    db->GetLiveFiles(local_live_files, &manifest_file_size);
-    std::flat_set<std::string> local_live_files_set{local_live_files};
-
-    std::vector<std::string> remote_live_files;
-    VirtualStore::ListObjects("infinity", "meta", remote_live_files);
-    std::flat_set<std::string> remote_live_files_set{remote_live_files};
-
-    for (auto &file : local_live_files) {
-        if (!remote_live_files_set.contains(fmt::format("meta{}", file)) || file.substr(1, 8) == "MANIFEST") {
-            if (file.substr(1, 8) == "MANIFEST") {
-                fmt::print("MANIFEST\n");
-            }
-            // upload to s3
-            auto *config = infinity::InfinityContext::instance().config();
-            auto catalog_path = config->CatalogDir();
-            auto remote_file_path = fmt::format("meta{}", file);
-            auto local_file_path = fmt::format("{}/{}", catalog_path, file);
-            if (!std::filesystem::exists(local_file_path)) {
-                return;
-            }
-            VirtualStore::UploadObject(local_file_path, remote_file_path);
-        }
-    }
-
-    for (auto &remote_file_path : remote_live_files) {
-        auto local_file_path = remote_file_path.substr(remote_file_path.find_last_of('/'));
-        if (!local_live_files_set.contains(local_file_path)) {
-            // delete from s3
-            VirtualStore::RemoveObject(remote_file_path);
-        }
-    }
-}
-
 bool is_not_sst_file(const std::string &file_name) { return file_name.find(".sst") == std::string::npos; }
 
 class FlushListener : public rocksdb::EventListener {
@@ -235,31 +199,6 @@ public:
         //     return;
         // }
         VirtualStore::UploadObject(local_file_path, remote_file_path);
-
-        // // CURRENT
-        // auto local_current_path = fmt::format("{}/CURRENT", catalog_path);
-        // VirtualStore::UploadObject(local_current_path, "meta/CURRENT");
-
-        // MANIFEST
-        // fmt::print("{}\n", CurrentFileName(""));
-        // fmt::print("{}", DescriptorFileName("", versions_->manifest_file_number()));
-
-        // OPTIONS
-
-        // ret.emplace_back(CurrentFileName(""));
-        // ret.emplace_back(DescriptorFileName("", versions_->manifest_file_number()));
-        // // In read-only mode the OPTIONS file number is zero when no OPTIONS file
-        // // exist at all. In this cases we do not record any OPTIONS file in the live
-        // // file list.
-        // if (versions_->options_file_number() != 0) {
-        //     ret.emplace_back(OptionsFileName("", versions_->options_file_number()));
-        // }
-        //
-        // // find length of manifest file while holding the mutex lock
-        // *manifest_file_size = versions_->manifest_file_size();
-
-        // auto *my_db = dynamic_cast<DBImpl *>(db);
-        // [[maybe_unused]] auto version_set = db->GetVersionSet();
 
         std::vector<std::string> local_live_files;
         uint64_t manifest_file_size{};
@@ -351,9 +290,6 @@ Status KVStore::Init(const std::string &db_path) {
     if (!s.ok()) {
         return Status::RocksDBError(std::move(s), fmt::format("rocksdb::TransactionDB::Open db path: {}", db_path));
     }
-    // for () {
-    //     disk_options_names_
-    // }
     return Status::OK();
 }
 
