@@ -234,26 +234,37 @@ bool NewTxnManager::CheckConflict1(NewTxn *txn, std::string &conflict_reason, bo
     std::vector<std::shared_ptr<NewTxn>> check_txns = GetCheckCandidateTxns(txn);
     LOG_DEBUG(fmt::format("CheckConflict1:: Txn {} check conflict with check_txns {}", txn->TxnID(), check_txns.size()));
 
-    // For read-only txn check if previous txn is writable txn. If so, remove the items to cache.
-    if ((txn->GetTxnStore() == nullptr && !txn->IsReplay()) or txn->txn_type() == TxnType::kReadOnly) {
-        for (const auto &check_txn : check_txns) {
-            if ((check_txn->GetTxnStore() == nullptr && !check_txn->IsReplay()) or check_txn->txn_type() == TxnType::kReadOnly) {
-                // Read only txn
-                continue;
-            } else {
-                // Writable Txn
-                txn->ResetMetaCache();
-                break;
-            }
-        }
-    }
-
     for (std::shared_ptr<NewTxn> &check_txn : check_txns) {
         if (txn->CheckConflictTxnStores(check_txn, conflict_reason, retry_query)) {
             return true;
         }
     }
     return false;
+}
+
+void NewTxnManager::SaveOrResetMetaCacheForReadTxn(NewTxn *txn) {
+    // For read-only txn check if previous txn is writable txn. If so, remove the items to cache.
+    if ((txn->GetTxnStore() == nullptr && !txn->IsReplay()) or txn->txn_type() == TxnType::kReadOnly) {
+        std::vector<std::shared_ptr<NewTxn>> check_txns = GetCheckCandidateTxns(txn);
+        bool all_read_txns = true;
+        for (const auto &check_txn : check_txns) {
+            if ((check_txn->GetTxnStore() == nullptr && !check_txn->IsReplay()) or check_txn->txn_type() == TxnType::kReadOnly) {
+                // Read only txn
+                continue;
+            } else {
+                // Writable Txn
+                LOG_DEBUG(fmt::format("Reset meta cache and cache info for read txn {}", txn->TxnID()));
+                txn->ResetMetaCacheAndCacheInfo();
+                all_read_txns = false;
+                break;
+            }
+        }
+
+        if (all_read_txns) {
+            LOG_DEBUG(fmt::format("Save meta cache and cache info for read txn {}", txn->TxnID()));
+            txn->SaveMetaCacheAndCacheInfo();
+        }
+    }
 }
 
 void NewTxnManager::SendToWAL(NewTxn *txn) {

@@ -735,4 +735,10 @@ Status Status::SnapshotAlreadyExists(const std::string &snapshot_name) {
     return Status(ErrorCode::kSnapshotAlreadyExists, std::make_unique<std::string>(fmt::format("Snapshot: {} already exists", snapshot_name)));
 }
 
+Status Status::SnapshotAlreadyDeleted(const std::string &snapshot_name) {
+    return Status(ErrorCode::kSnapshotAlreadyDeleted, std::make_unique<std::string>(fmt::format("Snapshot: {} already deleted", snapshot_name)));
+}
+
+Status Status::EmptyMemIndex() { return Status(ErrorCode::kEmptyMemIndex, std::make_unique<std::string>("Empty mem index")); }
+
 } // namespace infinity

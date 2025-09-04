@@ -122,8 +122,8 @@ Status DBMeeta::GetComment(std::string *&comment) {
         }
         comment_ = std::move(comment_str);
 
-        if (db_cache.get() != nullptr) {
-            db_cache->set_comment(std::make_shared<std::string>(*comment_));
+        if (db_cache.get() != nullptr && txn_ != nullptr) {
+            txn_->AddCacheInfo(std::make_shared<DBCacheCommentInfo>(db_name_, txn_begin_ts_, std::make_shared<std::string>(*comment_)));
         }
     }
     comment = &*comment_;
