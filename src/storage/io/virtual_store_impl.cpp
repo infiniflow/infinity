@@ -671,6 +671,12 @@ Status VirtualStore::CopyObject(const std::string &src_object_name, const std::s
     return Status::OK();
 }
 
+Status VirtualStore::ListObjects(const std::string &bucket_name, const std::string &prefix, std::vector<std::string> &object_names) {
+    s3_client_->ListObjects(bucket_name, prefix, object_names);
+
+    return Status::OK();
+}
+
 Status VirtualStore::BucketExists() {
     if (VirtualStore::storage_type_ == StorageType::kLocal) {
         return Status::InvalidStorageType("object_storage", "local");

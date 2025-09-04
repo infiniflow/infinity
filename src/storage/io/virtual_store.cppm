@@ -98,6 +98,7 @@ public:
     static Status UploadObject(const std::string &file_dir, const std::string &object_name);
     static Status RemoveObject(const std::string &object_name);
     static Status CopyObject(const std::string &src_object_name, const std::string &dst_object_name);
+    static Status ListObjects(const std::string &bucket_name, const std::string &prefix, std::vector<std::string> &object_names);
     //
     static Status BucketExists();
 

@@ -74,7 +74,7 @@ void UnrecoverableError(const std::string &message, const char *file_name, u32 l
     //     std::string error_msg = cleanup_tracer->GetCleanupInfo();
     //     LOG_ERROR(std::move(error_msg));
     // }
-    std::string location_message = fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line);
+    auto location_message = fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line);
     if (GetPrintStacktrace()) {
         if (IS_LOGGER_INITIALIZED()) {
             PrintStacktrace(location_message);

@@ -160,6 +160,7 @@ export using minio::s3::BucketExistsArgs;
 export using minio::s3::BucketExistsResponse;
 export using minio::s3::MakeBucketArgs;
 export using minio::s3::MakeBucketResponse;
+export using minio::s3::ListObjectsArgs;
 } // namespace s3
 
 namespace creds {
@@ -470,6 +471,10 @@ using Logger = ::ROCKSDB_NAMESPACE::Logger;
 
 namespace rocksdb {
 export using ::rocksdb::DestroyDB;
+export using ::rocksdb::EventListener;
+export using ::rocksdb::DB;
+export using ::rocksdb::FlushJobInfo;
+export using ::rocksdb::CompactionJobInfo;
 }
 
 namespace re2 {

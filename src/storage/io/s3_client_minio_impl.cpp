@@ -144,4 +144,22 @@ Status S3ClientMinio::MakeBucket(const std::string &bucket_name) {
     return Status::OK();
 }
 
+Status S3ClientMinio::ListObjects(const std::string &bucket_name, const std::string &prefix, std::vector<std::string> &object_names) {
+    minio::s3::ListObjectsArgs args;
+
+    args.bucket = bucket_name;
+    args.prefix = prefix;
+    args.recursive = true;
+
+    if (auto resp = client_->ListObjects(args)) {
+        for (; resp; ++resp) {
+            auto &item = *resp;
+            object_names.emplace_back(item.name);
+        }
+    } else {
+        LOG_WARN("No files in remote storage start with the prefix.");
+    }
+    return Status::OK();
+}
+
 } // namespace infinity
