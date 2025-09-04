@@ -364,7 +364,7 @@ public:
 private:
     Status ReplayCompact(WalCmdCompactV2 *compact_cmd);
 
-    Status CleanupInner(const std::vector<std::unique_ptr<MetaKey>> &metas);
+    Status CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas);
 
 public:
     Status Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint);
@@ -707,7 +707,6 @@ public:
 
     void AddSemaphore(std::unique_ptr<std::binary_semaphore> sema);
     const std::vector<std::unique_ptr<std::binary_semaphore>> &semas() const;
-    void AddMetaKeyForBufferObject(std::unique_ptr<MetaKey> object_meta_key);
 
     void AddMetaCache(const std::shared_ptr<MetaBaseCache> &meta_base_cache);
     void ResetMetaCache();

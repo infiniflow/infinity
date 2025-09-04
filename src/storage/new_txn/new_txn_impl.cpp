@@ -5060,7 +5060,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             }
 
             const std::vector<SegmentID> &segment_ids = import_txn_store->segment_ids_;
-            std::vector<std::unique_ptr<MetaKey>> metas;
+            std::vector<std::shared_ptr<MetaKey>> metas;
             auto &db_id_str = import_txn_store->db_id_str_;
             auto &table_id_str = import_txn_store->table_id_str_;
             auto index_names_size = import_txn_store->index_names_.size();
@@ -5068,8 +5068,8 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 // Restore memory index here
                 auto index_id_str = import_txn_store->index_ids_str_[i];
                 for (SegmentID segment_id : segment_ids) {
-                    metas.emplace_back(std::make_unique<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
-                    metas.emplace_back(std::make_unique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
+                    metas.emplace_back(std::make_shared<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
+                    metas.emplace_back(std::make_shared<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
                 }
             }
 
@@ -5084,7 +5084,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         }
         case TransactionType::kCompact: {
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
-            std::vector<std::unique_ptr<MetaKey>> metas;
+            std::vector<std::shared_ptr<MetaKey>> metas;
             auto &db_id_str = compact_txn_store->db_id_str_;
             auto &table_id_str = compact_txn_store->table_id_str_;
             auto index_names_size = compact_txn_store->index_names_.size();
@@ -5093,8 +5093,8 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 auto index_id_str = compact_txn_store->index_ids_str_[i];
                 const std::vector<SegmentID> &segment_ids_ = compact_txn_store->segment_ids_;
                 for (SegmentID segment_id : segment_ids_) {
-                    metas.emplace_back(std::make_unique<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
-                    metas.emplace_back(std::make_unique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
+                    metas.emplace_back(std::make_shared<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
+                    metas.emplace_back(std::make_shared<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
                 }
             }
 
@@ -5124,7 +5124,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             }
 
             if (std::find(index_id_strs_ptr->begin(), index_id_strs_ptr->end(), create_index_txn_store->index_id_str_) != index_id_strs_ptr->end()) {
-                std::vector<std::unique_ptr<MetaKey>> metas;
+                std::vector<std::shared_ptr<MetaKey>> metas;
                 metas.emplace_back(std::make_unique<TableIndexMetaKey>(create_index_txn_store->db_id_str_,
                                                                        create_index_txn_store->table_id_str_,
                                                                        create_index_txn_store->index_id_str_,
@@ -5172,7 +5172,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         }
         case TransactionType::kOptimizeIndex: {
             OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
-            std::vector<std::unique_ptr<MetaKey>> metas;
+            std::vector<std::shared_ptr<MetaKey>> metas;
             auto &entries = optimize_index_txn_store->entries_;
 
             for (const auto &entry : entries) {
@@ -5183,7 +5183,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 auto &new_chunk_infos = entry.new_chunk_infos_;
                 for (const auto &new_chunk_info : new_chunk_infos) {
                     auto chunk_id = new_chunk_info.chunk_id_;
-                    metas.emplace_back(std::make_unique<ChunkIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, chunk_id));
+                    metas.emplace_back(std::make_shared<ChunkIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, chunk_id));
                 }
             }
 
@@ -5275,7 +5275,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             }
 
             // // Clean up metadata entries that were created
-            // std::vector<std::unique_ptr<MetaKey>> metas;
+            // std::vector<std::shared_ptr<MetaKey>> metas;
             // for (const auto &segment_info : restore_table_txn_store->segment_infos_) {
             //     metas.emplace_back(std::make_unique<SegmentMetaKey>(restore_table_txn_store->db_id_str_,
             //                                                   restore_table_txn_store->table_id_str_,
@@ -5383,6 +5383,15 @@ Status NewTxn::Rollback() {
 }
 
 Status NewTxn::Cleanup() {
+
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+    TxnTimeStamp begin_ts = BeginTS();
+    base_txn_store_ = std::make_shared<CleanupTxnStore>();
+    CleanupTxnStore *txn_store = static_cast<CleanupTxnStore *>(base_txn_store_.get());
+    txn_store->timestamp_ = begin_ts;
+
     TxnTimeStamp last_cleanup_ts = new_catalog_->GetLastCleanupTS();
     TxnTimeStamp oldest_txn_begin_ts = txn_mgr_->GetOldestAliveTS();
     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
@@ -5393,13 +5402,13 @@ Status NewTxn::Cleanup() {
     }
 
     KVInstance *kv_instance = kv_instance_.get();
-    TxnTimeStamp begin_ts = BeginTS();
+
     TxnTimeStamp visible_ts = std::min(begin_ts, last_checkpoint_ts);
 
     LOG_INFO(fmt::format("Cleaning ts < {} dropped entities...", visible_ts));
 
     std::vector<std::string> dropped_keys;
-    std::vector<std::unique_ptr<MetaKey>> metas;
+    std::vector<std::shared_ptr<MetaKey>> metas;
     Status status = new_catalog_->GetCleanedMeta(visible_ts, kv_instance, metas, dropped_keys);
     if (!status.ok()) {
         return status;
@@ -5427,20 +5436,15 @@ Status NewTxn::Cleanup() {
         return status;
     }
 
-    if (base_txn_store_ != nullptr) {
-        return Status::UnexpectedError("txn store is not null");
-    }
-
-    base_txn_store_ = std::make_shared<CleanupTxnStore>();
-    CleanupTxnStore *txn_store = static_cast<CleanupTxnStore *>(base_txn_store_.get());
-    txn_store->timestamp_ = begin_ts;
+    txn_store->dropped_keys_ = dropped_keys;
+    txn_store->metas_ = metas;
 
     return Status::OK();
 }
 
 Status NewTxn::ReplayCleanup(WalCmdCleanup *cleanup_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
 
-Status NewTxn::CleanupInner(const std::vector<std::unique_ptr<MetaKey>> &metas) {
+Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) {
     KVInstance *kv_instance = kv_instance_.get();
     TxnTimeStamp begin_ts = BeginTS();
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();

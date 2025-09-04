@@ -960,6 +960,12 @@ void NewTxnManager::CollectInfo(NewTxn *txn) {
             if (txn->GetTxnState() == TxnState::kCommitted) {
                 clean_info->committed_ = true;
             }
+            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            if (base_txn_store == nullptr) {
+                CleanupTxnStore *cleanup_txn_store = static_cast<CleanupTxnStore *>(base_txn_store);
+                clean_info->dropped_keys_ = cleanup_txn_store->dropped_keys_;
+                clean_info->metas_ = cleanup_txn_store->metas_;
+            }
             this->AddCleanInfo(clean_info);
             break;
         }

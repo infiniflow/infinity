@@ -20,6 +20,7 @@ import :infinity_type;
 namespace infinity {
 
 struct FlushDataEntry;
+struct MetaKey;
 
 export struct TxnInfo {
     TransactionID txn_id_;
@@ -77,6 +78,8 @@ export struct TxnCleanInfo {
     TxnTimeStamp begin_ts_;
     TxnTimeStamp commit_ts_;
     bool committed_{false};
+    std::vector<std::string> dropped_keys_;
+    std::vector<std::shared_ptr<MetaKey>> metas_;
 };
 
 } // namespace infinity

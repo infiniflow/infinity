@@ -28,6 +28,7 @@ struct DataBlock;
 class IndexBase;
 class TableDef;
 struct EraseBaseCache;
+struct MetaKey;
 
 export struct MemIndexRange {
     std::string index_id_{};
@@ -512,6 +513,9 @@ export struct CleanupTxnStore final : public BaseTxnStore {
     ~CleanupTxnStore() override = default;
 
     i64 timestamp_{};
+
+    std::vector<std::string> dropped_keys_;
+    std::vector<std::shared_ptr<MetaKey>> metas_;
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;

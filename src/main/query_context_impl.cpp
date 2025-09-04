@@ -429,13 +429,37 @@ void QueryContext::BeginTxn(const BaseStatement *base_statement) {
     auto txn_text = std::make_unique<std::string>(base_statement ? base_statement->ToString() : "");
 
     std::shared_ptr<NewTxn> new_txn{};
-    if (base_statement->type_ == StatementType::kFlush) {
-        new_txn = txn_manager->BeginTxnShared(std::make_unique<std::string>(base_statement->ToString()), TransactionType::kNewCheckpoint);
+    TransactionType transaction_type = TransactionType::kNormal;
+    switch (base_statement->type_) {
+        case StatementType::kFlush: {
+            transaction_type = TransactionType::kNewCheckpoint;
+            break;
+        }
+        case StatementType::kCommand: {
+            const CommandStatement *command_statement = static_cast<const CommandStatement *>(base_statement);
+            switch (command_statement->command_info_->type()) {
+                case CommandType::kCleanup: {
+                    transaction_type = TransactionType::kCleanup;
+                    break;
+                }
+                default: {
+                    break;
+                }
+            }
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+
+    if (transaction_type == TransactionType::kNewCheckpoint) {
+        new_txn = txn_manager->BeginTxnShared(std::make_unique<std::string>(base_statement->ToString()), transaction_type);
         if (new_txn == nullptr) {
             RecoverableError(Status::FailToStartTxn("System is checkpointing"));
         }
     } else {
-        new_txn = txn_manager->BeginTxnShared(std::make_unique<std::string>(base_statement->ToString()), TransactionType::kNormal);
+        new_txn = txn_manager->BeginTxnShared(std::make_unique<std::string>(base_statement->ToString()), transaction_type);
     }
 
     if (new_txn == nullptr) {
