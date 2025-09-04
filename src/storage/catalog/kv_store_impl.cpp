@@ -209,9 +209,9 @@ public:
             // upload to s3
             remote_file_path = fmt::format("meta{}", file);
             local_file_path = fmt::format("{}/{}", catalog_path, file);
-            if (!std::filesystem::exists(local_file_path)) {
-                return;
-            }
+            // if (!std::filesystem::exists(local_file_path)) {
+            //     return;
+            // }
             VirtualStore::UploadObject(local_file_path, remote_file_path);
         }
     }
@@ -253,9 +253,9 @@ public:
             // upload to s3
             auto remote_file_path = fmt::format("meta{}", file);
             auto local_file_path = fmt::format("{}/{}", catalog_path, file);
-            if (!std::filesystem::exists(local_file_path)) {
-                return;
-            }
+            // if (!std::filesystem::exists(local_file_path)) {
+            //     return;
+            // }
             VirtualStore::UploadObject(local_file_path, remote_file_path);
         }
 
