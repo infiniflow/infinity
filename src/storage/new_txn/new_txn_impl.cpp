@@ -1969,7 +1969,10 @@ Status NewTxn::Commit() {
         TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(this);
         this->SetTxnCommitting(commit_ts);
         this->SetTxnCommitted();
-        this->SaveMetaCache(); // Load the meta used in this txn to cache.
+        if (!meta_cache_items_.empty() || !cache_infos_.empty()) {
+            txn_mgr_->SaveOrResetMetaCacheForReadTxn(this);
+        }
+
         LOG_TRACE(fmt::format("Commit READ txn: {}. begin ts: {}, Command: {}", txn_context_ptr_->txn_id_, BeginTS(), *GetTxnText()));
         return Status::OK();
     }
@@ -6312,19 +6315,18 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
     return Status::OK();
 }
 
-void NewTxn::AddMetaCache(const std::shared_ptr<MetaBaseCache> &meta_base_cache) {
-    meta_cache_items_.emplace_back(meta_base_cache);
-    return;
+void NewTxn::AddMetaCache(const std::shared_ptr<MetaBaseCache> &meta_base_cache) { meta_cache_items_.emplace_back(meta_base_cache); }
+
+void NewTxn::AddCacheInfo(const std::shared_ptr<CacheInfo> &cache_info) { cache_infos_.emplace_back(cache_info); }
+
+void NewTxn::ResetMetaCacheAndCacheInfo() {
+    meta_cache_items_.clear();
+    cache_infos_.clear();
 }
 
-void NewTxn::ResetMetaCache() { meta_cache_items_.clear(); }
-
-void NewTxn::SaveMetaCache() {
-    if (meta_cache_items_.empty()) {
-        return;
-    }
+void NewTxn::SaveMetaCacheAndCacheInfo() {
     MetaCache *meta_cache_ptr = txn_mgr_->storage()->meta_cache();
-    meta_cache_ptr->Put(meta_cache_items_, this->BeginTS());
+    meta_cache_ptr->Put(meta_cache_items_, cache_infos_, this->BeginTS());
 }
 
 } // namespace infinity
