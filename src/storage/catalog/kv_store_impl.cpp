@@ -19,6 +19,8 @@ import :status;
 import :rocksdb_merge_operator;
 import :logger;
 import :virtual_store;
+import :storage;
+import :infinity_context;
 
 import third_party;
 
@@ -176,42 +178,154 @@ Status KVInstance::Rollback() {
     return Status::OK();
 }
 
+void SomeFunction(rocksdb::DB *db) {
+    std::vector<std::string> local_live_files;
+    uint64_t manifest_file_size{};
+    db->GetLiveFiles(local_live_files, &manifest_file_size);
+    std::flat_set<std::string> local_live_files_set{local_live_files};
+
+    std::vector<std::string> remote_live_files;
+    VirtualStore::ListObjects("infinity", "meta", remote_live_files);
+    std::flat_set<std::string> remote_live_files_set{remote_live_files};
+
+    for (auto &file : local_live_files) {
+        if (!remote_live_files_set.contains(fmt::format("meta{}", file)) || file.substr(1, 8) == "MANIFEST") {
+            if (file.substr(1, 8) == "MANIFEST") {
+                fmt::print("MANIFEST\n");
+            }
+            // upload to s3
+            auto *config = infinity::InfinityContext::instance().config();
+            auto catalog_path = config->CatalogDir();
+            auto remote_file_path = fmt::format("meta{}", file);
+            auto local_file_path = fmt::format("{}/{}", catalog_path, file);
+            if (!std::filesystem::exists(local_file_path)) {
+                return;
+            }
+            VirtualStore::UploadObject(local_file_path, remote_file_path);
+        }
+    }
+
+    for (auto &remote_file_path : remote_live_files) {
+        auto local_file_path = remote_file_path.substr(remote_file_path.find_last_of('/'));
+        if (!local_live_files_set.contains(local_file_path)) {
+            // delete from s3
+            VirtualStore::RemoveObject(remote_file_path);
+        }
+    }
+}
+
+bool is_not_sst_file(const std::string &file_name) { return file_name.find(".sst") == std::string::npos; }
+
 class FlushListener : public rocksdb::EventListener {
 public:
     ~FlushListener() override = default;
 
-    // void OnFlushBegin(rocksdb::DB *db, const rocksdb::FlushJobInfo &info) override {
-    //
-    // }
+    void OnFlushCompleted(rocksdb::DB *db, const rocksdb::FlushJobInfo &info) final {
+        fmt::print("Flush\n");
+        auto absolute_file_path = info.file_path;
 
-    void OnFlushCompleted(rocksdb::DB *db, const rocksdb::FlushJobInfo &info) override {
-        std::filesystem::path rocksdb_path{"/var/infinity/catalog/"};
-        std::set<std::string> sst_set;
-        for (const auto &entry : std::filesystem::recursive_directory_iterator{rocksdb_path}) {
-            if (entry.is_regular_file()) {
-                auto relative_path = std::filesystem::relative(entry.path(), rocksdb_path);
-                sst_set.emplace(relative_path.string());
+        auto file = absolute_file_path.substr(absolute_file_path.find_last_of('/'));
+        auto *config = infinity::InfinityContext::instance().config();
+        auto catalog_path = config->CatalogDir();
+
+        // sst
+        auto remote_file_path = fmt::format("meta/sst{}", file);
+        auto local_file_path = fmt::format("{}/{}", catalog_path, file);
+        // if (!std::filesystem::exists(local_file_path)) {
+        //     return;
+        // }
+        VirtualStore::UploadObject(local_file_path, remote_file_path);
+
+        // // CURRENT
+        // auto local_current_path = fmt::format("{}/CURRENT", catalog_path);
+        // VirtualStore::UploadObject(local_current_path, "meta/CURRENT");
+
+        // MANIFEST
+        // fmt::print("{}\n", CurrentFileName(""));
+        // fmt::print("{}", DescriptorFileName("", versions_->manifest_file_number()));
+
+        // OPTIONS
+
+        // ret.emplace_back(CurrentFileName(""));
+        // ret.emplace_back(DescriptorFileName("", versions_->manifest_file_number()));
+        // // In read-only mode the OPTIONS file number is zero when no OPTIONS file
+        // // exist at all. In this cases we do not record any OPTIONS file in the live
+        // // file list.
+        // if (versions_->options_file_number() != 0) {
+        //     ret.emplace_back(OptionsFileName("", versions_->options_file_number()));
+        // }
+        //
+        // // find length of manifest file while holding the mutex lock
+        // *manifest_file_size = versions_->manifest_file_size();
+
+        // auto *my_db = dynamic_cast<DBImpl *>(db);
+        // [[maybe_unused]] auto version_set = db->GetVersionSet();
+
+        std::vector<std::string> local_live_files;
+        uint64_t manifest_file_size{};
+        db->GetLiveFiles(local_live_files, &manifest_file_size);
+        std::flat_set<std::string> local_live_files_set{local_live_files};
+
+        for (auto &file : local_live_files | std::views::filter(is_not_sst_file)) {
+            // upload to s3
+            remote_file_path = fmt::format("meta{}", file);
+            local_file_path = fmt::format("{}/{}", catalog_path, file);
+            if (!std::filesystem::exists(local_file_path)) {
+                return;
             }
+            VirtualStore::UploadObject(local_file_path, remote_file_path);
+        }
+    }
+};
+
+class CompactListener : public rocksdb::EventListener {
+public:
+    ~CompactListener() override = default;
+
+    void OnCompactionCompleted(rocksdb::DB *db, const rocksdb::CompactionJobInfo &info) final {
+        // sst
+        const auto &output_files = info.output_files;
+        const auto &input_files = info.input_files;
+        auto *config = infinity::InfinityContext::instance().config();
+        auto catalog_path = config->CatalogDir();
+
+        for (const auto &absolute_file_path : output_files) {
+            auto file = absolute_file_path.substr(absolute_file_path.find_last_of('/'));
+            auto remote_file_path = fmt::format("meta/sst{}", file);
+            auto local_file_path = fmt::format("{}/{}", catalog_path, file);
+            VirtualStore::UploadObject(local_file_path, remote_file_path);
+        }
+        for (const auto &absolute_file_path : input_files) {
+            auto file = absolute_file_path.substr(absolute_file_path.find_last_of('/'));
+            auto remote_file_path = fmt::format("meta/sst{}", file);
+            VirtualStore::RemoveObject(remote_file_path);
         }
 
-        std::set<std::string> s3_set;
-        // std::string prefix = "meta";
-        // for () {
-        //
-        // }
+        std::vector<std::string> local_live_files;
+        uint64_t manifest_file_size{};
+        db->GetLiveFiles(local_live_files, &manifest_file_size);
+        std::flat_set<std::string> local_live_files_set{local_live_files};
 
-        // for (auto &meta: s3_set) {
-        //     if (sst_set.contains(meta)) {
-        //         // delete from s3
-        //         // VirtualStore::s3_client_->RemoveObject(VirtualStore::bucket_, remove_task->object_name);
-        //     }
-        // }
+        std::vector<std::string> remote_live_files;
+        VirtualStore::ListObjects("infinity", "meta", remote_live_files);
+        std::flat_set<std::string> remote_live_files_set{remote_live_files};
 
-        for (auto &meta: sst_set) {
-            // if (!s3_set.contains(meta)) {
-                // upload to s3
-                VirtualStore::UploadObject("/var/infinity/catalog/" + meta, meta);
-            // }
+        for (auto &file : local_live_files | std::views::filter(is_not_sst_file)) {
+            // upload to s3
+            auto remote_file_path = fmt::format("meta{}", file);
+            auto local_file_path = fmt::format("{}/{}", catalog_path, file);
+            if (!std::filesystem::exists(local_file_path)) {
+                return;
+            }
+            VirtualStore::UploadObject(local_file_path, remote_file_path);
+        }
+
+        for (auto &remote_file_path : remote_live_files) {
+            auto local_file_path = remote_file_path.substr(remote_file_path.find_last_of('/'));
+            if (!local_live_files_set.contains(local_file_path)) {
+                // delete from s3
+                VirtualStore::RemoveObject(remote_file_path);
+            }
         }
     }
 };
@@ -227,12 +341,19 @@ Status KVStore::Init(const std::string &db_path) {
 
     write_options_.disableWAL = true;
 
-    options_.listeners.emplace_back(std::make_shared<FlushListener>());
+    auto *config = infinity::InfinityContext::instance().config();
+    if (config->StorageType() == StorageType::kMinio) {
+        options_.listeners.emplace_back(std::make_shared<FlushListener>());
+        options_.listeners.emplace_back(std::make_shared<CompactListener>());
+    }
 
     rocksdb::Status s = rocksdb::TransactionDB::Open(options_, txn_db_options_, db_path_, &transaction_db_);
     if (!s.ok()) {
         return Status::RocksDBError(std::move(s), fmt::format("rocksdb::TransactionDB::Open db path: {}", db_path));
     }
+    // for () {
+    //     disk_options_names_
+    // }
     return Status::OK();
 }
 

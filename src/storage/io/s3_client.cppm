@@ -35,6 +35,8 @@ public:
     virtual Status BucketExists(const std::string &bucket_name) = 0;
     virtual Status MakeBucket(const std::string &bucket_name) = 0;
 
+    virtual Status ListObjects(const std::string &bucket_name, const std::string &prefix, std::vector<std::string> &object_names) = 0;
+
 protected:
     std::string url;
     bool https;
