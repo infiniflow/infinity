@@ -949,6 +949,18 @@ void NewTxnManager::CollectInfo(NewTxn *txn) {
             if (txn->GetTxnState() == TxnState::kCommitted) {
                 import_info->committed_ = true;
             }
+
+            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            if (base_txn_store != nullptr) {
+                ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store);
+                import_info->db_name_ = import_txn_store->db_name_;
+                import_info->db_id_ = import_txn_store->db_id_;
+                import_info->table_name_ = import_txn_store->table_name_;
+                import_info->table_id_ = import_txn_store->table_id_;
+                import_info->segment_ids_ = import_txn_store->segment_ids_;
+                import_info->row_count_ = import_txn_store->RowCount();
+            }
+
             this->AddImportInfo(import_info);
             break;
         }
@@ -961,7 +973,7 @@ void NewTxnManager::CollectInfo(NewTxn *txn) {
                 clean_info->committed_ = true;
             }
             BaseTxnStore *base_txn_store = txn->GetTxnStore();
-            if (base_txn_store == nullptr) {
+            if (base_txn_store != nullptr) {
                 CleanupTxnStore *cleanup_txn_store = static_cast<CleanupTxnStore *>(base_txn_store);
                 clean_info->dropped_keys_ = cleanup_txn_store->dropped_keys_;
                 clean_info->metas_ = cleanup_txn_store->metas_;

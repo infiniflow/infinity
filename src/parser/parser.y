@@ -2194,8 +2194,7 @@ show_statement: SHOW DATABASES {
      $$ = new infinity::ShowStatement();
      $$->show_type_ = infinity::ShowStmtType::kShowClean;
      $$->txn_id_ = $3;
-}
-;
+};
 
 /*
  * FLUSH STATEMENT

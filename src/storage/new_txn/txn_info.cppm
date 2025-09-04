@@ -71,6 +71,12 @@ export struct TxnImportInfo {
     TxnTimeStamp begin_ts_;
     TxnTimeStamp commit_ts_;
     bool committed_{false};
+    std::string db_name_{};
+    std::string table_name_{};
+    u64 db_id_{};
+    u64 table_id_{};
+    std::vector<SegmentID> segment_ids_{};
+    u64 row_count_{};
 };
 
 export struct TxnCleanInfo {

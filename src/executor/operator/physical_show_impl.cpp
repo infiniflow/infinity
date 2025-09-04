@@ -685,24 +685,18 @@ void PhysicalShow::Init(QueryContext *query_context) {
             break;
         }
         case ShowStmtType::kListImport: {
-            output_names_->reserve(8);
-            output_types_->reserve(8);
+            output_names_->reserve(5);
+            output_types_->reserve(5);
             output_names_->emplace_back("txn");
             output_names_->emplace_back("begin");
             output_names_->emplace_back("commit");
-            output_names_->emplace_back("success");
-            output_names_->emplace_back("table_name");
-            output_names_->emplace_back("table_id");
-            output_names_->emplace_back("segment_id");
-            output_names_->emplace_back("row_count");
+            output_names_->emplace_back("committed");
+            output_names_->emplace_back("detail");
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bool_type);
             output_types_->emplace_back(varchar_type);
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(bigint_type);
             break;
         }
         case ShowStmtType::kListClean: {
@@ -7123,13 +7117,69 @@ void PhysicalShow::ExecuteListOptimize(QueryContext *query_context, ShowOperator
 }
 
 void PhysicalShow::ExecuteListImport(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Storage *storage = query_context->storage();
-    MetaCache *meta_cache = storage->meta_cache();
-    std::vector<std::shared_ptr<MetaBaseCache>> cache_items = meta_cache->GetAllCacheItems();
+    NewTxnManager *txn_manager = query_context->storage()->new_txn_manager();
+    std::vector<std::shared_ptr<TxnImportInfo>> txn_import_info_list = txn_manager->GetImportInfoList();
 
     output_block_ptr->Init(*output_types_);
+
+    size_t row_count = 0;
+    for (auto &txn_import_info : txn_import_info_list) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(*output_types_);
+        }
+
+        {
+            // txn
+            Value value = Value::MakeBigInt(txn_import_info->txn_id_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // begin ts
+            Value value = Value::MakeBigInt(txn_import_info->begin_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        {
+            // commit ts
+            Value value = Value::MakeBigInt(txn_import_info->commit_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+
+        {
+            // committed
+            Value value = Value::MakeBool(txn_import_info->committed_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        {
+            // detail
+            std::string detail = fmt::format("{}({}).{}({}), segments: [{}], row: {}",
+                                             txn_import_info->db_name_,
+                                             txn_import_info->db_id_,
+                                             txn_import_info->table_name_,
+                                             txn_import_info->txn_id_,
+                                             fmt::join(txn_import_info->segment_ids_, ","),
+                                             txn_import_info->row_count_);
+            Value value = Value::MakeVarchar(detail);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));

@@ -410,7 +410,7 @@ std::vector<std::shared_ptr<EraseBaseCache>> ImportTxnStore::ToCachedMeta(TxnTim
     return cache_items;
 }
 
-void ImportTxnStore::ClearData() { input_blocks_in_imports_.clear(); }
+void ImportTxnStore::ClearData() { return; }
 
 size_t ImportTxnStore::RowCount() const {
     size_t row_count = 0;
