@@ -155,23 +155,20 @@ void PhysicalShow::Init(QueryContext *query_context) {
         }
         case ShowStmtType::kTables: {
 
-            output_names_->reserve(9);
-            output_types_->reserve(9);
-
+            output_names_->reserve(8);
+            output_types_->reserve(8);
             output_names_->emplace_back("database");
             output_names_->emplace_back("table");
             output_names_->emplace_back("table_id");
             output_names_->emplace_back("column_count");
-            output_names_->emplace_back("block_count");
-            output_names_->emplace_back("block_capacity");
             output_names_->emplace_back("segment_count");
-            output_names_->emplace_back("segment_capacity");
+            output_names_->emplace_back("block_count");
+            output_names_->emplace_back("create_timestamp");
             output_names_->emplace_back("comment");
 
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
-            output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
@@ -1690,7 +1687,6 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
 
         size_t column_id = 0;
         {
-            // Append schema name to the 0 column
             const std::string *db_name = table_detail_ptr->db_name_.get();
             Value value = Value::MakeVarchar(*db_name);
             ValueExpression value_expr(value);
@@ -1699,7 +1695,6 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
 
         ++column_id;
         {
-            // Append table name to the 1 column
             const std::string *table_name = table_detail_ptr->table_name_.get();
             Value value = Value::MakeVarchar(*table_name);
             ValueExpression value_expr(value);
@@ -1708,7 +1703,6 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
 
         ++column_id;
         {
-            // Append table id to the 2 column
             const std::string *table_id = table_detail_ptr->table_id_.get();
             Value value = Value::MakeVarchar(*table_id);
             ValueExpression value_expr(value);
@@ -1717,7 +1711,6 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
 
         ++column_id;
         {
-            // Append column count the 3 column
             Value value = Value::MakeBigInt(static_cast<i64>(table_detail_ptr->column_count_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1725,23 +1718,6 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
 
         ++column_id;
         {
-            // Append block count the 4 column
-            Value value = Value::MakeBigInt(static_cast<i64>(table_detail_ptr->block_count_));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            // Append block capacity the 5 column
-            Value value = Value::MakeBigInt(static_cast<i64>(table_detail_ptr->block_capacity_));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            // Append segment count the 6 column
             Value value = Value::MakeBigInt(static_cast<i64>(table_detail_ptr->segment_count_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1749,16 +1725,20 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
 
         ++column_id;
         {
-            // Append segment capacity the 7 column
-            size_t default_row_size = table_detail_ptr->segment_capacity_;
-            Value value = Value::MakeBigInt(default_row_size);
+            Value value = Value::MakeBigInt(static_cast<i64>(table_detail_ptr->block_count_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
         ++column_id;
         {
-            // Append table comment the 8 column
+            Value value = Value::MakeBigInt(static_cast<i64>(table_detail_ptr->create_ts_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
             Value value = Value::MakeVarchar(*table_detail_ptr->table_comment_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);

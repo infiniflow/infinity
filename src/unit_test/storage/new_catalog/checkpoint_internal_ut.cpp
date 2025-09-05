@@ -156,7 +156,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint0) {
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         auto check_block = [&](BlockMeta &block_meta) {
@@ -368,9 +369,10 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint1) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
         TxnTimeStamp db_create_ts;
         status = txn->GetDBMeta(*db_name, db_meta, db_create_ts);
-        status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(!status.ok());
-        status = txn->GetTableMeta(*db_name, "renametable", db_meta, table_meta);
+        status = txn->GetTableMeta(*db_name, "renametable", db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
         checkpoint();
 
@@ -399,7 +401,8 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint1) {
         std::shared_ptr<TableMeeta> table_meta;
         TxnTimeStamp db_create_ts;
         status = txn->GetDBMeta(*db_name, db_meta, db_create_ts);
-        status = txn->GetTableMeta(*db_name, "renametable", db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        status = txn->GetTableMeta(*db_name, "renametable", db_meta, table_meta, create_timestamp);
         std::shared_ptr<TableIndexMeeta> table_index_meta;
         std::string table_key;
         std::string index_key;
@@ -768,7 +771,8 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_test_checkpoint4) {
             std::shared_ptr<TableMeeta> table_meta;
             TxnTimeStamp db_create_ts;
             status = txn->GetDBMeta(*db_name, db_meta, db_create_ts);
-            status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+            TxnTimeStamp create_timestamp;
+            status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
             auto [segment_ids, status1] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(status1.ok());
             EXPECT_EQ(*segment_ids, std::vector<SegmentID>({0}));

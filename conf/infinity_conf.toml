@@ -12,7 +12,7 @@ connection_pool_size     = 128
 [log]
 log_filename             = "infinity.log"
 log_dir                  = "/var/infinity/log"
-log_to_stdout            = false
+log_to_stdout            = true
 log_file_max_size        = "10GB"
 log_file_rotate_count    = 10
 
@@ -28,7 +28,7 @@ catalog_dir             = "/var/infinity/catalog"
 # s means seconds, for example "60s", 60 seconds
 # m means minutes, for example "60m", 60 minutes
 # h means hours, for example "1h", 1 hour
-optimize_interval        = "10s"
+optimize_interval        = "60s"
 cleanup_interval         = "60s"
 compact_interval         = "120s"
 storage_type             = "local"

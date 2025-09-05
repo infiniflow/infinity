@@ -523,7 +523,8 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
@@ -656,7 +657,8 @@ TEST_F(BufferObjTest, DISABLED_test_multiple_threads_read) {
 
             std::shared_ptr<DBMeeta> db_meta;
             std::shared_ptr<TableMeeta> table_meta;
-            auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+            TxnTimeStamp create_timestamp;
+            auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
             EXPECT_TRUE(status.ok());
 
             auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();

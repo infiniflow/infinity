@@ -456,11 +456,13 @@ public:
                         const std::string &table_name,
                         std::shared_ptr<DBMeeta> &db_meta,
                         std::shared_ptr<TableMeeta> &table_meta,
+                        TxnTimeStamp& create_timestamp,
                         std::string *table_key = nullptr);
 
     Status GetTableMeta(const std::string &table_name,
                         std::shared_ptr<DBMeeta> &db_meta,
                         std::shared_ptr<TableMeeta> &table_meta,
+                        TxnTimeStamp& create_timestamp,
                         std::string *table_key = nullptr);
 
     Status GetTableIndexMeta(const std::string &db_name,

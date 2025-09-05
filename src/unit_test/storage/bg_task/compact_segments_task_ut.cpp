@@ -108,7 +108,8 @@ TEST_P(CompactTaskTest, DISABLED_bg_compact) {
         auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         std::vector<SegmentID> *segment_ids_ptr = nullptr;
