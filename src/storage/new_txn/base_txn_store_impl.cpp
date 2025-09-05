@@ -415,7 +415,10 @@ void ImportTxnStore::ClearData() { return; }
 size_t ImportTxnStore::RowCount() const {
     size_t row_count = 0;
     for (const auto &input_blocks : input_blocks_in_imports_) {
-        row_count += input_blocks.second.at(0)->row_count();
+        const std::vector<std::shared_ptr<DataBlock>> &blocks = input_blocks.second;
+        for (const auto &input_block : blocks) {
+            row_count += input_block->row_count();
+        }
     }
     return row_count;
 }
