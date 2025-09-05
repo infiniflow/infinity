@@ -1,7 +1,5 @@
 module;
 
-#include <cassert>
-
 module infinity_core:skiplist_writer.impl;
 
 import :skiplist_writer;
@@ -18,8 +16,14 @@ namespace infinity {
 SkipListWriter::SkipListWriter() : PostingByteSlice(), last_key_(-1), last_value1_(-1) {}
 
 void SkipListWriter::AddItem(u32 last_doc_id, u32 total_tf, u32 block_max_tf, u16 block_max_percentage, u32 item_size) {
-    assert(static_cast<u32>(-1) == last_key_ || last_doc_id > last_key_);
-    assert(static_cast<u32>(-1) == last_value1_ || total_tf > last_value1_);
+    if ((static_cast<u32>(-1) != last_key_ && last_doc_id <= last_key_) || (static_cast<u32>(-1) != last_value1_ && total_tf <= last_value1_)) {
+        std::string msg = fmt::format("AddItem failed, last_doc_id: {}, total_tf: {}, last_key_: {}, last_value1_: {}",
+                                      last_doc_id,
+                                      total_tf,
+                                      last_key_,
+                                      last_value1_);
+        UnrecoverableError(msg);
+    }
     last_key_ = static_cast<u32>(-1) == last_key_ ? 0 : last_key_;
     last_value1_ = static_cast<u32>(-1) == last_value1_ ? 0 : last_value1_;
     PushBack(0, last_doc_id - last_key_);
@@ -36,8 +40,10 @@ void SkipListWriter::AddItem(u32 last_doc_id, u32 total_tf, u32 block_max_tf, u1
 }
 
 void SkipListWriter::AddItem(u32 key, u32 value1, u32 value2) {
-    assert(static_cast<u32>(-1) == last_key_ || key > last_key_);
-    assert(static_cast<u32>(-1) == last_value1_ || value1 > last_value1_);
+    if ((static_cast<u32>(-1) != last_key_ && key <= last_key_) || (static_cast<u32>(-1) != last_value1_ && value1 <= last_value1_)) {
+        std::string msg = fmt::format("AddItem failed, key: {}, value1: {}, last_key_: {}, last_value1_: {}", key, value1, last_key_, last_value1_);
+        UnrecoverableError(msg);
+    }
     last_key_ = static_cast<u32>(-1) == last_key_ ? 0 : last_key_;
     last_value1_ = static_cast<u32>(-1) == last_value1_ ? 0 : last_value1_;
     PushBack(0, key - last_key_);
@@ -52,7 +58,10 @@ void SkipListWriter::AddItem(u32 key, u32 value1, u32 value2) {
 }
 
 void SkipListWriter::AddItem(u32 key, u32 value1) {
-    assert(static_cast<u32>(-1) == last_key_ || key > last_key_);
+    if (static_cast<u32>(-1) != last_key_ && key <= last_key_) {
+        std::string msg = fmt::format("AddItem failed, key: {}, last_key_: {}", key, last_key_);
+        UnrecoverableError(msg);
+    }
     last_key_ = static_cast<u32>(-1) == last_key_ ? 0 : last_key_;
     PushBack(0, key - last_key_);
     PushBack(1, value1);
