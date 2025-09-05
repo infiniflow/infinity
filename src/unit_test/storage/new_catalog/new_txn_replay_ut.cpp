@@ -225,7 +225,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_create) {
         EXPECT_TRUE(status.ok());
     }
 
-    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
@@ -347,7 +347,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_drop) {
         EXPECT_TRUE(status.ok());
     }
 
-    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
@@ -463,7 +463,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_drop_column_add_column) {
         EXPECT_TRUE(status.ok());
     }
 
-    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
@@ -562,7 +562,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_compact) {
         EXPECT_TRUE(status.ok());
     }
 
-    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
@@ -671,7 +671,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_delete_compact) {
         EXPECT_TRUE(status.ok());
     }
 
-    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
@@ -757,7 +757,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_rename) {
         EXPECT_TRUE(status.ok());
     }
 
-    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
@@ -873,7 +873,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_dump_optimize_index) {
         EXPECT_TRUE(status.ok());
     }
 
-    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
@@ -965,7 +965,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_append) {
     append();
     append();
 
-    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
@@ -1106,7 +1106,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_dump_index) {
         EXPECT_TRUE(status.ok());
     }
 
-    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
@@ -1252,7 +1252,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_optimize_index) {
         EXPECT_TRUE(status.ok());
     }
 
-    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());

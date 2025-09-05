@@ -128,7 +128,7 @@ TEST_P(WalReplayTest, wal_replay_database) {
         }
         {
             auto *txn2 = txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS());
+            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
             status = txn_mgr->CommitTxn(txn2);
             EXPECT_TRUE(status.ok());
@@ -266,7 +266,7 @@ TEST_P(WalReplayTest, wal_replay_tables) {
         }
         {
             auto *txn2 = txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS());
+            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
             status = txn_mgr->CommitTxn(txn2);
             EXPECT_TRUE(status.ok());
@@ -421,7 +421,7 @@ TEST_P(WalReplayTest, wal_replay_append) {
         }
         {
             auto *txn2 = txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS());
+            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
             status = txn_mgr->CommitTxn(txn2);
             EXPECT_TRUE(status.ok());
@@ -478,7 +478,8 @@ TEST_P(WalReplayTest, wal_replay_append) {
 
             std::shared_ptr<DBMeeta> db_meta;
             std::shared_ptr<TableMeeta> table_meta;
-            status = txn->GetTableMeta("default_db", "tbl4", db_meta, table_meta);
+            TxnTimeStamp create_timestamp;
+            status = txn->GetTableMeta("default_db", "tbl4", db_meta, table_meta, create_timestamp);
             EXPECT_TRUE(status.ok());
 
             auto check_block = [&](BlockMeta &block_meta) {
@@ -610,7 +611,7 @@ TEST_P(WalReplayTest, wal_replay_import) {
         }
         {
             auto *txn2 = txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS());
+            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
             status = txn_mgr->CommitTxn(txn2);
             EXPECT_TRUE(status.ok());
@@ -694,7 +695,8 @@ TEST_P(WalReplayTest, wal_replay_import) {
 
                 std::shared_ptr<DBMeeta> db_meta;
                 std::shared_ptr<TableMeeta> table_meta;
-                status = txn->GetTableMeta("default_db", "tbl3", db_meta, table_meta);
+                TxnTimeStamp create_timestamp;
+                status = txn->GetTableMeta("default_db", "tbl3", db_meta, table_meta, create_timestamp);
                 EXPECT_TRUE(status.ok());
 
                 auto check_block = [&](BlockMeta &block_meta) {

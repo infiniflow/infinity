@@ -96,7 +96,7 @@ public:
 
         new_txn->SetWalSize(wal_size);
         auto last_checkpoint_ts = wal_manager->LastCheckpointTS();
-        auto status = new_txn->Checkpoint(last_checkpoint_ts);
+        auto status = new_txn->Checkpoint(last_checkpoint_ts, false);
         if (status.ok()) {
             status = txn_mgr->CommitTxn(new_txn);
         }

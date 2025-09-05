@@ -854,7 +854,6 @@ TEST_P(TestTxnImport, test_import_drop_db) {
 
         // Check the imported data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
-        TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->CommitTxn(txn7);
@@ -910,7 +909,6 @@ TEST_P(TestTxnImport, test_import_drop_db) {
 
         // Check the imported data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
-        TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->CommitTxn(txn7);
@@ -966,7 +964,6 @@ TEST_P(TestTxnImport, test_import_drop_db) {
 
         // Check the imported data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
-        TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->CommitTxn(txn7);
@@ -1404,7 +1401,6 @@ TEST_P(TestTxnImport, test_import_drop_table) {
 
         // Check the imported data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
-        TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
         status = new_txn_mgr->CommitTxn(txn7);
@@ -1466,7 +1462,6 @@ TEST_P(TestTxnImport, test_import_drop_table) {
 
         // Check the imported data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
-        TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
         status = new_txn_mgr->CommitTxn(txn7);
@@ -1528,7 +1523,6 @@ TEST_P(TestTxnImport, test_import_drop_table) {
 
         // Check the imported data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
-        TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
         status = new_txn_mgr->CommitTxn(txn7);

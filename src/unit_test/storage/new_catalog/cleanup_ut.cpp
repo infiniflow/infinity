@@ -85,7 +85,7 @@ protected:
             {
                 auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
                 auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-                auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+                auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
                 EXPECT_TRUE(status.ok());
                 status = new_txn_mgr_->CommitTxn(txn);
                 EXPECT_TRUE(status.ok());
@@ -157,7 +157,7 @@ protected:
         {
             auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -176,7 +176,7 @@ protected:
         {
             auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -191,7 +191,7 @@ protected:
         {
             auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -796,7 +796,7 @@ TEST_P(TestTxnCleanup, cleanup_and_update) {
             if (txn == nullptr) {
                 LOG_WARN("Conflict checkpoint, ignore");
             } else {
-                auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+                auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
                 EXPECT_TRUE(status.ok());
                 status = new_txn_mgr_->CommitTxn(txn);
                 EXPECT_TRUE(status.ok());

@@ -408,7 +408,7 @@ TEST_P(TestTxnReplayCompact, test_replay_compact_flush_gap) {
         EXPECT_TRUE(status.ok());
     }
 
-    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
