@@ -404,6 +404,14 @@ class ListSnapshotsResponse;
 
 class DropSnapshotRequest;
 
+class ConfigValue;
+
+class SetConfigRequest;
+
+class ShowConfigRequest;
+
+class ShowConfigResponse;
+
 typedef struct _Property__isset {
     _Property__isset() : key(false), value(false) {}
     bool key : 1;
@@ -4862,6 +4870,174 @@ public:
 void swap(DropSnapshotRequest &a, DropSnapshotRequest &b);
 
 std::ostream &operator<<(std::ostream &out, const DropSnapshotRequest &obj);
+
+typedef struct _ConfigValue__isset {
+    _ConfigValue__isset() : string_value(false), int_value(false), bool_value(false), double_value(false) {}
+    bool string_value : 1;
+    bool int_value : 1;
+    bool bool_value : 1;
+    bool double_value : 1;
+} _ConfigValue__isset;
+
+class ConfigValue : public virtual ::apache::thrift::TBase {
+public:
+    ConfigValue(const ConfigValue &);
+    ConfigValue &operator=(const ConfigValue &);
+    ConfigValue() noexcept;
+
+    virtual ~ConfigValue() noexcept;
+    std::string string_value;
+    int64_t int_value;
+    bool bool_value;
+    double double_value;
+
+    _ConfigValue__isset __isset;
+
+    void __set_string_value(const std::string &val);
+
+    void __set_int_value(const int64_t val);
+
+    void __set_bool_value(const bool val);
+
+    void __set_double_value(const double val);
+
+    bool operator==(const ConfigValue &rhs) const;
+    bool operator!=(const ConfigValue &rhs) const { return !(*this == rhs); }
+
+    bool operator<(const ConfigValue &) const;
+
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
+
+    virtual void printTo(std::ostream &out) const;
+};
+
+void swap(ConfigValue &a, ConfigValue &b);
+
+std::ostream &operator<<(std::ostream &out, const ConfigValue &obj);
+
+typedef struct _SetConfigRequest__isset {
+    _SetConfigRequest__isset() : session_id(false), config_name(false), config_value(false) {}
+    bool session_id : 1;
+    bool config_name : 1;
+    bool config_value : 1;
+} _SetConfigRequest__isset;
+
+class SetConfigRequest : public virtual ::apache::thrift::TBase {
+public:
+    SetConfigRequest(const SetConfigRequest &);
+    SetConfigRequest &operator=(const SetConfigRequest &);
+    SetConfigRequest() noexcept;
+
+    virtual ~SetConfigRequest() noexcept;
+    int64_t session_id;
+    std::string config_name;
+    ConfigValue config_value;
+
+    _SetConfigRequest__isset __isset;
+
+    void __set_session_id(const int64_t val);
+
+    void __set_config_name(const std::string &val);
+
+    void __set_config_value(const ConfigValue &val);
+
+    bool operator==(const SetConfigRequest &rhs) const;
+    bool operator!=(const SetConfigRequest &rhs) const { return !(*this == rhs); }
+
+    bool operator<(const SetConfigRequest &) const;
+
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
+
+    virtual void printTo(std::ostream &out) const;
+};
+
+void swap(SetConfigRequest &a, SetConfigRequest &b);
+
+std::ostream &operator<<(std::ostream &out, const SetConfigRequest &obj);
+
+typedef struct _ShowConfigRequest__isset {
+    _ShowConfigRequest__isset() : session_id(false), config_name(false) {}
+    bool session_id : 1;
+    bool config_name : 1;
+} _ShowConfigRequest__isset;
+
+class ShowConfigRequest : public virtual ::apache::thrift::TBase {
+public:
+    ShowConfigRequest(const ShowConfigRequest &);
+    ShowConfigRequest &operator=(const ShowConfigRequest &);
+    ShowConfigRequest() noexcept;
+
+    virtual ~ShowConfigRequest() noexcept;
+    int64_t session_id;
+    std::string config_name;
+
+    _ShowConfigRequest__isset __isset;
+
+    void __set_session_id(const int64_t val);
+
+    void __set_config_name(const std::string &val);
+
+    bool operator==(const ShowConfigRequest &rhs) const;
+    bool operator!=(const ShowConfigRequest &rhs) const { return !(*this == rhs); }
+
+    bool operator<(const ShowConfigRequest &) const;
+
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
+
+    virtual void printTo(std::ostream &out) const;
+};
+
+void swap(ShowConfigRequest &a, ShowConfigRequest &b);
+
+std::ostream &operator<<(std::ostream &out, const ShowConfigRequest &obj);
+
+typedef struct _ShowConfigResponse__isset {
+    _ShowConfigResponse__isset() : error_code(false), error_msg(false), config_name(false), config_value(false) {}
+    bool error_code : 1;
+    bool error_msg : 1;
+    bool config_name : 1;
+    bool config_value : 1;
+} _ShowConfigResponse__isset;
+
+class ShowConfigResponse : public virtual ::apache::thrift::TBase {
+public:
+    ShowConfigResponse(const ShowConfigResponse &);
+    ShowConfigResponse &operator=(const ShowConfigResponse &);
+    ShowConfigResponse() noexcept;
+
+    virtual ~ShowConfigResponse() noexcept;
+    int64_t error_code;
+    std::string error_msg;
+    std::string config_name;
+    ConfigValue config_value;
+
+    _ShowConfigResponse__isset __isset;
+
+    void __set_error_code(const int64_t val);
+
+    void __set_error_msg(const std::string &val);
+
+    void __set_config_name(const std::string &val);
+
+    void __set_config_value(const ConfigValue &val);
+
+    bool operator==(const ShowConfigResponse &rhs) const;
+    bool operator!=(const ShowConfigResponse &rhs) const { return !(*this == rhs); }
+
+    bool operator<(const ShowConfigResponse &) const;
+
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
+
+    virtual void printTo(std::ostream &out) const;
+};
+
+void swap(ShowConfigResponse &a, ShowConfigResponse &b);
+
+std::ostream &operator<<(std::ostream &out, const ShowConfigResponse &obj);
 
 } // namespace infinity_thrift_rpc
 

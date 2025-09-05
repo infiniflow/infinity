@@ -19,7 +19,6 @@ module;
 module infinity_core:ut.cleanup;
 
 import :ut.base_test;
-import third_party;
 import :status;
 import :new_catalog;
 import :new_txn_manager;
@@ -43,6 +42,8 @@ import :segment_index_meta;
 import :chunk_index_meta;
 import :buffer_obj;
 import :secondary_index_in_mem;
+
+import third_party;
 
 import extra_ddl_info;
 import column_def;

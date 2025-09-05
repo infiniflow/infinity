@@ -227,10 +227,12 @@ bool MetaIndexCache::is_dropped() const {
     return is_dropped_;
 }
 
-void MetaCache::Put(const std::vector<std::shared_ptr<MetaBaseCache>> &cache_items, TxnTimeStamp begin_ts) {
+void MetaCache::Put(const std::vector<std::shared_ptr<MetaBaseCache>> &cache_items,
+                    const std::vector<std::shared_ptr<CacheInfo>> &cache_infos,
+                    TxnTimeStamp begin_ts) {
     std::unique_lock lock(cache_mtx_);
+    // When put txn's begin ts should be larger than the erased ts by erased txn.
     if (begin_ts > latest_erased_ts_) {
-        // When put txn's begin ts should be larger than the erased ts by erased txn.
         for (const auto &cache_item : cache_items) {
             switch (cache_item->type()) {
                 case MetaCacheType::kCreateDB: {
@@ -254,6 +256,81 @@ void MetaCache::Put(const std::vector<std::shared_ptr<MetaBaseCache>> &cache_ite
             }
         }
         LOG_TRACE(fmt::format("Put cache items: {}", cache_items.size()));
+
+        for (const auto &cache_info : cache_infos) {
+            switch (cache_info->cache_type_) {
+                case CacheType::kDb: {
+                    DBCacheInfo *db_cache_info = static_cast<DBCacheInfo *>(cache_info.get());
+                    std::shared_ptr<MetaDbCache> db_cache = GetDbNolock(db_cache_info->db_name_, db_cache_info->begin_ts_);
+                    switch (db_cache_info->info_type_) {
+                        case DBCacheInfoType::kComment: {
+                            DBCacheCommentInfo *db_cache_info = static_cast<DBCacheCommentInfo *>(cache_info.get());
+                            db_cache->set_comment(db_cache_info->comment_);
+                            break;
+                        }
+                        default: {
+                            UnrecoverableError("Invalid db cache info type");
+                        }
+                    }
+                    break;
+                }
+                case CacheType::kTable: {
+                    TableCacheInfo *table_cache_info = static_cast<TableCacheInfo *>(cache_info.get());
+                    std::shared_ptr<MetaTableCache> table_cache =
+                        GetTableNolock(table_cache_info->db_id_, table_cache_info->table_name_, table_cache_info->begin_ts_);
+                    switch (table_cache_info->info_type_) {
+                        case TableCacheInfoType::kIndex: {
+                            TableCacheIndexInfo *table_cache_index_info = static_cast<TableCacheIndexInfo *>(cache_info.get());
+                            table_cache->set_index_ids(table_cache_index_info->index_ids_ptr_, table_cache_index_info->index_names_ptr_);
+                            break;
+                        }
+                        case TableCacheInfoType::kColumn: {
+                            TableCacheColumnInfo *table_cache_column_info = static_cast<TableCacheColumnInfo *>(cache_info.get());
+                            table_cache->set_columns(table_cache_column_info->columns_ptr_);
+                            break;
+                        }
+                        case TableCacheInfoType::kSegment: {
+                            TableCacheSegmentInfo *table_cache_segment_info = static_cast<TableCacheSegmentInfo *>(cache_info.get());
+                            table_cache->set_segments(table_cache_segment_info->segments_);
+                            break;
+                        }
+                        case TableCacheInfoType::kSegmentTag: {
+                            TableCacheSegmentTagInfo *table_cache_segment_tag_info = static_cast<TableCacheSegmentTagInfo *>(cache_info.get());
+                            table_cache->set_segment_tag(table_cache_segment_tag_info->segment_id_,
+                                                         table_cache_segment_tag_info->tag_,
+                                                         table_cache_segment_tag_info->value_);
+                            break;
+                        }
+                        default: {
+                            UnrecoverableError("Invalid table cache info type");
+                        }
+                    }
+                    break;
+                }
+                case CacheType::kIndex: {
+                    IndexCacheInfo *index_cache_info = static_cast<IndexCacheInfo *>(cache_info.get());
+                    std::shared_ptr<MetaIndexCache> index_cache = GetIndexNolock(index_cache_info->db_id_,
+                                                                                 index_cache_info->table_id_,
+                                                                                 index_cache_info->index_name_,
+                                                                                 index_cache_info->begin_ts_);
+                    switch (index_cache_info->info_type_) {
+                        case IndexCacheInfoType::kIndexDef: {
+                            IndexCacheIndexDefInfo *index_cache_index_def_info = static_cast<IndexCacheIndexDefInfo *>(cache_info.get());
+                            index_cache->set_index_def(index_cache_index_def_info->index_def_);
+                            break;
+                        }
+                        default: {
+                            UnrecoverableError("Invalid index cache info type");
+                        }
+                    }
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Invalid cache type");
+                }
+            }
+        }
+        LOG_TRACE(fmt::format("Put cache infos: {}", cache_infos.size()));
     }
 }
 
@@ -348,9 +425,8 @@ void MetaCache::PutDbNolock(const std::shared_ptr<MetaDbCache> &db_cache) {
     TrimCacheNolock();
 }
 
-std::shared_ptr<MetaDbCache> MetaCache::GetDb(const std::string &db_name, TxnTimeStamp begin_ts) {
+std::shared_ptr<MetaDbCache> MetaCache::GetDbNolock(const std::string &db_name, TxnTimeStamp begin_ts) {
     std::string name = KeyEncode::CatalogDbPrefix(db_name);
-    std::unique_lock lock(cache_mtx_);
     ++db_request_count_;
     auto iter = dbs_.find(name);
     if (iter != dbs_.end()) {
@@ -365,6 +441,11 @@ std::shared_ptr<MetaDbCache> MetaCache::GetDb(const std::string &db_name, TxnTim
         }
     }
     return nullptr;
+}
+
+std::shared_ptr<MetaDbCache> MetaCache::GetDb(const std::string &db_name, TxnTimeStamp begin_ts) {
+    std::unique_lock lock(cache_mtx_);
+    return GetDbNolock(db_name, begin_ts);
 }
 
 void MetaCache::EraseDbNolock(const std::string &db_name) {
@@ -399,10 +480,8 @@ void MetaCache::PutTableNolock(const std::shared_ptr<MetaTableCache> &table_cach
     TrimCacheNolock();
 }
 
-std::shared_ptr<MetaTableCache> MetaCache::GetTable(u64 db_id, const std::string &table_name, TxnTimeStamp begin_ts) {
+std::shared_ptr<MetaTableCache> MetaCache::GetTableNolock(u64 db_id, const std::string &table_name, TxnTimeStamp begin_ts) {
     std::string name = KeyEncode::CatalogTablePrefix(std::to_string(db_id), table_name);
-
-    std::unique_lock lock(cache_mtx_);
     ++table_request_count_;
     auto iter = tables_.find(name);
     if (iter != tables_.end()) {
@@ -418,6 +497,11 @@ std::shared_ptr<MetaTableCache> MetaCache::GetTable(u64 db_id, const std::string
         }
     }
     return nullptr;
+}
+
+std::shared_ptr<MetaTableCache> MetaCache::GetTable(u64 db_id, const std::string &table_name, TxnTimeStamp begin_ts) {
+    std::unique_lock lock(cache_mtx_);
+    return GetTableNolock(db_id, table_name, begin_ts);
 }
 
 void MetaCache::EraseTableNolock(u64 db_id, const std::string &table_name) {
@@ -456,10 +540,8 @@ void MetaCache::EraseIndexNolock(u64 db_id, u64 table_id, const std::string &ind
     LOG_TRACE(fmt::format("Erase index name: {}", name));
 }
 
-std::shared_ptr<MetaIndexCache> MetaCache::GetIndex(u64 db_id, u64 table_id, const std::string &index_name, TxnTimeStamp begin_ts) {
+std::shared_ptr<MetaIndexCache> MetaCache::GetIndexNolock(u64 db_id, u64 table_id, const std::string &index_name, TxnTimeStamp begin_ts) {
     std::string name = KeyEncode::CatalogIndexPrefix(std::to_string(db_id), std::to_string(table_id), index_name);
-
-    std::unique_lock lock(cache_mtx_);
     ++index_request_count_;
     auto iter = indexes_.find(name);
     if (iter != indexes_.end()) {
@@ -474,6 +556,11 @@ std::shared_ptr<MetaIndexCache> MetaCache::GetIndex(u64 db_id, u64 table_id, con
         }
     }
     return nullptr;
+}
+
+std::shared_ptr<MetaIndexCache> MetaCache::GetIndex(u64 db_id, u64 table_id, const std::string &index_name, TxnTimeStamp begin_ts) {
+    std::unique_lock lock(cache_mtx_);
+    return GetIndexNolock(db_id, table_id, index_name, begin_ts);
 }
 
 CacheStatus MetaCache::GetCacheStatus(MetaCacheType cache_type) const {

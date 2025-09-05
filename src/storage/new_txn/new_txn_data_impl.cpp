@@ -1449,8 +1449,7 @@ Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &o
             if (!flush_column or !flush_version) {
                 continue;
             } else {
-                std::shared_ptr<FlushDataEntry> flush_data_entry =
-                    std::make_shared<FlushDataEntry>(table_meta.db_id_str(), table_meta.table_id_str(), segment_id, block_id);
+                auto flush_data_entry = std::make_shared<FlushDataEntry>(table_meta.db_id_str(), table_meta.table_id_str(), segment_id, block_id);
                 if (flush_column && flush_version) {
                     flush_data_entry->to_flush_ = "data and version";
                 } else if (flush_column) {
@@ -1467,7 +1466,6 @@ Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &o
 }
 
 Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
-    Status status;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const std::string &db_id_str = import_cmd->db_id_;
     const std::string &table_id_str = import_cmd->table_id_;
@@ -1477,7 +1475,7 @@ Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
     TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
 
-    status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);
+    Status status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1945,10 +1943,7 @@ Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
 }
 
 Status NewTxn::TryToMmap(BlockMeta &block_meta, TxnTimeStamp save_ts, bool *to_mmap_ptr) {
-    Status status;
-
-    size_t row_cnt;
-    std::tie(row_cnt, status) = block_meta.GetRowCnt1();
+    auto [row_cnt, status] = block_meta.GetRowCnt1();
     if (!status.ok()) {
         return status;
     }

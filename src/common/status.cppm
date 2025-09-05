@@ -150,6 +150,7 @@ export enum class ErrorCode : long {
     kIndexOnColumn = 3099,
     kSnapshotAlreadyExists = 3100,
     kSnapshotAlreadyDeleted = 3101,
+    kEmptyMemIndex = 3102,
     // 4. Txn fail
     kTxnRollback = 4001,
     kTxnConflict = 4002,
@@ -345,6 +346,7 @@ public:
     static Status IndexOnColumn(const std::string &column_name);
     static Status SnapshotAlreadyExists(const std::string &snapshot_name);
     static Status SnapshotAlreadyDeleted(const std::string &snapshot_name);
+    static Status EmptyMemIndex();
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id, const std::string &rollback_reason = "no reason");
     static Status TxnConflict(u64 txn_id, const std::string &conflict_reason);

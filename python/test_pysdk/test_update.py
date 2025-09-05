@@ -97,7 +97,7 @@ class TestInfinity:
         with pytest.raises(InfinityException) as e:
             table_obj.update(None, {"c2": 90, "c3": 900})
         assert e.type == InfinityException
-        assert e.value.args[0] == ErrorCode.COLUMN_NOT_EXIST or e.value.args[0] == ErrorCode.INVALID_JSON_FORMAT
+        assert e.value.args[0] == ErrorCode.SYNTAX_ERROR
 
         res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(

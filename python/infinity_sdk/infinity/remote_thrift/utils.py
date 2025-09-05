@@ -193,12 +193,18 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
             cons.key.lower())  # key is the function name cover to >, <, >=, <=, =, and, or, etc.
 
         arguments = []
-        for value in cons.hashable_args:
-            if fn:
-                expr = fn(value)
-            else:
-                expr = traverse_conditions(value)
-            arguments.append(expr)
+        if fn:
+            expr = fn(cons.left)
+        else:
+            expr = traverse_conditions(cons.left)
+        arguments.append(expr)
+
+        if fn:
+            expr = fn(cons.right)
+        else:
+            expr = traverse_conditions(cons.right)
+        arguments.append(expr)
+
         function_expr.arguments = arguments
 
         parser_expr_type = ttypes.ParsedExprType()
@@ -327,7 +333,7 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
     elif isinstance(cons, exp.Neg):
         func_expr = ttypes.FunctionExpr(
             function_name='-',
-            arguments=[parse_expr(cons.hashable_args[0])]
+            arguments=[parse_expr(cons.args['this'])]
         )
         expr_type = ttypes.ParsedExprType(function_expr=func_expr)
         parsed_expr = ttypes.ParsedExpr(type=expr_type)
@@ -346,11 +352,58 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
         return parsed_expr
     elif isinstance(cons, exp.Func):
         arguments = []
-        for arg in cons.args.values():
-            if arg:
+        func_name = ""
+        if isinstance(cons, exp.Substring):
+            func_name = cons.key
+            this_arg = parse_expr(cons.args['this'])
+            arguments.append(this_arg)
+            start_arg = parse_expr(cons.args['start'])
+            arguments.append(start_arg)
+            length_arg = parse_expr(cons.args['length'])
+            arguments.append(length_arg)
+        elif isinstance(cons, exp.Trim):
+            position = cons.args['position']
+            if position == 'LEADING':
+                func_name = "ltrim"
+            elif position == 'TRAILING':
+                func_name = "rtrim"
+            else:
+                func_name = "trim"
+            arg = parse_expr(cons.args['this'])
+            arguments.append(arg)
+        elif isinstance(cons, exp.Unnest):
+            func_name = cons.key
+            for arg in cons.args['expressions']:
                 arguments.append(parse_expr(arg))
+        elif isinstance(cons, exp.Length):
+            func_name = "char_length"
+            this_arg = parse_expr(cons.args['this'])
+            arguments.append(this_arg)
+        else:
+            func_name = cons.key
+            for arg_key, arg_value in cons.arg_types.items():
+                if arg_value:
+                    arg = cons.args[arg_key]
+                    arguments.append(parse_expr(arg))
+
+            # for arg in cons.args['expressions']:
+            #     if arg:
+            #         arguments.append(parse_expr(arg))
+
+            if len(arguments) == 0:
+                if cons.alias_or_name == "*":
+                    column_expr = ttypes.ColumnExpr(
+                        star=True,
+                        column_name=[]
+                    )
+                    expr_type = ttypes.ParsedExprType(column_expr=column_expr)
+                    parsed_expr = ttypes.ParsedExpr(type=expr_type)
+                    arguments.append(parsed_expr)
+                else:
+                    arguments.append(parse_expr(cons.args['this']))
+
         func_expr = ttypes.FunctionExpr(
-            function_name=cons.key,
+            function_name=func_name,
             arguments=arguments
         )
         expr_type = ttypes.ParsedExprType(function_expr=func_expr)
@@ -388,23 +441,14 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
         parsed_expr = ttypes.ParsedExpr(type=expr_type)
         return parsed_expr
     else:
-        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown condition type: {cons}")
+        return traverse_conditions(cons[1])
 
 
 def parse_expr(expr) -> ttypes.ParsedExpr:
     try:
         return traverse_conditions(expr, parse_expr)
     except:
-        if isinstance(expr, exp.Star):
-            column_expr = ttypes.ColumnExpr(
-                star=True,
-                column_name=[]
-            )
-            expr_type = ttypes.ParsedExprType(column_expr=column_expr)
-            parsed_expr = ttypes.ParsedExpr(type=expr_type)
-            return parsed_expr
-        else:
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown expression type: {expr}")
+        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown expression type: {expr}")
 
 
 def get_search_optional_filter_from_opt_params(opt_params: dict):

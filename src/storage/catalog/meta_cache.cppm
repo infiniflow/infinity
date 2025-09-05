@@ -205,6 +205,122 @@ export struct MetaEraseIndexCache : public EraseBaseCache {
     std::string index_name_{};
 };
 
+export enum class CacheType {
+    kInvalid,
+    kDb,
+    kTable,
+    kIndex,
+};
+
+export struct CacheInfo {
+    explicit CacheInfo(CacheType type) : cache_type_(type) {}
+    virtual ~CacheInfo() = default;
+    CacheType cache_type_{CacheType::kInvalid};
+};
+
+export enum class DBCacheInfoType {
+    kInvalid,
+    kComment,
+};
+
+export struct DBCacheInfo : public CacheInfo {
+    explicit DBCacheInfo(DBCacheInfoType type, const std::string &db_name, TxnTimeStamp begin_ts)
+        : CacheInfo(CacheType::kDb), info_type_(type), db_name_(db_name), begin_ts_(begin_ts) {}
+    virtual ~DBCacheInfo() = default;
+    DBCacheInfoType info_type_{DBCacheInfoType::kInvalid};
+    std::string db_name_{};
+    TxnTimeStamp begin_ts_{};
+};
+
+export struct DBCacheCommentInfo : public DBCacheInfo {
+    explicit DBCacheCommentInfo(const std::string &db_name, TxnTimeStamp begin_ts, std::shared_ptr<std::string> comment)
+        : DBCacheInfo(DBCacheInfoType::kComment, db_name, begin_ts), comment_(comment) {}
+    std::shared_ptr<std::string> comment_{};
+};
+
+export enum class TableCacheInfoType {
+    kInvalid,
+    kIndex,
+    kColumn,
+    kSegment,
+    kSegmentTag,
+};
+
+export struct TableCacheInfo : public CacheInfo {
+    explicit TableCacheInfo(TableCacheInfoType type, u64 db_id, const std::string &table_name, TxnTimeStamp begin_ts)
+        : CacheInfo(CacheType::kTable), info_type_(type), db_id_(db_id), table_name_(table_name), begin_ts_(begin_ts) {}
+    virtual ~TableCacheInfo() = default;
+    TableCacheInfoType info_type_{TableCacheInfoType::kInvalid};
+    u64 db_id_{};
+    std::string table_name_{};
+    TxnTimeStamp begin_ts_{};
+};
+
+export struct TableCacheIndexInfo : public TableCacheInfo {
+    explicit TableCacheIndexInfo(u64 db_id,
+                                 const std::string &table_name,
+                                 TxnTimeStamp begin_ts,
+                                 std::shared_ptr<std::vector<std::string>> index_ids_ptr,
+                                 std::shared_ptr<std::vector<std::string>> index_names_ptr)
+        : TableCacheInfo(TableCacheInfoType::kIndex, db_id, table_name, begin_ts), index_ids_ptr_(index_ids_ptr), index_names_ptr_(index_names_ptr) {}
+    std::shared_ptr<std::vector<std::string>> index_ids_ptr_{};
+    std::shared_ptr<std::vector<std::string>> index_names_ptr_{};
+};
+
+export struct TableCacheColumnInfo : public TableCacheInfo {
+    explicit TableCacheColumnInfo(u64 db_id,
+                                  const std::string &table_name,
+                                  TxnTimeStamp begin_ts,
+                                  std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> columns_ptr)
+        : TableCacheInfo(TableCacheInfoType::kColumn, db_id, table_name, begin_ts), columns_ptr_(columns_ptr) {}
+    std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> columns_ptr_{};
+};
+
+export struct TableCacheSegmentInfo : public TableCacheInfo {
+    explicit TableCacheSegmentInfo(u64 db_id, const std::string &table_name, TxnTimeStamp begin_ts, std::shared_ptr<std::vector<SegmentID>> segments)
+        : TableCacheInfo(TableCacheInfoType::kSegment, db_id, table_name, begin_ts), segments_(segments) {}
+    std::shared_ptr<std::vector<SegmentID>> segments_{};
+};
+
+export struct TableCacheSegmentTagInfo : public TableCacheInfo {
+    explicit TableCacheSegmentTagInfo(u64 db_id,
+                                      const std::string &table_name,
+                                      TxnTimeStamp begin_ts,
+                                      SegmentID segment_id,
+                                      const std::string &tag,
+                                      u64 value)
+        : TableCacheInfo(TableCacheInfoType::kSegmentTag, db_id, table_name, begin_ts), segment_id_(segment_id), tag_(tag), value_(value) {}
+    SegmentID segment_id_;
+    std::string tag_;
+    u64 value_;
+};
+
+export enum class IndexCacheInfoType {
+    kInvalid,
+    kIndexDef,
+};
+
+export struct IndexCacheInfo : public CacheInfo {
+    explicit IndexCacheInfo(IndexCacheInfoType type, u64 db_id, u64 table_id, const std::string &index_name, TxnTimeStamp begin_ts)
+        : CacheInfo(CacheType::kIndex), info_type_(type), db_id_(db_id), table_id_(table_id), index_name_(index_name), begin_ts_(begin_ts) {}
+    virtual ~IndexCacheInfo() = default;
+    IndexCacheInfoType info_type_{IndexCacheInfoType::kInvalid};
+    u64 db_id_{};
+    u64 table_id_{};
+    std::string index_name_{};
+    TxnTimeStamp begin_ts_{};
+};
+
+export struct IndexCacheIndexDefInfo : public IndexCacheInfo {
+    explicit IndexCacheIndexDefInfo(u64 db_id,
+                                    u64 table_id,
+                                    const std::string &index_name,
+                                    TxnTimeStamp begin_ts,
+                                    std::shared_ptr<IndexBase> index_def)
+        : IndexCacheInfo(IndexCacheInfoType::kIndexDef, db_id, table_id, index_name, begin_ts), index_def_(index_def) {}
+    std::shared_ptr<IndexBase> index_def_;
+};
+
 struct CacheItem {
     std::string name_;
     std::shared_ptr<MetaBaseCache> meta_cache_;
@@ -244,16 +360,20 @@ private:
 public:
     explicit MetaCache(size_t capacity) : capacity_(capacity) {};
 
-    void Put(const std::vector<std::shared_ptr<MetaBaseCache>> &cache_items, TxnTimeStamp begin_ts);
+    void Put(const std::vector<std::shared_ptr<MetaBaseCache>> &cache_items,
+             const std::vector<std::shared_ptr<CacheInfo>> &cache_infos,
+             TxnTimeStamp begin_ts);
 
     Status Erase(const std::vector<std::shared_ptr<EraseBaseCache>> &cache_items, KVInstance *kv_instance, TxnTimeStamp commit_ts);
 
     Status PutOrErase(const std::vector<std::shared_ptr<MetaBaseCache>> &cache_items, KVInstance *kv_instance);
 
+    std::shared_ptr<MetaDbCache> GetDbNolock(const std::string &db_name, TxnTimeStamp begin_ts);
+    std::shared_ptr<MetaTableCache> GetTableNolock(u64 db_id, const std::string &table_name, TxnTimeStamp begin_ts);
+    std::shared_ptr<MetaIndexCache> GetIndexNolock(u64 db_id, u64 table_id, const std::string &index_name, TxnTimeStamp begin_ts);
+
     std::shared_ptr<MetaDbCache> GetDb(const std::string &db_name, TxnTimeStamp begin_ts);
-
     std::shared_ptr<MetaTableCache> GetTable(u64 db_id, const std::string &table_name, TxnTimeStamp begin_ts);
-
     std::shared_ptr<MetaIndexCache> GetIndex(u64 db_id, u64 table_id, const std::string &index_name, TxnTimeStamp begin_ts);
 
     CacheStatus GetCacheStatus(MetaCacheType type) const;

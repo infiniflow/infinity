@@ -426,7 +426,8 @@ class InfinityThriftQueryBuilder(ABC):
                     parsed_expr = ParsedExpr(type=expr_type)
                     select_list.append(parsed_expr)
                 case _:
-                    select_list.append(parse_expr(maybe_parse(column)))
+                    unknown_expr = maybe_parse(column)
+                    select_list.append(parse_expr(unknown_expr))
 
         self._columns = select_list
         return self

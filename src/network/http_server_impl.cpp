@@ -1590,7 +1590,15 @@ public:
                 update_expr = nullptr;
             }
 
-            std::string where_clause = doc["filter"].get<std::string>();
+            auto filter_value = doc.find_field("filter");
+            if (filter_value.is_null()) {
+                json_response["error_code"] = ErrorCode::kSyntaxError;
+                json_response["error_message"] = "No filter in update clause";
+                http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, json_response.dump());
+            }
+
+            std::string where_clause = filter_value.get<std::string>();
 
             std::unique_ptr<ExpressionParserResult> expr_parsed_result = std::make_unique<ExpressionParserResult>();
             ExprParser expr_parser;
@@ -2418,8 +2426,17 @@ public:
             json_response["error_code"] = 0;
             DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
             Value value = data_block->GetValue(0, 0);
-            const std::string &variable_value = value.ToString();
-            json_response[config_name] = variable_value;
+            if (value.type().type() == LogicalType::kVarchar) {
+                json_response[config_name] = value.GetVarchar();
+            } else if (value.type().type() == LogicalType::kBigInt) {
+                json_response[config_name] = value.value_.big_int;
+            } else if (value.type().type() == LogicalType::kBoolean) {
+                json_response[config_name] = value.value_.boolean;
+            } else if (value.type().type() == LogicalType::kDouble) {
+                json_response[config_name] = value.value_.float64;
+            } else {
+                UnrecoverableError("ShowConfig: unsupported config value type.");
+            }
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
