@@ -594,15 +594,10 @@ void NewTxnManager::CleanupTxn(NewTxn *txn) {
     TransactionID txn_id = txn->TxnID();
     LOG_DEBUG(fmt::format("Cleanup txn, id: {}, begin_ts: {}", txn_id, begin_ts));
     if (is_write_transaction) {
-        // For writing txn, we need to update the state: committing->committed, rollbacking->rollbacked
         TxnState txn_state = txn->GetTxnState();
         switch (txn_state) {
-            case TxnState::kCommitting: {
-                txn->SetTxnCommitted();
-                break;
-            }
-            case TxnState::kRollbacking: {
-                txn->SetTxnRollbacked();
+            case TxnState::kCommitted:
+            case TxnState::kRollbacked: {
                 break;
             }
             default: {

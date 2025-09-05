@@ -70,6 +70,7 @@ import :meta_tree;
 import :meta_cache;
 import :block_version;
 import :txn_info;
+import :base_txn_store;
 
 import std;
 import show_statement;
@@ -7023,13 +7024,38 @@ void PhysicalShow::ExecuteListCheckpoint(QueryContext *query_context, ShowOperat
 
 void PhysicalShow::ExecuteShowCheckpoint(QueryContext *query_context, ShowOperatorState *operator_state) {
 
-    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Storage *storage = query_context->storage();
-    MetaCache *meta_cache = storage->meta_cache();
-    std::vector<std::shared_ptr<MetaBaseCache>> cache_items = meta_cache->GetAllCacheItems();
-
+    NewTxnManager *txn_manager = query_context->storage()->new_txn_manager();
+    std::vector<std::shared_ptr<TxnCheckpointInfo>> txn_checkpoint_info_list = txn_manager->GetCheckpointInfoList();
     output_block_ptr->Init(*output_types_);
+    for (auto &txn_checkpoint_info : txn_checkpoint_info_list) {
+        if (txn_checkpoint_info->txn_id_ == txn_id_) {
+            // detail
+            nlohmann::json ckp_info_json;
+            ckp_info_json["txn_id"] = txn_checkpoint_info->txn_id_;
+            ckp_info_json["begin_ts"] = txn_checkpoint_info->begin_ts_;
+            ckp_info_json["commit_ts"] = txn_checkpoint_info->commit_ts_;
+            ckp_info_json["checkpoint_ts"] = txn_checkpoint_info->checkpoint_ts_;
+            ckp_info_json["committed"] = txn_checkpoint_info->committed_;
+            ckp_info_json["auto_flush"] = txn_checkpoint_info->auto_flush_;
+            for (const std::shared_ptr<FlushDataEntry> &data_entry : txn_checkpoint_info->entries_) {
+                nlohmann::json ckp_info_entry;
+                ckp_info_entry["db_id"] = data_entry->db_id_str_;
+                ckp_info_entry["table_id"] = data_entry->table_id_str_;
+                ckp_info_entry["segment_id"] = data_entry->segment_id_;
+                ckp_info_entry["block_id"] = data_entry->block_id_;
+                ckp_info_entry["to_flush"] = data_entry->to_flush_;
+                ckp_info_json["entries"].push_back(ckp_info_entry);
+            }
+
+            auto meta_str = ckp_info_json.dump(4);
+
+            Value value = Value::MakeVarchar(meta_str);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+    }
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
@@ -7260,13 +7286,35 @@ void PhysicalShow::ExecuteListClean(QueryContext *query_context, ShowOperatorSta
 }
 
 void PhysicalShow::ExecuteShowClean(QueryContext *query_context, ShowOperatorState *operator_state) {
-    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
-    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Storage *storage = query_context->storage();
-    MetaCache *meta_cache = storage->meta_cache();
-    std::vector<std::shared_ptr<MetaBaseCache>> cache_items = meta_cache->GetAllCacheItems();
 
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    NewTxnManager *txn_manager = query_context->storage()->new_txn_manager();
+    std::vector<std::shared_ptr<TxnCleanInfo>> txn_clean_info_list = txn_manager->GetCleanInfoList();
     output_block_ptr->Init(*output_types_);
+    for (auto &txn_clean_info : txn_clean_info_list) {
+        if (txn_clean_info->txn_id_ == txn_id_) {
+            // detail
+            nlohmann::json clean_info_json;
+            clean_info_json["txn_id"] = txn_clean_info->txn_id_;
+            clean_info_json["begin_ts"] = txn_clean_info->begin_ts_;
+            clean_info_json["commit_ts"] = txn_clean_info->commit_ts_;
+            clean_info_json["committed"] = txn_clean_info->committed_;
+            for (const auto &dropped_key : txn_clean_info->dropped_keys_) {
+                clean_info_json["dropped_keys"].push_back(dropped_key);
+            }
+
+            for (const auto &meta_key : txn_clean_info->metas_) {
+                clean_info_json["meta_key"].push_back(meta_key->ToJson());
+            }
+
+            auto meta_str = clean_info_json.dump(4);
+
+            Value value = Value::MakeVarchar(meta_str);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+    }
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));

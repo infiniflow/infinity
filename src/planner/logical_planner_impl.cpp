@@ -1939,14 +1939,14 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, std::shared_ptr<BindC
                                                                 std::nullopt,
                                                                 std::nullopt,
                                                                 std::nullopt,
-                                                                statement->txn_id_,
+                                                                std::nullopt,
                                                                 std::nullopt,
                                                                 statement->show_nullable_);
             break;
         }
         case ShowStmtType::kShowCheckpoint: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                ShowStmtType::kListCheckpoint,
+                                                                ShowStmtType::kShowCheckpoint,
                                                                 "",
                                                                 "",
                                                                 bind_context_ptr->GenerateTableIndex(),
@@ -1957,7 +1957,7 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, std::shared_ptr<BindC
                                                                 std::nullopt,
                                                                 std::nullopt,
                                                                 std::nullopt,
-                                                                std::nullopt,
+                                                                statement->txn_id_,
                                                                 std::nullopt);
             break;
         }
