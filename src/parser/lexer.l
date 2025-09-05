@@ -56,6 +56,7 @@ CAST            { return CAST; }
 CATALOG         { return CATALOG; }
 CATALOGS        { return CATALOGS; }
 CHECK           { return CHECK; }
+CHECKPOINT      { return CHECKPOINT; }
 CHUNK           { return CHUNK; }
 CIRCLE          { return CIRCLE; }
 CLEAN           { return CLEAN; }
@@ -116,6 +117,7 @@ HOURS           { return HOURS; }
 HUGEINT         { return HUGEINT; }
 IF              { return IF; }
 IGNORE          { return IGNORE; }
+IMPORT          { return IMPORT; }
 IN              { return IN; }
 INDEX           { return INDEX; }
 INDEXES         { return INDEXES; }

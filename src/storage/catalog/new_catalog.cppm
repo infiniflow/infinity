@@ -209,8 +209,8 @@ public:
 
 public:
     Status
-    GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, std::vector<std::unique_ptr<MetaKey>> &metas, std::vector<std::string> &drop_keys) const;
-    std::vector<std::string> GetEncodeKeys(std::vector<std::unique_ptr<MetaKey>> &metas) const;
+    GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, std::vector<std::shared_ptr<MetaKey>> &metas, std::vector<std::string> &drop_keys) const;
+    std::vector<std::string> GetEncodeKeys(std::vector<std::shared_ptr<MetaKey>> &metas) const;
 
     // Profile related methods
     void SetProfile(bool flag) { enable_profile_ = flag; }

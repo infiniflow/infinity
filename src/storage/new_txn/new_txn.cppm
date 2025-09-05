@@ -365,10 +365,10 @@ public:
 private:
     Status ReplayCompact(WalCmdCompactV2 *compact_cmd);
 
-    Status CleanupInner(const std::vector<std::unique_ptr<MetaKey>> &metas);
+    Status CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas);
 
 public:
-    Status Checkpoint(TxnTimeStamp last_ckp_ts);
+    Status Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint);
 
     // Getter
     BufferManager *buffer_mgr() const { return buffer_mgr_; }
@@ -457,11 +457,13 @@ public:
                         const std::string &table_name,
                         std::shared_ptr<DBMeeta> &db_meta,
                         std::shared_ptr<TableMeeta> &table_meta,
+                        TxnTimeStamp& create_timestamp,
                         std::string *table_key = nullptr);
 
     Status GetTableMeta(const std::string &table_name,
                         std::shared_ptr<DBMeeta> &db_meta,
                         std::shared_ptr<TableMeeta> &table_meta,
+                        TxnTimeStamp& create_timestamp,
                         std::string *table_key = nullptr);
 
     Status GetTableIndexMeta(const std::string &db_name,
@@ -709,7 +711,6 @@ public:
 
     void AddSemaphore(std::unique_ptr<std::binary_semaphore> sema);
     const std::vector<std::unique_ptr<std::binary_semaphore>> &semas() const;
-    void AddMetaKeyForBufferObject(std::unique_ptr<MetaKey> object_meta_key);
 
     void AddMetaCache(const std::shared_ptr<MetaBaseCache> &meta_base_cache);
     void AddCacheInfo(const std::shared_ptr<CacheInfo> &cache_info);

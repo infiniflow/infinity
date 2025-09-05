@@ -187,7 +187,8 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta_opt;
     std::string table_key;
-    status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
+    TxnTimeStamp create_timestamp;
+    status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, create_timestamp, &table_key);
     if (!status.ok()) {
         return status;
     }
@@ -404,7 +405,8 @@ Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, 
 
             std::shared_ptr<DBMeeta> db_meta;
             std::shared_ptr<TableMeeta> table_meta_opt;
-            status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt);
+            TxnTimeStamp create_timestamp;
+            status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt, create_timestamp);
             if (!status.ok()) {
                 return status;
             }
@@ -431,7 +433,8 @@ Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, 
 
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta_opt;
-    status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt);
+    TxnTimeStamp create_timestamp;
+    status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt, create_timestamp);
     if (!status.ok()) {
         return status;
     }
@@ -453,7 +456,8 @@ Status NewTxn::Append(const std::string &db_name, const std::string &table_name,
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
     std::string table_key;
-    auto status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
+    TxnTimeStamp create_timestamp;
+    auto status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp, &table_key);
     if (!status.ok()) {
         return status;
     }
@@ -527,7 +531,8 @@ Status NewTxn::Delete(const std::string &db_name, const std::string &table_name,
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta_opt;
     std::string table_key;
-    auto status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
+    TxnTimeStamp create_timestamp;
+    auto status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, create_timestamp, &table_key);
     if (!status.ok()) {
         return status;
     }
@@ -555,7 +560,8 @@ Status NewTxn::Delete(const std::string &db_name, const std::string &table_name,
 Status NewTxn::ReplayDelete(WalCmdDeleteV2 *delete_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
-    Status status = GetTableMeta(delete_cmd->db_name_, delete_cmd->table_name_, db_meta, table_meta);
+    TxnTimeStamp create_timestamp;
+    Status status = GetTableMeta(delete_cmd->db_name_, delete_cmd->table_name_, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
         return status;
     }
@@ -588,7 +594,8 @@ Status NewTxn::Update(const std::string &db_name,
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
     std::string table_key;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
+    TxnTimeStamp create_timestamp;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp, &table_key);
     if (!status.ok()) {
         return status;
     }
@@ -647,7 +654,8 @@ Status NewTxn::Compact(const std::string &db_name, const std::string &table_name
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta_opt;
     std::string table_key;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
+    TxnTimeStamp create_timestamp;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, create_timestamp, &table_key);
     if (!status.ok()) {
         return status;
     }
@@ -806,7 +814,8 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd) {
 
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta_opt;
-    status = GetTableMeta(compact_cmd->db_name_, compact_cmd->table_name_, db_meta, table_meta_opt);
+    TxnTimeStamp create_timestamp;
+    status = GetTableMeta(compact_cmd->db_name_, compact_cmd->table_name_, db_meta, table_meta_opt, create_timestamp);
     if (!status.ok()) {
         return status;
     }
@@ -855,7 +864,8 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_t
 
                     std::shared_ptr<DBMeeta> db_meta;
                     std::shared_ptr<TableMeeta> table_meta_opt;
-                    status = GetTableMeta(compact_cmd->db_name_, compact_cmd->table_name_, db_meta, table_meta_opt);
+                    TxnTimeStamp create_timestamp;
+                    status = GetTableMeta(compact_cmd->db_name_, compact_cmd->table_name_, db_meta, table_meta_opt, create_timestamp);
                     if (!status.ok()) {
                         return status;
                     }
@@ -889,7 +899,8 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_t
 
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta_opt;
-    Status status = GetTableMeta(compact_cmd->db_name_, compact_cmd->table_name_, db_meta, table_meta_opt);
+    TxnTimeStamp create_timestamp;
+    Status status = GetTableMeta(compact_cmd->db_name_, compact_cmd->table_name_, db_meta, table_meta_opt, create_timestamp);
     if (!status.ok()) {
         return status;
     }

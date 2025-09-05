@@ -85,7 +85,7 @@ protected:
             {
                 auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
                 auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-                auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+                auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
                 EXPECT_TRUE(status.ok());
                 status = new_txn_mgr_->CommitTxn(txn);
                 EXPECT_TRUE(status.ok());
@@ -157,7 +157,7 @@ protected:
         {
             auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -176,7 +176,7 @@ protected:
         {
             auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -191,7 +191,7 @@ protected:
         {
             auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -333,7 +333,8 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_table) {
             auto txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kRead);
             std::shared_ptr<DBMeeta> db_meta;
             std::shared_ptr<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
+            TxnTimeStamp create_timestamp;
+            Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta, create_timestamp);
             EXPECT_FALSE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -368,7 +369,8 @@ TEST_P(TestTxnCleanup, cleanup_and_add_columns) {
             std::shared_ptr<DBMeeta> db_meta;
             std::shared_ptr<TableMeeta> table_meta;
             std::string table_key;
-            Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
+            TxnTimeStamp create_timestamp;
+            Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta, create_timestamp);
             EXPECT_TRUE(status.ok());
 
             std::vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -416,7 +418,8 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_columns) {
             std::shared_ptr<DBMeeta> db_meta;
             std::shared_ptr<TableMeeta> table_meta;
             std::string table_key;
-            Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
+            TxnTimeStamp create_timestamp;
+            Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta, create_timestamp);
             EXPECT_TRUE(status.ok());
 
             std::vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -460,7 +463,8 @@ TEST_P(TestTxnCleanup, cleanup_and_rename_table) {
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kRead);
             std::shared_ptr<DBMeeta> db_meta;
             std::shared_ptr<TableMeeta> table_meta;
-            auto status = txn->GetTableMeta(*db_name_, *new_table_name, db_meta, table_meta);
+            TxnTimeStamp create_timestamp;
+            auto status = txn->GetTableMeta(*db_name_, *new_table_name, db_meta, table_meta, create_timestamp);
             EXPECT_TRUE(status.ok());
 
             std::vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -496,7 +500,8 @@ TEST_P(TestTxnCleanup, cleanup_and_compact) {
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("get segment"), TransactionType::kRead);
             std::shared_ptr<DBMeeta> db_meta;
             std::shared_ptr<TableMeeta> table_meta;
-            auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
+            TxnTimeStamp create_timestamp;
+            auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta, create_timestamp);
             EXPECT_TRUE(status.ok());
 
             std::vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -534,7 +539,8 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_index) {
             std::shared_ptr<DBMeeta> db_meta;
             std::shared_ptr<TableMeeta> table_meta;
             std::string table_key;
-            Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
+            TxnTimeStamp create_timestamp;
+            Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta, create_timestamp);
             EXPECT_TRUE(status.ok());
 
             std::vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -664,7 +670,8 @@ TEST_P(TestTxnCleanup, cleanup_and_append) {
 
             std::shared_ptr<DBMeeta> db_meta;
             std::shared_ptr<TableMeeta> table_meta;
-            auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
+            TxnTimeStamp create_timestamp;
+            auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta, create_timestamp);
             EXPECT_TRUE(status.ok());
 
             std::vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -730,7 +737,8 @@ TEST_P(TestTxnCleanup, cleanup_and_delete) {
 
             std::shared_ptr<DBMeeta> db_meta;
             std::shared_ptr<TableMeeta> table_meta;
-            auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
+            TxnTimeStamp create_timestamp;
+            auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta, create_timestamp);
             EXPECT_TRUE(status.ok());
 
             std::vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -788,7 +796,7 @@ TEST_P(TestTxnCleanup, cleanup_and_update) {
             if (txn == nullptr) {
                 LOG_WARN("Conflict checkpoint, ignore");
             } else {
-                auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+                auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
                 EXPECT_TRUE(status.ok());
                 status = new_txn_mgr_->CommitTxn(txn);
                 EXPECT_TRUE(status.ok());
@@ -800,7 +808,8 @@ TEST_P(TestTxnCleanup, cleanup_and_update) {
 
             std::shared_ptr<DBMeeta> db_meta;
             std::shared_ptr<TableMeeta> table_meta;
-            auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta);
+            TxnTimeStamp create_timestamp;
+            auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta, create_timestamp);
             EXPECT_TRUE(status.ok());
 
             std::vector<SegmentID> *segment_ids_ptr = nullptr;

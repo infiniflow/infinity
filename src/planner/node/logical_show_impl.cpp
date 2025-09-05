@@ -116,6 +116,27 @@ std::string ToString(ShowStmtType type) {
             return "List caches";
         case ShowStmtType::kShowCache:
             return "Show cache";
+        case ShowStmtType::kListCompact: {
+            return "List compact";
+        }
+        case ShowStmtType::kListCheckpoint: {
+            return "List checkpoint";
+        }
+        case ShowStmtType::kShowCheckpoint: {
+            return "Show checkpoint";
+        }
+        case ShowStmtType::kListOptimize: {
+            return "List optimize";
+        }
+        case ShowStmtType::kListImport: {
+            return "List import";
+        }
+        case ShowStmtType::kListClean: {
+            return "List clean";
+        }
+        case ShowStmtType::kShowClean: {
+            return "Show clean";
+        }
         case ShowStmtType::kInvalid: {
             UnrecoverableError("Invalid chunk scan type");
         }

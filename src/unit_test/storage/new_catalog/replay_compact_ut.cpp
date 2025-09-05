@@ -76,7 +76,8 @@ protected:
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         size_t table_row_cnt;
@@ -130,7 +131,8 @@ protected:
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         size_t table_row_cnt;
@@ -406,7 +408,7 @@ TEST_P(TestTxnReplayCompact, test_replay_compact_flush_gap) {
         EXPECT_TRUE(status.ok());
     }
 
-    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+    Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());

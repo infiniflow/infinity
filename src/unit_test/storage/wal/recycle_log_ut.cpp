@@ -113,7 +113,7 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
             WalManager *wal_manager_{};
             wal_manager_ = infinity::InfinityContext::instance().storage()->wal_manager();
             auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check point"), TransactionType::kNewCheckpoint);
-            Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+            Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn, ckp_commit_ts.get());
             EXPECT_TRUE(status.ok());

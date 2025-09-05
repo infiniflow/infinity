@@ -875,6 +875,7 @@ std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildShow(const std::shared_p
                                           logical_show->session_id(),
                                           logical_show->transaction_id(),
                                           logical_show->function_name(),
+                                          logical_show->show_nullable(),
                                           logical_operator->load_metas());
 }
 

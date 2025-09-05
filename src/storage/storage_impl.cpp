@@ -344,7 +344,7 @@ Status Storage::AdminToWriter() {
 
     auto *new_txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
 
-    status = new_txn->Checkpoint(wal_mgr_->LastCheckpointTS());
+    status = new_txn->Checkpoint(wal_mgr_->LastCheckpointTS(), true);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Failed to checkpoint: {}", status.message()));
     }

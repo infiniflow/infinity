@@ -2205,6 +2205,104 @@ ExplainLogicalPlan::Explain(const LogicalShow *show_node, std::shared_ptr<std::v
             result->emplace_back(std::make_shared<std::string>(show_str));
             break;
         }
+        case ShowStmtType::kListCompact: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> SHOW COMPACT ";
+            } else {
+                show_str = "SHOW COMPACT ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+            break;
+        }
+        case ShowStmtType::kListCheckpoint: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> SHOW CHECKPOINTS ";
+            } else {
+                show_str = "SHOW CHECKPOINTS ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+            break;
+        }
+        case ShowStmtType::kShowCheckpoint: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> SHOW CHECKPOINT ";
+            } else {
+                show_str = "SHOW CHECKPOINT ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+            break;
+        }
+        case ShowStmtType::kListOptimize: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> SHOW OPTIMIZE ";
+            } else {
+                show_str = "SHOW OPTIMIZE ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+            break;
+        }
+        case ShowStmtType::kListImport: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> SHOW IMPORT ";
+            } else {
+                show_str = "SHOW IMPORT ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+            break;
+        }
+        case ShowStmtType::kListClean: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> SHOW CLEAN ";
+            } else {
+                show_str = "SHOW CLEAN ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+            break;
+        }
+        case ShowStmtType::kShowClean: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> SHOW CLEAN ";
+            } else {
+                show_str = "SHOW CLEAN ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+            break;
+        }
     }
     return Status::OK();
 }
