@@ -29,6 +29,8 @@ import :fast_rough_filter;
 import :kv_utility;
 import :snapshot_info;
 import :meta_cache;
+import :new_txn;
+import :new_txn_manager;
 
 import std;
 import third_party;
@@ -269,8 +271,9 @@ Status SegmentMeta::LoadFirstDeleteTS() {
     }
     first_delete_ts_ = std::stoull(first_delete_ts_str);
 
-    if (table_cache.get() != nullptr) {
-        table_cache->set_segment_tag(segment_id_, first_delete_ts_key, *first_delete_ts_);
+    if (table_cache.get() != nullptr && table_meta_.txn() != nullptr) {
+        table_meta_.txn()->AddCacheInfo(
+            std::make_shared<TableCacheSegmentTagInfo>(db_id, table_name, begin_ts_, segment_id_, first_delete_ts_key, *first_delete_ts_));
     }
     return Status::OK();
 }

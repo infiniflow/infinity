@@ -72,8 +72,9 @@ std::tuple<std::shared_ptr<IndexBase>, Status> TableIndexMeeta::GetIndexBase() {
     index_def_ =
         infinity::GetTableIndexDef(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
 
-    if (index_cache.get() != nullptr) {
-        index_cache->set_index_def(index_def_);
+    if (index_cache.get() != nullptr && table_meta_.txn() != nullptr) {
+        table_meta_.txn()->AddCacheInfo(
+            std::make_shared<IndexCacheIndexDefInfo>(db_id, table_id, index_name_str_, table_meta_.begin_ts(), index_def_));
     }
 
     return {index_def_, Status::OK()};

@@ -648,8 +648,8 @@ Status TableMeeta::LoadColumnDefs() {
         return a->id_ < b->id_;
     });
     column_defs_ = std::move(column_defs);
-    if (table_cache.get() != nullptr) {
-        table_cache->set_columns(column_defs_);
+    if (table_cache.get() != nullptr && txn_ != nullptr) {
+        txn_->AddCacheInfo(std::make_shared<TableCacheColumnInfo>(db_id_, table_name_, begin_ts_, column_defs_));
     }
     return Status::OK();
 }
@@ -728,8 +728,8 @@ Status TableMeeta::LoadIndexIDs() {
         }
     }
 
-    if (table_cache.get() != nullptr) {
-        table_cache->set_index_ids(index_ids_ptr, index_names_ptr);
+    if (table_cache.get() != nullptr && txn_ != nullptr) {
+        txn_->AddCacheInfo(std::make_shared<TableCacheIndexInfo>(db_id_, table_name_, begin_ts_, index_ids_ptr, index_names_ptr));
     }
 
     index_id_strs_ = index_id_strs;
@@ -883,8 +883,8 @@ std::tuple<std::vector<SegmentID> *, Status> TableMeeta::GetSegmentIDs1() {
         segment_ids1_ = infinity::GetTableSegments(kv_instance_, db_id_str_, table_id_str_, begin_ts_, commit_ts_);
     }
 
-    if (table_cache.get() != nullptr) {
-        table_cache->set_segments(segment_ids1_);
+    if (table_cache.get() != nullptr && txn_ != nullptr) {
+        txn_->AddCacheInfo(std::make_shared<TableCacheSegmentInfo>(db_id_, table_name_, begin_ts_, segment_ids1_));
     }
 
     return {&*segment_ids1_, Status::OK()};

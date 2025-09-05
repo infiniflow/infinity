@@ -44,6 +44,8 @@ public:
 
     void SortForOfflineDump();
 
+    void MergePrepare();
+
     void Merge(ColumnInverter &rhs);
 
     static void Merge(std::vector<std::shared_ptr<ColumnInverter>> &inverters);
@@ -113,8 +115,6 @@ private:
     u32 AddTerm(StringRef term);
 
     void SortTerms();
-
-    void MergePrepare();
 
     std::unique_ptr<Analyzer> analyzer_{nullptr};
     u32 begin_doc_id_{0};

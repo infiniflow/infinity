@@ -72,6 +72,7 @@ public:
     // std::optional<std::string> CheckTxnConflict(NewTxn *txn);
 
     bool CheckConflict1(NewTxn *txn, std::string &conflict_reason, bool &retry_query);
+    void SaveOrResetMetaCacheForReadTxn(NewTxn *txn);
 
     void SendToWAL(NewTxn *txn);
 
@@ -158,6 +159,11 @@ public:
     void RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, NewTxn *txn_ptr);
 
     SystemCache *GetSystemCachePtr() const;
+
+    TxnTimeStamp LastKVCommitTS() const {
+        std::lock_guard guard(locker_);
+        return last_kv_commit_ts_;
+    }
 
 private:
     mutable std::mutex locker_{};
