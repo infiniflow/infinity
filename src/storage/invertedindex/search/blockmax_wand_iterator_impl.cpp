@@ -195,7 +195,18 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
         if (num_iterators > SORT_SKIP_THRESHOLD && should_sort) {
             pivot = FindPivotOptimized(threshold_);
         } else {
-            // Fallback to linear search for smaller sets or when skipping sort
+            // When skipping sort or for smaller sets, always ensure we have a sorted view
+            // for correct pivot calculation. The BMW algorithm requires sorted order.
+            if (!should_sort) {
+                // Force a sort when we need accurate pivot calculation
+                std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), [](const auto &a, const auto &b) { 
+                    return a->DocID() < b->DocID(); 
+                });
+                iterations_since_sort_ = 0;
+                prefix_sums_valid_ = false;
+            }
+            
+            // Now we can safely use linear search on sorted array
             pivot = num_iterators;
             float sum_score_ub = 0.0f;
             for (size_t i = 0; i < num_iterators; i++) {
