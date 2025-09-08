@@ -70,6 +70,13 @@ enum class ShowStmtType {
     kShowSnapshot,
     kListCaches,
     kShowCache,
+    kListCompact,
+    kListCheckpoint,
+    kShowCheckpoint,
+    kListOptimize,
+    kListImport,
+    kListClean,
+    kShowClean
 };
 
 class ShowStatement : public BaseStatement {
@@ -93,6 +100,7 @@ public:
     std::optional<uint64_t> txn_id_{};
     std::string var_name_{};
     std::optional<std::string> snapshot_name_{};
+    bool show_nullable_{true};
 };
 
 } // namespace infinity
