@@ -99,7 +99,7 @@ public:
     std::optional<uint64_t> column_id_{};
     std::optional<uint64_t> session_id_{};
     std::optional<uint64_t> txn_id_{};
-    std::string var_name_{};
+    std::optional<std::string> var_name_{};
     std::optional<std::string> snapshot_name_{};
     bool show_nullable_{true};
 };
