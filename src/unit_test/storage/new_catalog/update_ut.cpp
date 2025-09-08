@@ -88,7 +88,8 @@ struct TestSetup {
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         SegmentID segment_id = 0;
@@ -132,7 +133,8 @@ struct TestSetup {
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         SegmentID segment_id = 0;
@@ -180,7 +182,8 @@ struct TestSetup {
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         SegmentID segment_id = 0;
@@ -235,7 +238,8 @@ struct TestSetup {
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         SegmentID segment_id = 0;
@@ -415,7 +419,8 @@ TEST_P(TestTxnUpdate, test_update) {
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        Status status = txn->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         SegmentID segment_id = 0;
@@ -525,7 +530,8 @@ TEST_P(TestTxnUpdate, test_update_multiple_blocks) {
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        Status status = txn->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         SegmentID segment_id = 0;
@@ -649,7 +655,8 @@ TEST_P(TestTxnUpdate, test_update_and_drop_db) {
         auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = setup.new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
@@ -688,7 +695,8 @@ TEST_P(TestTxnUpdate, test_update_and_drop_db) {
         auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = setup.new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
@@ -719,7 +727,8 @@ TEST_P(TestTxnUpdate, test_update_and_drop_db) {
         auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = setup.new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
@@ -803,7 +812,8 @@ TEST_P(TestTxnUpdate, test_update_and_drop_table) {
         auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
         status = setup.new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
@@ -844,7 +854,8 @@ TEST_P(TestTxnUpdate, test_update_and_drop_table) {
         auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
         status = setup.new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
@@ -877,7 +888,8 @@ TEST_P(TestTxnUpdate, test_update_and_drop_table) {
         auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
         status = setup.new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
@@ -910,7 +922,8 @@ TEST_P(TestTxnUpdate, test_update_and_drop_table) {
         auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
         status = setup.new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
@@ -1351,7 +1364,8 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
         auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("verify"), TransactionType::kNormal);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         // Should only have 2 columns (col1 and col2), col3 should not exist
@@ -1402,7 +1416,8 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
         auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("verify"), TransactionType::kNormal);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        status = txn7->GetTableMeta(*setup.db_name, *setup.table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         // Should have 2 columns (col1 and col2), col2 should still exist
