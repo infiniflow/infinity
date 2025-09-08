@@ -5405,6 +5405,8 @@ Status NewTxn::Rollback() {
 
     Status status = PostRollback(abort_ts);
 
+    this->SetTxnRollbacked();
+
     LOG_TRACE(fmt::format("NewTxn: {} is rolled back.", txn_context_ptr_->txn_id_));
 
     return status;
