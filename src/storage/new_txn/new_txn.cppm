@@ -711,7 +711,6 @@ public:
 
     void AddSemaphore(std::unique_ptr<std::binary_semaphore> sema);
     const std::vector<std::unique_ptr<std::binary_semaphore>> &semas() const;
-    void AddMetaKeyForBufferObject(std::unique_ptr<MetaKey> object_meta_key);
 
     void AddMetaCache(const std::shared_ptr<MetaBaseCache> &meta_base_cache);
     void AddCacheInfo(const std::shared_ptr<CacheInfo> &cache_info);

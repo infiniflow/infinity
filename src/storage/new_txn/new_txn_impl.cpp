@@ -2059,6 +2059,7 @@ Status NewTxn::Commit() {
         this->SetTxnRollbacking(commit_ts);
         txn_mgr_->SendToWAL(this);
         PostRollback(commit_ts);
+        this->SetTxnRollbacked();
         return status;
     }
 
@@ -2070,6 +2071,7 @@ Status NewTxn::Commit() {
     std::unique_lock<std::mutex> lk(commit_lock_);
     commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
     PostCommit();
+    this->SetTxnCommitted();
     return Status::OK();
 }
 
@@ -2090,6 +2092,8 @@ Status NewTxn::CommitReplay() {
     txn_mgr_->CommitKVInstance(this);
 
     PostCommit();
+
+    this->SetTxnCommitted();
 
     return Status::OK();
 }
