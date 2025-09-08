@@ -279,56 +279,56 @@ void NewCatalog::DropSegmentUpdateTSByKey(const std::string &segment_update_ts_k
 
 Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts,
                                   KVInstance *kv_instance,
-                                  std::vector<std::unique_ptr<MetaKey>> &metas,
+                                  std::vector<std::shared_ptr<MetaKey>> &metas,
                                   std::vector<std::string> &drop_keys) const {
     auto GetCleanedMetaImpl = [&](const std::vector<std::string> &keys) {
         const std::string &type_str = keys[1];
         const std::string &meta_str = keys[2];
         auto meta_infos = infinity::Partition(meta_str, '/');
         if (type_str == "db") {
-            metas.emplace_back(std::make_unique<DBMetaKey>(std::move(meta_infos[2]), std::move(meta_infos[0]), std::stoull(meta_infos[1])));
+            metas.emplace_back(std::make_shared<DBMetaKey>(std::move(meta_infos[2]), std::move(meta_infos[0]), std::stoull(meta_infos[1])));
         } else if (type_str == "tbl") {
-            std::unique_ptr<TableMetaKey> table_meta_key =
-                std::make_unique<TableMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[3]), std::move(meta_infos[1]));
+            std::shared_ptr<TableMetaKey> table_meta_key =
+                std::make_shared<TableMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[3]), std::move(meta_infos[1]));
             table_meta_key->commit_ts_ = std::stoull(meta_infos[2]);
             metas.emplace_back(std::move(table_meta_key));
         } else if (type_str == "tbl_name") {
-            std::unique_ptr<TableNameMetaKey> table_name_meta_key =
-                std::make_unique<TableNameMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[3]), std::move(meta_infos[1]));
+            std::shared_ptr<TableNameMetaKey> table_name_meta_key =
+                std::make_shared<TableNameMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[3]), std::move(meta_infos[1]));
             table_name_meta_key->commit_ts_ = std::stoull(meta_infos[2]);
             metas.emplace_back(std::move(table_name_meta_key));
         } else if (type_str == "seg") {
-            metas.emplace_back(std::make_unique<SegmentMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::stoull(meta_infos[2])));
+            metas.emplace_back(std::make_shared<SegmentMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::stoull(meta_infos[2])));
         } else if (type_str == "blk") {
-            metas.emplace_back(std::make_unique<BlockMetaKey>(std::move(meta_infos[0]),
+            metas.emplace_back(std::make_shared<BlockMetaKey>(std::move(meta_infos[0]),
                                                               std::move(meta_infos[1]),
                                                               std::stoull(meta_infos[2]),
                                                               std::stoull(meta_infos[3])));
         } else if (type_str == "tbl_col") {
-            std::unique_ptr<TableColumnMetaKey> table_column_meta_key =
-                std::make_unique<TableColumnMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::move(meta_infos[2]));
+            std::shared_ptr<TableColumnMetaKey> table_column_meta_key =
+                std::make_shared<TableColumnMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::move(meta_infos[2]));
             table_column_meta_key->commit_ts_ = std::stoull(meta_infos[3]);
             metas.emplace_back(std::move(table_column_meta_key));
         } else if (type_str == "blk_col") {
-            metas.emplace_back(std::make_unique<ColumnMetaKey>(std::move(meta_infos[0]),
+            metas.emplace_back(std::make_shared<ColumnMetaKey>(std::move(meta_infos[0]),
                                                                std::move(meta_infos[1]),
                                                                std::stoull(meta_infos[2]),
                                                                std::stoull(meta_infos[3]),
                                                                ColumnDef::FromJson(meta_infos[4])));
         } else if (type_str == "idx") {
-            std::unique_ptr<TableIndexMetaKey> table_index_meta_key = std::make_unique<TableIndexMetaKey>(std::move(meta_infos[0]),
+            std::shared_ptr<TableIndexMetaKey> table_index_meta_key = std::make_shared<TableIndexMetaKey>(std::move(meta_infos[0]),
                                                                                                           std::move(meta_infos[1]),
                                                                                                           std::move(meta_infos[4]),
                                                                                                           std::move(meta_infos[2]));
             table_index_meta_key->commit_ts_ = std::stoull(meta_infos[3]);
             metas.emplace_back(std::move(table_index_meta_key));
         } else if (type_str == "idx_seg") {
-            metas.emplace_back(std::make_unique<SegmentIndexMetaKey>(std::move(meta_infos[0]),
+            metas.emplace_back(std::make_shared<SegmentIndexMetaKey>(std::move(meta_infos[0]),
                                                                      std::move(meta_infos[1]),
                                                                      std::move(meta_infos[2]),
                                                                      std::stoull(meta_infos[3])));
         } else if (type_str == "idx_chunk") {
-            metas.emplace_back(std::make_unique<ChunkIndexMetaKey>(std::move(meta_infos[0]),
+            metas.emplace_back(std::make_shared<ChunkIndexMetaKey>(std::move(meta_infos[0]),
                                                                    std::move(meta_infos[1]),
                                                                    std::move(meta_infos[2]),
                                                                    std::stoull(meta_infos[3]),
@@ -376,7 +376,7 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts,
         GetCleanedMetaImpl(keys);
     }
     // Delete entities at lower hierarchy level first to avoid missing them when removing higher-level entities.
-    std::sort(metas.begin(), metas.end(), [&](const std::unique_ptr<MetaKey> &lhs, const std::unique_ptr<MetaKey> &rhs) {
+    std::sort(metas.begin(), metas.end(), [&](const std::shared_ptr<MetaKey> &lhs, const std::shared_ptr<MetaKey> &rhs) {
         return static_cast<size_t>(lhs->type_) > static_cast<size_t>(rhs->type_);
     });
     return Status::OK();
@@ -401,7 +401,7 @@ std::vector<std::shared_ptr<MetaKey>> NewCatalog::MakeMetaKeys() const {
     meta_keys.reserve(meta_count);
 
     std::vector<std::string> dropped_keys;
-    std::vector<std::unique_ptr<MetaKey>> metas;
+    std::vector<std::shared_ptr<MetaKey>> metas;
     if (auto status = GetCleanedMeta(MAX_TIMESTAMP, kv_instance_ptr.get(), metas, dropped_keys); !status.ok()) {
         LOG_ERROR((fmt::format("GetCleanedMeta failed: {}", status.message())));
         return meta_keys;
@@ -467,7 +467,7 @@ std::unique_ptr<SystemCache> NewCatalog::RestoreCatalogCache(Storage *storage_pt
 
 KVStore *NewCatalog::kv_store() const { return kv_store_; }
 
-std::vector<std::string> NewCatalog::GetEncodeKeys(std::vector<std::unique_ptr<MetaKey>> &metas) const {
+std::vector<std::string> NewCatalog::GetEncodeKeys(std::vector<std::shared_ptr<MetaKey>> &metas) const {
     std::vector<std::string> keys_encode;
     keys_encode.reserve(metas.size());
     for (auto &meta : metas) {
