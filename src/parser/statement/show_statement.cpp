@@ -205,6 +205,34 @@ std::string ShowStatement::ToString() const {
             ss << "Show cache";
             break;
         }
+        case ShowStmtType::kListCompact: {
+            ss << "List compacts";
+            break;
+        }
+        case ShowStmtType::kListCheckpoint: {
+            ss << "List checkpoints";
+            break;
+        }
+        case ShowStmtType::kShowCheckpoint: {
+            ss << "Show checkpoint";
+            break;
+        }
+        case ShowStmtType::kListOptimize: {
+            ss << "List optimize";
+            break;
+        }
+        case ShowStmtType::kListImport: {
+            ss << "List import";
+            break;
+        }
+        case ShowStmtType::kListClean: {
+            ss << "List clean";
+            break;
+        }
+        case ShowStmtType::kShowClean: {
+            ss << "Show clean";
+            break;
+        }
     }
     return ss.str();
 }

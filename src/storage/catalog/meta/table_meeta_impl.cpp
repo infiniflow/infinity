@@ -509,9 +509,7 @@ Status TableMeeta::GetTableDetail(TableDetail &table_detail) {
         block_count += block_ids_ptr->size();
     }
     table_detail.block_count_ = block_count;
-    table_detail.block_capacity_ = DEFAULT_BLOCK_CAPACITY;
     table_detail.segment_count_ = segment_ids_ptr->size();
-    table_detail.segment_capacity_ = DEFAULT_SEGMENT_CAPACITY;
 
     return Status::OK();
 }

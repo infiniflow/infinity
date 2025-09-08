@@ -111,11 +111,8 @@ export struct TableDetail {
     std::shared_ptr<std::string> table_comment_{};
     TxnTimeStamp create_ts_{};
     i64 column_count_{};
-    i64 row_count_{};
     i64 block_count_{};
-    i64 block_capacity_{};
     i64 segment_count_{};
-    i64 segment_capacity_{};
 };
 
 export struct ViewDetail {
