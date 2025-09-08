@@ -5993,7 +5993,37 @@ void PhysicalShow::ExecuteListCatalogKey(QueryContext *query_context, ShowOperat
     KVInstance *kv_instance = txn->kv_instance();
     auto all_key_values = kv_instance->GetAllKeyValue();
 
-    if (object_name_.has_value()) {
+    if (*object_name_ == "all") {
+        for (const auto &meta_pair : all_key_values) {
+            if (output_block_ptr.get() == nullptr) {
+                output_block_ptr = DataBlock::MakeUniquePtr();
+                output_block_ptr->Init(*output_types_);
+            }
+
+            {
+                // key
+                Value value = Value::MakeVarchar(meta_pair.first);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            }
+            {
+                // value
+                Value value = Value::MakeVarchar(meta_pair.second);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            }
+
+            ++row_count;
+            if (row_count == output_block_ptr->capacity()) {
+                output_block_ptr->Finalize();
+                operator_state->output_.emplace_back(std::move(output_block_ptr));
+                output_block_ptr = nullptr;
+                row_count = 0;
+            }
+        }
+
+    } else {
+
         const std::string &key_name = object_name_.value();
         for (const auto &meta_pair : all_key_values) {
             auto keys = infinity::Partition(meta_pair.first, '|');
@@ -6023,34 +6053,6 @@ void PhysicalShow::ExecuteListCatalogKey(QueryContext *query_context, ShowOperat
                     output_block_ptr = nullptr;
                     row_count = 0;
                 }
-            }
-        }
-    } else {
-        for (const auto &meta_pair : all_key_values) {
-            if (output_block_ptr.get() == nullptr) {
-                output_block_ptr = DataBlock::MakeUniquePtr();
-                output_block_ptr->Init(*output_types_);
-            }
-
-            {
-                // key
-                Value value = Value::MakeVarchar(meta_pair.first);
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-            }
-            {
-                // value
-                Value value = Value::MakeVarchar(meta_pair.second);
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-            }
-
-            ++row_count;
-            if (row_count == output_block_ptr->capacity()) {
-                output_block_ptr->Finalize();
-                operator_state->output_.emplace_back(std::move(output_block_ptr));
-                output_block_ptr = nullptr;
-                row_count = 0;
             }
         }
     }
