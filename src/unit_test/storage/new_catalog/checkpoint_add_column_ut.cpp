@@ -146,7 +146,7 @@ TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
     EXPECT_TRUE(status.ok());
 
     txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-    status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+    status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
@@ -167,7 +167,8 @@ TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
         // Check table row count is 20
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        Status status1 = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        Status status1 = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status1.ok());
 
         size_t row_count = 0;

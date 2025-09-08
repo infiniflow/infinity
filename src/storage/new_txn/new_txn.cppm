@@ -368,7 +368,7 @@ private:
     Status CleanupInner(const std::vector<std::unique_ptr<MetaKey>> &metas);
 
 public:
-    Status Checkpoint(TxnTimeStamp last_ckp_ts);
+    Status Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint);
 
     // Getter
     BufferManager *buffer_mgr() const { return buffer_mgr_; }
@@ -457,11 +457,13 @@ public:
                         const std::string &table_name,
                         std::shared_ptr<DBMeeta> &db_meta,
                         std::shared_ptr<TableMeeta> &table_meta,
+                        TxnTimeStamp& create_timestamp,
                         std::string *table_key = nullptr);
 
     Status GetTableMeta(const std::string &table_name,
                         std::shared_ptr<DBMeeta> &db_meta,
                         std::shared_ptr<TableMeeta> &table_meta,
+                        TxnTimeStamp& create_timestamp,
                         std::string *table_key = nullptr);
 
     Status GetTableIndexMeta(const std::string &db_name,
