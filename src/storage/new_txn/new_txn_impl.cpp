@@ -5466,6 +5466,9 @@ Status NewTxn::Cleanup() {
         return status;
     }
 
+    txn_store->dropped_keys_ = dropped_keys;
+    txn_store->metas_ = metas;
+
     return Status::OK();
 }
 
