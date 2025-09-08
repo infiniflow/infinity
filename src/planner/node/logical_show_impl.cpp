@@ -90,6 +90,8 @@ std::string ToString(ShowStmtType type) {
             return "Show logs";
         case ShowStmtType::kCatalog:
             return "Show catalog";
+        case ShowStmtType::kListCatalogKey:
+            return "List catalog keys";
         case ShowStmtType::kCatalogToFile:
             return "Show catalog to file";
         case ShowStmtType::kPersistenceFiles:

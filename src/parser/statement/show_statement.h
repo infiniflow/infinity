@@ -58,6 +58,7 @@ enum class ShowStmtType {
     kIndexChunk,
     kLogs,
     kCatalog,
+    kListCatalogKey,
     kCatalogToFile,
     kPersistenceFiles,
     kPersistenceObjects,

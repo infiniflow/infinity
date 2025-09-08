@@ -483,6 +483,15 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowStmtType::kListCatalogKey: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+            output_names_->emplace_back("key");
+            output_names_->emplace_back("value");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         case ShowStmtType::kCatalogToFile: {
             output_names_->reserve(1);
             output_types_->reserve(1);
@@ -853,6 +862,10 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowStmtType::kCatalog: {
             ExecuteShowCatalog(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kListCatalogKey: {
+            ExecuteListCatalogKey(query_context, show_operator_state);
             break;
         }
         case ShowStmtType::kCatalogToFile: {
@@ -5968,6 +5981,49 @@ void PhysicalShow::ExecuteShowCatalog(QueryContext *query_context, ShowOperatorS
     }
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
+void PhysicalShow::ExecuteListCatalogKey(QueryContext *query_context, ShowOperatorState *operator_state) {
+
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(*output_types_);
+    size_t row_count = 0;
+
+    NewTxn *txn = query_context->GetNewTxn();
+    KVInstance* kv_instance = txn->kv_instance();
+    auto all_key_values = kv_instance->GetAllKeyValue();
+
+    for (const auto &meta_pair : all_key_values) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(*output_types_);
+        }
+
+        {
+            // key
+            Value value = Value::MakeVarchar(meta_pair.first);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // value
+            Value value = Value::MakeVarchar(meta_pair.second);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
 }
 
 void PhysicalShow::ExecuteShowCatalogToFile(QueryContext *query_context, ShowOperatorState *operator_state) {
