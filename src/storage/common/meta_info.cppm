@@ -109,6 +109,7 @@ export struct TableDetail {
     std::shared_ptr<std::string> table_name_{};
     std::shared_ptr<std::string> table_id_{};
     std::shared_ptr<std::string> table_comment_{};
+    TxnTimeStamp create_ts_{};
     i64 column_count_{};
     i64 row_count_{};
     i64 block_count_{};

@@ -118,7 +118,7 @@ public:
 
     void Checkpoint() {
         auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-        Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+        Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -262,7 +262,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_db) {
         }
         {
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+            Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
 
             status = txn->GetTableFilePaths(*db_name, *table_name, exist_file_paths_);
@@ -390,7 +390,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_table) {
         }
         {
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+            Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
 
             status = txn->GetTableFilePaths(*db_name, *table_name, exist_file_paths_);
@@ -544,7 +544,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_index) {
 
         {
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+            Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
 
             status = txn->GetTableFilePaths(*db_name, *table_name, exist_file_paths_);
@@ -986,7 +986,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_drop_index_and_checkpoint_and_restar
 
     {
         auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-        Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+        Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr_->CommitTxn(txn);
@@ -1017,7 +1017,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_drop_index_and_checkpoint_and_restar
     {
         auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
 
-        Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+        Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());

@@ -494,11 +494,13 @@ export struct FlushDataEntry {
     std::string to_flush_{};
 };
 export struct CheckpointTxnStore final : public BaseTxnStore {
-    CheckpointTxnStore() : BaseTxnStore(TransactionType::kNewCheckpoint) {}
+    explicit CheckpointTxnStore(TxnTimeStamp checkpoint_ts, bool auto_checkpoint)
+        : BaseTxnStore(TransactionType::kNewCheckpoint), max_commit_ts_(checkpoint_ts), auto_check_point_(auto_checkpoint) {}
     ~CheckpointTxnStore() override = default;
 
     std::vector<std::shared_ptr<FlushDataEntry>> entries_{};
     i64 max_commit_ts_{};
+    bool auto_check_point_{};
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;

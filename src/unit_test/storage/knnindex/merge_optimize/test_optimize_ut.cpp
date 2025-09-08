@@ -78,7 +78,7 @@ protected:
         NewTxnManager *new_txn_mgr = storage->new_txn_manager();
         WalManager *wal_manager = storage->wal_manager();
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-        Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS());
+        Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS(), false);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());

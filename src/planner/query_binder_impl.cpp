@@ -430,7 +430,8 @@ std::shared_ptr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_co
     NewTxn *new_txn = query_context->GetNewTxn();
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
-    status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
+    TxnTimeStamp create_timestamp;
+    status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
         RecoverableError(status);
     }

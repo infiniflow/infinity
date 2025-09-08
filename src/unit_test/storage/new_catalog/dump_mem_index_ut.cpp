@@ -5310,7 +5310,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         SegmentID segment_id = 0;
@@ -6272,7 +6273,8 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_test_dump_index_and_optimize_index) {
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         std::shared_ptr<TableIndexMeeta> table_index_meta;
@@ -6624,7 +6626,8 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         std::shared_ptr<TableIndexMeeta> table_index_meta;

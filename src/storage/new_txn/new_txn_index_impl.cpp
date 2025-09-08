@@ -311,7 +311,8 @@ Status NewTxn::OptimizeTableIndexes(const std::string &db_name, const std::strin
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
     std::string table_key;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
+    TxnTimeStamp create_timestamp;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp, &table_key);
     if (!status.ok()) {
         return status;
     }
@@ -669,7 +670,8 @@ Status NewTxn::OptimizeIndexByParams(const std::string &db_name,
 Status NewTxn::ListIndex(const std::string &db_name, const std::string &table_name, std::vector<std::string> &index_names) {
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+    TxnTimeStamp create_timestamp;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
         return status;
     }
@@ -2078,7 +2080,8 @@ Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
 Status NewTxn::GetFullTextIndexReader(const std::string &db_name, const std::string &table_name, std::shared_ptr<IndexReader> &index_reader) {
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+    TxnTimeStamp create_timestamp;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
         return status;
     }
@@ -2308,7 +2311,8 @@ Status NewTxn::ManualDumpIndex(const std::string &db_name, const std::string &ta
     std::shared_ptr<TableIndexMeeta> table_index_meta;
     std::string table_key;
     std::string index_key;
-    status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+    TxnTimeStamp create_timestamp;
+    status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
         return status;
     }
