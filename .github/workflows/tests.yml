@@ -1673,8 +1673,8 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
-            "mv /infinity/parallel_test_release.log /infinity_log/minio_pysdk_remote_test_release.log &&
-            mv /infinity/parallel_test_release_error.log /infinity_log/minio_pysdk_remote_test_release_error.log &&
+            "mv /infinity/minio_pysdk_remote_test_release.log /infinity_log/minio_pysdk_remote_test_release.log &&
+            mv /infinity/minio_pysdk_remote_test_release_error.log /infinity_log/minio_pysdk_remote_test_release_error.log &&
             echo 'minio pysdk remote test release log' &&
             tail -n 1000 /infinity_log/minio_pysdk_remote_test_release.log &&
             echo 'minio pysdk remote test release error log' &&
@@ -1810,8 +1810,8 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
-            "mv /infinity/parallel_test_release.log /infinity_log/minio_parallel_test_release.log &&
-            mv /infinity/parallel_test_release_error.log /infinity_log/minio_parallel_test_release_error.log &&
+            "mv /infinity/minio_parallel_test_release.log /infinity_log/minio_parallel_test_release.log &&
+            mv /infinity/minio_parallel_test_release_error.log /infinity_log/minio_parallel_test_release_error.log &&
             echo 'minio parallel test release log' &&
             tail -n 1000 /infinity_log/minio_parallel_test_release.log &&
             echo 'minio parallel test release error log' &&
