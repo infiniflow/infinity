@@ -27,7 +27,6 @@ import :logical_node_type;
 import :session_manager;
 import :query_context;
 
-import std;
 import std.compat;
 import third_party;
 

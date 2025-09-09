@@ -23,7 +23,6 @@ import :roaring_bitmap;
 import :status;
 import :logger;
 
-import std;
 import std.compat;
 
 import third_party;

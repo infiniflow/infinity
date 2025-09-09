@@ -874,7 +874,7 @@ TEST_P(TestTxnIndex, create_index_and_drop_table) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestTxnIndex, DISABLED_create_index_create_index) {
+TEST_P(TestTxnIndex, DISABLED_SLOW_create_index_create_index) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 

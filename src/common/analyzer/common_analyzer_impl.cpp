@@ -25,7 +25,6 @@ import :tokenizer;
 import :common_analyzer;
 import :default_values;
 
-import std;
 import std.compat;
 
 namespace infinity {

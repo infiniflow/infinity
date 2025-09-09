@@ -69,7 +69,6 @@ import :mem_index;
 import :catalog_cache;
 import :meta_cache;
 
-import std;
 import std.compat;
 import third_party;
 
@@ -2018,7 +2017,7 @@ Status NewTxn::Commit() {
         switch (txn_state) {
             case TxnState::kCommitting: {
                 // LOG_INFO(fmt::format("To allocation task: {}, transaction: {}", *this->GetTxnText(), txn_context_ptr_->txn_id_));
-                std::shared_ptr<TxnAllocatorTask> txn_allocator_task = std::make_shared<TxnAllocatorTask>(this);
+                auto txn_allocator_task = std::make_shared<TxnAllocatorTask>(this);
                 txn_mgr_->SubmitForAllocation(txn_allocator_task);
                 txn_allocator_task->Wait();
                 status = txn_allocator_task->status_;

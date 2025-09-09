@@ -32,7 +32,6 @@ import :persist_result_handler;
 import :kv_code;
 import :kv_store;
 
-import std;
 import std.compat;
 import third_party;
 

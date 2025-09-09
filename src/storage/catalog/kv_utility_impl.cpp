@@ -29,7 +29,6 @@ import :buffer_manager;
 import :infinity_exception;
 import :config;
 
-import std;
 import std.compat;
 import third_party;
 

@@ -410,7 +410,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnReplayOptimize,
                          ::testing::Values(TestTxnReplayOptimize::NEW_CONFIG_PATH, TestTxnReplayOptimize::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestTxnReplayOptimize, DISABLED_test_optimize_commit) {
+TEST_P(TestTxnReplayOptimize, DISABLED_SLOW_test_optimize_commit) {
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, table_def, ConflictType::kError);
@@ -452,7 +452,7 @@ TEST_P(TestTxnReplayOptimize, DISABLED_test_optimize_commit) {
     }
 }
 
-TEST_P(TestTxnReplayOptimize, DISABLED_test_optimize_rollback) {
+TEST_P(TestTxnReplayOptimize, DISABLED_SLOW_test_optimize_rollback) {
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, table_def, ConflictType::kError);
@@ -508,7 +508,7 @@ TEST_P(TestTxnReplayOptimize, DISABLED_test_optimize_rollback) {
     }
 }
 
-TEST_P(TestTxnReplayOptimize, DISABLED_test_optimize_interrupt) {
+TEST_P(TestTxnReplayOptimize, DISABLED_SLOW_test_optimize_interrupt) {
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, table_def, ConflictType::kError);

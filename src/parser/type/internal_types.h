@@ -40,7 +40,6 @@
 
 #ifndef PARESER_USE_STD_MODULE
 #define PARESER_USE_STD_MODULE 1
-import std;
 import std.compat;
 #endif
 

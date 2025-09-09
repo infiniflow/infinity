@@ -54,7 +54,6 @@ import :value;
 import :fixed_dimensional_encoding;
 import :function_expression;
 
-import std;
 import std.compat;
 import third_party;
 

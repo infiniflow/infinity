@@ -1,6 +1,5 @@
 export module infinity_core:random;
 
-import std;
 import std.compat;
 
 namespace infinity {

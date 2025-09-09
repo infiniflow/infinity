@@ -23,7 +23,6 @@ import :column_length_io;
 import :logger;
 import :infinity_exception;
 
-import std;
 import std.compat;
 
 import row_id;

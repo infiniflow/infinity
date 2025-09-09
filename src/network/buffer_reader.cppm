@@ -21,7 +21,6 @@ import :pg_message;
 import :ring_buffer_iterator;
 import :default_values;
 
-import std;
 import std.compat;
 
 import global_resource_usage;

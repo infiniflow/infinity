@@ -64,7 +64,6 @@ import :bg_task;
 import :fst.build;
 import :default_values;
 
-import std;
 import std.compat;
 import third_party;
 

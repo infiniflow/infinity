@@ -30,7 +30,6 @@ import :roaring_bitmap;
 import :block_index;
 import :knn_filter;
 
-import std;
 import std.compat;
 
 namespace infinity {

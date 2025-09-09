@@ -26,7 +26,6 @@ import :analyzer_pool;
 import :analyzer;
 import :logger;
 
-import std;
 import std.compat;
 import third_party;
 

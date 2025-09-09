@@ -28,7 +28,6 @@ import :bound_cast_func;
 import :value;
 import :value_expression;
 
-import std;
 import std.compat;
 import third_party;
 

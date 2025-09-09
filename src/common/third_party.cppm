@@ -19,7 +19,6 @@ module;
 #pragma clang diagnostic ignored "-Wall"
 
 // wait for clang fix
-import std;
 import std.compat;
 
 #define _GLIBCXX_FILESYSTEM 1

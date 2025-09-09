@@ -18,7 +18,6 @@ import :status;
 import :index_base;
 import :meta_info;
 
-import std;
 import std.compat;
 import third_party;
 

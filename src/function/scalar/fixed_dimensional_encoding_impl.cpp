@@ -27,7 +27,6 @@ import :column_vector;
 import :data_block;
 import :value;
 
-import std;
 import std.compat;
 
 import embedding_info;

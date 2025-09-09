@@ -18,7 +18,6 @@ import :darts_trie;
 import :darts;
 import :status;
 
-import std;
 import std.compat;
 
 namespace infinity {

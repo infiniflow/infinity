@@ -17,7 +17,6 @@ module infinity_core:tokenizer.impl;
 import :term;
 import :tokenizer;
 
-import std;
 import std.compat;
 
 namespace infinity {

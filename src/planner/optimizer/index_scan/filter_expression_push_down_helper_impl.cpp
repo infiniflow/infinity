@@ -27,7 +27,6 @@ import :infinity_exception;
 import :value;
 import :secondary_index_data;
 
-import std;
 import std.compat;
 import third_party;
 

@@ -33,7 +33,6 @@ import :mlas_matrix_multiply;
 import :vector_distance;
 import :index_base;
 
-import std;
 import std.compat;
 import third_party;
 

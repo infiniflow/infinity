@@ -26,7 +26,6 @@ import :virtual_store;
 import :kv_store;
 import :status;
 
-import std;
 import std.compat;
 import third_party;
 

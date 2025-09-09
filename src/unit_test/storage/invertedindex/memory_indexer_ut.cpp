@@ -200,7 +200,7 @@ TEST_P(MemoryIndexerTest, Chunk) {
     Check();
 }
 
-TEST_P(MemoryIndexerTest, DISABLED_Memory) {
+TEST_P(MemoryIndexerTest, DISABLED_SLOW_Memory) {
     auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
     auto db_name = std::make_shared<std::string>("db1");
     auto table_name = std::make_shared<std::string>("tb1");
@@ -256,7 +256,7 @@ TEST_P(MemoryIndexerTest, SpillLoadTest) {
     }
 }
 
-TEST_P(MemoryIndexerTest, DISABLED_SeekPosition) {
+TEST_P(MemoryIndexerTest, DISABLED_SLOW_SeekPosition) {
     // "A B C" repeats 7 times
     std::string paragraph(R"#(A B C A B C A B C A B C A B C A B C A B C)#");
     auto column = ColumnVector::Make(std::make_shared<DataType>(LogicalType::kVarchar));

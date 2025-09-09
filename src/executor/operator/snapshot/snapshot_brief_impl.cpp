@@ -25,7 +25,6 @@ import :local_file_handle;
 import :infinity_exception;
 import :logger;
 
-import std;
 import std.compat;
 import third_party;
 

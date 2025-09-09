@@ -16,7 +16,6 @@ export module infinity_core:logger;
 
 import :status;
 
-import std;
 import std.compat;
 import third_party;
 

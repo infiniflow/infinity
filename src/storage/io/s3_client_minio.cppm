@@ -39,7 +39,7 @@ public:
                       const std::string &dst_object_name) final;
     Status BucketExists(const std::string &bucket_name) final;
     Status MakeBucket(const std::string &bucket_name) final;
-    Status ListObjects(const std::string &bucket_name, const std::string &prefix, std::vector<std::string> &object_names) final;
+    Status ListObjects(std::string_view bucket_name, std::string_view prefix, std::vector<std::string> &object_names) final;
 
 private:
     minio::s3::BaseUrl base_url;

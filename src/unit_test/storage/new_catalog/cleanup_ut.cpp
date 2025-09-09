@@ -603,7 +603,7 @@ TEST_P(TestTxnCleanup, cleanup_and_optimize_index) {
             std::shared_ptr<TableIndexMeeta> table_index_meta;
             std::string table_key;
             std::string index_key;
-            Status status =
+            auto status =
                 txn->GetTableIndexMeta(*db_name_, *table_name_, *index_name1_, db_meta, table_meta, table_index_meta, &table_key, &index_key);
             EXPECT_TRUE(status.ok());
 
@@ -624,7 +624,7 @@ TEST_P(TestTxnCleanup, cleanup_and_optimize_index) {
             ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
             {
                 ChunkIndexMetaInfo *chunk_info = nullptr;
-                Status status = chunk_index_meta.GetChunkInfo(chunk_info);
+                auto status = chunk_index_meta.GetChunkInfo(chunk_info);
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(chunk_info->row_cnt_, block_row_cnt);
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));

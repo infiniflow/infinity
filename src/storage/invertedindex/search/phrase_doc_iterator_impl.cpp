@@ -10,7 +10,6 @@ import :posting_iterator;
 import :column_length_io;
 import :logger;
 
-import std;
 import std.compat;
 import third_party;
 

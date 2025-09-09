@@ -16,7 +16,6 @@ export module infinity_core:obj_stat_accessor;
 
 import :obj_status;
 
-import std;
 import std.compat;
 import third_party;
 

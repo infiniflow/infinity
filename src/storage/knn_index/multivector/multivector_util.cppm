@@ -14,7 +14,6 @@
 
 export module infinity_core:multivector_util;
 
-import std;
 import std.compat;
 import third_party;
 

@@ -76,7 +76,6 @@ import :highlighter;
 import :new_txn;
 import :utility;
 
-import std;
 import std.compat;
 import third_party;
 

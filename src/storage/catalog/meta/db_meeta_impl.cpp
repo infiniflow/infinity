@@ -26,7 +26,6 @@ import :kv_utility;
 import :new_txn_manager;
 import :meta_cache;
 
-import std;
 import std.compat;
 import third_party;
 

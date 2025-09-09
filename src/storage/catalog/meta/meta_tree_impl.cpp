@@ -39,7 +39,6 @@ import :new_txn_manager;
 import :utility;
 import :infinity_type;
 
-import std;
 import std.compat;
 import third_party;
 

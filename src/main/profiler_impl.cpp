@@ -22,7 +22,6 @@ import :infinity_exception;
 import :operator_state;
 import :physical_operator;
 
-import std;
 import std.compat;
 
 namespace infinity {

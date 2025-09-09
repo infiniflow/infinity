@@ -64,6 +64,8 @@ private:
 };
 
 class KVStore {
+    using upload_cnt_t = size_t;
+    using download_cnt_t = size_t;
 public:
     KVStore() = default;
     ~KVStore();
@@ -84,6 +86,7 @@ public:
     std::string ToString() const;
     size_t KeyValueNum() const;
     std::vector<std::pair<std::string, std::string>> GetAllKeyValue();
+    rocksdb::TransactionDB *transaction_db() const { return transaction_db_; }
 
     // For UT
     static Status Destroy(const std::string &db_path);
@@ -96,6 +99,7 @@ private:
     rocksdb::TransactionOptions txn_options_;
     rocksdb::WriteOptions write_options_;
     rocksdb::ReadOptions read_options_;
+    std::unordered_set<std::string, std::pair<upload_cnt_t, download_cnt_t>> kv_; // U D
 };
 
 } // namespace infinity

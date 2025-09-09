@@ -19,7 +19,6 @@ export module infinity_core:persistence_manager;
 import :obj_status;
 import :status;
 
-import std;
 import std.compat;
 import third_party;
 

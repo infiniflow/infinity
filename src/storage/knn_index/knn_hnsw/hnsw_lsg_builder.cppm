@@ -30,7 +30,6 @@ import :merge_knn;
 import :infinity_context;
 import :logger;
 
-import std;
 import std.compat;
 import column_def;
 import statement_common;
