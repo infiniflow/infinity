@@ -77,7 +77,7 @@ ObjAddr ObjAddr::ReadBufAdv(const char *&buf) {
 PersistenceManager::PersistenceManager(const std::string &workspace, const std::string &data_dir, size_t object_size_limit, bool local_storage)
     : workspace_(workspace), local_data_dir_(data_dir), object_size_limit_(object_size_limit) {
     if (local_storage) {
-        objects_ = std::make_unique<ObjectStatAccessor_LocalStorage>();
+        objects_ = std::make_unique<ObjectStatAccessor>();
     } else {
         UnrecoverableError("Remote storage is not supported yet.");
     }

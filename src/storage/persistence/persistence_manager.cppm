@@ -30,7 +30,7 @@ namespace infinity {
 
 class KVStore;
 class KVInstance;
-class ObjectStatAccessorBase;
+class ObjectStatAccessor;
 
 export struct ObjAddr {
     std::string obj_key_{};
@@ -147,7 +147,7 @@ private:
 
     mutable std::mutex mtx_;
     // std::unordered_map<std::string, ObjStat> objects_;        // obj_key -> ObjStat
-    std::unique_ptr<ObjectStatAccessorBase> objects_; // obj_key -> ObjStat
+    std::unique_ptr<ObjectStatAccessor> objects_; // obj_key -> ObjStat
     // Current unsealed object key
     std::string current_object_key_;
     size_t current_object_size_ = 0;

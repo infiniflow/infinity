@@ -33,160 +33,9 @@ import third_party;
 
 namespace infinity {
 
-void ObjectStatAccessorBase::AddObjStatToKVStore(const std::string &key, const ObjStat &obj_stat) {
-    Storage *storage = InfinityContext::instance().storage();
-    if (!storage) {
-        return;
-    }
-    KVStore *kv_store = storage->kv_store();
-    if (!kv_store) {
-        return;
-    }
-    Status status = kv_store->Put(KeyEncode::PMObjectStatKey(key), obj_stat.ToString());
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
-}
+// ObjectStatAccessor
 
-void ObjectStatAccessorBase::RemoveObjStatFromKVStore(const std::string &key) {
-    Storage *storage = InfinityContext::instance().storage();
-    if (!storage) {
-        return;
-    }
-    KVStore *kv_store = storage->kv_store();
-    if (!kv_store) {
-        return;
-    }
-    Status status = kv_store->Delete(KeyEncode::PMObjectStatKey(key));
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
-}
-
-// ObjectStatMap
-
-ObjectStatMap::~ObjectStatMap() {
-    [[maybe_unused]] size_t sum_ref_count = 0;
-    for (const auto &lru_iter : lru_list_) {
-        if (lru_iter.obj_stat_.ref_count_ > 0) {
-            LOG_ERROR(fmt::format("ObjectStatMap {} still has ref count {}", lru_iter.key_, lru_iter.obj_stat_.ref_count_));
-        }
-        sum_ref_count += lru_iter.obj_stat_.ref_count_;
-    }
-    assert(sum_ref_count == 0);
-}
-
-ObjStat *ObjectStatMap::Get(const std::string &key) {
-    auto map_iter = obj_map_.find(key);
-    if (map_iter == obj_map_.end()) {
-        return nullptr;
-    }
-    LRUListIter lru_iter = map_iter->second;
-    ObjStat *obj_stat = &lru_iter->obj_stat_;
-    if (obj_stat->ref_count_ == 0) {
-        using_list_.splice(using_list_.begin(), lru_list_, lru_iter);
-    }
-    ++obj_stat->ref_count_;
-    return obj_stat;
-}
-
-ObjStat *ObjectStatMap::GetNoCount(const std::string &key) {
-    auto map_iter = obj_map_.find(key);
-    if (map_iter == obj_map_.end()) {
-        return nullptr;
-    }
-    return &map_iter->second->obj_stat_;
-}
-
-std::pair<bool, ObjStat *> ObjectStatMap::Release(const std::string &key) {
-    auto map_iter = obj_map_.find(key);
-    if (map_iter == obj_map_.end()) {
-        return {false, nullptr};
-    }
-    LRUListIter lru_iter = map_iter->second;
-    ObjStat *obj_stat = &lru_iter->obj_stat_;
-    if (obj_stat->ref_count_ <= 0) {
-        UnrecoverableError(fmt::format("Release object {} ref count is {}", key, obj_stat->ref_count_));
-    }
-    --obj_stat->ref_count_;
-    if (obj_stat->ref_count_ > 0) {
-        return {false, obj_stat};
-    }
-    lru_list_.splice(lru_list_.begin(), using_list_, lru_iter);
-    return {true, obj_stat};
-}
-
-void ObjectStatMap::PutNew(const std::string &key, ObjStat obj_stat) {
-    auto map_iter = obj_map_.find(key);
-    if (map_iter != obj_map_.end()) {
-        map_iter->second->obj_stat_ = std::move(obj_stat);
-        LOG_DEBUG(fmt::format("PutNew: {} is already in object map", key));
-        return;
-    }
-    lru_list_.emplace_front(key, std::move(obj_stat));
-    obj_map_.emplace(key, lru_list_.begin());
-}
-
-void ObjectStatMap::Recover(const std::string &key) {
-    auto map_iter = obj_map_.find(key);
-    if (map_iter == obj_map_.end()) {
-        UnrecoverableError(fmt::format("Recover object {} not found", key));
-    }
-    LRUListIter lru_iter = map_iter->second;
-    ObjStat &obj_stat = lru_iter->obj_stat_;
-    if (obj_stat.ref_count_ > 0) {
-        UnrecoverableError(fmt::format("Recover object {} ref count is {}", key, lru_iter->obj_stat_.ref_count_));
-    }
-    lru_list_.splice(lru_list_.begin(), cleanuped_list_, lru_iter);
-    auto expect = ObjCached::kNotCached;
-    if (not obj_stat.cached_.compare_exchange_strong(expect, ObjCached::kCached)) {
-        UnrecoverableError(fmt::format("Recover object {} not cleaned", key));
-    }
-}
-
-std::optional<ObjStat> ObjectStatMap::Invalidate(const std::string &key) {
-    auto map_iter = obj_map_.find(key);
-    if (map_iter == obj_map_.end()) {
-        return std::nullopt;
-    }
-    LRUListIter lru_iter = map_iter->second;
-    ObjStat obj_stat = std::move(lru_iter->obj_stat_);
-    if (obj_stat.ref_count_ > 0) {
-        UnrecoverableError(fmt::format("Invalidate object {} ref count is {}", key, obj_stat.ref_count_));
-    }
-    ObjCached cached = obj_stat.cached_.load();
-    if (cached == ObjCached::kDownloading) {
-        UnrecoverableError(fmt::format("Invalidate object {} is downloading", key));
-    }
-    if (cached == ObjCached::kCached) {
-        lru_list_.erase(lru_iter);
-    } else {
-        cleanuped_list_.erase(lru_iter);
-    }
-    obj_map_.erase(map_iter);
-    return obj_stat;
-}
-
-LRUListEntry *ObjectStatMap::EnvictLast() {
-    if (lru_list_.empty()) {
-        return nullptr;
-    }
-    LRUListIter lru_iter = std::prev(lru_list_.end());
-    ObjStat &obj_stat = lru_iter->obj_stat_;
-    if (obj_stat.ref_count_ > 0) {
-        UnrecoverableError(fmt::format("EnvictLast object {} ref count is {}", lru_iter->key_, obj_stat.ref_count_));
-    }
-    auto expect = ObjCached::kCached;
-    if (not obj_stat.cached_.compare_exchange_strong(expect, ObjCached::kNotCached)) {
-        UnrecoverableError(fmt::format("EnvictLast object {} is already cleaned", lru_iter->key_));
-    }
-    cleanuped_list_.splice(cleanuped_list_.begin(), lru_list_, lru_iter);
-    return &(*lru_iter);
-}
-
-// ObjectStatAccessor_LocalStorage
-
-ObjectStatAccessor_LocalStorage::~ObjectStatAccessor_LocalStorage() {
+ObjectStatAccessor::~ObjectStatAccessor() {
     std::unique_lock<std::mutex> lock(mutex_);
     [[maybe_unused]] size_t sum_ref_count = 0;
     for (const auto &[key, obj_stat] : obj_map_) {
@@ -198,7 +47,7 @@ ObjectStatAccessor_LocalStorage::~ObjectStatAccessor_LocalStorage() {
     assert(sum_ref_count == 0);
 }
 
-std::optional<ObjStat> ObjectStatAccessor_LocalStorage::Get(const std::string &key) {
+std::optional<ObjStat> ObjectStatAccessor::Get(const std::string &key) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
@@ -208,7 +57,7 @@ std::optional<ObjStat> ObjectStatAccessor_LocalStorage::Get(const std::string &k
     return map_iter->second;
 }
 
-std::optional<ObjStat> ObjectStatAccessor_LocalStorage::GetNoCount(const std::string &key) {
+std::optional<ObjStat> ObjectStatAccessor::GetNoCount(const std::string &key) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
@@ -217,7 +66,7 @@ std::optional<ObjStat> ObjectStatAccessor_LocalStorage::GetNoCount(const std::st
     return map_iter->second;
 }
 
-std::optional<ObjStat> ObjectStatAccessor_LocalStorage::Release(const std::string &key, std::vector<std::string> &drop_keys) {
+std::optional<ObjStat> ObjectStatAccessor::Release(const std::string &key, std::vector<std::string> &drop_keys) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
@@ -230,7 +79,7 @@ std::optional<ObjStat> ObjectStatAccessor_LocalStorage::Release(const std::strin
     return map_iter->second;
 }
 
-void ObjectStatAccessor_LocalStorage::PutNew(const std::string &key, ObjStat obj_stat, std::vector<std::string> &drop_keys) {
+void ObjectStatAccessor::PutNew(const std::string &key, ObjStat obj_stat, std::vector<std::string> &drop_keys) {
     this->AddObjStatToKVStore(key, obj_stat);
 
     std::unique_lock<std::mutex> lock(mutex_);
@@ -242,9 +91,9 @@ void ObjectStatAccessor_LocalStorage::PutNew(const std::string &key, ObjStat obj
     obj_map_.emplace_hint(map_iter, key, std::move(obj_stat));
 }
 
-void ObjectStatAccessor_LocalStorage::PutNoCount(const std::string &key, ObjStat obj_stat) {
+void ObjectStatAccessor::PutNoCount(const std::string &key, ObjStat obj_stat) {
     obj_stat.cached_ = ObjCached::kCached;
-    this->AddObjStatToKVStore(key, obj_stat);
+    this->AddObjStatToKVStore(key, obj_stat); // obj_stat.ref_count_ isn't update if key can be found in obj_map_
 
     std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
@@ -255,7 +104,7 @@ void ObjectStatAccessor_LocalStorage::PutNoCount(const std::string &key, ObjStat
     obj_map_.insert_or_assign(key, std::move(obj_stat));
 }
 
-std::optional<ObjStat> ObjectStatAccessor_LocalStorage::Invalidate(const std::string &key) {
+std::optional<ObjStat> ObjectStatAccessor::Invalidate(const std::string &key) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto iter = obj_map_.find(key);
     if (iter == obj_map_.end()) {
@@ -268,47 +117,14 @@ std::optional<ObjStat> ObjectStatAccessor_LocalStorage::Invalidate(const std::st
     return obj_stat;
 }
 
-void ObjectStatAccessor_LocalStorage::CheckValid(size_t current_object_size) {
+void ObjectStatAccessor::CheckValid(size_t current_object_size) {
     std::unique_lock<std::mutex> lock(mutex_);
     for (auto &[obj_key, obj_stat] : obj_map_) {
         obj_stat.CheckValid(obj_key, current_object_size);
     }
 }
 
-nlohmann::json ObjectStatAccessor_LocalStorage::Serialize() {
-    std::unique_lock<std::mutex> lock(mutex_);
-    nlohmann::json json_obj;
-    json_obj["obj_stat_size"] = obj_map_.size();
-    json_obj["obj_stat_array"] = nlohmann::json::array();
-    for (auto &[obj_key, obj_stat] : obj_map_) {
-        nlohmann::json pair;
-        pair["obj_key"] = obj_key;
-        pair["obj_stat"] = obj_stat.Serialize();
-        json_obj["obj_stat_array"].emplace_back(pair);
-    }
-    return json_obj;
-}
-
-void ObjectStatAccessor_LocalStorage::Deserialize(std::string_view obj_str) {
-    simdjson::padded_string obj_json(obj_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(obj_json);
-    std::unique_lock<std::mutex> lock(mutex_);
-    // size_t len = 0;
-    // if (size_t len_json; doc["obj_stat_size"].get<size_t>(len_json) == simdjson::SUCCESS) {
-    //     len = len_json;
-    // }
-    for (simdjson::array array = doc["obj_stat_array"]; auto item : array) {
-        std::string obj_key = item["obj_key"].get<std::string>();
-        ObjStat obj_stat;
-        obj_stat.Deserialize(item["obj_stat"].raw_json());
-        obj_stat.cached_ = ObjCached::kCached;
-        obj_map_.emplace(obj_key, std::move(obj_stat));
-        LOG_TRACE(fmt::format("Deserialize added object {}", obj_key));
-    }
-}
-
-void ObjectStatAccessor_LocalStorage::Deserialize(KVInstance *kv_instance) {
+void ObjectStatAccessor::Deserialize(KVInstance *kv_instance) {
     const std::string &obj_stat_prefix = KeyEncode::PMObjectStatPrefix();
     size_t obj_stat_prefix_len = obj_stat_prefix.size();
 
@@ -327,163 +143,39 @@ void ObjectStatAccessor_LocalStorage::Deserialize(KVInstance *kv_instance) {
     }
 }
 
-std::unordered_map<std::string, ObjStat> ObjectStatAccessor_LocalStorage::GetAllObjects() const {
+std::unordered_map<std::string, ObjStat> ObjectStatAccessor::GetAllObjects() const {
     std::unique_lock<std::mutex> lock(mutex_);
     return obj_map_;
 }
 
-// ObjectStatAccessor_ObjectStorage
-
-ObjectStatAccessor_ObjectStorage::ObjectStatAccessor_ObjectStorage(size_t disk_capacity_limit) : disk_capacity_limit_(disk_capacity_limit) {}
-
-ObjectStatAccessor_ObjectStorage::~ObjectStatAccessor_ObjectStorage() = default;
-
-std::optional<ObjStat> ObjectStatAccessor_ObjectStorage::Get(const std::string &key) {
-    std::unique_lock<std::shared_mutex> lock(mutex_);
-    ObjStat *obj_stat = obj_map_.Get(key);
-    if (obj_stat == nullptr) {
-        return std::nullopt;
+void ObjectStatAccessor::AddObjStatToKVStore(const std::string &key, const ObjStat &obj_stat) {
+    Storage *storage = InfinityContext::instance().storage();
+    if (!storage) {
+        return;
     }
-    if (disk_used_ < obj_stat->obj_size_) {
-        UnrecoverableError(fmt::format("Object {} size {} is larger than disk used {}", key, obj_stat->obj_size_, disk_used_));
+    KVStore *kv_store = storage->kv_store();
+    if (!kv_store) {
+        return;
     }
-    disk_used_ -= obj_stat->obj_size_;
-    return *obj_stat;
-}
-
-std::optional<ObjStat> ObjectStatAccessor_ObjectStorage::GetNoCount(const std::string &key) {
-    std::shared_lock<std::shared_mutex> lock(mutex_);
-    ObjStat *obj_stat = obj_map_.GetNoCount(key);
-    if (obj_stat == nullptr) {
-        return std::nullopt;
-    }
-    return *obj_stat;
-}
-
-std::optional<ObjStat> ObjectStatAccessor_ObjectStorage::Release(const std::string &key, std::vector<std::string> &drop_keys) {
-    std::unique_lock<std::shared_mutex> lock(mutex_);
-    auto [release_ok, obj_stat] = obj_map_.Release(key);
-    if (!release_ok) {
-        return *obj_stat;
-    }
-    disk_used_ += obj_stat->obj_size_;
-    if (disk_used_ > disk_capacity_limit_) {
-        EnvictNoLock(drop_keys);
-    }
-    return *obj_stat;
-}
-
-void ObjectStatAccessor_ObjectStorage::PutNew(const std::string &key, ObjStat obj_stat, std::vector<std::string> &drop_keys) {
-    std::unique_lock<std::shared_mutex> lock(mutex_);
-    this->AddObjStatToKVStore(key, obj_stat);
-
-    obj_map_.PutNew(key, std::move(obj_stat));
-    disk_used_ += obj_stat.obj_size_;
-    if (disk_used_ > disk_capacity_limit_) {
-        EnvictNoLock(drop_keys);
+    Status status = kv_store->Put(KeyEncode::PMObjectStatKey(key), obj_stat.ToString());
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
     }
 }
 
-void ObjectStatAccessor_ObjectStorage::PutNoCount(const std::string &key, ObjStat obj_stat) {
-    this->AddObjStatToKVStore(key, obj_stat);
-    std::unique_lock<std::shared_mutex> lock(mutex_);
-    obj_map_.PutNew(key, std::move(obj_stat));
-}
-
-std::optional<ObjStat> ObjectStatAccessor_ObjectStorage::Invalidate(const std::string &key) {
-    std::unique_lock<std::shared_mutex> lock(mutex_);
-    std::optional<ObjStat> obj_stat = obj_map_.Invalidate(key);
-    if (!obj_stat.has_value()) {
-        return std::nullopt;
+void ObjectStatAccessor::RemoveObjStatFromKVStore(const std::string &key) {
+    Storage *storage = InfinityContext::instance().storage();
+    if (!storage) {
+        return;
     }
-    disk_used_ -= obj_stat->obj_size_;
-
-    this->RemoveObjStatFromKVStore(key);
-    return obj_stat;
-}
-
-void ObjectStatAccessor_ObjectStorage::CheckValid(size_t current_object_size) {
-    std::shared_lock<std::shared_mutex> lock(mutex_);
-    for (const auto &[obj_key, lru_iter] : obj_map_.obj_map()) {
-        lru_iter->obj_stat_.CheckValid(obj_key, current_object_size);
+    KVStore *kv_store = storage->kv_store();
+    if (!kv_store) {
+        return;
     }
-}
-
-nlohmann::json ObjectStatAccessor_ObjectStorage::Serialize() {
-    std::shared_lock<std::shared_mutex> lock(mutex_);
-    nlohmann::json json_obj;
-    json_obj["obj_stat_size"] = obj_map_.obj_map().size();
-    json_obj["obj_stat_array"] = nlohmann::json::array();
-    for (const auto &[obj_key, lru_iter] : obj_map_.obj_map()) {
-        nlohmann::json pair;
-        pair["obj_key"] = obj_key;
-        pair["obj_stat"] = lru_iter->obj_stat_.Serialize();
-        json_obj["obj_stat_array"].emplace_back(pair);
+    Status status = kv_store->Delete(KeyEncode::PMObjectStatKey(key));
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
     }
-    return json_obj;
-}
-
-void ObjectStatAccessor_ObjectStorage::Deserialize(std::string_view obj_str) {
-    simdjson::padded_string obj_json(obj_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(obj_json);
-    // size_t len = 0;
-    // if (auto item = doc["obj_stat_size"]; item.error() == simdjson::SUCCESS) {
-    //     len = item.get<size_t>();
-    // }
-    std::unique_lock<std::shared_mutex> lock(mutex_);
-    for (simdjson::array array = doc["obj_stat_array"]; auto item : array) {
-        std::string obj_key = item["obj_key"].get<std::string>();
-        ObjStat obj_stat;
-        obj_stat.Deserialize(item["obj_stat"].raw_json());
-        obj_stat.cached_ = ObjCached::kNotCached;
-        obj_map_.PutNew(obj_key, std::move(obj_stat));
-        LOG_TRACE(fmt::format("Deserialize added object {}", obj_key));
-    }
-}
-
-void ObjectStatAccessor_ObjectStorage::Deserialize(KVInstance *kv_instance) {
-    const std::string &obj_stat_prefix = KeyEncode::PMObjectStatPrefix();
-    size_t obj_stat_prefix_len = obj_stat_prefix.size();
-
-    auto iter = kv_instance->GetIterator();
-
-    std::unique_lock<std::shared_mutex> lock(mutex_);
-    while (iter->Valid() && iter->Key().starts_with(obj_stat_prefix)) {
-        std::string obj_key = iter->Key().ToString().substr(obj_stat_prefix_len);
-        std::string obj_value = iter->Value().ToString();
-        ObjStat obj_stat;
-        obj_stat.Deserialize(obj_value);
-        obj_stat.cached_ = ObjCached::kNotCached;
-        LOG_TRACE(fmt::format("Deserialize added object {}", obj_key));
-        obj_map_.PutNew(std::move(obj_key), std::move(obj_stat));
-        iter->Next();
-    }
-}
-
-std::unordered_map<std::string, ObjStat> ObjectStatAccessor_ObjectStorage::GetAllObjects() const {
-    std::unordered_map<std::string, ObjStat> res;
-    std::shared_lock<std::shared_mutex> lock(mutex_);
-    for (const auto &[key, lru_iter] : obj_map_.obj_map()) {
-        res.emplace(key, lru_iter->obj_stat_);
-    }
-    return res;
-}
-
-bool ObjectStatAccessor_ObjectStorage::EnvictNoLock(std::vector<std::string> &drop_keys) {
-    while (disk_used_ > disk_capacity_limit_) {
-        LRUListEntry *lru_entry = obj_map_.EnvictLast();
-        if (lru_entry == nullptr) {
-            break;
-        }
-        drop_keys.push_back(lru_entry->key_);
-        disk_used_ -= lru_entry->obj_stat_.obj_size_;
-    }
-    if (disk_used_ > disk_capacity_limit_) {
-        LOG_WARN(fmt::format("Envict disk used {} is larger than disk capacity limit {}", disk_used_, disk_capacity_limit_));
-        return false;
-    }
-    return true;
 }
 
 } // namespace infinity
