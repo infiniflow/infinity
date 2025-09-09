@@ -241,7 +241,7 @@ jobs:
             flock /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/lock -c "rsync -a infiniflow@${BUILD_IP}:/home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/infinity /home/infiniflow/artifacts/infinity/${CONTAINER_NAME}/"
 
       - name: Prepare data dir & Start test container
-#        id: start
+        #        id: start
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
@@ -420,6 +420,11 @@ jobs:
         run: |
           sudo docker rm -f -v ${TEST_CONTAINER_NAME}
           sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
+
+      - name: Remove minio container
+        if: always()
+        run: |
+          sudo docker rm -f -v ${MINIO_CONTAINER}
 
   debug_restart_test:
     name: debug_restart_test
@@ -1232,6 +1237,11 @@ jobs:
         run: |
           sudo docker rm -f -v ${TEST_CONTAINER_NAME}
           sudo rm -rf /var/infinity/${TEST_CONTAINER_NAME}/
+
+      - name: Remove minio container
+        if: always()
+        run: |
+          sudo docker rm -f -v ${MINIO_CONTAINER}
 
   release_pysdk_remote_test:
     name: release_pysdk_remote_test
