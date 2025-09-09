@@ -83,7 +83,7 @@ TEST_P(UploadMetaToS3, DISABLED_MINIO_test1) {
     {
         auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
         auto *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-        auto status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+        auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
         EXPECT_TRUE(status.ok());
         status = txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -120,7 +120,8 @@ TEST_P(UploadMetaToS3, DISABLED_MINIO_test1) {
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         std::vector<SegmentID> *segment_ids_ptr = nullptr;
