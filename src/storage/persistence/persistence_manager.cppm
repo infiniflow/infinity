@@ -30,7 +30,7 @@ namespace infinity {
 
 class KVStore;
 class KVInstance;
-class ObjectStatAccessorBase;
+class ObjectStatAccessor;
 
 export struct ObjAddr {
     std::string obj_key_{};
@@ -117,12 +117,11 @@ private:
     void CurrentObjAppendNoLock(const std::string &tmp_file_path, size_t file_size);
 
     // Finalize current object.
-    void CurrentObjFinalizeNoLock(std::vector<std::string> &persist_keys, std::vector<std::string> &drop_keys);
+    void CurrentObjFinalizeNoLock(std::vector<std::string> &persist_keys);
 
     // Cleanup
     void CleanupNoLock(const ObjAddr &object_addr,
                        std::vector<std::string> &persist_keys,
-                       std::vector<std::string> &drop_keys,
                        std::vector<std::string> &drop_from_remote_keys,
                        bool check_ref_count = false);
 
@@ -147,7 +146,7 @@ private:
 
     mutable std::mutex mtx_;
     // std::unordered_map<std::string, ObjStat> objects_;        // obj_key -> ObjStat
-    std::unique_ptr<ObjectStatAccessorBase> objects_; // obj_key -> ObjStat
+    std::unique_ptr<ObjectStatAccessor> objects_; // obj_key -> ObjStat
     // Current unsealed object key
     std::string current_object_key_;
     size_t current_object_size_ = 0;

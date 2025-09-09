@@ -77,7 +77,7 @@ ObjAddr ObjAddr::ReadBufAdv(const char *&buf) {
 PersistenceManager::PersistenceManager(const std::string &workspace, const std::string &data_dir, size_t object_size_limit, bool local_storage)
     : workspace_(workspace), local_data_dir_(data_dir), object_size_limit_(object_size_limit) {
     if (local_storage) {
-        objects_ = std::make_unique<ObjectStatAccessor_LocalStorage>();
+        objects_ = std::make_unique<ObjectStatAccessor>();
     } else {
         UnrecoverableError("Remote storage is not supported yet.");
     }
@@ -124,7 +124,7 @@ PersistWriteResult PersistenceManager::Persist(const std::string &file_path, con
         // Cleanup the file if it already exists in the KV
         ObjAddr obj_addr;
         obj_addr.Deserialize(pm_fp_value);
-        CleanupNoLock(obj_addr, result.persist_keys_, result.drop_keys_, result.drop_from_remote_keys_);
+        CleanupNoLock(obj_addr, result.persist_keys_, result.drop_from_remote_keys_);
         LOG_TRACE(fmt::format("Persist deleted mapping from local path {} to ObjAddr({}, {}, {})",
                               local_path,
                               obj_addr.obj_key_,
@@ -162,7 +162,7 @@ PersistWriteResult PersistenceManager::Persist(const std::string &file_path, con
         }
         ObjAddr obj_addr(obj_key, 0, src_size);
         std::lock_guard<std::mutex> lock(mtx_);
-        objects_->PutNew(obj_key, ObjStat(src_size, 1, 0), result.drop_keys_);
+        objects_->PutNew(obj_key, ObjStat(src_size, 1, 0));
         LOG_TRACE(fmt::format("Persist added dedicated object {}", obj_key));
 
         status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump());
@@ -181,7 +181,7 @@ PersistWriteResult PersistenceManager::Persist(const std::string &file_path, con
     }
     std::lock_guard<std::mutex> lock(mtx_);
     if (int(src_size) >= CurrentObjRoomNoLock()) {
-        CurrentObjFinalizeNoLock(result.persist_keys_, result.drop_keys_);
+        CurrentObjFinalizeNoLock(result.persist_keys_);
     }
     current_object_size_ = (current_object_size_ + ObjAlignment - 1) & ~(ObjAlignment - 1);
     ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
@@ -211,7 +211,7 @@ PersistWriteResult PersistenceManager::CurrentObjFinalize(bool validate) {
     PersistWriteResult result;
     {
         std::lock_guard<std::mutex> lock(mtx_);
-        CurrentObjFinalizeNoLock(result.persist_keys_, result.drop_keys_);
+        CurrentObjFinalizeNoLock(result.persist_keys_);
     }
 
     if (validate) {
@@ -257,7 +257,7 @@ void PersistenceManager::CheckValid() {
                          static_cast<TimeDurationType>(part2_end - part2_begin).count()));
 }
 
-void PersistenceManager::CurrentObjFinalizeNoLock(std::vector<std::string> &persist_keys, std::vector<std::string> &drop_keys) {
+void PersistenceManager::CurrentObjFinalizeNoLock(std::vector<std::string> &persist_keys) {
     if (current_object_size_ > 0) {
         persist_keys.push_back(current_object_key_);
         if (current_object_parts_ > 1) {
@@ -273,7 +273,7 @@ void PersistenceManager::CurrentObjFinalizeNoLock(std::vector<std::string> &pers
             outFile.close();
         }
 
-        objects_->PutNew(current_object_key_, ObjStat(current_object_size_, current_object_parts_, current_object_ref_count_), drop_keys);
+        objects_->PutNew(current_object_key_, ObjStat(current_object_size_, current_object_parts_, current_object_ref_count_));
         LOG_TRACE(fmt::format("CurrentObjFinalizeNoLock added composed object {}", current_object_key_));
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
@@ -408,7 +408,7 @@ PersistWriteResult PersistenceManager::PutObjCache(const std::string &file_path)
         current_object_ref_count_--;
         LOG_TRACE(fmt::format("PutObjCache current object {} ref count {}", obj_addr.obj_key_, current_object_ref_count_));
     } else {
-        std::optional<ObjStat> obj_stat = objects_->Release(obj_addr.obj_key_, result.drop_keys_);
+        std::optional<ObjStat> obj_stat = objects_->Release(obj_addr.obj_key_);
         if (obj_stat) {
             LOG_TRACE(fmt::format("PutObjCache object {} ref count {}", obj_addr.obj_key_, obj_stat->ref_count_));
         } else {
@@ -477,7 +477,6 @@ void PersistenceManager::CurrentObjAppendNoLock(const std::string &tmp_file_path
 
 void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
                                        std::vector<std::string> &persist_keys,
-                                       std::vector<std::string> &drop_keys,
                                        std::vector<std::string> &drop_from_remote_keys,
                                        bool check_ref_count) {
     std::optional<ObjStat> obj_stat = objects_->GetNoCount(object_addr.obj_key_);
@@ -486,7 +485,7 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
             assert(object_addr.part_size_ == 0);
             return;
         } else if (object_addr.obj_key_ == current_object_key_) {
-            CurrentObjFinalizeNoLock(persist_keys, drop_keys);
+            CurrentObjFinalizeNoLock(persist_keys);
             obj_stat = objects_->GetNoCount(object_addr.obj_key_);
             assert(obj_stat.has_value());
         } else {
@@ -618,7 +617,7 @@ PersistWriteResult PersistenceManager::Cleanup(const std::string &file_path) {
     ObjAddr obj_addr;
     obj_addr.Deserialize(value);
 
-    CleanupNoLock(obj_addr, result.persist_keys_, result.drop_keys_, result.drop_from_remote_keys_, true);
+    CleanupNoLock(obj_addr, result.persist_keys_, result.drop_from_remote_keys_, true);
     LOG_TRACE(fmt::format("Deleted mapping from local path {} to ObjAddr({}, {}, {})",
                           local_path,
                           obj_addr.obj_key_,
