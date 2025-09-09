@@ -139,6 +139,8 @@ private:
 
     void ExecuteShowCatalog(QueryContext *query_context, ShowOperatorState *operator_state);
 
+    void ExecuteListCatalogKey(QueryContext *query_context, ShowOperatorState *operator_state);
+
     void ExecuteShowCatalogToFile(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowPersistenceFiles(QueryContext *query_context, ShowOperatorState *operator_state);

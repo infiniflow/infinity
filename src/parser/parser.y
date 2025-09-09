@@ -2087,6 +2087,13 @@ show_statement: SHOW DATABASES {
       $$ = new infinity::ShowStatement();
       $$->show_type_ = infinity::ShowStmtType::kCatalog;
 }
+| SHOW CATALOG STRING {
+      $$ = new infinity::ShowStatement();
+      $$->show_type_ = infinity::ShowStmtType::kListCatalogKey;
+      ParserHelper::ToLower($3);
+      $$->var_name_ = $3;
+      free($3);
+}
 | SHOW CATALOG TO file_path {
       $$ = new infinity::ShowStatement();
       $$->show_type_ = infinity::ShowStmtType::kCatalogToFile;
