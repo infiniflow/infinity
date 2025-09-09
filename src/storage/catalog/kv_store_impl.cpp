@@ -278,7 +278,7 @@ Status KVStore::Init(const std::string &db_path) {
     write_options_.disableWAL = true;
 
     auto *config = infinity::InfinityContext::instance().config();
-    if (config->StorageType() == StorageType::kMinio) {
+    if (config != nullptr && config->StorageType() == StorageType::kMinio) {
         options_.listeners.emplace_back(std::make_shared<FlushListener>());
         options_.listeners.emplace_back(std::make_shared<CompactListener>());
     }

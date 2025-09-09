@@ -402,7 +402,7 @@ jobs:
         id: run_unit_test_debug
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ &&
-            ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter="-*MINIO_*" > unittest_debug.log 2> unittest_debug_error.log"
+            ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > unittest_debug.log 2> unittest_debug_error.log"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -1214,7 +1214,7 @@ jobs:
         id: run_unit_test_debug
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ &&
-            ASAN_OPTIONS=detect_leaks=0 cmake-build-release/src/test_main --gtest_also_run_disabled_tests --gtest_filter="-*MINIO_*" > unittest_release.log 2> unittest_release_error.log"
+            ASAN_OPTIONS=detect_leaks=0 cmake-build-release/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > unittest_release.log 2> unittest_release_error.log"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}

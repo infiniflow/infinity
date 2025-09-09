@@ -225,7 +225,7 @@ jobs:
 
       - name: Unit test debug version only slow test
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_filter=-* --gtest_also_run_disabled_tests --gtest_filter="*SLOW_*" > unittest_debug.log 2>&1"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_filter=-* --gtest_also_run_disabled_tests --gtest_filter=*SLOW_* > unittest_debug.log 2>&1"
 
       - name: Collect infinity unit test debug output
         if: ${{ !cancelled() && failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
@@ -237,7 +237,7 @@ jobs:
 
       - name: Unit test release version only slow test
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main --gtest_filter=-* --gtest_also_run_disabled_tests --gtest_filter="*SLOW_*" > unittest_release.log 2>&1"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main --gtest_filter=-* --gtest_also_run_disabled_tests --gtest_filter=*SLOW_* > unittest_release.log 2>&1"
 
       - name: Collect infinity unit test release output
         if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
