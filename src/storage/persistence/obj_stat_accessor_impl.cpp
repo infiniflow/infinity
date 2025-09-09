@@ -66,7 +66,7 @@ std::optional<ObjStat> ObjectStatAccessor::GetNoCount(const std::string &key) {
     return map_iter->second;
 }
 
-std::optional<ObjStat> ObjectStatAccessor::Release(const std::string &key, std::vector<std::string> &drop_keys) {
+std::optional<ObjStat> ObjectStatAccessor::Release(const std::string &key) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
@@ -79,7 +79,7 @@ std::optional<ObjStat> ObjectStatAccessor::Release(const std::string &key, std::
     return map_iter->second;
 }
 
-void ObjectStatAccessor::PutNew(const std::string &key, ObjStat obj_stat, std::vector<std::string> &drop_keys) {
+void ObjectStatAccessor::PutNew(const std::string &key, ObjStat obj_stat) {
     this->AddObjStatToKVStore(key, obj_stat);
 
     std::unique_lock<std::mutex> lock(mutex_);

@@ -32,9 +32,9 @@ public:
 
     std::optional<ObjStat> GetNoCount(const std::string &key);
 
-    std::optional<ObjStat> Release(const std::string &key, std::vector<std::string> &drop_keys);
+    std::optional<ObjStat> Release(const std::string &key);
 
-    void PutNew(const std::string &key, ObjStat obj_stat, std::vector<std::string> &drop_keys);
+    void PutNew(const std::string &key, ObjStat obj_stat);
 
     void PutNoCount(const std::string &key, ObjStat obj_stat);
 
