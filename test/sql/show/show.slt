@@ -189,3 +189,9 @@ CHECK TABLE tb1;
 
 statement ok
 CHECK TABLE db1.tb1;
+
+statement ok
+USE default_db;
+
+statement ok
+DROP DATABASE db1;

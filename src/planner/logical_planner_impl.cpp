@@ -1771,6 +1771,16 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, std::shared_ptr<BindC
 
             break;
         }
+        case ShowStmtType::kListCatalogKey: {
+            this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                ShowStmtType::kListCatalogKey,
+                                                                statement->schema_name_,
+                                                                statement->var_name_,
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                statement->file_path_);
+
+            break;
+        }
         case ShowStmtType::kCatalogToFile: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                 ShowStmtType::kCatalogToFile,

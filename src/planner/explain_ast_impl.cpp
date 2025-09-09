@@ -729,6 +729,10 @@ ExplainAST::BuildShow(const ShowStatement *show_statement, std::shared_ptr<std::
             result->emplace_back(std::make_shared<std::string>("SHOW CATALOG"));
             break;
         }
+        case ShowStmtType::kListCatalogKey: {
+            result->emplace_back(std::make_shared<std::string>("LIST CATALOG KEY"));
+            break;
+        }
         case ShowStmtType::kCatalogToFile: {
             result->emplace_back(std::make_shared<std::string>("SHOW CATALOG TO FILE"));
             break;
