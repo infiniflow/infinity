@@ -294,7 +294,12 @@ void BufferManager::FreeUnloadBuffer(BufferObj *buffer_obj) {
     size_t buffer_size = buffer_obj->GetBufferSize();
     [[maybe_unused]] auto memory_size = current_memory_size_.fetch_sub(buffer_size);
     if (memory_size < buffer_size) {
-        UnrecoverableError(fmt::format("BufferManager::FreeUnloadBuffer: memory_size < buffer_size: {} < {}", memory_size, buffer_size));
+        current_memory_size_ = 0;
+        const std::string error_message = fmt::format("BufferManager::FreeUnloadBuffer: memory_size < buffer_size: {} < {}, current_memory_size: {}",
+                                                      memory_size,
+                                                      buffer_size,
+                                                      current_memory_size_.load());
+        LOG_WARN(error_message);
     }
 }
 

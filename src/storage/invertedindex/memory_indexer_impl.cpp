@@ -84,7 +84,7 @@ MemoryIndexer::MemoryIndexer(const std::string &index_dir,
                              const std::string &analyzer)
     : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), posting_format_(PostingFormatOption(flag_)),
       analyzer_(analyzer), inverting_thread_pool_(infinity::InfinityContext::instance().GetFulltextInvertingThreadPool()),
-      commiting_thread_pool_(infinity::InfinityContext::instance().GetFulltextCommitingThreadPool()), ring_inverted_(15UL), ring_sorted_(13UL) {
+      commiting_thread_pool_(infinity::InfinityContext::instance().GetFulltextCommitingThreadPool()), ring_sorted_(13UL) {
     assert(std::filesystem::path(index_dir).is_absolute());
     posting_table_ = std::make_shared<PostingTable>();
     prepared_posting_ = std::make_shared<PostingWriter>(posting_format_, column_lengths_);
@@ -153,7 +153,9 @@ void MemoryIndexer::Insert(std::shared_ptr<ColumnVector> column_vector, u32 row_
             // LOG_INFO(fmt::format("online inverter {} begin", id));
             size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
             column_length_sum_ += column_length_sum;
-            this->ring_inverted_.Put(task->task_seq_, inverter);
+            inverter->MergePrepare();
+            inverter->Sort();
+            this->ring_sorted_.Put(task->task_seq_, inverter);
             // LOG_INFO(fmt::format("online inverter {} end", id));
         };
         {
@@ -210,7 +212,9 @@ void MemoryIndexer::AsyncInsertBottom(const std::shared_ptr<ColumnVector> &colum
         // LOG_INFO(fmt::format("online inverter {} begin", id));
         size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
         column_length_sum_ += column_length_sum;
-        this->ring_inverted_.Put(task->task_seq_, inverter);
+        inverter->MergePrepare();
+        inverter->Sort();
+        this->ring_sorted_.Put(task->task_seq_, inverter);
         // LOG_INFO(fmt::format("online inverter {} end", id));
         {
             std::unique_lock lock(append_batch->mtx_);
@@ -253,7 +257,9 @@ std::unique_ptr<std::binary_semaphore> MemoryIndexer::AsyncInsert(std::shared_pt
         // LOG_INFO(fmt::format("online inverter {} begin", id));
         size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
         column_length_sum_ += column_length_sum;
-        this->ring_inverted_.Put(task->task_seq_, inverter);
+        inverter->MergePrepare();
+        inverter->Sort();
+        this->ring_sorted_.Put(task->task_seq_, inverter);
         // LOG_INFO(fmt::format("online inverter {} end", id));
         CommitSync(100);
     };
@@ -318,24 +324,12 @@ size_t MemoryIndexer::CommitOffline(size_t wait_if_empty_ms) {
 }
 
 size_t MemoryIndexer::CommitSync(size_t wait_if_empty_ms) {
-    std::shared_lock commit_sync_lock(mutex_commit_sync_share_);
-    std::vector<std::shared_ptr<ColumnInverter>> inverters;
-    // LOG_INFO("MemoryIndexer::CommitSync begin");
-    u64 seq_commit = this->ring_inverted_.GetBatch(inverters);
-    size_t num_sorted = inverters.size();
-    size_t num_generated = 0;
-    // size_t num_merged = 0;
-    if (num_sorted > 0) {
-        ColumnInverter::Merge(inverters);
-        inverters[0]->Sort();
-        this->ring_sorted_.Put(seq_commit, inverters[0]);
-    };
-
     std::unique_lock<std::mutex> lock(mutex_commit_, std::defer_lock);
     if (!lock.try_lock()) {
         return 0;
     }
-
+    size_t num_generated = 0;
+    std::vector<std::shared_ptr<ColumnInverter>> inverters;
     MemUsageChange mem_usage_change = {true, 0};
     while (true) {
         this->ring_sorted_.GetBatch(inverters, wait_if_empty_ms);

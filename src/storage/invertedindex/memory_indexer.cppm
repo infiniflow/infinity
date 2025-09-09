@@ -165,7 +165,6 @@ private:
     u32 doc_count_{0};
     std::shared_ptr<PostingTable> posting_table_;
     PostingPtr prepared_posting_{nullptr};
-    Ring<std::shared_ptr<ColumnInverter>> ring_inverted_;
     Ring<std::shared_ptr<ColumnInverter>> ring_sorted_;
     u64 seq_inserted_{0};
     u64 inflight_tasks_{0};

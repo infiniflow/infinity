@@ -314,7 +314,7 @@ QueryResult Infinity::ShowVariable(const std::string &variable_name, SetScope sc
 
     std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->var_name_ = variable_name;
-    ToLower(show_statement->var_name_);
+    ToLower(*show_statement->var_name_);
     switch (scope) {
         case SetScope::kGlobal: {
             show_statement->show_type_ = ShowStmtType::kGlobalVariable;
@@ -362,7 +362,7 @@ QueryResult Infinity::ShowConfig(const std::string &config_name) {
 
     std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
     show_statement->var_name_ = config_name;
-    ToLower(show_statement->var_name_);
+    ToLower(*show_statement->var_name_);
 
     show_statement->show_type_ = ShowStmtType::kConfig;
 

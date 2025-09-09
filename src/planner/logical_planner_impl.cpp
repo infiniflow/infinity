@@ -297,7 +297,8 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, std::s
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
     std::string table_key;
-    Status status = new_txn->GetTableMeta(schema_name, table_name, db_meta, table_meta, &table_key);
+    TxnTimeStamp create_timestamp;
+    Status status = new_txn->GetTableMeta(schema_name, table_name, db_meta, table_meta, create_timestamp, &table_key);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -459,7 +460,8 @@ Status LogicalPlanner::BuildInsertSelect(const InsertStatement *statement, std::
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
     std::string table_key;
-    Status status = new_txn->GetTableMeta(schema_name, table_name, db_meta, table_meta, &table_key);
+    TxnTimeStamp create_timestamp;
+    Status status = new_txn->GetTableMeta(schema_name, table_name, db_meta, table_meta, create_timestamp, &table_key);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -817,7 +819,12 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
 
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
-    Status status = new_txn->GetTableMeta(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_, db_meta, table_meta);
+    TxnTimeStamp create_timestamp;
+    Status status = new_txn->GetTableMeta(*base_table_ref->table_info_->db_name_,
+                                          *base_table_ref->table_info_->table_name_,
+                                          db_meta,
+                                          table_meta,
+                                          create_timestamp);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -1078,7 +1085,8 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, std::shared_p
     NewTxn *new_txn = query_context_ptr_->GetNewTxn();
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
-    status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, table_meta);
+    TxnTimeStamp create_timestamp;
+    status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -1230,7 +1238,8 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, std::shared_p
     NewTxn *new_txn = query_context_ptr_->GetNewTxn();
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
-    Status status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, table_meta);
+    TxnTimeStamp create_timestamp;
+    Status status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -1267,7 +1276,8 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, std::shared_ptr<Bin
     Status status;
     std::shared_ptr<TableMeeta> table_meta;
     std::shared_ptr<DBMeeta> db_meta;
-    status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, table_meta);
+    TxnTimeStamp create_timestamp;
+    status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -1385,7 +1395,9 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, s
             auto *new_txn = query_context_ptr_->GetNewTxn();
             std::shared_ptr<DBMeeta> db_meta;
             std::shared_ptr<TableMeeta> table_meta;
-            Status status = new_txn->GetTableMeta(query_context_ptr_->schema_name(), check_table->table_name(), db_meta, table_meta);
+            TxnTimeStamp create_timestamp;
+            Status status =
+                new_txn->GetTableMeta(query_context_ptr_->schema_name(), check_table->table_name(), db_meta, table_meta, create_timestamp);
             if (!status.ok()) {
                 return status;
             }
@@ -1759,6 +1771,16 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, std::shared_ptr<BindC
 
             break;
         }
+        case ShowStmtType::kListCatalogKey: {
+            this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                ShowStmtType::kListCatalogKey,
+                                                                statement->schema_name_,
+                                                                statement->var_name_,
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                statement->file_path_);
+
+            break;
+        }
         case ShowStmtType::kCatalogToFile: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                 ShowStmtType::kCatalogToFile,
@@ -1908,6 +1930,129 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, std::shared_ptr<BindC
                                                                 std::nullopt);
             break;
         }
+        case ShowStmtType::kListCompact: {
+            this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                ShowStmtType::kListCompact,
+                                                                "",
+                                                                "",
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                statement->show_nullable_);
+            break;
+        }
+        case ShowStmtType::kListCheckpoint: {
+            this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                ShowStmtType::kListCheckpoint,
+                                                                "",
+                                                                "",
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                statement->show_nullable_);
+            break;
+        }
+        case ShowStmtType::kShowCheckpoint: {
+            this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                ShowStmtType::kShowCheckpoint,
+                                                                "",
+                                                                "",
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                statement->txn_id_,
+                                                                std::nullopt);
+            break;
+        }
+        case ShowStmtType::kListOptimize: {
+            this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                ShowStmtType::kListOptimize,
+                                                                "",
+                                                                "",
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                statement->show_nullable_);
+            break;
+        }
+        case ShowStmtType::kListImport: {
+            this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                ShowStmtType::kListImport,
+                                                                "",
+                                                                "",
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt);
+            break;
+        }
+        case ShowStmtType::kListClean: {
+            this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                ShowStmtType::kListClean,
+                                                                "",
+                                                                "",
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                statement->show_nullable_);
+            break;
+        }
+        case ShowStmtType::kShowClean: {
+            this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                ShowStmtType::kShowClean,
+                                                                "",
+                                                                "",
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                statement->txn_id_,
+                                                                std::nullopt);
+            break;
+        }
         default: {
             UnrecoverableError("Unexpected show statement type.");
         }
@@ -2030,7 +2175,8 @@ Status LogicalPlanner::BuildCheck(const CheckStatement *statement, std::shared_p
                 check_statement->schema_name_ = query_context_ptr_->schema_name();
             }
             std::optional<std::string> schema_name = statement->schema_name_;
-            Status status = new_txn->GetTableMeta(schema_name.value(), table_name.value(), db_meta, table_meta, &table_key);
+            TxnTimeStamp create_timestamp;
+            Status status = new_txn->GetTableMeta(schema_name.value(), table_name.value(), db_meta, table_meta, create_timestamp, &table_key);
             if (!status.ok()) {
                 RecoverableError(status);
             }

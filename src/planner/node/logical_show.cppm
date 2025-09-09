@@ -41,10 +41,12 @@ public:
                          std::optional<std::string> index_name = std::nullopt,
                          std::optional<TransactionID> session_id = std::nullopt,
                          std::optional<u64> txn_id = std::nullopt,
-                         std::optional<std::string> function_name = std::nullopt)
+                         std::optional<std::string> function_name = std::nullopt,
+                         bool show_nullable = true)
         : LogicalNode(node_id, LogicalNodeType::kShow), show_type_(type), schema_name_(std::move(schema_name)), object_name_(std::move(object_name)),
           table_index_(table_index), file_path_(std::move(file_path)), segment_id_(segment_id), block_id_(block_id), chunk_id_(chunk_id),
-          column_id_(column_id), index_name_(index_name), session_id_(session_id), txn_id_(txn_id), function_name_(function_name) {}
+          column_id_(column_id), index_name_(index_name), session_id_(session_id), txn_id_(txn_id), function_name_(function_name),
+          show_nullable_(show_nullable) {}
 
     [[nodiscard]] std::vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -82,6 +84,8 @@ public:
 
     [[nodiscard]] inline const std::optional<std::string> function_name() const { return function_name_; }
 
+    [[nodiscard]] inline bool show_nullable() const { return show_nullable_; }
+
 private:
     ShowStmtType show_type_{ShowStmtType::kInvalid};
     std::string schema_name_;
@@ -97,6 +101,7 @@ private:
     std::optional<u64> session_id_{};
     std::optional<TransactionID> txn_id_{};
     std::optional<std::string> function_name_{};
+    bool show_nullable_{};
 };
 
 } // namespace infinity
