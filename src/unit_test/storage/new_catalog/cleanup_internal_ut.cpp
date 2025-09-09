@@ -19,7 +19,6 @@ module;
 module infinity_core:ut.cleanup_internal;
 
 import :ut.base_test;
-import third_party;
 import :status;
 import :new_catalog;
 import :new_txn_manager;
@@ -60,6 +59,8 @@ import :roaring_bitmap;
 import :index_filter_evaluators;
 import :index_emvb;
 import :wal_manager;
+
+import third_party;
 
 import extra_ddl_info;
 import column_def;

@@ -223,39 +223,9 @@ jobs:
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && mkdir -p cmake-build-debug && cmake --build /infinity/cmake-build-debug --target test_main"
 
-#      - name: Start infinity debug version
-#        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
-#        run: |
-#          # Run a command in the background
-#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_continuous_conf.toml > debug.log 2> debug_error.log" &
-
-#      - name: Run sqllogictest debug version
-#        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
-#        id: run_ci_sqllogictest_debug
-#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py" && sleep 1s
-
-#      - name: Stop infinity sqllogictest debug
-#        if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
-#        id: stop_ci_sqllogictest_debug
-#        run: |
-#          sudo chmod +x scripts/timeout_kill.sh
-#          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
-#          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
-#          if [ $? -ne 0 ]; then
-#              echo "Failed to kill infinity debug version"
-#              exit 1
-#          fi
-
-#      - name: Collect infinity debug output
-#        if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }} # always run this step even if previous steps failed
-#        run: |
-#          failure="${{ steps.run_ci_sqllogictest_debug.outcome == 'failure' || steps.stop_ci_sqllogictest_debug.outcome == 'failure' }}"
-#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
-#          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=debug.log --stderror_path=debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-
-      - name: Unit test debug version only disabled test
+      - name: Unit test debug version only slow test
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_filter=-* --gtest_also_run_disabled_tests > unittest_debug.log 2>&1"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_filter=-* --gtest_also_run_disabled_tests --gtest_filter=*SLOW_* > unittest_debug.log 2>&1"
 
       - name: Collect infinity unit test debug output
         if: ${{ !cancelled() && failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
@@ -265,39 +235,9 @@ jobs:
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && mkdir -p cmake-build-release && cmake --build /infinity/cmake-build-release --target test_main"
 
-#      - name: Start infinity release version
-#        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
-#        run: |
-#          # Run a command in the background
-#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_continuous_conf.toml > release.log 2> release_error.log" &
-#
-#      - name: Run sqllogictest release version
-#        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
-#        id: run_ci_sqllogictest_release
-#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/sqllogictest.py" && sleep 1s
-#
-#      - name: Stop infinity sqllogictest release
-#        if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
-#        id: stop_ci_sqllogictest_release
-#        run: |
-#          sudo chmod +x scripts/timeout_kill.sh
-#          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
-#          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
-#          if [ $? -ne 0 ]; then
-#              echo "Failed to kill infinity release version"
-#              exit 1
-#          fi
-#
-#      - name: Collect infinity release output
-#        if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }} # always run this step even if previous steps failed
-#        run: |
-#          failure="${{ steps.run_ci_sqllogictest_release.outcome == 'failure' || steps.stop_ci_sqllogictest_release.outcome == 'failure' }}"
-#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
-#          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=release.log --stderror_path=release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-
-      - name: Unit test release version only disabled test
+      - name: Unit test release version only slow test
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main --gtest_filter=-* --gtest_also_run_disabled_tests > unittest_release.log 2>&1"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main --gtest_filter=-* --gtest_also_run_disabled_tests --gtest_filter=*SLOW_* > unittest_release.log 2>&1"
 
       - name: Collect infinity unit test release output
         if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_CI_SLOW_TEST == 'true' }}

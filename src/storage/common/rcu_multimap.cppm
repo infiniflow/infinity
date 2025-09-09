@@ -4,7 +4,6 @@ export module infinity_core:rcu_multimap;
 
 import :infinity_type;
 
-import std;
 import std.compat;
 
 namespace infinity {

@@ -66,7 +66,6 @@ import :index_base;
 import :column_meta;
 import :mem_index;
 
-import std;
 import std.compat;
 import third_party;
 

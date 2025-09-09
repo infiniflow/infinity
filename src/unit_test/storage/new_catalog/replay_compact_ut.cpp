@@ -465,7 +465,7 @@ TEST_P(TestTxnReplayCompact, test_compact_interrupt) {
     }
 }
 
-TEST_P(TestTxnReplayCompact, DISABLED_test_compact_with_index) {
+TEST_P(TestTxnReplayCompact, DISABLED_SLOW_test_compact_with_index) {
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable(*db_name, table_def, ConflictType::kError);

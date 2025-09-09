@@ -28,7 +28,6 @@ import :simd_functions;
 import :smallfloat;
 import :default_values;
 
-import std;
 import std.compat;
 import third_party;
 

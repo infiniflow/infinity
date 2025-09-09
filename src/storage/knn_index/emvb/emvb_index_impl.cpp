@@ -34,7 +34,6 @@ import :block_meta;
 import :column_meta;
 import :kv_store;
 
-import std;
 import std.compat;
 import third_party;
 

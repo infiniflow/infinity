@@ -29,7 +29,6 @@ import :utility;
 import :block_version;
 import :fst.fst;
 
-import std;
 import std.compat;
 import third_party;
 

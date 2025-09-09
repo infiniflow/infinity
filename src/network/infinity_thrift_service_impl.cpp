@@ -35,7 +35,6 @@ import :column_vector;
 import :query_result;
 import :utility;
 
-import std;
 import std.compat;
 import third_party;
 

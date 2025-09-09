@@ -35,7 +35,6 @@ import :logger;
 import :buf_writer;
 import :profiler;
 
-import std;
 import std.compat;
 import third_party;
 

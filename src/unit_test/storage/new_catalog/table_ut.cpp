@@ -156,7 +156,7 @@ TEST_P(TestTxnTable, table_test2) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestTxnTable, DISABLED_createtable_createtable) {
+TEST_P(TestTxnTable, DISABLED_SLOW_createtable_createtable) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 

@@ -15,7 +15,6 @@
 #pragma once
 
 import infinity_core;
-import std;
 import std.compat;
 
 using namespace infinity;

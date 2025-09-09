@@ -23,7 +23,6 @@ import :linscan_alg;
 import :sparse_util;
 import :infinity_exception;
 
-import std;
 import std.compat;
 
 namespace infinity {

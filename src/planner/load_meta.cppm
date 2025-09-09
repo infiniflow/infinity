@@ -18,7 +18,6 @@ export module infinity_core:load_meta;
 
 import :column_binding;
 
-import std;
 import std.compat;
 
 import internal_types;

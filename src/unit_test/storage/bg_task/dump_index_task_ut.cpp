@@ -59,7 +59,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          DumpMemIndexTaskTest,
                          ::testing::Values(BaseTestParamStr::NEW_BG_ON_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_BG_ON_CONFIG_PATH));
 
-TEST_P(DumpMemIndexTaskTest, DISABLED_row_cnt_exceed_memindex_capacity) {
+TEST_P(DumpMemIndexTaskTest, DISABLED_SLOW_row_cnt_exceed_memindex_capacity) {
     auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     auto db_name = std::make_shared<std::string>("db1");

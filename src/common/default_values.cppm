@@ -16,7 +16,6 @@ export module infinity_core:default_values;
 
 import :infinity_type;
 
-import std;
 import std.compat;
 
 namespace infinity {
@@ -336,6 +335,11 @@ export {
     constexpr std::string_view NEXT_COLUMN_ID = "next_column_id";
     constexpr std::string_view NEXT_INDEX_ID = "next_index_id";
     constexpr std::string_view NEXT_BLOCK_ID = "next_block_id";
+
+    // S3 meta
+    constexpr std::string_view S3_META_PREFIX = "meta";
+    constexpr std::string_view S3_META_SST_PREFIX = "meta/sst";
+    constexpr std::string_view S3_DEFAULT_BUCKET = "infinity";
 
     // IO related
     constexpr size_t DEFAULT_READ_BUFFER_SIZE = 4096;

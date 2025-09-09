@@ -29,7 +29,6 @@ import :diskann_utils;
 import :infinity_exception;
 import :local_file_handle;
 
-import std;
 import std.compat;
 
 namespace infinity {

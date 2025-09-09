@@ -14,7 +14,6 @@
 
 export module infinity_core:bound_cast_func;
 
-import std;
 import std.compat;
 
 namespace infinity {

@@ -26,7 +26,6 @@ import :diskann_dist_func;
 import :infinity_exception;
 import :boost;
 
-import std;
 import std.compat;
 import third_party;
 

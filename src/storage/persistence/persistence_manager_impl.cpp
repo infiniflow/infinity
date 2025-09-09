@@ -29,7 +29,6 @@ import :kv_store;
 import :kv_code;
 import :infinity_context;
 
-import std;
 import std.compat;
 import third_party;
 

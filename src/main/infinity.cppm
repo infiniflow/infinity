@@ -19,7 +19,6 @@ export module infinity_core:infinity;
 import :query_options;
 import :infinity_type;
 
-import std;
 import std.compat;
 
 import command_statement;

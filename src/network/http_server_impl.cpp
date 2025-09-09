@@ -36,7 +36,6 @@ import :status;
 import :physical_import;
 import :utility;
 
-import std;
 import std.compat;
 import third_party;
 

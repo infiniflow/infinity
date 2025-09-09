@@ -31,7 +31,6 @@ import :diskann_dist_func;
 import :local_file_handle;
 import :virtual_store;
 
-import std;
 import std.compat;
 import third_party;
 

@@ -37,7 +37,6 @@ import :new_txn;
 import :meta_cache;
 import :new_txn_manager;
 
-import std;
 import std.compat;
 import third_party;
 import row_id;

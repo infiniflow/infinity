@@ -22,7 +22,6 @@ import :index_base;
 import :file_worker_type;
 import :persistence_manager;
 
-import std;
 import std.compat;
 
 import column_def;

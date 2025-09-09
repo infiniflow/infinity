@@ -16,7 +16,6 @@ export module infinity_core:local_file_handle;
 
 import :status;
 
-import std;
 import std.compat;
 import global_resource_usage;
 

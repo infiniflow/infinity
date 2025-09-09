@@ -48,7 +48,6 @@ import :infinity_context;
 import :new_txn;
 import :txn_state;
 
-import std;
 import std.compat;
 import third_party;
 

@@ -66,6 +66,8 @@ public:
 
     static constexpr const char *NEW_VFS_OFF_BG_OFF_PATH = "test/data/config/test_vfs_off_bg_off.toml";
 
+    static constexpr const char *S3_STORAGE = "test/data/config/test_minio_s3_storage.toml";
+
 protected:
     const char *GetHomeDir() { return "/var/infinity"; }
 

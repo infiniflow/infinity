@@ -285,7 +285,7 @@ TEST_P(TestTxnIndexInternal, test_index0) {
     });
 }
 
-TEST_P(TestTxnIndexInternal, DISABLED_test_index) {
+TEST_P(TestTxnIndexInternal, DISABLED_SLOW_test_index) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -827,7 +827,7 @@ TEST_P(TestTxnIndexInternal, test_populate_index0) {
     });
 }
 
-TEST_P(TestTxnIndexInternal, DISABLED_test_populate_index) {
+TEST_P(TestTxnIndexInternal, DISABLED_SLOW_test_populate_index) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();

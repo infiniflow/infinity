@@ -27,7 +27,6 @@ import :infinity_exception;
 import :simd_functions;
 import :default_values;
 
-import std;
 import std.compat;
 import third_party;
 

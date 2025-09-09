@@ -20,7 +20,6 @@ import :meta_type;
 import :meta_key;
 import :infinity_type;
 
-import std;
 import std.compat;
 import third_party;
 

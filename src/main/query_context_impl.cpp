@@ -34,7 +34,6 @@ import :new_txn_manager;
 import :admin_executor;
 import :utility;
 
-import std;
 import std.compat;
 
 import base_statement;

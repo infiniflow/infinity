@@ -20,7 +20,6 @@ import :vector_distance;
 import :logger;
 import :simd_functions;
 
-import std;
 import std.compat;
 
 namespace infinity {

@@ -29,7 +29,6 @@ import :s3_client_minio;
 import :infinity_context;
 import :utility;
 
-import std;
 import std.compat;
 
 namespace fs = std::filesystem;
@@ -667,6 +666,12 @@ Status VirtualStore::CopyObject(const std::string &src_object_name, const std::s
             return Status::NotSupport("Not support storage type");
         }
     }
+
+    return Status::OK();
+}
+
+Status VirtualStore::ListObjects(std::string_view bucket_name, std::string_view prefix, std::vector<std::string> &object_names) {
+    s3_client_->ListObjects(bucket_name, prefix, object_names);
 
     return Status::OK();
 }

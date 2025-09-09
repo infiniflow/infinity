@@ -14,7 +14,6 @@
 
 export module infinity_core:fst.registry;
 
-import std;
 import std.compat;
 
 namespace infinity {

@@ -37,7 +37,6 @@ import :cast_expression;
 import :expression_evaluator;
 import :expression_state;
 
-import std;
 import std.compat;
 import third_party;
 

@@ -17,7 +17,6 @@ export module infinity_core:meta_info;
 import :default_values;
 import :infinity_type;
 
-import std;
 import std.compat;
 import third_party;
 
