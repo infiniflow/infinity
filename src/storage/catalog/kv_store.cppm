@@ -64,8 +64,8 @@ private:
 };
 
 class KVStore {
-    using upload_cnt_t = size_t;
-    using download_cnt_t = size_t;
+    // using upload_cnt_t = size_t;
+    // using download_cnt_t = size_t;
 public:
     KVStore() = default;
     ~KVStore();
@@ -99,7 +99,7 @@ private:
     rocksdb::TransactionOptions txn_options_;
     rocksdb::WriteOptions write_options_;
     rocksdb::ReadOptions read_options_;
-    std::unordered_set<std::string, std::pair<upload_cnt_t, download_cnt_t>> kv_; // U D
+    // std::unordered_set<std::string, std::pair<upload_cnt_t, download_cnt_t>> kv_; // U D
 };
 
 } // namespace infinity
