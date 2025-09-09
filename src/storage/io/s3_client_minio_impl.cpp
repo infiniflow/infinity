@@ -24,6 +24,7 @@ Status S3ClientMinio::DownloadObject(const std::string &bucket_name, const std::
     args.bucket = bucket_name;
     args.object = object_name;
     args.filename = file_path;
+    args.overwrite = true;
 
     // Call download object.
     LOG_INFO(fmt::format("Downloading object {} from {} to {}", object_name, bucket_name, file_path));
