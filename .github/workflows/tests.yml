@@ -292,7 +292,11 @@ jobs:
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/sqllogictest_debug.log /infinity_log/sqllogictest_debug.log &&
-            mv /infinity/sqllogictest_debug_error.log /infinity_log/sqllogictest_debug_error.log"
+            mv /infinity/sqllogictest_debug_error.log /infinity_log/sqllogictest_debug_error.log &&
+            echo 'sqllogictest debug log' &&
+            tail -n 1000 /infinity_log/sqllogictest_debug.log &&
+            echo 'sqllogictest debug error log' &&
+            tail -n 1000 /infinity_log/sqllogictest_debug_error.log"
 
       - name: Remove test container
         if: always()
@@ -390,7 +394,11 @@ jobs:
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/unittest_debug.log /infinity_log/unittest_debug.log &&
-            mv /infinity/unittest_debug_error.log /infinity_log/unittest_debug_error.log"
+            mv /infinity/unittest_debug_error.log /infinity_log/unittest_debug_error.log &&
+            echo 'ut debug log' &&
+            tail -n 1000 /infinity_log/unittest_debug.log &&
+            echo 'ut debug error log' &&
+            tail -n 1000 /infinity_log/unittest_debug_error.log"
 
       - name: Remove test container
         if: always()
@@ -623,7 +631,11 @@ jobs:
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/pysdk_remote_debug.log /infinity_log/pysdk_remote_debug.log &&
-            mv /infinity/pysdk_remote_debug_error.log /infinity_log/pysdk_remote_debug_error.log"
+            mv /infinity/pysdk_remote_debug_error.log /infinity_log/pysdk_remote_debug_error.log &&
+            echo 'pysdk remote debug log' &&
+            tail -n 1000 /infinity_log/pysdk_remote_debug.log &&
+            echo 'pysdk remote debug error log' &&
+            tail -n 1000 /infinity_log/pysdk_remote_debug_error.log"
 
       - name: Remove test container
         if: always()
@@ -738,7 +750,11 @@ jobs:
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/http_remote_debug.log /infinity_log/http_remote_debug.log &&
-            mv /infinity/http_remote_debug_error.log /infinity_log/http_remote_debug_error.log"
+            mv /infinity/http_remote_debug_error.log /infinity_log/http_remote_debug_error.log &&
+            echo 'http remote debug log' &&
+            tail -n 1000 /infinity_log/http_remote_debug.log &&
+            echo 'http remote debug error log' &&
+            tail -n 1000 /infinity_log/http_remote_debug_error.log"
 
       - name: Remove test container
         if: always()
@@ -852,7 +868,11 @@ jobs:
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/parallel_test_debug.log /infinity_log/parallel_test_debug.log &&
-            mv /infinity/parallel_test_debug_error.log /infinity_log/parallel_test_debug_error.log"
+            mv /infinity/parallel_test_debug_error.log /infinity_log/parallel_test_debug_error.log &&
+            echo 'parallel test debug log' &&
+            tail -n 1000 /infinity_log/parallel_test_debug.log &&
+            echo 'parallel test debug error log' &&
+            tail -n 1000 /infinity_log/parallel_test_debug_error.log"
 
       - name: Remove test container
         if: always()
@@ -1069,7 +1089,11 @@ jobs:
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/sqllogictest_release.log /infinity_log/sqllogictest_release.log &&
-            mv /infinity/sqllogictest_release_error.log /infinity_log/sqllogictest_release_error.log"
+            mv /infinity/sqllogictest_release_error.log /infinity_log/sqllogictest_release_error.log &&
+            echo 'sqllogictest release log' &&
+            tail -n 1000 /infinity_log/sqllogictest_release.log &&
+            echo 'sqllogictest release error log' &&
+            tail -n 1000 /infinity_log/sqllogictest_release_error.log"
 
       - name: Remove test container
         if: always()
@@ -1167,7 +1191,11 @@ jobs:
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/unittest_release.log /infinity_log/unittest_release.log &&
-            mv /infinity/unittest_release_error.log /infinity_log/unittest_release_error.log"
+            mv /infinity/unittest_release_error.log /infinity_log/unittest_release_error.log &&
+            echo 'ut release log' &&
+            tail -n 1000 /infinity_log/unittest_release.log &&
+            echo 'ut release error log' &&
+            tail -n 1000 /infinity_log/unittest_release_error.log"
 
       - name: Remove test container
         if: always()
@@ -1280,7 +1308,11 @@ jobs:
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/pysdk_remote_release.log /infinity_log/pysdk_remote_release.log &&
-            mv /infinity/pysdk_remote_release_error.log /infinity_log/pysdk_remote_release_error.log"
+            mv /infinity/pysdk_remote_release_error.log /infinity_log/pysdk_remote_release_error.log &&
+            echo 'pysdk remote release log' &&
+            tail -n 1000 /infinity_log/pysdk_remote_release.log &&
+            echo 'pysdk remote release error log' &&
+            tail -n 1000 /infinity_log/pysdk_remote_release_error.log"
 
       - name: Remove builder container
         if: always()
@@ -1393,7 +1425,11 @@ jobs:
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/http_remote_release.log /infinity_log/http_remote_release.log &&
-            mv /infinity/http_remote_release_error.log /infinity_log/http_remote_release_error.log"
+            mv /infinity/http_remote_release_error.log /infinity_log/http_remote_release_error.log &&
+            echo 'http remote release log' &&
+            tail -n 1000 /infinity_log/http_remote_release.log &&
+            echo 'http remote release error log' &&
+            tail -n 1000 /infinity_log/http_remote_release_error.log"
 
       - name: Remove test container
         if: always()
@@ -1506,7 +1542,11 @@ jobs:
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
             "mv /infinity/parallel_test_release.log /infinity_log/parallel_test_release.log &&
-            mv /infinity/parallel_test_release_error.log /infinity_log/parallel_test_release_error.log"
+            mv /infinity/parallel_test_release_error.log /infinity_log/parallel_test_release_error.log &&
+            echo 'pysdk parallel release log' &&
+            tail -n 1000 /infinity_log/parallel_test_release.log &&
+            echo 'pysdk parallel release error log' &&
+            tail -n 1000 /infinity_log/parallel_test_release_error.log"
 
       - name: Remove test container
         if: always()
@@ -1619,7 +1659,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ &&
-            cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_release.log 2> parallel_test_release_error.log" &
+            cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > minio_pysdk_remote_test_release.log 2> minio_pysdk_remote_test_release_error.log" &
 
       - name: Run minio pysdk remote test
         if: ${{ !cancelled() && !failure() }}
@@ -1633,8 +1673,12 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
-            "mv /infinity/parallel_test_release.log /infinity_log/parallel_test_release.log &&
-            mv /infinity/parallel_test_release_error.log /infinity_log/parallel_test_release_error.log"
+            "mv /infinity/minio_pysdk_remote_test_release.log /infinity_log/minio_pysdk_remote_test_release.log &&
+            mv /infinity/minio_pysdk_remote_test_release_error.log /infinity_log/minio_pysdk_remote_test_release_error.log &&
+            echo 'minio pysdk remote test release log' &&
+            tail -n 1000 /infinity_log/minio_pysdk_remote_test_release.log &&
+            echo 'minio pysdk remote test release error log' &&
+            tail -n 1000 /infinity_log/minio_pysdk_remote_test_release_error.log"
 
       - name: Remove test container
         if: always()
@@ -1752,7 +1796,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ &&
-            cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > parallel_test_release.log 2> parallel_test_release_error.log" &
+            cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > minio_parallel_test_release.log 2> minio_parallel_test_release_error.log" &
 
       - name: Run minio parallel test
         if: ${{ !cancelled() && !failure() }}
@@ -1766,8 +1810,12 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c \
-            "mv /infinity/parallel_test_release.log /infinity_log/parallel_test_release.log &&
-            mv /infinity/parallel_test_release_error.log /infinity_log/parallel_test_release_error.log"
+            "mv /infinity/minio_parallel_test_release.log /infinity_log/minio_parallel_test_release.log &&
+            mv /infinity/minio_parallel_test_release_error.log /infinity_log/minio_parallel_test_release_error.log &&
+            echo 'minio parallel test release log' &&
+            tail -n 1000 /infinity_log/minio_parallel_test_release.log &&
+            echo 'minio parallel test release error log' &&
+            tail -n 1000 /infinity_log//minio_parallel_test_release_error.log"
 
       - name: Remove test container
         if: always()
