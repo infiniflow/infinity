@@ -61,7 +61,7 @@ export struct PersistReadResult {
     ObjAddr obj_addr_;                               // where data should read from
     std::vector<std::string> drop_keys_;             // object that should be removed from local disk. because of 1. disk used over limit
     std::vector<std::string> drop_from_remote_keys_; // object that should be removed from remote storage. because of object's all parts are deleted
-    ObjStat *obj_stat_{nullptr};                     // object stat
+    std::shared_ptr<ObjStat> obj_stat_{nullptr};     // object stat
 };
 
 export class PersistenceManager {
@@ -102,7 +102,7 @@ public:
 
     void SetKvStore(KVStore *kv_store);
 
-    std::unordered_map<std::string, ObjStat> GetAllObjects() const;
+    std::unordered_map<std::string, std::shared_ptr<ObjStat>> GetAllObjects() const;
     std::unordered_map<std::string, ObjAddr> GetAllFiles() const;
 
 private:
@@ -134,7 +134,7 @@ public: // for unit test
     void SaveLocalPath(const std::string &local_path, const ObjAddr &object_addr);
 
 private:
-    void SaveObjStat(const std::string &obj_key, const ObjStat &obj_stat);
+    void SaveObjStat(const std::string &obj_key, const std::shared_ptr<ObjStat> &obj_stat);
 
     void AddObjAddrToKVStore(const std::string &path, const ObjAddr &obj_addr);
 
@@ -144,8 +144,8 @@ private:
     size_t object_size_limit_;
 
     mutable std::mutex mtx_;
-    // std::unordered_map<std::string, ObjStat> objects_;        // obj_key -> ObjStat
-    std::unique_ptr<ObjectStatAccessor> objects_; // obj_key -> ObjStat
+    // std::unordered_map<std::string, ObjStat> object_stats_;        // obj_key -> ObjStat
+    std::shared_ptr<ObjectStatAccessor> object_stats_; // obj_key -> ObjStat
     // Current unsealed object key
     std::string current_object_key_;
     size_t current_object_size_ = 0;

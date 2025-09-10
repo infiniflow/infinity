@@ -76,7 +76,7 @@ ObjAddr ObjAddr::ReadBufAdv(const char *&buf) {
 PersistenceManager::PersistenceManager(const std::string &workspace, const std::string &data_dir, size_t object_size_limit, bool local_storage)
     : workspace_(workspace), local_data_dir_(data_dir), object_size_limit_(object_size_limit) {
     if (local_storage) {
-        objects_ = std::make_unique<ObjectStatAccessor>();
+        object_stats_ = std::make_shared<ObjectStatAccessor>();
     } else {
         UnrecoverableError("Remote storage is not supported yet.");
     }
@@ -161,7 +161,7 @@ PersistWriteResult PersistenceManager::Persist(const std::string &file_path, con
         }
         ObjAddr obj_addr(obj_key, 0, src_size);
         std::lock_guard<std::mutex> lock(mtx_);
-        objects_->PutNew(obj_key, ObjStat(src_size, 1, 0));
+        object_stats_->PutNew(obj_key, std::make_shared<ObjStat>(src_size, 1, 0));
         LOG_TRACE(fmt::format("Persist added dedicated object {}", obj_key));
 
         status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump());
@@ -235,8 +235,8 @@ void PersistenceManager::CheckValid() {
         if (obj_addr.obj_key_ == ObjAddr::KeyEmpty) {
             continue;
         }
-        std::optional<ObjStat> obj_stat = objects_->GetNoCount(obj_addr.obj_key_);
-        if (!obj_stat.has_value()) {
+        std::shared_ptr<ObjStat> obj_stat = object_stats_->GetNoCount(obj_addr.obj_key_);
+        if (obj_stat == nullptr) {
             LOG_ERROR(fmt::format("CheckValid Failed to find object for local path {}", local_path));
         }
     }
@@ -248,7 +248,7 @@ void PersistenceManager::CheckValid() {
         std::lock_guard<std::mutex> lock(mtx_);
         current_size = current_object_size_;
     }
-    objects_->CheckValid(current_size);
+    object_stats_->CheckValid(current_size);
 
     const auto part2_end = std::chrono::high_resolution_clock::now();
     LOG_INFO(fmt::format("PersistenceManager::CheckValid part 1: {} ms, part2: {} ms",
@@ -272,7 +272,7 @@ void PersistenceManager::CurrentObjFinalizeNoLock(std::vector<std::string> &pers
             outFile.close();
         }
 
-        objects_->PutNew(current_object_key_, ObjStat(current_object_size_, current_object_parts_, current_object_ref_count_));
+        object_stats_->PutNew(current_object_key_, std::make_shared<ObjStat>(current_object_size_, current_object_parts_, current_object_ref_count_));
         LOG_TRACE(fmt::format("CurrentObjFinalizeNoLock added composed object {}", current_object_key_));
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
@@ -309,13 +309,13 @@ PersistReadResult PersistenceManager::GetObjCache(const std::string &file_path) 
         if (obj_addr.obj_key_ != ObjAddr::KeyEmpty) {
             UnrecoverableError(fmt::format("GetObjCache object {} is empty", obj_addr.obj_key_));
         }
-    } else if (std::optional<ObjStat> obj_stat = objects_->Get(obj_addr.obj_key_); obj_stat) {
+    } else if (std::shared_ptr<ObjStat> obj_stat = object_stats_->Get(obj_addr.obj_key_); obj_stat) {
         LOG_TRACE(fmt::format("GetObjCache object {}, file_path: {}, ref count {}", obj_addr.obj_key_, file_path, obj_stat->ref_count_));
         std::string read_path = GetObjPath(result.obj_addr_.obj_key_);
         if (!VirtualStore::Exists(read_path)) {
             auto expect = ObjCached::kCached;
             obj_stat->cached_.compare_exchange_strong(expect, ObjCached::kNotCached);
-            result.obj_stat_ = &obj_stat.value();
+            result.obj_stat_ = obj_stat;
         }
     } else {
         if (obj_addr.obj_key_ != current_object_key_) {
@@ -407,8 +407,8 @@ PersistWriteResult PersistenceManager::PutObjCache(const std::string &file_path)
         current_object_ref_count_--;
         LOG_TRACE(fmt::format("PutObjCache current object {} ref count {}", obj_addr.obj_key_, current_object_ref_count_));
     } else {
-        std::optional<ObjStat> obj_stat = objects_->Release(obj_addr.obj_key_);
-        if (obj_stat) {
+        std::shared_ptr<ObjStat> obj_stat = object_stats_->Release(obj_addr.obj_key_);
+        if (obj_stat != nullptr) {
             LOG_TRACE(fmt::format("PutObjCache object {} ref count {}", obj_addr.obj_key_, obj_stat->ref_count_));
         } else {
             LOG_WARN(fmt::format("PutObjCache object {} unknown ref count", obj_addr.obj_key_));
@@ -478,15 +478,15 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
                                        std::vector<std::string> &persist_keys,
                                        std::vector<std::string> &drop_from_remote_keys,
                                        bool check_ref_count) {
-    std::optional<ObjStat> obj_stat = objects_->GetNoCount(object_addr.obj_key_);
-    if (!obj_stat.has_value()) {
+    std::shared_ptr<ObjStat> obj_stat = object_stats_->GetNoCount(object_addr.obj_key_);
+    if (obj_stat == nullptr) {
         if (object_addr.obj_key_ == ObjAddr::KeyEmpty) {
             assert(object_addr.part_size_ == 0);
             return;
         } else if (object_addr.obj_key_ == current_object_key_) {
             CurrentObjFinalizeNoLock(persist_keys);
-            obj_stat = objects_->GetNoCount(object_addr.obj_key_);
-            assert(obj_stat.has_value());
+            obj_stat = object_stats_->GetNoCount(object_addr.obj_key_);
+            assert(obj_stat != nullptr);
         } else {
             UnrecoverableError(fmt::format("CleanupNoLock Failed to find object {}", object_addr.obj_key_));
             return;
@@ -556,17 +556,17 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
             }
         }
         drop_from_remote_keys.emplace_back(object_addr.obj_key_);
-        objects_->Invalidate(object_addr.obj_key_);
+        object_stats_->Invalidate(object_addr.obj_key_);
         LOG_TRACE(fmt::format("Deleted object {}", object_addr.obj_key_));
     } else {
-        objects_->PutNoCount(object_addr.obj_key_, *obj_stat);
+        object_stats_->PutNoCount(object_addr.obj_key_, obj_stat);
     }
 }
 
 ObjStat PersistenceManager::GetObjStatByObjAddr(const ObjAddr &obj_addr) {
     std::lock_guard<std::mutex> lock(mtx_);
-    std::optional<ObjStat> obj_stat = objects_->GetNoCount(obj_addr.obj_key_);
-    if (!obj_stat.has_value()) {
+    std::shared_ptr<ObjStat> obj_stat = object_stats_->GetNoCount(obj_addr.obj_key_);
+    if (obj_stat == nullptr) {
         return ObjStat();
     }
     return *obj_stat;
@@ -574,9 +574,9 @@ ObjStat PersistenceManager::GetObjStatByObjAddr(const ObjAddr &obj_addr) {
 
 void PersistenceManager::SaveLocalPath(const std::string &file_path, const ObjAddr &object_addr) { AddObjAddrToKVStore(file_path, object_addr); }
 
-void PersistenceManager::SaveObjStat(const std::string &obj_key, const ObjStat &obj_stat) {
+void PersistenceManager::SaveObjStat(const std::string &obj_key, const std::shared_ptr<ObjStat> &obj_stat) {
     std::lock_guard<std::mutex> lock(mtx_);
-    objects_->PutNoCount(obj_key, obj_stat);
+    object_stats_->PutNoCount(obj_key, obj_stat);
 }
 
 void PersistenceManager::AddObjAddrToKVStore(const std::string &path, const ObjAddr &obj_addr) {
@@ -631,10 +631,10 @@ void PersistenceManager::SetKvStore(KVStore *kv_store) {
     }
     kv_store_ = kv_store;
     std::unique_ptr<KVInstance> kv_instance = kv_store_->GetInstance();
-    objects_->Deserialize(kv_instance.get());
+    object_stats_->Deserialize(kv_instance.get());
 }
 
-std::unordered_map<std::string, ObjStat> PersistenceManager::GetAllObjects() const { return objects_->GetAllObjects(); }
+std::unordered_map<std::string, std::shared_ptr<ObjStat>> PersistenceManager::GetAllObjects() const { return object_stats_->GetAllObjects(); }
 
 std::unordered_map<std::string, ObjAddr> PersistenceManager::GetAllFiles() const {
     std::unordered_map<std::string, ObjAddr> local_path_obj;
@@ -654,14 +654,14 @@ std::unordered_map<std::string, ObjAddr> PersistenceManager::GetAllFiles() const
     return local_path_obj;
 }
 
-void AddrSerializer::Initialize(PersistenceManager *persistence_manager, const std::vector<std::string> &path) {
+void AddrSerializer::Initialize(PersistenceManager *persistence_manager, const std::vector<std::string> &paths) {
     if (persistence_manager == nullptr) {
         return; // not use persistence manager
     }
     if (!paths_.empty()) {
         UnrecoverableError("AddrSerializer has been initialized");
     }
-    for (const std::string &path : path) {
+    for (const std::string &path : paths) {
         paths_.push_back(path);
         ObjAddr obj_addr = persistence_manager->GetObjCacheWithoutCnt(path);
         obj_addrs_.push_back(obj_addr);
@@ -739,7 +739,9 @@ void AddrSerializer::AddToPersistenceManager(PersistenceManager *persistence_man
         }
         LOG_TRACE(fmt::format("Add path {} to persistence manager", paths_[i]));
         persistence_manager->SaveLocalPath(paths_[i], obj_addrs_[i]);
-        persistence_manager->SaveObjStat(obj_addrs_[i].obj_key_, obj_stats_[i]);
+        std::shared_ptr<ObjStat> obj_stat = std::make_shared<ObjStat>();
+        *obj_stat = obj_stats_[i];
+        persistence_manager->SaveObjStat(obj_addrs_[i].obj_key_, obj_stat);
     }
 }
 

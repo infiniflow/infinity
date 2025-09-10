@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
 export module infinity_core:obj_stat_accessor;
 
 import :obj_status;
@@ -25,34 +27,34 @@ class KVInstance;
 
 export class ObjectStatAccessor {
 public:
+    ObjectStatAccessor();
+
     virtual ~ObjectStatAccessor();
 
-    std::optional<ObjStat> Get(const std::string &key);
+    std::shared_ptr<ObjStat> Get(const std::string &key);
 
-    std::optional<ObjStat> GetNoCount(const std::string &key);
+    std::shared_ptr<ObjStat> GetNoCount(const std::string &key);
 
-    std::optional<ObjStat> Release(const std::string &key);
+    std::shared_ptr<ObjStat> Release(const std::string &key);
 
-    void PutNew(const std::string &key, ObjStat obj_stat);
+    void PutNew(const std::string &key, std::shared_ptr<ObjStat> obj_stat);
 
-    void PutNoCount(const std::string &key, ObjStat obj_stat);
+    void PutNoCount(const std::string &key, std::shared_ptr<ObjStat> obj_stat);
 
-    std::optional<ObjStat> Invalidate(const std::string &key);
+    std::shared_ptr<ObjStat> Invalidate(const std::string &key);
 
     void CheckValid(size_t current_object_size);
 
     void Deserialize(KVInstance *kv_instance);
 
-    std::unordered_map<std::string, ObjStat> GetAllObjects() const;
+    std::unordered_map<std::string, std::shared_ptr<ObjStat>> GetAllObjects() const;
 
 private:
-    void AddObjStatToKVStore(const std::string &key, const ObjStat &obj_stat);
+    static void AddObjStatToKVStore(const std::string &key, const std::shared_ptr<ObjStat> &obj_stat);
+    static void RemoveObjStatFromKVStore(const std::string &key);
 
-    void RemoveObjStatFromKVStore(const std::string &key);
-
-private:
     mutable std::mutex mutex_{}; // protect obj_map_
-    std::unordered_map<std::string, ObjStat> obj_map_{};
+    std::unordered_map<std::string, std::shared_ptr<ObjStat>> obj_map_{};
 };
 
 } // namespace infinity

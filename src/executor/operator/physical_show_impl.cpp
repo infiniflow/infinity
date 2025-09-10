@@ -6191,7 +6191,7 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
         RecoverableError(status);
     }
 
-    std::unordered_map<std::string, ObjStat> object_map = persistence_manager->GetAllObjects();
+    std::unordered_map<std::string, std::shared_ptr<ObjStat>> object_map = persistence_manager->GetAllObjects();
     for (const auto &object_pair : object_map) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
@@ -6206,26 +6206,26 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
         }
         {
             // reference count
-            Value value = Value::MakeBigInt(object_pair.second.ref_count_);
+            Value value = Value::MakeBigInt(object_pair.second->ref_count_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }
         {
             // size
-            Value value = Value::MakeBigInt(object_pair.second.obj_size_);
+            Value value = Value::MakeBigInt(object_pair.second->obj_size_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
         }
         {
             // parts
-            Value value = Value::MakeBigInt(object_pair.second.parts_);
+            Value value = Value::MakeBigInt(object_pair.second->parts_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
         }
         {
             // deleted ranges
             std::ostringstream oss;
-            for (const auto &range : object_pair.second.deleted_ranges_) {
+            for (const auto &range : object_pair.second->deleted_ranges_) {
                 oss << fmt::format("[{}, {}) ", range.start_, range.end_);
             }
             std::string deleted_ranges = oss.str();
@@ -6268,14 +6268,14 @@ void PhysicalShow::ExecuteShowPersistenceObject(QueryContext *query_context, Sho
         RecoverableError(status);
     }
 
-    std::unordered_map<std::string, ObjStat> object_map = persistence_manager->GetAllObjects();
+    std::unordered_map<std::string, std::shared_ptr<ObjStat>> object_map = persistence_manager->GetAllObjects();
     auto iter = object_map.find(*object_name_);
     if (iter == object_map.end()) {
         Status status = Status::FileNotFound(*object_name_);
         RecoverableError(status);
     }
 
-    std::set<Range> &deleted_ranges = iter->second.deleted_ranges_;
+    std::set<Range> &deleted_ranges = iter->second->deleted_ranges_;
     for (auto &range : deleted_ranges) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();

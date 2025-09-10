@@ -34,52 +34,53 @@ import third_party;
 namespace infinity {
 
 // ObjectStatAccessor
+ObjectStatAccessor::ObjectStatAccessor() {}
 
 ObjectStatAccessor::~ObjectStatAccessor() {
     std::unique_lock<std::mutex> lock(mutex_);
     [[maybe_unused]] size_t sum_ref_count = 0;
     for (const auto &[key, obj_stat] : obj_map_) {
-        if (obj_stat.ref_count_ > 0) {
-            LOG_ERROR(fmt::format("ObjectStatAccessor {} still has ref count {}", key, obj_stat.ref_count_));
+        if (obj_stat->ref_count_ > 0) {
+            LOG_ERROR(fmt::format("ObjectStatAccessor {} still has ref count {}", key, obj_stat->ref_count_));
         }
-        sum_ref_count += obj_stat.ref_count_;
+        sum_ref_count += obj_stat->ref_count_;
     }
     assert(sum_ref_count == 0);
 }
 
-std::optional<ObjStat> ObjectStatAccessor::Get(const std::string &key) {
+std::shared_ptr<ObjStat> ObjectStatAccessor::Get(const std::string &key) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
-        return std::nullopt;
+        return nullptr;
     }
-    ++map_iter->second.ref_count_;
+    ++map_iter->second->ref_count_;
     return map_iter->second;
 }
 
-std::optional<ObjStat> ObjectStatAccessor::GetNoCount(const std::string &key) {
+std::shared_ptr<ObjStat> ObjectStatAccessor::GetNoCount(const std::string &key) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
-        return std::nullopt;
+        return nullptr;
     }
     return map_iter->second;
 }
 
-std::optional<ObjStat> ObjectStatAccessor::Release(const std::string &key) {
+std::shared_ptr<ObjStat> ObjectStatAccessor::Release(const std::string &key) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
-        return std::nullopt;
+        return nullptr;
     }
-    if (map_iter->second.ref_count_ <= 0) {
-        UnrecoverableError(fmt::format("Release object {} ref count is {}", key, map_iter->second.ref_count_));
+    if (map_iter->second->ref_count_ <= 0) {
+        UnrecoverableError(fmt::format("Release object {} ref count is {}", key, map_iter->second->ref_count_));
     }
-    --map_iter->second.ref_count_;
+    --map_iter->second->ref_count_;
     return map_iter->second;
 }
 
-void ObjectStatAccessor::PutNew(const std::string &key, ObjStat obj_stat) {
+void ObjectStatAccessor::PutNew(const std::string &key, std::shared_ptr<ObjStat> obj_stat) {
     this->AddObjStatToKVStore(key, obj_stat);
 
     std::unique_lock<std::mutex> lock(mutex_);
@@ -87,30 +88,30 @@ void ObjectStatAccessor::PutNew(const std::string &key, ObjStat obj_stat) {
     if (map_iter != obj_map_.end()) {
         UnrecoverableError(fmt::format("PutNew object {} is already in object map", key));
     }
-    obj_stat.cached_ = ObjCached::kCached;
+    obj_stat->cached_ = ObjCached::kCached;
     obj_map_.emplace_hint(map_iter, key, std::move(obj_stat));
 }
 
-void ObjectStatAccessor::PutNoCount(const std::string &key, ObjStat obj_stat) {
-    obj_stat.cached_ = ObjCached::kCached;
-    this->AddObjStatToKVStore(key, obj_stat); // obj_stat.ref_count_ isn't update if key can be found in obj_map_
+void ObjectStatAccessor::PutNoCount(const std::string &key, std::shared_ptr<ObjStat> obj_stat) {
+    obj_stat->cached_ = ObjCached::kCached;
+    this->AddObjStatToKVStore(key, obj_stat); // obj_stat->ref_count_ isn't update if key can be found in obj_map_
 
     std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter != obj_map_.end()) {
-        obj_stat.ref_count_ = map_iter->second.ref_count_;
+        obj_stat->ref_count_ = map_iter->second->ref_count_;
         LOG_DEBUG(fmt::format("PutNew: {} is already in object map", key));
     }
     obj_map_.insert_or_assign(key, std::move(obj_stat));
 }
 
-std::optional<ObjStat> ObjectStatAccessor::Invalidate(const std::string &key) {
+std::shared_ptr<ObjStat> ObjectStatAccessor::Invalidate(const std::string &key) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto iter = obj_map_.find(key);
     if (iter == obj_map_.end()) {
-        return std::nullopt;
+        return nullptr;
     }
-    ObjStat obj_stat = std::move(iter->second);
+    std::shared_ptr<ObjStat> obj_stat = std::move(iter->second);
     obj_map_.erase(iter);
 
     this->RemoveObjStatFromKVStore(key);
@@ -120,7 +121,7 @@ std::optional<ObjStat> ObjectStatAccessor::Invalidate(const std::string &key) {
 void ObjectStatAccessor::CheckValid(size_t current_object_size) {
     std::unique_lock<std::mutex> lock(mutex_);
     for (auto &[obj_key, obj_stat] : obj_map_) {
-        obj_stat.CheckValid(obj_key, current_object_size);
+        obj_stat->CheckValid(obj_key, current_object_size);
     }
 }
 
@@ -134,21 +135,21 @@ void ObjectStatAccessor::Deserialize(KVInstance *kv_instance) {
     while (iter->Valid() && iter->Key().starts_with(obj_stat_prefix)) {
         std::string obj_key = iter->Key().ToString().substr(obj_stat_prefix_len);
         std::string obj_value = iter->Value().ToString();
-        ObjStat obj_stat;
-        obj_stat.Deserialize(obj_value);
-        obj_stat.cached_ = ObjCached::kCached;
+        std::shared_ptr<ObjStat> obj_stat = std::make_shared<ObjStat>();
+        obj_stat->Deserialize(obj_value);
+        obj_stat->cached_ = ObjCached::kCached;
         LOG_TRACE(fmt::format("Deserialize added object {}", obj_key));
         obj_map_.emplace(std::move(obj_key), std::move(obj_stat));
         iter->Next();
     }
 }
 
-std::unordered_map<std::string, ObjStat> ObjectStatAccessor::GetAllObjects() const {
+std::unordered_map<std::string, std::shared_ptr<ObjStat>> ObjectStatAccessor::GetAllObjects() const {
     std::unique_lock<std::mutex> lock(mutex_);
     return obj_map_;
 }
 
-void ObjectStatAccessor::AddObjStatToKVStore(const std::string &key, const ObjStat &obj_stat) {
+void ObjectStatAccessor::AddObjStatToKVStore(const std::string &key, const std::shared_ptr<ObjStat> &obj_stat) {
     Storage *storage = InfinityContext::instance().storage();
     if (!storage) {
         return;
@@ -157,7 +158,7 @@ void ObjectStatAccessor::AddObjStatToKVStore(const std::string &key, const ObjSt
     if (!kv_store) {
         return;
     }
-    Status status = kv_store->Put(KeyEncode::PMObjectStatKey(key), obj_stat.ToString());
+    Status status = kv_store->Put(KeyEncode::PMObjectStatKey(key), obj_stat->ToString());
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
