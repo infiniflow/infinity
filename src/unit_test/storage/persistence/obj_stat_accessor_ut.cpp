@@ -6,7 +6,7 @@ module infinity_core:ut.obj_stat_accessor;
 
 import :ut.base_test;
 
-import :obj_stat_accessor;
+import :object_stats;
 import :obj_status;
 //
 // using namespace infinity;

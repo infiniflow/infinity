@@ -16,9 +16,9 @@ module;
 
 #include <cassert>
 
-module infinity_core:obj_stat_accessor.impl;
+module infinity_core:object_stats.impl;
 
-import :obj_stat_accessor;
+import :object_stats;
 import :infinity_exception;
 import :logger;
 import :obj_status;
@@ -33,22 +33,20 @@ import third_party;
 
 namespace infinity {
 
-// ObjectStatAccessor
-ObjectStatAccessor::ObjectStatAccessor() {}
-
-ObjectStatAccessor::~ObjectStatAccessor() {
+// ObjectStats
+ObjectStats::~ObjectStats() {
     std::unique_lock<std::mutex> lock(mutex_);
     [[maybe_unused]] size_t sum_ref_count = 0;
     for (const auto &[key, obj_stat] : obj_map_) {
         if (obj_stat->ref_count_ > 0) {
-            LOG_ERROR(fmt::format("ObjectStatAccessor {} still has ref count {}", key, obj_stat->ref_count_));
+            LOG_ERROR(fmt::format("ObjectStats {} still has ref count {}", key, obj_stat->ref_count_));
         }
         sum_ref_count += obj_stat->ref_count_;
     }
     assert(sum_ref_count == 0);
 }
 
-std::shared_ptr<ObjStat> ObjectStatAccessor::Get(const std::string &key) {
+std::shared_ptr<ObjStat> ObjectStats::Get(const std::string &key) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
@@ -58,7 +56,7 @@ std::shared_ptr<ObjStat> ObjectStatAccessor::Get(const std::string &key) {
     return map_iter->second;
 }
 
-std::shared_ptr<ObjStat> ObjectStatAccessor::GetNoCount(const std::string &key) {
+std::shared_ptr<ObjStat> ObjectStats::GetNoCount(const std::string &key) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
@@ -67,7 +65,7 @@ std::shared_ptr<ObjStat> ObjectStatAccessor::GetNoCount(const std::string &key) 
     return map_iter->second;
 }
 
-std::shared_ptr<ObjStat> ObjectStatAccessor::Release(const std::string &key) {
+std::shared_ptr<ObjStat> ObjectStats::Release(const std::string &key) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
@@ -80,7 +78,7 @@ std::shared_ptr<ObjStat> ObjectStatAccessor::Release(const std::string &key) {
     return map_iter->second;
 }
 
-void ObjectStatAccessor::PutNew(const std::string &key, std::shared_ptr<ObjStat> obj_stat) {
+void ObjectStats::PutNew(const std::string &key, std::shared_ptr<ObjStat> obj_stat) {
     this->AddObjStatToKVStore(key, obj_stat);
 
     std::unique_lock<std::mutex> lock(mutex_);
@@ -92,7 +90,7 @@ void ObjectStatAccessor::PutNew(const std::string &key, std::shared_ptr<ObjStat>
     obj_map_.emplace_hint(map_iter, key, std::move(obj_stat));
 }
 
-void ObjectStatAccessor::PutNoCount(const std::string &key, std::shared_ptr<ObjStat> obj_stat) {
+void ObjectStats::PutNoCount(const std::string &key, std::shared_ptr<ObjStat> obj_stat) {
     obj_stat->cached_ = ObjCached::kCached;
     this->AddObjStatToKVStore(key, obj_stat); // obj_stat->ref_count_ isn't update if key can be found in obj_map_
 
@@ -105,7 +103,7 @@ void ObjectStatAccessor::PutNoCount(const std::string &key, std::shared_ptr<ObjS
     obj_map_.insert_or_assign(key, std::move(obj_stat));
 }
 
-std::shared_ptr<ObjStat> ObjectStatAccessor::Invalidate(const std::string &key) {
+std::shared_ptr<ObjStat> ObjectStats::Invalidate(const std::string &key) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto iter = obj_map_.find(key);
     if (iter == obj_map_.end()) {
@@ -118,14 +116,14 @@ std::shared_ptr<ObjStat> ObjectStatAccessor::Invalidate(const std::string &key) 
     return obj_stat;
 }
 
-void ObjectStatAccessor::CheckValid(size_t current_object_size) {
+void ObjectStats::CheckValid(size_t current_object_size) {
     std::unique_lock<std::mutex> lock(mutex_);
     for (auto &[obj_key, obj_stat] : obj_map_) {
         obj_stat->CheckValid(obj_key, current_object_size);
     }
 }
 
-void ObjectStatAccessor::Deserialize(KVInstance *kv_instance) {
+void ObjectStats::Deserialize(KVInstance *kv_instance) {
     const std::string &obj_stat_prefix = KeyEncode::PMObjectStatPrefix();
     size_t obj_stat_prefix_len = obj_stat_prefix.size();
 
@@ -144,12 +142,12 @@ void ObjectStatAccessor::Deserialize(KVInstance *kv_instance) {
     }
 }
 
-std::unordered_map<std::string, std::shared_ptr<ObjStat>> ObjectStatAccessor::GetAllObjects() const {
+std::unordered_map<std::string, std::shared_ptr<ObjStat>> ObjectStats::GetAllObjects() const {
     std::unique_lock<std::mutex> lock(mutex_);
     return obj_map_;
 }
 
-void ObjectStatAccessor::AddObjStatToKVStore(const std::string &key, const std::shared_ptr<ObjStat> &obj_stat) {
+void ObjectStats::AddObjStatToKVStore(const std::string &key, const std::shared_ptr<ObjStat> &obj_stat) {
     Storage *storage = InfinityContext::instance().storage();
     if (!storage) {
         return;
@@ -164,7 +162,7 @@ void ObjectStatAccessor::AddObjStatToKVStore(const std::string &key, const std::
     }
 }
 
-void ObjectStatAccessor::RemoveObjStatFromKVStore(const std::string &key) {
+void ObjectStats::RemoveObjStatFromKVStore(const std::string &key) {
     Storage *storage = InfinityContext::instance().storage();
     if (!storage) {
         return;

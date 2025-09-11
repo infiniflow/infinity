@@ -30,6 +30,8 @@ namespace infinity {
 class KVStore;
 class KVInstance;
 class ObjectStatAccessor;
+class ObjectStats;
+export class Storage;
 
 export struct ObjAddr {
     std::string obj_key_{};
@@ -69,7 +71,11 @@ public:
     constexpr static size_t ObjAlignment = 8;
 
     // TODO: build cache from existing files under workspace
-    PersistenceManager(const std::string &workspace, const std::string &data_dir, size_t object_size_limit, bool local_storage = true);
+    PersistenceManager(Storage *storage,
+                       const std::string &workspace,
+                       const std::string &data_dir,
+                       size_t object_size_limit,
+                       bool local_storage = true);
 
     ~PersistenceManager();
 
@@ -138,6 +144,7 @@ private:
 
     void AddObjAddrToKVStore(const std::string &path, const ObjAddr &obj_addr);
 
+    Storage *storage_;
     KVStore *kv_store_{nullptr};
     std::string workspace_;
     std::string local_data_dir_;
@@ -145,7 +152,8 @@ private:
 
     mutable std::mutex mtx_;
     // std::unordered_map<std::string, ObjStat> object_stats_;        // obj_key -> ObjStat
-    std::shared_ptr<ObjectStatAccessor> object_stats_; // obj_key -> ObjStat
+    // std::shared_ptr<ObjectStatAccessor> object_stats_; // obj_key -> ObjStat
+    std::shared_ptr<ObjectStats> object_stats_{};
     // Current unsealed object key
     std::string current_object_key_;
     size_t current_object_size_ = 0;

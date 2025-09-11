@@ -1,4 +1,4 @@
-// Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2025 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,23 +13,22 @@
 // limitations under the License.
 
 module;
-
-export module infinity_core:obj_stat_accessor;
+export module infinity_core:object_stats;
 
 import :obj_status;
 
-import std.compat;
-import third_party;
+import std;
 
 namespace infinity {
 
+class Storage;
 class KVInstance;
 
-export class ObjectStatAccessor {
+export class ObjectStats {
 public:
-    ObjectStatAccessor();
+    explicit ObjectStats(Storage *storage) : storage_(storage) {}
 
-    virtual ~ObjectStatAccessor();
+    virtual ~ObjectStats();
 
     std::shared_ptr<ObjStat> Get(const std::string &key);
 
@@ -52,6 +51,8 @@ public:
 private:
     static void AddObjStatToKVStore(const std::string &key, const std::shared_ptr<ObjStat> &obj_stat);
     static void RemoveObjStatFromKVStore(const std::string &key);
+
+    Storage *storage_{};
 
     mutable std::mutex mutex_{}; // protect obj_map_
     std::unordered_map<std::string, std::shared_ptr<ObjStat>> obj_map_{};

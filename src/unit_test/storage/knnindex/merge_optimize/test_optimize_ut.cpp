@@ -21,7 +21,6 @@ module infinity_core:ut.test_optimize;
 import :ut.base_test;
 import :logger;
 import third_party;
-import :storage;
 import :infinity_context;
 import :table_def;
 import :column_vector;
@@ -49,6 +48,7 @@ import :status;
 import :new_txn;
 import :hnsw_handler;
 import :buffer_obj;
+import :storage;
 
 import compilation_config;
 import global_resource_usage;

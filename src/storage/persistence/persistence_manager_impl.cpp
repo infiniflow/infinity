@@ -24,10 +24,10 @@ import :uuid;
 import :infinity_exception;
 import :virtual_store;
 import :logger;
-import :obj_stat_accessor;
 import :kv_store;
 import :kv_code;
 import :infinity_context;
+import :object_stats;
 
 import std.compat;
 import third_party;
@@ -73,10 +73,14 @@ ObjAddr ObjAddr::ReadBufAdv(const char *&buf) {
     return ret;
 }
 
-PersistenceManager::PersistenceManager(const std::string &workspace, const std::string &data_dir, size_t object_size_limit, bool local_storage)
-    : workspace_(workspace), local_data_dir_(data_dir), object_size_limit_(object_size_limit) {
+PersistenceManager::PersistenceManager(Storage *storage,
+                                       const std::string &workspace,
+                                       const std::string &data_dir,
+                                       size_t object_size_limit,
+                                       bool local_storage)
+    : storage_(storage), workspace_(workspace), local_data_dir_(data_dir), object_size_limit_(object_size_limit) {
     if (local_storage) {
-        object_stats_ = std::make_shared<ObjectStatAccessor>();
+        object_stats_ = std::make_shared<ObjectStats>(storage);
     } else {
         UnrecoverableError("Remote storage is not supported yet.");
     }
