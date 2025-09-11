@@ -323,8 +323,8 @@ export struct ImportTxnStore final : public BaseTxnStore {
     u64 db_id_{};
     u64 table_id_{};
     std::string table_key_{};
-
-    std::map<SegmentID, std::vector<std::shared_ptr<DataBlock>>> input_blocks_in_imports_{};
+    std::string import_tmp_path_{};
+    std::vector<std::string> import_file_names_{}; // used during rollback
     std::vector<WalSegmentInfo> segment_infos_{};
 
     std::vector<std::string> index_names_{};
@@ -333,13 +333,12 @@ export struct ImportTxnStore final : public BaseTxnStore {
     std::vector<SegmentID> segment_ids_{};
     std::map<SegmentID, std::vector<WalChunkIndexInfo>> chunk_infos_in_segments_{};
     std::map<SegmentID, std::vector<ChunkID>> deprecate_ids_in_segments_{};
+    size_t row_count_{};
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
-    void ClearData() final;
-    size_t RowCount() const;
     size_t SegmentCount() const;
 };
 

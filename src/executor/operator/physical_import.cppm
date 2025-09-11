@@ -36,6 +36,7 @@ import data_type;
 namespace infinity {
 
 struct DataBlock;
+class NewImportCtx;
 
 export class PhysicalImport : public PhysicalOperator {
 public:
@@ -59,24 +60,21 @@ public:
 
     inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    void NewImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state, std::vector<std::shared_ptr<DataBlock>> &data_blocks);
+    void NewImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state);
 
-    void NewImportCSR(QueryContext *query_context, ImportOperatorState *import_op_state, std::vector<std::shared_ptr<DataBlock>> &data_blocks);
+    void NewImportCSR(QueryContext *query_context, ImportOperatorState *import_op_state);
 
-    void NewImportBVECS(QueryContext *query_context, ImportOperatorState *import_op_state, std::vector<std::shared_ptr<DataBlock>> &data_blocks);
+    void NewImportBVECS(QueryContext *query_context, ImportOperatorState *import_op_state);
 
-    void NewImportTypeVecs(QueryContext *query_context,
-                           ImportOperatorState *import_op_state,
-                           EmbeddingDataType embedding_data_type,
-                           std::vector<std::shared_ptr<DataBlock>> &data_blocks);
+    void NewImportTypeVecs(QueryContext *query_context, ImportOperatorState *import_op_state, EmbeddingDataType embedding_data_type);
 
-    void NewImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state, std::vector<std::shared_ptr<DataBlock>> &data_blocks);
+    void NewImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state);
 
-    void NewImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state, std::vector<std::shared_ptr<DataBlock>> &data_blocks);
+    void NewImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state);
 
-    void NewImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state, std::vector<std::shared_ptr<DataBlock>> &data_blocks);
+    void NewImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state);
 
-    void NewImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state, std::vector<std::shared_ptr<DataBlock>> &data_blocks);
+    void NewImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state);
 
     inline const TableInfo *table_info() const { return table_info_.get(); }
 
@@ -97,6 +95,8 @@ private:
 
     void ParquetValueHandler(const std::shared_ptr<arrow::Array> &array, ColumnVector &column_vector, u64 value_idx);
 
+    void FinalizeAndWriteDataBlock(NewImportCtx *import_ctx);
+
 private:
     std::shared_ptr<std::vector<std::string>> output_names_{};
     std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
@@ -106,6 +106,9 @@ private:
     std::string file_path_{};
     bool header_{false};
     char delimiter_{','};
+
+    NewTxn *txn_{};
+    std::vector<size_t> block_row_cnts_{};
 };
 
 export std::shared_ptr<ConstantExpr> BuildConstantExprFromJson(std::string_view json_object);

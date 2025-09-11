@@ -70,6 +70,8 @@ public:
 
     BufferObj *GetBufferObject(const std::string &file_path);
 
+    void ChangeBufferObjectState(const std::string &file_path);
+
     std::shared_ptr<std::string> GetFullDataDir() const { return data_dir_; }
 
     std::shared_ptr<std::string> GetTempDir() const { return temp_dir_; }
@@ -98,6 +100,8 @@ public:
     inline u64 TotalRequestCount() { return total_request_count_; }
     inline u64 CacheMissCount() { return cache_miss_count_; }
 
+    bool RemoveFromGCQueue(BufferObj *buffer_obj);
+
 private:
     friend class BufferObj;
 
@@ -107,8 +111,6 @@ private:
 
     // BufferHandle calls it, after unload.
     void PushGCQueue(BufferObj *buffer_obj);
-
-    bool RemoveFromGCQueue(BufferObj *buffer_obj);
 
     void AddToCleanList(BufferObj *buffer_obj, bool do_free);
 

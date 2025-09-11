@@ -152,6 +152,8 @@ public:
 
     void SetData(void *data);
     void SetDataSize(size_t size);
+    void SetType(BufferType type);
+    void SetStatus(BufferStatus status);
 
 protected:
     mutable std::mutex w_locker_{};

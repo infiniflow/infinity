@@ -78,31 +78,24 @@ public:
     bool CheckInit() const { return cur_block_ != nullptr; }
 
     void Init() {
-        auto data_block = std::make_shared<DataBlock>();
-        data_block->Init(column_types_, block_capacity_);
+        data_block_ = std::make_shared<DataBlock>();
+        data_block_->Init(column_types_, block_capacity_);
 
-        data_blocks_.push_back(data_block);
-        cur_block_ = data_block.get();
+        cur_block_ = data_block_.get();
     }
 
     void FinalizeBlock() {
         cur_block_->Finalize();
         cur_block_ = nullptr;
-        cur_row_count_ = 0;
+        cur_block_row_count_ = 0;
+        block_idx_++;
     }
 
-    std::vector<std::shared_ptr<DataBlock>> Finalize() && {
-        if (CheckInit()) {
-            FinalizeBlock();
-        }
-        return std::move(data_blocks_);
-    }
-
-    bool CheckFull() const { return cur_row_count_ >= cur_block_->capacity(); }
+    bool CheckFull() const { return cur_block_row_count_ >= cur_block_->capacity(); }
 
     void AddRowCnt() {
         ++row_count_;
-        ++cur_row_count_;
+        ++cur_block_row_count_;
     }
 
     ColumnVector &GetColumnVector(size_t column_idx) {
@@ -117,8 +110,12 @@ public:
         return column_defs_[column_idx];
     }
 
-    size_t row_count() const { return row_count_; }
-    size_t column_count() const { return column_defs_.size(); }
+    std::shared_ptr<DataBlock> &GetDataBlock() { return data_block_; }
+
+    size_t GetRowCount() const { return row_count_; }
+    size_t GetCurBlockRowCount() const { return cur_block_row_count_; }
+    size_t GetColumnCount() const { return column_defs_.size(); }
+    size_t GetBlockIdx() const { return block_idx_; }
 
     ZsvParser parser_;
 
@@ -128,10 +125,11 @@ private:
     std::vector<std::shared_ptr<ColumnDef>> column_defs_;
     std::vector<std::shared_ptr<DataType>> column_types_;
 
-    std::vector<std::shared_ptr<DataBlock>> data_blocks_;
+    std::shared_ptr<DataBlock> data_block_{};
 
     DataBlock *cur_block_ = nullptr;
-    size_t cur_row_count_ = 0;
+    size_t cur_block_row_count_ = 0;
+    size_t block_idx_ = 0;
 };
 
 class NewZxvParserCtx : public NewImportCtx {
@@ -142,6 +140,7 @@ public:
 public:
     ZsvParser parser_;
     std::shared_ptr<std::string> err_msg_;
+    PhysicalImport *physical_import_instance_ptr = nullptr;
 };
 
 void PhysicalImport::Init(QueryContext *query_context) {}
@@ -183,37 +182,38 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
         }
     }
 
-    ImportOperatorState *import_op_state = static_cast<ImportOperatorState *>(operator_state);
+    txn_ = query_context->GetNewTxn();
+    txn_->SetTxnType(TransactionType::kImport);
 
-    std::vector<std::shared_ptr<DataBlock>> data_blocks;
+    ImportOperatorState *import_op_state = static_cast<ImportOperatorState *>(operator_state);
 
     switch (file_type_) {
         case CopyFileType::kCSV: {
-            NewImportCSV(query_context, import_op_state, data_blocks);
+            NewImportCSV(query_context, import_op_state);
             break;
         }
         case CopyFileType::kJSON: {
-            NewImportJSON(query_context, import_op_state, data_blocks);
+            NewImportJSON(query_context, import_op_state);
             break;
         }
         case CopyFileType::kJSONL: {
-            NewImportJSONL(query_context, import_op_state, data_blocks);
+            NewImportJSONL(query_context, import_op_state);
             break;
         }
         case CopyFileType::kFVECS: {
-            NewImportFVECS(query_context, import_op_state, data_blocks);
+            NewImportFVECS(query_context, import_op_state);
             break;
         }
         case CopyFileType::kCSR: {
-            NewImportCSR(query_context, import_op_state, data_blocks);
+            NewImportCSR(query_context, import_op_state);
             break;
         }
         case CopyFileType::kBVECS: {
-            NewImportBVECS(query_context, import_op_state, data_blocks);
+            NewImportBVECS(query_context, import_op_state);
             break;
         }
         case CopyFileType::kPARQUET: {
-            NewImportPARQUET(query_context, import_op_state, data_blocks);
+            NewImportPARQUET(query_context, import_op_state);
             break;
         }
         default: {
@@ -221,9 +221,7 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
         }
     }
 
-    NewTxn *new_txn = query_context->GetNewTxn();
-    new_txn->SetTxnType(TransactionType::kImport);
-    Status status = new_txn->Import(*table_info_->db_name_, *table_info_->table_name_, data_blocks);
+    Status status = txn_->Import(*table_info_->db_name_, *table_info_->table_name_, block_row_cnts_);
     if (!status.ok()) {
         import_op_state->status_ = status;
     }
@@ -232,22 +230,15 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
     return true;
 }
 
-void PhysicalImport::NewImportFVECS(QueryContext *query_context,
-                                    ImportOperatorState *import_op_state,
-                                    std::vector<std::shared_ptr<DataBlock>> &data_blocks) {
-    NewImportTypeVecs(query_context, import_op_state, EmbeddingDataType::kElemFloat, data_blocks);
+void PhysicalImport::NewImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state) {
+    NewImportTypeVecs(query_context, import_op_state, EmbeddingDataType::kElemFloat);
 }
 
-void PhysicalImport::NewImportBVECS(QueryContext *query_context,
-                                    ImportOperatorState *import_op_state,
-                                    std::vector<std::shared_ptr<DataBlock>> &data_blocks) {
-    NewImportTypeVecs(query_context, import_op_state, EmbeddingDataType::kElemUInt8, data_blocks);
+void PhysicalImport::NewImportBVECS(QueryContext *query_context, ImportOperatorState *import_op_state) {
+    NewImportTypeVecs(query_context, import_op_state, EmbeddingDataType::kElemUInt8);
 }
 
-void PhysicalImport::NewImportTypeVecs(QueryContext *query_context,
-                                       ImportOperatorState *import_op_state,
-                                       EmbeddingDataType embedding_data_type,
-                                       std::vector<std::shared_ptr<DataBlock>> &data_blocks) {
+void PhysicalImport::NewImportTypeVecs(QueryContext *query_context, ImportOperatorState *import_op_state, EmbeddingDataType embedding_data_type) {
     if (table_info_->column_count_ != 1) {
         Status status = Status::ImportFileFormatError("file must have only one column.");
         RecoverableError(status);
@@ -303,7 +294,7 @@ void PhysicalImport::NewImportTypeVecs(QueryContext *query_context,
 
     auto import_ctx = std::make_unique<NewImportCtx>(table_info_->column_defs_);
     auto buffer = std::make_unique<f32[]>(dimension);
-    while (import_ctx->row_count() < vector_n) {
+    while (import_ctx->GetRowCount() < vector_n) {
         i32 dim;
         auto [nbytes, status_read] = file_handle->Read(&dim, sizeof(dimension));
         if (!status_read.ok()) {
@@ -324,11 +315,13 @@ void PhysicalImport::NewImportTypeVecs(QueryContext *query_context,
 
         import_ctx->AddRowCnt();
         if (import_ctx->CheckFull()) {
-            import_ctx->FinalizeBlock();
+            FinalizeAndWriteDataBlock(import_ctx.get());
         }
     }
 
-    data_blocks = std::move(*import_ctx).Finalize();
+    if (import_ctx->GetCurBlockRowCount() != 0) {
+        FinalizeAndWriteDataBlock(import_ctx.get());
+    }
 
     auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", vector_n));
     import_op_state->result_msg_ = std::move(result_msg);
@@ -368,9 +361,7 @@ std::unique_ptr<char[]> ConvertCSRIndice(std::unique_ptr<char[]> tmp_indice_ptr,
     return {};
 }
 
-void PhysicalImport::NewImportCSR(QueryContext *query_context,
-                                  ImportOperatorState *import_op_state,
-                                  std::vector<std::shared_ptr<DataBlock>> &data_blocks) {
+void PhysicalImport::NewImportCSR(QueryContext *query_context, ImportOperatorState *import_op_state) {
     if (table_info_->column_count_ != 1) {
         Status status = Status::ImportFileFormatError("CSR file must have only one column.");
         RecoverableError(status);
@@ -425,7 +416,7 @@ void PhysicalImport::NewImportCSR(QueryContext *query_context,
 
     auto import_ctx = std::make_unique<NewImportCtx>(table_info_->column_defs_);
 
-    while (i64(import_ctx->row_count()) < nrow) {
+    while (i64(import_ctx->GetRowCount()) < nrow) {
         i64 off = 0;
         file_handle->Read(&off, sizeof(i64));
         i64 nnz = off - prev_off;
@@ -449,19 +440,19 @@ void PhysicalImport::NewImportCSR(QueryContext *query_context,
         import_ctx->AddRowCnt();
 
         if (import_ctx->CheckFull()) {
-            import_ctx->FinalizeBlock();
+            FinalizeAndWriteDataBlock(import_ctx.get());
         }
     }
 
-    data_blocks = std::move(*import_ctx).Finalize();
+    if (import_ctx->GetCurBlockRowCount() != 0) {
+        FinalizeAndWriteDataBlock(import_ctx.get());
+    }
 
-    auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", import_ctx->row_count()));
+    auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", import_ctx->GetRowCount()));
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
-void PhysicalImport::NewImportCSV(QueryContext *query_context,
-                                  ImportOperatorState *import_op_state,
-                                  std::vector<std::shared_ptr<DataBlock>> &data_blocks) {
+void PhysicalImport::NewImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state) {
     FILE *fp = fopen(file_path_.c_str(), "rb");
     if (!fp) {
         UnrecoverableError(strerror(errno));
@@ -473,6 +464,7 @@ void PhysicalImport::NewImportCSV(QueryContext *query_context,
     });
 
     auto parser_context = std::make_unique<NewZxvParserCtx>(table_info_->column_defs_);
+    parser_context->physical_import_instance_ptr = this;
 
     auto opts = std::make_unique<ZsvOpts>();
     if (header_) {
@@ -493,7 +485,9 @@ void PhysicalImport::NewImportCSV(QueryContext *query_context,
     }
     parser_context->parser_.Finish();
 
-    data_blocks = std::move(*parser_context).Finalize();
+    if (parser_context->GetCurBlockRowCount() != 0) {
+        FinalizeAndWriteDataBlock(parser_context.get());
+    }
 
     if (csv_parser_status != zsv_status_no_more_input) {
         if (parser_context->err_msg_.get() != nullptr) {
@@ -504,12 +498,10 @@ void PhysicalImport::NewImportCSV(QueryContext *query_context,
         }
     }
 
-    import_op_state->result_msg_ = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", parser_context->row_count()));
+    import_op_state->result_msg_ = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", parser_context->GetRowCount()));
 }
 
-void PhysicalImport::NewImportJSONL(QueryContext *query_context,
-                                    ImportOperatorState *import_op_state,
-                                    std::vector<std::shared_ptr<DataBlock>> &data_blocks) {
+void PhysicalImport::NewImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state) {
     std::unique_ptr<StreamReader> stream_reader = VirtualStore::OpenStreamReader(file_path_);
 
     auto import_ctx = std::make_unique<NewImportCtx>(table_info_->column_defs_);
@@ -527,19 +519,19 @@ void PhysicalImport::NewImportJSONL(QueryContext *query_context,
         import_ctx->AddRowCnt();
 
         if (import_ctx->CheckFull()) {
-            import_ctx->FinalizeBlock();
+            FinalizeAndWriteDataBlock(import_ctx.get());
         }
     }
 
-    data_blocks = std::move(*import_ctx).Finalize();
+    if (import_ctx->GetCurBlockRowCount() != 0) {
+        FinalizeAndWriteDataBlock(import_ctx.get());
+    }
 
-    auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", import_ctx->row_count()));
+    auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", import_ctx->GetRowCount()));
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
-void PhysicalImport::NewImportJSON(QueryContext *query_context,
-                                   ImportOperatorState *import_op_state,
-                                   std::vector<std::shared_ptr<DataBlock>> &data_blocks) {
+void PhysicalImport::NewImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state) {
     auto [file_handle, status] = VirtualStore::Open(file_path_, FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());
@@ -580,12 +572,15 @@ void PhysicalImport::NewImportJSON(QueryContext *query_context,
         import_ctx->AddRowCnt();
 
         if (import_ctx->CheckFull()) {
-            import_ctx->FinalizeBlock();
+            FinalizeAndWriteDataBlock(import_ctx.get());
         }
     }
-    data_blocks = std::move(*import_ctx).Finalize();
 
-    auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", import_ctx->row_count()));
+    if (import_ctx->GetCurBlockRowCount() != 0) {
+        FinalizeAndWriteDataBlock(import_ctx.get());
+    }
+
+    auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", import_ctx->GetRowCount()));
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
@@ -594,7 +589,7 @@ void PhysicalImport::NewCSVHeaderHandler(void *context_raw_ptr) {
     ZsvParser &parser = parser_context->parser_;
     size_t csv_column_count = parser.CellCount();
 
-    size_t table_column_count = parser_context->column_count();
+    size_t table_column_count = parser_context->GetColumnCount();
     if (csv_column_count != table_column_count) {
         parser_context->err_msg_ =
             std::make_shared<std::string>(fmt::format("Unmatched column count ({} != {})", csv_column_count, table_column_count));
@@ -627,11 +622,11 @@ void PhysicalImport::NewCSVRowHandler(void *context_raw_ptr) {
     }
 
     size_t column_count = parser_context->parser_.CellCount();
-    size_t table_column_count = parser_context->column_count();
+    size_t table_column_count = parser_context->GetColumnCount();
     if (column_count > table_column_count) {
         Status status = Status::ColumnCountMismatch(
             fmt::format("CSV file column count isn't match with table schema, row id: {}, column_count: {}, table_entry->ColumnCount: {}.",
-                        parser_context->row_count(),
+                        parser_context->GetRowCount(),
                         column_count,
                         table_column_count));
         RecoverableError(status);
@@ -657,14 +652,14 @@ void PhysicalImport::NewCSVRowHandler(void *context_raw_ptr) {
             column_vector.AppendByConstantExpr(const_expr);
         } else {
             Status status = Status::ImportFileFormatError(
-                fmt::format("No value in column {} in CSV of row number: {}", column_def->name_, parser_context->row_count()));
+                fmt::format("No value in column {} in CSV of row number: {}", column_def->name_, parser_context->GetRowCount()));
             RecoverableError(status);
         }
     }
     parser_context->AddRowCnt();
 
     if (parser_context->CheckFull()) {
-        parser_context->FinalizeBlock();
+        parser_context->physical_import_instance_ptr->FinalizeAndWriteDataBlock(parser_context);
     }
 }
 
@@ -1218,9 +1213,7 @@ Status CheckParquetColumns(TableInfo *table_info, arrow::ParquetFileReader *arro
 
 } // namespace
 
-void PhysicalImport::NewImportPARQUET(QueryContext *query_context,
-                                      ImportOperatorState *import_op_state,
-                                      std::vector<std::shared_ptr<DataBlock>> &data_blocks) {
+void PhysicalImport::NewImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state) {
     arrow::MemoryPool *pool = arrow::DefaultMemoryPool();
 
     // Configure general Parquet reader settings
@@ -1276,14 +1269,16 @@ void PhysicalImport::NewImportPARQUET(QueryContext *query_context,
             }
             import_ctx->AddRowCnt();
             if (import_ctx->CheckFull()) {
-                import_ctx->FinalizeBlock();
+                FinalizeAndWriteDataBlock(import_ctx.get());
             }
         }
     }
 
-    data_blocks = std::move(*import_ctx).Finalize();
+    if (import_ctx->GetCurBlockRowCount() != 0) {
+        FinalizeAndWriteDataBlock(import_ctx.get());
+    }
 
-    auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", import_ctx->row_count()));
+    auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", import_ctx->GetRowCount()));
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
@@ -2087,5 +2082,26 @@ Value GetValueFromParquetRecursively(const DataType &data_type, const std::share
             return Value::MakeInvalid();
         }
     }
+}
+
+void PhysicalImport::FinalizeAndWriteDataBlock(NewImportCtx *import_ctx) {
+    size_t row_cnt = import_ctx->GetCurBlockRowCount();
+    size_t block_idx = import_ctx->GetBlockIdx();
+    block_row_cnts_.push_back(row_cnt);
+    import_ctx->FinalizeBlock();
+
+    std::vector<std::string> object_paths{};
+    if (txn_ == nullptr) {
+        UnrecoverableError("Txn is nullptr");
+    }
+    txn_->WriteDataBlockToFile(*table_info_->db_name_, *table_info_->table_name_, std::move(import_ctx->GetDataBlock()), block_idx, &object_paths);
+
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    for (auto &object_path : object_paths) {
+        auto bufobj = buffer_mgr->GetBufferObject(object_path);
+        buffer_mgr->RemoveFromGCQueue(bufobj);
+        bufobj->Free();
+    }
+    buffer_mgr->RemoveBufferObjects(object_paths);
 }
 } // namespace infinity
