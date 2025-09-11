@@ -10,19 +10,8 @@ TEST_SEC = 10 # run once
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Restart Test Continuously")
-    parser.add_argument(
-        "-t",
-        "--test_sec",
-        type=int,
-        default=TEST_SEC,
-        dest="test_sec",
-    )
-    parser.add_argument(
-        "--infinity_path",
-        type=str,
-        default="./build/Debug/src/infinity",
-        dest="infinity_path",
-    )
+    parser.add_argument("-t", "--test_sec", type=int, default=TEST_SEC, dest="test_sec")
+    parser.add_argument("--infinity_path", type=str, default="./build/Debug/src/infinity", dest="infinity_path")
     args = parser.parse_args()
     test_sec = args.test_sec
     infinity_path = args.infinity_path
