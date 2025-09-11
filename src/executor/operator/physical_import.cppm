@@ -95,8 +95,6 @@ private:
 
     void ParquetValueHandler(const std::shared_ptr<arrow::Array> &array, ColumnVector &column_vector, u64 value_idx);
 
-    void FinalizeAndWriteDataBlock(NewImportCtx *import_ctx);
-
 private:
     std::shared_ptr<std::vector<std::string>> output_names_{};
     std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
@@ -106,9 +104,6 @@ private:
     std::string file_path_{};
     bool header_{false};
     char delimiter_{','};
-
-    NewTxn *txn_{};
-    std::vector<size_t> block_row_cnts_{};
 };
 
 export std::shared_ptr<ConstantExpr> BuildConstantExprFromJson(std::string_view json_object);

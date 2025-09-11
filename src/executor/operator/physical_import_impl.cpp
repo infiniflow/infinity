@@ -67,8 +67,9 @@ namespace infinity {
 
 class NewImportCtx {
 public:
-    NewImportCtx(std::vector<std::shared_ptr<ColumnDef>> column_defs, size_t block_capacity = DEFAULT_BLOCK_CAPACITY)
-        : block_capacity_(block_capacity), column_defs_(std::move(column_defs)) {
+    NewImportCtx(NewTxn *txn, std::shared_ptr<TableInfo> table_info, size_t block_capacity = DEFAULT_BLOCK_CAPACITY)
+        : txn_(txn), block_capacity_(block_capacity), db_name_(*table_info->db_name_), table_name_(*table_info->table_name_),
+          column_defs_(table_info->column_defs_) {
         column_types_.reserve(column_defs_.size());
         for (const auto &column_def : column_defs_) {
             column_types_.push_back(column_def->type());
@@ -105,27 +106,55 @@ public:
 
     std::vector<std::shared_ptr<ColumnVector>> &GetColumnVectors() { return cur_block_->column_vectors; }
 
+    std::string GetDBName() const { return db_name_; }
+    std::string GetTableName() const { return table_name_; }
     std::shared_ptr<ColumnDef> GetColumnDef(size_t column_idx) {
         assert(column_idx < column_defs_.size());
         return column_defs_[column_idx];
     }
 
     std::shared_ptr<DataBlock> &GetDataBlock() { return data_block_; }
+    std::vector<size_t> GetBlockRowCnts() { return block_row_cnts_; }
 
     size_t GetRowCount() const { return row_count_; }
     size_t GetCurBlockRowCount() const { return cur_block_row_count_; }
     size_t GetColumnCount() const { return column_defs_.size(); }
     size_t GetBlockIdx() const { return block_idx_; }
 
-    ZsvParser parser_;
+    void FinalizeAndWriteDataBlock() {
+        size_t row_cnt = cur_block_row_count_;
+        size_t block_idx = block_idx_;
+
+        block_row_cnts_.push_back(row_cnt);
+        FinalizeBlock();
+
+        std::vector<std::string> object_paths{};
+        if (txn_ == nullptr) {
+            UnrecoverableError("Txn is nullptr");
+        }
+        txn_->WriteDataBlockToFile(db_name_, table_name_, std::move(data_block_), block_idx, &object_paths);
+
+        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+        for (auto &object_path : object_paths) {
+            auto buf_obj = buffer_mgr->GetBufferObject(object_path);
+            buffer_mgr->RemoveFromGCQueue(buf_obj);
+            buf_obj->Free();
+        }
+        buffer_mgr->RemoveBufferObjects(object_paths);
+    }
 
 private:
+    NewTxn *txn_ = nullptr;
+
     size_t block_capacity_ = 0;
     size_t row_count_ = 0;
+    std::string db_name_{};
+    std::string table_name_{};
     std::vector<std::shared_ptr<ColumnDef>> column_defs_;
     std::vector<std::shared_ptr<DataType>> column_types_;
 
     std::shared_ptr<DataBlock> data_block_{};
+    std::vector<size_t> block_row_cnts_{};
 
     DataBlock *cur_block_ = nullptr;
     size_t cur_block_row_count_ = 0;
@@ -134,13 +163,12 @@ private:
 
 class NewZxvParserCtx : public NewImportCtx {
 public:
-    NewZxvParserCtx(std::vector<std::shared_ptr<ColumnDef>> column_defs, size_t block_capacity = DEFAULT_BLOCK_CAPACITY)
-        : NewImportCtx(std::move(column_defs), block_capacity) {}
+    NewZxvParserCtx(NewTxn *txn, std::shared_ptr<TableInfo> table_info, size_t block_capacity = DEFAULT_BLOCK_CAPACITY)
+        : NewImportCtx(txn, table_info, block_capacity) {}
 
 public:
     ZsvParser parser_;
     std::shared_ptr<std::string> err_msg_;
-    PhysicalImport *physical_import_instance_ptr = nullptr;
 };
 
 void PhysicalImport::Init(QueryContext *query_context) {}
@@ -182,8 +210,8 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
         }
     }
 
-    txn_ = query_context->GetNewTxn();
-    txn_->SetTxnType(TransactionType::kImport);
+    NewTxn *txn = query_context->GetNewTxn();
+    txn->SetTxnType(TransactionType::kImport);
 
     ImportOperatorState *import_op_state = static_cast<ImportOperatorState *>(operator_state);
 
@@ -221,7 +249,7 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
         }
     }
 
-    Status status = txn_->Import(*table_info_->db_name_, *table_info_->table_name_, block_row_cnts_);
+    Status status = txn->Import(*table_info_->db_name_, *table_info_->table_name_, import_op_state->block_row_cnts_);
     if (!status.ok()) {
         import_op_state->status_ = status;
     }
@@ -292,7 +320,8 @@ void PhysicalImport::NewImportTypeVecs(QueryContext *query_context, ImportOperat
     }
     size_t vector_n = file_size / row_size;
 
-    auto import_ctx = std::make_unique<NewImportCtx>(table_info_->column_defs_);
+    auto import_ctx = std::make_unique<NewImportCtx>(query_context->GetNewTxn(), table_info_);
+
     auto buffer = std::make_unique<f32[]>(dimension);
     while (import_ctx->GetRowCount() < vector_n) {
         i32 dim;
@@ -315,14 +344,15 @@ void PhysicalImport::NewImportTypeVecs(QueryContext *query_context, ImportOperat
 
         import_ctx->AddRowCnt();
         if (import_ctx->CheckFull()) {
-            FinalizeAndWriteDataBlock(import_ctx.get());
+            import_ctx->FinalizeAndWriteDataBlock();
         }
     }
 
     if (import_ctx->GetCurBlockRowCount() != 0) {
-        FinalizeAndWriteDataBlock(import_ctx.get());
+        import_ctx->FinalizeAndWriteDataBlock();
     }
 
+    import_op_state->block_row_cnts_ = import_ctx->GetBlockRowCnts();
     auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", vector_n));
     import_op_state->result_msg_ = std::move(result_msg);
 }
@@ -414,7 +444,7 @@ void PhysicalImport::NewImportCSR(QueryContext *query_context, ImportOperatorSta
 
     // ------------------------------------------------------------------------------------------------------------------------
 
-    auto import_ctx = std::make_unique<NewImportCtx>(table_info_->column_defs_);
+    auto import_ctx = std::make_unique<NewImportCtx>(query_context->GetNewTxn(), table_info_);
 
     while (i64(import_ctx->GetRowCount()) < nrow) {
         i64 off = 0;
@@ -440,14 +470,15 @@ void PhysicalImport::NewImportCSR(QueryContext *query_context, ImportOperatorSta
         import_ctx->AddRowCnt();
 
         if (import_ctx->CheckFull()) {
-            FinalizeAndWriteDataBlock(import_ctx.get());
+            import_ctx->FinalizeAndWriteDataBlock();
         }
     }
 
     if (import_ctx->GetCurBlockRowCount() != 0) {
-        FinalizeAndWriteDataBlock(import_ctx.get());
+        import_ctx->FinalizeAndWriteDataBlock();
     }
 
+    import_op_state->block_row_cnts_ = import_ctx->GetBlockRowCnts();
     auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", import_ctx->GetRowCount()));
     import_op_state->result_msg_ = std::move(result_msg);
 }
@@ -463,8 +494,7 @@ void PhysicalImport::NewImportCSV(QueryContext *query_context, ImportOperatorSta
         }
     });
 
-    auto parser_context = std::make_unique<NewZxvParserCtx>(table_info_->column_defs_);
-    parser_context->physical_import_instance_ptr = this;
+    auto parser_context = std::make_unique<NewZxvParserCtx>(query_context->GetNewTxn(), table_info_);
 
     auto opts = std::make_unique<ZsvOpts>();
     if (header_) {
@@ -486,7 +516,7 @@ void PhysicalImport::NewImportCSV(QueryContext *query_context, ImportOperatorSta
     parser_context->parser_.Finish();
 
     if (parser_context->GetCurBlockRowCount() != 0) {
-        FinalizeAndWriteDataBlock(parser_context.get());
+        parser_context->FinalizeAndWriteDataBlock();
     }
 
     if (csv_parser_status != zsv_status_no_more_input) {
@@ -498,13 +528,14 @@ void PhysicalImport::NewImportCSV(QueryContext *query_context, ImportOperatorSta
         }
     }
 
+    import_op_state->block_row_cnts_ = parser_context->GetBlockRowCnts();
     import_op_state->result_msg_ = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", parser_context->GetRowCount()));
 }
 
 void PhysicalImport::NewImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state) {
     std::unique_ptr<StreamReader> stream_reader = VirtualStore::OpenStreamReader(file_path_);
 
-    auto import_ctx = std::make_unique<NewImportCtx>(table_info_->column_defs_);
+    auto import_ctx = std::make_unique<NewImportCtx>(query_context->GetNewTxn(), table_info_);
 
     while (true) {
         std::string json_str;
@@ -519,14 +550,15 @@ void PhysicalImport::NewImportJSONL(QueryContext *query_context, ImportOperatorS
         import_ctx->AddRowCnt();
 
         if (import_ctx->CheckFull()) {
-            FinalizeAndWriteDataBlock(import_ctx.get());
+            import_ctx->FinalizeAndWriteDataBlock();
         }
     }
 
     if (import_ctx->GetCurBlockRowCount() != 0) {
-        FinalizeAndWriteDataBlock(import_ctx.get());
+        import_ctx->FinalizeAndWriteDataBlock();
     }
 
+    import_op_state->block_row_cnts_ = import_ctx->GetBlockRowCnts();
     auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", import_ctx->GetRowCount()));
     import_op_state->result_msg_ = std::move(result_msg);
 }
@@ -563,7 +595,7 @@ void PhysicalImport::NewImportJSON(QueryContext *query_context, ImportOperatorSt
         return;
     }
 
-    auto import_ctx = std::make_unique<NewImportCtx>(table_info_->column_defs_);
+    auto import_ctx = std::make_unique<NewImportCtx>(query_context->GetNewTxn(), table_info_);
     for (auto element : doc.get_array()) {
         if (!import_ctx->CheckInit()) {
             import_ctx->Init();
@@ -572,14 +604,15 @@ void PhysicalImport::NewImportJSON(QueryContext *query_context, ImportOperatorSt
         import_ctx->AddRowCnt();
 
         if (import_ctx->CheckFull()) {
-            FinalizeAndWriteDataBlock(import_ctx.get());
+            import_ctx->FinalizeAndWriteDataBlock();
         }
     }
 
     if (import_ctx->GetCurBlockRowCount() != 0) {
-        FinalizeAndWriteDataBlock(import_ctx.get());
+        import_ctx->FinalizeAndWriteDataBlock();
     }
 
+    import_op_state->block_row_cnts_ = import_ctx->GetBlockRowCnts();
     auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", import_ctx->GetRowCount()));
     import_op_state->result_msg_ = std::move(result_msg);
 }
@@ -659,7 +692,7 @@ void PhysicalImport::NewCSVRowHandler(void *context_raw_ptr) {
     parser_context->AddRowCnt();
 
     if (parser_context->CheckFull()) {
-        parser_context->physical_import_instance_ptr->FinalizeAndWriteDataBlock(parser_context);
+        parser_context->FinalizeAndWriteDataBlock();
     }
 }
 
@@ -1246,7 +1279,7 @@ void PhysicalImport::NewImportPARQUET(QueryContext *query_context, ImportOperato
         RecoverableError(Status::ImportFileFormatError(status.ToString()));
     }
 
-    auto import_ctx = std::make_unique<NewImportCtx>(table_info_->column_defs_);
+    auto import_ctx = std::make_unique<NewImportCtx>(query_context->GetNewTxn(), table_info_);
 
     for (arrow::ArrowResult<std::shared_ptr<arrow::RecordBatch>> maybe_batch : *rb_reader) {
         if (!maybe_batch.ok()) {
@@ -1269,15 +1302,16 @@ void PhysicalImport::NewImportPARQUET(QueryContext *query_context, ImportOperato
             }
             import_ctx->AddRowCnt();
             if (import_ctx->CheckFull()) {
-                FinalizeAndWriteDataBlock(import_ctx.get());
+                import_ctx->FinalizeAndWriteDataBlock();
             }
         }
     }
 
     if (import_ctx->GetCurBlockRowCount() != 0) {
-        FinalizeAndWriteDataBlock(import_ctx.get());
+        import_ctx->FinalizeAndWriteDataBlock();
     }
 
+    import_op_state->block_row_cnts_ = import_ctx->GetBlockRowCnts();
     auto result_msg = std::make_unique<std::string>(fmt::format("IMPORT {} Rows", import_ctx->GetRowCount()));
     import_op_state->result_msg_ = std::move(result_msg);
 }
@@ -2082,26 +2116,5 @@ Value GetValueFromParquetRecursively(const DataType &data_type, const std::share
             return Value::MakeInvalid();
         }
     }
-}
-
-void PhysicalImport::FinalizeAndWriteDataBlock(NewImportCtx *import_ctx) {
-    size_t row_cnt = import_ctx->GetCurBlockRowCount();
-    size_t block_idx = import_ctx->GetBlockIdx();
-    block_row_cnts_.push_back(row_cnt);
-    import_ctx->FinalizeBlock();
-
-    std::vector<std::string> object_paths{};
-    if (txn_ == nullptr) {
-        UnrecoverableError("Txn is nullptr");
-    }
-    txn_->WriteDataBlockToFile(*table_info_->db_name_, *table_info_->table_name_, std::move(import_ctx->GetDataBlock()), block_idx, &object_paths);
-
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-    for (auto &object_path : object_paths) {
-        auto bufobj = buffer_mgr->GetBufferObject(object_path);
-        buffer_mgr->RemoveFromGCQueue(bufobj);
-        bufobj->Free();
-    }
-    buffer_mgr->RemoveBufferObjects(object_paths);
 }
 } // namespace infinity
