@@ -194,6 +194,9 @@ PersistWriteResult PersistenceManager::Persist(const std::string &file_path, con
         UnrecoverableError(fmt::format("Failed to remove {}", tmp_file_path));
     }
 
+    object_stats_->PutNew(current_object_key_, std::make_shared<ObjStat>(current_object_size_, current_object_parts_, current_object_ref_count_));
+    LOG_TRACE(fmt::format("Persist current object {}", current_object_key_));
+
     status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump());
     if (!status.ok()) {
         UnrecoverableError(status.message());

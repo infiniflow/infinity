@@ -78,16 +78,12 @@ std::shared_ptr<ObjStat> ObjectStats::Release(const std::string &key) {
     return map_iter->second;
 }
 
-void ObjectStats::PutNew(const std::string &key, std::shared_ptr<ObjStat> obj_stat) {
+void ObjectStats::PutNew(const std::string &key, const std::shared_ptr<ObjStat>& obj_stat) {
     this->AddObjStatToKVStore(key, obj_stat);
 
     std::unique_lock<std::mutex> lock(mutex_);
-    auto map_iter = obj_map_.find(key);
-    if (map_iter != obj_map_.end()) {
-        UnrecoverableError(fmt::format("PutNew object {} is already in object map", key));
-    }
     obj_stat->cached_ = ObjCached::kCached;
-    obj_map_.emplace_hint(map_iter, key, std::move(obj_stat));
+    obj_map_[key] = obj_stat;
 }
 
 void ObjectStats::PutNoCount(const std::string &key, std::shared_ptr<ObjStat> obj_stat) {

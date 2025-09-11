@@ -36,7 +36,7 @@ public:
 
     std::shared_ptr<ObjStat> Release(const std::string &key);
 
-    void PutNew(const std::string &key, std::shared_ptr<ObjStat> obj_stat);
+    void PutNew(const std::string &key, const std::shared_ptr<ObjStat> &obj_stat);
 
     void PutNoCount(const std::string &key, std::shared_ptr<ObjStat> obj_stat);
 
