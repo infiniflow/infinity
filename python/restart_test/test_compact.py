@@ -15,6 +15,7 @@ class TestCompact:
         columns = LChYDataGenerato.columns()
         indexes = LChYDataGenerato.index()
         import_file = LChYDataGenerato.import_file()
+        import_num = 1000
 
         @decorator
         def part1(infinity_obj):
@@ -23,6 +24,12 @@ class TestCompact:
             table_obj = db_obj.create_table("test_compact", columns)
             table_obj.import_data(import_file, {"file_type": "jsonl"})
             table_obj.import_data(import_file, {"file_type": "jsonl"})
+            table_obj.import_data(import_file, {"file_type": "jsonl"})
+            table_obj.import_data(import_file, {"file_type": "jsonl"})
+            data_dict, _, _ = table_obj.output(["count(*)"]).to_result()
+            count_star = data_dict["count(star)"][0]
+            assert count_star == import_num * 4
+            assert len(table_obj.show_segments()) == 4
             infinity_obj.flush_data()
             table_obj.compact()
             for index_info in indexes:
@@ -34,7 +41,11 @@ class TestCompact:
 
         @decorator
         def part2(infinity_obj):
-            pass
+            table_obj = infinity_obj.get_database("default_db").get_table("test_compact")
+            data_dict, _, _ = table_obj.output(["count(*)"]).to_result()
+            count_star = data_dict["count(star)"][0]
+            assert count_star == import_num * 4
+            assert len(table_obj.show_segments()) == 1
 
         part2()
 
@@ -66,19 +77,25 @@ class TestCompact:
             )
             table_obj.import_data(dataset_path, import_options)
             table_obj.import_data(dataset_path, import_options)
+            table_obj.import_data(dataset_path, import_options)
+            table_obj.import_data(dataset_path, import_options)
             table_obj.compact()
 
             infinity_obj.flush_data()
 
             table_obj.import_data(dataset_path, import_options)
+            table_obj.import_data(dataset_path, import_options)
+            table_obj.import_data(dataset_path, import_options)
             table_obj.compact()
             infinity_obj.flush_data()
 
+            table_obj.import_data(dataset_path, import_options)
+            table_obj.import_data(dataset_path, import_options)
             table_obj.import_data(dataset_path, import_options)
             table_obj.compact()
 
         part1()
-        import_time = 4
+        import_time = 10
 
         @decorator
         def part2(infinity_obj):
@@ -86,6 +103,7 @@ class TestCompact:
             data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
             count_star = data_dict["count(star)"][0]
             assert count_star == 9 * import_time
+            assert len(table_obj.show_segments()) == 1
 
         part2()
 
@@ -130,6 +148,7 @@ class TestCompact:
             count_star = data_dict["count(star)"][0]
             assert count_star == import_n * file_lines
 
+            # Background compact is executed regularly
             for i in range(import_num):
                 table_obj.import_data(import_path, import_options)
                 import_n += 1
@@ -139,6 +158,12 @@ class TestCompact:
 
         @decorator1
         def part3(infinity_obj):
+            nonlocal import_n
+            table_obj = infinity_obj.get_database("default_db").get_table(table_name)
+            data_dict, _, _ = table_obj.output(["count(*)"]).to_result()
+            count_star = data_dict["count(star)"][0]
+            assert count_star == import_n * file_lines
+
             db_obj = infinity_obj.get_database("default_db")
             db_obj.drop_table(table_name)
 
