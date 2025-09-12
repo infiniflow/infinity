@@ -312,6 +312,8 @@ public:
 
     Status Import(const std::string &db_name, const std::string &table_name, const std::vector<std::shared_ptr<DataBlock>> &input_blocks);
 
+    Status Import(const std::string &db_name, const std::string &table_name, const std::vector<size_t> &block_row_cnts);
+
 private:
     Status ReplayCreateDb(WalCmdCreateDatabaseV2 *create_db_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayDropDb(WalCmdDropDatabaseV2 *drop_db_cmd, TxnTimeStamp commit_ts, i64 txn_id);
@@ -457,13 +459,13 @@ public:
                         const std::string &table_name,
                         std::shared_ptr<DBMeeta> &db_meta,
                         std::shared_ptr<TableMeeta> &table_meta,
-                        TxnTimeStamp& create_timestamp,
+                        TxnTimeStamp &create_timestamp,
                         std::string *table_key = nullptr);
 
     Status GetTableMeta(const std::string &table_name,
                         std::shared_ptr<DBMeeta> &db_meta,
                         std::shared_ptr<TableMeeta> &table_meta,
-                        TxnTimeStamp& create_timestamp,
+                        TxnTimeStamp &create_timestamp,
                         std::string *table_key = nullptr);
 
     Status GetTableIndexMeta(const std::string &db_name,
@@ -717,6 +719,12 @@ public:
     void AddCacheInfo(const std::shared_ptr<CacheInfo> &cache_info);
     void ResetMetaCacheAndCacheInfo();
     void SaveMetaCacheAndCacheInfo();
+
+    Status WriteDataBlockToFile(const std::string &db_name,
+                                const std::string &table_name,
+                                std::shared_ptr<DataBlock> input_block,
+                                const u64 &input_block_idx,
+                                std::vector<std::string> *object_paths = nullptr);
 
 private:
     // Reference to external class

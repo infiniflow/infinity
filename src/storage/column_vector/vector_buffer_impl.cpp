@@ -137,8 +137,7 @@ void VectorBuffer::SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer
     void *src_ptr = std::get<std::unique_ptr<char[]>>(ptr_).release();
     buffer_obj->SetData(src_ptr);
 
-    BufferHandle buffer_handle = buffer_obj->Load();
-    ptr_ = buffer_handle;
+    ptr_ = buffer_obj->Load();
     if (buffer_type_ == VectorBufferType::kVarBuffer) {
         var_buffer_mgr_->SetToCatalog(outline_buffer_obj);
     }

@@ -964,7 +964,7 @@ void NewTxnManager::CollectInfo(NewTxn *txn) {
                 import_info->table_name_ = import_txn_store->table_name_;
                 import_info->table_id_ = import_txn_store->table_id_;
                 import_info->segment_ids_ = import_txn_store->segment_ids_;
-                import_info->row_count_ = import_txn_store->RowCount();
+                import_info->row_count_ = import_txn_store->row_count_;
             }
 
             this->AddImportInfo(import_info);

@@ -65,7 +65,8 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
         UnrecoverableError("No data will be written.");
     }
 
-    if (persistence_manager_ != nullptr && !to_spill) {
+    bool tmpfile = data_dir_->starts_with(*temp_dir_ + "/import");
+    if (persistence_manager_ != nullptr && !to_spill && !tmpfile) {
         std::string write_dir = *file_dir_;
         std::string write_path = std::filesystem::path(*data_dir_) / write_dir / *file_name_;
         std::string tmp_write_path = std::filesystem::path(*temp_dir_) / StringTransform(write_path, "/", "_");

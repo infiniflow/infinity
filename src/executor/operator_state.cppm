@@ -282,6 +282,8 @@ export struct InsertOperatorState : public OperatorState {
 export struct ImportOperatorState : public OperatorState {
     inline explicit ImportOperatorState() : OperatorState(PhysicalOperatorType::kImport) {}
 
+    std::vector<size_t> block_row_cnts_{};
+
     //    std::vector<std::shared_ptr<DataBlock>> output_{};
     std::shared_ptr<TableDef> table_def_{};
     // For insert, update, delete, update
