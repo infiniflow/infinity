@@ -316,7 +316,12 @@ PersistReadResult PersistenceManager::GetObjCache(const std::string &file_path) 
         if (obj_addr.obj_key_ != ObjAddr::KeyEmpty) {
             UnrecoverableError(fmt::format("GetObjCache object {} is empty", obj_addr.obj_key_));
         }
-    } else if (std::shared_ptr<ObjStat> obj_stat = object_stats_->Get(obj_addr.obj_key_); obj_stat) {
+    } else if (obj_addr.obj_key_ == current_object_key_) {
+        current_object_ref_count_++;
+        object_stats_->Get(obj_addr.obj_key_);
+        LOG_TRACE(fmt::format("GetObjCache current object {} ref count {}", obj_addr.obj_key_, current_object_ref_count_));
+    } else {
+        std::shared_ptr<ObjStat> obj_stat = object_stats_->Get(obj_addr.obj_key_);
         LOG_TRACE(fmt::format("GetObjCache object {}, file_path: {}, ref count {}", obj_addr.obj_key_, file_path, obj_stat->ref_count_));
         std::string read_path = GetObjPath(result.obj_addr_.obj_key_);
         if (!VirtualStore::Exists(read_path)) {
@@ -324,12 +329,6 @@ PersistReadResult PersistenceManager::GetObjCache(const std::string &file_path) 
             obj_stat->cached_.compare_exchange_strong(expect, ObjCached::kNotCached);
             result.obj_stat_ = obj_stat;
         }
-    } else {
-        if (obj_addr.obj_key_ != current_object_key_) {
-            UnrecoverableError(fmt::format("GetObjCache object {} not found", obj_addr.obj_key_));
-        }
-        current_object_ref_count_++;
-        LOG_TRACE(fmt::format("GetObjCache current object {} ref count {}", obj_addr.obj_key_, current_object_ref_count_));
     }
     return result;
 }

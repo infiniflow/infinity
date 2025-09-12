@@ -50,7 +50,7 @@ std::shared_ptr<ObjStat> ObjectStats::Get(const std::string &key) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
-        return nullptr;
+        UnrecoverableError(fmt::format("Can't find object {}", key));
     }
     ++map_iter->second->ref_count_;
     return map_iter->second;
@@ -78,7 +78,7 @@ std::shared_ptr<ObjStat> ObjectStats::Release(const std::string &key) {
     return map_iter->second;
 }
 
-void ObjectStats::PutNew(const std::string &key, const std::shared_ptr<ObjStat>& obj_stat) {
+void ObjectStats::PutNew(const std::string &key, const std::shared_ptr<ObjStat> &obj_stat) {
     this->AddObjStatToKVStore(key, obj_stat);
 
     std::unique_lock<std::mutex> lock(mutex_);
