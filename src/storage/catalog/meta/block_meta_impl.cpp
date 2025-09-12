@@ -324,7 +324,11 @@ std::tuple<std::shared_ptr<BlockInfo>, Status> BlockMeta::GetBlockInfo() {
     block_info->column_count_ = 0;         // TODO
     block_info->checkpoint_ts_ = 0;        // TODO
     block_info->storage_size_ = 0;         // TODO
-    block_info->files_ = this->FilePaths();
+
+    std::vector<std::string> file_paths;
+    status = NewCatalog::GetBlockFilePaths(*this, file_paths, nullptr);
+    block_info->files_ = file_paths;
+
     return {block_info, Status::OK()};
 }
 
