@@ -21,6 +21,8 @@ import :default_values;
 import :buffer_obj;
 import :infinity_exception;
 import :infinity_context;
+import :data_file_worker;
+import :var_file_worker;
 import :version_file_worker;
 import :block_version;
 import :buffer_handle;
@@ -57,6 +59,7 @@ import :base_memindex;
 import :emvb_index_in_mem;
 import :txn_context;
 import :persist_result_handler;
+import :virtual_store;
 
 import std;
 import third_party;
@@ -179,10 +182,29 @@ struct NewTxnCompactState {
 };
 
 Status NewTxn::Import(const std::string &db_name, const std::string &table_name, const std::vector<std::shared_ptr<DataBlock>> &input_blocks) {
+    Status status;
+    std::vector<size_t> block_row_cnts{};
+
+    for (size_t i = 0; i < input_blocks.size(); ++i) {
+        std::vector<std::shared_ptr<DataType>> column_types;
+        block_row_cnts.emplace_back(input_blocks[i]->row_count());
+        status = WriteDataBlockToFile(db_name, table_name, input_blocks[i], i);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    status = Import(db_name, table_name, block_row_cnts);
+    return status;
+}
+
+Status NewTxn::Import(const std::string &db_name, const std::string &table_name, const std::vector<size_t> &block_row_cnts) {
     this->CheckTxn(db_name);
 
     Status status;
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    std::string import_tmp_dir = "import" + std::to_string(TxnID());
+    std::string import_tmp_path = InfinityContext::instance().config()->TempDir() + "/" + import_tmp_dir;
 
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta_opt;
@@ -192,9 +214,7 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
     if (!status.ok()) {
         return status;
     }
-
     TableMeeta &table_meta = *table_meta_opt;
-
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
     u64 db_id = std::stoull(table_meta.db_id_str());
@@ -202,9 +222,9 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
     SystemCache *system_cache = txn_mgr_->GetSystemCachePtr();
     std::vector<SegmentID> segment_ids;
 
-    size_t input_block_count = input_blocks.size();
-    size_t segment_count = input_block_count % DEFAULT_BLOCK_PER_SEGMENT == 0 ? input_block_count / DEFAULT_BLOCK_PER_SEGMENT
-                                                                              : input_block_count / DEFAULT_BLOCK_PER_SEGMENT + 1;
+    size_t block_cnt = block_row_cnts.size();
+    size_t segment_count =
+        block_cnt % DEFAULT_BLOCK_PER_SEGMENT == 0 ? block_cnt / DEFAULT_BLOCK_PER_SEGMENT : block_cnt / DEFAULT_BLOCK_PER_SEGMENT + 1;
 
     // If the number of input blocks is 0, infinity would output
     // "IMPORT 0 Rows" instead of throwing an exception.
@@ -232,90 +252,89 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
         segment_metas.emplace_back(std::make_unique<SegmentMeta>(segment_ids[segment_idx], table_meta));
     }
 
-    std::vector<size_t> segment_row_cnts(segment_count, 0);
-    std::vector<std::vector<size_t>> block_row_cnts(segment_count);
-    for (size_t input_block_idx = 0; input_block_idx < input_blocks.size(); ++input_block_idx) {
-        const std::shared_ptr<DataBlock> &input_block = input_blocks[input_block_idx];
-        if (!input_block->Finalized()) {
-            UnrecoverableError("Attempt to import unfinalized data block");
-        }
-        u32 row_cnt = input_block->row_count();
+    // Put the data into local txn store
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
 
+    base_txn_store_ = std::make_shared<ImportTxnStore>();
+    ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
+    import_txn_store->db_name_ = db_name;
+    import_txn_store->db_id_str_ = table_meta.db_id_str();
+    import_txn_store->table_name_ = table_name;
+    import_txn_store->table_id_str_ = table_meta.table_id_str();
+    import_txn_store->table_key_ = table_key;
+    import_txn_store->table_id_ = std::stoull(table_meta.table_id_str());
+    import_txn_store->import_tmp_path_ = import_tmp_path;
+
+    std::vector<size_t> segment_row_cnts(segment_count, 0);
+    std::vector<std::vector<size_t>> block_row_cnts_in_seg(segment_count);
+    for (size_t input_block_idx = 0; input_block_idx < block_cnt; ++input_block_idx) {
         std::optional<BlockMeta> block_meta;
-        // status = NewCatalog::AddNewBlock(*segment_meta, block_id, block_meta);
         size_t segment_idx = input_block_idx / DEFAULT_BLOCK_PER_SEGMENT;
+        size_t block_idx = input_block_idx % DEFAULT_BLOCK_PER_SEGMENT;
         status = NewCatalog::AddNewBlock1(*segment_metas[segment_idx], fake_commit_ts, block_meta);
         if (!status.ok()) {
             return status;
         }
 
-        std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs_ptr;
-        std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
-        if (!status.ok()) {
-            return status;
+        // Rename the data block
+        std::string old_block_dir = fmt::format("db_{}/tbl_{}/seg_{}/blk_{}", db_meta->db_id_str(), table_meta.table_id(), segment_idx, block_idx);
+        std::string old_block_path = InfinityContext::instance().config()->TempDir() + "/" + import_tmp_dir + "/" + old_block_dir;
+        std::string new_block_dir = *block_meta->GetBlockDir();
+        std::string new_block_path = InfinityContext::instance().config()->DataDir() + "/" + new_block_dir;
+
+        std::vector<std::string> import_file_paths{};
+        for (const auto &entry : std::filesystem::directory_iterator(old_block_path)) {
+            std::string file_name = entry.path().filename().string();
+            import_file_paths.emplace_back(new_block_path + "/" + file_name);
         }
 
-        if (input_block_idx < input_blocks.size() - 1 && row_cnt != block_meta->block_capacity()) {
-            UnrecoverableError("Attempt to import data block with different capacity");
-        }
+        PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+        if (pm != nullptr) {
+            PersistResultHandler handler(pm);
+            for (const auto &entry : std::filesystem::directory_iterator(old_block_path)) {
+                std::string file_name = entry.path().filename().string();
+                std::string src_path = old_block_path + "/" + file_name;
+                std::string dest_path = new_block_path + "/" + file_name;
 
-        std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs{nullptr};
-        {
-            auto [col_defs, col_def_status] = table_meta.GetColumnDefs();
-            if (!col_def_status.ok()) {
-                return col_def_status;
+                PersistWriteResult persist_result = pm->Persist(dest_path, src_path);
+                handler.HandleWriteResult(persist_result);
+                import_txn_store->import_file_names_.emplace_back(new_block_dir + "/" + file_name);
             }
-            column_defs = col_defs;
-        }
-        size_t column_count = column_defs->size();
-        if (column_count != input_block->column_count()) {
-            std::string err_msg = fmt::format("Attempt to import different column count data block into transaction table store");
-            LOG_ERROR(err_msg);
-            return Status::ColumnCountMismatch(err_msg);
-        }
-
-        for (size_t i = 0; i < input_block->column_count(); ++i) {
-            std::shared_ptr<ColumnVector> col = input_block->column_vectors[i];
-
-            ColumnMeta column_meta(i, *block_meta);
-
-            BufferObj *buffer_obj = nullptr;
-            BufferObj *outline_buffer_obj = nullptr;
-
-            status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
-            if (!status.ok()) {
-                return status;
-            }
-            col->SetToCatalog(buffer_obj, outline_buffer_obj, ColumnVectorMode::kReadWrite);
-            // if (VarBufferManager *var_buffer_mgr = col->buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
-            //     size_t chunk_size = var_buffer_mgr->TotalSize();
-            //     Status status = column_meta.SetChunkOffset(chunk_size);
-            //     if (!status.ok()) {
-            //         return status;
-            //     }
-            // }
-
-            auto [data_size, status2] = column_meta.GetColumnSize(row_cnt, column_meta.get_column_def());
-            if (!status2.ok()) {
-                return status;
-            }
-            buffer_obj->SetDataSize(data_size);
-
-            buffer_obj->Save();
-            if (outline_buffer_obj) {
-                outline_buffer_obj->Save();
+        } else {
+            Status rename_status = VirtualStore::Rename(old_block_path, new_block_path);
+            if (!rename_status.ok()) {
+                return rename_status;
             }
         }
 
-        block_row_cnts[segment_idx].push_back(row_cnt);
-        segment_row_cnts[segment_idx] += row_cnt;
+        // Change type and status of buffer object of the import data files
+        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+        for (auto &import_file : import_file_paths) {
+            if (import_file.ends_with(".col") || import_file.ends_with("_out")) {
+                buffer_mgr->ChangeBufferObjectState(import_file);
+            }
+        }
+
+        block_row_cnts_in_seg[segment_idx].push_back(block_row_cnts[input_block_idx]);
+        segment_row_cnts[segment_idx] += block_row_cnts[input_block_idx];
+        import_txn_store->row_count_ += block_row_cnts[input_block_idx];
     }
+
+    if (VirtualStore::Exists(import_tmp_path)) {
+        Status remove_status = VirtualStore::RemoveDirectory(import_tmp_path);
+        if (!remove_status.ok()) {
+            LOG_WARN(fmt::format("Failed to remove import temp directory: {}", import_tmp_path));
+        }
+    }
+
     std::vector<WalSegmentInfo> segment_infos;
     segment_infos.reserve(segment_count);
     for (size_t segment_idx = 0; segment_idx < segment_count; ++segment_idx) {
         WalSegmentInfo segment_info(*segment_metas[segment_idx], begin_ts);
-        for (size_t i = 0; i < block_row_cnts[segment_idx].size(); ++i) {
-            segment_info.block_infos_[i].row_count_ = block_row_cnts[segment_idx][i];
+        for (size_t i = 0; i < block_row_cnts_in_seg[segment_idx].size(); ++i) {
+            segment_info.block_infos_[i].row_count_ = block_row_cnts_in_seg[segment_idx][i];
         }
         segment_info.row_count_ = segment_row_cnts[segment_idx];
         status = this->AddSegmentVersion(segment_info, *segment_metas[segment_idx]);
@@ -325,6 +344,9 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
         segment_infos.emplace_back(segment_info);
     }
 
+    import_txn_store->segment_infos_.insert(import_txn_store->segment_infos_.end(), segment_infos.begin(), segment_infos.end());
+    import_txn_store->segment_ids_.insert(import_txn_store->segment_ids_.end(), segment_ids.begin(), segment_ids.end());
+
     // index
     std::vector<std::string> *index_id_strs_ptr = nullptr;
     std::vector<std::string> *index_names_ptr = nullptr;
@@ -333,35 +355,13 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
         return status;
     }
 
-    // Put the data into local txn store
-    if (base_txn_store_ == nullptr) {
-        base_txn_store_ = std::make_shared<ImportTxnStore>();
-        ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
-        import_txn_store->db_name_ = db_name;
-        import_txn_store->db_id_str_ = table_meta.db_id_str();
-        import_txn_store->table_name_ = table_name;
-        import_txn_store->table_id_str_ = table_meta.table_id_str();
-        import_txn_store->table_key_ = table_key;
-        import_txn_store->table_id_ = std::stoull(table_meta.table_id_str());
-
-        for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
-            const std::string &index_id_str = (*index_id_strs_ptr)[i];
-            const std::string &index_name = (*index_names_ptr)[i];
-            import_txn_store->index_names_.emplace_back(index_name);
-            import_txn_store->index_ids_str_.emplace_back(index_id_str);
-            import_txn_store->index_ids_.emplace_back(std::stoull(index_id_str));
-        }
+    for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
+        const std::string &index_id_str = (*index_id_strs_ptr)[i];
+        const std::string &index_name = (*index_names_ptr)[i];
+        import_txn_store->index_names_.emplace_back(index_name);
+        import_txn_store->index_ids_str_.emplace_back(index_id_str);
+        import_txn_store->index_ids_.emplace_back(std::stoull(index_id_str));
     }
-    ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
-    for (size_t segment_idx = 0; segment_idx < segment_count; ++segment_idx) {
-        size_t input_block_start_idx = segment_idx * DEFAULT_BLOCK_PER_SEGMENT;
-        size_t input_block_end_idx = std::min(std::size_t(input_block_start_idx + DEFAULT_BLOCK_PER_SEGMENT), input_blocks.size());
-        import_txn_store->input_blocks_in_imports_.emplace(
-            segment_ids[segment_idx],
-            std::vector<std::shared_ptr<DataBlock>>(input_blocks.begin() + input_block_start_idx, input_blocks.begin() + input_block_end_idx));
-    }
-    import_txn_store->segment_infos_.insert(import_txn_store->segment_infos_.end(), segment_infos.begin(), segment_infos.end());
-    import_txn_store->segment_ids_.insert(import_txn_store->segment_ids_.end(), segment_ids.begin(), segment_ids.end());
 
     for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
         const std::string &index_id_str = (*index_id_strs_ptr)[i];
@@ -1983,6 +1983,115 @@ Status NewTxn::TryToMmap(BlockMeta &block_meta, TxnTimeStamp save_ts, bool *to_m
             }
         }
     }
+    return Status::OK();
+}
+
+Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
+                                    const std::string &table_name,
+                                    std::shared_ptr<DataBlock> input_block,
+                                    const u64 &input_block_idx,
+                                    std::vector<std::string> *object_paths) {
+    Status status;
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+
+    std::string import_tmp_dir = fmt::format("import{}", TxnID());
+    std::string import_tmp_path_ = InfinityContext::instance().config()->TempDir() + "/" + import_tmp_dir;
+
+    if (!input_block->Finalized()) {
+        UnrecoverableError("Attempt to import unfinalized data block");
+    }
+
+    auto [table_info, status2] = GetTableInfo(db_name, table_name);
+    if (!status2.ok()) {
+        return status2;
+    }
+
+    size_t table_column_count = table_info->column_defs_.size();
+    if (input_block->column_count() != table_column_count) {
+        std::string err_msg = fmt::format("Attempt to import different column count data block into transaction table store");
+        LOG_ERROR(err_msg);
+        return Status::ColumnCountMismatch(err_msg);
+    }
+
+    std::vector<std::shared_ptr<DataType>> column_types;
+    for (size_t col_id = 0; col_id < table_column_count; ++col_id) {
+        column_types.emplace_back(table_info->column_defs_[col_id]->type());
+        if (*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
+            LOG_ERROR(fmt::format("Attempt to import different type data into transaction table store"));
+            return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors[col_id]->data_type()->ToString());
+        }
+    }
+
+    u32 row_cnt = input_block->row_count();
+    LOG_INFO(fmt::format("Writing block {}, row_count: {}", input_block_idx, row_cnt));
+    size_t segment_idx = input_block_idx / DEFAULT_BLOCK_PER_SEGMENT;
+    size_t block_idx = input_block_idx % DEFAULT_BLOCK_PER_SEGMENT;
+
+    for (size_t i = 0; i < input_block->column_count(); ++i) {
+        std::shared_ptr<ColumnVector> col = input_block->column_vectors[i];
+        auto col_def = table_info->column_defs_[i];
+
+        BufferObj *buffer_obj = nullptr;
+        BufferObj *outline_buffer_obj = nullptr;
+        ColumnID column_id = col_def->id();
+        std::shared_ptr<std::string> col_filename = std::make_shared<std::string>(fmt::format("{}.col", column_id));
+
+        size_t total_data_size = 0;
+        if (col_def->type()->type() == LogicalType::kBoolean) {
+            total_data_size = (DEFAULT_BLOCK_CAPACITY + 7) / 8;
+        } else {
+            total_data_size = DEFAULT_BLOCK_CAPACITY * col_def->type()->Size();
+        }
+
+        std::shared_ptr<std::string> block_dir = std::make_shared<std::string>(
+            fmt::format("db_{}/tbl_{}/seg_{}/blk_{}", table_info->db_id_, table_info->table_id_, segment_idx, block_idx));
+        auto file_worker1 = std::make_unique<DataFileWorker>(std::make_shared<std::string>(import_tmp_path_),
+                                                             std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                                                             block_dir,
+                                                             col_filename,
+                                                             total_data_size,
+                                                             buffer_mgr->persistence_manager());
+
+        if (object_paths != nullptr) {
+            std::string file_path1 = file_worker1->GetFilePath();
+            object_paths->push_back(file_path1);
+        }
+
+        buffer_obj = buffer_mgr->AllocateBufferObject(std::move(file_worker1));
+
+        VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
+        if (buffer_type == VectorBufferType::kVarBuffer) {
+            std::shared_ptr<std::string> outline_filename = std::make_shared<std::string>(fmt::format("col_{}_out", column_id));
+            auto file_worker2 = std::make_unique<VarFileWorker>(std::make_shared<std::string>(import_tmp_path_),
+                                                                std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                                                                block_dir,
+                                                                outline_filename,
+                                                                0,
+                                                                buffer_mgr->persistence_manager());
+
+            if (object_paths != nullptr) {
+                std::string file_path2 = file_worker2->GetFilePath();
+                object_paths->push_back(file_path2);
+            }
+            outline_buffer_obj = buffer_mgr->AllocateBufferObject(std::move(file_worker2));
+        }
+
+        col->SetToCatalog(buffer_obj, outline_buffer_obj, ColumnVectorMode::kReadWrite);
+
+        size_t data_size = 0;
+        if (col_def->type()->type() == LogicalType::kBoolean) {
+            data_size = (row_cnt + 7) / 8;
+        } else {
+            data_size = row_cnt * col_def->type()->Size();
+        }
+        buffer_obj->SetDataSize(data_size);
+
+        buffer_obj->Save();
+        if (outline_buffer_obj) {
+            outline_buffer_obj->Save();
+        }
+    }
+
     return Status::OK();
 }
 

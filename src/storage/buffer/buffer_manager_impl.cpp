@@ -164,6 +164,16 @@ BufferObj *BufferManager::GetBufferObject(const std::string &file_path) {
     return nullptr;
 }
 
+void BufferManager::ChangeBufferObjectState(const std::string &file_path) {
+    std::unique_lock lock(w_locker_);
+
+    if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
+        BufferObj *buffer_obj = iter->second.get();
+        buffer_obj->SetType(BufferType::kPersistent);
+        buffer_obj->SetStatus(BufferStatus::kFreed);
+    }
+}
+
 std::vector<size_t> BufferManager::WaitingGCObjectCount() {
     std::vector<size_t> size_list(lru_caches_.size());
     for (size_t i = 0; i < lru_caches_.size(); ++i) {

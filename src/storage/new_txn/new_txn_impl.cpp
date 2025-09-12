@@ -5082,8 +5082,40 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         }
         case TransactionType::kImport: {
             ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
-            for (auto &[_, blocks] : import_txn_store->input_blocks_in_imports_) {
-                std::for_each(blocks.begin(), blocks.end(), [](auto &block) { block->UnInit(); });
+
+            if (VirtualStore::Exists(import_txn_store->import_tmp_path_)) {
+                Status remove_status = VirtualStore::RemoveDirectory(import_txn_store->import_tmp_path_);
+                if (!remove_status.ok()) {
+                    LOG_WARN(fmt::format("Failed to remove import temp directory during rollback: {}", import_txn_store->import_tmp_path_));
+                }
+            } else {
+                Config *config = InfinityContext::instance().config();
+                std::string data_dir = config->DataDir();
+                PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+                auto *kv_store = InfinityContext::instance().storage()->kv_store();
+                if (pm != nullptr) {
+                    for (auto &file_name : import_txn_store->import_file_names_) {
+                        PersistResultHandler handler(pm);
+                        PersistWriteResult result = pm->Cleanup(file_name);
+                        handler.HandleWriteResult(result);
+                        kv_store->Delete(KeyEncode::PMObjectKey(file_name));
+                    }
+                } else {
+                    for (const auto &segment_info : import_txn_store->segment_infos_) {
+                        std::string segment_dir = fmt::format("{}/db_{}/tbl_{}/seg_{}",
+                                                              data_dir,
+                                                              import_txn_store->db_id_str_,
+                                                              import_txn_store->table_id_str_,
+                                                              segment_info.segment_id_);
+
+                        if (VirtualStore::Exists(segment_dir)) {
+                            Status remove_status = VirtualStore::RemoveDirectory(segment_dir);
+                            if (!remove_status.ok()) {
+                                LOG_WARN(fmt::format("Failed to remove segment directory during rollback: {}", segment_dir));
+                            }
+                        }
+                    }
+                }
             }
 
             const std::vector<SegmentID> &segment_ids = import_txn_store->segment_ids_;
