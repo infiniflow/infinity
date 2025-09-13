@@ -34,7 +34,6 @@ import :table_def;
 import :column_vector;
 import :value;
 import :status;
-import third_party;
 import :base_table_ref;
 import :index_hnsw;
 import :bg_task;
@@ -66,6 +65,7 @@ import knn_expr;
 import statement_common;
 import embedding_info;
 import internal_types;
+import third_party;
 
 using namespace infinity;
 

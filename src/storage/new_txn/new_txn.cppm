@@ -596,6 +596,7 @@ private:
     Status PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd);
     Status PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd);
     Status PrepareCommitImport(WalCmdImportV2 *import_cmd);
+    Status PrepareCommitReplayImport(WalCmdImportV2 *import_cmd);
     Status CommitBottomAppend(WalCmdAppendV2 *append_cmd);
     Status CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd);
     Status PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd);

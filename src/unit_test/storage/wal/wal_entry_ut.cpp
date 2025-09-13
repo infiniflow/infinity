@@ -452,7 +452,7 @@ TEST_F(WalEntryTest, ReadWriteVFS) {
     auto kv_store = std::make_unique<KVStore>();
     Status status = kv_store->Init(GetCatalogDir());
     EXPECT_TRUE(status.ok());
-    PersistenceManager pm(workspace, data_dir, object_size_limit);
+    PersistenceManager pm(infinity::InfinityContext::instance().storage(), workspace, data_dir, object_size_limit);
     pm.SetKvStore(kv_store.get());
 
     ObjAddr obj_addr0{.obj_key_ = "key1", .part_offset_ = 0, .part_size_ = 10};

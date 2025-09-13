@@ -46,6 +46,7 @@ import :mem_index_appender;
 import :catalog_cache;
 import :meta_cache;
 import :wal_entry;
+import :object_stats;
 
 import std;
 import third_party;
@@ -119,6 +120,7 @@ Status Storage::InitToAdmin() {
                 UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
             }
         }
+
         // Construct persistence store
         std::string persistence_dir = config_ptr_->PersistenceDir();
         if (!persistence_dir.empty()) {
@@ -127,9 +129,8 @@ Status Storage::InitToAdmin() {
             }
             i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
             persistence_manager_ =
-                std::make_unique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (size_t)persistence_object_size_limit);
+                std::make_unique<PersistenceManager>(this, persistence_dir, config_ptr_->DataDir(), (size_t)persistence_object_size_limit);
         }
-
         current_storage_mode_ = StorageMode::kAdmin;
     }
     LOG_INFO(fmt::format("Finish initializing storage from un-init mode to admin"));

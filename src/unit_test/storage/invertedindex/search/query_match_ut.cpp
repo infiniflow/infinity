@@ -182,8 +182,7 @@ void QueryMatchTest::CreateDBAndTable(const std::string &db_name, const std::str
                                     std::make_shared<std::string>(table_name),
                                     std::make_shared<std::string>(),
                                     std::move(column_defs));
-    Storage *storage = InfinityContext::instance().storage();
-    NewTxnManager *txn_mgr = storage->new_txn_manager();
+    NewTxnManager *txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     {
         auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
         txn->DropTable(db_name, table_name, ConflictType::kIgnore);

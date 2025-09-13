@@ -447,7 +447,7 @@ Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, 
         return status;
     }
 
-    return PrepareCommitImport(import_cmd);
+    return PrepareCommitReplayImport(import_cmd);
 }
 
 Status NewTxn::Append(const std::string &db_name, const std::string &table_name, const std::shared_ptr<DataBlock> &input_block) {
@@ -1501,6 +1501,42 @@ Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
     status = this->CommitSegmentVersion(segment_info, segment_meta);
     if (!status.ok()) {
         return status;
+    }
+
+    BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta);
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    if (pm != nullptr) {
+        // When all data and index is write to disk, try to finalize the
+        PersistResultHandler handler(pm);
+        PersistWriteResult result = pm->CurrentObjFinalize();
+        handler.HandleWriteResult(result);
+    }
+
+    return Status::OK();
+}
+
+
+Status NewTxn::PrepareCommitReplayImport(WalCmdImportV2 *import_cmd) {
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    const std::string &db_id_str = import_cmd->db_id_;
+    const std::string &table_id_str = import_cmd->table_id_;
+    const std::string &table_name = import_cmd->table_name_;
+
+    WalSegmentInfo &segment_info = import_cmd->segment_info_;
+    TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
+    SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
+
+    Status status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);
+    if (!status.ok()) {
+        return status;
+    }
+    for (const WalBlockInfo &block_info : segment_info.block_infos_) {
+        BlockID block_id = block_info.block_id_;
+        status = segment_meta.CommitBlock(block_id, commit_ts);
+        if (!status.ok()) {
+            return status;
+        }
     }
 
     BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta);

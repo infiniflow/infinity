@@ -80,7 +80,6 @@ export import :meta_tree;
 export import :kv_utility;
 export import :kv_store;
 export import :persistence_manager;
-export import :obj_stat_accessor;
 export import :obj_status;
 export import :persist_result_handler;
 export import :result_cache_manager;

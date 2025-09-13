@@ -207,7 +207,10 @@ TEST_F(BufferManagerTest, varfile_test) {
     size_t buffer_size = 100;
     size_t file_num = 10;
 
-    auto persistence_manager_ = std::make_shared<PersistenceManager>(*persistence_dir_, *data_dir_, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
+    auto persistence_manager_ = std::make_shared<PersistenceManager>(infinity::InfinityContext::instance().storage(),
+                                                                     *persistence_dir_,
+                                                                     *data_dir_,
+                                                                     DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
     BufferManager buffer_mgr(buffer_size, data_dir_, temp_dir_, persistence_manager_.get());
     std::vector<BufferObj *> buffer_objs;
     for (size_t i = 0; i < file_num; ++i) {
@@ -418,7 +421,10 @@ public:
 
 TEST_F(BufferManagerParallelTest, parallel_test1) {
     for (int i = 0; i < 1; ++i) {
-        auto persistence_manager_ = std::make_shared<PersistenceManager>(*persistence_dir_, *data_dir_, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
+        auto persistence_manager_ = std::make_shared<PersistenceManager>(infinity::InfinityContext::instance().storage(),
+                                                                         *persistence_dir_,
+                                                                         *data_dir_,
+                                                                         DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
         auto buffer_mgr = std::make_unique<BufferManager>(buffer_size, data_dir_, temp_dir_, persistence_manager_.get());
         auto test1_obj = std::make_unique<Test1Obj>(avg_file_size, buffer_mgr.get(), data_dir_, temp_dir_);
 
