@@ -1772,7 +1772,7 @@ Status NewTxn::ReplayOptimize(WalCmdOptimizeV2 *optimize_cmd, TxnTimeStamp commi
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {
     std::shared_ptr<MemIndex> mem_index = segment_index_meta.PopMemIndex();
     if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
-        UnrecoverableError("Invalid mem index");
+        return Status::EmptyMemIndex();
     }
     TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
