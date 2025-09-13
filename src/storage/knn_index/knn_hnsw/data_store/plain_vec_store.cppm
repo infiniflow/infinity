@@ -118,6 +118,8 @@ public:
 
     const OtherDataType *GetVec(size_t idx, const Meta &meta) const { return ptr_.get() + idx * meta.dim(); }
 
+    const OtherDataType *GetVecToQuery(size_t idx, const Meta &meta) const { return GetVec(idx, meta); }
+
     void Prefetch(VertexType vec_i, const Meta &meta) const { _mm_prefetch(reinterpret_cast<const char *>(GetVec(vec_i, meta)), _MM_HINT_T0); }
 
 protected:

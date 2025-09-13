@@ -17,6 +17,7 @@ export module infinity_core:dist_func_cos;
 import :hnsw_common;
 import :plain_vec_store;
 import :lvq_vec_store;
+import :rabitq_vec_store;
 import :simd_functions;
 
 import std;
@@ -33,6 +34,7 @@ public:
     using This = PlainCosDist<DataType>;
     using VecStoreMeta = PlainVecStoreMeta<DataType>;
     using StoreType = typename VecStoreMeta::StoreType;
+    using QueryType = typename VecStoreMeta::QueryType;
     using DistanceType = typename VecStoreMeta::DistanceType;
     using LVQDist = LVQCosDist<DataType, i8>;
 
@@ -67,19 +69,14 @@ public:
     }
 
     template <typename DataStore>
-    DistanceType operator()(VertexType v1_i, VertexType v2_i, const DataStore &data_store) const {
-        return Inner(data_store.GetVec(v1_i), data_store.GetVec(v2_i), data_store.dim());
-    }
-
-    template <typename DataStore>
-    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
+    DistanceType operator()(const QueryType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
         return Inner(v1, data_store.GetVec(v2_i), data_store.dim());
     }
 
     LVQDist ToLVQDistance(size_t dim) &&;
 
 private:
-    DistanceType Inner(const StoreType &v1, const StoreType &v2, size_t dim) const { return -SIMDFunc(v1, v2, dim); }
+    DistanceType Inner(const QueryType &v1, const StoreType &v2, size_t dim) const { return -SIMDFunc(v1, v2, dim); }
 };
 
 export template <typename DataType, typename CompressType>
@@ -124,6 +121,7 @@ public:
     using LVQDist = This;
     using VecStoreMetaType = LVQVecStoreMetaType<DataType, CompressType, LVQCosCache<DataType, CompressType>>;
     using StoreType = typename VecStoreMetaType::StoreType;
+    using QueryType = typename VecStoreMetaType::QueryType;
     using DistanceType = typename VecStoreMetaType::DistanceType;
 
 private:
@@ -156,18 +154,13 @@ public:
     }
 
     template <typename DataStore>
-    DistanceType operator()(VertexType v1_i, VertexType v2_i, const DataStore &data_store) const {
-        return Inner(data_store.GetVec(v1_i), data_store.GetVec(v2_i), data_store.vec_store_meta());
-    }
-
-    template <typename DataStore>
-    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
+    DistanceType operator()(const QueryType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
         return Inner(v1, data_store.GetVec(v2_i), data_store.vec_store_meta());
     }
 
 private:
     template <typename VecStoreMeta>
-    DistanceType Inner(const StoreType &v1, const StoreType &v2, VecStoreMeta &vec_store_meta) const {
+    DistanceType Inner(const QueryType &v1, const StoreType &v2, VecStoreMeta &vec_store_meta) const {
         size_t dim = vec_store_meta.dim();
         i32 c1c2_ip = SIMDFunc(v1->compress_vec_, v2->compress_vec_, dim);
         auto scale1 = v1->scale_;
@@ -181,6 +174,63 @@ private:
                     (bias1 + bias2) * norm1_mean + mean_c_scale_1 + mean_c_scale_2;
 
         return -dist;
+    }
+};
+
+export template <typename DataType>
+class RabitqCosDist {
+public:
+    using This = RabitqCosDist<DataType>;
+    using RabitqDist = This;
+    using MetaType = RabitqVecStoreMetaType<DataType>;
+    using StoreType = typename MetaType::StoreType;
+    using QueryType = typename MetaType::QueryType;
+    using DistanceType = typename MetaType::DistanceType;
+    using CompressType = typename MetaType::CompressType;
+    using AlignType = typename MetaType::AlignType;
+
+private:
+    using SIMDFuncType = i32 (*)(const CompressType *, const CompressType *, size_t);
+
+    SIMDFuncType SIMDFunc = nullptr;
+
+public:
+    RabitqCosDist() : SIMDFunc(nullptr) {}
+    RabitqCosDist(RabitqCosDist &&other) : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
+    RabitqCosDist &operator=(RabitqCosDist &&other) {
+        if (this != &other) {
+            SIMDFunc = std::exchange(other.SIMDFunc, nullptr);
+        }
+        return *this;
+    }
+    ~RabitqCosDist() = default;
+    RabitqCosDist(size_t dim) {}
+
+    template <typename DataStore>
+    DistanceType operator()(const QueryType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
+        const StoreType &v2 = data_store.GetVec(v2_i);
+        size_t align_dim = data_store.align_dim();
+        return Inner(v1, v2, align_dim);
+    }
+
+private:
+    DistanceType Inner(const QueryType &query, const StoreType &base, size_t align_dim) const {
+        // estimate <x, q>
+        DistanceType ip_estimate = MetaType::IpDistanceBetweenQueryAndBinaryCode(query->query_compress_vec_, base->compress_vec_, align_dim);
+        DistanceType ip_recover =
+            MetaType::RecoverIpDistance(ip_estimate, align_dim, base->sum_, query->query_sum_, query->query_lower_bound_, query->query_delta_);
+
+        // estimate ||o_r, q_r||^2
+        DistanceType res = MetaType::RecoverL2DistanceSqr(ip_recover / base->error_, base->norm_, query->query_norm_);
+
+        // Recover cos distance
+        if (MetaType::IsApproxZero(base->raw_norm_) || MetaType::IsApproxZero(query->query_raw_norm_)) {
+            res = 1;
+        } else {
+            res = 1 - (query->query_raw_norm_ * query->query_raw_norm_ + base->raw_norm_ * base->raw_norm_ - res) * 0.5f /
+                          (query->query_raw_norm_ * base->raw_norm_);
+        }
+        return res;
     }
 };
 
