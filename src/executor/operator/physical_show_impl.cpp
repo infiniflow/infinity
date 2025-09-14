@@ -2285,44 +2285,47 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
         }
         ++column_id;
         {
-            std::string block_size_str;
+            size_t block_size = 0;
+            std::vector<std::string> &paths = block_info->files_;
+            bool check_buffer_obj = false;
             if (query_context->persistence_manager() == nullptr) {
-                std::string full_block_dir = std::filesystem::path(InfinityContext::instance().config()->DataDir()) / *block_info->block_dir_;
-                block_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_block_dir));
+                std::string full_block_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *block_info->block_dir_);
+                if (std::filesystem::exists(full_block_dir)) {
+                    block_size = VirtualStore::GetDirectorySize(full_block_dir);
+                } else {
+                    check_buffer_obj = true;
+                }
             } else {
-                std::vector<std::string> &paths = block_info->files_;
-                status = Status::OK();
-                size_t file_size = 0;
-                size_t block_size = 0;
-
+                block_size = 0;
                 for (const std::string &path : paths) {
-                    std::tie(file_size, status) = query_context->persistence_manager()->GetFileSize(path);
-                    if (!status.ok()) {
+                    auto [file_size, status2] = query_context->persistence_manager()->GetFileSize(path);
+                    if (!status2.ok()) {
+                        check_buffer_obj = true;
                         break;
                     }
                     block_size += file_size;
                 }
+            }
 
-                // If version file is not found in persistence manager, try to get the buffer object from buffer manager.
-                if (!status.ok()) {
-                    block_size = 0;
-                    BufferObj *buffer_obj = nullptr;
-                    BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+            // If block files are not found, try to get the buffer object from buffer manager.
+            if (check_buffer_obj) {
+                block_size = 0;
+                BufferObj *buffer_obj = nullptr;
+                BufferManager *buffer_manager = query_context->storage()->buffer_manager();
 
-                    for (const std::string &path : paths) {
-                        std::string version_filepath = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), path);
-                        buffer_obj = buffer_manager->GetBufferObject(version_filepath);
-                        if (buffer_obj != nullptr) {
-                            auto file_size = buffer_obj->GetBufferSize();
-                            block_size += file_size;
-                        } else {
-                            RecoverableError(status);
-                        }
+                for (const std::string &path : paths) {
+                    std::string filepath = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), path);
+                    buffer_obj = buffer_manager->GetBufferObject(filepath);
+                    if (buffer_obj != nullptr) {
+                        auto file_size = buffer_obj->GetBufferSize();
+                        block_size += file_size;
+                    } else {
+                        RecoverableError(status);
                     }
                 }
-
-                block_size_str = Utility::FormatByteSize(block_size);
             }
+
+            std::string block_size_str = Utility::FormatByteSize(block_size);
             Value value = Value::MakeVarchar(block_size_str);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);

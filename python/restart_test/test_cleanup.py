@@ -101,12 +101,10 @@ class TestCleanup:
 
         @decorator
         def part2(infinity_obj):
+            infinity_obj.cleanup()
+
             dropped_dirs = pathlib.Path(data_dir).rglob(f"*tbl_{table2_id}*")
-            if len(list(dropped_dirs)) != 0:
-                infinity_runner.logger.warning(
-                    f"cleanup {table_name2} failed. Not implemented"
-                )
-            # assert len(list(dropped_dirs)) == 0
+            assert len(list(dropped_dirs)) == 0
 
         part2()
 
@@ -200,11 +198,10 @@ class TestCleanup:
 
         @decorator
         def part2(infinity_obj):
+            infinity_obj.cleanup()
+
             dropped_dirs = pathlib.Path(data_dir).rglob(f"*idx_{index2_id}*")
-            if self.files_num(list(dropped_dirs)) != 0:
-                infinity_runner.logger.warning(
-                    f"cleanup {index_name2} failed. Not implemented"
-                )
+            assert self.files_num(list(dropped_dirs)) == 0
 
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
