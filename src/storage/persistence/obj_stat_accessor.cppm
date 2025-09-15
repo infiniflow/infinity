@@ -1,4 +1,4 @@
-// Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2025 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,47 +12,50 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export module infinity_core:obj_stat_accessor;
+module;
+export module infinity_core:object_stats;
 
 import :obj_status;
 
-import std.compat;
-import third_party;
+import std;
 
 namespace infinity {
 
+class Storage;
 class KVInstance;
 
-export class ObjectStatAccessor {
+export class ObjectStats {
 public:
-    virtual ~ObjectStatAccessor();
+    explicit ObjectStats(Storage *storage) : storage_(storage) {}
 
-    std::optional<ObjStat> Get(const std::string &key);
+    virtual ~ObjectStats();
 
-    std::optional<ObjStat> GetNoCount(const std::string &key);
+    std::shared_ptr<ObjStat> Get(const std::string &key);
 
-    std::optional<ObjStat> Release(const std::string &key);
+    std::shared_ptr<ObjStat> GetNoCount(const std::string &key);
 
-    void PutNew(const std::string &key, ObjStat obj_stat);
+    std::shared_ptr<ObjStat> Release(const std::string &key);
 
-    void PutNoCount(const std::string &key, ObjStat obj_stat);
+    void PutNew(const std::string &key, const std::shared_ptr<ObjStat> &obj_stat);
 
-    std::optional<ObjStat> Invalidate(const std::string &key);
+    void PutNoCount(const std::string &key, std::shared_ptr<ObjStat> obj_stat);
+
+    std::shared_ptr<ObjStat> Invalidate(const std::string &key);
 
     void CheckValid(size_t current_object_size);
 
     void Deserialize(KVInstance *kv_instance);
 
-    std::unordered_map<std::string, ObjStat> GetAllObjects() const;
+    std::unordered_map<std::string, std::shared_ptr<ObjStat>> GetAllObjects() const;
 
 private:
-    void AddObjStatToKVStore(const std::string &key, const ObjStat &obj_stat);
+    static void AddObjStatToKVStore(const std::string &key, const std::shared_ptr<ObjStat> &obj_stat);
+    static void RemoveObjStatFromKVStore(const std::string &key);
 
-    void RemoveObjStatFromKVStore(const std::string &key);
+    Storage *storage_{};
 
-private:
     mutable std::mutex mutex_{}; // protect obj_map_
-    std::unordered_map<std::string, ObjStat> obj_map_{};
+    std::unordered_map<std::string, std::shared_ptr<ObjStat>> obj_map_{};
 };
 
 } // namespace infinity

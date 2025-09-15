@@ -448,6 +448,25 @@ std::unique_ptr<SystemCache> NewCatalog::RestoreCatalogCache(Storage *storage_pt
     // std::vector<> = meta_tree->Check();
     // std::string meta_tree_str = meta_tree->ToJson().dump(4);
     // LOG_INFO(meta_tree_str);
+    Config *config_ptr = storage_ptr->config();
+    PersistenceManager *pm = storage_ptr->persistence_manager();
+    if (pm != nullptr) {
+        std::string persistence_dir = config_ptr->PersistenceDir();
+        std::vector<std::filesystem::path> uuid_files;
+        std::regex uuid_pattern("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
+        for (const auto &entry : std::filesystem::directory_iterator(persistence_dir)) {
+            if (entry.is_regular_file()) {
+                std::string filename = entry.path().filename().string();
+                if (std::regex_match(filename, uuid_pattern)) {
+                    std::string file_name = entry.path().filename().string();
+                    if (!meta_tree->pm_object_map_.contains(filename)) {
+                        // the pm object are redundant.
+                        VirtualStore::DeleteFile(entry.path().string());
+                    }
+                }
+            }
+        }
+    }
 
     std::unique_ptr<SystemCache> system_cache = meta_tree->RestoreSystemCache(storage_ptr);
     // std::vector<MetaTableObject *> table_ptrs = meta_tree->ListTables();
