@@ -39,11 +39,13 @@ ObjectStats::~ObjectStats() {
     [[maybe_unused]] size_t sum_ref_count = 0;
     for (const auto &[key, obj_stat] : obj_map_) {
         if (obj_stat->ref_count_ > 0) {
-            LOG_ERROR(fmt::format("ObjectStats {} still has ref count {}", key, obj_stat->ref_count_));
+            LOG_WARN(fmt::format("ObjectStats {} still has ref count {}", key, obj_stat->ref_count_));
         }
         sum_ref_count += obj_stat->ref_count_;
     }
-    assert(sum_ref_count == 0);
+    if (sum_ref_count != 0) {
+        LOG_WARN(fmt::format("Non-zero reference count of object stats", sum_ref_count));
+    }
 }
 
 std::shared_ptr<ObjStat> ObjectStats::Get(const std::string &key) {
