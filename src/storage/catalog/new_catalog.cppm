@@ -208,8 +208,8 @@ public:
     std::unordered_map<std::string, std::unique_ptr<ColumnDef>> special_columns_{};
 
 public:
-    Status
-    GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, std::vector<std::shared_ptr<MetaKey>> &metas, std::vector<std::string> &drop_keys) const;
+    static Status
+    GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, std::vector<std::shared_ptr<MetaKey>> &metas, std::vector<std::string> &drop_keys);
     std::vector<std::string> GetEncodeKeys(std::vector<std::shared_ptr<MetaKey>> &metas) const;
 
     // Profile related methods
