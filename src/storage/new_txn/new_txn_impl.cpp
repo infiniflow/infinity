@@ -5274,7 +5274,7 @@ Status NewTxn::Dummy() {
 
 void NewTxn::SetWalSize(i64 wal_size) {
     TransactionType txn_type = GetTxnType();
-    if (txn_type != TransactionType::kNewCheckpoint) {
+    if (txn_type != TransactionType::kNewCheckpoint and txn_type != TransactionType::kSkippedCheckpoint) {
         UnrecoverableError(fmt::format("Expected transaction type is checkpoint."));
     }
     wal_size_ = wal_size;
