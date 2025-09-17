@@ -320,7 +320,7 @@ TEST_F(MetaCacheTest, test_erase) {
     }
     {
         std::shared_ptr<MetaEraseDbCache> drop_cache = std::make_shared<MetaEraseDbCache>("db1");
-        cache.Erase({drop_cache}, nullptr, 1);
+        cache.EraseAndCommitKV({drop_cache}, nullptr, 1);
         std::shared_ptr<MetaDbCache> db_cache = cache.GetDb("db1", 5);
         EXPECT_EQ(db_cache.get(), nullptr);
         size_t size = cache.Size();
@@ -328,7 +328,7 @@ TEST_F(MetaCacheTest, test_erase) {
     }
     {
         std::shared_ptr<MetaEraseTableCache> drop_cache = std::make_shared<MetaEraseTableCache>(0, "tbl1");
-        cache.Erase({drop_cache}, nullptr, 1);
+        cache.EraseAndCommitKV({drop_cache}, nullptr, 1);
         std::shared_ptr<MetaTableCache> table_cache = cache.GetTable(0, "tbl1", 5);
         EXPECT_EQ(table_cache.get(), nullptr);
         size_t size = cache.Size();
@@ -336,7 +336,7 @@ TEST_F(MetaCacheTest, test_erase) {
     }
     {
         std::shared_ptr<MetaEraseIndexCache> drop_cache = std::make_shared<MetaEraseIndexCache>(0, 0, "idx1");
-        cache.Erase({drop_cache}, nullptr, 1);
+        cache.EraseAndCommitKV({drop_cache}, nullptr, 1);
         std::shared_ptr<MetaIndexCache> index_cache = cache.GetIndex(0, 0, "idx1", 5);
         EXPECT_EQ(index_cache.get(), nullptr);
         size_t size = cache.Size();

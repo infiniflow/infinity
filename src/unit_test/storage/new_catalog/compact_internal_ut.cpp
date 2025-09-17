@@ -90,14 +90,14 @@ TEST_P(TestTxnCompactInternal, test_compact) {
     auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -130,7 +130,7 @@ TEST_P(TestTxnCompactInternal, test_compact) {
         return input_block;
     };
     for (int i = 0; i < 2; ++i) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kImport);
         std::vector<std::shared_ptr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
         Status status = txn->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
@@ -138,7 +138,7 @@ TEST_P(TestTxnCompactInternal, test_compact) {
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
         std::vector<RowID> row_ids;
         for (u32 i = 1; i < block_row_cnt; i += 2) {
             row_ids.push_back(RowID(0, i));
@@ -149,14 +149,14 @@ TEST_P(TestTxnCompactInternal, test_compact) {
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
         Status status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -278,14 +278,14 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
     auto index_name2 = std::make_shared<std::string>("index2");
     auto index_def2 = IndexFullText::Make(index_name2, std::make_shared<std::string>(), "file_name", {column_def2->name()}, {});
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -293,7 +293,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
     }
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
         auto *txn =
-            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -328,7 +328,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
         return input_block;
     };
     for (int i = 0; i < 2; ++i) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kImport);
         std::vector<std::shared_ptr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
         Status status = txn->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
@@ -336,7 +336,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
         std::vector<RowID> row_ids;
         for (u32 i = 1; i < block_row_cnt; i += 2) {
             row_ids.push_back(RowID(0, i));
@@ -347,14 +347,14 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
         Status status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -459,7 +459,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
         }
     }
     auto check_index = [&](const std::string &index_name) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;

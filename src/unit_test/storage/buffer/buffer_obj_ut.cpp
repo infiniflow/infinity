@@ -354,14 +354,14 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
                                                    std::make_shared<std::string>("test_hnsw"),
                                                    std::make_shared<std::string>("test_comment"),
                                                    column_defs);
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         auto status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
     // CreateIndex
     {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kCreateIndex);
         std::vector<std::string> columns1{"col1"};
         std::vector<InitParameter *> parameters1;
         parameters1.emplace_back(new InitParameter("metric", "l2"));
@@ -388,7 +388,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     // Insert data
     {
         for (size_t i = 0; i < kInsertN; ++i) {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kAppend);
             std::vector<std::shared_ptr<ColumnVector>> column_vectors;
             auto column_vector = ColumnVector::Make(column_defs[0]->type());
             column_vector->Initialize();
@@ -415,7 +415,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     // Get Index
     {
 
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -446,7 +446,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     }
     // Drop Table
     {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
         auto status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = txn_mgr->CommitTxn(txn);
@@ -490,14 +490,14 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     }
     {
         auto table_def = std::make_unique<TableDef>(db_name, table_name, table_comment, column_defs);
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
     {
         for (size_t i = 0; i < kInsertN; ++i) {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kAppend);
             std::vector<std::shared_ptr<ColumnVector>> column_vectors;
             auto column_vector = ColumnVector::Make(std::make_shared<DataType>(column_defs[0]->type()->type()));
             column_vector->Initialize();
@@ -517,7 +517,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     }
 
     {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
         auto begin_ts = txn->BeginTS();
         auto commit_ts = txn->CommitTS();
 
@@ -582,7 +582,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     }
 
     {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
         auto status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
@@ -623,14 +623,14 @@ TEST_F(BufferObjTest, DISABLED_SLOW_test_multiple_threads_read) {
     }
     {
         auto table_def = std::make_unique<TableDef>(db_name, table_name, table_comment, column_defs);
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
     {
         for (size_t i = 0; i < kInsertN; ++i) {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kAppend);
             std::vector<std::shared_ptr<ColumnVector>> column_vectors;
             auto column_vector = ColumnVector::Make(std::make_shared<DataType>(column_defs[0]->type()->type()));
             column_vector->Initialize();
@@ -651,7 +651,7 @@ TEST_F(BufferObjTest, DISABLED_SLOW_test_multiple_threads_read) {
     std::vector<std::thread> ths;
     for (size_t i = 0; i < kThreadN; ++i) {
         std::thread th([&]() {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
             auto begin_ts = txn->BeginTS();
             auto commit_ts = txn->CommitTS();
 
@@ -721,7 +721,7 @@ TEST_F(BufferObjTest, DISABLED_SLOW_test_multiple_threads_read) {
     }
 
     {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
         auto status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);

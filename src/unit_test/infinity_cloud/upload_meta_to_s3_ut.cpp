@@ -34,7 +34,7 @@ TEST_P(UploadMetaToS3, DISABLED_MINIO_test1) {
     auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
 
     {
-        auto *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         auto status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = txn_mgr_->CommitTxn(txn);
@@ -42,7 +42,7 @@ TEST_P(UploadMetaToS3, DISABLED_MINIO_test1) {
     }
 
     {
-        auto *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = txn_mgr_->CommitTxn(txn);
@@ -72,7 +72,7 @@ TEST_P(UploadMetaToS3, DISABLED_MINIO_test1) {
     };
 
     {
-        auto *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kNormal);
+        auto *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kImport);
         auto input_block_ptr = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 1);
         std::vector<std::shared_ptr<DataBlock>> input_blocks = {input_block_ptr};
         auto status = txn->Import(*db_name, *table_name, input_blocks);
@@ -116,7 +116,7 @@ TEST_P(UploadMetaToS3, DISABLED_MINIO_test1) {
     kv_store->Init(catalog_dir);
 
     {
-        auto *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
+        auto *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;

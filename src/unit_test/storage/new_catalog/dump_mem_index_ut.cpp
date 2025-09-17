@@ -109,7 +109,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
     });
 
     auto create_db = [&](const std::string &db_name) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn->CreateDatabase(db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -117,7 +117,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
     };
 
     auto create_table = [&](const std::string &db_name, const std::shared_ptr<TableDef> &table_def) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -125,8 +125,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
     };
 
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn =
-            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
+                                          TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -181,7 +181,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         input_block->Finalize();
     }
     auto append_a_block = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
@@ -190,16 +190,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
     };
 
     //    auto dump_index = [&](const String &index_name) {
-    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)), TransactionType::kNormal);
-    //        SegmentID segment_id = 0;
-    //        Status status = txn->DumpMemIndex(*db_name, *table_name, index_name, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
+    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)),
+    //        TransactionType::kDumpMemIndex); SegmentID segment_id = 0; Status status = txn->DumpMemIndex(*db_name, *table_name, index_name,
+    //        segment_id); EXPECT_TRUE(status.ok()); status = new_txn_mgr->CommitTxn(txn); EXPECT_TRUE(status.ok());
     //    };
 
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -249,7 +246,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
     };
 
     auto check_index = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -310,7 +307,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -329,7 +327,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         });
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -348,13 +346,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -387,13 +386,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
@@ -426,13 +426,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -441,7 +442,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_FALSE(status.ok());
 
-        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get db"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get db"), TransactionType::kRead);
         auto [db_info, db_status] = txn7->GetDatabaseInfo(*db_name);
         EXPECT_FALSE(db_status.ok());
         status = new_txn_mgr->RollBackTxn(txn7);
@@ -460,10 +461,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
 
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
@@ -477,7 +479,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_FALSE(status.ok());
 
-        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get db"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get db"), TransactionType::kRead);
         auto [db_info, db_status] = txn7->GetDatabaseInfo(*db_name);
         EXPECT_FALSE(db_status.ok());
         status = new_txn_mgr->RollBackTxn(txn7);
@@ -496,10 +498,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         Status status = txn6->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -511,7 +514,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_FALSE(status.ok());
 
-        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get db"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get db"), TransactionType::kRead);
         auto [db_info, db_status] = txn7->GetDatabaseInfo(*db_name);
         EXPECT_FALSE(db_status.ok());
         status = new_txn_mgr->RollBackTxn(txn7);
@@ -531,11 +534,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         append_a_block();
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         Status status = txn6->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
@@ -546,7 +550,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_FALSE(status.ok());
 
-        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get db"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get db"), TransactionType::kRead);
         auto [db_info, db_status] = txn7->GetDatabaseInfo(*db_name);
         EXPECT_FALSE(db_status.ok());
         status = new_txn_mgr->RollBackTxn(txn7);
@@ -566,13 +570,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         append_a_block();
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         Status status = txn6->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_FALSE(status.ok());
@@ -626,7 +631,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
     });
 
     auto create_db = [&](const std::string &db_name) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn->CreateDatabase(db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -634,7 +639,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
     };
 
     auto create_table = [&](const std::string &db_name, const std::shared_ptr<TableDef> &table_def) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -642,8 +647,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
     };
 
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn =
-            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
+                                          TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -651,7 +656,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
     };
 
     auto drop_db = [&](const std::string &db_name) {
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         Status status = txn6->DropDatabase(db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -706,7 +711,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         input_block->Finalize();
     }
     auto append_a_block = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
@@ -715,16 +720,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
     };
 
     //    auto dump_index = [&](const String &index_name) {
-    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)), TransactionType::kNormal);
-    //        SegmentID segment_id = 0;
-    //        Status status = txn->DumpMemIndex(*db_name, *table_name, index_name, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
+    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)),
+    //        TransactionType::kDumpMemIndex); SegmentID segment_id = 0; Status status = txn->DumpMemIndex(*db_name, *table_name, index_name,
+    //        segment_id); EXPECT_TRUE(status.ok()); status = new_txn_mgr->CommitTxn(txn); EXPECT_TRUE(status.ok());
     //    };
 
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -775,7 +777,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
     };
 
     auto check_index = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -836,7 +838,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -854,7 +857,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         });
 
         // drop table
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
         status = txn5->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
@@ -875,13 +878,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // drop table
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -916,13 +920,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // drop table
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
         status = txn5->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
@@ -957,19 +962,20 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // drop table
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
         status = txn5->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
-        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kRead);
         auto [table_info, table_status] = txn7->GetTableInfo(*db_name, *table_name);
         EXPECT_FALSE(table_status.ok());
         status = new_txn_mgr->RollBackTxn(txn7);
@@ -993,10 +999,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         // drop table
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
 
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
@@ -1010,7 +1017,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_FALSE(status.ok());
 
-        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kRead);
         auto [table_info, table_status] = txn7->GetTableInfo(*db_name, *table_name);
         EXPECT_FALSE(table_status.ok());
         status = new_txn_mgr->RollBackTxn(txn7);
@@ -1031,10 +1038,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         // drop table
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
         Status status = txn5->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
@@ -1047,7 +1055,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_FALSE(status.ok());
 
-        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kRead);
         auto [table_info, table_status] = txn7->GetTableInfo(*db_name, *table_name);
         EXPECT_FALSE(table_status.ok());
         status = new_txn_mgr->RollBackTxn(txn7);
@@ -1069,11 +1077,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         append_a_block();
 
         // drop table
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
         Status status = txn5->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -1085,7 +1094,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_FALSE(status.ok());
 
-        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kRead);
         auto [table_info, table_status] = txn7->GetTableInfo(*db_name, *table_name);
         EXPECT_FALSE(table_status.ok());
         status = new_txn_mgr->RollBackTxn(txn7);
@@ -1107,13 +1116,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         append_a_block();
 
         // drop table
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
         Status status = txn5->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_FALSE(status.ok());
@@ -1121,7 +1131,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         status = new_txn_mgr->RollBackTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kNormal);
+        auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kRead);
         auto [table_info, table_status] = txn7->GetTableInfo(*db_name, *table_name);
         EXPECT_FALSE(table_status.ok());
         status = new_txn_mgr->RollBackTxn(txn7);
@@ -1179,7 +1189,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
     });
 
     auto create_db = [&](const std::string &db_name) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn->CreateDatabase(db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -1187,7 +1197,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
     };
 
     auto create_table = [&](const std::string &db_name, const std::shared_ptr<TableDef> &table_def) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -1195,8 +1205,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
     };
 
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn =
-            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
+                                          TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -1204,7 +1214,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
     };
 
     auto drop_db = [&](const std::string &db_name) {
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         Status status = txn6->DropDatabase(db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -1259,7 +1269,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         input_block->Finalize();
     }
     auto append_a_block = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
@@ -1317,7 +1327,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         input_block_4_columns->Finalize();
     }
     auto append_a_block_after_add_column = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
         Status status = txn->Append(*db_name, *table_name, input_block_4_columns);
         EXPECT_TRUE(status.ok());
@@ -1326,16 +1336,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
     };
 
     //    auto dump_index = [&](const String &index_name) {
-    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)), TransactionType::kNormal);
-    //        SegmentID segment_id = 0;
-    //        Status status = txn->DumpMemIndex(*db_name, *table_name, index_name, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
+    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)),
+    //        TransactionType::kDumpMemIndex); SegmentID segment_id = 0; Status status = txn->DumpMemIndex(*db_name, *table_name, index_name,
+    //        segment_id); EXPECT_TRUE(status.ok()); status = new_txn_mgr->CommitTxn(txn); EXPECT_TRUE(status.ok());
     //    };
 
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -1386,7 +1393,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
     };
 
     auto check_index = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -1446,7 +1453,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -1465,7 +1473,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         });
 
         // add column
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def4 =
             std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col5", std::set<ConstraintType>(), default_varchar);
         std::vector<std::shared_ptr<ColumnDef>> columns4;
@@ -1489,13 +1497,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // add table
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -1533,13 +1542,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // add table
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def4 =
             std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col5", std::set<ConstraintType>(), default_varchar);
         std::vector<std::shared_ptr<ColumnDef>> columns4;
@@ -1569,13 +1579,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // add table
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def4 =
             std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col5", std::set<ConstraintType>(), default_varchar);
         std::vector<std::shared_ptr<ColumnDef>> columns4;
@@ -1605,10 +1616,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         // add table
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
 
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
@@ -1643,10 +1655,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         // add column
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def4 =
             std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col5", std::set<ConstraintType>(), default_varchar);
         std::vector<std::shared_ptr<ColumnDef>> columns4;
@@ -1678,10 +1691,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         // add column
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def4 =
             std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col5", std::set<ConstraintType>(), default_varchar);
         std::vector<std::shared_ptr<ColumnDef>> columns4;
@@ -1714,7 +1728,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         append_a_block();
 
         // add column
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def4 =
             std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col5", std::set<ConstraintType>(), default_varchar);
         std::vector<std::shared_ptr<ColumnDef>> columns4;
@@ -1722,7 +1736,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         Status status = txn4->AddColumns(*db_name, *table_name, columns4);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -1750,7 +1765,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         append_a_block();
 
         // add column
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def4 =
             std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col5", std::set<ConstraintType>(), default_varchar);
         std::vector<std::shared_ptr<ColumnDef>> columns4;
@@ -1760,7 +1775,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -1820,7 +1836,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
     });
 
     auto create_db = [&](const std::string &db_name) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn->CreateDatabase(db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -1828,7 +1844,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
     };
 
     auto create_table = [&](const std::string &db_name, const std::shared_ptr<TableDef> &table_def) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -1836,8 +1852,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
     };
 
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn =
-            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
+                                          TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -1845,7 +1861,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
     };
 
     auto drop_db = [&](const std::string &db_name) {
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         Status status = txn6->DropDatabase(db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -1900,7 +1916,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         input_block->Finalize();
     }
     auto append_a_block = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
@@ -1944,7 +1960,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         input_block_2_columns->Finalize();
     }
     auto append_a_block_after_drop_column = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
         Status status = txn->Append(*db_name, *table_name, input_block_2_columns);
         EXPECT_TRUE(status.ok());
@@ -1953,16 +1969,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
     };
 
     //    auto dump_index = [&](const String &index_name) {
-    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)), TransactionType::kNormal);
-    //        SegmentID segment_id = 0;
-    //        Status status = txn->DumpMemIndex(*db_name, *table_name, index_name, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
+    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)),
+    //        TransactionType::kDumpMemIndex); SegmentID segment_id = 0; Status status = txn->DumpMemIndex(*db_name, *table_name, index_name,
+    //        segment_id); EXPECT_TRUE(status.ok()); status = new_txn_mgr->CommitTxn(txn); EXPECT_TRUE(status.ok());
     //    };
 
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -2013,7 +2026,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
     };
 
     auto check_index = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -2073,7 +2086,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -2091,7 +2105,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         });
 
         // drop column
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         std::vector<std::string> column_names;
         column_names.push_back("col3");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
@@ -2113,13 +2127,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // drop column
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -2155,13 +2170,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // drop column
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         std::vector<std::string> column_names;
         column_names.push_back("col3");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
@@ -2197,13 +2213,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // drop column
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         std::vector<std::string> column_names;
         column_names.push_back("col3");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
@@ -2238,10 +2255,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         // drop column
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
 
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
@@ -2281,10 +2299,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         // drop column
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         std::vector<std::string> column_names;
         column_names.push_back("col3");
         Status status = txn4->DropColumns(*db_name, *table_name, column_names);
@@ -2314,10 +2333,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         // drop column
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
 
         std::vector<std::string> column_names;
         column_names.push_back("col3");
@@ -2349,13 +2369,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         append_a_block();
 
         // drop column
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         std::vector<std::string> column_names;
         column_names.push_back("col3");
         Status status = txn4->DropColumns(*db_name, *table_name, column_names);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -2383,7 +2404,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         append_a_block();
 
         // drop column
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         std::vector<std::string> column_names;
         column_names.push_back("col3");
         Status status = txn4->DropColumns(*db_name, *table_name, column_names);
@@ -2391,7 +2412,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -2451,7 +2473,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
     });
 
     auto create_db = [&](const std::string &db_name) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn->CreateDatabase(db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -2459,7 +2481,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
     };
 
     auto create_table = [&](const std::string &db_name, const std::shared_ptr<TableDef> &table_def) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -2467,8 +2489,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
     };
 
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn =
-            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
+                                          TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -2476,7 +2498,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
     };
 
     auto drop_db = [&](const std::string &db_name) {
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         Status status = txn6->DropDatabase(db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -2531,7 +2553,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
         input_block->Finalize();
     }
     auto append_a_block = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
@@ -2540,16 +2562,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
     };
 
     //    auto dump_index = [&](const String &index_name) {
-    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)), TransactionType::kNormal);
-    //        SegmentID segment_id = 0;
-    //        Status status = txn->DumpMemIndex(*db_name, *table_name, index_name, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
+    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)),
+    //        TransactionType::kDumpMemIndex); SegmentID segment_id = 0; Status status = txn->DumpMemIndex(*db_name, *table_name, index_name,
+    //        segment_id); EXPECT_TRUE(status.ok()); status = new_txn_mgr->CommitTxn(txn); EXPECT_TRUE(status.ok());
     //    };
 
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -2600,7 +2619,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
     };
 
     auto check_index = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -2660,7 +2679,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -2678,7 +2698,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
         });
 
         // rename
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kRenameTable);
         status = txn5->RenameTable(*db_name, *table_name, "table2");
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
@@ -2698,13 +2718,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // rename
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kRenameTable);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -2738,13 +2759,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // rename
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kRenameTable);
         status = txn5->RenameTable(*db_name, *table_name, "table2");
         EXPECT_TRUE(status.ok());
 
@@ -2778,13 +2800,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // rename
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kRenameTable);
         status = txn5->RenameTable(*db_name, *table_name, "table2");
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
@@ -2807,10 +2830,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         // rename
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kRenameTable);
 
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
@@ -2838,10 +2862,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         // rename
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kRenameTable);
         Status status = txn5->RenameTable(*db_name, *table_name, "table2");
         EXPECT_TRUE(status.ok());
 
@@ -2869,10 +2894,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         // rename
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kRenameTable);
         Status status = txn5->RenameTable(*db_name, *table_name, "table2");
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
@@ -2899,11 +2925,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
         append_a_block();
 
         // rename
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kRenameTable);
         Status status = txn5->RenameTable(*db_name, *table_name, "table2");
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -2929,13 +2956,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
         append_a_block();
 
         // rename
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kRenameTable);
         Status status = txn5->RenameTable(*db_name, *table_name, "table2");
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_FALSE(status.ok());
@@ -2993,7 +3021,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
     });
 
     auto create_db = [&](const std::string &db_name) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn->CreateDatabase(db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -3001,7 +3029,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
     };
 
     auto create_table = [&](const std::string &db_name, const std::shared_ptr<TableDef> &table_def) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -3009,8 +3037,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
     };
 
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn =
-            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
+                                          TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -3018,7 +3046,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
     };
 
     auto drop_db = [&](const std::string &db_name) {
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         Status status = txn6->DropDatabase(db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -3073,7 +3101,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
         input_block->Finalize();
     }
     auto append_a_block = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
@@ -3082,16 +3110,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
     };
 
     //    auto dump_index = [&](const String &index_name) {
-    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)), TransactionType::kNormal);
-    //        SegmentID segment_id = 0;
-    //        Status status = txn->DumpMemIndex(*db_name, *table_name, index_name, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
+    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)),
+    //        TransactionType::kDumpMemIndex); SegmentID segment_id = 0; Status status = txn->DumpMemIndex(*db_name, *table_name, index_name,
+    //        segment_id); EXPECT_TRUE(status.ok()); status = new_txn_mgr->CommitTxn(txn); EXPECT_TRUE(status.ok());
     //    };
 
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -3142,7 +3167,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
     };
 
     auto check_index = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -3202,7 +3227,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -3210,8 +3236,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
         EXPECT_TRUE(status.ok());
 
         // create index
-        auto *txn5 =
-            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_def1->index_name_)), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_def1->index_name_)),
+                                           TransactionType::kCreateIndex);
         status = txn5->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
         EXPECT_FALSE(status.ok());
         status = new_txn_mgr->RollBackTxn(txn5);
@@ -3278,7 +3304,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
     });
 
     auto create_db = [&](const std::string &db_name) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn->CreateDatabase(db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -3286,7 +3312,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
     };
 
     auto create_table = [&](const std::string &db_name, const std::shared_ptr<TableDef> &table_def) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -3294,8 +3320,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
     };
 
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn =
-            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
+                                          TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -3303,7 +3329,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
     };
 
     auto drop_db = [&](const std::string &db_name) {
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         Status status = txn6->DropDatabase(db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -3358,7 +3384,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         input_block->Finalize();
     }
     auto append_a_block = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
@@ -3367,16 +3393,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
     };
 
     //    auto dump_index = [&](const String &index_name) {
-    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)), TransactionType::kNormal);
-    //        SegmentID segment_id = 0;
-    //        Status status = txn->DumpMemIndex(*db_name, *table_name, index_name, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
+    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)),
+    //        TransactionType::kDumpMemIndex); SegmentID segment_id = 0; Status status = txn->DumpMemIndex(*db_name, *table_name, index_name,
+    //        segment_id); EXPECT_TRUE(status.ok()); status = new_txn_mgr->CommitTxn(txn); EXPECT_TRUE(status.ok());
     //    };
 
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -3427,7 +3450,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
     };
 
     auto check_index = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -3487,7 +3510,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -3505,7 +3529,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         });
 
         // drop index
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kDropIndex);
         status = txn5->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
@@ -3525,13 +3549,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // drop index
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kDropIndex);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -3565,13 +3590,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // drop index
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kDropIndex);
         status = txn5->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
@@ -3605,13 +3631,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // drop index
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kDropIndex);
         status = txn5->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
@@ -3634,10 +3661,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         // drop index
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kDropIndex);
 
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
@@ -3665,10 +3693,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         // drop index
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kDropIndex);
         Status status = txn5->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
@@ -3696,10 +3725,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         // drop index
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kDropIndex);
         Status status = txn5->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
@@ -3726,11 +3756,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         append_a_block();
 
         // drop index
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kDropIndex);
         Status status = txn5->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -3756,13 +3787,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         append_a_block();
 
         // drop index
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kDropIndex);
         Status status = txn5->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_FALSE(status.ok());
@@ -3820,7 +3852,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
     });
 
     auto create_db = [&](const std::string &db_name) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn->CreateDatabase(db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -3828,7 +3860,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
     };
 
     auto create_table = [&](const std::string &db_name, const std::shared_ptr<TableDef> &table_def) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -3836,8 +3868,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
     };
 
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn =
-            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
+                                          TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -3845,7 +3877,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
     };
 
     auto drop_db = [&](const std::string &db_name) {
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         Status status = txn6->DropDatabase(db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -3905,7 +3937,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
     };
 
     auto append_a_block = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
         Status status = txn->Append(*db_name, *table_name, make_block());
         EXPECT_TRUE(status.ok());
@@ -3914,16 +3946,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
     };
 
     //    auto dump_index = [&](const String &index_name) {
-    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)), TransactionType::kNormal);
-    //        SegmentID segment_id = 0;
-    //        Status status = txn->DumpMemIndex(*db_name, *table_name, index_name, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
+    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)),
+    //        TransactionType::kDumpMemIndex); SegmentID segment_id = 0; Status status = txn->DumpMemIndex(*db_name, *table_name, index_name,
+    //        segment_id); EXPECT_TRUE(status.ok()); status = new_txn_mgr->CommitTxn(txn); EXPECT_TRUE(status.ok());
     //    };
 
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -3974,7 +4003,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
     };
 
     auto check_index1 = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -4024,7 +4053,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
     };
 
     auto check_index2 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -4075,7 +4104,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
     };
 
     auto check_index3 = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -4135,7 +4164,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -4152,7 +4182,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
             return std::make_pair(begin_id, row_cnt);
         });
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kImport);
         std::vector<std::shared_ptr<DataBlock>> input_blocks1 = {make_block()};
         status = txn3->Import(*db_name, *table_name, input_blocks1);
         EXPECT_TRUE(status.ok());
@@ -4181,12 +4211,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kImport);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -4229,12 +4260,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kImport);
         std::vector<std::shared_ptr<DataBlock>> input_blocks1 = {make_block()};
         status = txn3->Import(*db_name, *table_name, input_blocks1);
         EXPECT_TRUE(status.ok());
@@ -4277,12 +4309,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kImport);
         std::vector<std::shared_ptr<DataBlock>> input_blocks1 = {make_block()};
         status = txn3->Import(*db_name, *table_name, input_blocks1);
         EXPECT_TRUE(status.ok());
@@ -4325,9 +4358,10 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kImport);
 
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
@@ -4366,9 +4400,10 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kImport);
         std::vector<std::shared_ptr<DataBlock>> input_blocks1 = {make_block()};
         Status status = txn3->Import(*db_name, *table_name, input_blocks1);
         EXPECT_TRUE(status.ok());
@@ -4407,9 +4442,10 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kImport);
         std::vector<std::shared_ptr<DataBlock>> input_blocks1 = {make_block()};
         Status status = txn3->Import(*db_name, *table_name, input_blocks1);
         EXPECT_TRUE(status.ok());
@@ -4447,12 +4483,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
 
         append_a_block();
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kImport);
         std::vector<std::shared_ptr<DataBlock>> input_blocks1 = {make_block()};
         Status status = txn3->Import(*db_name, *table_name, input_blocks1);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -4488,14 +4525,15 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
 
         append_a_block();
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kImport);
         std::vector<std::shared_ptr<DataBlock>> input_blocks1 = {make_block()};
         Status status = txn3->Import(*db_name, *table_name, input_blocks1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -4565,7 +4603,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     });
 
     auto create_db = [&](const std::string &db_name) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn->CreateDatabase(db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -4573,7 +4611,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     };
 
     auto create_table = [&](const std::string &db_name, const std::shared_ptr<TableDef> &table_def) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -4581,8 +4619,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     };
 
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn =
-            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
+                                          TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -4590,7 +4628,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     };
 
     auto drop_db = [&](const std::string &db_name) {
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         Status status = txn6->DropDatabase(db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -4650,7 +4688,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     };
 
     auto append_a_block = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
         Status status = txn->Append(*db_name, *table_name, make_block());
         EXPECT_TRUE(status.ok());
@@ -4659,16 +4697,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     };
 
     //    auto dump_index = [&](const String &index_name) {
-    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)), TransactionType::kNormal);
-    //        SegmentID segment_id = 0;
-    //        Status status = txn->DumpMemIndex(*db_name, *table_name, index_name, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
+    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)),
+    //        TransactionType::kDumpMemIndex); SegmentID segment_id = 0; Status status = txn->DumpMemIndex(*db_name, *table_name, index_name,
+    //        segment_id); EXPECT_TRUE(status.ok()); status = new_txn_mgr->CommitTxn(txn); EXPECT_TRUE(status.ok());
     //    };
 
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -4719,7 +4754,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     };
 
     auto check_index1 = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -4769,7 +4804,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     };
 
     auto check_index3 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -4824,14 +4859,15 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
         status = txn3->Append(*db_name, *table_name, make_block());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
@@ -4859,12 +4895,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -4894,12 +4931,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
         status = txn3->Append(*db_name, *table_name, make_block());
         EXPECT_TRUE(status.ok());
 
@@ -4929,12 +4967,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
         status = txn3->Append(*db_name, *table_name, make_block());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
@@ -4959,9 +4998,10 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
@@ -4991,9 +5031,10 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
         Status status = txn3->Append(*db_name, *table_name, make_block());
         EXPECT_TRUE(status.ok());
 
@@ -5023,9 +5064,10 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
         Status status = txn3->Append(*db_name, *table_name, make_block());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
@@ -5053,11 +5095,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
 
         append_a_block();
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
         Status status = txn3->Append(*db_name, *table_name, make_block());
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -5084,13 +5127,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
 
         append_a_block();
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
         Status status = txn3->Append(*db_name, *table_name, make_block());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -5150,7 +5194,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
     });
 
     auto create_db = [&](const std::string &db_name) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn->CreateDatabase(db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -5158,7 +5202,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
     };
 
     auto create_table = [&](const std::string &db_name, const std::shared_ptr<TableDef> &table_def) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -5166,8 +5210,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
     };
 
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn =
-            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
+                                          TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -5175,7 +5219,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
     };
 
     auto drop_db = [&](const std::string &db_name) {
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         Status status = txn6->DropDatabase(db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -5235,7 +5279,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
     };
 
     auto append_a_block = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
         Status status = txn->Append(*db_name, *table_name, make_block());
         EXPECT_TRUE(status.ok());
@@ -5244,16 +5288,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
     };
 
     //    auto dump_index = [&](const String &index_name) {
-    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)), TransactionType::kNormal);
-    //        SegmentID segment_id = 0;
-    //        Status status = txn->DumpMemIndex(*db_name, *table_name, index_name, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
+    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)),
+    //        TransactionType::kDumpMemIndex); SegmentID segment_id = 0; Status status = txn->DumpMemIndex(*db_name, *table_name, index_name,
+    //        segment_id); EXPECT_TRUE(status.ok()); status = new_txn_mgr->CommitTxn(txn); EXPECT_TRUE(status.ok());
     //    };
 
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -5304,7 +5345,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
     };
 
     auto check_data = [&]() {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -5355,7 +5396,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -5363,7 +5405,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         EXPECT_TRUE(status.ok());
 
         // Delete data
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -5392,13 +5434,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // Delete data
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -5431,13 +5474,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // Delete data
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -5470,13 +5514,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
         // Delete data
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -5508,10 +5553,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         // Delete data
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
 
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
@@ -5548,10 +5594,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         // Delete data
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -5587,9 +5634,10 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         append_a_block();
 
         // Delete data
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
@@ -5626,9 +5674,10 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         append_a_block();
 
         // Delete data
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
@@ -5666,7 +5715,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         append_a_block();
 
         // Delete data
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -5676,7 +5725,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -5739,7 +5789,7 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
     });
 
     auto create_db = [&](const std::string &db_name) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn->CreateDatabase(db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -5747,7 +5797,7 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
     };
 
     auto create_table = [&](const std::string &db_name, const std::shared_ptr<TableDef> &table_def) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -5755,8 +5805,8 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
     };
 
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn =
-            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
+                                          TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -5764,7 +5814,7 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
     };
 
     auto drop_db = [&](const std::string &db_name) {
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         Status status = txn6->DropDatabase(db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -5824,7 +5874,7 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
     };
 
     auto append_a_block = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
         Status status = txn->Append(*db_name, *table_name, make_block());
         EXPECT_TRUE(status.ok());
@@ -5833,16 +5883,13 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
     };
 
     //    auto dump_index = [&](const String &index_name) {
-    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)), TransactionType::kNormal);
-    //        SegmentID segment_id = 0;
-    //        Status status = txn->DumpMemIndex(*db_name, *table_name, index_name, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
+    //        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<String>(fmt::format("dump mem index {}", index_name)),
+    //        TransactionType::kDumpMemIndex); SegmentID segment_id = 0; Status status = txn->DumpMemIndex(*db_name, *table_name, index_name,
+    //        segment_id); EXPECT_TRUE(status.ok()); status = new_txn_mgr->CommitTxn(txn); EXPECT_TRUE(status.ok());
     //    };
 
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -5893,7 +5940,7 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
     };
 
     auto check_index1 = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -5953,14 +6000,16 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn1 =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         status = txn1->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -5990,12 +6039,14 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn1 =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -6029,12 +6080,14 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn1 =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         status = txn1->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
@@ -6068,12 +6121,14 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
 
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn1 =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         status = txn1->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -6106,10 +6161,12 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
 
         append_a_block();
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
 
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn1 =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
@@ -6146,9 +6203,11 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
 
         append_a_block();
 
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn1 =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        auto *txn =
+            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kDumpMemIndex);
 
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
@@ -6216,21 +6275,21 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_test_dump_index_and_optimize_index) {
 
     auto PrepareForDumpAndOptimize = [&] {
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
             Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kCreateIndex);
             Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -6240,7 +6299,7 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_test_dump_index_and_optimize_index) {
         // For optimize
         for (int i = 0; i < 2; ++i) {
             {
-                auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("append {}", i)), TransactionType::kNormal);
+                auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("append {}", i)), TransactionType::kAppend);
                 std::shared_ptr<DataBlock> input_block = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
                 Status status = txn->Append(*db_name, *table_name, input_block);
                 EXPECT_TRUE(status.ok());
@@ -6250,7 +6309,7 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_test_dump_index_and_optimize_index) {
 
             //            new_txn_mgr->PrintAllKeyValue();
             {
-                auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump index {}", i)), TransactionType::kNormal);
+                auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump index {}", i)), TransactionType::kDumpMemIndex);
                 Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
                 EXPECT_TRUE(status.ok());
                 status = new_txn_mgr->CommitTxn(txn);
@@ -6259,7 +6318,7 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_test_dump_index_and_optimize_index) {
         }
 
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
             std::shared_ptr<DataBlock> input_block = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
             Status status = txn->Append(*db_name, *table_name, input_block);
             EXPECT_TRUE(status.ok());
@@ -6269,7 +6328,7 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_test_dump_index_and_optimize_index) {
     };
 
     auto CheckTable = [&](const std::vector<SegmentID> &segment_ids, const std::vector<ChunkID> &chunk_ids) { //
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -6300,7 +6359,7 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_test_dump_index_and_optimize_index) {
 
     auto DropDB = [&] {
         // drop database
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kDropDB);
         Status status = txn5->DropDatabase("db1", ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
@@ -6316,14 +6375,14 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_test_dump_index_and_optimize_index) {
 
         std::shared_ptr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index {}"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index {}"), TransactionType::kDumpMemIndex);
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kOptimizeIndex);
         status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -6343,12 +6402,12 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_test_dump_index_and_optimize_index) {
 
         std::shared_ptr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index {}"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index {}"), TransactionType::kDumpMemIndex);
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kOptimizeIndex);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -6372,12 +6431,12 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_test_dump_index_and_optimize_index) {
 
         std::shared_ptr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index {}"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index {}"), TransactionType::kDumpMemIndex);
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kOptimizeIndex);
         status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_FALSE(status.ok());
 
@@ -6401,12 +6460,12 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_test_dump_index_and_optimize_index) {
 
         std::shared_ptr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index {}"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index {}"), TransactionType::kDumpMemIndex);
         Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kOptimizeIndex);
         status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_FALSE(status.ok());
 
@@ -6430,10 +6489,10 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_test_dump_index_and_optimize_index) {
 
         std::shared_ptr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index {}"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index {}"), TransactionType::kDumpMemIndex);
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kOptimizeIndex);
         Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
 
@@ -6460,10 +6519,10 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_test_dump_index_and_optimize_index) {
 
         std::shared_ptr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index {}"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index {}"), TransactionType::kDumpMemIndex);
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kOptimizeIndex);
         Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -6490,11 +6549,11 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_test_dump_index_and_optimize_index) {
         std::shared_ptr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kOptimizeIndex);
         Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index {}"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index {}"), TransactionType::kDumpMemIndex);
 
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
@@ -6520,13 +6579,13 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_test_dump_index_and_optimize_index) {
         std::shared_ptr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kOptimizeIndex);
         Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index {}"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index {}"), TransactionType::kDumpMemIndex);
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -6578,21 +6637,21 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
 
     auto PrepareForCompactAndOptimize = [&] {
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
             Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kCreateIndex);
             Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -6601,7 +6660,7 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
 
         // For compact
         for (int i = 0; i < 2; ++i) {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("import {}", i)), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("import {}", i)), TransactionType::kImport);
             std::vector<std::shared_ptr<DataBlock>> input_blocks = {
                 make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
             Status status = txn->Import(*db_name, *table_name, input_blocks);
@@ -6612,7 +6671,7 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
 
         // For dump index
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
             std::shared_ptr<DataBlock> input_block = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
             Status status = txn->Append(*db_name, *table_name, input_block);
             EXPECT_TRUE(status.ok());
@@ -6622,7 +6681,7 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
     };
 
     auto CheckTable = [&](const std::vector<SegmentID> &segment_ids, SegmentID dump_segment_id, const std::vector<ChunkID> &chunk_ids) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -6653,7 +6712,7 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
 
     auto DropDB = [&] {
         // drop database
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kDropDB);
         Status status = txn5->DropDatabase("db1", ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
@@ -6669,14 +6728,14 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
 
         std::shared_ptr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
         Status status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kDumpMemIndex);
         status = txn2->DumpMemIndex(*db_name, *table_name, *index_name1, 2);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -6696,12 +6755,12 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
 
         std::shared_ptr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
         Status status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kDumpMemIndex);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -6725,12 +6784,12 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
 
         std::shared_ptr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
         Status status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kDumpMemIndex);
         status = txn2->DumpMemIndex(*db_name, *table_name, *index_name1, 2);
         EXPECT_TRUE(status.ok());
 
@@ -6754,12 +6813,12 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
 
         std::shared_ptr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
         Status status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kDumpMemIndex);
         status = txn2->DumpMemIndex(*db_name, *table_name, *index_name1, 2);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -6782,10 +6841,10 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
 
         std::shared_ptr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kDumpMemIndex);
         Status status = txn2->DumpMemIndex(*db_name, *table_name, *index_name1, 2);
         EXPECT_TRUE(status.ok());
 
@@ -6812,10 +6871,10 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
 
         std::shared_ptr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kDumpMemIndex);
         Status status = txn2->DumpMemIndex(*db_name, *table_name, *index_name1, 2);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
@@ -6841,11 +6900,11 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
         std::shared_ptr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kDumpMemIndex);
         Status status = txn2->DumpMemIndex(*db_name, *table_name, *index_name1, 2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
 
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
@@ -6870,13 +6929,13 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
         std::shared_ptr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
         // optimize index
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kDumpMemIndex);
         Status status = txn2->DumpMemIndex(*db_name, *table_name, *index_name1, 2);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
         status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);

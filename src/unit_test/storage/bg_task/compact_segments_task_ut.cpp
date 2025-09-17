@@ -55,7 +55,7 @@ protected:
     void AddSegments(NewTxnManager *txn_mgr, const std::string &table_name, const std::vector<size_t> &segment_sizes) {
         for (size_t segment_size : segment_sizes) {
             for (size_t i = 0; i < segment_size; ++i) {
-                auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kNormal);
+                auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kImport);
                 auto input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
                 std::vector<std::shared_ptr<DataBlock>> input_blocks = {input_block};
                 Status status = txn->Import("default_db", table_name, input_blocks);
@@ -83,7 +83,7 @@ TEST_P(CompactTaskTest, DISABLED_SLOW_bg_compact) {
 
     {
         // create table
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
 
@@ -105,7 +105,7 @@ TEST_P(CompactTaskTest, DISABLED_SLOW_bg_compact) {
         sleep(compact_interval + 1);
 
         // Check if the segment count has been reduced
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
         TxnTimeStamp create_timestamp;

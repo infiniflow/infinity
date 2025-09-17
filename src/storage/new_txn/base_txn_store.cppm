@@ -80,7 +80,7 @@ export struct BaseTxnStore {
 
 // DummyTxnStore is only used in test
 export struct DummyTxnStore final : public BaseTxnStore {
-    DummyTxnStore() : BaseTxnStore(TransactionType::kNormal) {}
+    DummyTxnStore() : BaseTxnStore(TransactionType::kInvalid) {}
     ~DummyTxnStore() override = default;
 
     std::string ToString() const final;

@@ -130,12 +130,6 @@ export struct ChunkInfoForCreateIndex {
     ChunkID chunk_id_{};
 };
 
-enum class TxnType {
-    kReadOnly,
-    kWrite,
-    kInvalid,
-};
-
 export class NewTxn : public std::enable_shared_from_this<NewTxn> {
 public:
     // For new txn
@@ -392,7 +386,7 @@ public:
 
     TransactionType GetTxnType() const;
 
-    TxnType txn_type() const;
+    bool readonly() const;
 
     bool NeedToAllocate() const;
 
@@ -721,7 +715,6 @@ private:
     std::shared_ptr<BaseTxnStore> base_txn_store_{};
 
     NewTxnStore txn_store_; // this has this ptr, so txn cannot be moved.
-    TxnType txn_type_{TxnType::kInvalid};
 
     // Use as txn context;
     mutable std::shared_mutex rw_locker_{};

@@ -184,13 +184,13 @@ void QueryMatchTest::CreateDBAndTable(const std::string &db_name, const std::str
                                     std::move(column_defs));
     NewTxnManager *txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
         txn->DropTable(db_name, table_name, ConflictType::kIgnore);
         Status status = txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         txn->CreateTable(db_name, table_def, ConflictType::kError);
 
         Status status = txn_mgr->CommitTxn(txn);
@@ -217,7 +217,7 @@ void QueryMatchTest::CreateIndex(const std::string &db_name,
                                                      index_file_name,
                                                      col_name_list,
                                                      analyzer);
-    auto *txn7 = txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kNormal);
+    auto *txn7 = txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kCreateIndex);
     status = txn7->CreateIndex(db_name, table_name, index_def, ConflictType::kError);
     EXPECT_TRUE(status.ok());
     status = txn_mgr->CommitTxn(txn7);
@@ -228,7 +228,7 @@ void QueryMatchTest::InsertData(const std::string &db_name, const std::string &t
     Storage *storage = InfinityContext::instance().storage();
     NewTxnManager *txn_mgr = storage->new_txn_manager();
 
-    auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("import data"), TransactionType::kNormal);
+    auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("import data"), TransactionType::kImport);
     auto input_block = std::make_shared<DataBlock>();
     for (size_t column_id = 0; column_id < table_def_->column_count(); ++column_id) {
         auto col1 = ColumnVector::Make(table_def_->columns()[column_id]->type());

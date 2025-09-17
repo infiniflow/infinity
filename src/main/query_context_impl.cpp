@@ -428,10 +428,111 @@ void QueryContext::BeginTxn(const BaseStatement *base_statement) {
     auto txn_text = std::make_unique<std::string>(base_statement ? base_statement->ToString() : "");
 
     std::shared_ptr<NewTxn> new_txn{};
-    TransactionType transaction_type = TransactionType::kNormal;
+    TransactionType transaction_type = TransactionType::kInvalid;
     switch (base_statement->type_) {
         case StatementType::kFlush: {
             transaction_type = TransactionType::kNewCheckpoint;
+            break;
+        }
+        case StatementType::kCopy: {
+            const CopyStatement *copy_statement = static_cast<const CopyStatement *>(base_statement);
+            if (copy_statement->copy_from_) {
+                // Import
+                transaction_type = TransactionType::kImport;
+            } else {
+                // Export
+                transaction_type = TransactionType::kRead;
+            }
+            break;
+        }
+        case StatementType::kInsert: {
+            transaction_type = TransactionType::kAppend;
+            break;
+        }
+        case StatementType::kUpdate: {
+            transaction_type = TransactionType::kUpdate;
+            break;
+        }
+        case StatementType::kDelete: {
+            transaction_type = TransactionType::kDelete;
+            break;
+        }
+        case StatementType::kCheck:
+        case StatementType::kExplain:
+        case StatementType::kShow:
+        case StatementType::kSelect: {
+            transaction_type = TransactionType::kRead;
+            break;
+        }
+        case StatementType::kAlter: {
+            const AlterStatement *alter_statement = static_cast<const AlterStatement *>(base_statement);
+            switch (alter_statement->type_) {
+                case AlterStatementType::kAddColumns: {
+                    transaction_type = TransactionType::kAddColumn;
+                    break;
+                }
+                case AlterStatementType::kDropColumns: {
+                    transaction_type = TransactionType::kDropColumn;
+                    break;
+                }
+                case AlterStatementType::kRenameTable: {
+                    transaction_type = TransactionType::kRenameTable;
+                    break;
+                }
+                case AlterStatementType::kInvalid: {
+                    std::string error_msg = "Invalid alter statement type";
+                    LOG_CRITICAL(error_msg);
+                    UnrecoverableError(error_msg);
+                }
+            }
+            break;
+        }
+        case StatementType::kCreate: {
+            const CreateStatement *create_statement = static_cast<const CreateStatement *>(base_statement);
+            switch (create_statement->ddl_type()) {
+                case DDLType::kCollection:
+                case DDLType::kTable: {
+                    transaction_type = TransactionType::kCreateTable;
+                    break;
+                }
+                case DDLType::kDatabase: {
+                    transaction_type = TransactionType::kCreateDB;
+                    break;
+                }
+                case DDLType::kIndex: {
+                    transaction_type = TransactionType::kCreateIndex;
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Unknown DDL type");
+                }
+            }
+            break;
+        }
+        case StatementType::kDrop: {
+            const DropStatement *drop_statement = static_cast<const DropStatement *>(base_statement);
+            switch (drop_statement->ddl_type()) {
+                case DDLType::kCollection:
+                case DDLType::kTable: {
+                    transaction_type = TransactionType::kDropTable;
+                    break;
+                }
+                case DDLType::kDatabase: {
+                    transaction_type = TransactionType::kDropDB;
+                    break;
+                }
+                case DDLType::kIndex: {
+                    transaction_type = TransactionType::kDropIndex;
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Unknown DDL type");
+                }
+            }
+            break;
+        }
+        case StatementType::kCompact: {
+            transaction_type = TransactionType::kCompact;
             break;
         }
         case StatementType::kCommand: {
@@ -441,14 +542,73 @@ void QueryContext::BeginTxn(const BaseStatement *base_statement) {
                     transaction_type = TransactionType::kCleanup;
                     break;
                 }
-                default: {
+                case CommandType::kExport:
+                case CommandType::kCheckTable: {
+                    transaction_type = TransactionType::kRead;
                     break;
+                }
+                case CommandType::kDumpIndex: {
+                    transaction_type = TransactionType::kDumpMemIndex;
+                    break;
+                }
+                case CommandType::kSet: {
+                    transaction_type = TransactionType::kSetCommand;
+                    break;
+                }
+                case CommandType::kSnapshot: {
+                    SnapshotCmd *snapshot_cmd = static_cast<SnapshotCmd *>(command_statement->command_info_.get());
+                    SnapshotScope snapshot_scope = snapshot_cmd->scope();
+                    switch (snapshot_cmd->operation()) {
+                        case SnapshotOp::kDrop:
+                        case SnapshotOp::kCreate: {
+                            transaction_type = TransactionType::kCreateTableSnapshot;
+                            break;
+                        }
+                        case SnapshotOp::kRestore: {
+                            switch (snapshot_scope) {
+                                case SnapshotScope::kDatabase: {
+                                    transaction_type = TransactionType::kRestoreDatabase;
+                                    break;
+                                }
+                                case SnapshotScope::kTable: {
+                                    transaction_type = TransactionType::kRestoreTable;
+                                    break;
+                                }
+                                default: {
+                                    UnrecoverableError("Unknown snapshot scope");
+                                }
+                            }
+                            break;
+                        }
+                        default: {
+                            UnrecoverableError("Unknown snapshot operation");
+                        }
+                    }
+                    break;
+                }
+                case CommandType::kUse: {
+                    transaction_type = TransactionType::kSetCommand;
+                    break;
+                }
+                case CommandType::kInvalid:
+                case CommandType::kTestCommand: {
+                    UnrecoverableError("Invalid command type");
                 }
             }
             break;
         }
-        default: {
+        case StatementType::kAdmin: {
+            UnrecoverableError("Not support admin type");
             break;
+        }
+        case StatementType::kOptimize: {
+            transaction_type = TransactionType::kOptimizeIndex;
+            break;
+        }
+        case StatementType::kInvalidStmt:
+        case StatementType::kPrepare:
+        case StatementType::kExecute: {
+            UnrecoverableError("Unsupported statement type");
         }
     }
 
