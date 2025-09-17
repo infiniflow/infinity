@@ -590,8 +590,11 @@ void QueryContext::BeginTxn(const BaseStatement *base_statement) {
                     transaction_type = TransactionType::kSetCommand;
                     break;
                 }
-                case CommandType::kInvalid:
                 case CommandType::kTestCommand: {
+                    transaction_type = TransactionType::kRead;
+                    break;
+                }
+                case CommandType::kInvalid: {
                     UnrecoverableError("Invalid command type");
                 }
             }
