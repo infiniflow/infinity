@@ -334,7 +334,7 @@ void MetaCache::Put(const std::vector<std::shared_ptr<MetaBaseCache>> &cache_ite
     }
 }
 
-Status MetaCache::Erase(const std::vector<std::shared_ptr<EraseBaseCache>> &cache_items, KVInstance *kv_instance, TxnTimeStamp commit_ts) {
+Status MetaCache::EraseAndCommitKV(const std::vector<std::shared_ptr<EraseBaseCache>> &cache_items, KVInstance *kv_instance, TxnTimeStamp commit_ts) {
     std::unique_lock lock(cache_mtx_);
     for (const auto &cache_item : cache_items) {
         switch (cache_item->type_) {

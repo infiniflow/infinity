@@ -245,11 +245,11 @@ bool NewTxnManager::CheckConflict1(NewTxn *txn, std::string &conflict_reason, bo
 
 void NewTxnManager::SaveOrResetMetaCacheForReadTxn(NewTxn *txn) {
     // For read-only txn check if previous txn is writable txn. If so, remove the items to cache.
-    if ((txn->GetTxnStore() == nullptr && !txn->IsReplay()) or txn->txn_type() == TxnType::kReadOnly) {
+    if ((txn->GetTxnStore() == nullptr && !txn->IsReplay()) or txn->readonly()) {
         std::vector<std::shared_ptr<NewTxn>> check_txns = GetCheckCandidateTxns(txn);
         bool all_read_txns = true;
         for (const auto &check_txn : check_txns) {
-            if ((check_txn->GetTxnStore() == nullptr && !check_txn->IsReplay()) or check_txn->txn_type() == TxnType::kReadOnly) {
+            if ((check_txn->GetTxnStore() == nullptr && !check_txn->IsReplay()) or check_txn->readonly()) {
                 // Read only txn
                 continue;
             } else {
@@ -312,7 +312,8 @@ Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
         *commit_ts_ptr = txn->CommitTS();
     }
     if (status.ok()) {
-        if (txn->GetTxnType() == TransactionType::kNewCheckpoint) {
+        TransactionType txn_type = txn->GetTxnType();
+        if (txn_type == TransactionType::kNewCheckpoint or txn_type == TransactionType::kSkippedCheckpoint) {
             std::lock_guard guard(locker_);
             ckp_begin_ts_ = UNCOMMIT_TS;
         }
@@ -336,7 +337,8 @@ void NewTxnManager::CommitReplayTxn(NewTxn *txn) {
 Status NewTxnManager::RollBackTxn(NewTxn *txn) {
     Status status = txn->Rollback();
     if (status.ok()) {
-        if (txn->GetTxnType() == TransactionType::kNewCheckpoint) {
+        TransactionType txn_type = txn->GetTxnType();
+        if (txn_type == TransactionType::kNewCheckpoint or txn_type == TransactionType::kSkippedCheckpoint) {
             std::lock_guard guard(locker_);
             ckp_begin_ts_ = UNCOMMIT_TS;
         }
@@ -471,7 +473,7 @@ void NewTxnManager::CommitKVInstance(NewTxn *txn) {
     }
 
     MetaCache *meta_cache_ptr = this->storage_->meta_cache();
-    Status status = meta_cache_ptr->Erase(items_to_erase, txn->kv_instance_.get(), commit_ts);
+    Status status = meta_cache_ptr->EraseAndCommitKV(items_to_erase, txn->kv_instance_.get(), commit_ts);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Put cache: {}", status.message()));
     }

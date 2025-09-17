@@ -364,7 +364,7 @@ public:
              const std::vector<std::shared_ptr<CacheInfo>> &cache_infos,
              TxnTimeStamp begin_ts);
 
-    Status Erase(const std::vector<std::shared_ptr<EraseBaseCache>> &cache_items, KVInstance *kv_instance, TxnTimeStamp commit_ts);
+    Status EraseAndCommitKV(const std::vector<std::shared_ptr<EraseBaseCache>> &cache_items, KVInstance *kv_instance, TxnTimeStamp commit_ts);
 
     Status PutOrErase(const std::vector<std::shared_ptr<MetaBaseCache>> &cache_items, KVInstance *kv_instance);
 

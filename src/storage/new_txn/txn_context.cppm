@@ -34,7 +34,7 @@ export struct TxnContext {
     TxnTimeStamp last_kv_commit_ts_{};
     TxnTimeStamp last_commit_ts_{};
     TxnState state_{TxnState::kStarted};
-    TransactionType txn_type_{TransactionType::kRead};
+    TransactionType txn_type_{TransactionType::kInvalid};
 
     bool is_write_transaction_{false};
     bool replay_{false};

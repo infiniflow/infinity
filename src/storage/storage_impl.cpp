@@ -849,7 +849,7 @@ void Storage::AttachCatalog(TxnTimeStamp checkpoint_ts) {
 }
 
 void Storage::RecoverMemIndex() {
-    //    NewTxn *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("recover mem index"), TransactionType::kNormal);
+    //    NewTxn *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("recover mem index"), TransactionType::kInvalid);
     //    txn->SetReplay(true);
     //    Status status = NewCatalog::MemIndexRecover(txn);
     //    if (!status.ok()) {
@@ -871,7 +871,7 @@ void Storage::RecoverMemIndex() {
 }
 
 void Storage::CreateDefaultDB() {
-    NewTxn *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create default_db"), TransactionType::kNormal);
+    NewTxn *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create default_db"), TransactionType::kCreateDB);
     Status status = txn->CreateDatabase("default_db", ConflictType::kError, std::make_shared<std::string>());
     if (!status.ok()) {
         if (status.code_ == ErrorCode::kDuplicateDatabaseName) {

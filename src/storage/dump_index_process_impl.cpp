@@ -85,7 +85,8 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
     do {
         dump_count++;
         std::shared_ptr<BGTaskInfo> bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kDumpMemIndex);
-        std::shared_ptr<NewTxn> new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("Dump index"), TransactionType::kNormal);
+        std::shared_ptr<NewTxn> new_txn_shared =
+            new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("Dump index"), TransactionType::kDumpMemIndex);
 
         Status status = new_txn_shared->DumpMemIndex(db_name, table_name, index_name, segment_id, begin_row_id);
         if (status.ok()) {

@@ -174,7 +174,7 @@ protected:
     }
 
     void CheckIndexBeforeOptimize(const std::string &index_name) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index before"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index before"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -217,7 +217,7 @@ protected:
     }
 
     void CheckIndexAfterSuccessfulOptimize(const std::string &index_name) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -274,7 +274,7 @@ protected:
     }
 
     void CheckIndexAfterFailedOptimize(const std::string &index_name) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
@@ -316,7 +316,7 @@ protected:
     void PrepareTableWithIndexesAndData() {
         // Create all indexes one by one
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create secondary index"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create secondary index"), TransactionType::kCreateIndex);
             Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -324,7 +324,7 @@ protected:
         }
 
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create fulltext index"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create fulltext index"), TransactionType::kCreateIndex);
             Status status = txn->CreateIndex(*db_name, *table_name, index_def2, ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -332,7 +332,7 @@ protected:
         }
 
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create HNSW index"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create HNSW index"), TransactionType::kCreateIndex);
             Status status = txn->CreateIndex(*db_name, *table_name, index_def3, ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -340,7 +340,7 @@ protected:
         }
 
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create secondary index 2"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create secondary index 2"), TransactionType::kCreateIndex);
             Status status = txn->CreateIndex(*db_name, *table_name, index_def4, ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -349,7 +349,7 @@ protected:
 
         // Insert data into 1 segment with 4 blocks, dump indexes after each append
         for (int block_id = 0; block_id < 4; ++block_id) {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
             std::shared_ptr<DataBlock> input_block = make_input_block();
             Status status = txn->Append(*db_name, *table_name, input_block);
             EXPECT_TRUE(status.ok());
@@ -357,27 +357,27 @@ protected:
             EXPECT_TRUE(status.ok());
 
             // Dump all indexes for segment 0 after each append (each block)
-            auto *dump_txn =
-                new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem indexes block {}", block_id)), TransactionType::kNormal);
+            auto *dump_txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem indexes block {}", block_id)),
+                                                   TransactionType::kDumpMemIndex);
 
             Status dump_status = dump_txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
             EXPECT_TRUE(dump_status.ok());
             new_txn_mgr->CommitTxn(dump_txn);
 
-            dump_txn =
-                new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem indexes block {}", block_id)), TransactionType::kNormal);
+            dump_txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem indexes block {}", block_id)),
+                                             TransactionType::kDumpMemIndex);
             dump_status = dump_txn->DumpMemIndex(*db_name, *table_name, *index_name2, 0);
             EXPECT_TRUE(dump_status.ok());
             new_txn_mgr->CommitTxn(dump_txn);
 
-            dump_txn =
-                new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem indexes block {}", block_id)), TransactionType::kNormal);
+            dump_txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem indexes block {}", block_id)),
+                                             TransactionType::kDumpMemIndex);
             dump_status = dump_txn->DumpMemIndex(*db_name, *table_name, *index_name3, 0);
             EXPECT_TRUE(dump_status.ok());
             new_txn_mgr->CommitTxn(dump_txn);
 
-            dump_txn =
-                new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem indexes block {}", block_id)), TransactionType::kNormal);
+            dump_txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem indexes block {}", block_id)),
+                                             TransactionType::kDumpMemIndex);
             dump_status = dump_txn->DumpMemIndex(*db_name, *table_name, *index_name4, 0);
             EXPECT_TRUE(dump_status.ok());
             new_txn_mgr->CommitTxn(dump_txn);
@@ -412,7 +412,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 
 TEST_P(TestTxnReplayOptimize, DISABLED_SLOW_test_optimize_commit) {
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(*db_name, table_def, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -429,7 +429,7 @@ TEST_P(TestTxnReplayOptimize, DISABLED_SLOW_test_optimize_commit) {
 
     // Optimize table
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize"), TransactionType::kOptimizeIndex);
         Status status = txn->OptimizeTableIndexes(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -444,7 +444,7 @@ TEST_P(TestTxnReplayOptimize, DISABLED_SLOW_test_optimize_commit) {
     CheckIndexAfterSuccessfulOptimize(*index_name4);
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
         Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -454,7 +454,7 @@ TEST_P(TestTxnReplayOptimize, DISABLED_SLOW_test_optimize_commit) {
 
 TEST_P(TestTxnReplayOptimize, DISABLED_SLOW_test_optimize_rollback) {
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(*db_name, table_def, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -471,12 +471,12 @@ TEST_P(TestTxnReplayOptimize, DISABLED_SLOW_test_optimize_rollback) {
 
     // Try to optimize but it will be rolled back due to conflict
     {
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
         std::shared_ptr<DataBlock> input_block = make_input_block();
         Status status = txn2->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
 
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize"), TransactionType::kOptimizeIndex);
         status = txn->OptimizeTableIndexes(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
 
@@ -500,7 +500,7 @@ TEST_P(TestTxnReplayOptimize, DISABLED_SLOW_test_optimize_rollback) {
     CheckIndexAfterFailedOptimize(*index_name4);
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
         Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -510,7 +510,7 @@ TEST_P(TestTxnReplayOptimize, DISABLED_SLOW_test_optimize_rollback) {
 
 TEST_P(TestTxnReplayOptimize, DISABLED_SLOW_test_optimize_interrupt) {
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(*db_name, table_def, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -522,7 +522,7 @@ TEST_P(TestTxnReplayOptimize, DISABLED_SLOW_test_optimize_interrupt) {
 
     // Start optimize but interrupt before commit
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("optimize"), TransactionType::kOptimizeIndex);
         Status status = txn->OptimizeTableIndexes(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
         // Don't commit - simulate interruption
@@ -536,7 +536,7 @@ TEST_P(TestTxnReplayOptimize, DISABLED_SLOW_test_optimize_interrupt) {
     CheckIndexAfterFailedOptimize(*index_name4);
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
         Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);

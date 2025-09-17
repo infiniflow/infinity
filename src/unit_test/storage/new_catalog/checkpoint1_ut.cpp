@@ -101,7 +101,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_db) {
     Status status;
     {
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
             status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -115,7 +115,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_db) {
         }
         RestartTxnMgr();
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("show"), TransactionType::kRead);
 
             std::vector<std::string> db_names;
             Status status = txn->ListDatabase(db_names);
@@ -140,7 +140,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_db) {
             status = new_txn_mgr->CommitTxn(txn2);
             EXPECT_TRUE(status.ok());
 
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
             status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -148,7 +148,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_db) {
         }
         RestartTxnMgr();
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("show"), TransactionType::kRead);
 
             std::vector<std::string> db_names;
             Status status = txn->ListDatabase(db_names);
@@ -166,7 +166,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_db) {
 
     {
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
             status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
             EXPECT_TRUE(status.ok());
 
@@ -182,7 +182,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_db) {
         }
         RestartTxnMgr();
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("show"), TransactionType::kRead);
 
             std::vector<std::string> db_names;
             Status status = txn->ListDatabase(db_names);
@@ -200,7 +200,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_db) {
 
     {
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
             status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
             EXPECT_TRUE(status.ok());
 
@@ -216,7 +216,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_db) {
         }
         RestartTxnMgr();
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("show"), TransactionType::kRead);
 
             std::vector<std::string> db_names;
             Status status = txn->ListDatabase(db_names);
@@ -236,7 +236,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_table) {
     Status status;
     {
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             status = txn->CreateTable(*db_name, table_def, ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -250,7 +250,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_table) {
         }
         RestartTxnMgr();
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("show"), TransactionType::kRead);
 
             std::vector<std::string> table_names;
             status = txn->ListTable(*db_name, table_names);
@@ -274,7 +274,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_table) {
             status = new_txn_mgr->CommitTxn(txn2);
             EXPECT_TRUE(status.ok());
 
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             status = txn->CreateTable(*db_name, table_def, ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -282,7 +282,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_table) {
         }
         RestartTxnMgr();
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("show"), TransactionType::kRead);
 
             std::vector<std::string> table_names;
             status = txn->ListTable(*db_name, table_names);
@@ -300,7 +300,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_table) {
 
     {
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             status = txn->CreateTable(*db_name, table_def, ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
 
@@ -316,7 +316,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_table) {
         }
         RestartTxnMgr();
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("show"), TransactionType::kRead);
 
             std::vector<std::string> table_names;
             status = txn->ListTable(*db_name, table_names);
@@ -334,7 +334,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_table) {
 
     {
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             status = txn->CreateTable(*db_name, table_def, ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
 
@@ -352,7 +352,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_table) {
         }
         RestartTxnMgr();
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("show"), TransactionType::kRead);
 
             std::vector<std::string> table_names;
             status = txn->ListTable(*db_name, table_names);

@@ -88,7 +88,7 @@ void CompactionProcessor::NewDoCompact() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     std::vector<std::pair<std::string, std::string>> db_table_names;
     {
-        auto *new_txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("list table for compaction"), TransactionType::kNormal);
+        auto *new_txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("list table for compaction"), TransactionType::kRead);
 
         std::vector<std::string> db_names;
         Status status = new_txn->ListDatabase(db_names);
@@ -214,7 +214,7 @@ Status CompactionProcessor::NewManualCompact(const std::string &db_name, const s
     //    LOG_TRACE(fmt::format("Compact command triggered compaction: {}.{}", db_name, table_name));
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto *new_txn =
-        new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kNormal);
+        new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kCompact);
 
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
