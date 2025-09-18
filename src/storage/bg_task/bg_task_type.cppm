@@ -27,11 +27,11 @@ namespace infinity {
 
 export enum class BGTaskType {
     kStopProcessor,
-    kNewCheckpoint,
+    kCheckpoint,
     kNotifyCompact,
-    kNewCompact,
+    kCompact,
     kNotifyOptimize,
-    kNewCleanup,
+    kCleanup,
     kUpdateSegmentBloomFilterData, // Not used
     kDumpMemIndex,
     kAppendMemIndex,

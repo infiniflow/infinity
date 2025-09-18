@@ -299,7 +299,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 Status status = Status::InvalidCommand(fmt::format("Attempt to set compact segment interval: {}", interval));
                                 RecoverableError(status);
                             }
-                            query_context->storage()->periodic_trigger_thread()->compact_segment_trigger_->UpdateInternal(interval);
+                            query_context->storage()->periodic_trigger_thread()->compact_trigger_->UpdateInternal(interval);
                             config->SetCompactInterval(interval);
                             break;
                         }

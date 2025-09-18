@@ -26,7 +26,7 @@ import global_resource_usage;
 
 namespace infinity {
 
-class NewCleanupTask;
+class CleanupTask;
 class NotifyOptimizeTask;
 class NotifyCompactTask;
 
@@ -58,16 +58,13 @@ protected:
     std::atomic_int64_t duration_{0};
 };
 
-export class NewCleanupPeriodicTrigger final : public PeriodicTrigger {
+export class CleanupPeriodicTrigger final : public PeriodicTrigger {
 public:
-    explicit NewCleanupPeriodicTrigger(const i64 interval) : PeriodicTrigger(interval) {}
+    explicit CleanupPeriodicTrigger(const i64 interval) : PeriodicTrigger(interval) {}
 
-    std::shared_ptr<NewCleanupTask> CreateNewCleanupTask();
+    std::shared_ptr<CleanupTask> CreateCleanupTask();
 
     void Trigger() override;
-
-private:
-    //
 };
 
 export class CheckpointPeriodicTrigger final : public PeriodicTrigger {
@@ -87,7 +84,7 @@ public:
     void Trigger() override;
 
 private:
-    CompactionProcessor *const compact_processor_{};
+    CompactionProcessor *compact_processor_{};
     std::shared_ptr<NotifyCompactTask> compact_task_{};
 };
 
@@ -101,7 +98,7 @@ public:
     void Trigger() override;
 
 private:
-    CompactionProcessor *const compact_processor_ = nullptr;
+    CompactionProcessor *compact_processor_{};
     std::shared_ptr<NotifyOptimizeTask> optimize_task_{};
 };
 

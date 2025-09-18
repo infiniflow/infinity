@@ -93,7 +93,7 @@ export struct CheckpointTaskBase : public BGTask {
 };
 
 export struct NewCheckpointTask final : public CheckpointTaskBase {
-    NewCheckpointTask(i64 wal_size) : CheckpointTaskBase(BGTaskType::kNewCheckpoint, false), wal_size_(wal_size) {}
+    NewCheckpointTask(i64 wal_size) : CheckpointTaskBase(BGTaskType::kCheckpoint, false), wal_size_(wal_size) {}
 
     std::string ToString() const final { return "New catalog"; }
 
@@ -104,11 +104,11 @@ export struct NewCheckpointTask final : public CheckpointTaskBase {
     i64 wal_size_{};
 };
 
-export class NewCleanupTask final : public BGTask {
+export class CleanupTask final : public BGTask {
 public:
-    NewCleanupTask() : BGTask(BGTaskType::kNewCleanup, false) {}
+    CleanupTask() : BGTask(BGTaskType::kCleanup, false) {}
 
-    std::string ToString() const override { return "NewCleanupTask"; }
+    std::string ToString() const override { return "CleanupTask"; }
 
     Status Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_cleanup_ts);
 

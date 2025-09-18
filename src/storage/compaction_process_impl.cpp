@@ -327,7 +327,7 @@ void CompactionProcessor::Process() {
                     running = false;
                     break;
                 }
-                case BGTaskType::kNewCompact: {
+                case BGTaskType::kCompact: {
                     // Triggered by compact command
                     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
                     if (storage_mode == StorageMode::kUnInitialized) {

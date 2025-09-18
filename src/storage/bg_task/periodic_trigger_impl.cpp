@@ -45,7 +45,7 @@ bool PeriodicTrigger::Check() {
     return true;
 }
 
-std::shared_ptr<NewCleanupTask> NewCleanupPeriodicTrigger::CreateNewCleanupTask() {
+std::shared_ptr<CleanupTask> CleanupPeriodicTrigger::CreateCleanupTask() {
     auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
@@ -55,11 +55,11 @@ std::shared_ptr<NewCleanupTask> NewCleanupPeriodicTrigger::CreateNewCleanupTask(
         return nullptr;
     }
 
-    return std::make_shared<NewCleanupTask>();
+    return std::make_shared<CleanupTask>();
 }
 
-void NewCleanupPeriodicTrigger::Trigger() {
-    auto cleanup_task = CreateNewCleanupTask();
+void CleanupPeriodicTrigger::Trigger() {
+    auto cleanup_task = CreateCleanupTask();
     if (!cleanup_task) {
         return;
     }

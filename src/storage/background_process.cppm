@@ -18,7 +18,6 @@ import :blocking_queue;
 
 namespace infinity {
 
-class CleanupPeriodicTrigger;
 class BGTask;
 
 export class BGTaskProcessor {
