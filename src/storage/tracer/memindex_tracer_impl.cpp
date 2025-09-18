@@ -44,7 +44,7 @@ void MemIndexTracer::InitMemUsed() {
     size_t cur_index_memory = 0;
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     std::shared_ptr<NewTxn> new_txn_shared =
-        new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("Init mem index tracer"), TransactionType::kNormal);
+        new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("Init mem index tracer"), TransactionType::kRead);
     std::vector<std::shared_ptr<MemIndexDetail>> mem_index_details = GetAllMemIndexes(new_txn_shared.get());
     for (auto &mem_index_detail : mem_index_details) {
         if (mem_index_detail->is_emvb_index_) {
@@ -105,7 +105,7 @@ void MemIndexTracer::DumpDone(std::shared_ptr<MemIndex> mem_index) {
 std::vector<std::shared_ptr<DumpMemIndexTask>> MemIndexTracer::MakeDumpTask() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     std::shared_ptr<NewTxn> new_txn_shared =
-        new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("Get all mem indexes"), TransactionType::kNormal);
+        new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("Get all mem indexes"), TransactionType::kRead);
 
     std::vector<std::shared_ptr<MemIndexDetail>> mem_index_details = GetAllMemIndexes(new_txn_shared.get());
     // Generate dump task for all EMVB index and at most one non-EMVB index
@@ -161,7 +161,7 @@ NewTxn *BGMemIndexTracer::GetTxn() {
     if (!txn_mgr_) {
         return nullptr;
     }
-    NewTxn *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("Dump index"), TransactionType::kNormal);
+    NewTxn *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("Dump index"), TransactionType::kDumpMemIndex);
     return txn;
 }
 

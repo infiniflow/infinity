@@ -40,7 +40,7 @@ public:
 
     void NotAllowEnqueue() { allow_enqueue_ = false; }
 
-    bool Enqueue(T &task) {
+    bool Enqueue(const T &task) {
         {
             if (!allow_enqueue_) {
                 return false;

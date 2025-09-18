@@ -136,14 +136,7 @@ TEST_P(TestTxnCleanupRollbackTxn, test_import_with_index_rollback_cleanup) {
     auto index_name2 = std::make_shared<String>("index2");
     auto index_def2 = IndexFullText::Make(index_name2, std::make_shared<String>(), "file_name", {column_def2->name()}, {});
     {
-        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<String>("create db"), TransactionType::kNormal);
-        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<String>());
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr_->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<String>("create db"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
@@ -151,7 +144,7 @@ TEST_P(TestTxnCleanupRollbackTxn, test_import_with_index_rollback_cleanup) {
     }
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
         auto *txn =
-            new_txn_mgr_->BeginTxn(std::make_unique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+            new_txn_mgr_->BeginTxn(std::make_unique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
@@ -187,12 +180,12 @@ TEST_P(TestTxnCleanupRollbackTxn, test_import_with_index_rollback_cleanup) {
     };
 
     {
-        auto *txn_import = new_txn_mgr_->BeginTxn(std::make_unique<String>("import"), TransactionType::kNormal);
+        auto *txn_import = new_txn_mgr_->BeginTxn(std::make_unique<String>("import"), TransactionType::kImport);
         Vector<std::shared_ptr<DataBlock>> input_blocks = {make_input_block()};
         Status status = txn_import->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
 
-        auto *txn_drop_db = new_txn_mgr_->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kNormal);
+        auto *txn_drop_db = new_txn_mgr_->BeginTxn(std::make_unique<String>("drop db"), TransactionType::kDropDB);
         status = txn_drop_db->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn_drop_db);

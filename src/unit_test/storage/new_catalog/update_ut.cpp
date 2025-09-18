@@ -82,7 +82,7 @@ struct TestSetup {
     }
 
     void verify_original_data() {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("verify"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -127,7 +127,7 @@ struct TestSetup {
     }
 
     void verify_data_after_delete_conflict() {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("verify"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -176,7 +176,7 @@ struct TestSetup {
     }
 
     void check_data() {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -232,7 +232,7 @@ struct TestSetup {
     }
 
     void check_data_no_conflicts() {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -281,14 +281,14 @@ struct TestSetup {
 
 void CreateDatabaseAndTable(TestSetup &setup) {
     // Create database
-    auto *txn1 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+    auto *txn1 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
     Status status = txn1->CreateDatabase(*setup.db_name, ConflictType::kError, std::make_shared<std::string>());
     EXPECT_TRUE(status.ok());
     status = setup.new_txn_mgr->CommitTxn(txn1);
     EXPECT_TRUE(status.ok());
 
     // Create table
-    auto *txn2 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+    auto *txn2 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
     status = txn2->CreateTable(*setup.db_name, std::move(setup.table_def), ConflictType::kIgnore);
     EXPECT_TRUE(status.ok());
     status = setup.new_txn_mgr->CommitTxn(txn2);
@@ -296,7 +296,7 @@ void CreateDatabaseAndTable(TestSetup &setup) {
 }
 
 void AppendData(TestSetup &setup, const std::shared_ptr<DataBlock> &input_block) {
-    auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+    auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
     Status status = txn->Append(*setup.db_name, *setup.table_name, input_block);
     EXPECT_TRUE(status.ok());
     status = setup.new_txn_mgr->CommitTxn(txn);
@@ -304,7 +304,7 @@ void AppendData(TestSetup &setup, const std::shared_ptr<DataBlock> &input_block)
 }
 
 void CreateIndex(TestSetup &setup) {
-    auto *txn_idx = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kNormal);
+    auto *txn_idx = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kCreateIndex);
     auto index_def1 = IndexSecondary::Make(setup.index_name, std::make_shared<std::string>(), "file_name", {setup.column_def1->name()});
     Status status = txn_idx->CreateIndex(*setup.db_name, *setup.table_name, index_def1, ConflictType::kError);
     EXPECT_TRUE(status.ok());
@@ -313,7 +313,7 @@ void CreateIndex(TestSetup &setup) {
 }
 
 void DropDatabase(TestSetup &setup) {
-    auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+    auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
     Status status = txn->DropDatabase(*setup.db_name, ConflictType::kError);
     EXPECT_TRUE(status.ok());
     status = setup.new_txn_mgr->CommitTxn(txn);
@@ -321,7 +321,7 @@ void DropDatabase(TestSetup &setup) {
 }
 
 void DropTable(TestSetup &setup) {
-    auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+    auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
     Status status = txn->DropTable(*setup.db_name, *setup.table_name, ConflictType::kError);
     EXPECT_TRUE(status.ok());
     status = setup.new_txn_mgr->CommitTxn(txn);
@@ -329,7 +329,7 @@ void DropTable(TestSetup &setup) {
 }
 
 void DropIndex(TestSetup &setup) {
-    auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kNormal);
+    auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kDropIndex);
     Status status = txn->DropIndexByName(*setup.db_name, *setup.table_name, *setup.index_name, ConflictType::kError);
     EXPECT_TRUE(status.ok());
     status = setup.new_txn_mgr->CommitTxn(txn);
@@ -337,7 +337,7 @@ void DropIndex(TestSetup &setup) {
 }
 
 void DumpIndex(TestSetup &setup) {
-    auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index"), TransactionType::kNormal);
+    auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump index"), TransactionType::kDumpMemIndex);
     Status status = txn->DumpMemIndex(*setup.db_name, *setup.table_name, *setup.index_name);
     EXPECT_TRUE(status.ok());
     status = setup.new_txn_mgr->CommitTxn(txn);
@@ -372,7 +372,7 @@ TEST_P(TestTxnUpdate, test_update) {
     }
 
     for (int i = 0; i < 2; ++i) {
-        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
         Status status = txn->Append(*setup.db_name, *setup.table_name, input_block);
         EXPECT_TRUE(status.ok());
         status = setup.new_txn_mgr->CommitTxn(txn);
@@ -401,7 +401,7 @@ TEST_P(TestTxnUpdate, test_update) {
     }
 
     {
-        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         row_ids.push_back(RowID(0, 1));
         row_ids.push_back(RowID(0, 3));
@@ -413,7 +413,7 @@ TEST_P(TestTxnUpdate, test_update) {
 
     // Check data
     {
-        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -457,7 +457,7 @@ TEST_P(TestTxnUpdate, test_update) {
     }
 
     {
-        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         row_ids.push_back(RowID(0, 0));
         Status status = txn->Update(*setup.db_name, *setup.table_name, update_block, row_ids);
@@ -496,7 +496,7 @@ TEST_P(TestTxnUpdate, test_update_multiple_blocks) {
     };
 
     auto append = [&] {
-        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
         auto input_block = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
         Status status = txn->Append(*setup.db_name, *setup.table_name, input_block);
         EXPECT_TRUE(status.ok());
@@ -511,7 +511,7 @@ TEST_P(TestTxnUpdate, test_update_multiple_blocks) {
     auto update_block = make_input_block(Value::MakeInt(999), Value::MakeVarchar("updated_value"), 8192);
 
     {
-        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 2 * 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -524,7 +524,7 @@ TEST_P(TestTxnUpdate, test_update_multiple_blocks) {
 
     // Check data
     {
-        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        auto *txn = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
@@ -637,7 +637,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_db) {
         CreateDatabaseAndTable(setup);
         AppendData(setup, input_block1);
 
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -652,7 +652,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_db) {
         DropDatabase(setup);
 
         // Check the updated data.
-        auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
         TxnTimeStamp create_timestamp;
@@ -670,7 +670,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_db) {
         CreateDatabaseAndTable(setup);
         AppendData(setup, input_block1);
 
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -679,7 +679,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
 
         status = setup.new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -692,7 +692,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         // Check the updated data.
-        auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
         TxnTimeStamp create_timestamp;
@@ -710,7 +710,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_db) {
         CreateDatabaseAndTable(setup);
         AppendData(setup, input_block1);
 
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -724,7 +724,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_db) {
         EXPECT_FALSE(status.ok());
 
         // Check the updated data.
-        auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
         TxnTimeStamp create_timestamp;
@@ -794,7 +794,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_table) {
         CreateDatabaseAndTable(setup);
         AppendData(setup, input_block1);
 
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -809,7 +809,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_table) {
         DropTable(setup);
 
         // Check the updated data.
-        auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
         TxnTimeStamp create_timestamp;
@@ -829,7 +829,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_table) {
         CreateDatabaseAndTable(setup);
         AppendData(setup, input_block1);
 
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -838,7 +838,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // drop table
-        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
 
         status = setup.new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -851,7 +851,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // Check the updated data.
-        auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
         TxnTimeStamp create_timestamp;
@@ -871,7 +871,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_table) {
         CreateDatabaseAndTable(setup);
         AppendData(setup, input_block1);
 
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -885,7 +885,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_table) {
         EXPECT_FALSE(status.ok());
 
         // Check the updated data.
-        auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
         TxnTimeStamp create_timestamp;
@@ -905,7 +905,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_table) {
         CreateDatabaseAndTable(setup);
         AppendData(setup, input_block1);
 
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
 
         DropTable(setup);
 
@@ -919,7 +919,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_table) {
         EXPECT_FALSE(status.ok());
 
         // Check the updated data.
-        auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
         TxnTimeStamp create_timestamp;
@@ -995,7 +995,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_index) {
         AppendData(setup, input_block1);
 
         // Update data
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -1006,7 +1006,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         // Drop index
-        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kNormal);
+        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kDropIndex);
         status = txn5->DropIndexByName(*setup.db_name, *setup.table_name, *setup.index_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = setup.new_txn_mgr->CommitTxn(txn5);
@@ -1028,7 +1028,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_index) {
         AppendData(setup, input_block1);
 
         // Update data
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -1037,7 +1037,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         // Drop index
-        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kNormal);
+        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kDropIndex);
 
         status = setup.new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -1063,7 +1063,7 @@ TEST_P(TestTxnUpdate, test_update_and_drop_index) {
         AppendData(setup, input_block1);
 
         // Update data
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -1146,7 +1146,7 @@ TEST_P(TestTxnUpdate, test_update_and_dump_index) {
         AppendData(setup, input_block1);
 
         // Update data
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -1175,7 +1175,7 @@ TEST_P(TestTxnUpdate, test_update_and_dump_index) {
         AppendData(setup, input_block1);
 
         // Update data
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -1183,7 +1183,7 @@ TEST_P(TestTxnUpdate, test_update_and_dump_index) {
         Status status = txn4->Update(*setup.db_name, *setup.table_name, update_block, row_ids);
         EXPECT_TRUE(status.ok());
 
-        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump_index"), TransactionType::kNormal);
+        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("dump_index"), TransactionType::kDumpMemIndex);
 
         status = setup.new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -1266,7 +1266,7 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
         AppendData(setup, input_block1);
 
         // Update data
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -1275,7 +1275,7 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
         EXPECT_TRUE(status.ok());
 
         // Add column in another transaction
-        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("add_column"), TransactionType::kNormal);
+        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("add_column"), TransactionType::kAddColumn);
         auto new_column_def =
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
         status = txn5->AddColumns(*setup.db_name, *setup.table_name, std::vector<std::shared_ptr<ColumnDef>>{new_column_def});
@@ -1302,7 +1302,7 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
         AppendData(setup, input_block1);
 
         // Update data
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -1311,7 +1311,7 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
         EXPECT_TRUE(status.ok());
 
         // Drop column in another transaction
-        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop_column"), TransactionType::kNormal);
+        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop_column"), TransactionType::kDropColumn);
         status = txn5->DropColumns(*setup.db_name, *setup.table_name, std::vector<std::string>{"col2"});
         EXPECT_TRUE(status.ok());
         status = setup.new_txn_mgr->CommitTxn(txn5);
@@ -1336,7 +1336,7 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
         AppendData(setup, input_block1);
 
         // Update data first
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -1345,7 +1345,7 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
         EXPECT_TRUE(status.ok());
 
         // Add column later - should fail due to update already committed
-        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("add_column"), TransactionType::kNormal);
+        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("add_column"), TransactionType::kAddColumn);
         auto new_column_def =
             std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
 
@@ -1361,7 +1361,7 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
         setup.check_data();
 
         // Verify that the column was not added
-        auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("verify"), TransactionType::kNormal);
+        auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
         TxnTimeStamp create_timestamp;
@@ -1389,7 +1389,7 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
         AppendData(setup, input_block1);
 
         // Update data first
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -1398,7 +1398,7 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
         EXPECT_TRUE(status.ok());
 
         // Drop column later - should fail due to update already committed
-        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop_column"), TransactionType::kNormal);
+        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop_column"), TransactionType::kDropColumn);
 
         // Commit the update transaction first
         status = setup.new_txn_mgr->CommitTxn(txn4);
@@ -1413,7 +1413,7 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
         setup.check_data();
 
         // Verify that the column was not dropped
-        auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("verify"), TransactionType::kNormal);
+        auto *txn7 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
         TxnTimeStamp create_timestamp;
@@ -1496,7 +1496,7 @@ TEST_P(TestTxnUpdate, test_update_and_compact_conflicts) {
         AppendData(setup, input_block1);
 
         // Update data
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -1505,7 +1505,7 @@ TEST_P(TestTxnUpdate, test_update_and_compact_conflicts) {
         EXPECT_TRUE(status.ok());
 
         // Compact table in another transaction
-        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kNormal);
+        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
         status = txn5->Compact(*setup.db_name, *setup.table_name, std::vector<SegmentID>{0});
         EXPECT_TRUE(status.ok());
         status = setup.new_txn_mgr->CommitTxn(txn5);
@@ -1531,12 +1531,12 @@ TEST_P(TestTxnUpdate, test_update_and_compact_conflicts) {
         AppendData(setup, input_block1);
 
         // Compact table
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
         Status status = txn4->Compact(*setup.db_name, *setup.table_name, std::vector<SegmentID>{0});
         EXPECT_TRUE(status.ok());
 
         // Update data in another transaction
-        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -1619,7 +1619,7 @@ TEST_P(TestTxnUpdate, test_update_and_create_index_conflicts) {
         AppendData(setup, input_block1);
 
         // Update data
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -1628,7 +1628,7 @@ TEST_P(TestTxnUpdate, test_update_and_create_index_conflicts) {
         EXPECT_TRUE(status.ok());
 
         // Create index in another transaction
-        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("create_index"), TransactionType::kNormal);
+        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("create_index"), TransactionType::kCreateIndex);
         auto index_def = IndexSecondary::Make(setup.index_name, std::make_shared<std::string>(), "file_name", {setup.column_def1->name()});
         status = txn5->CreateIndex(*setup.db_name, *setup.table_name, index_def, ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -1655,13 +1655,13 @@ TEST_P(TestTxnUpdate, test_update_and_create_index_conflicts) {
         AppendData(setup, input_block1);
 
         // Create index
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("create_index"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("create_index"), TransactionType::kCreateIndex);
         auto index_def = IndexSecondary::Make(setup.index_name, std::make_shared<std::string>(), "file_name", {setup.column_def1->name()});
         Status status = txn4->CreateIndex(*setup.db_name, *setup.table_name, index_def, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
         // Update data in another transaction
-        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -1745,7 +1745,7 @@ TEST_P(TestTxnUpdate, test_update_and_delete_conflicts) {
         AppendData(setup, input_block1);
 
         // Update data
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -1754,7 +1754,7 @@ TEST_P(TestTxnUpdate, test_update_and_delete_conflicts) {
         EXPECT_TRUE(status.ok());
 
         // Delete the same rows in another transaction
-        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kNormal);
+        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
         status = txn5->Delete(*setup.db_name, *setup.table_name, row_ids);
         EXPECT_TRUE(status.ok());
         status = setup.new_txn_mgr->CommitTxn(txn5);
@@ -1780,7 +1780,7 @@ TEST_P(TestTxnUpdate, test_update_and_delete_conflicts) {
         AppendData(setup, input_block1);
 
         // Delete data
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
@@ -1789,7 +1789,7 @@ TEST_P(TestTxnUpdate, test_update_and_delete_conflicts) {
         EXPECT_TRUE(status.ok());
 
         // Update the same rows in another transaction
-        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         status = txn5->Update(*setup.db_name, *setup.table_name, update_block, row_ids);
         EXPECT_TRUE(status.ok());
         status = setup.new_txn_mgr->CommitTxn(txn5);
@@ -1815,14 +1815,14 @@ TEST_P(TestTxnUpdate, test_update_and_delete_conflicts) {
         AppendData(setup, input_block1);
 
         // Delete data
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
         std::vector<RowID> row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             row_ids.push_back(RowID(0, row_id));
         }
 
         // Update the same rows in another transaction
-        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         Status status = txn5->Update(*setup.db_name, *setup.table_name, update_block, row_ids);
         EXPECT_TRUE(status.ok());
 
@@ -1906,7 +1906,7 @@ TEST_P(TestTxnUpdate, test_update_and_delete_no_conflicts) {
         AppendData(setup, input_block1);
 
         // Update odd-numbered rows
-        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kNormal);
+        auto *txn4 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("update"), TransactionType::kUpdate);
         std::vector<RowID> update_row_ids;
         for (size_t row_id = 1; row_id < 8192; row_id += 2) {
             update_row_ids.push_back(RowID(0, row_id));
@@ -1915,7 +1915,7 @@ TEST_P(TestTxnUpdate, test_update_and_delete_no_conflicts) {
         EXPECT_TRUE(status.ok());
 
         // Delete even-numbered rows (different from update)
-        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kNormal);
+        auto *txn5 = setup.new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
         std::vector<RowID> delete_row_ids;
         for (size_t row_id = 0; row_id < 8192; row_id += 2) {
             delete_row_ids.push_back(RowID(0, row_id));

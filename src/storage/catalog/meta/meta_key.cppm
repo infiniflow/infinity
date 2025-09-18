@@ -37,7 +37,7 @@ export struct MetaKey {
 };
 // class ColumnDef;
 
-export struct DBMetaKey final : public MetaKey {
+export struct DBMetaKey final : MetaKey {
     DBMetaKey(std::string db_id_str, std::string db_name) : MetaKey(MetaType::kDB), db_id_str_(std::move(db_id_str)), db_name_(std::move(db_name)) {}
 
     DBMetaKey(std::string db_id_str, std::string db_name, TxnTimeStamp commit_ts)
@@ -51,7 +51,7 @@ export struct DBMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct DBTagMetaKey final : public MetaKey {
+export struct DBTagMetaKey final : MetaKey {
     DBTagMetaKey(std::string db_id_str, std::string tag_name)
         : MetaKey(MetaType::kDBTag), db_id_str_(std::move(db_id_str)), tag_name_(std::move(tag_name)) {}
 
@@ -63,7 +63,7 @@ export struct DBTagMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct TableMetaKey final : public MetaKey {
+export struct TableMetaKey final : MetaKey {
     TableMetaKey(std::string db_id_str, std::string table_id_str, const std::string &table_name)
         : MetaKey(MetaType::kTable), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), table_name_(std::move(table_name)) {}
 
@@ -76,7 +76,7 @@ export struct TableMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct TableNameMetaKey final : public MetaKey {
+export struct TableNameMetaKey final : MetaKey {
     TableNameMetaKey(std::string db_id_str, std::string table_id_str, const std::string &table_name)
         : MetaKey(MetaType::kTableName), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
           table_name_(std::move(table_name)) {}
@@ -90,7 +90,7 @@ export struct TableNameMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct TableColumnMetaKey final : public MetaKey {
+export struct TableColumnMetaKey final : MetaKey {
     TableColumnMetaKey(std::string db_id_str, std::string table_id_str, std::string column_name)
         : MetaKey(MetaType::kTableColumn), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
           column_name_(std::move(column_name)) {}
@@ -105,7 +105,7 @@ export struct TableColumnMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct TableTagMetaKey final : public MetaKey {
+export struct TableTagMetaKey final : MetaKey {
     TableTagMetaKey(std::string db_id_str, std::string table_id_str, std::string tag_name)
         : MetaKey(MetaType::kTableTag), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), tag_name_(std::move(tag_name)) {}
 
@@ -118,7 +118,7 @@ export struct TableTagMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct SegmentMetaKey final : public MetaKey {
+export struct SegmentMetaKey final : MetaKey {
     SegmentMetaKey(std::string db_id_str, std::string table_id_str, SegmentID segment_id)
         : MetaKey(MetaType::kSegment), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id) {}
 
@@ -131,7 +131,7 @@ export struct SegmentMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct SegmentTagMetaKey final : public MetaKey {
+export struct SegmentTagMetaKey final : MetaKey {
     SegmentTagMetaKey(std::string db_id_str, std::string table_id_str, SegmentID segment_id, std::string tag_name)
         : MetaKey(MetaType::kSegmentTag), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id),
           tag_name_(std::move(tag_name)) {}
@@ -146,7 +146,7 @@ export struct SegmentTagMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct BlockMetaKey final : public MetaKey {
+export struct BlockMetaKey final : MetaKey {
     BlockMetaKey(std::string db_id_str, std::string table_id_str, SegmentID segment_id, BlockID block_id)
         : MetaKey(MetaType::kBlock), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id),
           block_id_(block_id) {}
@@ -161,7 +161,7 @@ export struct BlockMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct BlockTagMetaKey final : public MetaKey {
+export struct BlockTagMetaKey final : MetaKey {
     BlockTagMetaKey(std::string db_id_str, std::string table_id_str, SegmentID segment_id, BlockID block_id, std::string tag_name)
         : MetaKey(MetaType::kBlockTag), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id),
           block_id_(block_id), tag_name_(std::move(tag_name)) {}
@@ -177,7 +177,7 @@ export struct BlockTagMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct ColumnMetaKey final : public MetaKey {
+export struct ColumnMetaKey final : MetaKey {
     ColumnMetaKey(std::string db_id_str, std::string table_id_str, SegmentID segment_id, BlockID block_id, std::shared_ptr<ColumnDef> column_def);
 
     ~ColumnMetaKey() override;
@@ -192,7 +192,7 @@ export struct ColumnMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct TableIndexMetaKey final : public MetaKey {
+export struct TableIndexMetaKey final : MetaKey {
     TableIndexMetaKey(std::string db_id_str, std::string table_id_str, std::string index_id_str, std::string index_name)
         : MetaKey(MetaType::kTableIndex), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
           index_id_str_(std::move(index_id_str)), index_name_(std::move(index_name)) {}
@@ -207,7 +207,7 @@ export struct TableIndexMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct TableIndexTagMetaKey final : public MetaKey {
+export struct TableIndexTagMetaKey final : MetaKey {
     TableIndexTagMetaKey(std::string db_id_str, std::string table_id_str, std::string index_id_str, std::string tag_name)
         : MetaKey(MetaType::kTableIndexTag), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
           index_id_str_(std::move(index_id_str)), tag_name_(std::move(tag_name)) {}
@@ -222,7 +222,7 @@ export struct TableIndexTagMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct SegmentIndexMetaKey final : public MetaKey {
+export struct SegmentIndexMetaKey final : MetaKey {
     SegmentIndexMetaKey(std::string db_id_str, std::string table_id_str, std::string index_id_str, SegmentID segment_id)
         : MetaKey(MetaType::kSegmentIndex), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
           index_id_str_(std::move(index_id_str)), segment_id_(segment_id) {}
@@ -237,7 +237,7 @@ export struct SegmentIndexMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct SegmentIndexTagMetaKey final : public MetaKey {
+export struct SegmentIndexTagMetaKey final : MetaKey {
     SegmentIndexTagMetaKey(std::string db_id_str, std::string table_id_str, std::string index_id_str, SegmentID segment_id, std::string tag_name)
         : MetaKey(MetaType::kSegmentIndexTag), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
           index_id_str_(std::move(index_id_str)), segment_id_(segment_id), tag_name_(std::move(tag_name)) {}
@@ -253,7 +253,7 @@ export struct SegmentIndexTagMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct ChunkIndexMetaKey final : public MetaKey {
+export struct ChunkIndexMetaKey final : MetaKey {
     ChunkIndexMetaKey(std::string db_id_str, std::string table_id_str, std::string index_id_str, SegmentID segment_id, ChunkID chunk_id)
         : MetaKey(MetaType::kChunkIndex), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
           index_id_str_(std::move(index_id_str)), segment_id_(segment_id), chunk_id_(chunk_id) {}
@@ -269,7 +269,7 @@ export struct ChunkIndexMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct ChunkIndexTagMetaKey final : public MetaKey {
+export struct ChunkIndexTagMetaKey final : MetaKey {
     ChunkIndexTagMetaKey(std::string db_id_str,
                          std::string table_id_str,
                          std::string index_id_str,
@@ -291,7 +291,7 @@ export struct ChunkIndexTagMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct PmObjectMetaKey final : public MetaKey {
+export struct PmObjectMetaKey final : MetaKey {
     PmObjectMetaKey(std::string path_key) : MetaKey(MetaType::kPmObject), path_key_(std::move(path_key)) {}
 
     std::string path_key_{};
@@ -301,7 +301,7 @@ export struct PmObjectMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct PmStatMetaKey final : public MetaKey {
+export struct PmStatMetaKey final : MetaKey {
     PmStatMetaKey(std::string object_key) : MetaKey(MetaType::kPmStat), object_key_(std::move(object_key)) {}
 
     std::string object_key_{};
@@ -311,7 +311,7 @@ export struct PmStatMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct DropMetaKey final : public MetaKey {
+export struct DropMetaKey final : MetaKey {
     DropMetaKey(std::string scope, std::string object_key) : MetaKey(MetaType::kDrop), scope_(std::move(scope)), object_key_(std::move(object_key)) {}
 
     std::string scope_{};
@@ -322,7 +322,7 @@ export struct DropMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct SystemTagMetaKey final : public MetaKey {
+export struct SystemTagMetaKey final : MetaKey {
     SystemTagMetaKey(std::string tag_name) : MetaKey(MetaType::kSystemTag), tag_name_(std::move(tag_name)) {}
 
     std::string tag_name_{};

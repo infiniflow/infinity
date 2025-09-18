@@ -34,24 +34,24 @@ std::string ToString(BGTaskType type) {
             return "StopProcessor";
             break;
         }
-        case BGTaskType::kNewCheckpoint: {
-            return "NewCheckpoint";
+        case BGTaskType::kCheckpoint: {
+            return "Checkpoint";
             break;
         }
         case BGTaskType::kNotifyCompact: {
             return "NotifyCompact";
             break;
         }
-        case BGTaskType::kNewCompact: {
-            return "NewCompact";
+        case BGTaskType::kCompact: {
+            return "Compact";
             break;
         }
         case BGTaskType::kNotifyOptimize: {
             return "NotifyOptimize";
             break;
         }
-        case BGTaskType::kNewCleanup: {
-            return "NewCleanup";
+        case BGTaskType::kCleanup: {
+            return "Cleanup";
             break;
         }
         case BGTaskType::kUpdateSegmentBloomFilterData: {

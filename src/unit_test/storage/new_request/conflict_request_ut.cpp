@@ -55,7 +55,7 @@ public:
 
     size_t GetRowCount() {
         auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
         auto begin_ts = txn->BeginTS();
         auto commit_ts = txn->CommitTS();
 

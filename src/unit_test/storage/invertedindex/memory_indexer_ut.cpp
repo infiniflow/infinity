@@ -87,21 +87,21 @@ public:
         std::vector<InitParameter *> index_param_list;
         auto index_base = IndexFullText::Make(index_name, std::make_shared<std::string>(), "file_name", {column_def1->name()}, index_param_list);
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
             Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kCreateIndex);
             Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -145,8 +145,10 @@ public:
             std::string table_key;
             std::string index_key;
             auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dummy"), TransactionType::kNormal);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dummy"), TransactionType::kRead);
             Status status = txn->GetTableIndexMeta("db1", "tb1", "idx1", db_meta_, table_meta_, index_meta_, &table_key, &index_key);
+            EXPECT_TRUE(status.ok());
+            status = txn->Commit();
             EXPECT_TRUE(status.ok());
         }
         ColumnIndexReader reader;
@@ -192,7 +194,7 @@ TEST_P(MemoryIndexerTest, Chunk) {
     auto table_name = std::make_shared<std::string>("tb1");
     std::vector<std::shared_ptr<DataBlock>> blocks = {MakeInputBlock(wiki_paragraphs_)};
 
-    auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kNormal);
+    auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kImport);
     Status status = txn->Import(*db_name, *table_name, blocks);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
@@ -210,7 +212,7 @@ TEST_P(MemoryIndexerTest, DISABLED_SLOW_Memory) {
     std::vector<std::shared_ptr<DataBlock>> blocks = {MakeInputBlock(paragraphs1), MakeInputBlock(paragraphs2)};
 
     for (size_t i = 0; i < blocks.size(); ++i) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
         Status status = txn->Append(*db_name, *table_name, blocks[i]);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);

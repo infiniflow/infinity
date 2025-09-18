@@ -367,15 +367,15 @@ Status Storage::AdminToWriter() {
     periodic_trigger_thread_ = std::make_unique<PeriodicTriggerThread>();
 
     i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
-    periodic_trigger_thread_->new_cleanup_trigger_ = std::make_shared<NewCleanupPeriodicTrigger>(cleanup_interval);
+    periodic_trigger_thread_->new_cleanup_trigger_ = std::make_shared<CleanupPeriodicTrigger>(cleanup_interval);
 
     i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
-    periodic_trigger_thread_->optimize_index_trigger_ = std::make_shared<OptimizeIndexPeriodicTrigger>(optimize_interval);
+    periodic_trigger_thread_->optimize_index_trigger_ = std::make_shared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
 
     i64 checkpoint_interval_sec = config_ptr_->CheckpointInterval() > 0 ? config_ptr_->CheckpointInterval() : 0;
     periodic_trigger_thread_->checkpoint_trigger_ = std::make_shared<CheckpointPeriodicTrigger>(checkpoint_interval_sec);
 
-    periodic_trigger_thread_->compact_segment_trigger_ = std::make_shared<CompactSegmentPeriodicTrigger>(compact_interval);
+    periodic_trigger_thread_->compact_trigger_ = std::make_shared<CompactPeriodicTrigger>(compact_interval, compact_processor_.get());
 
     periodic_trigger_thread_->Start();
 
@@ -506,7 +506,7 @@ Status Storage::ReaderToWriter() {
     //                i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
     i64 checkpoint_interval_sec = config_ptr_->CheckpointInterval() > 0 ? config_ptr_->CheckpointInterval() : 0;
     periodic_trigger_thread_->checkpoint_trigger_ = std::make_shared<CheckpointPeriodicTrigger>(checkpoint_interval_sec);
-    periodic_trigger_thread_->compact_segment_trigger_ = std::make_shared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
+    periodic_trigger_thread_->compact_trigger_ = std::make_shared<CompactPeriodicTrigger>(compact_interval, compact_processor_.get());
     periodic_trigger_thread_->optimize_index_trigger_ = std::make_shared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
     periodic_trigger_thread_->Start();
 
@@ -604,7 +604,7 @@ Status Storage::WriterToReader() {
     i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
 
     periodic_trigger_thread_ = std::make_unique<PeriodicTriggerThread>();
-    periodic_trigger_thread_->new_cleanup_trigger_ = std::make_shared<NewCleanupPeriodicTrigger>(cleanup_interval);
+    periodic_trigger_thread_->new_cleanup_trigger_ = std::make_shared<CleanupPeriodicTrigger>(cleanup_interval);
 
     periodic_trigger_thread_->Start();
 
@@ -821,7 +821,7 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
     periodic_trigger_thread_ = std::make_unique<PeriodicTriggerThread>();
 
     i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
-    periodic_trigger_thread_->new_cleanup_trigger_ = std::make_shared<NewCleanupPeriodicTrigger>(cleanup_interval);
+    periodic_trigger_thread_->new_cleanup_trigger_ = std::make_shared<CleanupPeriodicTrigger>(cleanup_interval);
 
     periodic_trigger_thread_->Start();
     reader_init_phase_ = ReaderInitPhase::kPhase2;
@@ -849,7 +849,7 @@ void Storage::AttachCatalog(TxnTimeStamp checkpoint_ts) {
 }
 
 void Storage::RecoverMemIndex() {
-    //    NewTxn *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("recover mem index"), TransactionType::kNormal);
+    //    NewTxn *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("recover mem index"), TransactionType::kInvalid);
     //    txn->SetReplay(true);
     //    Status status = NewCatalog::MemIndexRecover(txn);
     //    if (!status.ok()) {
@@ -871,7 +871,7 @@ void Storage::RecoverMemIndex() {
 }
 
 void Storage::CreateDefaultDB() {
-    NewTxn *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create default_db"), TransactionType::kNormal);
+    NewTxn *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create default_db"), TransactionType::kCreateDB);
     Status status = txn->CreateDatabase("default_db", ConflictType::kError, std::make_shared<std::string>());
     if (!status.ok()) {
         if (status.code_ == ErrorCode::kDuplicateDatabaseName) {

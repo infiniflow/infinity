@@ -50,7 +50,7 @@ export struct BGTask {
     bool async_{false};
 
     bool complete_{false};
-    std::mutex mutex_{};
+    mutable std::mutex mutex_{};
     std::condition_variable cv_{};
 
     void Wait() {
@@ -68,6 +68,11 @@ export struct BGTask {
         std::unique_lock<std::mutex> locker(mutex_);
         complete_ = true;
         cv_.notify_one();
+    }
+
+    bool IsComplete() const {
+        std::unique_lock<std::mutex> locker(mutex_);
+        return complete_;
     }
 
     Status result_status_{};
@@ -88,7 +93,7 @@ export struct CheckpointTaskBase : public BGTask {
 };
 
 export struct NewCheckpointTask final : public CheckpointTaskBase {
-    NewCheckpointTask(i64 wal_size) : CheckpointTaskBase(BGTaskType::kNewCheckpoint, false), wal_size_(wal_size) {}
+    NewCheckpointTask(i64 wal_size) : CheckpointTaskBase(BGTaskType::kCheckpoint, false), wal_size_(wal_size) {}
 
     std::string ToString() const final { return "New catalog"; }
 
@@ -99,11 +104,11 @@ export struct NewCheckpointTask final : public CheckpointTaskBase {
     i64 wal_size_{};
 };
 
-export class NewCleanupTask final : public BGTask {
+export class CleanupTask final : public BGTask {
 public:
-    NewCleanupTask() : BGTask(BGTaskType::kNewCleanup, false) {}
+    CleanupTask() : BGTask(BGTaskType::kCleanup, false) {}
 
-    std::string ToString() const override { return "NewCleanupTask"; }
+    std::string ToString() const override { return "CleanupTask"; }
 
     Status Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_cleanup_ts);
 
@@ -132,14 +137,11 @@ public:
 
 export class NotifyOptimizeTask final : public BGTask {
 public:
-    NotifyOptimizeTask(bool new_optimize = false) : BGTask(BGTaskType::kNotifyOptimize, true), new_optimize_(new_optimize) {}
+    NotifyOptimizeTask(bool new_optimize = false) : BGTask(BGTaskType::kNotifyOptimize, true) {}
 
     ~NotifyOptimizeTask() override = default;
 
     std::string ToString() const override { return "NotifyOptimizeTask"; }
-
-public:
-    bool new_optimize_ = false;
 };
 
 export class DumpMemIndexTask final : public BGTask {

@@ -280,7 +280,7 @@ void NewCatalog::DropSegmentUpdateTSByKey(const std::string &segment_update_ts_k
 Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts,
                                   KVInstance *kv_instance,
                                   std::vector<std::shared_ptr<MetaKey>> &metas,
-                                  std::vector<std::string> &drop_keys) const {
+                                  std::vector<std::string> &drop_keys) {
     auto GetCleanedMetaImpl = [&](const std::vector<std::string> &keys) {
         const std::string &type_str = keys[1];
         const std::string &meta_str = keys[2];
@@ -341,12 +341,11 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts,
     static constexpr std::string drop_prefix = "drop";
     auto iter = kv_instance->GetIterator();
     iter->Seek(drop_prefix);
-    std::string drop_key, commit_ts_str;
     TxnTimeStamp drop_ts;
 
     while (iter->Valid() && iter->Key().starts_with(drop_prefix)) {
-        drop_key = iter->Key().ToString();
-        commit_ts_str = iter->Value().ToString();
+        std::string drop_key = iter->Key().ToString();
+        std::string commit_ts_str = iter->Value().ToString();
 
         auto keys = infinity::Partition(drop_key, '|');
         const std::string &type_str = keys[1];
@@ -432,6 +431,11 @@ std::vector<std::shared_ptr<MetaKey>> NewCatalog::MakeMetaKeys() const {
                            simdjson::padded_string json(pm_path_key->value_);
                            simdjson::parser parser;
                            simdjson::document doc = parser.iterate(json);
+                           std::string object_key = doc["obj_key"].get<std::string>();
+                           if (object_key == "KEY_EMPTY") {
+                               kv_instance_ptr->Delete(KeyEncode::PMObjectKey(pm_path_key->path_key_));
+                               return true;
+                           }
                        }
                        return false;
                    }).begin();

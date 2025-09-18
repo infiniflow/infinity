@@ -244,27 +244,47 @@ bool NewTxnManager::CheckConflict1(NewTxn *txn, std::string &conflict_reason, bo
 }
 
 void NewTxnManager::SaveOrResetMetaCacheForReadTxn(NewTxn *txn) {
-    // For read-only txn check if previous txn is writable txn. If so, remove the items to cache.
-    if ((txn->GetTxnStore() == nullptr && !txn->IsReplay()) or txn->txn_type() == TxnType::kReadOnly) {
-        std::vector<std::shared_ptr<NewTxn>> check_txns = GetCheckCandidateTxns(txn);
-        bool all_read_txns = true;
-        for (const auto &check_txn : check_txns) {
-            if ((check_txn->GetTxnStore() == nullptr && !check_txn->IsReplay()) or check_txn->txn_type() == TxnType::kReadOnly) {
-                // Read only txn
-                continue;
-            } else {
-                // Writable Txn
-                LOG_DEBUG(fmt::format("Reset meta cache and cache info for read txn {}", txn->TxnID()));
-                txn->ResetMetaCacheAndCacheInfo();
-                all_read_txns = false;
-                break;
-            }
-        }
 
-        if (all_read_txns) {
-            LOG_DEBUG(fmt::format("Save meta cache and cache info for read txn {}", txn->TxnID()));
-            txn->SaveMetaCacheAndCacheInfo();
+    if (txn->GetTxnStore() != nullptr) {
+        UnrecoverableError("Txn store isn't empty, not read-only transaction");
+    }
+
+    if (txn->IsReplay()) {
+        UnrecoverableError("Replay transaction can't be read-only.");
+    }
+
+    if (!txn->readonly()) {
+        // For non-readonly, don't save meta cache
+        return;
+    }
+
+    // For read-only txn check if previous txn is writable txn. If so, remove the items to cache.
+    std::vector<std::shared_ptr<NewTxn>> check_txns = GetCheckCandidateTxns(txn);
+    bool all_read_txns = true;
+    for (const auto &check_txn : check_txns) {
+        if (check_txn->GetTxnStore() == nullptr or check_txn->readonly()) {
+            if (check_txn->GetTxnStore() != nullptr) {
+                UnrecoverableError("Check txn store isn't empty, not read-only transaction");
+            }
+
+            if (check_txn->IsReplay()) {
+                UnrecoverableError("Check txn shouldn't be replay txn.");
+            }
+            // Read-only txn
+        } else {
+            // Writable Txn
+            LOG_DEBUG(fmt::format("Reset meta cache and cache info for read txn {}", txn->TxnID()));
+            txn->ResetMetaCacheAndCacheInfo();
+            all_read_txns = false;
+            break;
         }
+    }
+
+    // Check if current txn is started before any write-able txn. If no, the meta should be inserted into cache. Otherwise, the read meta could be
+    // deprecated, shouldn't be inserted into cache.
+    if (all_read_txns) {
+        LOG_DEBUG(fmt::format("Save meta cache and cache info for read txn {}", txn->TxnID()));
+        txn->SaveMetaCacheAndCacheInfo();
     }
 }
 
@@ -277,7 +297,7 @@ void NewTxnManager::SendToWAL(NewTxn *txn) {
         UnrecoverableError("NewTxnManager is null");
     }
 
-    TxnTimeStamp commit_ts = txn->CommitTS();
+    const TxnTimeStamp commit_ts = txn->CommitTS();
 
     std::lock_guard guard(locker_);
     if (wait_conflict_ck_.empty()) {
@@ -312,7 +332,8 @@ Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
         *commit_ts_ptr = txn->CommitTS();
     }
     if (status.ok()) {
-        if (txn->GetTxnType() == TransactionType::kNewCheckpoint) {
+        TransactionType txn_type = txn->GetTxnType();
+        if (txn_type == TransactionType::kNewCheckpoint or txn_type == TransactionType::kSkippedCheckpoint) {
             std::lock_guard guard(locker_);
             ckp_begin_ts_ = UNCOMMIT_TS;
         }
@@ -336,7 +357,8 @@ void NewTxnManager::CommitReplayTxn(NewTxn *txn) {
 Status NewTxnManager::RollBackTxn(NewTxn *txn) {
     Status status = txn->Rollback();
     if (status.ok()) {
-        if (txn->GetTxnType() == TransactionType::kNewCheckpoint) {
+        TransactionType txn_type = txn->GetTxnType();
+        if (txn_type == TransactionType::kNewCheckpoint or txn_type == TransactionType::kSkippedCheckpoint) {
             std::lock_guard guard(locker_);
             ckp_begin_ts_ = UNCOMMIT_TS;
         }
@@ -471,7 +493,7 @@ void NewTxnManager::CommitKVInstance(NewTxn *txn) {
     }
 
     MetaCache *meta_cache_ptr = this->storage_->meta_cache();
-    Status status = meta_cache_ptr->Erase(items_to_erase, txn->kv_instance_.get(), commit_ts);
+    Status status = meta_cache_ptr->EraseAndCommitKV(items_to_erase, txn->kv_instance_.get(), commit_ts);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Put cache: {}", status.message()));
     }

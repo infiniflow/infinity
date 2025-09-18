@@ -24,6 +24,7 @@ import :value;
 import :snapshot_info;
 import :column_vector;
 import :fast_rough_filter;
+import :txn_context;
 
 import std;
 
@@ -35,8 +36,7 @@ import statement_common;
 namespace infinity {
 
 class KVInstance;
-class NewCatalog;
-class NewTxnManager;
+
 struct WalEntry;
 struct WalCmd;
 struct WalCmdCreateDatabaseV2;
@@ -105,7 +105,6 @@ class BufferManager;
 class IndexBase;
 struct DataBlock;
 class TableDef;
-struct TxnContext;
 struct TableInfo;
 struct DatabaseInfo;
 struct TableIndexInfo;
@@ -118,6 +117,8 @@ struct CheckpointTxnStore;
 struct MetaKey;
 struct MetaBaseCache;
 struct CacheInfo;
+class NewCatalog;
+class NewTxnManager;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -128,12 +129,6 @@ export struct ChunkInfoForCreateIndex {
     std::string table_id_{};
     SegmentID segment_id_{};
     ChunkID chunk_id_{};
-};
-
-enum class TxnType {
-    kReadOnly,
-    kWrite,
-    kInvalid,
 };
 
 export class NewTxn : public std::enable_shared_from_this<NewTxn> {
@@ -344,8 +339,6 @@ public:
                   const std::vector<RowID> &row_ids);
 
 private:
-    std::tuple<std::vector<std::pair<RowID, u64>>, Status> GetRowRanges(TableMeeta &table_meta, const std::shared_ptr<DataBlock> &input_block);
-
     Status AppendInner(const std::string &db_name,
                        const std::string &table_name,
                        const std::string &table_key,
@@ -372,27 +365,27 @@ public:
     Status Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint);
 
     // Getter
-    BufferManager *buffer_mgr() const { return buffer_mgr_; }
+    [[nodiscard]] BufferManager *buffer_mgr() const { return buffer_mgr_; }
 
-    TransactionID TxnID() const;
+    [[nodiscard]] TransactionID TxnID() const;
 
-    TxnTimeStamp BeginTS() const;
+    [[nodiscard]] TxnTimeStamp BeginTS() const;
 
-    TxnTimeStamp CommitTS() const;
+    [[nodiscard]] TxnTimeStamp CommitTS() const;
 
-    TxnTimeStamp KVCommitTS() const;
+    [[nodiscard]] TxnTimeStamp KVCommitTS() const;
 
-    TxnTimeStamp LastSystemKVCommitTS() const;
+    [[nodiscard]] TxnTimeStamp LastSystemKVCommitTS() const;
 
-    TxnTimeStamp LastSystemCommitTS() const;
+    [[nodiscard]] TxnTimeStamp LastSystemCommitTS() const;
 
     void SetTxnKVCommitTS(TxnTimeStamp kv_commit_ts);
 
-    TxnState GetTxnState() const;
+    [[nodiscard]] TxnState GetTxnState() const;
 
-    TransactionType GetTxnType() const;
+    [[nodiscard]] TransactionType GetTxnType() const;
 
-    TxnType txn_type() const;
+    bool readonly() const;
 
     bool NeedToAllocate() const;
 
@@ -415,17 +408,13 @@ public:
 
     void SetTxnWrite();
 
-    void FullCheckpoint(const TxnTimeStamp max_commit_ts);
-
-    bool DeltaCheckpoint(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commit_ts);
-
     NewTxnManager *txn_mgr() const { return txn_mgr_; }
 
     WalEntry *GetWALEntry() const;
 
-    const std::shared_ptr<std::string> GetTxnText() const { return txn_text_; }
+    [[nodiscard]] std::shared_ptr<std::string> GetTxnText() const { return txn_text_; }
 
-    const std::string &db_name() const { return db_name_; }
+    [[nodiscard]] const std::string &db_name() const { return db_name_; }
 
     void SetDBName(const std::string &db_name) { db_name_ = db_name; }
 
@@ -721,7 +710,6 @@ private:
     std::shared_ptr<BaseTxnStore> base_txn_store_{};
 
     NewTxnStore txn_store_; // this has this ptr, so txn cannot be moved.
-    TxnType txn_type_{TxnType::kInvalid};
 
     // Use as txn context;
     mutable std::shared_mutex rw_locker_{};

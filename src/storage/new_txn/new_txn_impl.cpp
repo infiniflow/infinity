@@ -609,15 +609,15 @@ Status NewTxn::ReplayDropTable(WalCmdDropTableV2 *drop_table_cmd, TxnTimeStamp c
                                  txn_id));
             return Status::OK();
         } else {
-            LOG_ERROR(fmt::format(
-                "Replay drop table: Table {} created at {} with id {} and ts {} already dropped with different commit ts {}, commit ts: {}, txn: {}.",
-                drop_table_cmd->table_name_,
-                drop_table_cmd->create_ts_,
-                drop_table_cmd->table_id_,
-                drop_table_cmd->create_ts_,
-                table_commit_ts,
-                commit_ts,
-                txn_id));
+            LOG_ERROR(fmt::format("Replay drop table: Table {} created at {} with id {} and ts {} already dropped with different "
+                                  "commit ts {}, commit ts: {}, txn: {}.",
+                                  drop_table_cmd->table_name_,
+                                  drop_table_cmd->create_ts_,
+                                  drop_table_cmd->table_id_,
+                                  drop_table_cmd->create_ts_,
+                                  table_commit_ts,
+                                  commit_ts,
+                                  txn_id));
             return Status::UnexpectedError("Table commit timestamp mismatch during replay of table drop.");
         }
     }
@@ -972,15 +972,15 @@ Status NewTxn::ReplayDropColumns(WalCmdDropColumnsV2 *drop_columns_cmd, TxnTimeS
                                      txn_id));
                 continue;
             } else {
-                LOG_ERROR(fmt::format(
-                    "Replay drop column: Column {} created at {} in table {}.{} already dropped with different commit ts {}, commit ts: {}, txn: {}.",
-                    drop_columns_cmd->column_names_[i],
-                    create_ts,
-                    db_name,
-                    table_name,
-                    drop_column_commit_ts,
-                    commit_ts,
-                    txn_id));
+                LOG_ERROR(fmt::format("Replay drop column: Column {} created at {} in table {}.{} already dropped with different "
+                                      "commit ts {}, commit ts: {}, txn: {}.",
+                                      drop_columns_cmd->column_names_[i],
+                                      create_ts,
+                                      db_name,
+                                      table_name,
+                                      drop_column_commit_ts,
+                                      commit_ts,
+                                      txn_id));
                 return Status::UnexpectedError("Column commit timestamp mismatch during replay of column drop.");
             }
         }
@@ -1018,8 +1018,8 @@ Status NewTxn::ListTable(const std::string &db_name, std::vector<std::string> &t
     table_names = *table_names_ptr;
     return Status::OK();
 }
-// Index OPs
 
+// Index OPs
 Status NewTxn::CreateIndex(const std::string &db_name,
                            const std::string &table_name,
                            const std::shared_ptr<IndexBase> &index_base,
@@ -1099,7 +1099,7 @@ Status NewTxn::CreateIndex(const std::string &db_name,
 
 Status NewTxn::ReplayCreateIndex(WalCmdCreateIndexV2 *create_index_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     // Check if the index already exists in kv store
-    std::string index_key =
+    const std::string index_key =
         KeyEncode::CatalogIndexKey(create_index_cmd->db_id_, create_index_cmd->table_id_, *create_index_cmd->index_base_->index_name_, commit_ts);
     std::string index_id;
     Status status = kv_instance_->Get(index_key, index_id);
@@ -1113,14 +1113,14 @@ Status NewTxn::ReplayCreateIndex(WalCmdCreateIndexV2 *create_index_cmd, TxnTimeS
                                  txn_id));
             return Status::OK();
         } else {
-            LOG_ERROR(
-                fmt::format("Replay create index: Index {} already exists in table {} of database {} with different id {}, commit ts: {}, txn: {}.",
-                            *create_index_cmd->index_base_->index_name_,
-                            create_index_cmd->table_name_,
-                            create_index_cmd->db_name_,
-                            index_id,
-                            commit_ts,
-                            txn_id));
+            LOG_ERROR(fmt::format("Replay create index: Index {} already exists in table {} of database {} with different id {}, "
+                                  "commit ts: {}, txn: {}.",
+                                  *create_index_cmd->index_base_->index_name_,
+                                  create_index_cmd->table_name_,
+                                  create_index_cmd->db_name_,
+                                  index_id,
+                                  commit_ts,
+                                  txn_id));
             return Status::UnexpectedError("Index ID mismatch during replay of index creation.");
         }
     }
@@ -1130,12 +1130,12 @@ Status NewTxn::ReplayCreateIndex(WalCmdCreateIndexV2 *create_index_cmd, TxnTimeS
         return status;
     }
 
-    std::string next_index_id_key = KeyEncode::CatalogTableTagKey(create_index_cmd->db_id_, create_index_cmd->table_id_, NEXT_INDEX_ID.data());
+    const std::string next_index_id_key = KeyEncode::CatalogTableTagKey(create_index_cmd->db_id_, create_index_cmd->table_id_, NEXT_INDEX_ID.data());
     std::string next_index_id_str;
     status = kv_instance_->Get(next_index_id_key, next_index_id_str);
 
-    u64 next_index_id = std::stoull(next_index_id_str);
-    u64 this_index_id = std::stoull(create_index_cmd->index_id_);
+    const u64 next_index_id = std::stoull(next_index_id_str);
+    const u64 this_index_id = std::stoull(create_index_cmd->index_id_);
     if (this_index_id + 1 > next_index_id) {
         // Update the next index id
         std::string new_next_index_id_str = std::to_string(this_index_id + 1);
@@ -1248,14 +1248,14 @@ Status NewTxn::ReplayDropIndex(WalCmdDropIndexV2 *drop_index_cmd, TxnTimeStamp c
     if (status.ok()) {
         TxnTimeStamp index_commit_ts = std::stoull(drop_index_commit_ts_str);
         if (index_commit_ts == commit_ts) {
-            LOG_WARN(
-                fmt::format("Skipping replay drop index: Index {} created at {} already dropped in table {} of database {}, commit ts: {}, txn: {}.",
-                            drop_index_cmd->index_name_,
-                            drop_index_cmd->create_ts_,
-                            drop_index_cmd->table_name_,
-                            drop_index_cmd->db_name_,
-                            commit_ts,
-                            txn_id));
+            LOG_WARN(fmt::format("Skipping replay drop index: Index {} created at {} already dropped in table {} of database {}, "
+                                 "commit ts: {}, txn: {}.",
+                                 drop_index_cmd->index_name_,
+                                 drop_index_cmd->create_ts_,
+                                 drop_index_cmd->table_name_,
+                                 drop_index_cmd->db_name_,
+                                 commit_ts,
+                                 txn_id));
             return Status::OK();
         } else {
             LOG_ERROR(fmt::format("Replay drop index: Index {} created at {} already dropped in table {} of database {} with different commit ts {}, "
@@ -1517,14 +1517,13 @@ Status NewTxn::CreateTableSnapshot(const std::string &db_name, const std::string
 
 std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSnapshotInfo(const std::string &db_name) {
     this->CheckTxn(db_name);
-    std::shared_ptr<DatabaseSnapshotInfo> database_snapshot_info;
     std::shared_ptr<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return {nullptr, status};
     }
-    database_snapshot_info = std::make_shared<DatabaseSnapshotInfo>();
+    std::shared_ptr<DatabaseSnapshotInfo> database_snapshot_info = std::make_shared<DatabaseSnapshotInfo>();
     database_snapshot_info->db_name_ = db_name;
     database_snapshot_info->db_id_str_ = db_meta->db_id_str();
 
@@ -1735,16 +1734,9 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
     current_ckp_ts_ = checkpoint_ts;
     LOG_INFO(fmt::format("checkpoint ts: {}, txn: {}", current_ckp_ts_, txn_context_ptr_->txn_id_));
 
-    // Put the data into local txn store
-    if (base_txn_store_ != nullptr) {
-        return Status::UnexpectedError("txn store is not null");
-    }
-    base_txn_store_ = std::make_shared<CheckpointTxnStore>(checkpoint_ts, auto_checkpoint);
-    auto *txn_store = static_cast<CheckpointTxnStore *>(base_txn_store_.get());
-
     if (last_ckp_ts > 0 and last_ckp_ts + 2 >= checkpoint_ts) {
         // last checkpoint ts: last checkpoint txn begin ts. checkpoint is the begin_ts of current txn
-        txn_type_ = TxnType::kReadOnly;
+        txn_context_ptr_->txn_type_ = TransactionType::kSkippedCheckpoint;
         LOG_INFO(fmt::format("Last checkpoint ts {}, this checkpoint begin ts: {}, SKIP CHECKPOINT", last_ckp_ts, checkpoint_ts));
         return Status::OK();
     }
@@ -1766,6 +1758,13 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
     }
 
     LOG_DEBUG(fmt::format("checkpoint ts {}, got {} DBs.", checkpoint_ts, db_id_strs_ptr->size()));
+
+    // Put the data into local txn store
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+    base_txn_store_ = std::make_shared<CheckpointTxnStore>(checkpoint_ts, auto_checkpoint);
+    auto *txn_store = static_cast<CheckpointTxnStore *>(base_txn_store_.get());
 
     size_t db_count = db_id_strs_ptr->size();
     for (size_t idx = 0; idx < db_count; ++idx) {
@@ -1857,9 +1856,12 @@ TransactionType NewTxn::GetTxnType() const {
     return txn_context_ptr_->txn_type_;
 }
 
-TxnType NewTxn::txn_type() const {
+bool NewTxn::readonly() const {
     std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
-    return txn_type_;
+    if (txn_context_ptr_->txn_type_ == TransactionType::kInvalid) {
+        UnrecoverableError("Invalid transaction type");
+    }
+    return txn_context_ptr_->txn_type_ == TransactionType::kRead or txn_context_ptr_->txn_type_ == TransactionType::kSkippedCheckpoint;
 }
 
 void NewTxn::SetTxnBottomDone() {
@@ -1901,7 +1903,7 @@ void NewTxn::SetTxnType(TransactionType type) {
     }
 
     switch (txn_context_ptr_->txn_type_) {
-        case TransactionType::kNormal: {
+        case TransactionType::kInvalid: {
             txn_context_ptr_->txn_type_ = type;
             break;
         }
@@ -1916,9 +1918,11 @@ void NewTxn::SetTxnType(TransactionType type) {
             break;
         }
         default: {
-            UnrecoverableError(fmt::format("Attempt to change transaction type from {} to {}",
-                                           TransactionType2Str(txn_context_ptr_->txn_type_),
-                                           TransactionType2Str(type)));
+            std::string err_msg = fmt::format("Attempt to change transaction type from {} to {}",
+                                              TransactionType2Str(txn_context_ptr_->txn_type_),
+                                              TransactionType2Str(type));
+            LOG_CRITICAL(err_msg);
+            UnrecoverableError(err_msg);
         }
     }
 }
@@ -1979,7 +1983,14 @@ WalEntry *NewTxn::GetWALEntry() const { return wal_entry_.get(); }
 // }
 
 Status NewTxn::Commit() {
-    if ((base_txn_store_ == nullptr && !this->IsReplay()) or txn_type_ == TxnType::kReadOnly) {
+    if (base_txn_store_ == nullptr or this->readonly()) {
+        if (base_txn_store_ != nullptr) {
+            UnrecoverableError("Txn store isn't empty, not read-only transaction");
+        }
+
+        if (this->IsReplay()) {
+            UnrecoverableError("Replay transaction can't be read-only.");
+        }
         // Don't need to write empty WalEntry (read-only transactions).
         TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(this);
         this->SetTxnCommitting(commit_ts);
@@ -2037,7 +2048,8 @@ Status NewTxn::Commit() {
                 txn_mgr_->SubmitForAllocation(txn_allocator_task);
                 txn_allocator_task->Wait();
                 status = txn_allocator_task->status_;
-                // LOG_INFO(fmt::format("Finish allocation task: {}, transaction: {}", *this->GetTxnText(), txn_context_ptr_->txn_id_));
+                // LOG_INFO(fmt::format("Finish allocation task: {}, transaction: {}", *this->GetTxnText(),
+                // txn_context_ptr_->txn_id_));
                 break;
             }
             case TxnState::kRollbacking: {
@@ -2401,9 +2413,8 @@ Status NewTxn::GetTableIndexMeta(const std::string &db_name,
                                  std::shared_ptr<TableIndexMeeta> &table_index_meta,
                                  std::string *table_key_ptr,
                                  std::string *index_key_ptr) {
-    Status status;
     TxnTimeStamp db_create_ts;
-    status = this->GetDBMeta(db_name, db_meta, db_create_ts);
+    Status status = this->GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -2455,8 +2466,8 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
 
     // for (const auto &mem_index_detail : table_mem_indexes) {
     //     auto dump_index_task = std::make_shared<DumpMemIndexTask>(mem_index_detail->db_name_, mem_index_detail->table_name_,
-    //     mem_index_detail->index_name_, mem_index_detail->segment_id_, mem_index_detail->begin_row_id_); dump_tasks.push_back(dump_index_task);
-    //     dump_index_processor->Submit(std::move(dump_index_task));
+    //     mem_index_detail->index_name_, mem_index_detail->segment_id_, mem_index_detail->begin_row_id_);
+    //     dump_tasks.push_back(dump_index_task); dump_index_processor->Submit(std::move(dump_index_task));
     // }
 
     // // Wait for all dumps to complete
@@ -2504,13 +2515,13 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
 //    CreateDBTxnStore *txn_store = static_cast<CreateDBTxnStore *>(base_txn_store_.get());
 //    std::string db_id_str = std::to_string(txn_store->db_id_);
 //    std::shared_ptr<DBMeeta> db_meta;
-//    Status status = NewCatalog::AddNewDB(kv_instance_.get(), db_id_str, commit_ts, txn_store->db_name_, txn_store->comment_ptr_.get(), db_meta);
-//    if (!status.ok()) {
+//    Status status = NewCatalog::AddNewDB(kv_instance_.get(), db_id_str, commit_ts, txn_store->db_name_,
+//    txn_store->comment_ptr_.get(), db_meta); if (!status.ok()) {
 //        UnrecoverableError(status.message());
 //    }
 //
-//    std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdCreateDatabaseV2>(txn_store->db_name_, db_id_str, *txn_store->comment_ptr_);
-//    wal_entry_->cmds_.push_back(wal_command);
+//    std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdCreateDatabaseV2>(txn_store->db_name_, db_id_str,
+//    *txn_store->comment_ptr_); wal_entry_->cmds_.push_back(wal_command);
 //    txn_context_ptr_->AddOperation(std::make_shared<std::string>(wal_command->ToString()));
 //    return Status::OK();
 //}
@@ -3721,7 +3732,8 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
             const std::vector<std::string> &prev_db_names = optimize_index_txn_store->db_names_;
             const std::map<std::string, std::vector<std::string>> &prev_table_names_in_db = optimize_index_txn_store->table_names_in_db_;
 
-            // If there are multiple databases or multiple tables involved in index optimization, the optimization is processed for all indexes.
+            // If there are multiple databases or multiple tables involved in index optimization, the optimization is processed for
+            // all indexes.
             if (db_names.size() > 1 || prev_db_names.size() > 1 || table_names_in_db.at(db_names[0]).size() > 1 ||
                 prev_table_names_in_db.at(prev_db_names[0]).size() > 1) {
                 conflict = true;
@@ -3754,7 +3766,7 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
             }
             break;
         }
-        // There shold be no conflict between optimize index and import
+        // There should be no conflict between optimize index and import
         // case TransactionType::kImport: {
         //     LOG_INFO("OptimizeIndexTxnStore vs. ImportTxnStore conflict");
         //     ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(previous_txn->base_txn_store_.get());
@@ -3799,7 +3811,8 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
             const std::string &prev_table_name = drop_index_txn_store->table_name_;
             const std::string &prev_index_name = drop_index_txn_store->index_name_;
 
-            // If there are multiple databases or multiple tables involved in index optimization, the optimization is processed for all indexes.
+            // If there are multiple databases or multiple tables involved in index optimization, the optimization is processed for
+            // all indexes.
             if (db_names.size() > 1 || table_names_in_db.at(db_names[0]).size() > 1) {
                 conflict = true;
             } else {
@@ -4365,7 +4378,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 }
             }
 
-            Status status = CleanupInner(std::move(metas));
+            Status status = CleanupInner(metas);
             // if (status.code_ == ErrorCode::kIOError) {
             //     // TODO: move metas to kv_store
             // } else
@@ -4390,7 +4403,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 }
             }
 
-            Status status = CleanupInner(std::move(metas));
+            Status status = CleanupInner(metas);
             // if (status.code_ == ErrorCode::kIOError) {
             //     // TODO: move metas to kv_store
             // } else
@@ -4422,7 +4435,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                                                                        create_index_txn_store->index_id_str_,
                                                                        *create_index_txn_store->index_base_->index_name_));
 
-                status = CleanupInner(std::move(metas));
+                status = CleanupInner(metas);
                 if (!status.ok()) {
                     UnrecoverableError("During PostRollback, cleanup failed.");
                 }
@@ -4479,7 +4492,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 }
             }
 
-            Status status = CleanupInner(std::move(metas));
+            Status status = CleanupInner(metas);
             // if (status.code_ == ErrorCode::kIOError) {
             //     // TODO: move metas to kv_store
             // } else
@@ -4607,7 +4620,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
 
             // Status cleanup_status = CleanupInner(std::move(metas));
             // if (!cleanup_status.ok()) {
-            //     LOG_WARN(fmt::format("Failed to cleanup metadata during restore table rollback: {}", cleanup_status.message()));
+            //     LOG_WARN(fmt::format("Failed to clean up metadata during restore table rollback: {}", cleanup_status.message()));
             // }
 
             break;
@@ -5266,7 +5279,7 @@ Status NewTxn::Dummy() {
 
 void NewTxn::SetWalSize(i64 wal_size) {
     TransactionType txn_type = GetTxnType();
-    if (txn_type != TransactionType::kNewCheckpoint) {
+    if (txn_type != TransactionType::kNewCheckpoint and txn_type != TransactionType::kSkippedCheckpoint) {
         UnrecoverableError(fmt::format("Expected transaction type is checkpoint."));
     }
     wal_size_ = wal_size;
@@ -5570,7 +5583,7 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
 
     if (last_ckp_ts > 0 and last_ckp_ts + 2 >= checkpoint_ts) {
         // last checkpoint ts: last checkpoint txn begin ts. checkpoint is the begin_ts of current txn
-        txn_type_ = TxnType::kReadOnly;
+        txn_context_ptr_->txn_type_ = TransactionType::kSkippedCheckpoint;
         LOG_INFO(fmt::format("Last checkpoint ts {}, this checkpoint begin ts: {}, SKIP CHECKPOINT", last_ckp_ts, checkpoint_ts));
         return Status::OK();
     }

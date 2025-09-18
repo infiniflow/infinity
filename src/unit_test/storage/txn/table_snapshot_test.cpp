@@ -50,7 +50,7 @@ public:
         NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
         // Create a table to snapshot
-        NewTxn *create_table_txn = txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kNormal);
+        NewTxn *create_table_txn = txn_mgr->BeginTxn(std::make_unique<String>("create table"), TransactionType::kCreateTable);
 
         Vector<std::shared_ptr<ColumnDef>> columns;
         {
@@ -69,7 +69,7 @@ public:
         txn_mgr->CommitTxn(create_table_txn);
 
         // Insert data into the table
-        NewTxn *insert_txn = txn_mgr->BeginTxn(std::make_unique<String>("insert data"), TransactionType::kNormal);
+        NewTxn *insert_txn = txn_mgr->BeginTxn(std::make_unique<String>("insert data"), TransactionType::kAppend);
 
         Vector<std::shared_ptr<ColumnVector>> column_vectors;
         {
@@ -90,13 +90,13 @@ public:
         txn_mgr->CommitTxn(insert_txn);
 
         // Create snapshot using the correct method
-        NewTxn *snapshot_txn = txn_mgr->BeginTxn(std::make_unique<String>("create snapshot"), TransactionType::kNormal);
+        NewTxn *snapshot_txn = txn_mgr->BeginTxn(std::make_unique<String>("create snapshot"), TransactionType::kCreateTableSnapshot);
         status = snapshot_txn->CreateTableSnapshot("default_db", "test_table", "test_snapshot");
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(snapshot_txn);
 
         // Drop the original table
-        NewTxn *drop_table_txn = txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kNormal);
+        NewTxn *drop_table_txn = txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kDropTable);
         status = drop_table_txn->DropTable("default_db", "test_table", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(drop_table_txn);
@@ -110,7 +110,7 @@ TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     // Test 1: Successful restore
-    NewTxn *restore_txn = txn_mgr->BeginTxn(std::make_unique<String>("restore table"), TransactionType::kNormal);
+    NewTxn *restore_txn = txn_mgr->BeginTxn(std::make_unique<String>("restore table"), TransactionType::kRestoreTable);
 
     // Deserialize the snapshot info
     String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
@@ -125,18 +125,18 @@ TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     txn_mgr->CommitTxn(restore_txn);
 
     // Verify that the table was restored with data
-    NewTxn *check_txn1 = txn_mgr->BeginTxn(std::make_unique<String>("check table"), TransactionType::kNormal);
+    NewTxn *check_txn1 = txn_mgr->BeginTxn(std::make_unique<String>("check table"), TransactionType::kRead);
     auto [table_info1, check_status1] = check_txn1->GetTableInfo("default_db", "test_table");
     EXPECT_TRUE(check_status1.ok()); // Table should exist after restore
     txn_mgr->CommitTxn(check_txn1);
 
-    NewTxn *drop_table_txn1 = txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kNormal);
+    NewTxn *drop_table_txn1 = txn_mgr->BeginTxn(std::make_unique<String>("drop table"), TransactionType::kDropTable);
     status = drop_table_txn1->DropTable("default_db", "test_table", ConflictType::kError);
     EXPECT_TRUE(status.ok());
     txn_mgr->CommitTxn(drop_table_txn1);
 
     // Test 2: Rollback restore
-    NewTxn *restore_txn1 = txn_mgr->BeginTxn(std::make_unique<String>("restore table"), TransactionType::kNormal);
+    NewTxn *restore_txn1 = txn_mgr->BeginTxn(std::make_unique<String>("restore table"), TransactionType::kRestoreTable);
 
     // Deserialize the snapshot info again
     std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, "test_snapshot");
@@ -152,7 +152,7 @@ TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     // DO NOT call CommitTxn here - the transaction is already rolled back
 
     // Verify that the table was not actually created (rollback worked)
-    NewTxn *check_txn = txn_mgr->BeginTxn(std::make_unique<String>("check table"), TransactionType::kNormal);
+    NewTxn *check_txn = txn_mgr->BeginTxn(std::make_unique<String>("check table"), TransactionType::kRead);
     auto [table_info, check_status] = check_txn->GetTableInfo("default_db", "test_table");
     EXPECT_FALSE(check_status.ok()); // Table should not exist after rollback
     txn_mgr->CommitTxn(check_txn);

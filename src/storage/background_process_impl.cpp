@@ -75,7 +75,7 @@ void BGTaskProcessor::Process() {
                     running = false;
                     break;
                 }
-                case BGTaskType::kNewCheckpoint: {
+                case BGTaskType::kCheckpoint: {
                     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
                     if (storage_mode == StorageMode::kUnInitialized) {
                         UnrecoverableError("Uninitialized storage mode");
@@ -102,7 +102,7 @@ void BGTaskProcessor::Process() {
                     }
                     break;
                 }
-                case BGTaskType::kNewCleanup: {
+                case BGTaskType::kCleanup: {
                     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
                     if (storage_mode == StorageMode::kUnInitialized) {
                         UnrecoverableError("Uninitialized storage mode");
@@ -122,8 +122,8 @@ void BGTaskProcessor::Process() {
                         CleanupTxnStore *cleanup_txn_store = static_cast<CleanupTxnStore *>(new_txn_shared->GetTxnStore());
                         if (cleanup_txn_store != nullptr) {
                             TxnTimeStamp clean_ts = cleanup_txn_store->timestamp_;
-                            std::shared_ptr<BGTaskInfo> bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kNewCleanup);
-                            std::string task_text = fmt::format("NewCleanup task, cleanup timestamp: {}", clean_ts);
+                            std::shared_ptr<BGTaskInfo> bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kCleanup);
+                            std::string task_text = fmt::format("Cleanup task, cleanup timestamp: {}", clean_ts);
                             bg_task_info->task_info_list_.emplace_back(task_text);
                             if (status.ok()) {
                                 bg_task_info->status_list_.emplace_back("OK");
@@ -133,7 +133,7 @@ void BGTaskProcessor::Process() {
                             }
                             new_txn_mgr->AddTaskInfo(bg_task_info);
                         }
-                        LOG_DEBUG("NewCleanup task in background done");
+                        LOG_DEBUG("Cleanup task in background done");
                     }
                     break;
                 }

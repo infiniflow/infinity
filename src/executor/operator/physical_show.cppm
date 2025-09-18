@@ -73,10 +73,6 @@ public:
     inline const std::optional<std::string> object_name() const { return object_name_; };
 
 private:
-    void ExecuteShowViewDetail(QueryContext *query_context,
-                               const std::shared_ptr<std::vector<std::shared_ptr<DataType>>> &column_types,
-                               const std::shared_ptr<std::vector<std::string>> &column_names);
-
     void ExecuteShowDatabase(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowTable(QueryContext *query_context, ShowOperatorState *operator_state);
