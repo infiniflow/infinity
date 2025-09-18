@@ -73,7 +73,7 @@ std::vector<SegmentID> GetTableIndexSegments(KVInstance *kv_instance,
                                              TxnTimeStamp commit_ts) {
     std::vector<SegmentID> segment_ids;
 
-    std::string segment_id_prefix = KeyEncode::CatalogIdxSegmentKeyPrefix(db_id_str, table_id_str, index_id_str);
+    const std::string segment_id_prefix = KeyEncode::CatalogIdxSegmentKeyPrefix(db_id_str, table_id_str, index_id_str);
     auto iter = kv_instance->GetIterator();
     iter->Seek(segment_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(segment_id_prefix)) {

@@ -78,7 +78,7 @@ public:
     void SaveBufferObj(BufferObj *buffer_obj) { buffer_obj->Save(); };
 
     void WaitCleanup(Storage *storage) {
-        auto cleanup_task = std::make_shared<NewCleanupTask>();
+        auto cleanup_task = std::make_shared<CleanupTask>();
         TxnTimeStamp cur_cleanup_ts;
         cleanup_task->Execute(0, cur_cleanup_ts);
     }

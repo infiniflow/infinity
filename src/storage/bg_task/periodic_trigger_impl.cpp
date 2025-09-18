@@ -45,7 +45,7 @@ bool PeriodicTrigger::Check() {
     return true;
 }
 
-std::shared_ptr<NewCleanupTask> NewCleanupPeriodicTrigger::CreateNewCleanupTask() {
+std::shared_ptr<CleanupTask> CleanupPeriodicTrigger::CreateCleanupTask() {
     auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
@@ -55,11 +55,11 @@ std::shared_ptr<NewCleanupTask> NewCleanupPeriodicTrigger::CreateNewCleanupTask(
         return nullptr;
     }
 
-    return std::make_shared<NewCleanupTask>();
+    return std::make_shared<CleanupTask>();
 }
 
-void NewCleanupPeriodicTrigger::Trigger() {
-    auto cleanup_task = CreateNewCleanupTask();
+void CleanupPeriodicTrigger::Trigger() {
+    auto cleanup_task = CreateCleanupTask();
     if (!cleanup_task) {
         return;
     }
@@ -90,23 +90,25 @@ void CheckpointPeriodicTrigger::Trigger() {
     bg_processor->Submit(std::move(checkpoint_task));
 }
 
-void CompactSegmentPeriodicTrigger::Trigger() {
-    LOG_DEBUG(fmt::format("Trigger compact segment task, after {} seconds", duration_.load()));
-    auto compact_task = std::make_shared<NotifyCompactTask>();
-    auto *compact_processor = InfinityContext::instance().storage()->compaction_processor();
-    compact_processor->Submit(std::move(compact_task));
+void CompactPeriodicTrigger::Trigger() {
+    if (compact_task_ != nullptr and !compact_task_->IsComplete()) {
+        LOG_DEBUG(fmt::format("Skipping compact task, after {} seconds", duration_.load()));
+    }
+
+    LOG_DEBUG(fmt::format("Trigger compact task, after {} seconds", duration_.load()));
+    compact_task_ = std::make_shared<NotifyCompactTask>();
+    compact_processor_->Submit(compact_task_);
 }
 
 void OptimizeIndexPeriodicTrigger::Trigger() {
-    LOG_DEBUG(fmt::format("Trigger optimize index task, after {} seconds", duration_.load()));
-    if (!new_optimize_) {
-        auto optimize_task = std::make_shared<NotifyOptimizeTask>();
-        compact_processor_->Submit(std::move(optimize_task));
-    } else {
-        auto optimize_task = std::make_shared<NotifyOptimizeTask>(true);
-        auto *compact_processor = InfinityContext::instance().storage()->compaction_processor();
-        compact_processor->Submit(std::move(optimize_task));
+
+    if (optimize_task_ != nullptr and !optimize_task_->IsComplete()) {
+        LOG_DEBUG(fmt::format("Skipping optimize index task, after {} seconds", duration_.load()));
     }
+
+    LOG_DEBUG(fmt::format("Trigger optimize index task, after {} seconds", duration_.load()));
+    optimize_task_ = std::make_shared<NotifyOptimizeTask>();
+    compact_processor_->Submit(optimize_task_);
 }
 
 } // namespace infinity

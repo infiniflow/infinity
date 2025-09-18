@@ -59,8 +59,8 @@ void PeriodicTriggerThread::Run() {
             checkpoint_trigger_->Trigger();
         }
 
-        if (compact_segment_trigger_ != nullptr && compact_segment_trigger_->Check()) {
-            compact_segment_trigger_->Trigger();
+        if (compact_trigger_ != nullptr && compact_trigger_->Check()) {
+            compact_trigger_->Trigger();
         }
 
         if (optimize_index_trigger_ != nullptr && optimize_index_trigger_->Check()) {

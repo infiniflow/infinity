@@ -76,7 +76,7 @@ public:
                 }
             }
             float correct_rate = float(correct) / element_size;
-            // std::printf("correct rage: %f\n", correct_rate);
+            // std::printf("correct rate: %f\n", correct_rate);
             EXPECT_GE(correct_rate, 0.95);
         };
 
@@ -138,7 +138,7 @@ public:
                 }
             }
             float correct_rate = float(correct) / element_size;
-            // std::printf("correct rage: %f\n", correct_rate);
+            // std::printf("correct rate: %f\n", correct_rate);
             EXPECT_GE(correct_rate, 0.95);
         };
 
@@ -222,7 +222,7 @@ public:
                 }
             }
             float correct_rate = float(correct) / element_size;
-            // std::printf("correct rage: %f\n", correct_rate);
+            // std::printf("correct rate: %f\n", correct_rate);
             EXPECT_GE(correct_rate, 0.95);
         };
 

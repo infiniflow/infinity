@@ -78,8 +78,8 @@ void CompactionProcessor::Stop() {
     LOG_INFO("Compaction processor is stopped.");
 }
 
-void CompactionProcessor::Submit(std::shared_ptr<BGTask> bg_task) {
-    task_queue_.Enqueue(std::move(bg_task));
+void CompactionProcessor::Submit(const std::shared_ptr<BGTask>& bg_task) {
+    task_queue_.Enqueue(bg_task);
     ++task_count_;
 }
 
@@ -327,7 +327,7 @@ void CompactionProcessor::Process() {
                     running = false;
                     break;
                 }
-                case BGTaskType::kNewCompact: {
+                case BGTaskType::kCompact: {
                     // Triggered by compact command
                     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
                     if (storage_mode == StorageMode::kUnInitialized) {

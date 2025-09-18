@@ -193,21 +193,21 @@ Status TableMeeta::RemoveSegmentIDs1(const std::vector<SegmentID> &segment_ids) 
     std::unordered_set<SegmentID> segment_ids_set(segment_ids.begin(), segment_ids.end());
 
     std::string segment_id_prefix = KeyEncode::CatalogTableSegmentKeyPrefix(db_id_str_, table_id_str_);
-    auto iter = kv_instance_->GetIterator();
-    iter->Seek(segment_id_prefix);
+    auto kv_iter = kv_instance_->GetIterator();
+    kv_iter->Seek(segment_id_prefix);
     std::vector<std::string> delete_keys;
-    while (iter->Valid() && iter->Key().starts_with(segment_id_prefix)) {
-        TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-        SegmentID segment_id = std::stoull(iter->Key().ToString().substr(segment_id_prefix.size()));
+    while (kv_iter->Valid() && kv_iter->Key().starts_with(segment_id_prefix)) {
+        TxnTimeStamp commit_ts = std::stoull(kv_iter->Value().ToString());
+        SegmentID segment_id = std::stoull(kv_iter->Key().ToString().substr(segment_id_prefix.size()));
         if (segment_ids_set.contains(segment_id)) {
             if (commit_ts > begin_ts_ and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
                 UnrecoverableError(
                     fmt::format("Segment id: {} is not allowed to be removed. commit_ts: {}, begin_ts: {}", segment_id, commit_ts, begin_ts_));
             }
             // the key is committed before the txn or the key isn't committed
-            delete_keys.push_back(iter->Key().ToString());
+            delete_keys.push_back(kv_iter->Key().ToString());
         }
-        iter->Next();
+        kv_iter->Next();
     }
     for (const std::string &key : delete_keys) {
         Status status = kv_instance_->Delete(key);
@@ -253,14 +253,14 @@ std::pair<SegmentID, Status> TableMeeta::AddSegmentID1(TxnTimeStamp commit_ts) {
 }
 
 Status TableMeeta::AddSegmentWithID(TxnTimeStamp commit_ts, SegmentID segment_id) {
-    std::string segment_id_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
-    std::string commit_ts_str = fmt::format("{}", commit_ts);
+    const std::string segment_id_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
+    const std::string commit_ts_str = fmt::format("{}", commit_ts);
     return kv_instance_->Put(segment_id_key, commit_ts_str);
 }
 
 Status TableMeeta::CommitSegment(SegmentID segment_id, TxnTimeStamp commit_ts) {
-    std::string segment_id_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
-    std::string commit_ts_str = fmt::format("{}", commit_ts);
+    const std::string segment_id_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
+    const std::string commit_ts_str = fmt::format("{}", commit_ts);
     Status status = kv_instance_->Put(segment_id_key, commit_ts_str);
     if (!status.ok()) {
         return status;
@@ -273,8 +273,8 @@ Status TableMeeta::InitSet(std::shared_ptr<TableDef> table_def) {
 
     // Create table comment;
     if (table_def->table_comment() != nullptr and !table_def->table_comment()->empty()) {
-        std::string &table_comment = *table_def->table_comment();
-        std::string table_comment_key = GetTableTag("comment");
+        const std::string &table_comment = *table_def->table_comment();
+        const std::string table_comment_key = GetTableTag("comment");
         status = kv_instance_->Put(table_comment_key, table_comment);
         if (!status.ok()) {
             return status;
@@ -289,14 +289,14 @@ Status TableMeeta::InitSet(std::shared_ptr<TableDef> table_def) {
     }
 
     // Create the next segment id;
-    std::string table_latest_segment_id_key = GetTableTag("next_segment_id");
+    const std::string table_latest_segment_id_key = GetTableTag("next_segment_id");
     status = kv_instance_->Put(table_latest_segment_id_key, "0");
     if (!status.ok()) {
         return status;
     }
 
     // Create next index id;
-    std::string next_index_id_key = GetTableTag(NEXT_INDEX_ID.data());
+    const std::string next_index_id_key = GetTableTag(NEXT_INDEX_ID.data());
     status = kv_instance_->Put(next_index_id_key, "0");
     if (!status.ok()) {
         return status;
@@ -313,7 +313,7 @@ Status TableMeeta::InitSet(std::shared_ptr<TableDef> table_def) {
     // }
 
     for (const auto &column : table_def->columns()) {
-        std::string column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column->name(), commit_ts_);
+        const std::string column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column->name(), commit_ts_);
         status = kv_instance_->Put(column_key, column->ToJson().dump());
         if (!status.ok()) {
             return status;
@@ -357,31 +357,30 @@ Status TableMeeta::LoadSet() {
 }
 
 Status TableMeeta::UninitSet(UsageFlag usage_flag) {
-    Status status;
 
     // Create next index id;
-    std::string next_index_id_key = GetTableTag(NEXT_INDEX_ID.data());
-    status = kv_instance_->Delete(next_index_id_key);
+    const std::string next_index_id_key = GetTableTag(NEXT_INDEX_ID.data());
+    Status status = kv_instance_->Delete(next_index_id_key);
     if (!status.ok()) {
         return status;
     }
 
     // delete table segment id;
-    std::string table_latest_segment_id_key = GetTableTag("next_segment_id");
+    const std::string table_latest_segment_id_key = GetTableTag("next_segment_id");
     status = kv_instance_->Delete(table_latest_segment_id_key);
     if (!status.ok()) {
         return status;
     }
 
     // Delete table column id;
-    std::string table_latest_column_id_key = GetTableTag(NEXT_COLUMN_ID.data());
+    const std::string table_latest_column_id_key = GetTableTag(NEXT_COLUMN_ID.data());
     status = kv_instance_->Delete(table_latest_column_id_key);
     if (!status.ok()) {
         return status;
     }
 
     // Delete table comment
-    std::string table_comment_key = GetTableTag("comment");
+    const std::string table_comment_key = GetTableTag("comment");
     status = kv_instance_->Delete(table_comment_key);
     if (!status.ok()) {
         return status;
@@ -404,7 +403,7 @@ Status TableMeeta::UninitSet(UsageFlag usage_flag) {
         }
     }
 
-    std::string unsealed_seg_id_key = GetTableTag("unsealed_segment_id");
+    const std::string unsealed_seg_id_key = GetTableTag("unsealed_segment_id");
     status = kv_instance_->Delete(unsealed_seg_id_key);
     if (!status.ok()) {
         if (status.code() != ErrorCode::kNotFound) {
@@ -412,12 +411,12 @@ Status TableMeeta::UninitSet(UsageFlag usage_flag) {
         }
     }
 
-    std::string table_column_prefix = KeyEncode::TableColumnPrefix(db_id_str_, table_id_str_);
+    const std::string table_column_prefix = KeyEncode::TableColumnPrefix(db_id_str_, table_id_str_);
     auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(table_column_prefix);
 
     while (iter2->Valid() && iter2->Key().starts_with(table_column_prefix)) {
-        std::string table_column_key = iter2->Key().ToString();
+        const std::string table_column_key = iter2->Key().ToString();
         status = kv_instance_->Delete(table_column_key);
         if (!status.ok()) {
             return status;
@@ -425,12 +424,12 @@ Status TableMeeta::UninitSet(UsageFlag usage_flag) {
         iter2->Next();
     }
 
-    std::string index_prefix = KeyEncode::CatalogTableIndexPrefix(db_id_str_, table_id_str_);
+    const std::string index_prefix = KeyEncode::CatalogTableIndexPrefix(db_id_str_, table_id_str_);
     auto iter = kv_instance_->GetIterator();
     iter->Seek(index_prefix);
 
     while (iter->Valid() && iter->Key().starts_with(index_prefix)) {
-        std::string index_key = iter->Key().ToString();
+        const std::string index_key = iter->Key().ToString();
         status = kv_instance_->Delete(index_key);
         if (!status.ok()) {
             return status;
