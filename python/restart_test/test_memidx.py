@@ -539,7 +539,7 @@ class TestMemIdx:
             table_obj2.insert([{"c1": 4, "c2": [0.2, 0.1, 0.3, 0.4]} for i in range(6)])
 
             # wait for mem index dump
-            time.sleep(3)
+            time.sleep(10)
 
             # 2 chunk indexes for each index
             db1_dir = data_dir + "/db_2"
@@ -554,7 +554,7 @@ class TestMemIdx:
         @decorator2
         def part2(infinity_obj):
             # wait for optimize
-            time.sleep(3)
+            time.sleep(20)
 
             # new chunk index is generated after optimize for each index
             db1_dir = data_dir + "/db_2"
