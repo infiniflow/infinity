@@ -104,9 +104,10 @@ public:
     /**
      * Utils
      */
-    std::string GetObjPath(const std::string &obj_key) const { return std::filesystem::path(workspace_).append(obj_key).string(); }
-
+    KVStore *kv_store() const { return kv_store_; }
     void SetKvStore(KVStore *kv_store);
+
+    std::string GetObjPath(const std::string &obj_key) const { return std::filesystem::path(workspace_).append(obj_key).string(); }
 
     std::unordered_map<std::string, std::shared_ptr<ObjStat>> GetAllObjects() const;
     std::unordered_map<std::string, ObjAddr> GetAllFiles() const;

@@ -692,37 +692,38 @@ void NewTxnManager::CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp be
 }
 
 void NewTxnManager::PrintAllKeyValue() const {
-    std::println("All store key and value: ");
-    std::println("{}", kv_store_->ToString());
-    std::println(" -------------- ");
+    std::stringstream ss;
+    ss << "All store key and value: " << std::endl;
+    ss << kv_store_->ToString();
+    LOG_INFO(ss.str());
 }
 
 void NewTxnManager::PrintPMKeyValue() const {
-    LOG_TRACE("Persistence Manager keys and values: ");
-    // Get all key-value pairs from the KV store
+    std::stringstream ss;
+    ss << "Persistence Manager keys and values: " << std::endl;
     std::vector<std::pair<std::string, std::string>> all_key_values = kv_store_->GetAllKeyValue();
-
     for (const auto &[key, value] : all_key_values) {
         // Check if the key is a PM key by looking for "pm|" prefix
         if (key.find("pm|") == 0) {
-            LOG_TRACE(fmt::format("PM key: {}, value: {}", key, value));
+            ss << fmt::format("PM key: {}, value: {}", key, value) << std::endl;
         }
     }
-    LOG_TRACE("------------------------------------");
+    LOG_INFO(ss.str());
 }
 
 void NewTxnManager::PrintAllDroppedKeys() const {
-    LOG_TRACE("All dropped keys: ");
+    std::stringstream ss;
+    ss << "All dropped keys: " << std::endl;
     // Get all key-value pairs from the KV store
     std::vector<std::pair<std::string, std::string>> all_key_values = kv_store_->GetAllKeyValue();
 
     for (const auto &[key, value] : all_key_values) {
         // Check if the key is a dropped key by looking for "drop|" prefix
         if (key.find("drop|") == 0) {
-            LOG_TRACE(fmt::format("Dropped key: {}, value: {}", key, value));
+            ss << fmt::format("Dropped key: {}, value: {}", key, value) << std::endl;
         }
     }
-    LOG_TRACE("------------------------------------");
+    LOG_INFO(ss.str());
 }
 
 size_t NewTxnManager::KeyValueNum() const { return kv_store_->KeyValueNum(); }

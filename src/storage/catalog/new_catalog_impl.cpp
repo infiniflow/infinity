@@ -424,24 +424,6 @@ std::vector<std::shared_ptr<MetaKey>> NewCatalog::MakeMetaKeys() const {
         }
         meta_keys.emplace_back(meta_key);
     }
-
-    auto new_end = std::ranges::remove_if(meta_keys, [&](const auto &meta_key) {
-                       if (meta_key->type_ == MetaType::kPmObject) {
-                           auto pm_path_key = static_cast<PmObjectMetaKey *>(meta_key.get());
-                           simdjson::padded_string json(pm_path_key->value_);
-                           simdjson::parser parser;
-                           simdjson::document doc = parser.iterate(json);
-                           std::string object_key = doc["obj_key"].get<std::string>();
-                           if (object_key == "KEY_EMPTY") {
-                               kv_instance_ptr->Delete(KeyEncode::PMObjectKey(pm_path_key->path_key_));
-                               return true;
-                           }
-                       }
-                       return false;
-                   }).begin();
-    meta_keys.erase(new_end, meta_keys.end());
-
-    kv_instance_ptr->Commit();
     return meta_keys;
 }
 
@@ -452,26 +434,6 @@ std::unique_ptr<SystemCache> NewCatalog::RestoreCatalogCache(Storage *storage_pt
     // std::vector<> = meta_tree->Check();
     // std::string meta_tree_str = meta_tree->ToJson().dump(4);
     // LOG_INFO(meta_tree_str);
-    Config *config_ptr = storage_ptr->config();
-    PersistenceManager *pm = storage_ptr->persistence_manager();
-    if (pm != nullptr) {
-        std::string persistence_dir = config_ptr->PersistenceDir();
-        std::vector<std::filesystem::path> uuid_files;
-        std::regex uuid_pattern("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
-        for (const auto &entry : std::filesystem::directory_iterator(persistence_dir)) {
-            if (entry.is_regular_file()) {
-                std::string filename = entry.path().filename().string();
-                if (std::regex_match(filename, uuid_pattern)) {
-                    std::string file_name = entry.path().filename().string();
-                    if (!meta_tree->pm_object_map_.contains(filename)) {
-                        // the pm object are redundant.
-                        VirtualStore::DeleteFile(entry.path().string());
-                    }
-                }
-            }
-        }
-    }
-
     std::unique_ptr<SystemCache> system_cache = meta_tree->RestoreSystemCache(storage_ptr);
     // std::vector<MetaTableObject *> table_ptrs = meta_tree->ListTables();
     // for (const auto &table_ptr : table_ptrs) {

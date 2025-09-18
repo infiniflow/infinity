@@ -137,7 +137,7 @@ void ColumnVector::AppendValue(const Value &value) {
         UnrecoverableError(fmt::format("Exceed the column vector capacity.({}/{})", tail_index, capacity_));
     }
     SetValueByIndex(tail_index, value);
-    LOG_TRACE(fmt::format("ColumnVector::AppendValue: data_ptr_ {:p}, tail_index {}, value {}", data_ptr_, tail_index, value.ToString()));
+    // LOG_TRACE(fmt::format("ColumnVector::AppendValue: data_ptr_ {:p}, tail_index {}, value {}", data_ptr_, tail_index, value.ToString()));
 }
 
 void ColumnVector::SetVectorType(ColumnVectorType vector_type) {
@@ -2267,7 +2267,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, size_t from, size_t cou
         }
     }
     tail_index_.fetch_add(count);
-    LOG_TRACE(fmt::format("ColumnVector::AppendWith: data_ptr_ {:p}, tail_index {}, from {}, count {}", data_ptr_, tail_index, from, count));
+    // LOG_TRACE(fmt::format("ColumnVector::AppendWith: data_ptr_ {:p}, tail_index {}, from {}, count {}", data_ptr_, tail_index, from, count));
 }
 
 size_t ColumnVector::AppendWith(RowID from, size_t row_count) {
