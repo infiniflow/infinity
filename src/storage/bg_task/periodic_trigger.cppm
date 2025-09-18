@@ -80,13 +80,12 @@ public:
     explicit CompactSegmentPeriodicTrigger(i64 interval, CompactionProcessor *compact_processor)
         : PeriodicTrigger(interval), compact_processor_(compact_processor) {}
 
-    explicit CompactSegmentPeriodicTrigger(i64 interval) : PeriodicTrigger(interval), new_compaction_(true) {}
+    explicit CompactSegmentPeriodicTrigger(i64 interval) : PeriodicTrigger(interval) {}
 
     virtual void Trigger() override;
 
 private:
     CompactionProcessor *const compact_processor_{};
-    bool new_compaction_ = false;
 };
 
 export class OptimizeIndexPeriodicTrigger final : public PeriodicTrigger {
@@ -94,13 +93,12 @@ public:
     explicit OptimizeIndexPeriodicTrigger(i64 interval, CompactionProcessor *compact_processor)
         : PeriodicTrigger(interval), compact_processor_(compact_processor) {}
 
-    explicit OptimizeIndexPeriodicTrigger(i64 interval) : PeriodicTrigger(interval), new_optimize_(true) {}
+    explicit OptimizeIndexPeriodicTrigger(i64 interval) : PeriodicTrigger(interval) {}
 
     virtual void Trigger() override;
 
 private:
     CompactionProcessor *const compact_processor_ = nullptr;
-    bool new_optimize_ = false;
 };
 
 } // namespace infinity

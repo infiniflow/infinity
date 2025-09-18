@@ -68,7 +68,6 @@ import :kv_utility;
 import :mem_index;
 import :catalog_cache;
 import :meta_cache;
-import :new_txn_context;
 
 import std.compat;
 import third_party;

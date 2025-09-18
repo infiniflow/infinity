@@ -308,6 +308,9 @@ Status NewTxn::OptimizeAllIndexes() {
 }
 
 Status NewTxn::OptimizeTableIndexes(const std::string &db_name, const std::string &table_name) {
+
+    LOG_TRACE(fmt::format("Attempt to optimize the indexes of table: {}.{}", db_name, table_name));
+
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
     std::string table_key;

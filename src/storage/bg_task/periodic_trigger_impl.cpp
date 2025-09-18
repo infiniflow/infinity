@@ -93,20 +93,13 @@ void CheckpointPeriodicTrigger::Trigger() {
 void CompactSegmentPeriodicTrigger::Trigger() {
     LOG_DEBUG(fmt::format("Trigger compact segment task, after {} seconds", duration_.load()));
     auto compact_task = std::make_shared<NotifyCompactTask>();
-    auto *compact_processor = InfinityContext::instance().storage()->compaction_processor();
-    compact_processor->Submit(std::move(compact_task));
+    compact_processor_->Submit(std::move(compact_task));
 }
 
 void OptimizeIndexPeriodicTrigger::Trigger() {
     LOG_DEBUG(fmt::format("Trigger optimize index task, after {} seconds", duration_.load()));
-    if (!new_optimize_) {
-        auto optimize_task = std::make_shared<NotifyOptimizeTask>();
-        compact_processor_->Submit(std::move(optimize_task));
-    } else {
-        auto optimize_task = std::make_shared<NotifyOptimizeTask>(true);
-        auto *compact_processor = InfinityContext::instance().storage()->compaction_processor();
-        compact_processor->Submit(std::move(optimize_task));
-    }
+    auto optimize_task = std::make_shared<NotifyOptimizeTask>(true);
+    compact_processor_->Submit(std::move(optimize_task));
 }
 
 } // namespace infinity
