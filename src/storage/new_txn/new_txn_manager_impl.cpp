@@ -261,7 +261,7 @@ void NewTxnManager::SaveOrResetMetaCacheForReadTxn(NewTxn *txn) {
     std::vector<std::shared_ptr<NewTxn>> check_txns = GetCheckCandidateTxns(txn);
     bool all_read_txns = true;
     for (const auto &check_txn : check_txns) {
-        if (check_txn->readonly()) {
+        if (check_txn->GetTxnStore() == nullptr or check_txn->readonly()) {
             if (check_txn->GetTxnStore() != nullptr) {
                 UnrecoverableError("Check txn store isn't empty, not read-only transaction");
             }

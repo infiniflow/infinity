@@ -68,6 +68,7 @@ import :kv_utility;
 import :mem_index;
 import :catalog_cache;
 import :meta_cache;
+import :new_txn_context;
 
 import std.compat;
 import third_party;
@@ -1734,13 +1735,6 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
     current_ckp_ts_ = checkpoint_ts;
     LOG_INFO(fmt::format("checkpoint ts: {}, txn: {}", current_ckp_ts_, txn_context_ptr_->txn_id_));
 
-    // Put the data into local txn store
-    if (base_txn_store_ != nullptr) {
-        return Status::UnexpectedError("txn store is not null");
-    }
-    base_txn_store_ = std::make_shared<CheckpointTxnStore>(checkpoint_ts, auto_checkpoint);
-    auto *txn_store = static_cast<CheckpointTxnStore *>(base_txn_store_.get());
-
     if (last_ckp_ts > 0 and last_ckp_ts + 2 >= checkpoint_ts) {
         // last checkpoint ts: last checkpoint txn begin ts. checkpoint is the begin_ts of current txn
         txn_context_ptr_->txn_type_ = TransactionType::kSkippedCheckpoint;
@@ -1765,6 +1759,13 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
     }
 
     LOG_DEBUG(fmt::format("checkpoint ts {}, got {} DBs.", checkpoint_ts, db_id_strs_ptr->size()));
+
+    // Put the data into local txn store
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+    base_txn_store_ = std::make_shared<CheckpointTxnStore>(checkpoint_ts, auto_checkpoint);
+    auto *txn_store = static_cast<CheckpointTxnStore *>(base_txn_store_.get());
 
     size_t db_count = db_id_strs_ptr->size();
     for (size_t idx = 0; idx < db_count; ++idx) {
@@ -1983,7 +1984,7 @@ WalEntry *NewTxn::GetWALEntry() const { return wal_entry_.get(); }
 // }
 
 Status NewTxn::Commit() {
-    if (this->readonly()) {
+    if (base_txn_store_ == nullptr or this->readonly()) {
         if (base_txn_store_ != nullptr) {
             UnrecoverableError("Txn store isn't empty, not read-only transaction");
         }

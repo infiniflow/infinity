@@ -24,6 +24,7 @@ import :value;
 import :snapshot_info;
 import :column_vector;
 import :fast_rough_filter;
+import :txn_context;
 
 import std;
 
@@ -35,8 +36,7 @@ import statement_common;
 namespace infinity {
 
 class KVInstance;
-class NewCatalog;
-class NewTxnManager;
+
 struct WalEntry;
 struct WalCmd;
 struct WalCmdCreateDatabaseV2;
@@ -105,7 +105,6 @@ class BufferManager;
 class IndexBase;
 struct DataBlock;
 class TableDef;
-struct TxnContext;
 struct TableInfo;
 struct DatabaseInfo;
 struct TableIndexInfo;
@@ -118,6 +117,8 @@ struct CheckpointTxnStore;
 struct MetaKey;
 struct MetaBaseCache;
 struct CacheInfo;
+class NewCatalog;
+class NewTxnManager;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
