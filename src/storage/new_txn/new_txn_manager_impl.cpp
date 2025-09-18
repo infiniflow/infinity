@@ -254,7 +254,8 @@ void NewTxnManager::SaveOrResetMetaCacheForReadTxn(NewTxn *txn) {
     }
 
     if (!txn->readonly()) {
-        UnrecoverableError("Not read-only transaction.");
+        // For non-readonly, don't save meta cache
+        return;
     }
 
     // For read-only txn check if previous txn is writable txn. If so, remove the items to cache.
