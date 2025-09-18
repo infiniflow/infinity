@@ -56,7 +56,7 @@ public:
 
     void Stop();
 
-    void Submit(std::shared_ptr<BGTask> bg_task);
+    void Submit(const std::shared_ptr<BGTask> &bg_task);
 
     void NewDoCompact();
 

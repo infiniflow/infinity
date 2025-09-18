@@ -50,7 +50,7 @@ export struct BGTask {
     bool async_{false};
 
     bool complete_{false};
-    std::mutex mutex_{};
+    mutable std::mutex mutex_{};
     std::condition_variable cv_{};
 
     void Wait() {
@@ -68,6 +68,11 @@ export struct BGTask {
         std::unique_lock<std::mutex> locker(mutex_);
         complete_ = true;
         cv_.notify_one();
+    }
+
+    bool IsComplete() const {
+        std::unique_lock<std::mutex> locker(mutex_);
+        return complete_;
     }
 
     Status result_status_{};
@@ -132,14 +137,11 @@ public:
 
 export class NotifyOptimizeTask final : public BGTask {
 public:
-    NotifyOptimizeTask(bool new_optimize = false) : BGTask(BGTaskType::kNotifyOptimize, true), new_optimize_(new_optimize) {}
+    NotifyOptimizeTask(bool new_optimize = false) : BGTask(BGTaskType::kNotifyOptimize, true) {}
 
     ~NotifyOptimizeTask() override = default;
 
     std::string ToString() const override { return "NotifyOptimizeTask"; }
-
-public:
-    bool new_optimize_ = false;
 };
 
 export class DumpMemIndexTask final : public BGTask {

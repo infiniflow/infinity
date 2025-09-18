@@ -90,16 +90,25 @@ void CheckpointPeriodicTrigger::Trigger() {
     bg_processor->Submit(std::move(checkpoint_task));
 }
 
-void CompactSegmentPeriodicTrigger::Trigger() {
-    LOG_DEBUG(fmt::format("Trigger compact segment task, after {} seconds", duration_.load()));
-    auto compact_task = std::make_shared<NotifyCompactTask>();
-    compact_processor_->Submit(std::move(compact_task));
+void CompactPeriodicTrigger::Trigger() {
+    if (compact_task_ != nullptr and !compact_task_->IsComplete()) {
+        LOG_DEBUG(fmt::format("Skipping compact task, after {} seconds", duration_.load()));
+    }
+
+    LOG_DEBUG(fmt::format("Trigger compact task, after {} seconds", duration_.load()));
+    compact_task_ = std::make_shared<NotifyCompactTask>();
+    compact_processor_->Submit(compact_task_);
 }
 
 void OptimizeIndexPeriodicTrigger::Trigger() {
+
+    if (optimize_task_ != nullptr and !optimize_task_->IsComplete()) {
+        LOG_DEBUG(fmt::format("Skipping optimize index task, after {} seconds", duration_.load()));
+    }
+
     LOG_DEBUG(fmt::format("Trigger optimize index task, after {} seconds", duration_.load()));
-    auto optimize_task = std::make_shared<NotifyOptimizeTask>(true);
-    compact_processor_->Submit(std::move(optimize_task));
+    optimize_task_ = std::make_shared<NotifyOptimizeTask>();
+    compact_processor_->Submit(optimize_task_);
 }
 
 } // namespace infinity

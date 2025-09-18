@@ -27,10 +27,12 @@ import global_resource_usage;
 namespace infinity {
 
 class NewCleanupTask;
+class NotifyOptimizeTask;
+class NotifyCompactTask;
 
 export class PeriodicTrigger {
 public:
-    explicit PeriodicTrigger(i64 interval) : interval_(interval), last_check_(std::chrono::system_clock::now()) {
+    explicit PeriodicTrigger(const i64 interval) : interval_(interval), last_check_(std::chrono::system_clock::now()) {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("PeriodicTrigger");
 #endif
@@ -44,7 +46,7 @@ public:
 
     bool Check();
 
-    void UpdateInternal(i64 new_interval) { interval_ = new_interval; }
+    void UpdateInternal(const i64 new_interval) { interval_ = new_interval; }
 
     virtual void Trigger() = 0;
 
@@ -58,11 +60,11 @@ protected:
 
 export class NewCleanupPeriodicTrigger final : public PeriodicTrigger {
 public:
-    NewCleanupPeriodicTrigger(i64 interval) : PeriodicTrigger(interval) {}
+    explicit NewCleanupPeriodicTrigger(const i64 interval) : PeriodicTrigger(interval) {}
 
     std::shared_ptr<NewCleanupTask> CreateNewCleanupTask();
 
-    virtual void Trigger() override;
+    void Trigger() override;
 
 private:
     //
@@ -70,35 +72,37 @@ private:
 
 export class CheckpointPeriodicTrigger final : public PeriodicTrigger {
 public:
-    explicit CheckpointPeriodicTrigger(i64 interval) : PeriodicTrigger(interval) {}
+    explicit CheckpointPeriodicTrigger(const i64 interval) : PeriodicTrigger(interval) {}
 
-    virtual void Trigger() override;
+    void Trigger() override;
 };
 
-export class CompactSegmentPeriodicTrigger final : public PeriodicTrigger {
+export class CompactPeriodicTrigger final : public PeriodicTrigger {
 public:
-    explicit CompactSegmentPeriodicTrigger(i64 interval, CompactionProcessor *compact_processor)
+    explicit CompactPeriodicTrigger(const i64 interval, CompactionProcessor *compact_processor)
         : PeriodicTrigger(interval), compact_processor_(compact_processor) {}
 
-    explicit CompactSegmentPeriodicTrigger(i64 interval) : PeriodicTrigger(interval) {}
+    explicit CompactPeriodicTrigger(const i64 interval) : PeriodicTrigger(interval) {}
 
-    virtual void Trigger() override;
+    void Trigger() override;
 
 private:
     CompactionProcessor *const compact_processor_{};
+    std::shared_ptr<NotifyCompactTask> compact_task_{};
 };
 
 export class OptimizeIndexPeriodicTrigger final : public PeriodicTrigger {
 public:
-    explicit OptimizeIndexPeriodicTrigger(i64 interval, CompactionProcessor *compact_processor)
+    explicit OptimizeIndexPeriodicTrigger(const i64 interval, CompactionProcessor *compact_processor)
         : PeriodicTrigger(interval), compact_processor_(compact_processor) {}
 
-    explicit OptimizeIndexPeriodicTrigger(i64 interval) : PeriodicTrigger(interval) {}
+    explicit OptimizeIndexPeriodicTrigger(const i64 interval) : PeriodicTrigger(interval) {}
 
-    virtual void Trigger() override;
+    void Trigger() override;
 
 private:
     CompactionProcessor *const compact_processor_ = nullptr;
+    std::shared_ptr<NotifyOptimizeTask> optimize_task_{};
 };
 
 } // namespace infinity

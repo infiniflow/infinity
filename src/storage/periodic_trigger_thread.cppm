@@ -33,7 +33,7 @@ public:
 public:
     std::shared_ptr<NewCleanupPeriodicTrigger> new_cleanup_trigger_;
     std::shared_ptr<CheckpointPeriodicTrigger> checkpoint_trigger_;
-    std::shared_ptr<CompactSegmentPeriodicTrigger> compact_segment_trigger_;
+    std::shared_ptr<CompactPeriodicTrigger> compact_segment_trigger_;
     std::shared_ptr<OptimizeIndexPeriodicTrigger> optimize_index_trigger_;
 
 private:
