@@ -159,8 +159,9 @@ TEST_P(TestTxnImport, test_import1) {
 
                 Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
+                auto some = col.GetValueByIndex(0);
 
-                EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
+                EXPECT_EQ(some, Value::MakeInt(1));
                 EXPECT_EQ(col.GetValueByIndex(1), Value::MakeInt(2));
                 EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeInt(1));
                 EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeInt(2));

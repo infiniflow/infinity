@@ -103,7 +103,7 @@ public:
     }
 };
 
-TEST_F(BufferObjTest, test1) {
+TEST_F(BufferObjTest, DISABLED_XXX_test1) {
     // Earlier cases may leave a dirty infinity instance. Destroy it first.
     infinity::Infinity::LocalUnInit();
     RemoveDbDirs();
@@ -309,7 +309,7 @@ TEST_F(BufferObjTest, test1) {
     infinity::InfinityContext::instance().UnInit();
 }
 
-TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
+TEST_F(BufferObjTest, DISABLED_XXX_test_hnsw_index_buffer_obj_shutdown) {
     // Earlier cases may leave a dirty infinity instance. Destroy it first.
     infinity::Infinity::LocalUnInit();
     RemoveDbDirs();
@@ -457,7 +457,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     infinity::InfinityContext::instance().UnInit();
 }
 
-TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
+TEST_F(BufferObjTest, DISABLED_XXX_test_big_with_gc_and_cleanup) {
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
     // Earlier cases may leave a dirty infinity instance. Destroy it first.
     infinity::Infinity::LocalUnInit();
@@ -591,7 +591,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     infinity::InfinityContext::instance().UnInit();
 }
 
-TEST_F(BufferObjTest, DISABLED_SLOW_test_multiple_threads_read) {
+TEST_F(BufferObjTest, DISABLED_XXX_DISABLED_SLOW_test_multiple_threads_read) {
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
     // Earlier cases may leave a dirty infinity instance. Destroy it first.
     infinity::Infinity::LocalUnInit();

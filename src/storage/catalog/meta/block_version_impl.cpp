@@ -290,7 +290,7 @@ Status BlockVersion::Print(TxnTimeStamp begin_ts, i32 offset, bool ignore_invisi
 }
 
 void BlockVersion::RestoreFromSnapshot(TxnTimeStamp commit_ts) {
-    // set all the create timestamp to commit_ts
+    // set all the creation timestamp to commit_ts
     auto row_count = created_.back().row_count_;
     created_.clear();
     created_.emplace_back(commit_ts, row_count);

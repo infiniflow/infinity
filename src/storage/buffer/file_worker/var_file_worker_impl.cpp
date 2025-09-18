@@ -33,33 +33,37 @@ VarFileWorker::VarFileWorker(std::shared_ptr<std::string> data_dir,
                              size_t buffer_size,
                              PersistenceManager *persistence_manager)
     : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager),
-      buffer_size_(buffer_size) {}
+      buffer_size_(buffer_size) {
+    VarFileWorker::AllocateInMemory();
+}
 
 VarFileWorker::~VarFileWorker() {
-    if (data_ != nullptr) {
-        FreeInMemory();
-        data_ = nullptr;
-    }
+    // if (data_ != nullptr) {
+    //     FreeInMemory();
+    //     data_ = nullptr;
+    // }
 
-    if (mmap_data_ != nullptr) {
-        auto *var_buffer = reinterpret_cast<VarBuffer *>(mmap_data_);
-        delete var_buffer;
-        mmap_data_ = nullptr;
-    }
+    VarFileWorker::FreeInMemory();
+
+    // if (mmap_data_ != nullptr) {
+    //     auto *var_buffer = reinterpret_cast<VarBuffer *>(mmap_data_);
+    //     delete var_buffer;
+    //     mmap_data_ = nullptr;
+    // }
 }
 
 void VarFileWorker::AllocateInMemory() {
-    if (data_ != nullptr) {
-        UnrecoverableError("Data is already allocated.");
-    }
+    // if (data_ != nullptr) {
+    //     UnrecoverableError("Data is already allocated.");
+    // }
     auto *buffer = new VarBuffer(buffer_obj_);
     data_ = static_cast<void *>(buffer);
 }
 
 void VarFileWorker::FreeInMemory() {
-    if (data_ == nullptr) {
-        UnrecoverableError("Data is already freed.");
-    }
+    // if (data_ == nullptr) {
+    //     UnrecoverableError("Data is already freed.");
+    // }
     auto *buffer = static_cast<VarBuffer *>(data_);
     buffer_size_ = buffer->TotalSize();
     delete buffer;

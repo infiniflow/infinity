@@ -43,7 +43,9 @@ public:
                           std::move(index_base),
                           std::move(column_def),
                           persistence_manager),
-          start_segment_offset_(start_segment_offset) {}
+          start_segment_offset_(start_segment_offset) {
+        AllocateInMemory();
+    }
 
     ~EMVBIndexFileWorker() override;
 

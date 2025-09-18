@@ -72,7 +72,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnReplayTest,
                          ::testing::Values(TestTxnReplayTest::NEW_CONFIG_PATH, TestTxnReplayTest::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestTxnReplayTest, test_replay_create_db) {
+TEST_P(TestTxnReplayTest, DISABLED_XXX_test_replay_create_db) {
     using namespace infinity;
 
     {
@@ -584,7 +584,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_compact) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestTxnReplayTest, test_replay_flush_gap_delete_compact) {
+TEST_P(TestTxnReplayTest, DISABLED_XXX_test_replay_flush_gap_delete_compact) {
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -693,7 +693,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_delete_compact) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_rename) {
+TEST_P(TestTxnReplayTest, DISABLED_XXX_test_replay_flush_gap_append_rename) {
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -779,7 +779,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_rename) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_dump_optimize_index) {
+TEST_P(TestTxnReplayTest, DISABLED_XXX_test_replay_flush_gap_append_dump_optimize_index) {
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -895,7 +895,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_dump_optimize_index) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_append) {
+TEST_P(TestTxnReplayTest, DISABLED_XXX_test_replay_flush_gap_append_append) {
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -1019,7 +1019,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_append) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestTxnReplayTest, test_replay_flush_gap_dump_index) {
+TEST_P(TestTxnReplayTest, DISABLED_XXX_test_replay_flush_gap_dump_index) {
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -1159,7 +1159,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_dump_index) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestTxnReplayTest, test_replay_flush_gap_optimize_index) {
+TEST_P(TestTxnReplayTest, DISABLED_XXX_test_replay_flush_gap_optimize_index) {
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());

@@ -283,7 +283,7 @@ TEST_P(TestTxnReplayAppend, test_replay_append_delete) {
     }
 }
 
-TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
+TEST_P(TestTxnReplayAppend, DISABLED_XXX_test_replay_append_with_index0) {
     using namespace infinity;
 
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");

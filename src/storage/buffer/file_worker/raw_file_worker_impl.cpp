@@ -35,29 +35,32 @@ RawFileWorker::RawFileWorker(std::shared_ptr<std::string> data_dir,
                              std::shared_ptr<std::string> file_name,
                              u32 file_size,
                              PersistenceManager *persistence_manager)
-    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), buffer_size_(file_size) {}
+    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), buffer_size_(file_size) {
+    RawFileWorker::AllocateInMemory();
+}
 
 RawFileWorker::~RawFileWorker() {
-    if (data_ != nullptr) {
-        FreeInMemory();
-        data_ = nullptr;
-    }
+    // if (data_ != nullptr) {
+    //     FreeInMemory();
+    //     data_ = nullptr;
+    // }
+    RawFileWorker::FreeInMemory();
 }
 
 void RawFileWorker::AllocateInMemory() {
-    if (data_ != nullptr) {
-        UnrecoverableError("Data is already allocated.");
-    }
-    if (buffer_size_ == 0) {
-        UnrecoverableError("Buffer size is 0.");
-    }
+    // if (data_ != nullptr) {
+    //     UnrecoverableError("Data is already allocated.");
+    // }
+    // if (buffer_size_ == 0) {
+    //     UnrecoverableError("Buffer size is 0.");
+    // }
     data_ = static_cast<void *>(new char[buffer_size_]);
 }
 
 void RawFileWorker::FreeInMemory() {
-    if (data_ == nullptr) {
-        UnrecoverableError("Data is already freed.");
-    }
+    // if (data_ == nullptr) {
+    //     UnrecoverableError("Data is already freed.");
+    // }
     delete[] static_cast<char *>(data_);
     data_ = nullptr;
 }

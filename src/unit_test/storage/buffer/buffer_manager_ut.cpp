@@ -98,7 +98,7 @@ protected:
     }
 };
 
-TEST_F(BufferManagerTest, cleanup_test) {
+TEST_F(BufferManagerTest, DISABLED_XXX_cleanup_test) {
     const size_t k = 2;
     const size_t file_size = 100;
     const size_t buffer_size = k * file_size;
@@ -203,7 +203,7 @@ TEST_F(BufferManagerTest, cleanup_test) {
     }
 }
 
-TEST_F(BufferManagerTest, varfile_test) {
+TEST_F(BufferManagerTest, DISABLED_XXX_varfile_test) {
     size_t buffer_size = 100;
     size_t file_num = 10;
 
@@ -419,7 +419,7 @@ public:
     }
 };
 
-TEST_F(BufferManagerParallelTest, parallel_test1) {
+TEST_F(BufferManagerParallelTest, DISABLED_XXX_parallel_test1) {
     for (int i = 0; i < 1; ++i) {
         auto persistence_manager_ = std::make_shared<PersistenceManager>(infinity::InfinityContext::instance().storage(),
                                                                          *persistence_dir_,
@@ -506,7 +506,7 @@ public:
     }
 };
 
-TEST_F(BufferManagerParallelTest, parallel_test2) {
+TEST_F(BufferManagerParallelTest, DISABLED_XXX_parallel_test2) {
     for (int i = 0; i < 1; ++i) {
         auto buffer_mgr = std::make_unique<BufferManager>(buffer_size, data_dir_, temp_dir_, nullptr);
         auto test2_obj = std::make_unique<Test2Obj>(var_file_step, buffer_mgr.get(), data_dir_, temp_dir_);

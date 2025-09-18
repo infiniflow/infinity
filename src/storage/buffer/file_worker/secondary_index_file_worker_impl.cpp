@@ -36,9 +36,10 @@ SecondaryIndexFileWorker::~SecondaryIndexFileWorker() {
 }
 
 void SecondaryIndexFileWorker::AllocateInMemory() {
-    if (data_) [[unlikely]] {
-        UnrecoverableError("AllocateInMemory: Already allocated.");
-    } else if (auto &data_type = column_def_->type(); data_type->CanBuildSecondaryIndex()) [[likely]] {
+    // if (data_) [[unlikely]] {
+    //     UnrecoverableError("AllocateInMemory: Already allocated.");
+    // } else
+    if (auto &data_type = column_def_->type(); data_type->CanBuildSecondaryIndex()) [[likely]] {
         data_ = static_cast<void *>(GetSecondaryIndexData(data_type, row_count_, true));
         LOG_TRACE("Finished AllocateInMemory().");
     } else {

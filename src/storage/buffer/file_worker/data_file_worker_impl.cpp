@@ -35,22 +35,28 @@ DataFileWorker::DataFileWorker(std::shared_ptr<std::string> data_dir,
                                size_t buffer_size,
                                PersistenceManager *persistence_manager)
     : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager),
-      buffer_size_(buffer_size) {}
+      buffer_size_(buffer_size) {
+    DataFileWorker::AllocateInMemory();
+}
 
 DataFileWorker::~DataFileWorker() {
-    if (data_ != nullptr) {
-        FreeInMemory();
-        data_ = nullptr;
-    }
+    // if (data_ != nullptr) {
+    //     FreeInMemory();
+    //     data_ = nullptr;
+    // }
+    // if (data_ == nullptr) {
+    //     UnrecoverableError("Data is already freed.");
+    // }
+    DataFileWorker::FreeInMemory();
 }
 
 void DataFileWorker::AllocateInMemory() {
-    if (data_ != nullptr) {
-        UnrecoverableError("Data is already allocated.");
-    }
-    if (buffer_size_ == 0) {
-        UnrecoverableError("Buffer size is 0.");
-    }
+    // if (data_ != nullptr) {
+    //     UnrecoverableError("Data is already allocated.");
+    // }
+    // if (buffer_size_ == 0) {
+    //     UnrecoverableError("Buffer size is 0.");
+    // }
     data_ = static_cast<void *>(new char[buffer_size_]{});
 }
 

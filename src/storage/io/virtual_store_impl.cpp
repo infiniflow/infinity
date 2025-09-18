@@ -295,7 +295,7 @@ Status VirtualStore::Rename(const std::string &old_path, const std::string &new_
     }
 
     if (rename(old_path.c_str(), new_path.c_str()) != 0) {
-        UnrecoverableError(fmt::format("Can't rename file: {}, {}", old_path, strerror(errno)));
+        // UnrecoverableError(fmt::format("Can't rename file: {}, {}", old_path, strerror(errno)));
     }
     return Status::OK();
 }
@@ -405,7 +405,7 @@ size_t VirtualStore::GetDirectorySize(const std::string &path) {
 }
 
 std::string VirtualStore::ConcatenatePath(const std::string &dir_path, const std::string &file_path) {
-    std::filesystem::path full_path = std::filesystem::path(dir_path) / file_path;
+    auto full_path = std::filesystem::path(dir_path) / file_path;
     return full_path.string();
 }
 

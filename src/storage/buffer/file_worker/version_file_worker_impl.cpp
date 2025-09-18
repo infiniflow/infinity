@@ -31,30 +31,33 @@ VersionFileWorker::VersionFileWorker(std::shared_ptr<std::string> data_dir,
                                      std::shared_ptr<std::string> file_name,
                                      size_t capacity,
                                      PersistenceManager *persistence_manager)
-    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), capacity_(capacity) {}
+    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), capacity_(capacity) {
+    VersionFileWorker::AllocateInMemory();
+}
 
 VersionFileWorker::~VersionFileWorker() {
-    if (data_ != nullptr) {
-        FreeInMemory();
-        data_ = nullptr;
-    }
+    // if (data_ != nullptr) {
+    //     FreeInMemory();
+    //     data_ = nullptr;
+    // }
+    VersionFileWorker::FreeInMemory();
 }
 
 void VersionFileWorker::AllocateInMemory() {
-    if (data_ != nullptr) {
-        UnrecoverableError("Data is already allocated.");
-    }
-    if (capacity_ == 0) {
-        UnrecoverableError("Capacity is 0.");
-    }
+    // if (data_ != nullptr) {
+    //     UnrecoverableError("Data is already allocated.");
+    // }
+    // if (capacity_ == 0) {
+    //     UnrecoverableError("Capacity is 0.");
+    // }
     auto *data = new BlockVersion(capacity_);
     data_ = static_cast<void *>(data);
 }
 
 void VersionFileWorker::FreeInMemory() {
-    if (data_ == nullptr) {
-        UnrecoverableError("Data is already freed.");
-    }
+    // if (data_ == nullptr) {
+    //     UnrecoverableError("Data is already freed.");
+    // }
     auto *data = static_cast<BlockVersion *>(data_);
     delete data;
     data_ = nullptr;

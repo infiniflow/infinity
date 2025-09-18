@@ -62,23 +62,27 @@ HnswFileWorker::HnswFileWorker(std::shared_ptr<std::string> data_dir,
         }
     }
     index_size_ = index_size;
+
+    HnswFileWorker::AllocateInMemory();
 }
 
 HnswFileWorker::~HnswFileWorker() {
-    if (data_ != nullptr) {
-        FreeInMemory();
-        data_ = nullptr;
-    }
-    if (mmap_data_ != nullptr) {
-        FreeFromMmapImpl();
-        mmap_data_ = nullptr;
-    }
+    // if (data_ != nullptr) {
+    //     FreeInMemory();
+    //     data_ = nullptr;
+    // }
+    // if (mmap_data_ != nullptr) {
+    //     FreeFromMmapImpl();
+    //     mmap_data_ = nullptr;
+    // }
+
+    HnswFileWorker::FreeInMemory();
 }
 
 void HnswFileWorker::AllocateInMemory() {
-    if (data_) {
-        UnrecoverableError("Data is already allocated.");
-    }
+    // if (data_) {
+    //     UnrecoverableError("Data is already allocated.");
+    // }
     data_ = static_cast<void *>(new HnswHandlerPtr());
 }
 

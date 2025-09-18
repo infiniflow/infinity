@@ -309,14 +309,6 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
             }
         }
 
-        // Change type and status of buffer object of the import data files
-        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-        for (auto &import_file : import_file_paths) {
-            if (import_file.ends_with(".col") || import_file.ends_with("_out")) {
-                buffer_mgr->ChangeBufferObjectState(import_file);
-            }
-        }
-
         block_row_cnts_in_seg[segment_idx].push_back(block_row_cnts[input_block_idx]);
         segment_row_cnts[segment_idx] += block_row_cnts[input_block_idx];
         import_txn_store->row_count_ += block_row_cnts[input_block_idx];

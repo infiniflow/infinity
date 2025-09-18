@@ -37,19 +37,20 @@ import internal_types;
 namespace infinity {
 
 EMVBIndexFileWorker::~EMVBIndexFileWorker() {
-    if (data_ != nullptr) {
-        FreeInMemory();
-        data_ = nullptr;
-    }
+    // if (data_ != nullptr) {
+    //     FreeInMemory();
+    //     data_ = nullptr;
+    // }
+    FreeInMemory();
 }
 
 void EMVBIndexFileWorker::AllocateInMemory() {
-    if (data_) {
-        UnrecoverableError("Data is already allocated.");
-    }
-    if (index_base_->index_type_ != IndexType::kEMVB) {
-        UnrecoverableError("Index type is mismatched");
-    }
+    // if (data_) {
+    //     UnrecoverableError("Data is already allocated.");
+    // }
+    // if (index_base_->index_type_ != IndexType::kEMVB) {
+    //     UnrecoverableError("Index type is mismatched");
+    // }
     const auto &data_type = column_def_->type();
     if (data_type->type() != LogicalType::kTensor) {
         UnrecoverableError("EMVB Index should be created on Tensor column now.");
@@ -72,9 +73,9 @@ void EMVBIndexFileWorker::AllocateInMemory() {
 }
 
 void EMVBIndexFileWorker::FreeInMemory() {
-    if (!data_) {
-        UnrecoverableError("Data is not allocated.");
-    }
+    // if (!data_) {
+    //     UnrecoverableError("Data is not allocated.");
+    // }
     auto index = static_cast<EMVBIndex *>(data_);
     delete index;
     data_ = nullptr;

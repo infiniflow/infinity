@@ -19,6 +19,7 @@ import :file_worker;
 import :index_base;
 import :file_worker_type;
 import :persistence_manager;
+import :ivf_index_data;
 
 import column_def;
 
@@ -39,7 +40,9 @@ public:
                           std::move(file_name),
                           std::move(index_base),
                           std::move(column_def),
-                          persistence_manager) {}
+                          persistence_manager) {
+        IVFIndexFileWorker::AllocateInMemory();
+    }
 
     ~IVFIndexFileWorker() override;
 

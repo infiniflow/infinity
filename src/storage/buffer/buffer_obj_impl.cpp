@@ -71,74 +71,11 @@ void BufferObj::UpdateFileWorkerInfo(std::unique_ptr<FileWorker> new_file_worker
 }
 
 BufferHandle BufferObj::Load() {
-    buffer_mgr_->AddRequestCount();
+    // buffer_mgr_->AddRequestCount();
     std::unique_lock<std::mutex> locker(w_locker_);
-    if (type_ == BufferType::kMmap) {
-        switch (status_) {
-            case BufferStatus::kUnloaded:
-            case BufferStatus::kLoaded: {
-                break;
-            }
-            case BufferStatus::kFreed:
-            case BufferStatus::kNew: {
-                file_worker_->Mmap();
-                break;
-            }
-            default: {
-                UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
-            }
-        }
-        status_ = BufferStatus::kLoaded;
-        ++rc_;
-        void *data = file_worker_->GetMmapData();
-        return BufferHandle(this, data);
+    if (file_worker_->GetData() == nullptr) {
+        file_worker_->AllocateInMemory();
     }
-    switch (status_) {
-        case BufferStatus::kLoaded: {
-            break;
-        }
-        case BufferStatus::kUnloaded: {
-            if (!buffer_mgr_->RemoveFromGCQueue(this)) {
-                UnrecoverableError(fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", GetFilename()));
-            }
-            break;
-        }
-        case BufferStatus::kFreed: {
-            buffer_mgr_->AddCacheMissCount();
-
-            if (type_ == BufferType::kEphemeral) {
-                UnrecoverableError("Invalid status");
-            }
-
-            bool from_spill = type_ != BufferType::kPersistent;
-            file_worker_->ReadFromFile(from_spill);
-
-            size_t buffer_size = GetBufferSize();
-            LOG_TRACE(fmt::format("Request memory {}", buffer_size));
-            bool free_success = buffer_mgr_->RequestSpace(buffer_size);
-            if (!free_success) {
-                UnrecoverableError("Out of memory.");
-            }
-            break;
-        }
-        case BufferStatus::kNew: {
-            buffer_mgr_->AddCacheMissCount();
-
-            size_t buffer_size = GetBufferSize();
-            LOG_TRACE(fmt::format("Request memory {}", buffer_size));
-            bool free_success = buffer_mgr_->RequestSpace(buffer_size);
-            if (!free_success) {
-                UnrecoverableError("Out of memory.");
-            }
-            file_worker_->AllocateInMemory();
-            LOG_TRACE(fmt::format("Allocated memory {}", buffer_size));
-            break;
-        }
-        default: {
-            UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
-        }
-    }
-    status_ = BufferStatus::kLoaded;
     ++rc_;
     void *data = file_worker_->GetData();
     return BufferHandle(this, data);
@@ -149,30 +86,6 @@ bool BufferObj::Free() {
     if (!locker.try_lock()) {
         return false; // when other thread is loading or cleaning, return false
     }
-    if (status_ != BufferStatus::kUnloaded) {
-        UnrecoverableError(fmt::format("attempt to free {} buffer object", BufferStatusToString(status_)));
-    }
-    switch (type_) {
-        case BufferType::kTemp:
-            [[fallthrough]];
-        case BufferType::kPersistent: {
-            // do nothing
-            break;
-        }
-        case BufferType::kEphemeral: {
-            type_ = BufferType::kTemp;
-            bool all_save = file_worker_->WriteToFile(true);
-            if (!all_save) {
-                UnrecoverableError(fmt::format("Spill to file failed: {}", GetFilename()));
-            }
-            buffer_mgr_->AddTemp(this);
-            break;
-        }
-        default: {
-            UnrecoverableError(fmt::format("Invalid buffer type: {}", BufferTypeToString(type_)));
-        }
-    }
-    file_worker_->FreeInMemory();
     status_ = BufferStatus::kFreed;
     return true;
 }
@@ -180,100 +93,20 @@ bool BufferObj::Free() {
 bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
     bool write = false;
     std::unique_lock<std::mutex> locker(w_locker_);
-    LOG_TRACE(fmt::format("BufferObj::Save begin, type_: {}, status_: {}, file: {}", int(type_), int(status_), GetFilename()));
-    if (type_ == BufferType::kEphemeral) {
-        switch (status_) {
-            case BufferStatus::kNew: {
-                file_worker_->AllocateInMemory();
-                buffer_mgr_->PushGCQueue(this);
-                status_ = BufferStatus::kUnloaded;
-            }
-            case BufferStatus::kLoaded:
-                [[fallthrough]];
-            case BufferStatus::kUnloaded: {
-                LOG_TRACE(fmt::format("BufferObj::Save file: {}", GetFilename()));
-                bool all_save = file_worker_->WriteToFile(false, ctx);
-                if (all_save) {
-                    type_ = BufferType::kPersistent;
-                }
-                write = true;
-                break;
-            }
-            case BufferStatus::kFreed: {
-                LOG_TRACE(fmt::format("BufferObj::Move file: {}", GetFilename()));
-                file_worker_->MoveFile();
-                break;
-            }
-            default: {
-                UnrecoverableError(fmt::format("Invalid buffer status: {}.", BufferStatusToString(status_)));
-            }
-        }
-    } else if (type_ == BufferType::kTemp) {
-        LOG_TRACE(fmt::format("BufferObj::Move file: {}", GetFilename()));
-        buffer_mgr_->MoveTemp(this);
-        file_worker_->MoveFile();
-        type_ = BufferType::kPersistent;
+    if (file_worker_->GetData() == nullptr) {
+        file_worker_->AllocateInMemory();
     }
-    LOG_TRACE(fmt::format("BufferObj::Save end, type_: {}, status_: {}, file: {}, write: {}", int(type_), int(status_), GetFilename(), write));
+    [[maybe_unused]] bool all_save = file_worker_->WriteToFile(false, ctx);
+
     return write;
 }
 
 void BufferObj::PickForCleanup() {
     std::unique_lock<std::mutex> locker(w_locker_);
-    if (obj_rc_ == 0) {
-        UnrecoverableError(fmt::format("SubObjRc: obj_rc_ is 0, buffer: {}", GetFilename()));
-    }
-    obj_rc_--;
-    if (obj_rc_ > 0) {
-        LOG_INFO(fmt::format("BufferObj::PickForCleanup: obj_rc_ is {}, buffer: {}", obj_rc_, GetFilename()));
-        return;
-    }
-    if (type_ == BufferType::kMmap) {
-        file_worker_->Munmap();
-        buffer_mgr_->AddToCleanList(this, false /*do_free*/);
-        status_ = BufferStatus::kClean;
-        return;
-    }
-    switch (status_) {
-        // when insert data into table with index, the index buffer_obj
-        // will remain BufferStatus::kNew, so we should allow this situation
-        case BufferStatus::kNew: {
-            if (file_worker_->GetData() != nullptr) {
-                file_worker_->FreeInMemory();
-            }
-            buffer_mgr_->AddToCleanList(this, false /*do_free*/);
-            break;
-        }
-        case BufferStatus::kFreed: {
-            buffer_mgr_->AddToCleanList(this, false /*do_free*/);
-            break;
-        }
-        case BufferStatus::kUnloaded: {
-            file_worker_->FreeInMemory();
-            buffer_mgr_->AddToCleanList(this, true /*do_free*/);
-            break;
-        }
-        default: {
-            UnrecoverableError(fmt::format("Buffer: {}, Invalid status: {}, buffer type: {}, rc: {}",
-                                           GetFilename(),
-                                           BufferStatusToString(status_),
-                                           BufferTypeToString(type_),
-                                           rc_));
-        }
-    }
-    status_ = BufferStatus::kClean;
-    if (type_ == BufferType::kTemp) {
-        buffer_mgr_->RemoveTemp(this);
-    }
+    buffer_mgr_->AddToCleanList(this, false /*do_free*/);
 }
 
 Status BufferObj::CleanupFile() const {
-    if (status_ != BufferStatus::kClean) {
-        UnrecoverableError("Invalid status");
-    }
-    if (file_worker_->GetData() != nullptr) {
-        UnrecoverableError("Buffer is not freed.");
-    }
     return file_worker_->CleanupFile();
 }
 
@@ -287,33 +120,10 @@ void BufferObj::CleanupTempFile() const {
 
 void BufferObj::ToMmap() {
     std::unique_lock<std::mutex> locker(w_locker_);
-    if (type_ == BufferType::kMmap) {
-        return;
+    if (file_worker_->GetData()) {
+        file_worker_->AllocateInMemory();
     }
-    if (type_ != BufferType::kPersistent) {
-        UnrecoverableError(fmt::format("Invalid buffer type: {}", BufferTypeToString(type_)));
-    }
-    switch (status_) {
-        case BufferStatus::kLoaded: {
-            type_ = BufferType::kToMmap;
-            break;
-        }
-        case BufferStatus::kUnloaded: {
-            buffer_mgr_->RemoveFromGCQueue(this);
-            file_worker_->FreeInMemory();
-            buffer_mgr_->FreeUnloadBuffer(this);
-            status_ = BufferStatus::kFreed;
-            type_ = BufferType::kMmap;
-            break;
-        }
-        case BufferStatus::kFreed: {
-            type_ = BufferType::kMmap;
-            break;
-        }
-        default: {
-            UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
-        }
-    }
+    file_worker_->Mmap();
 }
 
 void BufferObj::LoadInner() {
@@ -341,24 +151,24 @@ void *BufferObj::GetMutPointer() {
 
 void BufferObj::UnloadInner() {
     std::unique_lock<std::mutex> locker(w_locker_);
-    if (status_ != BufferStatus::kLoaded) {
-        UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
-    }
+    // if (status_ != BufferStatus::kLoaded) {
+    //     UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
+    // }
     --rc_;
-    if (rc_ == 0) {
-        if (type_ == BufferType::kToMmap) {
-            file_worker_->FreeInMemory();
-            buffer_mgr_->FreeUnloadBuffer(this);
-            status_ = BufferStatus::kFreed;
-            type_ = BufferType::kMmap;
-        } else if (type_ == BufferType::kMmap) {
-            file_worker_->MmapNotNeed();
-            status_ = BufferStatus::kUnloaded;
-        } else {
-            buffer_mgr_->PushGCQueue(this);
-            status_ = BufferStatus::kUnloaded;
-        }
-    }
+    // if (rc_ == 0) {
+    //     if (type_ == BufferType::kToMmap) {
+    //         file_worker_->FreeInMemory();
+    //         buffer_mgr_->FreeUnloadBuffer(this);
+    //         status_ = BufferStatus::kFreed;
+    //         type_ = BufferType::kMmap;
+    //     } else if (type_ == BufferType::kMmap) {
+    //         file_worker_->MmapNotNeed();
+    //         status_ = BufferStatus::kUnloaded;
+    //     } else {
+    //         buffer_mgr_->PushGCQueue(this);
+    //         status_ = BufferStatus::kUnloaded;
+    //     }
+    // }
 }
 
 bool BufferObj::AddBufferSize(size_t add_size) {

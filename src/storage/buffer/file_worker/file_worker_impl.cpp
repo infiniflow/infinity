@@ -169,9 +169,9 @@ void FileWorker::MoveFile() {
 }
 
 void FileWorker::SetData(void *data) {
-    if (data_ != nullptr) {
-        UnrecoverableError("Data has been set.");
-    }
+    // if (data_ != nullptr) {
+    //     UnrecoverableError("Data has been set.");
+    // }
     data_ = data;
 }
 

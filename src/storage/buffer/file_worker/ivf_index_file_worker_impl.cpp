@@ -28,32 +28,34 @@ import third_party;
 namespace infinity {
 
 IVFIndexFileWorker::~IVFIndexFileWorker() {
-    if (data_ != nullptr) {
-        FreeInMemory();
-        data_ = nullptr;
-    }
+    // if (data_ != nullptr) {
+    //     FreeInMemory();
+    //     data_ = nullptr;
+    // }
+    FreeInMemory();
 }
 
 void IVFIndexFileWorker::AllocateInMemory() {
-    if (data_) [[unlikely]] {
-        UnrecoverableError("AllocateInMemory: Already allocated.");
-    }
+    // if (data_) [[unlikely]] {
+    //     UnrecoverableError("AllocateInMemory: Already allocated.");
+    // }
     data_ = static_cast<void *>(IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get()));
 }
 
 void IVFIndexFileWorker::FreeInMemory() {
-    if (data_) [[likely]] {
+    if (data_) {
         auto index = static_cast<IVFIndexInChunk *>(data_);
         delete index;
         data_ = nullptr;
         LOG_TRACE("Finished IVFIndexFileWorker::FreeInMemory(), deleted data_ ptr.");
-    } else {
-        UnrecoverableError("FreeInMemory: Data is not allocated.");
     }
+    // else {
+    //     UnrecoverableError("FreeInMemory: Data is not allocated.");
+    // }
 }
 
 bool IVFIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-    if (data_) [[likely]] {
+    if (data_) {
         auto index = static_cast<IVFIndexInChunk *>(data_);
         index->SaveIndexInner(*file_handle_);
         prepare_success = true;
@@ -65,7 +67,7 @@ bool IVFIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, c
 }
 
 void IVFIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
-    if (!data_) [[likely]] {
+    if (!data_) {
         auto index = IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get());
         index->ReadIndexInner(*file_handle_);
         data_ = static_cast<void *>(index);
