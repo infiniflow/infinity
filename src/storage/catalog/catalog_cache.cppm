@@ -78,8 +78,8 @@ export struct SegmentIndexCache {
 public:
     explicit SegmentIndexCache(SegmentID segment_id) : segment_id_(segment_id) {}
 
-    SegmentID segment_id() const { return segment_id_; }
-    ChunkID next_chunk_id() const { return next_chunk_id_; }
+    [[nodiscard]] SegmentID segment_id() const { return segment_id_; }
+    [[nodiscard]] ChunkID next_chunk_id() const { return next_chunk_id_; }
 
     SegmentID segment_id_{};
     ChunkID next_chunk_id_{};
@@ -149,7 +149,7 @@ public:
     void AddTableIndexCacheNolock(const std::shared_ptr<TableIndexCache> &table_index_cache);
     void DropTableIndexCacheNolock(u64 index_id);
 
-    std::string ToString() const;
+    [[nodiscard]] std::string ToString() const;
 
     u64 table_id_{};
     std::string table_name_{};

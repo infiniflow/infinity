@@ -2095,14 +2095,14 @@ Status NewTxn::GetFullTextIndexReader(const std::string &db_name, const std::str
 }
 
 Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    std::string db_name = create_index_cmd->db_name_;
-    std::string table_name = create_index_cmd->table_name_;
-    std::string index_name = *create_index_cmd->index_base_->index_name_;
-    std::string db_id_str = create_index_cmd->db_id_;
-    std::string table_id_str = create_index_cmd->table_id_;
-    std::string table_key = create_index_cmd->table_key_;
-    std::string &index_id_str = create_index_cmd->index_id_;
+    const TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    const std::string &db_name = create_index_cmd->db_name_;
+    const std::string &table_name = create_index_cmd->table_name_;
+    const std::string &index_name = *create_index_cmd->index_base_->index_name_;
+    const std::string &db_id_str = create_index_cmd->db_id_;
+    const std::string &table_id_str = create_index_cmd->table_id_;
+    const std::string &table_key = create_index_cmd->table_key_;
+    const std::string &index_id_str = create_index_cmd->index_id_;
     std::shared_ptr<IndexBase> &index_base = create_index_cmd->index_base_;
 
     TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
@@ -2201,7 +2201,7 @@ Status NewTxn::PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
 }
 
 Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVInstance *kv_instance) {
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    const TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const std::string &db_id_str = dump_index_cmd->db_id_;
     const std::string &table_id_str = dump_index_cmd->table_id_;
     const std::string &table_name = dump_index_cmd->table_name_;

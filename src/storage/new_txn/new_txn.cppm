@@ -338,8 +338,6 @@ public:
                   const std::vector<RowID> &row_ids);
 
 private:
-    std::tuple<std::vector<std::pair<RowID, u64>>, Status> GetRowRanges(TableMeeta &table_meta, const std::shared_ptr<DataBlock> &input_block);
-
     Status AppendInner(const std::string &db_name,
                        const std::string &table_name,
                        const std::string &table_key,
@@ -366,25 +364,25 @@ public:
     Status Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint);
 
     // Getter
-    BufferManager *buffer_mgr() const { return buffer_mgr_; }
+    [[nodiscard]] BufferManager *buffer_mgr() const { return buffer_mgr_; }
 
-    TransactionID TxnID() const;
+    [[nodiscard]] TransactionID TxnID() const;
 
-    TxnTimeStamp BeginTS() const;
+    [[nodiscard]] TxnTimeStamp BeginTS() const;
 
-    TxnTimeStamp CommitTS() const;
+    [[nodiscard]] TxnTimeStamp CommitTS() const;
 
-    TxnTimeStamp KVCommitTS() const;
+    [[nodiscard]] TxnTimeStamp KVCommitTS() const;
 
-    TxnTimeStamp LastSystemKVCommitTS() const;
+    [[nodiscard]] TxnTimeStamp LastSystemKVCommitTS() const;
 
-    TxnTimeStamp LastSystemCommitTS() const;
+    [[nodiscard]] TxnTimeStamp LastSystemCommitTS() const;
 
     void SetTxnKVCommitTS(TxnTimeStamp kv_commit_ts);
 
-    TxnState GetTxnState() const;
+    [[nodiscard]] TxnState GetTxnState() const;
 
-    TransactionType GetTxnType() const;
+    [[nodiscard]] TransactionType GetTxnType() const;
 
     bool readonly() const;
 
@@ -409,17 +407,13 @@ public:
 
     void SetTxnWrite();
 
-    void FullCheckpoint(const TxnTimeStamp max_commit_ts);
-
-    bool DeltaCheckpoint(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commit_ts);
-
     NewTxnManager *txn_mgr() const { return txn_mgr_; }
 
     WalEntry *GetWALEntry() const;
 
-    const std::shared_ptr<std::string> GetTxnText() const { return txn_text_; }
+    [[nodiscard]] std::shared_ptr<std::string> GetTxnText() const { return txn_text_; }
 
-    const std::string &db_name() const { return db_name_; }
+    [[nodiscard]] const std::string &db_name() const { return db_name_; }
 
     void SetDBName(const std::string &db_name) { db_name_ = db_name; }
 
