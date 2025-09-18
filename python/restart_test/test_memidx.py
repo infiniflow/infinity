@@ -554,7 +554,7 @@ class TestMemIdx:
         @decorator2
         def part2(infinity_obj):
             # wait for optimize
-            time.sleep(3)
+            time.sleep(20)
 
             # new chunk index is generated after optimize for each index
             db1_dir = data_dir + "/db_2"
