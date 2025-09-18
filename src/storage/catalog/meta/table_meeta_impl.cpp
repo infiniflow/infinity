@@ -102,22 +102,25 @@ Status TableMeeta::GetIndexIDs(std::vector<std::string> *&index_id_strs, std::ve
 
 Status TableMeeta::GetIndexID(const std::string &index_name, std::string &index_key, std::string &index_id_str, TxnTimeStamp &create_index_ts) {
 
-    std::shared_ptr<MetaIndexCache> index_cache = meta_cache_->GetIndex(db_id_, table_id_, index_name, begin_ts_);
-    if (index_cache.get() != nullptr) {
-        if (index_cache->is_dropped()) {
-            return Status::IndexNotExist(index_name);
+    if (txn_ != nullptr and txn_->readonly()) {
+        std::shared_ptr<MetaIndexCache> index_cache = meta_cache_->GetIndex(db_id_, table_id_, index_name, begin_ts_);
+        if (index_cache.get() != nullptr) {
+            if (index_cache->is_dropped()) {
+                return Status::IndexNotExist(index_name);
+            }
+            index_key = index_cache->index_key();
+            index_id_str = std::to_string(index_cache->index_id());
+            create_index_ts = index_cache->commit_ts();
+            LOG_TRACE(
+                fmt::format("Get table index meta from cache, db_id: {}, table_id: {}, index_name: {}, index_id{}, index_key: {}, commit_ts: {}",
+                            db_id_,
+                            table_id_,
+                            index_name,
+                            index_id_str,
+                            index_key,
+                            create_index_ts));
+            return Status::OK();
         }
-        index_key = index_cache->index_key();
-        index_id_str = std::to_string(index_cache->index_id());
-        create_index_ts = index_cache->commit_ts();
-        LOG_TRACE(fmt::format("Get table index meta from cache, db_id: {}, table_id: {}, index_name: {}, index_id{}, index_key: {}, commit_ts: {}",
-                              db_id_,
-                              table_id_,
-                              index_name,
-                              index_id_str,
-                              index_key,
-                              create_index_ts));
-        return Status::OK();
     }
 
     std::string index_key_prefix = KeyEncode::CatalogIndexPrefix(db_id_str_, table_id_str_, index_name);
@@ -158,7 +161,7 @@ Status TableMeeta::GetIndexID(const std::string &index_name, std::string &index_
         return Status::IndexNotExist(index_name);
     }
 
-    if (txn_ != nullptr) {
+    if (txn_ != nullptr and txn_->readonly()) {
         txn_->AddMetaCache(std::make_shared<
                            MetaIndexCache>(db_id_, table_id_, index_name, std::stoull(index_id_str), max_commit_ts, index_key, false, txn_->TxnID()));
     }
@@ -593,11 +596,13 @@ Status TableMeeta::LoadColumnDefs() {
 
     std::shared_ptr<MetaTableCache> table_cache{};
     if (column_defs_ == nullptr) {
-        table_cache = meta_cache_->GetTable(db_id_, table_name_, begin_ts_);
-        if (table_cache.get() != nullptr) {
-            column_defs_ = table_cache->get_columns();
-            if (column_defs_ != nullptr) {
-                return Status::OK();
+        if (txn_ != nullptr and txn_->readonly()) {
+            table_cache = meta_cache_->GetTable(db_id_, table_name_, begin_ts_);
+            if (table_cache.get() != nullptr) {
+                column_defs_ = table_cache->get_columns();
+                if (column_defs_ != nullptr) {
+                    return Status::OK();
+                }
             }
         }
     }
@@ -647,7 +652,7 @@ Status TableMeeta::LoadColumnDefs() {
         return a->id_ < b->id_;
     });
     column_defs_ = std::move(column_defs);
-    if (table_cache.get() != nullptr && txn_ != nullptr) {
+    if (table_cache.get() != nullptr && txn_ != nullptr && txn_->readonly()) {
         txn_->AddCacheInfo(std::make_shared<TableCacheColumnInfo>(db_id_, table_name_, begin_ts_, column_defs_));
     }
     return Status::OK();
@@ -657,13 +662,15 @@ Status TableMeeta::LoadIndexIDs() {
 
     std::shared_ptr<MetaTableCache> table_cache{};
     if (index_id_strs_ == std::nullopt or index_name_strs_ == std::nullopt) {
-        table_cache = meta_cache_->GetTable(db_id_, table_name_, begin_ts_);
-        if (table_cache.get() != nullptr) {
-            auto [index_ids_ptr, index_names_ptr] = table_cache->get_index_ids();
-            if (index_ids_ptr != nullptr and index_names_ptr != nullptr) {
-                index_id_strs_ = *index_ids_ptr;
-                index_name_strs_ = *index_names_ptr;
-                return Status::OK();
+        if (txn_ != nullptr and txn_->readonly()) {
+            table_cache = meta_cache_->GetTable(db_id_, table_name_, begin_ts_);
+            if (table_cache.get() != nullptr) {
+                auto [index_ids_ptr, index_names_ptr] = table_cache->get_index_ids();
+                if (index_ids_ptr != nullptr and index_names_ptr != nullptr) {
+                    index_id_strs_ = *index_ids_ptr;
+                    index_name_strs_ = *index_names_ptr;
+                    return Status::OK();
+                }
             }
         }
     }
@@ -709,7 +716,7 @@ Status TableMeeta::LoadIndexIDs() {
             if (drop_index_ts.empty() || std::stoull(drop_index_ts) > begin_ts_) {
                 index_id_strs.push_back(index_id);
                 index_names.push_back(index_name);
-                if (txn_ != nullptr) {
+                if (txn_ != nullptr and txn_->readonly()) {
                     std::shared_ptr<MetaIndexCache> index_cache = meta_cache_->GetIndex(db_id_, table_id_, index_name, begin_ts_);
                     if (index_cache.get() == nullptr) {
                         index_cache = std::make_shared<MetaIndexCache>(db_id_,
@@ -727,7 +734,7 @@ Status TableMeeta::LoadIndexIDs() {
         }
     }
 
-    if (table_cache.get() != nullptr && txn_ != nullptr) {
+    if (table_cache.get() != nullptr && txn_ != nullptr && txn_->readonly()) {
         txn_->AddCacheInfo(std::make_shared<TableCacheIndexInfo>(db_id_, table_name_, begin_ts_, index_ids_ptr, index_names_ptr));
     }
 
@@ -871,18 +878,20 @@ std::tuple<std::vector<SegmentID> *, Status> TableMeeta::GetSegmentIDs1() {
     std::lock_guard<std::mutex> lock(mtx_);
     std::shared_ptr<MetaTableCache> table_cache{};
     if (segment_ids1_.get() == nullptr) {
-        table_cache = meta_cache_->GetTable(db_id_, table_name_, begin_ts_);
-        if (table_cache.get() != nullptr) {
-            segment_ids1_ = table_cache->get_segments();
-            if (segment_ids1_ != nullptr) {
-                return {&*segment_ids1_, Status::OK()};
+        if (txn_ != nullptr and txn_->readonly()) {
+            table_cache = meta_cache_->GetTable(db_id_, table_name_, begin_ts_);
+            if (table_cache.get() != nullptr) {
+                segment_ids1_ = table_cache->get_segments();
+                if (segment_ids1_ != nullptr) {
+                    return {&*segment_ids1_, Status::OK()};
+                }
             }
         }
 
         segment_ids1_ = infinity::GetTableSegments(kv_instance_, db_id_str_, table_id_str_, begin_ts_, commit_ts_);
     }
 
-    if (table_cache.get() != nullptr && txn_ != nullptr) {
+    if (table_cache.get() != nullptr && txn_ != nullptr && txn_->readonly()) {
         txn_->AddCacheInfo(std::make_shared<TableCacheSegmentInfo>(db_id_, table_name_, begin_ts_, segment_ids1_));
     }
 

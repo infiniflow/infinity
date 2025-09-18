@@ -74,6 +74,8 @@ try:
     res = table_instance.output(["num", "body", "vec"]).explain(ExplainType.Pipeline)
     print(res)
 
+    db_instance.drop_table("my_table", infinity.common.ConflictType.Error)
+
     infinity_instance.disconnect()
 
     print('test done')
