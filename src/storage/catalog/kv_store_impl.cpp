@@ -269,13 +269,12 @@ public:
 Status KVStore::Init(const std::string &db_path) {
     db_path_ = db_path;
     options_.create_if_missing = true;
-    options_.manual_wal_flush = true;
-    options_.avoid_flush_during_shutdown = true;
     options_.merge_operator = String2UInt64AddOperator::Create();
+    options_.avoid_flush_during_shutdown = true;
+    options_.manual_wal_flush = true;
+    write_options_.disableWAL = true;
 
     txn_options_.set_snapshot = true;
-
-    write_options_.disableWAL = true;
 
     auto *config = infinity::InfinityContext::instance().config();
     if (config != nullptr && config->StorageType() == StorageType::kMinio) {
@@ -353,16 +352,20 @@ std::unique_ptr<KVInstance> KVStore::GetInstance() {
     return kv_instance;
 }
 
-Status KVStore::Put(const std::string &key, const std::string &value) {
-    rocksdb::Status s = transaction_db_->Put(write_options_, key, value);
+Status KVStore::Put(const std::string &key, const std::string &value, bool disable_wal) {
+    rocksdb::WriteOptions write_options;
+    write_options.disableWAL = disable_wal;
+    rocksdb::Status s = transaction_db_->Put(write_options, key, value);
     if (!s.ok()) {
         return Status::RocksDBError(std::move(s), fmt::format("rocksdb::TransactionDB::Put key: {}, value: {}", key, value));
     }
     return Status::OK();
 }
 
-Status KVStore::Delete(const std::string &key) {
-    rocksdb::Status s = transaction_db_->Delete(write_options_, key);
+Status KVStore::Delete(const std::string &key, bool disable_wal) {
+    rocksdb::WriteOptions write_options;
+    write_options.disableWAL = disable_wal;
+    rocksdb::Status s = transaction_db_->Delete(write_options, key);
     if (!s.ok()) {
         return Status::RocksDBError(std::move(s), fmt::format("rocksdb::TransactionDB::Delete key: {}", key));
     }
@@ -384,8 +387,10 @@ Status KVStore::Get(const std::string &key, std::string &value) {
     return Status::OK();
 }
 
-Status KVStore::Merge(const std::string &key, const std::string &value) {
-    rocksdb::Status s = transaction_db_->Merge(write_options_, nullptr, key, value);
+Status KVStore::Merge(const std::string &key, const std::string &value, bool disable_wal) {
+    rocksdb::WriteOptions write_options;
+    write_options.disableWAL = disable_wal;
+    rocksdb::Status s = transaction_db_->Merge(write_options, nullptr, key, value);
     if (!s.ok()) {
         return Status::RocksDBError(std::move(s), fmt::format("rocksdb::TransactionDB::Merge key: {}, value: {}", key, value));
     }

@@ -8,7 +8,7 @@ server_address           = "0.0.0.0"
 [log]
 log_filename             = "infinity.log"
 log_dir                  = "/var/infinity/log"
-log_level                = "info"
+log_level                = "trace"
 
 [storage]
 optimize_interval        = "0s"
@@ -21,6 +21,7 @@ temp_dir                 = "/var/infinity/tmp"
 
 [wal]
 wal_dir                  = "/var/infinity/wal"
+checkpoint_interval      = "0s"
 
 [resource]
 resource_dir             = "/var/infinity/resource"

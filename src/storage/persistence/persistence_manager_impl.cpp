@@ -98,7 +98,6 @@ PersistenceManager::PersistenceManager(Storage *storage,
     }
     std::string read_path_empty = GetObjPath(ObjAddr::KeyEmpty);
     VirtualStore::Truncate(read_path_empty, 0);
-
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("PersistenceManager");
 #endif
@@ -125,6 +124,10 @@ PersistWriteResult PersistenceManager::Persist(const std::string &file_path, con
     Status status = kv_store_->Get(pm_fp_key, pm_fp_value);
     if (status.ok()) {
         // Cleanup the file if it already exists in the KV
+        status = kv_store_->Delete(pm_fp_key, false);
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Failed to delete object for local path {}", local_path));
+        }
         ObjAddr obj_addr;
         obj_addr.Deserialize(pm_fp_value);
         CleanupNoLock(obj_addr, result.persist_keys_, result.drop_from_remote_keys_);
@@ -146,7 +149,7 @@ PersistWriteResult PersistenceManager::Persist(const std::string &file_path, con
         if (ec) {
             UnrecoverableError(fmt::format("Failed to remove {}", tmp_file_path));
         }
-        status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump());
+        status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump(), false);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -168,7 +171,7 @@ PersistWriteResult PersistenceManager::Persist(const std::string &file_path, con
         object_stats_->PutNew(obj_key, std::make_shared<ObjStat>(src_size, 1, 0));
         LOG_TRACE(fmt::format("Persist added dedicated object {}", obj_key));
 
-        status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump());
+        status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump(), false);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -197,7 +200,7 @@ PersistWriteResult PersistenceManager::Persist(const std::string &file_path, con
     object_stats_->PutNew(current_object_key_, std::make_shared<ObjStat>(current_object_size_, current_object_parts_, current_object_ref_count_));
     LOG_TRACE(fmt::format("Persist current object {}", current_object_key_));
 
-    status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump());
+    status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump(), false);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -588,7 +591,7 @@ void PersistenceManager::SaveObjStat(const std::string &obj_key, const std::shar
 void PersistenceManager::AddObjAddrToKVStore(const std::string &path, const ObjAddr &obj_addr) {
     std::string key = KeyEncode::PMObjectKey(RemovePrefix(path));
     std::string value = obj_addr.Serialize().dump();
-    Status status = kv_store_->Put(key, value);
+    Status status = kv_store_->Put(key, value, false);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -619,6 +622,11 @@ PersistWriteResult PersistenceManager::Cleanup(const std::string &file_path) {
         LOG_WARN(fmt::format("Failed to find object for local path {}", local_path));
         return result;
     }
+    status = kv_store_->Delete(pm_fp_key, false);
+    if (!status.ok()) {
+        LOG_CRITICAL(fmt::format("Failed to delete object for local path {}", local_path));
+        return result;
+    }
     ObjAddr obj_addr;
     obj_addr.Deserialize(value);
 
@@ -632,9 +640,6 @@ PersistWriteResult PersistenceManager::Cleanup(const std::string &file_path) {
 }
 
 void PersistenceManager::SetKvStore(KVStore *kv_store) {
-    if (kv_store_) {
-        UnrecoverableError("KVStore has been set");
-    }
     kv_store_ = kv_store;
     std::unique_ptr<KVInstance> kv_instance = kv_store_->GetInstance();
     object_stats_->Deserialize(kv_instance.get());

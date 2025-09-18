@@ -4338,13 +4338,11 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 Config *config = InfinityContext::instance().config();
                 std::string data_dir = config->DataDir();
                 PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-                auto *kv_store = InfinityContext::instance().storage()->kv_store();
                 if (pm != nullptr) {
                     for (auto &file_name : import_txn_store->import_file_names_) {
                         PersistResultHandler handler(pm);
                         PersistWriteResult result = pm->Cleanup(file_name);
                         handler.HandleWriteResult(result);
-                        kv_store->Delete(KeyEncode::PMObjectKey(file_name));
                     }
                 } else {
                     for (const auto &segment_info : import_txn_store->segment_infos_) {

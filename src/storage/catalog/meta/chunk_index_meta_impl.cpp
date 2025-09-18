@@ -503,7 +503,6 @@ Status ChunkIndexMeta::RestoreSetFromSnapshot(const ChunkIndexMetaInfo &chunk_in
 }
 
 Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
-    auto *kv_store = InfinityContext::instance().storage()->kv_store();
     Status status = this->GetIndexBuffer(index_buffer_);
     if (!status.ok()) {
         return status;
@@ -537,10 +536,6 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
 
                 handler.HandleWriteResult(result1);
                 handler.HandleWriteResult(result2);
-
-                kv_store->Delete(KeyEncode::PMObjectKey(posting_file));
-                kv_store->Delete(KeyEncode::PMObjectKey(dict_file));
-
             } else {
                 std::string absolute_posting_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), posting_file);
                 std::string absolute_dict_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), dict_file);

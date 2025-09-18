@@ -39,7 +39,9 @@ public:
 
     [[nodiscard]] inline Storage *storage() noexcept { return storage_.get(); }
 
-    [[nodiscard]] inline PersistenceManager *persistence_manager() noexcept { return storage_->persistence_manager(); }
+    [[nodiscard]] inline PersistenceManager *persistence_manager() noexcept {
+        return (storage_ == nullptr) ? nullptr : storage_->persistence_manager();
+    }
 
     [[nodiscard]] inline ResourceManager *resource_manager() noexcept { return resource_manager_.get(); }
 
