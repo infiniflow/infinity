@@ -46,16 +46,18 @@ CatalogMeta::CatalogMeta(KVInstance *kv_instance, MetaCache *meta_cache)
 
 Status CatalogMeta::GetDBID(const std::string &db_name, std::string &db_key, std::string &db_id_str, TxnTimeStamp &create_ts) {
 
-    std::shared_ptr<MetaDbCache> db_cache = meta_cache_->GetDb(db_name, this->read_ts_);
-    if (db_cache.get() != nullptr) {
-        if (db_cache->is_dropped()) {
-            return Status::DBNotExist(db_name);
+    if (txn_ != nullptr and txn_->readonly()) {
+        std::shared_ptr<MetaDbCache> db_cache = meta_cache_->GetDb(db_name, this->read_ts_);
+        if (db_cache.get() != nullptr) {
+            if (db_cache->is_dropped()) {
+                return Status::DBNotExist(db_name);
+            }
+            db_id_str = std::to_string(db_cache->db_id());
+            db_key = db_cache->db_key();
+            create_ts = db_cache->commit_ts();
+            LOG_TRACE(fmt::format("Get db meta from cache, db: {}, db_id: {}, commit_ts: {}", db_name, db_id_str, create_ts));
+            return Status::OK();
         }
-        db_id_str = std::to_string(db_cache->db_id());
-        db_key = db_cache->db_key();
-        create_ts = db_cache->commit_ts();
-        LOG_TRACE(fmt::format("Get db meta from cache, db: {}, db_id: {}, commit_ts: {}", db_name, db_id_str, create_ts));
-        return Status::OK();
     }
 
     std::string db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);
@@ -100,7 +102,7 @@ Status CatalogMeta::GetDBID(const std::string &db_name, std::string &db_key, std
         return Status::DBNotExist(db_name);
     }
 
-    if (txn_ != nullptr) {
+    if (txn_ != nullptr and txn_->readonly()) {
         txn_->AddMetaCache(std::make_shared<MetaDbCache>(db_name, std::stoull(db_id_str), max_commit_ts, db_key, false, txn_->TxnID()));
     }
 

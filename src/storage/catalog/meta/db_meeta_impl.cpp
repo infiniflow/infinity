@@ -101,13 +101,16 @@ Status DBMeeta::UninitSet(UsageFlag usage_flag) {
 Status DBMeeta::GetComment(std::string *&comment) {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!comment_) {
-        std::shared_ptr<MetaDbCache> db_cache = meta_cache_->GetDb(db_name_, txn_begin_ts_);
-        if (db_cache.get() != nullptr) {
-            if (db_cache->get_comment()) {
-                LOG_TRACE(fmt::format("Get db comment from db: {}", db_name_));
-                comment_ = *db_cache->comment();
-                comment = &*comment_;
-                return Status::OK();
+        std::shared_ptr<MetaDbCache> db_cache = nullptr;
+        if (txn_ != nullptr and txn_->readonly()) {
+            db_cache = meta_cache_->GetDb(db_name_, txn_begin_ts_);
+            if (db_cache.get() != nullptr) {
+                if (db_cache->get_comment()) {
+                    LOG_TRACE(fmt::format("Get db comment from db: {}", db_name_));
+                    comment_ = *db_cache->comment();
+                    comment = &*comment_;
+                    return Status::OK();
+                }
             }
         }
 
@@ -121,7 +124,7 @@ Status DBMeeta::GetComment(std::string *&comment) {
         }
         comment_ = std::move(comment_str);
 
-        if (db_cache.get() != nullptr && txn_ != nullptr) {
+        if (db_cache.get() != nullptr && txn_ != nullptr && txn_->readonly()) {
             txn_->AddCacheInfo(std::make_shared<DBCacheCommentInfo>(db_name_, txn_begin_ts_, std::make_shared<std::string>(*comment_)));
         }
     }
@@ -147,21 +150,23 @@ Status DBMeeta::GetTableIDs(std::vector<std::string> *&table_id_strs, std::vecto
 Status DBMeeta::GetTableID(const std::string &table_name, std::string &table_key, std::string &table_id_str, TxnTimeStamp &create_table_ts) {
 
     u64 db_id = std::stoull(db_id_str_);
-    std::shared_ptr<MetaTableCache> table_cache = meta_cache_->GetTable(db_id, table_name, txn_begin_ts_);
-    if (table_cache.get() != nullptr) {
-        if (table_cache->is_dropped()) {
-            return Status::TableNotExist(table_name);
+    if (txn_ != nullptr and txn_->readonly()) {
+        std::shared_ptr<MetaTableCache> table_cache = meta_cache_->GetTable(db_id, table_name, txn_begin_ts_);
+        if (table_cache.get() != nullptr) {
+            if (table_cache->is_dropped()) {
+                return Status::TableNotExist(table_name);
+            }
+            table_id_str = std::to_string(table_cache->table_id());
+            table_key = table_cache->table_key();
+            create_table_ts = table_cache->commit_ts();
+            LOG_TRACE(fmt::format("Get table meta from cache, db_id: {}, table_name: {}, table_key: {}, table_id: {}, commit_ts: {}",
+                                  db_id,
+                                  table_name,
+                                  table_key,
+                                  table_id_str,
+                                  create_table_ts));
+            return Status::OK();
         }
-        table_id_str = std::to_string(table_cache->table_id());
-        table_key = table_cache->table_key();
-        create_table_ts = table_cache->commit_ts();
-        LOG_TRACE(fmt::format("Get table meta from cache, db_id: {}, table_name: {}, table_key: {}, table_id: {}, commit_ts: {}",
-                              db_id,
-                              table_name,
-                              table_key,
-                              table_id_str,
-                              create_table_ts));
-        return Status::OK();
     }
 
     std::string table_key_prefix = KeyEncode::CatalogTablePrefix(db_id_str_, table_name);
@@ -206,7 +211,7 @@ Status DBMeeta::GetTableID(const std::string &table_name, std::string &table_key
         return Status::TableNotExist(table_name);
     }
 
-    if (txn_ != nullptr) {
+    if (txn_ != nullptr and txn_->readonly()) {
         txn_->AddMetaCache(
             std::make_shared<MetaTableCache>(db_id, table_name, std::stoull(table_id_str), max_commit_ts, table_key, false, txn_->TxnID()));
     }
