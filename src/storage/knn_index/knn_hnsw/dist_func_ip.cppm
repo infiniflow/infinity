@@ -196,6 +196,7 @@ export template <typename DataType>
 class RabitqIPDist {
 public:
     using This = RabitqIPDist<DataType>;
+    using LVQDist = This;
     using RabitqDist = This;
     using MetaType = RabitqVecStoreMetaType<DataType>;
     using StoreType = typename MetaType::StoreType;

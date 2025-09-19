@@ -99,6 +99,15 @@ using LVQIPLSGDist = LSGDistWrapper<LVQIPDist<DataType, CompressType>, LVQVecSto
 export template <typename DataType, typename CompressType, typename LVQCache>
 using LVQCosLSGDist = LSGDistWrapper<LVQCosDist<DataType, CompressType>, LVQVecStoreMeta<DataType, CompressType, LVQCache, true>>;
 
+export template <typename DataType>
+using RabitqL2LSGDist = LSGDistWrapper<RabitqL2Dist<DataType>, RabitqVecStoreMeta<DataType, true>>;
+
+export template <typename DataType>
+using RabitqIPLSGDist = LSGDistWrapper<RabitqIPDist<DataType>, RabitqVecStoreMeta<DataType, true>>;
+
+export template <typename DataType>
+using RabitqCosLSGDist = LSGDistWrapper<RabitqCosDist<DataType>, RabitqVecStoreMeta<DataType, true>>;
+
 export template <typename Distance>
 concept IsLSGDistance = requires { typename Distance::LSG; };
 

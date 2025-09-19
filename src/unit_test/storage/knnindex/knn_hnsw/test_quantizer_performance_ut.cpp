@@ -141,8 +141,6 @@ private:
         std::tie(base_num_, base_dim_, base_data_) = DecodeFvecsDataset<DataType>(base_path_);
         std::tie(query_num_, query_dim_, query_data_) = DecodeFvecsDataset<DataType>(query_path_);
         std::tie(gt_num_, gt_dim_, groundtruth_data_) = DecodeFvecsDataset<LabelType>(groundtruth_path_);
-
-        query_num_ = 100;
     }
 
 public:
@@ -153,6 +151,53 @@ public:
     }
 
     void TearDown() override {}
+
+    std::unique_ptr<float[]> GetAvgBF(size_t vec_num, size_t dim, const float *data, size_t ls_k, size_t sample_num) {
+        auto avg = std::make_unique<float[]>(vec_num);
+        std::vector<size_t> sample_idx(sample_num);
+        for (size_t i = 0; i < sample_num; ++i) {
+            sample_idx[i] = rand() % vec_num;
+        }
+        auto task = [&](size_t start_i, size_t end_i) {
+            std::vector<float> distances(sample_num);
+            for (size_t i = start_i; i < end_i; ++i) {
+                if (i % 1000 == 0) {
+                    std::cout << fmt::format("Sample {} / {}", i, vec_num) << std::endl;
+                }
+                const float *v = data + i * dim;
+                for (size_t j = 0; j < sample_num; ++j) {
+                    const float *v2 = data + sample_idx[j] * dim;
+
+                    float distance = 0;
+                    for (size_t k = 0; k < dim; ++k) {
+                        float diff = v[k] - v2[k];
+                        distance += diff * diff;
+                    }
+                    distances[j] = distance;
+                }
+                std::sort(distances.begin(), distances.end());
+                avg[i] = 0;
+                for (size_t j = 0; j < ls_k; ++j) {
+                    avg[i] += distances[j];
+                }
+                avg[i] /= ls_k;
+            }
+        };
+        std::vector<std::thread> threads;
+        size_t thread_num = 16;
+        size_t task_size = (vec_num - 1) / thread_num + 1;
+
+        for (size_t i = 0; i < thread_num; ++i) {
+            size_t start_i = i * task_size;
+            size_t end_i = std::min(start_i + task_size, vec_num);
+            threads.emplace_back(task, start_i, end_i);
+        }
+        for (auto &thread : threads) {
+            thread.join();
+        }
+
+        return avg;
+    }
 
 public:
     size_t base_dim_ = 128;
@@ -334,6 +379,73 @@ TEST_F(QuantizerPerformanceTest, test_hnsw_rabitq) {
 
     auto hnsw_index = Hnsw::Make(chunk_size_, max_chunk_n, base_dim_, M, ef_construction);
     auto iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
+    auto t0 = std::chrono::high_resolution_clock::now();
+    hnsw_index->InsertVecs(std::move(iter), {true});
+    auto t1 = std::chrono::high_resolution_clock::now();
+    double seconds = std::chrono::duration<double>(t1 - t0).count();
+    std::cout << "Build index use time: " << seconds << std::endl;
+
+    KnnSearchOption search_option{.ef_ = ef_search};
+    auto KnnSearchSortedByFlat = [&](const auto &hnsw_index, const DataType *query) -> std::vector<std::pair<DistanceType, LabelType>> {
+        auto L2Distance = GetSIMD_FUNCTIONS().HNSW_F32L2_ptr_;
+        auto [result_n, d_ptr, v_ptr] = hnsw_index->KnnSearch(query, topk_, search_option);
+        std::vector<std::pair<DistanceType, LabelType>> result(result_n);
+        for (size_t i = 0; i < result_n; ++i) {
+            LabelType id = hnsw_index->GetLabel(v_ptr[i]);
+            const DataType *ori_vec = base_data_.get() + id * base_dim_;
+            DistanceType dis = L2Distance(query, ori_vec, base_dim_);
+            result[i] = {dis, id};
+        }
+        std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+        return result;
+    };
+
+    int correct = 0;
+    for (int i = 0; i < query_num_; ++i) {
+        const auto &query = query_data_.get() + i * query_dim_;
+        const auto &gt = groundtruth_data_.get() + i * gt_dim_;
+        auto result = KnnSearchSortedByFlat(hnsw_index, query);
+        result.resize(topk_);
+
+        std::unordered_set<LabelType> gt_set(gt, gt + recall_at_);
+        for (auto item : result) {
+            if (gt_set.contains(item.second)) {
+                ++correct;
+            }
+        }
+
+        std::cout << "query: " << i;
+        std::cout << ", gt:";
+        for (LabelType id : gt_set) {
+            std::cout << " " << id;
+        }
+        std::cout << ", ids:";
+        for (auto item : result) {
+            std::cout << " " << item.second;
+        }
+        std::cout << std::endl;
+    }
+    float correct_rate = float(correct) / query_num_ / recall_at_;
+    std::printf("correct rage: %f\n", correct_rate);
+    // EXPECT_GE(correct_rate, 0.9);
+}
+
+TEST_F(QuantizerPerformanceTest, test_hnsw_lsg_rabitq) {
+    using Hnsw = KnnHnsw<RabitqL2VecStoreType<DataType, true>, LabelType>;
+    size_t M = 16;
+    size_t ef_construction = 200;
+    size_t ef_search = 200;
+    size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
+
+    auto hnsw_index = Hnsw::Make(chunk_size_, max_chunk_n, base_dim_, M, ef_construction);
+    auto iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
+
+    size_t sample_num = base_num_ * 0.1;
+    size_t ls_k = 10;
+    float alpha = 1.0;
+    std::unique_ptr<float[]> avg = GetAvgBF(base_num_, base_dim_, base_data_.get(), ls_k, sample_num);
+    hnsw_index->distance().SetLSGParam(alpha, avg.get());
+
     auto t0 = std::chrono::high_resolution_clock::now();
     hnsw_index->InsertVecs(std::move(iter), {true});
     auto t1 = std::chrono::high_resolution_clock::now();

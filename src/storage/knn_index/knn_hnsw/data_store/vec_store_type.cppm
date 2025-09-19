@@ -203,7 +203,7 @@ public:
     }
 };
 
-export template <typename DataT>
+export template <typename DataT, bool LSG = false>
 class RabitqCosVecStoreType {
 public:
     using This = RabitqCosVecStoreType<DataT>;
@@ -216,7 +216,7 @@ public:
     using MetaType = RabitqVecStoreMetaType<DataType>;
     using StoreType = typename MetaType::StoreType;
     using QueryType = typename MetaType::QueryType;
-    using Distance = RabitqCosDist<DataType>;
+    using Distance = std::conditional_t<LSG, RabitqCosLSGDist<DataType>, RabitqCosDist<DataType>>;
 
     static constexpr bool HasOptimize = true;
 
@@ -226,7 +226,7 @@ public:
     }
 };
 
-export template <typename DataT>
+export template <typename DataT, bool LSG = false>
 class RabitqL2VecStoreType {
 public:
     using This = RabitqL2VecStoreType<DataT>;
@@ -239,7 +239,7 @@ public:
     using MetaType = RabitqVecStoreMetaType<DataType>;
     using StoreType = typename MetaType::StoreType;
     using QueryType = typename MetaType::QueryType;
-    using Distance = RabitqL2Dist<DataType>;
+    using Distance = std::conditional_t<LSG, RabitqL2LSGDist<DataType>, RabitqL2Dist<DataType>>;
 
     static constexpr bool HasOptimize = true;
 
@@ -249,7 +249,7 @@ public:
     }
 };
 
-export template <typename DataT>
+export template <typename DataT, bool LSG = false>
 class RabitqIPVecStoreType {
 public:
     using This = RabitqIPVecStoreType<DataT>;
@@ -262,7 +262,7 @@ public:
     using MetaType = RabitqVecStoreMetaType<DataType>;
     using StoreType = typename MetaType::StoreType;
     using QueryType = typename MetaType::QueryType;
-    using Distance = RabitqIPDist<DataType>;
+    using Distance = std::conditional_t<LSG, RabitqIPLSGDist<DataType>, RabitqIPDist<DataType>>;
 
     static constexpr bool HasOptimize = true;
 
