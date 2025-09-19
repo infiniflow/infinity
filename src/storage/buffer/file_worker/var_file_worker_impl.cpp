@@ -98,9 +98,9 @@ bool VarFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const 
 }
 
 void VarFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
-    if (data_ != nullptr) {
-        UnrecoverableError("Data is not allocated.");
-    }
+    // if (data_ != nullptr) {
+    //     UnrecoverableError("Data is not allocated.");
+    // }
     if (file_size < buffer_size_) {
         UnrecoverableError(fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_));
     } else {

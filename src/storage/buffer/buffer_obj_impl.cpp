@@ -76,6 +76,9 @@ BufferHandle BufferObj::Load() {
     if (file_worker_->GetData() == nullptr) {
         file_worker_->AllocateInMemory();
     }
+
+    file_worker_->ReadFromFile(true);
+
     ++rc_;
     void *data = file_worker_->GetData();
     return BufferHandle(this, data);
@@ -97,6 +100,7 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
         file_worker_->AllocateInMemory();
     }
     [[maybe_unused]] bool all_save = file_worker_->WriteToFile(false, ctx);
+    // [[maybe_unused]] std::vector<rocksdb::ColumnFamilyDescriptor *> v;
 
     return write;
 }
@@ -106,9 +110,7 @@ void BufferObj::PickForCleanup() {
     buffer_mgr_->AddToCleanList(this, false /*do_free*/);
 }
 
-Status BufferObj::CleanupFile() const {
-    return file_worker_->CleanupFile();
-}
+Status BufferObj::CleanupFile() const { return file_worker_->CleanupFile(); }
 
 void BufferObj::CleanupTempFile() const {
     std::unique_lock<std::mutex> locker(w_locker_);
@@ -241,6 +243,7 @@ void BufferObj::SetData(void *data) {
         UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
     }
     file_worker_->SetData(data);
+    [[maybe_unused]] auto foo = file_worker_->WriteToFile(true);
 
     status_ = BufferStatus::kLoaded;
     type_ = BufferType::kEphemeral;

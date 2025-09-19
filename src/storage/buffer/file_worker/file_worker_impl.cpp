@@ -126,6 +126,29 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
 
 void FileWorker::ReadFromFile(bool from_spill) {
     auto [defer_fn, read_path] = GetFilePathInner(from_spill);
+    if (read_path == "version") {
+        return;
+    }
+    if (!std::filesystem::exists(read_path)) {
+        from_spill = !from_spill;
+        auto[defer_fn, read_path] = GetFilePathInner(from_spill);
+        bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
+        size_t file_size = 0;
+        auto [file_handle, status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Read path: {}, error: {}", read_path, status.message()));
+        }
+        if (use_object_cache) {
+            file_handle->Seek(obj_addr_.part_offset_);
+            file_size = obj_addr_.part_size_;
+        } else {
+            file_size = file_handle->FileSize();
+        }
+        file_handle_ = std::move(file_handle);
+        DeferFn defer_fn2([&]() { file_handle_ = nullptr; });
+        ReadFromFileImpl(file_size, from_spill);
+        return;
+    }
     bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
     size_t file_size = 0;
     auto [file_handle, status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
@@ -189,6 +212,9 @@ std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> FileWorker
     std::optional<DeferFn<std::function<void()>>> defer_fn;
     std::string read_path;
     read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
+    if (*file_name_ == "version") {
+        return {{}, "version"};
+    }
     if (use_object_cache) {
         PersistReadResult result = persistence_manager_->GetObjCache(read_path);
         defer_fn.emplace(([=, this]() {

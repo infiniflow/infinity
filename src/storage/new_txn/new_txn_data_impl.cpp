@@ -183,6 +183,7 @@ struct NewTxnCompactState {
 
 Status NewTxn::Import(const std::string &db_name, const std::string &table_name, const std::vector<std::shared_ptr<DataBlock>> &input_blocks) {
     Status status;
+    [[maybe_unused]] auto buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
     std::vector<size_t> block_row_cnts{};
 
     for (size_t i = 0; i < input_blocks.size(); ++i) {
@@ -200,7 +201,7 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
 
 Status NewTxn::Import(const std::string &db_name, const std::string &table_name, const std::vector<size_t> &block_row_cnts) {
     this->CheckTxn(db_name);
-
+    [[maybe_unused]] auto buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
     Status status;
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     std::string import_tmp_dir = "import" + std::to_string(TxnID());
@@ -1507,7 +1508,6 @@ Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
 
     return Status::OK();
 }
-
 
 Status NewTxn::PrepareCommitReplayImport(WalCmdImportV2 *import_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
