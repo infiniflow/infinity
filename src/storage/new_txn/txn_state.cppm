@@ -59,10 +59,10 @@ export inline std::string TxnState2Str(TxnState txn_state) {
 }
 
 export enum class TransactionType {
-    kInvalid,
-    kCheckpoint, // Develop know it's a checkpoint txn
+    kInvalid,    // Developer doesn't know what type is this txn
+    kSkippedCheckpoint, // Develop know it's a checkpoint txn
     kRead,       // Developer know it's a read txn
-    kNormal,     // Developer doesn't know what type is this txn
+    kDummy,
     kReplay,
     kRecovery,
     kNewCheckpoint,
@@ -83,6 +83,7 @@ export enum class TransactionType {
     kDumpMemIndex,
     kOptimizeIndex,
     kAddColumn,
+    kSetCommand,
     kDropColumn,
     kCleanup,
     kCreateTableSnapshot
@@ -90,8 +91,11 @@ export enum class TransactionType {
 
 export inline std::string TransactionType2Str(TransactionType txn_type) {
     switch (txn_type) {
-        case TransactionType::kCheckpoint: {
-            return "Checkpoint";
+        case TransactionType::kDummy: {
+            return "Dummy";
+        }
+        case TransactionType::kSkippedCheckpoint: {
+            return "Skipped_Checkpoint";
         }
         case TransactionType::kRead: {
             return "Read";
@@ -119,9 +123,6 @@ export inline std::string TransactionType2Str(TransactionType txn_type) {
         }
         case TransactionType::kUpdate: {
             return "update";
-        }
-        case TransactionType::kNormal: {
-            return "Normal";
         }
         case TransactionType::kReplay: {
             return "Replay";
@@ -170,6 +171,9 @@ export inline std::string TransactionType2Str(TransactionType txn_type) {
         }
         case TransactionType::kCreateTableSnapshot: {
             return "CreateTableSnapshot";
+        }
+        case TransactionType::kSetCommand: {
+            return "SetCommand";
         }
     }
     return "Normal";

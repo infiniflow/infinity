@@ -26,7 +26,6 @@ import :default_values;
 import :status;
 import :logger;
 
-import std;
 import std.compat;
 
 namespace infinity {

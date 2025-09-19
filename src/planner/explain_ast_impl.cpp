@@ -729,6 +729,10 @@ ExplainAST::BuildShow(const ShowStatement *show_statement, std::shared_ptr<std::
             result->emplace_back(std::make_shared<std::string>("SHOW CATALOG"));
             break;
         }
+        case ShowStmtType::kListCatalogKey: {
+            result->emplace_back(std::make_shared<std::string>("LIST CATALOG KEY"));
+            break;
+        }
         case ShowStmtType::kCatalogToFile: {
             result->emplace_back(std::make_shared<std::string>("SHOW CATALOG TO FILE"));
             break;
@@ -775,6 +779,34 @@ ExplainAST::BuildShow(const ShowStatement *show_statement, std::shared_ptr<std::
         }
         case ShowStmtType::kShowCache: {
             result->emplace_back(std::make_shared<std::string>("SHOW CACHE"));
+            break;
+        }
+        case ShowStmtType::kListCompact: {
+            result->emplace_back(std::make_shared<std::string>("LIST COMPACT"));
+            break;
+        }
+        case ShowStmtType::kListCheckpoint: {
+            result->emplace_back(std::make_shared<std::string>("LIST CHECKPOINT"));
+            break;
+        }
+        case ShowStmtType::kShowCheckpoint: {
+            result->emplace_back(std::make_shared<std::string>("SHOW CHECKPOINT"));
+            break;
+        }
+        case ShowStmtType::kListOptimize: {
+            result->emplace_back(std::make_shared<std::string>("LIST OPTIMIZE"));
+            break;
+        }
+        case ShowStmtType::kListImport: {
+            result->emplace_back(std::make_shared<std::string>("LIST IMPORT"));
+            break;
+        }
+        case ShowStmtType::kListClean: {
+            result->emplace_back(std::make_shared<std::string>("LIST CLEAN"));
+            break;
+        }
+        case ShowStmtType::kShowClean: {
+            result->emplace_back(std::make_shared<std::string>("SHOW CLEAN"));
             break;
         }
         case ShowStmtType::kInvalid: {

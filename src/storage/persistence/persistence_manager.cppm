@@ -19,7 +19,6 @@ export module infinity_core:persistence_manager;
 import :obj_status;
 import :status;
 
-import std;
 import std.compat;
 import third_party;
 
@@ -30,7 +29,9 @@ namespace infinity {
 
 class KVStore;
 class KVInstance;
-class ObjectStatAccessorBase;
+class ObjectStatAccessor;
+class ObjectStats;
+export class Storage;
 
 export struct ObjAddr {
     std::string obj_key_{};
@@ -62,7 +63,7 @@ export struct PersistReadResult {
     ObjAddr obj_addr_;                               // where data should read from
     std::vector<std::string> drop_keys_;             // object that should be removed from local disk. because of 1. disk used over limit
     std::vector<std::string> drop_from_remote_keys_; // object that should be removed from remote storage. because of object's all parts are deleted
-    ObjStat *obj_stat_{nullptr};                     // object stat
+    std::shared_ptr<ObjStat> obj_stat_{nullptr};     // object stat
 };
 
 export class PersistenceManager {
@@ -70,7 +71,11 @@ public:
     constexpr static size_t ObjAlignment = 8;
 
     // TODO: build cache from existing files under workspace
-    PersistenceManager(const std::string &workspace, const std::string &data_dir, size_t object_size_limit, bool local_storage = true);
+    PersistenceManager(Storage *storage,
+                       const std::string &workspace,
+                       const std::string &data_dir,
+                       size_t object_size_limit,
+                       bool local_storage = true);
 
     ~PersistenceManager();
 
@@ -103,7 +108,7 @@ public:
 
     void SetKvStore(KVStore *kv_store);
 
-    std::unordered_map<std::string, ObjStat> GetAllObjects() const;
+    std::unordered_map<std::string, std::shared_ptr<ObjStat>> GetAllObjects() const;
     std::unordered_map<std::string, ObjAddr> GetAllFiles() const;
 
 private:
@@ -117,12 +122,11 @@ private:
     void CurrentObjAppendNoLock(const std::string &tmp_file_path, size_t file_size);
 
     // Finalize current object.
-    void CurrentObjFinalizeNoLock(std::vector<std::string> &persist_keys, std::vector<std::string> &drop_keys);
+    void CurrentObjFinalizeNoLock(std::vector<std::string> &persist_keys);
 
     // Cleanup
     void CleanupNoLock(const ObjAddr &object_addr,
                        std::vector<std::string> &persist_keys,
-                       std::vector<std::string> &drop_keys,
                        std::vector<std::string> &drop_from_remote_keys,
                        bool check_ref_count = false);
 
@@ -136,18 +140,20 @@ public: // for unit test
     void SaveLocalPath(const std::string &local_path, const ObjAddr &object_addr);
 
 private:
-    void SaveObjStat(const std::string &obj_key, const ObjStat &obj_stat);
+    void SaveObjStat(const std::string &obj_key, const std::shared_ptr<ObjStat> &obj_stat);
 
     void AddObjAddrToKVStore(const std::string &path, const ObjAddr &obj_addr);
 
+    Storage *storage_;
     KVStore *kv_store_{nullptr};
     std::string workspace_;
     std::string local_data_dir_;
     size_t object_size_limit_;
 
     mutable std::mutex mtx_;
-    // std::unordered_map<std::string, ObjStat> objects_;        // obj_key -> ObjStat
-    std::unique_ptr<ObjectStatAccessorBase> objects_; // obj_key -> ObjStat
+    // std::unordered_map<std::string, ObjStat> object_stats_;        // obj_key -> ObjStat
+    // std::shared_ptr<ObjectStatAccessor> object_stats_; // obj_key -> ObjStat
+    std::shared_ptr<ObjectStats> object_stats_{};
     // Current unsealed object key
     std::string current_object_key_;
     size_t current_object_size_ = 0;

@@ -33,7 +33,6 @@ import :lemmatizer;
 import :stemmer;
 import :term;
 
-import std;
 import std.compat;
 
 namespace fs = std::filesystem;

@@ -28,6 +28,7 @@ struct DataBlock;
 class IndexBase;
 class TableDef;
 struct EraseBaseCache;
+struct MetaKey;
 
 export struct MemIndexRange {
     std::string index_id_{};
@@ -79,7 +80,7 @@ export struct BaseTxnStore {
 
 // DummyTxnStore is only used in test
 export struct DummyTxnStore final : public BaseTxnStore {
-    DummyTxnStore() : BaseTxnStore(TransactionType::kNormal) {}
+    DummyTxnStore() : BaseTxnStore(TransactionType::kInvalid) {}
     ~DummyTxnStore() override = default;
 
     std::string ToString() const final;
@@ -322,8 +323,8 @@ export struct ImportTxnStore final : public BaseTxnStore {
     u64 db_id_{};
     u64 table_id_{};
     std::string table_key_{};
-
-    std::map<SegmentID, std::vector<std::shared_ptr<DataBlock>>> input_blocks_in_imports_{};
+    std::string import_tmp_path_{};
+    std::vector<std::string> import_file_names_{}; // used during rollback
     std::vector<WalSegmentInfo> segment_infos_{};
 
     std::vector<std::string> index_names_{};
@@ -332,13 +333,12 @@ export struct ImportTxnStore final : public BaseTxnStore {
     std::vector<SegmentID> segment_ids_{};
     std::map<SegmentID, std::vector<WalChunkIndexInfo>> chunk_infos_in_segments_{};
     std::map<SegmentID, std::vector<ChunkID>> deprecate_ids_in_segments_{};
+    size_t row_count_{};
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
-    void ClearData() final;
-    size_t RowCount() const;
     size_t SegmentCount() const;
 };
 
@@ -494,11 +494,13 @@ export struct FlushDataEntry {
     std::string to_flush_{};
 };
 export struct CheckpointTxnStore final : public BaseTxnStore {
-    CheckpointTxnStore() : BaseTxnStore(TransactionType::kNewCheckpoint) {}
+    explicit CheckpointTxnStore(TxnTimeStamp checkpoint_ts, bool auto_checkpoint)
+        : BaseTxnStore(TransactionType::kNewCheckpoint), max_commit_ts_(checkpoint_ts), auto_check_point_(auto_checkpoint) {}
     ~CheckpointTxnStore() override = default;
 
     std::vector<std::shared_ptr<FlushDataEntry>> entries_{};
     i64 max_commit_ts_{};
+    bool auto_check_point_{};
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
@@ -510,6 +512,9 @@ export struct CleanupTxnStore final : public BaseTxnStore {
     ~CleanupTxnStore() override = default;
 
     i64 timestamp_{};
+
+    std::vector<std::string> dropped_keys_;
+    std::vector<std::shared_ptr<MetaKey>> metas_;
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;

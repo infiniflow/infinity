@@ -85,7 +85,6 @@ extern int sqldebug;
 
 #ifndef PARESER_USE_STD_MODULE
 #define PARESER_USE_STD_MODULE 1
-import std;
 import std.compat;
 #endif
 
@@ -338,7 +337,9 @@ struct SQL_LTYPE {
     HISTORY = 461,                 /* HISTORY  */
     CHECK = 462,                   /* CHECK  */
     CLEAN = 463,                   /* CLEAN  */
-    NUMBER = 464                   /* NUMBER  */
+    CHECKPOINT = 464,              /* CHECKPOINT  */
+    IMPORT = 465,                  /* IMPORT  */
+    NUMBER = 466                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -428,7 +429,7 @@ union SQLSTYPE
     std::pair<int64_t, int64_t>*    int_sparse_ele_t;
     std::pair<int64_t, double>*     float_sparse_ele_t;
 
-#line 432 "parser.h"
+#line 434 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

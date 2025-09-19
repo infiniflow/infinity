@@ -308,10 +308,14 @@ Status NewTxn::OptimizeAllIndexes() {
 }
 
 Status NewTxn::OptimizeTableIndexes(const std::string &db_name, const std::string &table_name) {
+
+    LOG_TRACE(fmt::format("Attempt to optimize the indexes of table: {}.{}", db_name, table_name));
+
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
     std::string table_key;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
+    TxnTimeStamp create_timestamp;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp, &table_key);
     if (!status.ok()) {
         return status;
     }
@@ -669,7 +673,8 @@ Status NewTxn::OptimizeIndexByParams(const std::string &db_name,
 Status NewTxn::ListIndex(const std::string &db_name, const std::string &table_name, std::vector<std::string> &index_names) {
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+    TxnTimeStamp create_timestamp;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
         return status;
     }
@@ -1770,7 +1775,7 @@ Status NewTxn::ReplayOptimize(WalCmdOptimizeV2 *optimize_cmd, TxnTimeStamp commi
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {
     std::shared_ptr<MemIndex> mem_index = segment_index_meta.PopMemIndex();
     if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
-        UnrecoverableError("Invalid mem index");
+        return Status::EmptyMemIndex();
     }
     TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
@@ -2078,7 +2083,8 @@ Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
 Status NewTxn::GetFullTextIndexReader(const std::string &db_name, const std::string &table_name, std::shared_ptr<IndexReader> &index_reader) {
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+    TxnTimeStamp create_timestamp;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
         return status;
     }
@@ -2092,14 +2098,14 @@ Status NewTxn::GetFullTextIndexReader(const std::string &db_name, const std::str
 }
 
 Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    std::string db_name = create_index_cmd->db_name_;
-    std::string table_name = create_index_cmd->table_name_;
-    std::string index_name = *create_index_cmd->index_base_->index_name_;
-    std::string db_id_str = create_index_cmd->db_id_;
-    std::string table_id_str = create_index_cmd->table_id_;
-    std::string table_key = create_index_cmd->table_key_;
-    std::string &index_id_str = create_index_cmd->index_id_;
+    const TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    const std::string &db_name = create_index_cmd->db_name_;
+    const std::string &table_name = create_index_cmd->table_name_;
+    const std::string &index_name = *create_index_cmd->index_base_->index_name_;
+    const std::string &db_id_str = create_index_cmd->db_id_;
+    const std::string &table_id_str = create_index_cmd->table_id_;
+    const std::string &table_key = create_index_cmd->table_key_;
+    const std::string &index_id_str = create_index_cmd->index_id_;
     std::shared_ptr<IndexBase> &index_base = create_index_cmd->index_base_;
 
     TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
@@ -2198,7 +2204,7 @@ Status NewTxn::PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
 }
 
 Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVInstance *kv_instance) {
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    const TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const std::string &db_id_str = dump_index_cmd->db_id_;
     const std::string &table_id_str = dump_index_cmd->table_id_;
     const std::string &table_name = dump_index_cmd->table_name_;
@@ -2308,7 +2314,8 @@ Status NewTxn::ManualDumpIndex(const std::string &db_name, const std::string &ta
     std::shared_ptr<TableIndexMeeta> table_index_meta;
     std::string table_key;
     std::string index_key;
-    status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+    TxnTimeStamp create_timestamp;
+    status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
         return status;
     }

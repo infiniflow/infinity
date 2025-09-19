@@ -18,7 +18,6 @@ export module infinity_core:mem_index;
 
 import :infinity_type;
 
-import std;
 import std.compat;
 
 import row_id;

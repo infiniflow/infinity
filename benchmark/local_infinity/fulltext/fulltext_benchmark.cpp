@@ -22,7 +22,6 @@
 #include <jemalloc/jemalloc.h>
 #endif
 
-import std;
 import std.compat;
 import infinity_core;
 import compilation_config;

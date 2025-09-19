@@ -23,7 +23,6 @@ import :aho_corasick;
 import :analyzer;
 import :term;
 
-import std;
 import std.compat;
 
 namespace infinity {

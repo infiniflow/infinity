@@ -14,7 +14,6 @@
 
 export module infinity_core:data_store_util;
 
-import std;
 import std.compat;
 
 namespace infinity {

@@ -18,7 +18,6 @@
 
 #ifndef PARESER_USE_STD_MODULE
 #define PARESER_USE_STD_MODULE 1
-import std;
 import std.compat;
 #endif
 
@@ -58,6 +57,7 @@ enum class ShowStmtType {
     kIndexChunk,
     kLogs,
     kCatalog,
+    kListCatalogKey,
     kCatalogToFile,
     kPersistenceFiles,
     kPersistenceObjects,
@@ -70,6 +70,13 @@ enum class ShowStmtType {
     kShowSnapshot,
     kListCaches,
     kShowCache,
+    kListCompact,
+    kListCheckpoint,
+    kShowCheckpoint,
+    kListOptimize,
+    kListImport,
+    kListClean,
+    kShowClean
 };
 
 class ShowStatement : public BaseStatement {
@@ -91,8 +98,9 @@ public:
     std::optional<uint64_t> column_id_{};
     std::optional<uint64_t> session_id_{};
     std::optional<uint64_t> txn_id_{};
-    std::string var_name_{};
+    std::optional<std::string> var_name_{};
     std::optional<std::string> snapshot_name_{};
+    bool show_nullable_{true};
 };
 
 } // namespace infinity

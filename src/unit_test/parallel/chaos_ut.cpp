@@ -354,7 +354,7 @@ void RunChaosTestInParallel(const std::string &db_name, const std::string &table
     }
 }
 
-TEST_P(ParallelTest, DISABLED_ChaosTest) {
+TEST_P(ParallelTest, DISABLED_SLOW_ChaosTest) {
     auto db_name = "default_db";
     auto table_name = "chaos_test";
 

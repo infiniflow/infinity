@@ -26,7 +26,6 @@ import :virtual_store;
 import :persistence_manager;
 import :local_file_handle;
 
-import std;
 import std.compat;
 import third_party;
 

@@ -16,7 +16,6 @@ export module infinity_core:utility;
 
 import :infinity_type;
 
-import std;
 import std.compat;
 
 export namespace infinity::Utility {

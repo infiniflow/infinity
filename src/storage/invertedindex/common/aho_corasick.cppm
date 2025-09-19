@@ -3,7 +3,6 @@ export module infinity_core:aho_corasick;
 import :darts;
 import :infinity_type;
 
-import std;
 import std.compat;
 
 namespace infinity {

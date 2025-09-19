@@ -63,7 +63,7 @@ protected:
     }
 
     NewTxn *DeleteRow(const std::string &db_name, const std::string &table_name, std::vector<SegmentOffset> segment_offsets) {
-        auto *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("Delete row"), TransactionType::kNormal);
+        auto *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("Delete row"), TransactionType::kDelete);
 
         std::vector<RowID> row_ids;
         for (auto segment_offset : segment_offsets) {
@@ -81,14 +81,14 @@ protected:
     };
 
     void InitTable(const std::string &db_name, const std::string &table_name, std::shared_ptr<TableDef> table_def, size_t row_cnt) {
-        auto *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("Init table"), TransactionType::kNormal);
+        auto *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("Init table"), TransactionType::kCreateTable);
 
         Status status = txn->CreateTable(db_name, table_def, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kNormal);
+        txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kAppend);
         std::vector<std::shared_ptr<ColumnVector>> column_vectors;
         {
             auto column_vector = std::make_shared<ColumnVector>(table_def->columns()[0]->type());
@@ -108,11 +108,12 @@ protected:
     }
 
     void CheckRowCnt(const std::string &db_name, const std::string &table_name, size_t expected_row_cnt) {
-        auto *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("Check row count"), TransactionType::kNormal);
+        auto *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("Check row count"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        Status status = txn->GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
         auto [row_cnt, status2] = table_meta->GetTableRowCount();
         EXPECT_TRUE(status2.ok());

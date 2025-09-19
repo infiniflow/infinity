@@ -72,14 +72,14 @@ TEST_P(TestTxnColumn, test_add_columns) {
     auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1});
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -105,7 +105,7 @@ TEST_P(TestTxnColumn, test_add_columns) {
         return input_block;
     };
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
         auto input_block = make_input_block(Value::MakeInt(1));
         Status status = txn->Append(*db_name, *table_name, input_block);
@@ -114,7 +114,7 @@ TEST_P(TestTxnColumn, test_add_columns) {
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
 
         std::vector<std::shared_ptr<ColumnDef>> columns;
         columns.emplace_back(column_def2);
@@ -124,11 +124,12 @@ TEST_P(TestTxnColumn, test_add_columns) {
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         SegmentID segment_id = 0;
@@ -158,7 +159,7 @@ TEST_P(TestTxnColumn, test_add_columns) {
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
 
         std::vector<std::string> column_names;
         column_names.emplace_back(column_def2->name());
@@ -191,7 +192,7 @@ TEST_P(TestTxnColumn, alter_column) {
         //                                  |------|------------|
         //                                 t2    add column   commit (success)
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -200,13 +201,13 @@ TEST_P(TestTxnColumn, alter_column) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
         auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
         std::vector<std::shared_ptr<ColumnDef>> columns;
@@ -219,7 +220,7 @@ TEST_P(TestTxnColumn, alter_column) {
 
         new_txn_mgr->PrintAllKeyValue();
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         std::vector<std::string> column_names;
         column_names.push_back("col3");
         column_names.push_back("col2");
@@ -230,14 +231,14 @@ TEST_P(TestTxnColumn, alter_column) {
 
         new_txn_mgr->PrintAllKeyValue();
 
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
         status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -262,7 +263,7 @@ TEST_P(TestTxnColumn, add_column_and_drop_db) {
         //                                     |------------------|----------|
         //                                    t2                drop      commit
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -271,13 +272,13 @@ TEST_P(TestTxnColumn, add_column_and_drop_db) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
         auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
         std::vector<std::shared_ptr<ColumnDef>> columns;
@@ -289,7 +290,7 @@ TEST_P(TestTxnColumn, add_column_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -303,7 +304,7 @@ TEST_P(TestTxnColumn, add_column_and_drop_db) {
         //         |------------------|----------|
         //         t2                drop      commit
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -312,15 +313,15 @@ TEST_P(TestTxnColumn, add_column_and_drop_db) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
 
         auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
         auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
@@ -347,7 +348,7 @@ TEST_P(TestTxnColumn, add_column_and_drop_db) {
         //         |----|----------|
         //         t2  drop      commit
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -356,15 +357,15 @@ TEST_P(TestTxnColumn, add_column_and_drop_db) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
 
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -397,7 +398,7 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
     std::string table_name = "tb1";
     {
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -406,13 +407,13 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
         auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
         std::vector<std::shared_ptr<ColumnDef>> columns;
@@ -425,14 +426,14 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
 
         new_txn_mgr->PrintAllKeyValue();
 
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
         status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -446,7 +447,7 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         //                            |------|------------|
         //                            t2    drop table  commit (success)
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -455,13 +456,13 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
         auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
         std::vector<std::shared_ptr<ColumnDef>> columns;
@@ -470,7 +471,7 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         status = txn3->AddColumns(*db_name, table_name, columns);
         EXPECT_TRUE(status.ok());
 
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -481,7 +482,7 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -495,7 +496,7 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         //                            |------|-----------------|
         //                            t2    drop table      commit (success)
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -504,13 +505,13 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
         auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
         std::vector<std::shared_ptr<ColumnDef>> columns;
@@ -519,7 +520,7 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         status = txn3->AddColumns(*db_name, table_name, columns);
         EXPECT_TRUE(status.ok());
 
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
         status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
@@ -530,7 +531,7 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -544,7 +545,7 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         //       |------|---------------------------|
         //      t2    drop table              commit (success)
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -553,15 +554,15 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
 
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
 
         status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -581,7 +582,7 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -595,7 +596,7 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         //       |------|---------------------------|
         //      t2    drop table              commit
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -604,15 +605,15 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
 
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
 
         status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -632,7 +633,7 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -646,7 +647,7 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         //       |------|------------------|
         //      t2    drop table        commit
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -655,18 +656,18 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
 
         status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -683,7 +684,7 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -703,7 +704,7 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
     std::string table_name = "tb1";
     {
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -712,13 +713,13 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
         std::vector<std::shared_ptr<ColumnDef>> columns3;
         columns3.emplace_back(column_def3);
@@ -727,7 +728,7 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
         std::vector<std::shared_ptr<ColumnDef>> columns4;
         columns4.emplace_back(column_def4);
@@ -737,7 +738,7 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -746,7 +747,7 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
 
     {
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -755,13 +756,13 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
         std::vector<std::shared_ptr<ColumnDef>> columns3;
         columns3.emplace_back(column_def3);
@@ -770,7 +771,7 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def4 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
         std::vector<std::shared_ptr<ColumnDef>> columns4;
         columns4.emplace_back(column_def4);
@@ -780,7 +781,7 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -789,7 +790,7 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
 
     {
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -798,13 +799,13 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
         std::vector<std::shared_ptr<ColumnDef>> columns3;
         columns3.emplace_back(column_def3);
@@ -813,7 +814,7 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def4 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
         std::vector<std::shared_ptr<ColumnDef>> columns4;
         columns4.emplace_back(column_def4);
@@ -823,7 +824,7 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -837,7 +838,7 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         //                                   |------|------------------|
         //                                  t2    add column        commit (success)
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -846,20 +847,20 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
         std::vector<std::shared_ptr<ColumnDef>> columns3;
         columns3.emplace_back(column_def3);
         status = txn3->AddColumns(*db_name, table_name, columns3);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -873,7 +874,7 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -887,7 +888,7 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         //                       |------|------------------|
         //                      t2    add column     commit (fail)
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -896,20 +897,20 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
         std::vector<std::shared_ptr<ColumnDef>> columns3;
         columns3.emplace_back(column_def3);
         status = txn3->AddColumns(*db_name, table_name, columns3);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
         std::vector<std::shared_ptr<ColumnDef>> columns4;
         columns4.emplace_back(column_def4);
@@ -923,7 +924,7 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -937,7 +938,7 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         //         |------|------------------|
         //        t2    add column        commit (success)
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -946,15 +947,15 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
         std::vector<std::shared_ptr<ColumnDef>> columns4;
         columns4.emplace_back(column_def4);
@@ -974,7 +975,7 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -998,7 +999,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_db) {
         //                                     |------------------|----------|
         //                                    t2                drop      commit
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -1007,14 +1008,14 @@ TEST_P(TestTxnColumn, drop_column_and_drop_db) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
         // drop columns
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         std::vector<std::string> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, table_name, column_names);
@@ -1023,7 +1024,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -1037,7 +1038,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_db) {
         //         |------------------|----------|
         //         t2                drop      commit
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -1046,17 +1047,17 @@ TEST_P(TestTxnColumn, drop_column_and_drop_db) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
         // drop columns
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
 
         std::vector<std::string> column_names;
         column_names.push_back("col2");
@@ -1080,7 +1081,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_db) {
         //         |----|----------|
         //         t2  drop      commit
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -1089,16 +1090,16 @@ TEST_P(TestTxnColumn, drop_column_and_drop_db) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
         // drop columns
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
 
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -1128,7 +1129,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
     std::string table_name = "tb1";
     {
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -1137,13 +1138,13 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         std::vector<std::string> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, table_name, column_names);
@@ -1153,14 +1154,14 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
 
         new_txn_mgr->PrintAllKeyValue();
 
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
         status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -1174,7 +1175,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         //                            |------|------------|
         //                            t2    drop table  commit (success)
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -1183,19 +1184,19 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         std::vector<std::string> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, table_name, column_names);
         EXPECT_TRUE(status.ok());
 
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -1206,7 +1207,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -1220,7 +1221,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         //                            |------|-----------------|
         //                            t2    drop table      commit (success)
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -1229,19 +1230,19 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         std::vector<std::string> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, table_name, column_names);
         EXPECT_TRUE(status.ok());
 
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
         status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
@@ -1252,7 +1253,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -1266,7 +1267,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         //       |------|---------------------------|
         //      t2    drop table              commit (success)
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -1275,15 +1276,15 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
 
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
 
         status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -1300,7 +1301,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -1314,7 +1315,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         //       |------|---------------------------|
         //      t2    drop table              commit
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -1323,15 +1324,15 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
 
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
 
         status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -1348,7 +1349,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -1362,7 +1363,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         //       |------|------------------|
         //      t2    drop table        commit
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -1371,18 +1372,18 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
 
         status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -1396,7 +1397,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_FALSE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -1416,7 +1417,7 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
     std::string table_name = "tb1";
     {
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -1425,14 +1426,14 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
         // drop column
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         std::vector<std::string> column_names;
         column_names.push_back("col2");
         status = txn3->DropColumns(*db_name, table_name, column_names);
@@ -1440,7 +1441,7 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
         std::vector<std::shared_ptr<ColumnDef>> columns4;
         columns4.emplace_back(column_def4);
@@ -1449,7 +1450,7 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kRead);
         auto [table_info, table_status] = txn5->GetTableInfo(*db_name, table_name);
         EXPECT_TRUE(table_status.ok());
         EXPECT_EQ(table_info->column_defs_.size(), 2);
@@ -1458,7 +1459,7 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn5);
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -1472,7 +1473,7 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         //                                   |------|------------------|
         //                                  t2    drop column        commit (success)
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -1481,20 +1482,20 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
         std::vector<std::shared_ptr<ColumnDef>> columns3;
         columns3.emplace_back(column_def3);
         status = txn3->AddColumns(*db_name, table_name, columns3);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -1507,7 +1508,7 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kRead);
         auto [table_info, table_status] = txn5->GetTableInfo(*db_name, table_name);
         EXPECT_TRUE(table_status.ok());
         EXPECT_EQ(table_info->column_defs_.size(), 2);
@@ -1516,7 +1517,7 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn5);
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -1530,7 +1531,7 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         //                       |------|------------------|
         //                      t2    drop column   commit (success)
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -1539,20 +1540,20 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
         auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
         std::vector<std::shared_ptr<ColumnDef>> columns3;
         columns3.emplace_back(column_def3);
         status = txn3->AddColumns(*db_name, table_name, columns3);
         EXPECT_TRUE(status.ok());
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         std::vector<std::string> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, table_name, column_names);
@@ -1565,7 +1566,7 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -1579,7 +1580,7 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         //         |------|------------------|
         //        t2    drop column        commit (success)
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -1588,15 +1589,15 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
 
         std::vector<std::string> column_names;
         column_names.push_back("col2");
@@ -1616,7 +1617,7 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -1636,7 +1637,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
     std::string table_name = "tb1";
     {
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -1647,14 +1648,14 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
                                          std::make_shared<std::string>(table_name),
                                          std::make_shared<std::string>(),
                                          {column_def1, column_def2, column_def3});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
         // drop column
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         {
             std::vector<std::string> column_names;
             column_names.push_back("col1");
@@ -1665,7 +1666,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
 
         // drop column
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         {
             std::vector<std::string> column_names;
             column_names.push_back("col3");
@@ -1675,7 +1676,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kRead);
         auto [table_info, table_status] = txn5->GetTableInfo(*db_name, table_name);
         EXPECT_TRUE(table_status.ok());
         EXPECT_EQ(table_info->column_defs_.size(), 1);
@@ -1683,7 +1684,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         status = new_txn_mgr->CommitTxn(txn5);
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -1692,7 +1693,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
 
     {
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -1703,14 +1704,14 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
                                          std::make_shared<std::string>(table_name),
                                          std::make_shared<std::string>(),
                                          {column_def1, column_def2, column_def3});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
         // drop column
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         {
             std::vector<std::string> column_names;
             column_names.push_back("col1");
@@ -1721,7 +1722,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
 
         // drop column
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         {
             std::vector<std::string> column_names;
             column_names.push_back("col1");
@@ -1731,7 +1732,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         status = new_txn_mgr->RollBackTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kRead);
         auto [table_info, table_status] = txn5->GetTableInfo(*db_name, table_name);
         EXPECT_TRUE(table_status.ok());
         EXPECT_EQ(table_info->column_defs_.size(), 2);
@@ -1740,7 +1741,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         status = new_txn_mgr->CommitTxn(txn5);
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -1754,7 +1755,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         //                                   |------|------------------|
         //                                  t2    drop column        commit (success)
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -1765,13 +1766,13 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
                                          std::make_shared<std::string>(table_name),
                                          std::make_shared<std::string>(),
                                          {column_def1, column_def2, column_def3});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         {
             std::vector<std::string> column_names;
             column_names.push_back("col1");
@@ -1779,7 +1780,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
             EXPECT_TRUE(status.ok());
         }
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -1794,7 +1795,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kRead);
         auto [table_info, table_status] = txn5->GetTableInfo(*db_name, table_name);
         EXPECT_TRUE(table_status.ok());
         EXPECT_EQ(table_info->column_defs_.size(), 1);
@@ -1802,7 +1803,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         status = new_txn_mgr->CommitTxn(txn5);
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -1816,7 +1817,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         //                       |------|------------------|
         //                      t2    drop column (fail)  commit (success)
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -1825,14 +1826,14 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
         // drop column
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         {
             std::vector<std::string> column_names;
             column_names.push_back("col1");
@@ -1840,7 +1841,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
             EXPECT_TRUE(status.ok());
         }
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         // drop column
         {
             std::vector<std::string> column_names;
@@ -1856,7 +1857,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
@@ -1870,7 +1871,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         //         |------|------------------|
         //        t2    drop column        commit (success)
         // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn1);
@@ -1879,15 +1880,15 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         // create table tb1
         auto table_def1 =
             TableDef::Make(db_name, std::make_shared<std::string>(table_name), std::make_shared<std::string>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
 
-        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
         // drop column
         {
             std::vector<std::string> column_names;
@@ -1911,7 +1912,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);

@@ -24,6 +24,7 @@ import :value;
 import :snapshot_info;
 import :column_vector;
 import :fast_rough_filter;
+import :txn_context;
 
 import std;
 
@@ -35,8 +36,7 @@ import statement_common;
 namespace infinity {
 
 class KVInstance;
-class NewCatalog;
-class NewTxnManager;
+
 struct WalEntry;
 struct WalCmd;
 struct WalCmdCreateDatabaseV2;
@@ -105,7 +105,6 @@ class BufferManager;
 class IndexBase;
 struct DataBlock;
 class TableDef;
-struct TxnContext;
 struct TableInfo;
 struct DatabaseInfo;
 struct TableIndexInfo;
@@ -118,6 +117,8 @@ struct CheckpointTxnStore;
 struct MetaKey;
 struct MetaBaseCache;
 struct CacheInfo;
+class NewCatalog;
+class NewTxnManager;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -128,12 +129,6 @@ export struct ChunkInfoForCreateIndex {
     std::string table_id_{};
     SegmentID segment_id_{};
     ChunkID chunk_id_{};
-};
-
-enum class TxnType {
-    kReadOnly,
-    kWrite,
-    kInvalid,
 };
 
 export class NewTxn : public std::enable_shared_from_this<NewTxn> {
@@ -185,7 +180,6 @@ public:
 
     Status CommitRecovery();
 
-    bool CheckConflict1(std::shared_ptr<NewTxn> check_txn, std::string &conflict_reason, bool &retry_query);
     bool CheckConflictTxnStores(std::shared_ptr<NewTxn> check_txn, std::string &conflict_reason, bool &retry_query);
 
     Status PrepareCommit();
@@ -312,6 +306,8 @@ public:
 
     Status Import(const std::string &db_name, const std::string &table_name, const std::vector<std::shared_ptr<DataBlock>> &input_blocks);
 
+    Status Import(const std::string &db_name, const std::string &table_name, const std::vector<size_t> &block_row_cnts);
+
 private:
     Status ReplayCreateDb(WalCmdCreateDatabaseV2 *create_db_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayDropDb(WalCmdDropDatabaseV2 *drop_db_cmd, TxnTimeStamp commit_ts, i64 txn_id);
@@ -343,8 +339,6 @@ public:
                   const std::vector<RowID> &row_ids);
 
 private:
-    std::tuple<std::vector<std::pair<RowID, u64>>, Status> GetRowRanges(TableMeeta &table_meta, const std::shared_ptr<DataBlock> &input_block);
-
     Status AppendInner(const std::string &db_name,
                        const std::string &table_name,
                        const std::string &table_key,
@@ -365,33 +359,33 @@ public:
 private:
     Status ReplayCompact(WalCmdCompactV2 *compact_cmd);
 
-    Status CleanupInner(const std::vector<std::unique_ptr<MetaKey>> &metas);
+    Status CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas);
 
 public:
-    Status Checkpoint(TxnTimeStamp last_ckp_ts);
+    Status Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint);
 
     // Getter
-    BufferManager *buffer_mgr() const { return buffer_mgr_; }
+    [[nodiscard]] BufferManager *buffer_mgr() const { return buffer_mgr_; }
 
-    TransactionID TxnID() const;
+    [[nodiscard]] TransactionID TxnID() const;
 
-    TxnTimeStamp BeginTS() const;
+    [[nodiscard]] TxnTimeStamp BeginTS() const;
 
-    TxnTimeStamp CommitTS() const;
+    [[nodiscard]] TxnTimeStamp CommitTS() const;
 
-    TxnTimeStamp KVCommitTS() const;
+    [[nodiscard]] TxnTimeStamp KVCommitTS() const;
 
-    TxnTimeStamp LastSystemKVCommitTS() const;
+    [[nodiscard]] TxnTimeStamp LastSystemKVCommitTS() const;
 
-    TxnTimeStamp LastSystemCommitTS() const;
+    [[nodiscard]] TxnTimeStamp LastSystemCommitTS() const;
 
     void SetTxnKVCommitTS(TxnTimeStamp kv_commit_ts);
 
-    TxnState GetTxnState() const;
+    [[nodiscard]] TxnState GetTxnState() const;
 
-    TransactionType GetTxnType() const;
+    [[nodiscard]] TransactionType GetTxnType() const;
 
-    TxnType txn_type() const;
+    bool readonly() const;
 
     bool NeedToAllocate() const;
 
@@ -414,17 +408,13 @@ public:
 
     void SetTxnWrite();
 
-    void FullCheckpoint(const TxnTimeStamp max_commit_ts);
-
-    bool DeltaCheckpoint(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commit_ts);
-
     NewTxnManager *txn_mgr() const { return txn_mgr_; }
 
     WalEntry *GetWALEntry() const;
 
-    const std::shared_ptr<std::string> GetTxnText() const { return txn_text_; }
+    [[nodiscard]] std::shared_ptr<std::string> GetTxnText() const { return txn_text_; }
 
-    const std::string &db_name() const { return db_name_; }
+    [[nodiscard]] const std::string &db_name() const { return db_name_; }
 
     void SetDBName(const std::string &db_name) { db_name_ = db_name; }
 
@@ -457,11 +447,13 @@ public:
                         const std::string &table_name,
                         std::shared_ptr<DBMeeta> &db_meta,
                         std::shared_ptr<TableMeeta> &table_meta,
+                        TxnTimeStamp &create_timestamp,
                         std::string *table_key = nullptr);
 
     Status GetTableMeta(const std::string &table_name,
                         std::shared_ptr<DBMeeta> &db_meta,
                         std::shared_ptr<TableMeeta> &table_meta,
+                        TxnTimeStamp &create_timestamp,
                         std::string *table_key = nullptr);
 
     Status GetTableIndexMeta(const std::string &db_name,
@@ -592,6 +584,7 @@ private:
     Status PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd);
     Status PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd);
     Status PrepareCommitImport(WalCmdImportV2 *import_cmd);
+    Status PrepareCommitReplayImport(WalCmdImportV2 *import_cmd);
     Status CommitBottomAppend(WalCmdAppendV2 *append_cmd);
     Status CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd);
     Status PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd);
@@ -617,20 +610,6 @@ private:
     Status IncrLatestID(std::string &id_str, std::string_view id_name) const;
 
     // Check transaction conflicts
-    bool CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query);
-    bool CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query);
-    bool CheckConflictCmd(const WalCmdDropDatabaseV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query);
-    bool CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query);
-    bool CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query);
-    bool CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query);
-    bool CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query);
-    bool CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query);
-    bool CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query);
-    bool CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query);
-    bool CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query);
-    bool CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query);
-    bool CheckConflictCmd(const WalCmdDropTableV2 &cmd, NewTxn *previous_txn, std::string &cause, bool &retry_query);
-
     bool CheckConflictTxnStore(NewTxn *previous_txn, std::string &cause, bool &retry_query);
     bool CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);
     bool CheckConflictTxnStore(const DropDBTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);
@@ -709,12 +688,17 @@ public:
 
     void AddSemaphore(std::unique_ptr<std::binary_semaphore> sema);
     const std::vector<std::unique_ptr<std::binary_semaphore>> &semas() const;
-    void AddMetaKeyForBufferObject(std::unique_ptr<MetaKey> object_meta_key);
 
     void AddMetaCache(const std::shared_ptr<MetaBaseCache> &meta_base_cache);
     void AddCacheInfo(const std::shared_ptr<CacheInfo> &cache_info);
     void ResetMetaCacheAndCacheInfo();
     void SaveMetaCacheAndCacheInfo();
+
+    Status WriteDataBlockToFile(const std::string &db_name,
+                                const std::string &table_name,
+                                std::shared_ptr<DataBlock> input_block,
+                                const u64 &input_block_idx,
+                                std::vector<std::string> *object_paths = nullptr);
 
 private:
     // Reference to external class
@@ -726,7 +710,6 @@ private:
     std::shared_ptr<BaseTxnStore> base_txn_store_{};
 
     NewTxnStore txn_store_; // this has this ptr, so txn cannot be moved.
-    TxnType txn_type_{TxnType::kInvalid};
 
     // Use as txn context;
     mutable std::shared_mutex rw_locker_{};

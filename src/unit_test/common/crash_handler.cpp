@@ -19,7 +19,6 @@ module;
 module crash_handler;
 
 import infinity_core;
-import std;
 import std.compat;
 
 namespace infinity {

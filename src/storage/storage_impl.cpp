@@ -46,6 +46,7 @@ import :mem_index_appender;
 import :catalog_cache;
 import :meta_cache;
 import :wal_entry;
+import :object_stats;
 
 import std;
 import third_party;
@@ -119,6 +120,7 @@ Status Storage::InitToAdmin() {
                 UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
             }
         }
+
         // Construct persistence store
         std::string persistence_dir = config_ptr_->PersistenceDir();
         if (!persistence_dir.empty()) {
@@ -127,9 +129,8 @@ Status Storage::InitToAdmin() {
             }
             i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
             persistence_manager_ =
-                std::make_unique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (size_t)persistence_object_size_limit);
+                std::make_unique<PersistenceManager>(this, persistence_dir, config_ptr_->DataDir(), (size_t)persistence_object_size_limit);
         }
-
         current_storage_mode_ = StorageMode::kAdmin;
     }
     LOG_INFO(fmt::format("Finish initializing storage from un-init mode to admin"));
@@ -344,7 +345,7 @@ Status Storage::AdminToWriter() {
 
     auto *new_txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
 
-    status = new_txn->Checkpoint(wal_mgr_->LastCheckpointTS());
+    status = new_txn->Checkpoint(wal_mgr_->LastCheckpointTS(), true);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Failed to checkpoint: {}", status.message()));
     }
@@ -366,15 +367,15 @@ Status Storage::AdminToWriter() {
     periodic_trigger_thread_ = std::make_unique<PeriodicTriggerThread>();
 
     i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
-    periodic_trigger_thread_->new_cleanup_trigger_ = std::make_shared<NewCleanupPeriodicTrigger>(cleanup_interval);
+    periodic_trigger_thread_->new_cleanup_trigger_ = std::make_shared<CleanupPeriodicTrigger>(cleanup_interval);
 
     i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
-    periodic_trigger_thread_->optimize_index_trigger_ = std::make_shared<OptimizeIndexPeriodicTrigger>(optimize_interval);
+    periodic_trigger_thread_->optimize_index_trigger_ = std::make_shared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
 
     i64 checkpoint_interval_sec = config_ptr_->CheckpointInterval() > 0 ? config_ptr_->CheckpointInterval() : 0;
     periodic_trigger_thread_->checkpoint_trigger_ = std::make_shared<CheckpointPeriodicTrigger>(checkpoint_interval_sec);
 
-    periodic_trigger_thread_->compact_segment_trigger_ = std::make_shared<CompactSegmentPeriodicTrigger>(compact_interval);
+    periodic_trigger_thread_->compact_trigger_ = std::make_shared<CompactPeriodicTrigger>(compact_interval, compact_processor_.get());
 
     periodic_trigger_thread_->Start();
 
@@ -505,7 +506,7 @@ Status Storage::ReaderToWriter() {
     //                i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
     i64 checkpoint_interval_sec = config_ptr_->CheckpointInterval() > 0 ? config_ptr_->CheckpointInterval() : 0;
     periodic_trigger_thread_->checkpoint_trigger_ = std::make_shared<CheckpointPeriodicTrigger>(checkpoint_interval_sec);
-    periodic_trigger_thread_->compact_segment_trigger_ = std::make_shared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
+    periodic_trigger_thread_->compact_trigger_ = std::make_shared<CompactPeriodicTrigger>(compact_interval, compact_processor_.get());
     periodic_trigger_thread_->optimize_index_trigger_ = std::make_shared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
     periodic_trigger_thread_->Start();
 
@@ -603,7 +604,7 @@ Status Storage::WriterToReader() {
     i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
 
     periodic_trigger_thread_ = std::make_unique<PeriodicTriggerThread>();
-    periodic_trigger_thread_->new_cleanup_trigger_ = std::make_shared<NewCleanupPeriodicTrigger>(cleanup_interval);
+    periodic_trigger_thread_->new_cleanup_trigger_ = std::make_shared<CleanupPeriodicTrigger>(cleanup_interval);
 
     periodic_trigger_thread_->Start();
 
@@ -820,7 +821,7 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
     periodic_trigger_thread_ = std::make_unique<PeriodicTriggerThread>();
 
     i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
-    periodic_trigger_thread_->new_cleanup_trigger_ = std::make_shared<NewCleanupPeriodicTrigger>(cleanup_interval);
+    periodic_trigger_thread_->new_cleanup_trigger_ = std::make_shared<CleanupPeriodicTrigger>(cleanup_interval);
 
     periodic_trigger_thread_->Start();
     reader_init_phase_ = ReaderInitPhase::kPhase2;
@@ -848,7 +849,7 @@ void Storage::AttachCatalog(TxnTimeStamp checkpoint_ts) {
 }
 
 void Storage::RecoverMemIndex() {
-    //    NewTxn *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("recover mem index"), TransactionType::kNormal);
+    //    NewTxn *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("recover mem index"), TransactionType::kInvalid);
     //    txn->SetReplay(true);
     //    Status status = NewCatalog::MemIndexRecover(txn);
     //    if (!status.ok()) {
@@ -870,7 +871,7 @@ void Storage::RecoverMemIndex() {
 }
 
 void Storage::CreateDefaultDB() {
-    NewTxn *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create default_db"), TransactionType::kNormal);
+    NewTxn *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create default_db"), TransactionType::kCreateDB);
     Status status = txn->CreateDatabase("default_db", ConflictType::kError, std::make_shared<std::string>());
     if (!status.ok()) {
         if (status.code_ == ErrorCode::kDuplicateDatabaseName) {

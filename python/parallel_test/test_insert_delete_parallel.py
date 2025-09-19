@@ -27,6 +27,33 @@ class TestInsertDeleteParallel:
         table_obj = db_obj.create_table(
             table_name, {"id": {"type": "int64"}, "text": {"type": "varchar"}}, ConflictType.Error
         )
+        connection_pool.release_conn(infinity_obj)
+
+        count_num = [0]
+        threads = []
+        for i in range(kNumThread):
+            threads.append(
+                Thread(target=worker_thread, args=[connection_pool, count_num, i])
+            )
+        for i in range(len(threads)):
+            threads[i].start()
+        for i in range(len(threads)):
+            threads[i].join()
+
+        res = db_obj.drop_table(table_name, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    def test_insert_and_delete_with_index_parallel(self, get_infinity_connection_pool):
+        connection_pool = get_infinity_connection_pool
+        infinity_obj = connection_pool.get_conn()
+        db_name = "default_db"
+        table_name = "parallel_insert_delete_test"
+        db_obj = infinity_obj.get_database(db_name)
+        res = db_obj.drop_table(table_name, ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
+        table_obj = db_obj.create_table(
+            table_name, {"id": {"type": "int64"}, "text": {"type": "varchar"}}, ConflictType.Error
+        )
         table_obj.create_index(
             "text_index", index.IndexInfo("text", index.IndexType.FullText)
         )
@@ -43,15 +70,8 @@ class TestInsertDeleteParallel:
         for i in range(len(threads)):
             threads[i].join()
 
-        infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database(db_name)
-        table_obj = db_obj.get_table(table_name)
-        res, extra_result = table_obj.output(["*"]).to_df()
-        # FIXME: assert len(res) == 0
-
         res = db_obj.drop_table(table_name, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-
 
 def worker_thread(connection_pool: ConnectionPool, count_num, thread_id):
     infinity_obj = connection_pool.get_conn()
@@ -95,6 +115,6 @@ def worker_thread(connection_pool: ConnectionPool, count_num, thread_id):
                         f"id > {delete_id - 1} and id < {delete_id + batch_size}"
                     )
                 except Exception as e:
-                    return
+                    print(f"Delete from table {table_name} failed. {e}")
 
     connection_pool.release_conn(infinity_obj)

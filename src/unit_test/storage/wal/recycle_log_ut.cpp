@@ -84,7 +84,7 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
                 // create and drop db to fill wal log
                 {
                     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-                    auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+                    auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
                     auto status = txn->DropDatabase("db1", ConflictType::kIgnore);
                     EXPECT_TRUE(status.ok());
                     status = new_txn_mgr->CommitTxn(txn);
@@ -92,7 +92,7 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
                 }
                 { // put create after drop to prevent the merge delta result is empty
                     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-                    auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+                    auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
                     auto status = txn->CreateDatabase("db1", ConflictType::kIgnore, std::make_shared<std::string>());
                     EXPECT_TRUE(status.ok());
                     status = new_txn_mgr->CommitTxn(txn);
@@ -113,7 +113,7 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
             WalManager *wal_manager_{};
             wal_manager_ = infinity::InfinityContext::instance().storage()->wal_manager();
             auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check point"), TransactionType::kNewCheckpoint);
-            Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+            Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn, ckp_commit_ts.get());
             EXPECT_TRUE(status.ok());

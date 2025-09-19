@@ -15,7 +15,6 @@
 #include "hnsw_benchmark_util.h"
 #include <cassert>
 
-import std;
 import std.compat;
 import infinity_core;
 import compilation_config;

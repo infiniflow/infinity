@@ -1,7 +1,6 @@
 #ifndef GTEST_EXPAND_H
 #define GTEST_EXPAND_H
 
-import std;
 import std.compat;
 
 #define _GLIBCXX_MEMORY 1

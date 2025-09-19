@@ -21,7 +21,7 @@ namespace infinity {
 
 export struct TxnContext {
     // This struct is used to store the operation history of a transaction. This history can be used for debugging purposes.
-    static std::unique_ptr<TxnContext> Make() { return std::make_unique<TxnContext>(); }
+    static std::shared_ptr<TxnContext> Make() { return std::make_shared<TxnContext>(); }
 
     void AddOperation(const std::shared_ptr<std::string> &operation_text) { operations_.push_back(operation_text); }
     std::vector<std::shared_ptr<std::string>> GetOperations() const { return operations_; }
@@ -34,7 +34,7 @@ export struct TxnContext {
     TxnTimeStamp last_kv_commit_ts_{};
     TxnTimeStamp last_commit_ts_{};
     TxnState state_{TxnState::kStarted};
-    TransactionType txn_type_{TransactionType::kRead};
+    TransactionType txn_type_{TransactionType::kInvalid};
 
     bool is_write_transaction_{false};
     bool replay_{false};

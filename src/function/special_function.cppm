@@ -16,7 +16,6 @@ export module infinity_core:special_function;
 
 import :function;
 
-import std;
 import std.compat;
 
 import data_type;

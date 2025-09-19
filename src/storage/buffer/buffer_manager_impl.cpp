@@ -26,7 +26,6 @@ import :virtual_store;
 import :kv_store;
 import :status;
 
-import std;
 import std.compat;
 import third_party;
 
@@ -165,6 +164,16 @@ BufferObj *BufferManager::GetBufferObject(const std::string &file_path) {
     return nullptr;
 }
 
+void BufferManager::ChangeBufferObjectState(const std::string &file_path) {
+    std::unique_lock lock(w_locker_);
+
+    if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
+        BufferObj *buffer_obj = iter->second.get();
+        buffer_obj->SetType(BufferType::kPersistent);
+        buffer_obj->SetStatus(BufferStatus::kFreed);
+    }
+}
+
 std::vector<size_t> BufferManager::WaitingGCObjectCount() {
     std::vector<size_t> size_list(lru_caches_.size());
     for (size_t i = 0; i < lru_caches_.size(); ++i) {
@@ -295,7 +304,12 @@ void BufferManager::FreeUnloadBuffer(BufferObj *buffer_obj) {
     size_t buffer_size = buffer_obj->GetBufferSize();
     [[maybe_unused]] auto memory_size = current_memory_size_.fetch_sub(buffer_size);
     if (memory_size < buffer_size) {
-        UnrecoverableError(fmt::format("BufferManager::FreeUnloadBuffer: memory_size < buffer_size: {} < {}", memory_size, buffer_size));
+        current_memory_size_ = 0;
+        const std::string error_message = fmt::format("BufferManager::FreeUnloadBuffer: memory_size < buffer_size: {} < {}, current_memory_size: {}",
+                                                      memory_size,
+                                                      buffer_size,
+                                                      current_memory_size_.load());
+        LOG_WARN(error_message);
     }
 }
 

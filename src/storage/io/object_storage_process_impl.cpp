@@ -39,7 +39,7 @@ void ObjectStorageProcess::Start() {
 
 void ObjectStorageProcess::Stop() {
     LOG_INFO("Object storage processor is stopping.");
-    std::shared_ptr<StopObjectStorageProcessTask> stop_task = std::make_shared<StopObjectStorageProcessTask>();
+    auto stop_task = std::make_shared<StopObjectStorageProcessTask>();
     task_queue_.Enqueue(stop_task);
     stop_task->Wait();
     processor_thread_.join();
@@ -69,7 +69,7 @@ void ObjectStorageProcess::Process() {
                 }
                 case ObjectStorageTaskType::kDownload: {
                     LOG_TRACE("Download task");
-                    DownloadTask *download_task = static_cast<DownloadTask *>(object_storage_task.get());
+                    auto *download_task = static_cast<DownloadTask *>(object_storage_task.get());
                     assert(download_task != nullptr);
                     VirtualStore::s3_client_->DownloadObject(VirtualStore::bucket_, download_task->object_name, download_task->file_dir);
                     LOG_TRACE("Download task done");
@@ -77,7 +77,7 @@ void ObjectStorageProcess::Process() {
                 }
                 case ObjectStorageTaskType::kUpload: {
                     LOG_TRACE("Upload task");
-                    UploadTask *upload_task = static_cast<UploadTask *>(object_storage_task.get());
+                    auto *upload_task = static_cast<UploadTask *>(object_storage_task.get());
                     assert(upload_task != nullptr);
                     VirtualStore::s3_client_->UploadObject(VirtualStore::bucket_, upload_task->object_name, upload_task->file_dir);
                     LOG_TRACE("Upload task done");
@@ -85,7 +85,7 @@ void ObjectStorageProcess::Process() {
                 }
                 case ObjectStorageTaskType::kCopy: {
                     LOG_TRACE("Copy task");
-                    CopyTask *copy_task = static_cast<CopyTask *>(object_storage_task.get());
+                    auto *copy_task = static_cast<CopyTask *>(object_storage_task.get());
                     assert(copy_task != nullptr);
                     VirtualStore::s3_client_->CopyObject(VirtualStore::bucket_,
                                                          copy_task->src_object_name,
@@ -96,7 +96,7 @@ void ObjectStorageProcess::Process() {
                 }
                 case ObjectStorageTaskType::kRemove: {
                     LOG_TRACE("Remove task");
-                    RemoveTask *remove_task = static_cast<RemoveTask *>(object_storage_task.get());
+                    auto *remove_task = static_cast<RemoveTask *>(object_storage_task.get());
                     assert(remove_task != nullptr);
                     VirtualStore::s3_client_->RemoveObject(VirtualStore::bucket_, remove_task->object_name);
                     LOG_TRACE("Remove task done");
@@ -104,7 +104,7 @@ void ObjectStorageProcess::Process() {
                 }
                 case ObjectStorageTaskType::kLocalDrop: {
                     LOG_TRACE("Local drop task");
-                    LocalDropTask *local_drop_task = static_cast<LocalDropTask *>(object_storage_task.get());
+                    auto *local_drop_task = static_cast<LocalDropTask *>(object_storage_task.get());
                     bool removed = fs::remove(local_drop_task->drop_path_);
                     if (!removed) {
                         LOG_WARN(fmt::format("ObjectStorageProcess::Process failed to remove file: {}", local_drop_task->drop_path_));
@@ -113,7 +113,7 @@ void ObjectStorageProcess::Process() {
                     break;
                 }
                 default: {
-                    UnrecoverableError(fmt::format("Invalid object storage: {}", (u8)object_storage_task->type_));
+                    UnrecoverableError(fmt::format("Invalid object storage: {}", static_cast<u8>(object_storage_task->type_)));
                     break;
                 }
             }

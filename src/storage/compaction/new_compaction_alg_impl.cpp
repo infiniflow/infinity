@@ -20,7 +20,6 @@ import :new_compaction_alg;
 import :default_values;
 import :infinity_exception;
 
-import std;
 import std.compat;
 
 namespace infinity {

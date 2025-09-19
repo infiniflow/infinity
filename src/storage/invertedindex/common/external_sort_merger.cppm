@@ -22,7 +22,6 @@ import :loser_tree;
 import :infinity_exception;
 import :blocking_queue;
 
-import std;
 import std.compat;
 import third_party;
 

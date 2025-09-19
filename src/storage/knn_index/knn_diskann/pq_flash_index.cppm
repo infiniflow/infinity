@@ -35,7 +35,6 @@ import :default_values;
 import :diskann_partition_and_pq;
 import :virtual_store;
 
-import std;
 import std.compat;
 import third_party;
 

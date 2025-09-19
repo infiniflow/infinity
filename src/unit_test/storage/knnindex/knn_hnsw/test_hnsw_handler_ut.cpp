@@ -118,7 +118,7 @@ public:
             }
         }
         float correct_rate = float(correct) / element_size;
-        std::printf("correct rage: %f\n", correct_rate);
+        std::printf("correct rate: %f\n", correct_rate);
         EXPECT_GE(correct_rate, 0.95);
     }
 
@@ -334,12 +334,12 @@ TEST_F(HnswHandlerTest, test_parallel) {
             for (int i = 0; i < 4; ++i) {
                 worker_threads.emplace_back([&] {
                     while (true) {
-                        i32 i = idx.fetch_add(1);
-                        if (i >= end_i) {
+                        i32 j = idx.fetch_add(1);
+                        if (j >= end_i) {
                             break;
                         }
                         auto r_lck = SharedOptLck();
-                        hnsw_handler->Build(i);
+                        hnsw_handler->Build(j);
                     }
                 });
             }
@@ -376,6 +376,6 @@ TEST_F(HnswHandlerTest, test_parallel) {
         t.join();
     }
     float correct_rate = float(res) / total;
-    std::printf("correct rage: %f\n", correct_rate);
+    std::printf("correct rate: %f\n", correct_rate);
     EXPECT_GE(correct_rate, 0.95);
 }

@@ -78,8 +78,8 @@ void CompactionProcessor::Stop() {
     LOG_INFO("Compaction processor is stopped.");
 }
 
-void CompactionProcessor::Submit(std::shared_ptr<BGTask> bg_task) {
-    task_queue_.Enqueue(std::move(bg_task));
+void CompactionProcessor::Submit(const std::shared_ptr<BGTask>& bg_task) {
+    task_queue_.Enqueue(bg_task);
     ++task_count_;
 }
 
@@ -88,7 +88,7 @@ void CompactionProcessor::NewDoCompact() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     std::vector<std::pair<std::string, std::string>> db_table_names;
     {
-        auto *new_txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("list table for compaction"), TransactionType::kNormal);
+        auto *new_txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("list table for compaction"), TransactionType::kRead);
 
         std::vector<std::string> db_names;
         Status status = new_txn->ListDatabase(db_names);
@@ -113,7 +113,7 @@ void CompactionProcessor::NewDoCompact() {
 
     auto compact_table = [&](const std::string &db_name, const std::string &table_name, std::shared_ptr<BGTaskInfo> &bg_task_info) {
         auto new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>(fmt::format("compact table {}.{}", db_name, table_name)),
-                                                          TransactionType::kNormal);
+                                                          TransactionType::kCompact);
         LOG_INFO(fmt::format("Compact begin ts: {}", new_txn_shared->BeginTS()));
         Status status = Status::OK();
         DeferFn defer_fn([&] {
@@ -155,7 +155,8 @@ void CompactionProcessor::NewDoCompact() {
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        status = new_txn_shared->GetTableMeta(db_name, table_name, db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        status = new_txn_shared->GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
         if (!status.ok()) {
             return;
         }
@@ -213,11 +214,12 @@ Status CompactionProcessor::NewManualCompact(const std::string &db_name, const s
     //    LOG_TRACE(fmt::format("Compact command triggered compaction: {}.{}", db_name, table_name));
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto *new_txn =
-        new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kNormal);
+        new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kCompact);
 
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
-    Status status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
+    TxnTimeStamp create_timestamp;
+    Status status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
         return status;
     }
@@ -259,7 +261,7 @@ Status CompactionProcessor::NewManualCompact(const std::string &db_name, const s
 
 void CompactionProcessor::NewScanAndOptimize() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    auto new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("optimize index"), TransactionType::kNormal);
+    auto new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("optimize index"), TransactionType::kOptimizeIndex);
     LOG_INFO(fmt::format("Optimize all indexes begin ts: {}", new_txn_shared->BeginTS()));
 
     std::shared_ptr<BGTaskInfo> bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kNotifyOptimize);
@@ -325,7 +327,7 @@ void CompactionProcessor::Process() {
                     running = false;
                     break;
                 }
-                case BGTaskType::kNewCompact: {
+                case BGTaskType::kCompact: {
                     // Triggered by compact command
                     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
                     if (storage_mode == StorageMode::kUnInitialized) {

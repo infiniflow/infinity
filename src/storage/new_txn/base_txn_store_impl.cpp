@@ -410,20 +410,9 @@ std::vector<std::shared_ptr<EraseBaseCache>> ImportTxnStore::ToCachedMeta(TxnTim
     return cache_items;
 }
 
-void ImportTxnStore::ClearData() { input_blocks_in_imports_.clear(); }
-
-size_t ImportTxnStore::RowCount() const {
-    size_t row_count = 0;
-    for (const auto &input_blocks : input_blocks_in_imports_) {
-        row_count += input_blocks.second.at(0)->row_count();
-    }
-    return row_count;
-}
-
 size_t ImportTxnStore::SegmentCount() const {
-    size_t row_count = RowCount();
     size_t segment_count =
-        row_count % DEFAULT_SEGMENT_CAPACITY == 0 ? row_count / DEFAULT_SEGMENT_CAPACITY : row_count / DEFAULT_SEGMENT_CAPACITY + 1;
+        row_count_ % DEFAULT_SEGMENT_CAPACITY == 0 ? row_count_ / DEFAULT_SEGMENT_CAPACITY : row_count_ / DEFAULT_SEGMENT_CAPACITY + 1;
     return segment_count;
 }
 

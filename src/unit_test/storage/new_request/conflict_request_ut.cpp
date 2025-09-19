@@ -55,13 +55,14 @@ public:
 
     size_t GetRowCount() {
         auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
         auto begin_ts = txn->BeginTS();
         auto commit_ts = txn->CommitTS();
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta("default_db", "t1", db_meta, table_meta);
+        TxnTimeStamp create_timestamp;
+        Status status = txn->GetTableMeta("default_db", "t1", db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();

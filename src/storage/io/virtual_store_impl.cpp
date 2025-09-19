@@ -29,7 +29,6 @@ import :s3_client_minio;
 import :infinity_context;
 import :utility;
 
-import std;
 import std.compat;
 
 namespace fs = std::filesystem;
@@ -286,6 +285,15 @@ Status VirtualStore::Rename(const std::string &old_path, const std::string &new_
     if (!std::filesystem::path(new_path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", new_path));
     }
+
+    std::filesystem::path new_dir_path = std::filesystem::path(new_path).parent_path();
+    if (!std::filesystem::exists(new_dir_path)) {
+        std::error_code ec;
+        if (!std::filesystem::create_directories(new_dir_path, ec)) {
+            UnrecoverableError(fmt::format("Can't create parent directory {}: {}", new_dir_path.string(), ec.message()));
+        }
+    }
+
     if (rename(old_path.c_str(), new_path.c_str()) != 0) {
         UnrecoverableError(fmt::format("Can't rename file: {}, {}", old_path, strerror(errno)));
     }
@@ -667,6 +675,12 @@ Status VirtualStore::CopyObject(const std::string &src_object_name, const std::s
             return Status::NotSupport("Not support storage type");
         }
     }
+
+    return Status::OK();
+}
+
+Status VirtualStore::ListObjects(std::string_view bucket_name, std::string_view prefix, std::vector<std::string> &object_names) {
+    s3_client_->ListObjects(bucket_name, prefix, object_names);
 
     return Status::OK();
 }

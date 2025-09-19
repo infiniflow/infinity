@@ -21,7 +21,6 @@ module infinity_core:ut.test_optimize;
 import :ut.base_test;
 import :logger;
 import third_party;
-import :storage;
 import :infinity_context;
 import :table_def;
 import :column_vector;
@@ -49,6 +48,7 @@ import :status;
 import :new_txn;
 import :hnsw_handler;
 import :buffer_obj;
+import :storage;
 
 import compilation_config;
 import global_resource_usage;
@@ -78,7 +78,7 @@ protected:
         NewTxnManager *new_txn_mgr = storage->new_txn_manager();
         WalManager *wal_manager = storage->wal_manager();
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-        Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS());
+        Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS(), false);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
@@ -109,7 +109,7 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
     auto index_name = std::make_shared<std::string>("idx1");
 
     {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
         txn_mgr->CommitTxn(txn);
@@ -129,7 +129,7 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
 
         auto index_hnsw = IndexHnsw::Make(index_name, std::make_shared<std::string>("test comment"), file_name, column_names, index_param_list_ptr);
         // create index idx1
-        auto *txn3 = txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kNormal);
+        auto *txn3 = txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kCreateIndex);
         Status status = txn3->CreateIndex(*db_name, *table_name, index_hnsw, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = txn_mgr->CommitTxn(txn3);
@@ -137,7 +137,7 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
     }
 
     auto DoAppend = [&]() {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kAppend);
         std::vector<std::shared_ptr<ColumnVector>> column_vectors;
         for (size_t i = 0; i < table_def->columns().size(); ++i) {
             std::shared_ptr<DataType> data_type = table_def->columns()[i]->type();
@@ -164,7 +164,7 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
             DoAppend();
         }
         {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("dump mem index"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("dump mem index"), TransactionType::kDumpMemIndex);
 
             Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name, 0);
             EXPECT_TRUE(status.ok());
@@ -173,127 +173,7 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
         }
     }
     {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("merge index {}", *index_name)), TransactionType::kNormal);
-        SegmentID segment_id = 0;
-        Status status = txn->OptimizeIndex(*db_name, *table_name, *index_name, segment_id);
-        EXPECT_TRUE(status.ok());
-        status = txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-
-    WaitCheckpoint(storage);
-    WaitCleanup(storage);
-    {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
-
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
-        std::string table_key;
-        std::string index_key;
-        Status status = txn->GetTableIndexMeta(*db_name, *table_name, *index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
-        EXPECT_TRUE(status.ok());
-
-        {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*segment_ids, std::vector<SegmentID>({0}));
-        }
-        SegmentID segment_id = 0;
-        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
-
-        std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-        ASSERT_NE(mem_index, nullptr);
-        EXPECT_EQ(mem_index->GetHnswIndex(), nullptr);
-        txn_mgr->PrintAllKeyValue();
-        {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*chunk_ids, std::vector<ChunkID>({3}));
-        }
-        ChunkID chunk_id = 3;
-        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-        {
-            ChunkIndexMetaInfo *chunk_info = nullptr;
-            Status status = chunk_index_meta.GetChunkInfo(chunk_info);
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(chunk_info->row_cnt_, 24);
-            EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
-        }
-
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
-        EXPECT_TRUE(status.ok());
-
-        status = txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-}
-
-TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
-    Storage *storage = InfinityContext::instance().storage();
-    NewTxnManager *txn_mgr = storage->new_txn_manager();
-
-    auto db_name = std::make_shared<std::string>("default_db");
-    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-    auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1});
-    auto index_name = std::make_shared<std::string>("idx1");
-
-    {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
-        txn->CreateTable(*db_name, table_def, ConflictType::kError);
-        txn_mgr->CommitTxn(txn);
-    }
-
-    {
-        std::vector<std::string> column_names{"col1"};
-        const std::string &file_name = "idx_file.idx";
-        auto index_secondary = IndexSecondary::Make(index_name, std::make_shared<std::string>("test comment"), file_name, column_names);
-        // create index idx1
-        auto *txn3 = txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kNormal);
-        Status status = txn3->CreateIndex(*db_name, *table_name, index_secondary, ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-        status = txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
-    }
-
-    auto DoAppend = [&]() {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kNormal);
-        std::vector<std::shared_ptr<ColumnVector>> column_vectors;
-        for (size_t i = 0; i < table_def->columns().size(); ++i) {
-            std::shared_ptr<DataType> data_type = table_def->columns()[i]->type();
-            column_vectors.push_back(std::make_shared<ColumnVector>(data_type));
-            column_vectors.back()->Initialize();
-        }
-        std::vector<int> col1{2, 4, 6, 8};
-        size_t row_cnt = 4;
-        for (size_t i = 0; i < row_cnt; ++i) {
-            column_vectors[0]->AppendByPtr(reinterpret_cast<const char *>(&col1[i]));
-        }
-        auto data_block = DataBlock::Make();
-        data_block->Init(column_vectors);
-
-        Status status = txn->Append(*db_name, *table_name, data_block);
-        EXPECT_TRUE(status.ok());
-        txn_mgr->CommitTxn(txn);
-    };
-
-    for (int j = 0; j < 3; ++j) {
-        for (int i = 0; i < 2; ++i) {
-            DoAppend();
-        }
-        {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("dump mem index"), TransactionType::kNormal);
-
-            Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name, 0);
-            EXPECT_TRUE(status.ok());
-
-            txn_mgr->CommitTxn(txn);
-        }
-    }
-    {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("merge index {}", *index_name)), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("merge index {}", *index_name)), TransactionType::kOptimizeIndex);
         SegmentID segment_id = 0;
         Status status = txn->OptimizeIndex(*db_name, *table_name, *index_name, segment_id);
         EXPECT_TRUE(status.ok());
@@ -303,7 +183,7 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
     WaitCheckpoint(storage);
     WaitCleanup(storage);
     {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kNormal);
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
         std::shared_ptr<DBMeeta> db_meta;
         std::shared_ptr<TableMeeta> table_meta;

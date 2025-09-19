@@ -14,7 +14,6 @@
 
 export module infinity_core:vector_with_lock;
 
-import std;
 import std.compat;
 
 namespace infinity {

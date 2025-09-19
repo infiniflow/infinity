@@ -1750,6 +1750,24 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node,
             result->emplace_back(std::make_shared<std::string>(output_columns_str));
             break;
         }
+        case ShowStmtType::kListCatalogKey: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> LIST CATALOG KEYS ";
+            } else {
+                show_str = "LIST CATALOG KEYS ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+
+            std::string output_columns_str = std::string(intent_size, ' ');
+            output_columns_str += " - output columns: [key, value]";
+            result->emplace_back(std::make_shared<std::string>(output_columns_str));
+            break;
+        }
         case ShowStmtType::kCatalogToFile: {
             std::string show_str;
             if (intent_size != 0) {
@@ -1963,6 +1981,132 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node,
 
             std::string output_columns_str = std::string(intent_size, ' ');
             output_columns_str += " - output columns: [cache_type, number, request_count, hit_count, hit_rate]";
+            result->emplace_back(std::make_shared<std::string>(output_columns_str));
+            break;
+        }
+        case ShowStmtType::kListCompact: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> SHOW COMPACT ";
+            } else {
+                show_str = "SHOW COMPACT ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+
+            std::string output_columns_str = std::string(intent_size, ' ');
+            output_columns_str += " - output columns: [txn, begin, commit, result, table_name, table_id, segments, new_segment]";
+            result->emplace_back(std::make_shared<std::string>(output_columns_str));
+            break;
+        }
+        case ShowStmtType::kListCheckpoint: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> SHOW CHECKPOINTS ";
+            } else {
+                show_str = "SHOW CHECKPOINTS ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+
+            std::string output_columns_str = std::string(intent_size, ' ');
+            output_columns_str += " - output columns: [id, txn, begin, commit, success]";
+            result->emplace_back(std::make_shared<std::string>(output_columns_str));
+            break;
+        }
+        case ShowStmtType::kShowCheckpoint: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> SHOW CHECKPOINT ";
+            } else {
+                show_str = "SHOW CHECKPOINT ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+
+            std::string output_columns_str = std::string(intent_size, ' ');
+            output_columns_str += " - output columns: [detail]";
+            result->emplace_back(std::make_shared<std::string>(output_columns_str));
+            break;
+        }
+        case ShowStmtType::kListOptimize: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> SHOW OPTIMIZE ";
+            } else {
+                show_str = "SHOW OPTIMIZE ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+
+            std::string output_columns_str = std::string(intent_size, ' ');
+            output_columns_str += " - output columns: [txn, begin, commit, result, table_name, table_id, segment_id, chunks, new_chunk]";
+            result->emplace_back(std::make_shared<std::string>(output_columns_str));
+            break;
+        }
+        case ShowStmtType::kListImport: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> SHOW IMPORT ";
+            } else {
+                show_str = "SHOW IMPORT ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+
+            std::string output_columns_str = std::string(intent_size, ' ');
+            output_columns_str += " - output columns: [txn, begin, commit, result, table_name, table_id, segment_id, row_count]";
+            result->emplace_back(std::make_shared<std::string>(output_columns_str));
+            break;
+        }
+        case ShowStmtType::kListClean: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> SHOW CLEANS ";
+            } else {
+                show_str = "SHOW CLEANS ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+
+            std::string output_columns_str = std::string(intent_size, ' ');
+            output_columns_str += " - output columns: [txn, begin, commit, success]";
+            result->emplace_back(std::make_shared<std::string>(output_columns_str));
+            break;
+        }
+        case ShowStmtType::kShowClean: {
+            std::string show_str;
+            if (intent_size != 0) {
+                show_str = std::string(intent_size - 2, ' ');
+                show_str += "-> SHOW CLEAN ";
+            } else {
+                show_str = "SHOW CLEAN ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(std::make_shared<std::string>(show_str));
+
+            std::string output_columns_str = std::string(intent_size, ' ');
+            output_columns_str += " - output columns: [detail]";
             result->emplace_back(std::make_shared<std::string>(output_columns_str));
             break;
         }

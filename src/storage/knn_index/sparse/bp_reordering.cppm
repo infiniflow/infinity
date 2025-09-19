@@ -16,7 +16,6 @@ export module infinity_core:bp_reordering;
 
 import :infinity_type;
 
-import std;
 import std.compat;
 import third_party;
 

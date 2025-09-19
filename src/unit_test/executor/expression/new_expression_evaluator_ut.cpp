@@ -137,7 +137,7 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
         for (size_t i = 0; i < row_count; ++i) {
             Value value = input_data_block->GetValue(0, i);
             EXPECT_EQ(value.type().type(), LogicalType::kBigInt);
-            EXPECT_EQ(value.value_.big_int, i64(i));
+            EXPECT_EQ(value.value_.big_int, static_cast<i64>(i));
         }
 
         //        Vector<std::shared_ptr<DataBlock>> input_blocks;
@@ -157,7 +157,7 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
 
         for (size_t row_id = 0; row_id < row_count; ++row_id) {
             Value value = output_column_vector->GetValueByIndex(row_id);
-            EXPECT_EQ(value.value_.big_int, (i64)(row_id + 1));
+            EXPECT_EQ(value.value_.big_int, static_cast<i64>(row_id + 1));
         }
     }
 }

@@ -37,7 +37,7 @@ namespace infinity {
 
 Status NewCheckpointTask::ExecuteWithinTxn() {
     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
-    Status status = new_txn_->Checkpoint(last_checkpoint_ts);
+    Status status = new_txn_->Checkpoint(last_checkpoint_ts, false);
     new_txn_->SetWalSize(wal_size_);
     return status;
 }
@@ -51,13 +51,13 @@ Status NewCheckpointTask::ExecuteWithNewTxn() {
     }
     new_txn_shared->SetWalSize(wal_size_);
     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
-    Status status = new_txn_shared->Checkpoint(last_checkpoint_ts);
+    Status status = new_txn_shared->Checkpoint(last_checkpoint_ts, true);
     if (status.ok()) {
         status = new_txn_mgr->CommitTxn(new_txn_shared.get());
 
         auto *ckp_idx_store = static_cast<CheckpointTxnStore *>(new_txn_shared->GetTxnStore());
         if (ckp_idx_store != nullptr) {
-            std::shared_ptr<BGTaskInfo> bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kNewCheckpoint);
+            std::shared_ptr<BGTaskInfo> bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kCheckpoint);
             for (const std::shared_ptr<FlushDataEntry> &flush_data_entry : ckp_idx_store->entries_) {
                 std::string task_text = fmt::format("Txn: {}, commit: {}, checkpoint data: {}.{}.{}.{} {}",
                                                     new_txn_shared->TxnID(),
@@ -76,7 +76,7 @@ Status NewCheckpointTask::ExecuteWithNewTxn() {
     return status;
 }
 
-Status NewCleanupTask::Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_cleanup_ts) {
+Status CleanupTask::Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_cleanup_ts) {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("cleanup"), TransactionType::kCleanup);
     Status status = txn->Cleanup();
@@ -88,7 +88,7 @@ Status NewCleanupTask::Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_c
 }
 
 NewCompactTask::NewCompactTask(NewTxn *new_txn, std::string db_name, std::string table_name)
-    : BGTask(BGTaskType::kNewCompact, false), new_txn_(new_txn), db_name_(db_name), table_name_(table_name) {}
+    : BGTask(BGTaskType::kCompact, false), new_txn_(new_txn), db_name_(db_name), table_name_(table_name) {}
 
 DumpMemIndexTask::DumpMemIndexTask(const std::string &db_name,
                                    const std::string &table_name,

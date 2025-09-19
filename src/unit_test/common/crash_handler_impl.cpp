@@ -21,7 +21,6 @@ module infinity_core:ut.crash_handler.impl;
 
 import :ut.crash_handler;
 
-import std;
 import std.compat;
 import third_party;
 

@@ -303,7 +303,7 @@ export enum class IndexCacheInfoType {
 export struct IndexCacheInfo : public CacheInfo {
     explicit IndexCacheInfo(IndexCacheInfoType type, u64 db_id, u64 table_id, const std::string &index_name, TxnTimeStamp begin_ts)
         : CacheInfo(CacheType::kIndex), info_type_(type), db_id_(db_id), table_id_(table_id), index_name_(index_name), begin_ts_(begin_ts) {}
-    virtual ~IndexCacheInfo() = default;
+    ~IndexCacheInfo() override = default;
     IndexCacheInfoType info_type_{IndexCacheInfoType::kInvalid};
     u64 db_id_{};
     u64 table_id_{};
@@ -312,13 +312,13 @@ export struct IndexCacheInfo : public CacheInfo {
 };
 
 export struct IndexCacheIndexDefInfo : public IndexCacheInfo {
-    explicit IndexCacheIndexDefInfo(u64 db_id,
-                                    u64 table_id,
+    explicit IndexCacheIndexDefInfo(const u64 db_id,
+                                    const u64 table_id,
                                     const std::string &index_name,
-                                    TxnTimeStamp begin_ts,
-                                    std::shared_ptr<IndexBase> index_def)
+                                    const TxnTimeStamp begin_ts,
+                                    const std::shared_ptr<IndexBase> &index_def)
         : IndexCacheInfo(IndexCacheInfoType::kIndexDef, db_id, table_id, index_name, begin_ts), index_def_(index_def) {}
-    std::shared_ptr<IndexBase> index_def_;
+    std::shared_ptr<IndexBase> index_def_{};
 };
 
 struct CacheItem {
@@ -364,7 +364,7 @@ public:
              const std::vector<std::shared_ptr<CacheInfo>> &cache_infos,
              TxnTimeStamp begin_ts);
 
-    Status Erase(const std::vector<std::shared_ptr<EraseBaseCache>> &cache_items, KVInstance *kv_instance, TxnTimeStamp commit_ts);
+    Status EraseAndCommitKV(const std::vector<std::shared_ptr<EraseBaseCache>> &cache_items, KVInstance *kv_instance, TxnTimeStamp commit_ts);
 
     Status PutOrErase(const std::vector<std::shared_ptr<MetaBaseCache>> &cache_items, KVInstance *kv_instance);
 

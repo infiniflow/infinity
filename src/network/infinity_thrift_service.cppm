@@ -25,7 +25,6 @@ import :column_vector;
 import :query_result;
 import :status;
 
-import std;
 import std.compat;
 
 import column_def;

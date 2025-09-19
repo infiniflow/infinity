@@ -107,39 +107,39 @@ TEST_P(WalReplayTest, wal_replay_database) {
         WalManager *wal_manager = storage->wal_manager();
 
         {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
             txn->CreateDatabase("db1", ConflictType::kIgnore, std::make_shared<std::string>());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
             txn->CreateDatabase("db2", ConflictType::kIgnore, std::make_shared<std::string>());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
             txn->CreateDatabase("db3", ConflictType::kIgnore, std::make_shared<std::string>());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
             txn->CreateDatabase("db4", ConflictType::kIgnore, std::make_shared<std::string>());
             txn_mgr->CommitTxn(txn);
         }
         {
             auto *txn2 = txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS());
+            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
             status = txn_mgr->CommitTxn(txn2);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
             txn->CreateDatabase("db5", ConflictType::kIgnore, std::make_shared<std::string>());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
             txn->DropDatabase("db1", ConflictType::kIgnore);
             txn_mgr->CommitTxn(txn);
         }
@@ -164,13 +164,13 @@ TEST_P(WalReplayTest, wal_replay_database) {
         NewTxnManager *txn_mgr = storage->new_txn_manager();
 
         {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
             Status status = txn->DropDatabase("db4", ConflictType::kError);
             EXPECT_EQ(status.ok(), true);
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
             Status status = txn->CreateDatabase("db1", ConflictType::kError, std::make_shared<std::string>());
             EXPECT_EQ(status.ok(), true);
             txn_mgr->CommitTxn(txn);
@@ -233,7 +233,7 @@ TEST_P(WalReplayTest, wal_replay_tables) {
                                                        std::make_shared<std::string>("tbl1"),
                                                        std::make_shared<std::string>(),
                                                        columns);
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
@@ -243,13 +243,13 @@ TEST_P(WalReplayTest, wal_replay_tables) {
                                                        std::make_shared<std::string>("tbl2"),
                                                        std::make_shared<std::string>(),
                                                        columns);
-            auto *txn2 = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn2 = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             Status status2 = txn2->CreateTable("default_db", std::move(tbl2_def), ConflictType::kIgnore);
             EXPECT_TRUE(status2.ok());
             txn_mgr->CommitTxn(txn2);
         }
         {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
             Status status = txn->DropTable("default_db", "tbl2", ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
@@ -259,14 +259,14 @@ TEST_P(WalReplayTest, wal_replay_tables) {
                                                        std::make_shared<std::string>("tbl3"),
                                                        std::make_shared<std::string>(),
                                                        columns);
-            auto *txn3 = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn3 = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             Status status = txn3->CreateTable("default_db", std::move(tbl3_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn3);
         }
         {
             auto *txn2 = txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS());
+            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
             status = txn_mgr->CommitTxn(txn2);
             EXPECT_TRUE(status.ok());
@@ -295,13 +295,13 @@ TEST_P(WalReplayTest, wal_replay_tables) {
                                                        std::make_shared<std::string>("tbl2"),
                                                        std::make_shared<std::string>(),
                                                        columns);
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             Status status = txn->CreateTable("default_db", std::move(tbl2_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
             Status status = txn->DropTable("default_db", "tbl3", ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
@@ -367,7 +367,7 @@ TEST_P(WalReplayTest, wal_replay_append) {
                                                        std::make_shared<std::string>("tbl1"),
                                                        std::make_shared<std::string>(),
                                                        columns);
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
@@ -377,7 +377,7 @@ TEST_P(WalReplayTest, wal_replay_append) {
                                                        std::make_shared<std::string>("tbl3"),
                                                        std::make_shared<std::string>(),
                                                        columns);
-            auto *txn3 = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn3 = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             Status status = txn3->CreateTable("default_db", std::move(tbl3_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn3);
@@ -387,13 +387,13 @@ TEST_P(WalReplayTest, wal_replay_append) {
                                                        std::make_shared<std::string>("tbl4"),
                                                        std::make_shared<std::string>(),
                                                        columns);
-            auto *txn4 = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn4 = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             Status status = txn4->CreateTable("default_db", std::move(tbl4_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn4);
         }
         {
-            auto *txn5 = txn_mgr->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kNormal);
+            auto *txn5 = txn_mgr->BeginTxn(std::make_unique<std::string>("insert table"), TransactionType::kAppend);
             std::shared_ptr<DataBlock> input_block = std::make_shared<DataBlock>();
 
             // Prepare the input data block
@@ -421,7 +421,7 @@ TEST_P(WalReplayTest, wal_replay_append) {
         }
         {
             auto *txn2 = txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS());
+            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
             status = txn_mgr->CommitTxn(txn2);
             EXPECT_TRUE(status.ok());
@@ -464,7 +464,7 @@ TEST_P(WalReplayTest, wal_replay_append) {
                                                        std::make_shared<std::string>("tbl5"),
                                                        std::make_shared<std::string>(),
                                                        columns);
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
 
             Status status = txn->CreateTable("default_db", std::move(tbl5_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
@@ -473,12 +473,13 @@ TEST_P(WalReplayTest, wal_replay_append) {
         }
 
         auto check_table = [&] {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
             Status status;
 
             std::shared_ptr<DBMeeta> db_meta;
             std::shared_ptr<TableMeeta> table_meta;
-            status = txn->GetTableMeta("default_db", "tbl4", db_meta, table_meta);
+            TxnTimeStamp create_timestamp;
+            status = txn->GetTableMeta("default_db", "tbl4", db_meta, table_meta, create_timestamp);
             EXPECT_TRUE(status.ok());
 
             auto check_block = [&](BlockMeta &block_meta) {
@@ -593,7 +594,7 @@ TEST_P(WalReplayTest, wal_replay_import) {
                                                        std::make_shared<std::string>("tbl1"),
                                                        std::make_shared<std::string>(),
                                                        columns);
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
@@ -603,20 +604,20 @@ TEST_P(WalReplayTest, wal_replay_import) {
                                                        std::make_shared<std::string>("tbl2"),
                                                        std::make_shared<std::string>(),
                                                        columns);
-            auto *txn2 = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn2 = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             Status status = txn2->CreateTable("default_db", std::move(tbl2_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn2);
         }
         {
             auto *txn2 = txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS());
+            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
             status = txn_mgr->CommitTxn(txn2);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             auto tbl3_def = std::make_unique<TableDef>(std::make_shared<std::string>("default_db"),
                                                        std::make_shared<std::string>("tbl3"),
                                                        std::make_shared<std::string>(),
@@ -658,7 +659,7 @@ TEST_P(WalReplayTest, wal_replay_import) {
         };
 
         {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kImport);
             std::vector<std::shared_ptr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
             Status status = txn->Import("default_db", "tbl3", input_blocks);
             EXPECT_TRUE(status.ok());
@@ -689,12 +690,13 @@ TEST_P(WalReplayTest, wal_replay_import) {
         {
             u32 row_count = 8192;
             auto check_table = [&] {
-                auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kNormal);
+                auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
                 Status status;
 
                 std::shared_ptr<DBMeeta> db_meta;
                 std::shared_ptr<TableMeeta> table_meta;
-                status = txn->GetTableMeta("default_db", "tbl3", db_meta, table_meta);
+                TxnTimeStamp create_timestamp;
+                status = txn->GetTableMeta("default_db", "tbl3", db_meta, table_meta, create_timestamp);
                 EXPECT_TRUE(status.ok());
 
                 auto check_block = [&](BlockMeta &block_meta) {
@@ -790,7 +792,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
                                                        std::make_shared<std::string>("tbl1"),
                                                        std::make_shared<std::string>(),
                                                        columns);
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
 
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
@@ -819,7 +821,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
         };
 
         for (u64 i = 0; i < test_segment_n; ++i) { // add 2 segments
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kImport);
             std::vector<std::shared_ptr<DataBlock>> input_blocks = {make_input_block()};
             Status status = txn->Import("default_db", "tbl1", input_blocks);
             EXPECT_TRUE(status.ok());
@@ -829,7 +831,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
 
         {
             // add compact
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
             Status status = txn->Compact("default_db", "tbl1", {0, 1});
             EXPECT_TRUE(status.ok());
             status = txn_mgr->CommitTxn(txn);
@@ -856,7 +858,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
         NewTxnManager *txn_mgr = storage->new_txn_manager();
 
         {
-            auto txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kNormal);
+            auto txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
             txn_mgr->PrintAllKeyValue();
             {
                 auto [table_info, status] = txn->GetTableInfo("default_db", "tbl1");
@@ -921,7 +923,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
                                                        std::make_shared<std::string>("test_annivfflat"),
                                                        std::make_shared<std::string>(),
                                                        columns);
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
@@ -943,7 +945,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
             const std::string &table_name = "test_annivfflat";
             ConflictType conflict_type = ConflictType::kError;
 
-            auto *txn3 = txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kNormal);
+            auto *txn3 = txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kCreateIndex);
             Status status = txn3->CreateIndex(db_name, table_name, index_base_ivf, conflict_type);
             EXPECT_TRUE(status.ok());
             status = txn_mgr->CommitTxn(txn3);
@@ -1022,7 +1024,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
                                                        std::make_shared<std::string>("test_hnsw"),
                                                        std::make_shared<std::string>(),
                                                        columns);
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
@@ -1046,7 +1048,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
             const std::string &db_name = "default_db";
             const std::string &table_name = "test_hnsw";
             ConflictType conflict_type = ConflictType::kError;
-            auto *txn3 = txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kNormal);
+            auto *txn3 = txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kCreateIndex);
             Status status = txn3->CreateIndex(db_name, table_name, index_base_hnsw, conflict_type);
             EXPECT_TRUE(status.ok());
             status = txn_mgr->CommitTxn(txn3);

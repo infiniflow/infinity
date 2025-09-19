@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import std;
 import std.compat;
 import infinity_core;
 import compilation_config;

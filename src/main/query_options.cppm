@@ -14,7 +14,6 @@
 
 export module infinity_core:query_options;
 
-import std;
 import std.compat;
 
 import extra_ddl_info;

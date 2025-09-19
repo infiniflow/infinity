@@ -441,4 +441,14 @@ void BufferObj::SetDataSize(size_t size) {
     file_worker_->SetDataSize(size);
 }
 
+void BufferObj::SetType(BufferType type) {
+    std::unique_lock<std::mutex> locker(w_locker_);
+    type_ = type;
+}
+
+void BufferObj::SetStatus(BufferStatus status) {
+    std::unique_lock<std::mutex> locker(w_locker_);
+    status_ = status;
+}
+
 } // namespace infinity

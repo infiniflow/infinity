@@ -26,7 +26,6 @@ import :bmp_util;
 import :infinity_exception;
 import :index_defines;
 
-import std;
 import std.compat;
 
 import serialize;

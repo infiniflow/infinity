@@ -17,7 +17,6 @@ export module infinity_core:value;
 import :infinity_exception;
 import :status;
 
-import std;
 import std.compat;
 
 import internal_types;

@@ -15,7 +15,6 @@ import :segment_posting;
 import :in_doc_pos_state;
 import :index_defines;
 
-import std;
 import std.compat;
 
 import internal_types;

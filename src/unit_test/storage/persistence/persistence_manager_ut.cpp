@@ -32,7 +32,7 @@ public:
         kv_store_ = std::make_unique<KVStore>();
         Status status = kv_store_->Init(catalog_dir_);
         EXPECT_TRUE(status.ok());
-        pm_ = std::make_unique<PersistenceManager>(workspace_, file_dir_, ObjSizeLimit);
+        pm_ = std::make_unique<PersistenceManager>(infinity::InfinityContext::instance().storage(), workspace_, file_dir_, ObjSizeLimit);
         pm_->SetKvStore(kv_store_.get());
         handler_ = std::make_unique<PersistResultHandler>(pm_.get());
     }

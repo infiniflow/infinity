@@ -32,7 +32,6 @@ import :persist_result_handler;
 import :kv_code;
 import :kv_store;
 
-import std;
 import std.compat;
 import third_party;
 
@@ -66,7 +65,8 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
         UnrecoverableError("No data will be written.");
     }
 
-    if (persistence_manager_ != nullptr && !to_spill) {
+    bool tmpfile = data_dir_->starts_with(*temp_dir_ + "/import");
+    if (persistence_manager_ != nullptr && !to_spill && !tmpfile) {
         std::string write_dir = *file_dir_;
         std::string write_path = std::filesystem::path(*data_dir_) / write_dir / *file_name_;
         std::string tmp_write_path = std::filesystem::path(*temp_dir_) / StringTransform(write_path, "/", "_");
@@ -214,7 +214,7 @@ Status FileWorker::CleanupFile() const {
         PersistResultHandler handler(persistence_manager_);
         std::string path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
         PersistWriteResult result = persistence_manager_->Cleanup(path);
-        handler.HandleWriteResult(result);
+        handler.HandleWriteResult(result); // Delete files
         // Delete from RocksDB
         auto *kv_store = InfinityContext::instance().storage()->kv_store();
         std::string relevant_full_path = KeyEncode::PMObjectKey(fmt::format("{}/{}", *file_dir_, *file_name_));

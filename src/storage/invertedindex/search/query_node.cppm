@@ -18,7 +18,6 @@ import :meta_info;
 import :doc_iterator;
 import :parse_fulltext_options;
 
-import std;
 import std.compat;
 
 namespace infinity {

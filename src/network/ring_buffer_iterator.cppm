@@ -16,7 +16,6 @@ export module infinity_core:ring_buffer_iterator;
 
 import :default_values;
 
-import std;
 import std.compat;
 
 import global_resource_usage;
