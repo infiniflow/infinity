@@ -87,13 +87,13 @@ void SkipListWriter::AddItem(u32 value_delta) {
 
 void SkipListWriter::Dump(const std::shared_ptr<FileWriter> &file, bool spill) {
     if (spill) {
-        file->WriteVInt(posting_writer_.GetSize());
-        if (posting_writer_.GetSize() == 0)
+        file->WriteVInt(slice_writer_.GetSize());
+        if (slice_writer_.GetSize() == 0)
             return;
         file->WriteVInt(last_key_);
         file->WriteVInt(last_value1_);
     }
-    posting_writer_.Dump(file);
+    slice_writer_.Dump(file);
 }
 
 void SkipListWriter::Load(const std::shared_ptr<FileReader> &file) {
@@ -102,7 +102,7 @@ void SkipListWriter::Load(const std::shared_ptr<FileReader> &file) {
         return;
     last_key_ = file->ReadVInt();
     last_value1_ = file->ReadVInt();
-    posting_writer_.Load(file, size);
+    slice_writer_.Load(file, size);
 }
 
 } // namespace infinity
