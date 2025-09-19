@@ -206,7 +206,7 @@ public:
 export template <typename DataT, bool LSG = false>
 class RabitqCosVecStoreType {
 public:
-    using This = RabitqCosVecStoreType<DataT>;
+    using This = RabitqCosVecStoreType<DataT, LSG>;
     using DataType = DataT;
     template <bool OwnMem>
     using Meta = RabitqVecStoreMeta<DataType, OwnMem>;
@@ -229,7 +229,7 @@ public:
 export template <typename DataT, bool LSG = false>
 class RabitqL2VecStoreType {
 public:
-    using This = RabitqL2VecStoreType<DataT>;
+    using This = RabitqL2VecStoreType<DataT, LSG>;
     using DataType = DataT;
     template <bool OwnMem>
     using Meta = RabitqVecStoreMeta<DataType, OwnMem>;
@@ -252,7 +252,7 @@ public:
 export template <typename DataT, bool LSG = false>
 class RabitqIPVecStoreType {
 public:
-    using This = RabitqIPVecStoreType<DataT>;
+    using This = RabitqIPVecStoreType<DataT, LSG>;
     using DataType = DataT;
     template <bool OwnMem>
     using Meta = RabitqVecStoreMeta<DataType, OwnMem>;

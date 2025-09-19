@@ -225,8 +225,8 @@ public:
     template <typename DataStore>
     DistanceType operator()(const QueryType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
         const StoreType &v2 = data_store.GetVec(v2_i);
-        size_t align_dim = data_store.align_dim();
-        return Inner(v1, v2, align_dim);
+        size_t dim = data_store.dim();
+        return Inner(v1, v2, dim);
     }
 
 private:

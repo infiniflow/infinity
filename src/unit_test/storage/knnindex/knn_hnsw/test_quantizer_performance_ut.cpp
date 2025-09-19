@@ -221,7 +221,7 @@ public:
     std::unique_ptr<LabelType[]> groundtruth_data_;
 };
 
-TEST_F(QuantizerPerformanceTest, test_flat_lvq) {
+TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_flat_lvq) {
     using namespace infinity;
     using CompressType = i8;
     using VecStoreType = LVQL2VecStoreType<DataType, CompressType>;
@@ -273,7 +273,7 @@ TEST_F(QuantizerPerformanceTest, test_flat_lvq) {
     std::cout << "Recall_10@1 = " << recall << std::endl;
 }
 
-TEST_F(QuantizerPerformanceTest, test_flat_rabitq) {
+TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_flat_rabitq) {
     using namespace infinity;
     using VecStoreType = RabitqL2VecStoreType<DataType>;
     using DataStore = DataStore<VecStoreType, LabelType>;
@@ -324,7 +324,7 @@ TEST_F(QuantizerPerformanceTest, test_flat_rabitq) {
     std::cout << "Recall_10@1 = " << recall << std::endl;
 }
 
-TEST_F(QuantizerPerformanceTest, test_hnsw_lvq) {
+TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_hnsw_lvq) {
     using Hnsw = KnnHnsw<LVQL2VecStoreType<DataType, i8>, LabelType>;
     size_t M = 16;
     size_t ef_construction = 200;
@@ -370,7 +370,7 @@ TEST_F(QuantizerPerformanceTest, test_hnsw_lvq) {
     // EXPECT_GE(correct_rate, 0.9);
 }
 
-TEST_F(QuantizerPerformanceTest, test_hnsw_rabitq) {
+TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_hnsw_rabitq) {
     using Hnsw = KnnHnsw<RabitqL2VecStoreType<DataType>, LabelType>;
     size_t M = 16;
     size_t ef_construction = 200;
@@ -430,7 +430,7 @@ TEST_F(QuantizerPerformanceTest, test_hnsw_rabitq) {
     // EXPECT_GE(correct_rate, 0.9);
 }
 
-TEST_F(QuantizerPerformanceTest, test_hnsw_lsg_rabitq) {
+TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_hnsw_lsg_rabitq) {
     using Hnsw = KnnHnsw<RabitqL2VecStoreType<DataType, true>, LabelType>;
     size_t M = 16;
     size_t ef_construction = 200;

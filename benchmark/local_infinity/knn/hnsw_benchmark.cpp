@@ -47,6 +47,8 @@ enum class BuildType : i8 {
     LSGBuild,
     LSGLVQBuild,
     LSGCompressToLVQ,
+    RabitqBuild,
+    LSGRabitqBuild
 };
 
 std::string BuildTypeToString(BuildType build_type) {
@@ -63,6 +65,10 @@ std::string BuildTypeToString(BuildType build_type) {
             return "lvq_lsg";
         case BuildType::LSGCompressToLVQ:
             return "clvq_lsg";
+        case BuildType::RabitqBuild:
+            return "rabitq";
+        case BuildType::LSGRabitqBuild:
+            return "rabitq_lsg";
     }
 }
 
@@ -84,6 +90,8 @@ public:
             {"lsg", BuildType::LSGBuild},
             {"lvq_lsg", BuildType::LSGLVQBuild},
             {"clvq_lsg", BuildType::LSGCompressToLVQ},
+            {"rabitq", BuildType::RabitqBuild},
+            {"rabitq_lsg", BuildType::LSGRabitqBuild},
         };
 
         app_.add_option("--mode", mode_type_, "mode")->required()->transform(CLI::CheckedTransformer(mode_map, CLI::ignore_case));
@@ -164,6 +172,8 @@ using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
 using HnswLSG = KnnHnsw<PlainL2VecStoreType<float, true>, LabelT>;
 using HnswLVQ = KnnHnsw<LVQL2VecStoreType<float, i8>, LabelT>;
 using HnswLVQLSG = KnnHnsw<LVQL2VecStoreType<float, i8, true>, LabelT>;
+using HnswRabitq = KnnHnsw<RabitqL2VecStoreType<float>, LabelT>;
+using HnswRabitqLSG = KnnHnsw<RabitqL2VecStoreType<float, true>, LabelT>;
 
 std::unique_ptr<float[]> GetAvgBF(size_t vec_num, size_t dim, const float *data, size_t ls_k, size_t sample_num) {
     auto avg = std::make_unique<float[]>(vec_num);
@@ -222,7 +232,7 @@ void Build(const BenchmarkOption &option) {
     auto hnsw = HnswT::Make(option.chunk_size_, option.max_chunk_num_, dim, option.M_, option.ef_construction_);
 
     std::unique_ptr<float[]> avg;
-    if constexpr (std::is_same_v<HnswT, HnswLSG> || std::is_same_v<HnswT, HnswLVQLSG>) {
+    if constexpr (std::is_same_v<HnswT, HnswLSG> || std::is_same_v<HnswT, HnswLVQLSG> || std::is_same_v<HnswT, HnswRabitqLSG>) {
         size_t sample_num = vec_num * 0.01;
         size_t ls_k = 10;
         avg = GetAvgBF(vec_num, dim, data.get(), ls_k, sample_num);
@@ -296,7 +306,7 @@ void Query(const BenchmarkOption &option) {
     if (gt_num != query_num) {
         UnrecoverableError("gt_num != query_num");
     }
-    std::vector<std::vector<LabelT>> results(query_num, std::vector<LabelT>(query_topk));
+    std::vector<std::vector<LabelT>> results(query_num, std::vector<LabelT>());
 
     auto test = [&](size_t i, const KnnSearchOption &search_option) {
         profiler.Begin();
@@ -312,7 +322,8 @@ void Query(const BenchmarkOption &option) {
                     if (pairs.size() < query_topk) {
                         UnrecoverableError("result_n != topk");
                     }
-                    for (size_t j = 0; j < query_topk; ++j) {
+                    results[i].resize(pairs.size());
+                    for (size_t j = 0; j < pairs.size(); ++j) {
                         results[i][j] = pairs[j].second;
                     }
                 }
@@ -329,7 +340,7 @@ void Query(const BenchmarkOption &option) {
         i32 correct = 0;
         for (size_t i = 0; i < query_num; ++i) {
             std::unordered_set<LabelT> gt_set(gt_data.get() + i * topk, gt_data.get() + i * topk + query_topk);
-            for (size_t j = 0; j < query_topk; ++j) {
+            for (size_t j = 0; j < results[i].size(); ++j) {
                 if (gt_set.contains(results[i][j])) {
                     correct++;
                 }
@@ -415,6 +426,14 @@ int main(int argc, char *argv[]) {
                     Build<HnswLSG, HnswLVQ>(option);
                     break;
                 }
+                case BuildType::RabitqBuild: {
+                    Build<HnswRabitq, HnswRabitq>(option);
+                    break;
+                }
+                case BuildType::LSGRabitqBuild: {
+                    Build<HnswRabitqLSG, HnswRabitqLSG>(option);
+                    break;
+                }
             }
             break;
         }
@@ -436,6 +455,14 @@ int main(int argc, char *argv[]) {
                 }
                 case BuildType::LSGLVQBuild: {
                     Query<HnswLVQLSG>(option);
+                    break;
+                }
+                case BuildType::RabitqBuild: {
+                    Query<HnswRabitq>(option);
+                    break;
+                }
+                case BuildType::LSGRabitqBuild: {
+                    Query<HnswRabitqLSG>(option);
                     break;
                 }
             }
