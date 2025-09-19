@@ -52,9 +52,12 @@ public:
     using LVQData = LVQData<DataType, LocalCacheType, CompressType>;
     struct LVQQuery {
         std::unique_ptr<LVQData> inner_;
-        operator const LVQData *() const { return inner_.get(); }
+        LVQData *operator->() const { return inner_.get(); }
 
         LVQQuery(size_t compress_data_size) : inner_(new(new char[compress_data_size]) LVQData) {}
+        LVQQuery(size_t compress_data_size, const LVQData *data) : LVQQuery(compress_data_size) {
+            memcpy(reinterpret_cast<char *>(inner_.get()), reinterpret_cast<const char *>(data), compress_data_size);
+        }
         LVQQuery(LVQQuery &&other) = default;
         ~LVQQuery() { delete[] reinterpret_cast<char *>(inner_.release()); }
     };
@@ -326,8 +329,8 @@ public:
     using This = LVQVecStoreInnerBase<DataType, CompressType, LVQCache, OwnMem>;
     using Meta = LVQVecStoreMetaBase<DataType, CompressType, LVQCache, OwnMem>;
     // Decompress: Q = scale * C + bias + Mean
-    using LocalCacheType = LVQCache::LocalCacheType;
-    using LVQData = LVQData<DataType, LocalCacheType, CompressType>;
+    using StoreType = Meta::StoreType;
+    using QueryType = Meta::QueryType;
 
 public:
     LVQVecStoreInnerBase() = default;
@@ -350,9 +353,9 @@ public:
         }
     }
 
-    const LVQData *GetVec(size_t idx, const Meta &meta) const {
-        return reinterpret_cast<const LVQData *>(ptr_.get() + idx * meta.compress_data_size());
-    }
+    StoreType GetVec(size_t idx, const Meta &meta) const { return reinterpret_cast<StoreType>(ptr_.get() + idx * meta.compress_data_size()); }
+
+    QueryType GetVecToQuery(size_t idx, const Meta &meta) const { return QueryType(meta.compress_data_size(), GetVec(idx, meta)); }
 
     void Prefetch(VertexType vec_i, const Meta &meta) const { _mm_prefetch(reinterpret_cast<const char *>(GetVec(vec_i, meta)), _MM_HINT_T0); }
 
@@ -363,7 +366,7 @@ public:
     void Dump(std::ostream &os, size_t offset, size_t chunk_size, const Meta &meta) const {
         for (int i = 0; i < (int)chunk_size; ++i) {
             os << "vec " << i << "(" << offset + i << "): ";
-            const LVQData *vec = GetVec(i, meta);
+            StoreType vec = GetVec(i, meta);
             os << "scale: " << vec->scale_ << ", bias: " << vec->bias_ << std::endl;
             os << "compress_vec: ";
             for (size_t j = 0; j < meta.dim(); ++j) {

@@ -17,6 +17,7 @@ export module infinity_core:dist_func_l2;
 import :hnsw_common;
 import :plain_vec_store;
 import :lvq_vec_store;
+import :rabitq_vec_store;
 import :simd_functions;
 
 import std;
@@ -35,6 +36,7 @@ public:
     using This = PlainL2Dist<DataType>;
     using VecStoreMeta = PlainVecStoreMeta<DataType>;
     using StoreType = typename VecStoreMeta::StoreType;
+    using QueryType = typename VecStoreMeta::QueryType;
     using DistanceType = typename VecStoreMeta::DistanceType;
     using LVQDist = LVQL2Dist<DataType, i8>;
 
@@ -85,19 +87,14 @@ public:
     }
 
     template <typename DataStore>
-    DistanceType operator()(VertexType v1_i, VertexType v2_i, const DataStore &data_store) const {
-        return Inner(data_store.GetVec(v1_i), data_store.GetVec(v2_i), data_store.dim());
-    }
-
-    template <typename DataStore>
-    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
+    DistanceType operator()(const QueryType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
         return Inner(v1, data_store.GetVec(v2_i), data_store.dim());
     }
 
     LVQDist ToLVQDistance(size_t dim) &&;
 
 private:
-    DistanceType Inner(const StoreType &v1, const StoreType &v2, size_t dim) const { return SIMDFunc(v1, v2, dim); }
+    DistanceType Inner(const QueryType &v1, const StoreType &v2, size_t dim) const { return SIMDFunc(v1, v2, dim); }
 };
 
 export template <typename DataType, typename CompressType>
@@ -134,6 +131,7 @@ public:
     using LVQDist = This;
     using VecStoreMetaType = LVQVecStoreMetaType<DataType, CompressType, LVQL2Cache<DataType, CompressType>>;
     using StoreType = typename VecStoreMetaType::StoreType;
+    using QueryType = typename VecStoreMetaType::QueryType;
     using DistanceType = typename VecStoreMetaType::DistanceType;
 
 private:
@@ -166,22 +164,14 @@ public:
     }
 
     template <typename DataStore>
-    DistanceType operator()(VertexType v1_i, VertexType v2_i, const DataStore &data_store) const {
-        const StoreType &v1 = data_store.GetVec(v1_i);
-        const StoreType &v2 = data_store.GetVec(v2_i);
-        size_t dim = data_store.dim();
-        return Inner(v1, v2, dim);
-    }
-
-    template <typename DataStore>
-    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
+    DistanceType operator()(const QueryType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
         const StoreType &v2 = data_store.GetVec(v2_i);
         size_t dim = data_store.dim();
         return Inner(v1, v2, dim);
     }
 
 private:
-    DistanceType Inner(const StoreType &v1, const StoreType &v2, size_t dim) const {
+    DistanceType Inner(const QueryType &v1, const StoreType &v2, size_t dim) const {
         i32 c1c2_ip = SIMDFunc(v1->compress_vec_, v2->compress_vec_, dim);
         auto scale1 = v1->scale_;
         auto scale2 = v2->scale_;
@@ -191,6 +181,55 @@ private:
         auto [norm1_scale_2, norm2sq_scalesq_2] = v2->local_cache_;
         return norm2sq_scalesq_1 + norm2sq_scalesq_2 + beta * beta * dim - 2 * scale1 * scale2 * c1c2_ip + 2 * beta * norm1_scale_1 -
                2 * beta * norm1_scale_2;
+    }
+};
+
+export template <typename DataType>
+class RabitqL2Dist {
+public:
+    using This = RabitqL2Dist<DataType>;
+    using LVQDist = This;
+    using RabitqDist = This;
+    using MetaType = RabitqVecStoreMetaType<DataType>;
+    using StoreType = typename MetaType::StoreType;
+    using QueryType = typename MetaType::QueryType;
+    using DistanceType = typename MetaType::DistanceType;
+    using CompressType = typename MetaType::CompressType;
+    using AlignType = typename MetaType::AlignType;
+
+private:
+    using SIMDFuncType = i32 (*)(const CompressType *, const AlignType *, size_t);
+
+    SIMDFuncType SIMDFunc = nullptr;
+
+public:
+    RabitqL2Dist() : SIMDFunc(nullptr) {}
+    RabitqL2Dist(RabitqL2Dist &&other) : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
+    RabitqL2Dist &operator=(RabitqL2Dist &&other) {
+        if (this != &other) {
+            SIMDFunc = std::exchange(other.SIMDFunc, nullptr);
+        }
+        return *this;
+    }
+    ~RabitqL2Dist() = default;
+    RabitqL2Dist(size_t dim) {}
+
+    template <typename DataStore>
+    DistanceType operator()(const QueryType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
+        const StoreType &v2 = data_store.GetVec(v2_i);
+        size_t dim = data_store.dim();
+        return Inner(v1, v2, dim);
+    }
+
+private:
+    DistanceType Inner(const QueryType &query, const StoreType &base, size_t dim) const {
+        // estimate <x, q>
+        DistanceType ip_estimate = MetaType::IpDistanceBetweenQueryAndBinaryCode(query->query_compress_vec_, base->compress_vec_, dim);
+        DistanceType ip_recover =
+            MetaType::RecoverIpDistance(ip_estimate, dim, base->sum_, query->query_sum_, query->query_lower_bound_, query->query_delta_);
+
+        // estimate ||o_r, q_r||^2
+        return MetaType::RecoverL2DistanceSqr(ip_recover / base->error_, base->norm_, query->query_norm_);
     }
 };
 

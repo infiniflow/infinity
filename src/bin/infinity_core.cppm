@@ -133,6 +133,7 @@ export import :graph_store;
 export import :lvq_vec_store;
 export import :sparse_vec_store;
 export import :plain_vec_store;
+export import :rabitq_vec_store;
 export import :vec_store_type;
 export import :data_store;
 export import :data_store_util;
