@@ -104,9 +104,10 @@ public:
     /**
      * Utils
      */
-    std::string GetObjPath(const std::string &obj_key) const { return std::filesystem::path(workspace_).append(obj_key).string(); }
-
+    KVStore *kv_store() const { return kv_store_; }
     void SetKvStore(KVStore *kv_store);
+
+    std::string GetObjPath(const std::string &obj_key) const { return std::filesystem::path(workspace_).append(obj_key).string(); }
 
     std::unordered_map<std::string, std::shared_ptr<ObjStat>> GetAllObjects() const;
     std::unordered_map<std::string, ObjAddr> GetAllFiles() const;
@@ -160,24 +161,6 @@ private:
     size_t current_object_parts_ = 0;
     size_t current_object_ref_count_ = 0;
     friend struct AddrSerializer;
-};
-
-export struct AddrSerializer {
-    void Initialize(PersistenceManager *persistence_manager, const std::vector<std::string> &path);
-
-    void InitializeValid(PersistenceManager *persistence_manager);
-
-    size_t GetSizeInBytes() const;
-
-    void WriteBufAdv(char *&buf) const;
-
-    std::vector<std::string> ReadBufAdv(const char *&buf);
-
-    void AddToPersistenceManager(PersistenceManager *persistence_manager) const;
-
-    std::vector<std::string> paths_;
-    std::vector<ObjAddr> obj_addrs_; // set mutable to minimize refactor
-    std::vector<ObjStat> obj_stats_;
 };
 
 } // namespace infinity

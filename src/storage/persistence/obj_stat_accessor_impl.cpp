@@ -146,30 +146,30 @@ std::unordered_map<std::string, std::shared_ptr<ObjStat>> ObjectStats::GetAllObj
 }
 
 void ObjectStats::AddObjStatToKVStore(const std::string &key, const std::shared_ptr<ObjStat> &obj_stat) {
-    Storage *storage = InfinityContext::instance().storage();
-    if (!storage) {
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    if (!pm) {
         return;
     }
-    KVStore *kv_store = storage->kv_store();
+    KVStore *kv_store = pm->kv_store();
     if (!kv_store) {
         return;
     }
-    Status status = kv_store->Put(KeyEncode::PMObjectStatKey(key), obj_stat->ToString());
+    Status status = kv_store->Put(KeyEncode::PMObjectStatKey(key), obj_stat->ToString(), false);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 }
 
 void ObjectStats::RemoveObjStatFromKVStore(const std::string &key) {
-    Storage *storage = InfinityContext::instance().storage();
-    if (!storage) {
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    if (!pm) {
         return;
     }
-    KVStore *kv_store = storage->kv_store();
+    KVStore *kv_store = pm->kv_store();
     if (!kv_store) {
         return;
     }
-    Status status = kv_store->Delete(KeyEncode::PMObjectStatKey(key));
+    Status status = kv_store->Delete(KeyEncode::PMObjectStatKey(key), false);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }

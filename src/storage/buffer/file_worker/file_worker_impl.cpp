@@ -215,11 +215,6 @@ Status FileWorker::CleanupFile() const {
         std::string path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
         PersistWriteResult result = persistence_manager_->Cleanup(path);
         handler.HandleWriteResult(result); // Delete files
-        // Delete from RocksDB
-        auto *kv_store = InfinityContext::instance().storage()->kv_store();
-        std::string relevant_full_path = KeyEncode::PMObjectKey(fmt::format("{}/{}", *file_dir_, *file_name_));
-        kv_store->Delete(relevant_full_path);
-        LOG_TRACE(fmt::format("Fileworker: cleanup pm object key: {}", relevant_full_path));
         return Status::OK();
     }
 

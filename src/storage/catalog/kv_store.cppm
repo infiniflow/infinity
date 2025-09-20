@@ -78,10 +78,10 @@ public:
 
     std::unique_ptr<KVInstance> GetInstance();
 
-    Status Put(const std::string &key, const std::string &value);
-    Status Delete(const std::string &key);
+    Status Put(const std::string &key, const std::string &value, bool disable_wal = true);
+    Status Delete(const std::string &key, bool disable_wal = true);
     Status Get(const std::string &key, std::string &value);
-    Status Merge(const std::string &key, const std::string &value);
+    Status Merge(const std::string &key, const std::string &value, bool disable_wal = true);
 
     std::string ToString() const;
     size_t KeyValueNum() const;
