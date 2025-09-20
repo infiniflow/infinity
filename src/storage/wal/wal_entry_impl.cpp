@@ -53,12 +53,6 @@ namespace infinity {
 
 WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_id()) {
     Status status;
-    // auto [row_count, status] = block_meta.GetRowCnt();
-    // if (!status.ok()) {
-    //     UnrecoverableError(status.message());
-    // }
-
-    // row_count_ = row_count;
     row_capacity_ = block_meta.block_capacity();
 
     std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs_ptr;
@@ -70,16 +64,7 @@ WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_i
     for (size_t column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
         ColumnMeta column_meta(column_idx, block_meta);
         size_t chunk_offset = 0;
-        // status = column_meta.GetChunkOffset(chunk_offset);
-        // if (!status.ok()) {
-        //     UnrecoverableError(status.message());
-        // }
         outline_infos_[column_idx] = {1, chunk_offset};
-
-        Status status = column_meta.FilePaths(paths);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
     }
 }
 
