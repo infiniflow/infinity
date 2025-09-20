@@ -67,7 +67,6 @@ WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_i
         UnrecoverableError(status.message());
     }
     outline_infos_.resize(column_defs_ptr->size());
-    std::vector<std::string> paths;
     for (size_t column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
         ColumnMeta column_meta(column_idx, block_meta);
         size_t chunk_offset = 0;
@@ -81,26 +80,10 @@ WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_i
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        paths_.insert(paths_.end(), paths.begin(), paths.end());
     }
-    paths = block_meta.FilePaths();
-    paths_.insert(paths_.end(), paths.begin(), paths.end());
-#ifdef INFINITY_DEBUG
-    for (auto &pth : paths_) {
-        assert(!std::filesystem::path(pth).is_absolute());
-    }
-#endif
 }
 
 bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
-    if (paths_.size() != other.paths_.size()) {
-        return false;
-    }
-    for (size_t i = 0; i < paths_.size(); i++) {
-        if (paths_[i] != other.paths_[i]) {
-            return false;
-        }
-    }
     return block_id_ == other.block_id_ && row_count_ == other.row_count_ && row_capacity_ == other.row_capacity_ &&
            outline_infos_ == other.outline_infos_;
 }
@@ -108,19 +91,10 @@ bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
 i32 WalBlockInfo::GetSizeInBytes() const {
     i32 size = sizeof(BlockID) + sizeof(row_count_) + sizeof(row_capacity_);
     size += sizeof(i32) + outline_infos_.size() * (sizeof(u32) + sizeof(u64));
-    size += sizeof(i32);
-    for (const auto &path : paths_) {
-        size += sizeof(i32) + path.size();
-    }
     return size;
 }
 
 void WalBlockInfo::WriteBufferAdv(char *&buf) const {
-#ifdef INFINITY_DEBUG
-    for (auto &pth : paths_) {
-        assert(!std::filesystem::path(pth).is_absolute());
-    }
-#endif
     WriteBufAdv(buf, block_id_);
     WriteBufAdv(buf, row_count_);
     WriteBufAdv(buf, row_capacity_);
@@ -128,10 +102,6 @@ void WalBlockInfo::WriteBufferAdv(char *&buf) const {
     for (const auto &[idx, off] : outline_infos_) {
         WriteBufAdv(buf, idx);
         WriteBufAdv(buf, off);
-    }
-    WriteBufAdv(buf, paths_.size());
-    for (const auto &path : paths_) {
-        WriteBufAdv(buf, path);
     }
 }
 
@@ -147,11 +117,6 @@ WalBlockInfo WalBlockInfo::ReadBufferAdv(const char *&ptr) {
         const auto buffer_cnt = ReadBufAdv<u32>(ptr);
         const auto last_chunk_offset = ReadBufAdv<u64>(ptr);
         outline_info = {buffer_cnt, last_chunk_offset};
-    }
-    i32 path_count = ReadBufAdv<i32>(ptr);
-    block_info.paths_.resize(path_count);
-    for (i32 i = 0; i < path_count; i++) {
-        block_info.paths_[i] = ReadBufAdv<std::string>(ptr);
     }
     return block_info;
 }
@@ -307,29 +272,16 @@ i32 WalChunkIndexInfo::GetSizeInBytes() const {
     size += sizeof(ChunkID) + sizeof(i32) + base_name_.size();
     size += sizeof(base_rowid_) + sizeof(row_count_);
     size += sizeof(index_size_) + sizeof(deprecate_ts_);
-    size += sizeof(i32);
-    for (const auto &path : paths_) {
-        size += sizeof(i32) + path.size();
-    }
     return size;
 }
 
 void WalChunkIndexInfo::WriteBufferAdv(char *&buf) const {
-#ifdef INFINITY_DEBUG
-    for (auto &pth : paths_) {
-        assert(!std::filesystem::path(pth).is_absolute());
-    }
-#endif
     WriteBufAdv(buf, chunk_id_);
     WriteBufAdv(buf, base_name_);
     WriteBufAdv(buf, base_rowid_);
     WriteBufAdv(buf, row_count_);
     WriteBufAdv(buf, index_size_);
     WriteBufAdv(buf, deprecate_ts_);
-    WriteBufAdv(buf, static_cast<i32>(paths_.size()));
-    for (const auto &path : paths_) {
-        WriteBufAdv(buf, path);
-    }
 }
 
 WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(const char *&ptr) {
@@ -340,10 +292,6 @@ WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(const char *&ptr) {
     chunk_index_info.row_count_ = ReadBufAdv<u32>(ptr);
     chunk_index_info.index_size_ = ReadBufAdv<u32>(ptr);
     chunk_index_info.deprecate_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
-    i32 path_count = ReadBufAdv<i32>(ptr);
-    for (i32 i = 0; i < path_count; i++) {
-        chunk_index_info.paths_.push_back(ReadBufAdv<std::string>(ptr));
-    }
     return chunk_index_info;
 }
 

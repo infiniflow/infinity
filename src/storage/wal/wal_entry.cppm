@@ -116,7 +116,6 @@ export struct WalBlockInfo {
     u16 row_count_{};
     u16 row_capacity_{};
     std::vector<std::pair<u32, u64>> outline_infos_;
-    std::vector<std::string> paths_; // the last one is the block version file, previous ones are column files
 
     WalBlockInfo() = default;
 
@@ -178,7 +177,6 @@ export struct WalSegmentInfoV2 {
 export struct WalChunkIndexInfo {
     ChunkID chunk_id_{};
     std::string base_name_{};
-    std::vector<std::string> paths_{};
     RowID base_rowid_{};
     u32 row_count_{};
     u32 index_size_{};
