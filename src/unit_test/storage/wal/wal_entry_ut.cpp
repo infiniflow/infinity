@@ -31,8 +31,6 @@ import :data_block;
 import :default_values;
 import :index_base;
 import :index_ivf;
-import :persistence_manager;
-import :kv_store;
 import :status;
 
 import global_resource_usage;
@@ -97,6 +95,8 @@ WalSegmentInfo MakeSegmentInfo(size_t row_count, TxnTimeStamp commit_ts, size_t 
         std::vector<std::pair<u32, u64>> outline_info;
         outline_info.resize(column_count);
         block_info.outline_infos_ = std::move(outline_info);
+        block_info.paths_.emplace_back("db_1/tbl_0/seg_0/blk_0/0.col");
+        block_info.paths_.emplace_back("db_1/tbl_0/seg_0/blk_0/version");
     }
     segment_info.block_infos_ = std::move(block_infos_);
     return segment_info;

@@ -28,7 +28,6 @@ import :defer_op;
 import :logger;
 import :block_version;
 import :index_defines;
-import :persistence_manager;
 import :infinity_context;
 import :virtual_store;
 import :chunk_index_meta;
@@ -94,6 +93,14 @@ WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_i
 }
 
 bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
+    if (paths_.size() != other.paths_.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < paths_.size(); i++) {
+        if (paths_[i] != other.paths_[i]) {
+            return false;
+        }
+    }
     return block_id_ == other.block_id_ && row_count_ == other.row_count_ && row_capacity_ == other.row_capacity_ &&
            outline_infos_ == other.outline_infos_;
 }
@@ -101,6 +108,10 @@ bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
 i32 WalBlockInfo::GetSizeInBytes() const {
     i32 size = sizeof(BlockID) + sizeof(row_count_) + sizeof(row_capacity_);
     size += sizeof(i32) + outline_infos_.size() * (sizeof(u32) + sizeof(u64));
+    size += sizeof(i32);
+    for (const auto &path : paths_) {
+        size += sizeof(i32) + path.size();
+    }
     return size;
 }
 

@@ -22,7 +22,6 @@ import :table_def;
 import :index_base;
 import :data_block;
 import :infinity_exception;
-import :persistence_manager;
 
 import std;
 
