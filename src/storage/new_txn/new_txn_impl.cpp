@@ -5450,7 +5450,6 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     // Check persistence manager state during restore replay
     PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
     if (persistence_manager != nullptr) {
-        restore_table_cmd->addr_serializer_.AddToPersistenceManager(persistence_manager);
         std::unordered_map<std::string, ObjAddr> all_files = persistence_manager->GetAllFiles();
         LOG_DEBUG(fmt::format("Persistence manager has {} registered files during restore replay, commit ts: {}, txn: {}",
                               all_files.size(),

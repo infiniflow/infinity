@@ -1936,10 +1936,6 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
             block_lock->max_ts_ = std::max(block_lock->max_ts_, commit_ts);
             block_lock->checkpoint_ts_ = commit_ts;
         }
-
-        if (pm) {
-            block_info.addr_serializer_.InitializeValid(pm);
-        }
     }
 
     return Status::OK();

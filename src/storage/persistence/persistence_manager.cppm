@@ -163,22 +163,4 @@ private:
     friend struct AddrSerializer;
 };
 
-export struct AddrSerializer {
-    void Initialize(PersistenceManager *persistence_manager, const std::vector<std::string> &path);
-
-    void InitializeValid(PersistenceManager *persistence_manager);
-
-    size_t GetSizeInBytes() const;
-
-    void WriteBufAdv(char *&buf) const;
-
-    std::vector<std::string> ReadBufAdv(const char *&buf);
-
-    void AddToPersistenceManager(PersistenceManager *persistence_manager) const;
-
-    std::vector<std::string> paths_;
-    std::vector<ObjAddr> obj_addrs_; // set mutable to minimize refactor
-    std::vector<ObjStat> obj_stats_;
-};
-
 } // namespace infinity
