@@ -65,7 +65,7 @@ u32 IVFIndexInMem::GetInputRowCount() const {
     return input_row_count_;
 }
 
-const ChunkIndexMetaInfo IVFIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", begin_row_id_, input_row_count_, 0}; }
+const ChunkIndexMetaInfo IVFIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", begin_row_id_, input_row_count_, 0, 0}; }
 
 template <LogicalType column_logical_type, EmbeddingDataType embedding_data_type>
 struct InMemStorage;

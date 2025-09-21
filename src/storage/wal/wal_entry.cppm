@@ -179,6 +179,7 @@ export struct WalChunkIndexInfo {
     std::string base_name_{};
     RowID base_rowid_{};
     u32 row_count_{};
+    u32 term_count_{};
     u32 index_size_{};
     TxnTimeStamp deprecate_ts_{};
 

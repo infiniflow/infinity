@@ -29,11 +29,12 @@ class BufferObj;
 
 export struct ChunkIndexMetaInfo {
     ChunkIndexMetaInfo() = default;
-    ChunkIndexMetaInfo(std::string base_name, RowID base_row_id, size_t row_cnt, size_t index_size)
-        : base_name_(base_name), base_row_id_(base_row_id), row_cnt_(row_cnt), index_size_(index_size) {}
+    ChunkIndexMetaInfo(std::string base_name, RowID base_row_id, size_t row_cnt, size_t term_cnt, size_t index_size)
+        : base_name_(base_name), base_row_id_(base_row_id), row_cnt_(row_cnt), term_cnt_(term_cnt), index_size_(index_size) {}
     std::string base_name_{};
     RowID base_row_id_{};
     size_t row_cnt_{};
+    size_t term_cnt_{}; // used only in fulltext index
     size_t index_size_{};
 
     void ToJson(nlohmann::json &json) const;

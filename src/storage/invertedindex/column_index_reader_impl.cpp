@@ -77,7 +77,6 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
         if (!status.ok()) {
             return status;
         }
-        RowID ft_info_next_rowid = RowID(segment_index_meta.segment_id(), ft_info_ptr->ft_column_len_cnt_);
 
         std::vector<ChunkID> *chunk_ids_ptr = nullptr;
         std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
@@ -110,28 +109,9 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
 
             chunk_index_meta_infos_.emplace_back(
                 ColumnReaderChunkInfo{index_buffer, chunk_info_ptr->base_row_id_, u32(chunk_info_ptr->row_cnt_), chunk_id, segment_id});
-            if (chunk_info_ptr->base_row_id_ >= ft_info_next_rowid) {
-                // KV ft_info doesn't cover this chunk due to shutdown before checkpoint.
-                // NewCatalog::LoadFlushedChunkIndex1 isn't responsible to rectify it.
-                // So we need to rectify it here just before query.
-                // Refers to FullTextColumnLengthReader::SeekFile(RowID row_id)
-                u64 chunk_column_len_sum = 0;
-                BufferHandle chunk_buffer_handle = index_buffer->Load();
-                auto column_lengths = (const u32 *)chunk_buffer_handle.GetData();
-                for (size_t i = 0; i < chunk_info_ptr->row_cnt_; i++) {
-                    chunk_column_len_sum += column_lengths[i];
-                }
-                column_len_sum += chunk_column_len_sum;
-                column_len_cnt += chunk_info_ptr->row_cnt_;
-            }
+            column_len_sum += chunk_info_ptr->term_cnt_;
+            column_len_cnt += chunk_info_ptr->row_cnt_;
         }
-
-        status = segment_index_meta.GetFtInfo(ft_info_ptr);
-        if (!status.ok()) {
-            return status;
-        }
-        column_len_sum += ft_info_ptr->ft_column_len_sum_;
-        column_len_cnt += ft_info_ptr->ft_column_len_cnt_;
 
         {
             std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
@@ -172,24 +152,7 @@ std::unique_ptr<PostingIterator> ColumnIndexReader::Lookup(const std::string &te
     return iter;
 }
 
-std::pair<u64, float> ColumnIndexReader::GetTotalDfAndAvgColumnLength() {
-    std::lock_guard lock(mutex_);
-    if (total_df_ == 0) {
-        u64 column_len_sum = 0;
-        u32 column_len_cnt = 0;
-
-        for (auto &[segment_id, segment_index_ft_info] : segment_index_ft_infos_) {
-            column_len_sum += segment_index_ft_info->ft_column_len_sum_;
-            column_len_cnt += segment_index_ft_info->ft_column_len_cnt_;
-        }
-
-        if (column_len_cnt != 0) {
-            total_df_ = column_len_cnt;
-            avg_column_length_ = static_cast<float>(column_len_sum) / column_len_cnt;
-        }
-    }
-    return std::pair<u64, float>(total_df_, avg_column_length_);
-}
+std::pair<u64, float> ColumnIndexReader::GetTotalDfAndAvgColumnLength() { return std::pair<u64, float>(total_df_, avg_column_length_); }
 
 void ColumnIndexReader::InvalidateSegment(SegmentID segment_id) {
     for (auto iter = segment_readers_.begin(); iter != segment_readers_.end();) {

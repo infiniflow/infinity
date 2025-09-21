@@ -243,19 +243,20 @@ WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta) : chunk_i
     base_name_ = chunk_info_ptr->base_name_;
     base_rowid_ = chunk_info_ptr->base_row_id_;
     row_count_ = chunk_info_ptr->row_cnt_;
+    term_count_ = chunk_info_ptr->term_cnt_;
     index_size_ = chunk_info_ptr->index_size_;
     deprecate_ts_ = UNCOMMIT_TS;
 }
 
 bool WalChunkIndexInfo::operator==(const WalChunkIndexInfo &other) const {
     return chunk_id_ == other.chunk_id_ && base_name_ == other.base_name_ && base_rowid_ == other.base_rowid_ && row_count_ == other.row_count_ &&
-           index_size_ == other.index_size_ && deprecate_ts_ == other.deprecate_ts_;
+           term_count_ == other.term_count_ && index_size_ == other.index_size_ && deprecate_ts_ == other.deprecate_ts_;
 }
 
 i32 WalChunkIndexInfo::GetSizeInBytes() const {
     size_t size = 0;
     size += sizeof(ChunkID) + sizeof(i32) + base_name_.size();
-    size += sizeof(base_rowid_) + sizeof(row_count_);
+    size += sizeof(base_rowid_) + sizeof(row_count_) + sizeof(term_count_);
     size += sizeof(index_size_) + sizeof(deprecate_ts_);
     return size;
 }
@@ -265,6 +266,7 @@ void WalChunkIndexInfo::WriteBufferAdv(char *&buf) const {
     WriteBufAdv(buf, base_name_);
     WriteBufAdv(buf, base_rowid_);
     WriteBufAdv(buf, row_count_);
+    WriteBufAdv(buf, term_count_);
     WriteBufAdv(buf, index_size_);
     WriteBufAdv(buf, deprecate_ts_);
 }
@@ -275,6 +277,7 @@ WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(const char *&ptr) {
     chunk_index_info.base_name_ = ReadBufAdv<std::string>(ptr);
     chunk_index_info.base_rowid_ = ReadBufAdv<RowID>(ptr);
     chunk_index_info.row_count_ = ReadBufAdv<u32>(ptr);
+    chunk_index_info.term_count_ = ReadBufAdv<u32>(ptr);
     chunk_index_info.index_size_ = ReadBufAdv<u32>(ptr);
     chunk_index_info.deprecate_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
     return chunk_index_info;
@@ -283,7 +286,7 @@ WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(const char *&ptr) {
 std::string WalChunkIndexInfo::ToString() const {
     std::stringstream ss;
     ss << "chunk_id: " << chunk_id_ << ", base_name: " << base_name_ << ", base_rowid: " << base_rowid_.ToString() << ", row_count: " << row_count_
-       << ", index_size: " << index_size_ << ", deprecate_ts: " << deprecate_ts_;
+       << ", term_count: " << term_count_ << ", index_size: " << index_size_ << ", deprecate_ts: " << deprecate_ts_;
     return std::move(ss).str();
 }
 

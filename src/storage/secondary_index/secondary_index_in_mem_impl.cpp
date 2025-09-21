@@ -135,7 +135,7 @@ MemIndexTracerInfo SecondaryIndexInMem::GetInfo() const {
     return MemIndexTracerInfo(nullptr, nullptr, nullptr, mem, row_cnt);
 }
 
-const ChunkIndexMetaInfo SecondaryIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", GetBeginRowID(), GetRowCount(), 0}; }
+const ChunkIndexMetaInfo SecondaryIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", GetBeginRowID(), GetRowCount(), 0, 0}; }
 
 std::shared_ptr<SecondaryIndexInMem> SecondaryIndexInMem::NewSecondaryIndexInMem(const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id) {
     if (!column_def->type()->CanBuildSecondaryIndex()) {

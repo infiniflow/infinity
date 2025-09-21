@@ -534,7 +534,9 @@ MemIndexTracerInfo MemoryIndexer::GetInfo() const {
                               doc_count_);
 }
 
-const ChunkIndexMetaInfo MemoryIndexer::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{base_name_, base_row_id_, GetDocCount(), 0}; }
+const ChunkIndexMetaInfo MemoryIndexer::GetChunkIndexMetaInfo() const {
+    return ChunkIndexMetaInfo{base_name_, base_row_id_, GetDocCount(), GetColumnLengthSum(), 0};
+}
 
 size_t MemoryIndexer::MemUsed() const { return mem_used_; }
 

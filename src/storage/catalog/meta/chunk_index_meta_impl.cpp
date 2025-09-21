@@ -69,6 +69,7 @@ void ChunkIndexMetaInfo::ToJson(nlohmann::json &json) const {
     json["base_name"] = base_name_;
     json["base_row_id"] = base_row_id_.ToUint64();
     json["row_count"] = row_cnt_;
+    json["term_count"] = term_cnt_;
     json["index_size"] = index_size_;
 }
 
@@ -79,6 +80,7 @@ void ChunkIndexMetaInfo::FromJson(std::string_view json_str) {
     base_name_ = doc["base_name"].get<std::string>();
     base_row_id_ = RowID::FromUint64(doc["base_row_id"].get<u64>());
     row_cnt_ = doc["row_count"].get<u64>();
+    term_cnt_ = doc["term_count"].get<u64>();
     index_size_ = doc["index_size"].get<u64>();
 }
 

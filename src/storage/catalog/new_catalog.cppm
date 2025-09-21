@@ -319,6 +319,7 @@ public:
                                     ChunkID chunk_id,
                                     RowID base_row_id,
                                     size_t row_count,
+                                    size_t term_count,
                                     const std::string &base_name,
                                     size_t index_size,
                                     std::optional<ChunkIndexMeta> &chunk_index_meta);
@@ -328,6 +329,7 @@ public:
                                         ChunkID chunk_id,
                                         RowID base_row_id,
                                         size_t row_count,
+                                        size_t term_count,
                                         const std::string &base_name,
                                         size_t index_size,
                                         std::optional<ChunkIndexMeta> &chunk_index_meta,

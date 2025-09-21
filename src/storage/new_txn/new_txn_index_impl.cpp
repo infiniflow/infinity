@@ -386,6 +386,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     }
     RowID base_rowid;
     u32 row_cnt = 0;
+    u32 term_cnt = 0;
     std::vector<size_t> row_cnts;
 
     std::string base_name;
@@ -395,7 +396,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         return index_status;
     }
     if (index_base->index_type_ == IndexType::kFullText) {
-        status = this->OptimizeFtIndex(index_base, segment_index_meta, base_rowid, row_cnt, base_name);
+        status = this->OptimizeFtIndex(index_base, segment_index_meta, base_rowid, row_cnt, term_cnt, base_name);
         if (!status.ok()) {
             return status;
         }
@@ -429,8 +430,15 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     std::optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
     {
-        status =
-            NewCatalog::AddNewChunkIndex1(segment_index_meta, this, chunk_id, base_rowid, row_cnt, base_name, 0 /*index_size*/, chunk_index_meta);
+        status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
+                                               this,
+                                               chunk_id,
+                                               base_rowid,
+                                               row_cnt,
+                                               term_cnt,
+                                               base_name,
+                                               0 /*index_size*/,
+                                               chunk_index_meta);
         if (!status.ok()) {
             return status;
         }
@@ -1357,6 +1365,7 @@ Status NewTxn::PopulateFtIndexInner(std::shared_ptr<IndexBase> index_base,
                                                    new_chunk_id,
                                                    chunk_index_meta_info.base_row_id_,
                                                    chunk_index_meta_info.row_cnt_,
+                                                   chunk_index_meta_info.term_cnt_,
                                                    chunk_index_meta_info.base_name_,
                                                    chunk_index_meta_info.index_size_,
                                                    chunk_index_meta);
@@ -1399,6 +1408,7 @@ Status NewTxn::PopulateIvfIndexInner(std::shared_ptr<IndexBase> index_base,
                                                       chunk_id,
                                                       base_row_id,
                                                       row_count,
+                                                      0 /*term_count*/,
                                                       "" /*base_name*/,
                                                       0 /*index_size*/,
                                                       chunk_index_meta);
@@ -1448,6 +1458,7 @@ Status NewTxn::PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
                                                       chunk_id,
                                                       base_row_id,
                                                       row_count,
+                                                      0 /*term_count*/,
                                                       "" /*base_name*/,
                                                       0 /*index_size*/,
                                                       chunk_index_meta);
@@ -1469,6 +1480,7 @@ Status NewTxn::OptimizeFtIndex(std::shared_ptr<IndexBase> index_base,
                                SegmentIndexMeta &segment_index_meta,
                                RowID &base_rowid_out,
                                u32 &row_cnt_out,
+                               u32 &term_cnt_out,
                                std::string &base_name_out) {
     const auto *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
 
@@ -1488,6 +1500,7 @@ Status NewTxn::OptimizeFtIndex(std::shared_ptr<IndexBase> index_base,
     std::vector<RowID> base_rowids;
     RowID base_rowid;
     u32 total_row_count = 0;
+    u32 total_term_count = 0;
     std::vector<ChunkID> old_ids;
 
     for (auto iter = chunk_ids.begin(); iter != chunk_ids.end(); ++iter) {
@@ -1522,6 +1535,7 @@ Status NewTxn::OptimizeFtIndex(std::shared_ptr<IndexBase> index_base,
         base_names.push_back(chunk_info_ptr->base_name_);
         base_rowids.push_back(chunk_info_ptr->base_row_id_);
         total_row_count += chunk_info_ptr->row_cnt_;
+        total_term_count += chunk_info_ptr->term_cnt_;
     }
 
     if (chunk_ids.size() <= 1) {
@@ -1540,6 +1554,7 @@ Status NewTxn::OptimizeFtIndex(std::shared_ptr<IndexBase> index_base,
     {
         base_rowid_out = base_rowid;
         row_cnt_out = total_row_count;
+        term_cnt_out = total_term_count;
         base_name_out = dst_base_name;
     }
 
@@ -1795,6 +1810,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
                                                       new_chunk_id,
                                                       chunk_index_meta_info.base_row_id_,
                                                       chunk_index_meta_info.row_cnt_,
+                                                      chunk_index_meta_info.term_cnt_,
                                                       chunk_index_meta_info.base_name_,
                                                       chunk_index_meta_info.index_size_,
                                                       chunk_index_meta);
@@ -1973,6 +1989,18 @@ Status NewTxn::RecoverMemIndex(TableIndexMeeta &table_index_meta) {
             }
         }
     }
+    std::ostringstream oss;
+    oss << "[";
+    for (const auto &range : append_ranges) {
+        oss << fmt::format("({}, {}), ", range.first.ToUint64(), range.second);
+    }
+    oss << "]";
+    LOG_INFO(fmt::format("NewTxn::RecoverMemIndex db {} table {} index {} append_ranges {}: {}",
+                         table_meta.db_id_str(),
+                         table_meta.table_id_str(),
+                         table_index_meta.index_id_str(),
+                         append_ranges.size(),
+                         oss.str()));
     for (const auto &range : append_ranges) {
         status = this->AppendIndex(table_index_meta, range);
         if (!status.ok()) {
@@ -2220,6 +2248,7 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const std
                                                              chunk_index.chunk_id_,
                                                              chunk_index.base_rowid_,
                                                              chunk_index.row_count_,
+                                                             chunk_index.term_count_,
                                                              chunk_index.base_name_,
                                                              chunk_index.index_size_,
                                                              chunk_index_meta,

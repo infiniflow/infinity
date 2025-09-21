@@ -544,6 +544,7 @@ private:
                            SegmentIndexMeta &segment_index_meta,
                            RowID &base_rowid,
                            u32 &row_cnt,
+                           u32 &term_cnt,
                            std::string &base_name);
 
     Status OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,

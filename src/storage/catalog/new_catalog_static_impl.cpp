@@ -1094,6 +1094,7 @@ Status NewCatalog::AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
                                      ChunkID chunk_id,
                                      RowID base_row_id,
                                      size_t row_count,
+                                     size_t term_count,
                                      const std::string &base_name,
                                      size_t index_size,
                                      std::optional<ChunkIndexMeta> &chunk_index_meta) {
@@ -1101,6 +1102,7 @@ Status NewCatalog::AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
     chunk_info.base_name_ = base_name;
     chunk_info.base_row_id_ = base_row_id;
     chunk_info.row_cnt_ = row_count;
+    chunk_info.term_cnt_ = term_count;
     chunk_info.index_size_ = index_size;
     {
         chunk_index_meta.emplace(chunk_id, segment_index_meta);
@@ -1123,6 +1125,7 @@ Status NewCatalog::RestoreNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
                                          ChunkID chunk_id,
                                          RowID base_row_id,
                                          size_t row_count,
+                                         size_t term_count,
                                          const std::string &base_name,
                                          size_t index_size,
                                          std::optional<ChunkIndexMeta> &chunk_index_meta,
@@ -1131,6 +1134,7 @@ Status NewCatalog::RestoreNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
     chunk_info.base_name_ = base_name;
     chunk_info.base_row_id_ = base_row_id;
     chunk_info.row_cnt_ = row_count;
+    chunk_info.term_cnt_ = term_count;
     chunk_info.index_size_ = index_size;
     {
         chunk_index_meta.emplace(chunk_id, segment_index_meta);
@@ -1169,6 +1173,7 @@ Status NewCatalog::LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, 
         chunk_meta_info.base_name_ = chunk_info.base_name_;
         chunk_meta_info.base_row_id_ = chunk_info.base_rowid_;
         chunk_meta_info.row_cnt_ = chunk_info.row_count_;
+        chunk_meta_info.term_cnt_ = chunk_info.term_count_;
         chunk_meta_info.index_size_ = 0;
     }
     status = chunk_index_meta.SetChunkInfo(chunk_meta_info);
