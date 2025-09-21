@@ -84,6 +84,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
             return status;
         }
 
+        RowID exp_begin_row_id = INVALID_ROWID;
         for (ChunkID chunk_id : *chunk_ids_ptr) {
             ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
             ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
@@ -107,6 +108,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
                 return status;
             }
 
+            exp_begin_row_id = chunk_info_ptr->base_row_id_ + chunk_info_ptr->row_cnt_;
             chunk_index_meta_infos_.emplace_back(
                 ColumnReaderChunkInfo{index_buffer, chunk_info_ptr->base_row_id_, u32(chunk_info_ptr->row_cnt_), chunk_id, segment_id});
             column_len_sum += chunk_info_ptr->term_cnt_;
@@ -117,6 +119,12 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
             std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
             std::shared_ptr<MemoryIndexer> memory_indexer = mem_index == nullptr ? nullptr : mem_index->GetFulltextIndex();
             if (memory_indexer && memory_indexer->GetDocCount() != 0) {
+                RowID act_begin_row_id = memory_indexer->GetBeginRowID();
+                if (exp_begin_row_id != INVALID_ROWID && exp_begin_row_id != act_begin_row_id) {
+                    UnrecoverableError(fmt::format("memory index begin row id {} not match the expeced {}",
+                                                   act_begin_row_id.ToUint64(),
+                                                   exp_begin_row_id.ToUint64()));
+                }
                 std::shared_ptr<InMemIndexSegmentReader> segment_reader = std::make_shared<InMemIndexSegmentReader>(segment_id, memory_indexer.get());
                 segment_readers_.push_back(std::move(segment_reader));
                 // for loading column length file
