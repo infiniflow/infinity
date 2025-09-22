@@ -498,7 +498,8 @@ public:
     using This = KnnHnsw<VecStoreType, LabelType, OwnMem>;
     using DataStore = DataStore<VecStoreType, LabelType, OwnMem>;
     using Distance = typename VecStoreType::Distance;
-    using CompressVecStoreType = decltype(VecStoreType::template ToLVQ<i8>());
+    using CompressLVQVecStoreType = decltype(VecStoreType::template ToLVQ<i8>());
+    using CompressRabitqVecStoreType = decltype(VecStoreType::ToRabitq());
     constexpr static bool kOwnMem = OwnMem;
 
     KnnHnsw(size_t M, size_t ef_construction, DataStore data_store, Distance distance) {
@@ -543,17 +544,31 @@ public:
         return std::make_unique<This>(M, ef_construction, std::move(data_store), std::move(distance));
     }
 
-    std::unique_ptr<KnnHnsw<CompressVecStoreType, LabelType>> CompressToLVQ() && {
-        if constexpr (std::is_same_v<VecStoreType, CompressVecStoreType>) {
+    std::unique_ptr<KnnHnsw<CompressLVQVecStoreType, LabelType>> CompressToLVQ() && {
+        if constexpr (std::is_same_v<VecStoreType, CompressLVQVecStoreType>) {
             return std::make_unique<This>(std::move(*this));
         } else {
-            using CompressedDistance = typename CompressVecStoreType::Distance;
+            using CompressedDistance = typename CompressLVQVecStoreType::Distance;
             CompressedDistance distance = std::move(this->distance_).ToLVQDistance(this->data_store_.dim());
-            auto compressed_datastore = std::move(this->data_store_).template CompressToLVQ<CompressVecStoreType>();
-            return std::make_unique<KnnHnsw<CompressVecStoreType, LabelType>>(this->M_,
-                                                                              this->ef_construction_,
-                                                                              std::move(compressed_datastore),
-                                                                              std::move(distance));
+            auto compressed_datastore = std::move(this->data_store_).template CompressToLVQ<CompressLVQVecStoreType>();
+            return std::make_unique<KnnHnsw<CompressLVQVecStoreType, LabelType>>(this->M_,
+                                                                                 this->ef_construction_,
+                                                                                 std::move(compressed_datastore),
+                                                                                 std::move(distance));
+        }
+    }
+
+    std::unique_ptr<KnnHnsw<CompressRabitqVecStoreType, LabelType>> CompressToRabitq() && {
+        if constexpr (std::is_same_v<VecStoreType, CompressRabitqVecStoreType>) {
+            return std::make_unique<This>(std::move(*this));
+        } else {
+            using CompressedDistance = typename CompressRabitqVecStoreType::Distance;
+            CompressedDistance distance = std::move(this->distance_).ToRabitqDistance(this->data_store_.dim());
+            auto compressed_datastore = std::move(this->data_store_).template CompressToRabitq<CompressRabitqVecStoreType>();
+            return std::make_unique<KnnHnsw<CompressRabitqVecStoreType, LabelType>>(this->M_,
+                                                                                    this->ef_construction_,
+                                                                                    std::move(compressed_datastore),
+                                                                                    std::move(distance));
         }
     }
 };

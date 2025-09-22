@@ -23,7 +23,8 @@ using namespace infinity;
 enum class ModeType : i8 {
     BUILD,
     QUERY,
-    COMPRESS,
+    CompressLVQ,
+    CompressRabitq,
 };
 
 enum class BenchmarkType : i8 {
@@ -43,12 +44,14 @@ std::string BenchmarkTypeToString(BenchmarkType benchmark_type) {
 enum class BuildType : i8 {
     PLAIN,
     LVQ,
+    Rabitq,
     CompressToLVQ,
+    CompressToRabitq,
     LSGBuild,
     LSGLVQBuild,
     LSGCompressToLVQ,
-    RabitqBuild,
-    LSGRabitqBuild
+    LSGRabitqBuild,
+    LSGCompressToRabitq
 };
 
 std::string BuildTypeToString(BuildType build_type) {
@@ -57,18 +60,22 @@ std::string BuildTypeToString(BuildType build_type) {
             return "plain";
         case BuildType::LVQ:
             return "lvq";
+        case BuildType::Rabitq:
+            return "rabitq";
         case BuildType::CompressToLVQ:
             return "clvq";
+        case BuildType::CompressToRabitq:
+            return "crabitq";
         case BuildType::LSGBuild:
             return "lsg";
         case BuildType::LSGLVQBuild:
             return "lvq_lsg";
         case BuildType::LSGCompressToLVQ:
             return "clvq_lsg";
-        case BuildType::RabitqBuild:
-            return "rabitq";
         case BuildType::LSGRabitqBuild:
             return "rabitq_lsg";
+        case BuildType::LSGCompressToRabitq:
+            return "crabitq_lsg";
     }
 }
 
@@ -81,17 +88,22 @@ public:
     }
 
     void Parse(int argc, char *argv[]) {
-        std::map<std::string, ModeType> mode_map = {{"build", ModeType::BUILD}, {"query", ModeType::QUERY}, {"compress", ModeType::COMPRESS}};
+        std::map<std::string, ModeType> mode_map = {{"build", ModeType::BUILD},
+                                                    {"query", ModeType::QUERY},
+                                                    {"clvq", ModeType::CompressLVQ},
+                                                    {"crabitq", ModeType::CompressRabitq}};
         std::map<std::string, BenchmarkType> benchmark_type_map = {{"sift", BenchmarkType::SIFT}, {"gist", BenchmarkType::GIST}};
         std::map<std::string, BuildType> build_type_map = {
             {"plain", BuildType::PLAIN},
             {"lvq", BuildType::LVQ},
+            {"rabitq", BuildType::Rabitq},
             {"clvq", BuildType::CompressToLVQ},
+            {"crabitq", BuildType::CompressToRabitq},
             {"lsg", BuildType::LSGBuild},
             {"lvq_lsg", BuildType::LSGLVQBuild},
             {"clvq_lsg", BuildType::LSGCompressToLVQ},
-            {"rabitq", BuildType::RabitqBuild},
             {"rabitq_lsg", BuildType::LSGRabitqBuild},
+            {"crabitq_lsg", BuildType::LSGCompressToRabitq},
         };
 
         app_.add_option("--mode", mode_type_, "mode")->required()->transform(CLI::CheckedTransformer(mode_map, CLI::ignore_case));
@@ -281,8 +293,15 @@ void Build(const BenchmarkOption &option) {
     if constexpr (std::is_same_v<HnswT, HnswT2>) {
         save(hnsw);
     } else {
-        auto hnsw_lvq = std::move(*hnsw).CompressToLVQ();
-        save(hnsw_lvq);
+        std::unique_ptr<HnswT2> hnsw_compress;
+        if constexpr (std::is_same_v<HnswT2, HnswLVQ>) {
+            hnsw_compress = std::move(*hnsw).CompressToLVQ();
+        } else if (std::is_same_v<HnswT2, HnswRabitq>) {
+            hnsw_compress = std::move(*hnsw).CompressToRabitq();
+        } else {
+            UnrecoverableError("Compress failed: Compress Type not exists!");
+        }
+        save(hnsw_compress);
     }
 }
 
@@ -388,12 +407,19 @@ void Compress(const BenchmarkOption &option) {
     }
     std::filesystem::path new_index_save_path = option.index_dir_ / fmt::format("{}.bin", new_index_name);
 
-    auto hnsw_lvq = std::move(*hnsw).CompressToLVQ();
-    auto [index_file_lvq, index_status_lvq] = VirtualStore::Open(new_index_save_path.string(), FileAccessMode::kWrite);
-    if (!index_status_lvq.ok()) {
-        UnrecoverableError(index_status_lvq.message());
+    std::unique_ptr<HnswT2> hnsw_compress;
+    if constexpr (std::is_same_v<HnswT2, HnswLVQ>) {
+        hnsw_compress = std::move(*hnsw).CompressToLVQ();
+    } else if (std::is_same_v<HnswT2, HnswRabitq>) {
+        hnsw_compress = std::move(*hnsw).CompressToRabitq();
+    } else {
+        UnrecoverableError("Compress failed: Compress Type not exists!");
     }
-    hnsw_lvq->Save(*index_file_lvq);
+    auto [index_file_compress, index_status_compress] = VirtualStore::Open(new_index_save_path.string(), FileAccessMode::kWrite);
+    if (!index_status_compress.ok()) {
+        UnrecoverableError(index_status_compress.message());
+    }
+    hnsw_compress->Save(*index_file_compress);
 }
 
 int main(int argc, char *argv[]) {
@@ -410,8 +436,16 @@ int main(int argc, char *argv[]) {
                     Build<HnswLVQ, HnswLVQ>(option);
                     break;
                 }
+                case BuildType::Rabitq: {
+                    Build<HnswRabitq, HnswRabitq>(option);
+                    break;
+                }
                 case BuildType::CompressToLVQ: {
                     Build<Hnsw, HnswLVQ>(option);
+                    break;
+                }
+                case BuildType::CompressToRabitq: {
+                    Build<Hnsw, HnswRabitq>(option);
                     break;
                 }
                 case BuildType::LSGBuild: {
@@ -426,12 +460,12 @@ int main(int argc, char *argv[]) {
                     Build<HnswLSG, HnswLVQ>(option);
                     break;
                 }
-                case BuildType::RabitqBuild: {
-                    Build<HnswRabitq, HnswRabitq>(option);
-                    break;
-                }
                 case BuildType::LSGRabitqBuild: {
                     Build<HnswRabitqLSG, HnswRabitqLSG>(option);
+                    break;
+                }
+                case BuildType::LSGCompressToRabitq: {
+                    Build<HnswLSG, HnswRabitq>(option);
                     break;
                 }
             }
@@ -449,16 +483,18 @@ int main(int argc, char *argv[]) {
                     Query<HnswLVQ>(option);
                     break;
                 }
+                case BuildType::Rabitq:
+                case BuildType::CompressToRabitq:
+                case BuildType::LSGCompressToRabitq: {
+                    Query<HnswRabitq>(option);
+                    break;
+                }
                 case BuildType::LSGBuild: {
                     Query<HnswLSG>(option);
                     break;
                 }
                 case BuildType::LSGLVQBuild: {
                     Query<HnswLVQLSG>(option);
-                    break;
-                }
-                case BuildType::RabitqBuild: {
-                    Query<HnswRabitq>(option);
                     break;
                 }
                 case BuildType::LSGRabitqBuild: {
@@ -468,7 +504,7 @@ int main(int argc, char *argv[]) {
             }
             break;
         }
-        case ModeType::COMPRESS: {
+        case ModeType::CompressLVQ: {
             switch (option.build_type_) {
                 case BuildType::PLAIN: {
                     Compress<Hnsw, HnswLVQ>(option);
@@ -476,6 +512,22 @@ int main(int argc, char *argv[]) {
                 }
                 case BuildType::LSGBuild: {
                     Compress<HnswLSG, HnswLVQ>(option);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Unsupport compress type");
+                }
+            }
+            break;
+        }
+        case ModeType::CompressRabitq: {
+            switch (option.build_type_) {
+                case BuildType::PLAIN: {
+                    Compress<Hnsw, HnswRabitq>(option);
+                    break;
+                }
+                case BuildType::LSGBuild: {
+                    Compress<HnswLSG, HnswRabitq>(option);
                     break;
                 }
                 default: {

@@ -28,6 +28,9 @@ export template <typename DataType, typename CompressType>
 class LVQL2Dist;
 
 export template <typename DataType>
+class RabitqL2Dist;
+
+export template <typename DataType>
 class PlainLSL2Dist;
 
 export template <typename DataType>
@@ -39,6 +42,7 @@ public:
     using QueryType = typename VecStoreMeta::QueryType;
     using DistanceType = typename VecStoreMeta::DistanceType;
     using LVQDist = LVQL2Dist<DataType, i8>;
+    using RabitqDist = RabitqL2Dist<DataType>;
 
 private:
     using SIMDFuncType = std::conditional_t<std::is_same_v<DataType, float>, f32, i32> (*)(const DataType *, const DataType *, size_t);
@@ -93,6 +97,8 @@ public:
 
     LVQDist ToLVQDistance(size_t dim) &&;
 
+    RabitqDist ToRabitqDistance(size_t dim) &&;
+
 private:
     DistanceType Inner(const QueryType &v1, const StoreType &v2, size_t dim) const { return SIMDFunc(v1, v2, dim); }
 };
@@ -129,6 +135,7 @@ class LVQL2Dist {
 public:
     using This = LVQL2Dist<DataType, CompressType>;
     using LVQDist = This;
+    using RabitqDist = This;
     using VecStoreMetaType = LVQVecStoreMetaType<DataType, CompressType, LVQL2Cache<DataType, CompressType>>;
     using StoreType = typename VecStoreMetaType::StoreType;
     using QueryType = typename VecStoreMetaType::QueryType;
@@ -236,6 +243,11 @@ private:
 template <typename DataType>
 LVQL2Dist<DataType, i8> PlainL2Dist<DataType>::ToLVQDistance(size_t dim) && {
     return LVQL2Dist<DataType, i8>(dim);
+}
+
+template <typename DataType>
+RabitqL2Dist<DataType> PlainL2Dist<DataType>::ToRabitqDistance(size_t dim) && {
+    return RabitqL2Dist<DataType>(dim);
 }
 
 } // namespace infinity

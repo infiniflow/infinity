@@ -29,6 +29,7 @@ public:
     using DistanceType = typename VecStoreMeta::DistanceType;
     using LSG = void;
     using LVQDist = typename Dist::LVQDist;
+    using RabitqDist = typename Dist::RabitqDist;
 
     LSGDistWrapper() = default;
     LSGDistWrapper(LSGDistWrapper &&other) : avg_(std::exchange(other.avg_, nullptr)), alpha_(other.alpha_), dist_(std::move(other.dist_)) {}
@@ -58,11 +59,20 @@ public:
         avg_ = avg;
     }
 
+    // Discard LSG Wrapper after compression
     LVQDist ToLVQDistance(size_t dim) && {
         if constexpr (std::is_same_v<typename Dist::This, typename Dist::LVQDist>) {
             return std::move(dist_);
         } else {
             return std::move(dist_).ToLVQDistance(dim);
+        }
+    }
+
+    RabitqDist ToRabitqDistance(size_t dim) && {
+        if constexpr (std::is_same_v<typename Dist::This, typename Dist::RabitqDist>) {
+            return std::move(dist_);
+        } else {
+            return std::move(dist_).ToRabitqDistance(dim);
         }
     }
 

@@ -39,6 +39,15 @@ export template <typename DataT, typename CompressT, bool LSG = false>
 class LVQIPVecStoreType;
 
 export template <typename DataT, bool LSG = false>
+class RabitqCosVecStoreType;
+
+export template <typename DataT, bool LSG = false>
+class RabitqL2VecStoreType;
+
+export template <typename DataT, bool LSG = false>
+class RabitqIPVecStoreType;
+
+export template <typename DataT, bool LSG = false>
 class PlainCosVecStoreType {
     // friend infinity::DataType;
 public:
@@ -59,6 +68,8 @@ public:
     static constexpr LVQCosVecStoreType<DataType, CompressType> ToLVQ() {
         return {};
     }
+
+    static constexpr RabitqCosVecStoreType<DataType> ToRabitq() { return {}; }
 };
 
 export template <typename DataT, bool LSG = false>
@@ -81,6 +92,8 @@ public:
     static constexpr LVQL2VecStoreType<DataType, CompressType> ToLVQ() {
         return {};
     }
+
+    static constexpr RabitqL2VecStoreType<DataType> ToRabitq() { return {}; }
 };
 
 export template <typename DataT, bool LSG = false>
@@ -103,6 +116,8 @@ public:
     static constexpr LVQIPVecStoreType<DataType, CompressType> ToLVQ() {
         return {};
     }
+
+    static constexpr RabitqIPVecStoreType<DataType> ToRabitq() { return {}; }
 };
 
 export template <typename DataT, typename IndexT>
@@ -126,6 +141,8 @@ public:
     static constexpr This ToLVQ() {
         return {};
     }
+
+    static constexpr This ToRabitq() { return {}; }
 };
 
 export template <typename DataT, typename CompressT, bool LSG = false>
@@ -151,6 +168,8 @@ public:
     static constexpr This ToLVQ() {
         return {};
     }
+
+    static constexpr This ToRabitq() { return {}; }
 };
 
 export template <typename DataT, typename CompressT, bool LSG = false>
@@ -176,6 +195,8 @@ public:
     static constexpr This ToLVQ() {
         return {};
     }
+
+    static constexpr This ToRabitq() { return {}; }
 };
 
 export template <typename DataT, typename CompressT, bool LSG = false>
@@ -201,6 +222,8 @@ public:
     static constexpr This ToLVQ() {
         return {};
     }
+
+    static constexpr This ToRabitq() { return {}; }
 };
 
 export template <typename DataT, bool LSG = false>
@@ -224,6 +247,8 @@ public:
     static constexpr This ToLVQ() {
         return {};
     }
+
+    static constexpr This ToRabitq() { return {}; }
 };
 
 export template <typename DataT, bool LSG = false>
@@ -247,6 +272,8 @@ public:
     static constexpr This ToLVQ() {
         return {};
     }
+
+    static constexpr This ToRabitq() { return {}; }
 };
 
 export template <typename DataT, bool LSG = false>
@@ -270,6 +297,8 @@ public:
     static constexpr This ToLVQ() {
         return {};
     }
+
+    static constexpr This ToRabitq() { return {}; }
 };
 
 } // namespace infinity
