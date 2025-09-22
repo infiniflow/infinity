@@ -490,3 +490,24 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_update_sparse_vector" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+    def test_update_embedding(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_update_embedding" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_embedding" + suffix, {"c1": {"type": "vector,3,int"}},
+                                        ConflictType.Error)
+        assert table_obj
+        res = table_obj.insert([{"c1": [1, 2, 3]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": [4, 5, 6]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": [7, 8, 9]}])
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.update("1 = 1", {"c1": [10, 20, 30]})
+        assert res.error_code == ErrorCode.OK
+        res, extra_result = table_obj.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ([10, 20, 30], [10, 20, 30], [10, 20, 30])}))
+
+        res = db_obj.drop_table("test_update_embedding" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
