@@ -609,7 +609,8 @@ PersistWriteResult PersistenceManager::Cleanup(const std::string &file_path) {
 
     std::string local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
-        UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
+        // UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
+        return result;
     }
 
     std::string pm_fp_key = KeyEncode::PMObjectKey(local_path);

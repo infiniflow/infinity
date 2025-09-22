@@ -44,7 +44,9 @@ public:
                           std::move(index_base),
                           std::move(column_def),
                           persistence_manager),
-          row_count_(row_count) {}
+          row_count_(row_count) {
+        AllocateInMemory();
+    }
 
     ~SecondaryIndexFileWorker() override;
 

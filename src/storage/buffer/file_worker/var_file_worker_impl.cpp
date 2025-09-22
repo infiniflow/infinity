@@ -35,6 +35,8 @@ VarFileWorker::VarFileWorker(std::shared_ptr<std::string> data_dir,
     : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager),
       buffer_size_(buffer_size) {
     VarFileWorker::AllocateInMemory();
+    // [[maybe_unused]] bool foo = WriteToFile(false, {});
+    // ReadFromFile(true);
 }
 
 VarFileWorker::~VarFileWorker() {

@@ -1224,6 +1224,7 @@ Status NewCatalog::GetColumnVector(ColumnMeta &column_meta,
     }
 
     column_vector = ColumnVector(column_type);
+    // buffer_obj->file_worker()->ReadFromFile(true);
     column_vector.Initialize(buffer_obj, outline_buffer_obj, row_count, tipe);
     return Status::OK();
 }

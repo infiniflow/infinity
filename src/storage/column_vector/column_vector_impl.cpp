@@ -104,6 +104,21 @@ ColumnVector &ColumnVector::operator=(ColumnVector &&right) noexcept {
     return *this;
 }
 
+ColumnVector &ColumnVector::operator=(const ColumnVector &right) noexcept {
+    if (this != &right) {
+        data_type_size_ = right.data_type_size_;
+        buffer_ = right.buffer_;
+        nulls_ptr_ = right.nulls_ptr_;
+        initialized = right.initialized;
+        vector_type_ = right.vector_type_;
+        data_type_ = right.data_type_;
+        data_ptr_ = right.data_ptr_;
+        capacity_ = right.capacity_;
+        tail_index_.store(right.tail_index_.load());
+    }
+    return *this;
+}
+
 ColumnVector::~ColumnVector() {
     // Reset(); // TODO: overload copy constructor and move constructor TO PREVENT USING `Reset`
 #ifdef INFINITY_DEBUG

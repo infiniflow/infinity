@@ -106,6 +106,8 @@ public:
 
     ColumnVector &operator=(ColumnVector &&right) noexcept;
 
+    ColumnVector &operator=(const ColumnVector &right) noexcept;
+
     ~ColumnVector();
 
     std::string ToString() const;

@@ -62,6 +62,8 @@ public:
     void Start();
     void Stop();
 
+    auto &buffer_map() { return buffer_map_; }
+
     // Create a new BufferHandle, or in replay process. (read data block from wal)
     BufferObj *AllocateBufferObject(std::unique_ptr<FileWorker> file_worker);
 
@@ -134,7 +136,7 @@ private:
     std::atomic<u64> current_memory_size_{};
 
     std::mutex w_locker_{};
-    std::unordered_map<std::string, std::unique_ptr<BufferObj>> buffer_map_{};
+    std::unordered_map<std::string, std::shared_ptr<BufferObj>> buffer_map_{};
     std::atomic<u32> buffer_id_{};
 
     std::mutex gc_locker_{};

@@ -60,6 +60,7 @@ import :emvb_index_in_mem;
 import :txn_context;
 import :persist_result_handler;
 import :virtual_store;
+import :utility;
 
 import std;
 import third_party;
@@ -375,6 +376,28 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
                 return status;
             }
         }
+    }
+
+    auto &buffer_map = buffer_mgr_->buffer_map();
+
+    std::vector<std::pair<std::string, std::shared_ptr<BufferObj>>> buffers;
+
+    for (auto [path, buffer_obj] : buffer_map) {
+        if (path.find("tmp/import") != std::string::npos) {
+            buffers.push_back(std::make_pair(path, buffer_obj));
+        }
+    }
+
+    for (auto [path, buffer_obj] : buffers) {
+        auto v = infinity::Partition(path, '/');
+        auto vv = infinity::Partition(v[7], '_');
+        auto seg = fmt::format("{}_{}", vv[0], stoull(vv[1]) + segment_ids[0]);
+        path = fmt::format("/{}/{}/data/{}/{}/{}/{}/{}", v[1], v[2], v[5], v[6], seg, v[8], v[9]);
+        buffer_map[path] = buffer_obj;
+    }
+
+    for (const auto &[path, buffer_obj] : buffers) {
+        buffer_map.erase(path);
     }
 
     return Status::OK();

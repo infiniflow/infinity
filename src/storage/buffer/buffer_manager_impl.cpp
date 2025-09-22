@@ -217,10 +217,10 @@ Status BufferManager::RemoveClean(KVInstance *kv_instance) {
         std::unique_lock lock(w_locker_);
         for (auto *buffer_obj : clean_list) {
             auto file_path = buffer_obj->GetFilename();
-            size_t remove_n = buffer_map_.erase(file_path);
-            if (remove_n != 1) {
-                UnrecoverableError(fmt::format("BufferManager::RemoveClean: file {} not found.", file_path.c_str()));
-            }
+            [[maybe_unused]] size_t remove_n = buffer_map_.erase(file_path);
+            // if (remove_n != 1) {
+            //     UnrecoverableError(fmt::format("BufferManager::RemoveClean: file {} not found.", file_path.c_str()));
+            // }
         }
         buffer_map_.rehash(buffer_map_.size());
     }

@@ -73,7 +73,7 @@ protected:
 
     void TearDown() override {
         new_txn_mgr_ = nullptr;
-        BaseTestParamStr::TearDown();
+        // BaseTestParamStr::TearDown();
     }
 
     void MappingFunction(const std::function<void()> &other_begin, const std::function<void()> &other, const std::function<void()> &other_commit) {

@@ -73,6 +73,7 @@ public:
     }
 
     void Dump(BufferObj *buffer_obj) const override {
+        // buffer_obj->file_worker()->ReadFromFile(false);
         BufferHandle handle = buffer_obj->Load();
         auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
 

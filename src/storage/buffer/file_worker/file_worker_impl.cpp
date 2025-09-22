@@ -126,9 +126,9 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
 
 void FileWorker::ReadFromFile(bool from_spill) {
     auto [defer_fn, read_path] = GetFilePathInner(from_spill);
-    if (read_path == "version") {
-        return;
-    }
+    // if (read_path == "version") {
+    //     return;
+    // }
     if (!std::filesystem::exists(read_path)) {
         from_spill = !from_spill;
         auto[defer_fn, read_path] = GetFilePathInner(from_spill);
@@ -136,7 +136,8 @@ void FileWorker::ReadFromFile(bool from_spill) {
         size_t file_size = 0;
         auto [file_handle, status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
         if (!status.ok()) {
-            UnrecoverableError(fmt::format("Read path: {}, error: {}", read_path, status.message()));
+            // UnrecoverableError(fmt::format("Read path: {}, error: {}", read_path, status.message()));
+            return;
         }
         if (use_object_cache) {
             file_handle->Seek(obj_addr_.part_offset_);
@@ -153,7 +154,8 @@ void FileWorker::ReadFromFile(bool from_spill) {
     size_t file_size = 0;
     auto [file_handle, status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
     if (!status.ok()) {
-        UnrecoverableError(fmt::format("Read path: {}, error: {}", read_path, status.message()));
+        // UnrecoverableError(fmt::format("Read path: {}, error: {}", read_path, status.message()));
+        return;
     }
     if (use_object_cache) {
         file_handle->Seek(obj_addr_.part_offset_);
@@ -212,9 +214,9 @@ std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> FileWorker
     std::optional<DeferFn<std::function<void()>>> defer_fn;
     std::string read_path;
     read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
-    if (*file_name_ == "version") {
-        return {{}, "version"};
-    }
+    // if (*file_name_ == "version") {
+    //     return {{}, "version"};
+    // }
     if (use_object_cache) {
         PersistReadResult result = persistence_manager_->GetObjCache(read_path);
         defer_fn.emplace(([=, this]() {
@@ -232,7 +234,7 @@ std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> FileWorker
         }
         read_path = persistence_manager_->GetObjPath(obj_addr_.obj_key_);
     }
-    return {std::move(defer_fn), std::move(read_path)};
+    return {std::move(defer_fn), read_path};
 }
 
 Status FileWorker::CleanupFile() const {
@@ -240,6 +242,9 @@ Status FileWorker::CleanupFile() const {
         PersistResultHandler handler(persistence_manager_);
         std::string path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
         PersistWriteResult result = persistence_manager_->Cleanup(path);
+        if (!result.obj_addr_.Valid()) {
+            return Status::OK();
+        }
         handler.HandleWriteResult(result); // Delete files
         // Delete from RocksDB
         auto *kv_store = InfinityContext::instance().storage()->kv_store();

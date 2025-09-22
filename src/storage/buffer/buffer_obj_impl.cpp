@@ -73,13 +73,16 @@ void BufferObj::UpdateFileWorkerInfo(std::unique_ptr<FileWorker> new_file_worker
 BufferHandle BufferObj::Load() {
     // buffer_mgr_->AddRequestCount();
     std::unique_lock<std::mutex> locker(w_locker_);
-    if (file_worker_->GetData() == nullptr) {
-        file_worker_->AllocateInMemory();
-    }
+    // if (file_worker_->GetData() == nullptr) {
+    //     file_worker_->AllocateInMemory(); // when we call buffer_mgr::allocateBufferObj, memory is allocated.
+    // } // we have no chance to remove status and types in buffer_obj
 
-    file_worker_->ReadFromFile(true);
+    // file_worker_->ReadFromFile(true);
 
     ++rc_;
+    // if (file_worker_->GetData()== nullptr) {
+    //     file_worker_
+    // }
     void *data = file_worker_->GetData();
     return BufferHandle(this, data);
 }
@@ -125,7 +128,7 @@ void BufferObj::ToMmap() {
     if (file_worker_->GetData()) {
         file_worker_->AllocateInMemory();
     }
-    file_worker_->Mmap();
+    // file_worker_->Mmap();
 }
 
 void BufferObj::LoadInner() {
@@ -156,7 +159,7 @@ void BufferObj::UnloadInner() {
     // if (status_ != BufferStatus::kLoaded) {
     //     UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
     // }
-    --rc_;
+    // --rc_;
     // if (rc_ == 0) {
     //     if (type_ == BufferType::kToMmap) {
     //         file_worker_->FreeInMemory();

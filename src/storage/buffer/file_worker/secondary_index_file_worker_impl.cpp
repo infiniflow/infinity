@@ -29,10 +29,11 @@ import third_party;
 namespace infinity {
 
 SecondaryIndexFileWorker::~SecondaryIndexFileWorker() {
-    if (data_ != nullptr) {
-        FreeInMemory();
-        data_ = nullptr;
-    }
+    // if (data_ != nullptr) {
+    //     FreeInMemory();
+    //     data_ = nullptr;
+    // }
+    FreeInMemory();
 }
 
 void SecondaryIndexFileWorker::AllocateInMemory() {
