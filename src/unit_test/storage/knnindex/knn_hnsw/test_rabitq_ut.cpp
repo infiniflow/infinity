@@ -15,6 +15,7 @@
 module;
 
 #include "unit_test/gtest_expand.h"
+#include <immintrin.h>
 
 module infinity_core:ut.test_rabitq;
 
@@ -336,4 +337,109 @@ TEST_F(RabitqTest, test_distance) {
         // output
         std::cout << fmt::format("id: {}, truth distance: {:.2f}, estimate distance: {:.2f}", id, truth_dis, estimate_dis) << std::endl;
     }
+}
+
+void print_m256i_binary(__m256i vec) {
+    uint8_t bytes[32];
+    _mm256_storeu_si256((__m256i *)bytes, vec);
+
+    std::cout << "__m256i: " << std::endl;
+    for (int i = 0; i < 32; i++) {
+        std::cout << std::bitset<8>(bytes[i]) << " ";
+        if ((i + 1) % 8 == 0)
+            std::cout << std::endl;
+    }
+    std::cout << std::endl;
+}
+
+TEST_F(RabitqTest, test_simd) {
+    using namespace infinity;
+
+    u8 pv[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31};
+    u8 pv_b[] = {0b11100000, 0b01110000, 0b00111000, 0b00011100};
+
+    __m256i v1 = _mm256_loadu_si256((__m256i *)pv);
+    print_m256i_binary(v1);
+
+    __m256i v2 = _mm256_setr_epi8(pv_b[0],
+                                  pv_b[0],
+                                  pv_b[0],
+                                  pv_b[0],
+                                  pv_b[0],
+                                  pv_b[0],
+                                  pv_b[0],
+                                  pv_b[0],
+                                  pv_b[1],
+                                  pv_b[1],
+                                  pv_b[1],
+                                  pv_b[1],
+                                  pv_b[1],
+                                  pv_b[1],
+                                  pv_b[1],
+                                  pv_b[1],
+                                  pv_b[2],
+                                  pv_b[2],
+                                  pv_b[2],
+                                  pv_b[2],
+                                  pv_b[2],
+                                  pv_b[2],
+                                  pv_b[2],
+                                  pv_b[2],
+                                  pv_b[3],
+                                  pv_b[3],
+                                  pv_b[3],
+                                  pv_b[3],
+                                  pv_b[3],
+                                  pv_b[3],
+                                  pv_b[3],
+                                  pv_b[3]);
+    v2 = _mm256_and_si256(v2,
+                          _mm256_setr_epi8(0x01,
+                                           0x02,
+                                           0x04,
+                                           0x08,
+                                           0x10,
+                                           0x20,
+                                           0x40,
+                                           0x80,
+                                           0x01,
+                                           0x02,
+                                           0x04,
+                                           0x08,
+                                           0x10,
+                                           0x20,
+                                           0x40,
+                                           0x80,
+                                           0x01,
+                                           0x02,
+                                           0x04,
+                                           0x08,
+                                           0x10,
+                                           0x20,
+                                           0x40,
+                                           0x80,
+                                           0x01,
+                                           0x02,
+                                           0x04,
+                                           0x08,
+                                           0x10,
+                                           0x20,
+                                           0x40,
+                                           0x80));
+    v2 = _mm256_cmpeq_epi8(v2, _mm256_setzero_si256());
+    v2 = _mm256_andnot_si256(v2, _mm256_set1_epi8(0xFF));
+
+    __m256i acc = _mm256_setzero_si256();
+    __m256i mask = _mm256_and_si256(v1, v2);
+    __m256i v16_lo = _mm256_unpacklo_epi8(mask, _mm256_setzero_si256());
+    __m256i v16_hi = _mm256_unpackhi_epi8(mask, _mm256_setzero_si256());
+    __m256i v32_0 = _mm256_unpacklo_epi16(v16_lo, _mm256_setzero_si256());
+    __m256i v32_1 = _mm256_unpackhi_epi16(v16_lo, _mm256_setzero_si256());
+    __m256i v32_2 = _mm256_unpacklo_epi16(v16_hi, _mm256_setzero_si256());
+    __m256i v32_3 = _mm256_unpackhi_epi16(v16_hi, _mm256_setzero_si256());
+    __m256i sum_01 = _mm256_hadd_epi32(v32_0, v32_1);
+    __m256i sum_23 = _mm256_hadd_epi32(v32_2, v32_3);
+    acc = _mm256_add_epi32(acc, _mm256_hadd_epi32(sum_01, sum_23));
+    print_m256i_binary(mask);
+    print_m256i_binary(acc);
 }

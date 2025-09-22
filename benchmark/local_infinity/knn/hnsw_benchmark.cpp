@@ -318,7 +318,7 @@ void Query(const BenchmarkOption &option) {
 
     auto [query_num, query_dim, query_data] = benchmark::DecodeFvecsDataset<float>(option.query_path_);
     auto [gt_num, topk, gt_data] = benchmark::DecodeFvecsDataset<i32>(option.groundtruth_path_);
-    size_t query_topk = topk;
+    size_t query_topk = 10;
     if (option.query_topk_ != 0) {
         query_topk = option.query_topk_;
     }
@@ -366,7 +366,7 @@ void Query(const BenchmarkOption &option) {
             }
         }
         float recall = float(correct) / (query_num * query_topk);
-        std::cout << fmt::format("ef: {}, recall: {}", search_option.ef_, recall) << std::endl;
+        std::cout << fmt::format("ef: {}, recall@{}: {}", search_option.ef_, query_topk, recall) << std::endl;
     };
     if (option.ef_ == 0) {
         for (size_t ef = 100; ef <= 1000; ef += 100) {

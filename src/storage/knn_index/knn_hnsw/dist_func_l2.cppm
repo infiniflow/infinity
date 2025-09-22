@@ -219,7 +219,19 @@ public:
         return *this;
     }
     ~RabitqL2Dist() = default;
-    RabitqL2Dist(size_t dim) {}
+    RabitqL2Dist(size_t dim) {
+        if constexpr (std::is_same<CompressType, u8>() && std::is_same<AlignType, u8>()) {
+            if (dim % 64 == 0) {
+                SIMDFunc = GetSIMD_FUNCTIONS().Rabitq_U8IP_64_ptr_;
+            } else if (dim % 32 == 0) {
+                SIMDFunc = GetSIMD_FUNCTIONS().Rabitq_U8IP_32_ptr_;
+            } else if (dim % 16 == 0) {
+                SIMDFunc = GetSIMD_FUNCTIONS().Rabitq_U8IP_16_ptr_;
+            } else {
+                SIMDFunc = GetSIMD_FUNCTIONS().Rabitq_U8IP_ptr_;
+            }
+        }
+    }
 
     template <typename DataStore>
     DistanceType operator()(const QueryType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
@@ -231,7 +243,8 @@ public:
 private:
     DistanceType Inner(const QueryType &query, const StoreType &base, size_t dim) const {
         // estimate <x, q>
-        DistanceType ip_estimate = MetaType::IpDistanceBetweenQueryAndBinaryCode(query->query_compress_vec_, base->compress_vec_, dim);
+        // DistanceType ip_estimate = MetaType::IpDistanceBetweenQueryAndBinaryCode(query->query_compress_vec_, base->compress_vec_, dim);
+        DistanceType ip_estimate = SIMDFunc(query->query_compress_vec_, base->compress_vec_, dim);
         DistanceType ip_recover =
             MetaType::RecoverIpDistance(ip_estimate, dim, base->sum_, query->query_sum_, query->query_lower_bound_, query->query_delta_);
 

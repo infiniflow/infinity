@@ -55,6 +55,12 @@ export struct SIMD_FUNCTIONS {
     U8DistanceFuncType HNSW_U8IP_64_ptr_ = Get_HNSW_U8IP_64_ptr();
     U8CosDistanceFuncType HNSW_U8Cos_ptr_ = Get_HNSW_U8Cos_ptr();
 
+    // Rabitq U8
+    U8DistanceFuncType Rabitq_U8IP_ptr_ = Get_Rabitq_U8IP_ptr();
+    U8DistanceFuncType Rabitq_U8IP_16_ptr_ = Get_Rabitq_U8IP_16_ptr();
+    U8DistanceFuncType Rabitq_U8IP_32_ptr_ = Get_Rabitq_U8IP_32_ptr();
+    U8DistanceFuncType Rabitq_U8IP_64_ptr_ = Get_Rabitq_U8IP_64_ptr();
+
     // MaxSim IP
     MaxSimF32BitIPFuncType MaxSimF32BitIP_func_ptr_ = GetMaxSimF32BitIPFuncPtr();
     MaxSimI32BitIPFuncType MaxSimI32BitIP_func_ptr_ = GetMaxSimI32BitIPFuncPtr();
