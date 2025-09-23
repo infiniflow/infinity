@@ -58,11 +58,12 @@ void TermDocIterator::InitBM25Info(std::unique_ptr<FullTextColumnLengthReader> &
                                    const float k1,
                                    const float b) {
     column_length_reader_ = std::move(column_length_reader);
-    avg_column_len_ = column_length_reader_->GetAvgColumnLength();
-    if (avg_column_len_ <= 1e-6f) {
-        UnrecoverableError("avg_column_len_ is 0.0f");
+    auto [doc_cnt, doc_len] = column_length_reader_->GetDocTermCount();
+    if (doc_cnt <= 0) {
+        UnrecoverableError("doc_cnt is <=0");
     }
-    total_df_ = column_length_reader_->GetTotalDF();
+    avg_column_len_ = doc_len * 1.0 / doc_cnt;
+    total_df_ = doc_cnt;
     if (total_df_ < doc_freq_) {
         UnrecoverableError(fmt::format("total_df_ {} is less than doc_freq_ {}", total_df_, doc_freq_));
     }

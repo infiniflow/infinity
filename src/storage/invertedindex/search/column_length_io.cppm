@@ -51,17 +51,16 @@ public:
         return SeekFile(row_id);
     }
 
-    inline u64 GetTotalDF() const { return total_df_; }
-    inline float GetAvgColumnLength() const { return avg_column_len_; }
+    std::pair<u64, u64> GetDocTermCount() const;
 
 private:
     u32 SeekFile(RowID row_id);
     const std::string &index_dir_;
     std::vector<ColumnReaderChunkInfo> chunk_index_meta_infos_{}; // must in ascending order
-
     std::shared_ptr<MemoryIndexer> memory_indexer_{};
-    u64 total_df_{};
-    float avg_column_len_{};
+    size_t chunk_doc_cnt_{};
+    size_t chunk_term_cnt_{};
+
     const u32 *column_lengths_{nullptr};
     RowID current_chunk_base_rowid_{(u64)0};
     u32 current_chunk_row_count_{0};

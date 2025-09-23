@@ -1312,12 +1312,6 @@ Status NewTxn::PopulateFtIndexInner(std::shared_ptr<IndexBase> index_base,
                                  memory_indexer->GetBaseName(),
                                  memory_indexer->GetRowCount()));
             memory_indexer->Dump(false /*offline*/, false /*spill*/);
-            u64 len_sum = memory_indexer->GetColumnLengthSum();
-            u32 len_cnt = memory_indexer->GetDocCount();
-            Status status = segment_index_meta.UpdateFtInfo(len_sum, len_cnt);
-            if (!status.ok()) {
-                return status;
-            }
             ChunkID new_chunk_id = 0;
             std::tie(new_chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
             if (!status.ok()) {
@@ -1803,12 +1797,6 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         }
         case IndexType::kFullText: {
             memory_indexer->Dump(false /*offline*/, false /*spill*/);
-            u64 len_sum = memory_indexer->GetColumnLengthSum();
-            u32 len_cnt = memory_indexer->GetDocCount();
-            Status status = segment_index_meta.UpdateFtInfo(len_sum, len_cnt);
-            if (!status.ok()) {
-                return status;
-            }
             break;
         }
         case IndexType::kIVF: {

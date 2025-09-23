@@ -115,7 +115,10 @@ public:
         return doc_count_;
     }
 
-    u32 GetColumnLengthSum() const { return column_length_sum_.load(); }
+    std::pair<size_t, size_t> GetDocTermCount() const {
+        std::unique_lock<std::mutex> lock(mutex_);
+        return {doc_count_, term_cnt_.load()};
+    }
 
     u32 GetColumnLength(u32 doc_id) { return column_lengths_.Get(doc_id); }
 
@@ -182,7 +185,7 @@ private:
 
     // for column length info
     VectorWithLock<u32> column_lengths_;
-    std::atomic<u32> column_length_sum_{0};
+    std::atomic<u32> term_cnt_{0};
 
     // spill file write buf
     std::unique_ptr<char[]> spill_buffer_{};

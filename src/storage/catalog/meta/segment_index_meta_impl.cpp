@@ -103,17 +103,6 @@ std::tuple<std::vector<ChunkID> *, Status> SegmentIndexMeta::GetChunkIDs1() {
     return {&*chunk_ids_, Status::OK()};
 }
 
-Status SegmentIndexMeta::GetFtInfo(std::shared_ptr<SegmentIndexFtInfo> &ft_info) {
-    if (!ft_info_) {
-        Status status = LoadFtInfo();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    ft_info = ft_info_;
-    return Status::OK();
-}
-
 Status SegmentIndexMeta::RemoveChunkIDs(const std::vector<ChunkID> &chunk_ids) {
     TableMeeta &table_meta = table_index_meta_.table_meta();
     for (ChunkID chunk_id : chunk_ids) {
@@ -160,28 +149,6 @@ Status SegmentIndexMeta::AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn) {
     }
     chunk_ids_->push_back(chunk_id);
     return kv_instance_.Put(chunk_id_key, commit_ts_str);
-}
-
-Status SegmentIndexMeta::UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt) {
-    if (!ft_info_) {
-        Status status = LoadFtInfo();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    ft_info_->ft_column_len_sum_ += column_len_sum;
-    ft_info_->ft_column_len_cnt_ += column_len_cnt;
-
-    std::string ft_info_key = GetSegmentIndexTag("ft_info");
-    std::vector<u64> sum_cnt = {ft_info_->ft_column_len_sum_, ft_info_->ft_column_len_cnt_};
-    std::string ft_info_str = nlohmann::json(sum_cnt).dump();
-    Status status = kv_instance_.Put(ft_info_key, ft_info_str);
-    LOG_INFO(fmt::format("UpdateFtInfo: column_len_sum={}, column_len_cnt={}, ft_info_key={}, ft_info_str={}",
-                         column_len_sum,
-                         column_len_cnt,
-                         ft_info_key,
-                         ft_info_str));
-    return status;
 }
 
 Status SegmentIndexMeta::SetNoMemIndex() {
@@ -377,28 +344,6 @@ Status SegmentIndexMeta::LoadNextChunkID() {
         return status;
     }
     next_chunk_id_ = std::stoull(next_chunk_id_str);
-    return Status::OK();
-}
-
-Status SegmentIndexMeta::LoadFtInfo() {
-    if (!ft_info_) {
-        ft_info_ = std::make_shared<SegmentIndexFtInfo>(0, 0);
-    }
-    std::string ft_info_key = GetSegmentIndexTag("ft_info");
-    std::string ft_info_str;
-    Status status = kv_instance_.Get(ft_info_key, ft_info_str);
-    if (!status.ok()) {
-        if (status.code() == ErrorCode::kNotFound) {
-            return Status::OK();
-        }
-        return status;
-    }
-    simdjson::padded_string json_str(ft_info_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(json_str);
-    std::vector<u64> sum_cnt = doc.get<std::vector<u64>>();
-    ft_info_->ft_column_len_sum_ = sum_cnt[0];
-    ft_info_->ft_column_len_cnt_ = sum_cnt[1];
     return Status::OK();
 }
 

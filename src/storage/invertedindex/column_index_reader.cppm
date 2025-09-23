@@ -37,8 +37,8 @@ struct SegmentIndexFtInfo;
 struct ColumnReaderChunkInfo {
     BufferObj *index_buffer_ = nullptr;
     RowID base_rowid_{};
-    u32 row_count_{};
-
+    size_t row_cnt_{};
+    size_t term_cnt_{};
     SegmentID segment_id_ = 0;
     ChunkID chunk_id_ = 0;
 };
@@ -50,8 +50,6 @@ public:
     Status Open(optionflag_t flag, TableIndexMeeta &table_index_meta);
 
     std::unique_ptr<PostingIterator> Lookup(const std::string &term, bool fetch_position = true);
-
-    std::pair<u64, float> GetTotalDfAndAvgColumnLength();
 
     optionflag_t GetOptionFlag() const { return flag_; }
 
@@ -68,10 +66,6 @@ private:
 
     optionflag_t flag_;
     std::vector<std::shared_ptr<IndexSegmentReader>> segment_readers_;
-    std::map<SegmentID, std::shared_ptr<SegmentIndexFtInfo>> segment_index_ft_infos_;
-
-    u64 total_df_ = 0;
-    float avg_column_length_ = 0.0f;
 
 public:
     std::string column_name_;
