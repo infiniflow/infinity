@@ -2237,14 +2237,10 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::DUMP_INDEX_V2: {
-                // Commit of dump mem index command is handled in CommitBottom().
-                // Process dump mem index operation caused by other commands (import, compact, optimizeIndex) here.
                 auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
-                if (dump_index_cmd->dump_cause_ != DumpIndexCause::kDumpMemIndex) {
-                    Status status = PrepareCommitDumpIndex(dump_index_cmd, kv_instance_.get());
-                    if (!status.ok()) {
-                        return status;
-                    }
+                Status status = PrepareCommitDumpIndex(dump_index_cmd, kv_instance_.get());
+                if (!status.ok()) {
+                    return status;
                 }
                 break;
             }
@@ -4211,16 +4207,6 @@ void NewTxn::CommitBottom() {
                 auto status = CommitBottomAppend(append_cmd);
                 if (!status.ok()) {
                     UnrecoverableError(fmt::format("CommitBottomAppend failed: {}", status.message()));
-                }
-                break;
-            }
-            case WalCommandType::DUMP_INDEX_V2: {
-                auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
-                if (dump_index_cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex && !IsReplay()) {
-                    auto status = CommitBottomDumpMemIndex(dump_index_cmd);
-                    if (!status.ok()) {
-                        UnrecoverableError(fmt::format("CommitBottomDumpMemIndex failed: {}", status.message()));
-                    }
                 }
                 break;
             }

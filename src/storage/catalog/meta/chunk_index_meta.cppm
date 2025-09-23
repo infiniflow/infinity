@@ -72,8 +72,6 @@ public:
 
     Status SetChunkInfo(const ChunkIndexMetaInfo &chunk_info);
 
-    Status SetChunkInfoNoPutKV(const ChunkIndexMetaInfo &chunk_info);
-
     Status FilePaths(std::vector<std::string> &paths);
 
     std::tuple<std::shared_ptr<ChunkIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo(ChunkID chunk_id);

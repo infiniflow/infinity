@@ -34,6 +34,7 @@ namespace infinity {
 
 enum class SegmentStatus : u8;
 class ChunkIndexMeta;
+class ChunkIndexMetaInfo;
 class BlockMeta;
 class SegmentMeta;
 struct EraseBaseCache;
@@ -186,6 +187,7 @@ export struct WalChunkIndexInfo {
     WalChunkIndexInfo() = default;
 
     explicit WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta);
+    explicit WalChunkIndexInfo(const ChunkIndexMetaInfo &chunk_index_meta_info, const ChunkID &chunk_id);
 
     bool operator==(const WalChunkIndexInfo &other) const;
 

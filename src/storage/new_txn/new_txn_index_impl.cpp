@@ -124,12 +124,6 @@ Status NewTxn::DumpMemIndex(const std::string &db_name, const std::string &table
         }
         mem_index->SetIsDumping(true);
 
-        ChunkID chunk_id = 0;
-        std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
-        if (!status.ok()) {
-            return status;
-        }
-
         ChunkIndexMetaInfo chunk_index_meta_info;
         if (mem_index->GetBaseMemIndex() != nullptr) {
             chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
@@ -138,12 +132,22 @@ Status NewTxn::DumpMemIndex(const std::string &db_name, const std::string &table
         } else {
             return Status::UnexpectedError("Invalid mem index.");
         }
-        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-        chunk_index_meta.SetChunkInfoNoPutKV(chunk_index_meta_info);
-        std::vector<WalChunkIndexInfo> chunk_infos;
-        chunk_infos.emplace_back(chunk_index_meta);
 
+        ChunkID chunk_id = 0;
+        std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+        if (!status.ok()) {
+            return status;
+        }
+
+        std::vector<WalChunkIndexInfo> chunk_infos;
+        chunk_infos.emplace_back(chunk_index_meta_info, chunk_id);
         txn_store->chunk_infos_in_segments_.emplace(segment_id, chunk_infos);
+
+        // Dump Mem Index
+        status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
+        if (!status.ok() && status.code() != ErrorCode::kEmptyMemIndex) {
+            return status;
+        }
     }
 
     if (txn_store->chunk_infos_in_segments_.empty()) {
@@ -187,14 +191,6 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
     }
     mem_index->SetIsDumping(true);
 
-    // Get chunk id of the chunk index to dump mem index to.
-    ChunkID chunk_id = 0;
-    std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
-    if (!status.ok()) {
-        return status;
-    }
-
-    // Get chunk index info of the mem index and put it to chunk index meta.
     ChunkIndexMetaInfo chunk_index_meta_info;
     if (mem_index->GetBaseMemIndex() != nullptr) {
         chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
@@ -203,10 +199,21 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
     } else {
         return Status::UnexpectedError("Invalid mem index.");
     }
-    ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-    chunk_index_meta.SetChunkInfoNoPutKV(chunk_index_meta_info);
+
+    ChunkID chunk_id = 0;
+    std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+    if (!status.ok()) {
+        return status;
+    }
+
     std::vector<WalChunkIndexInfo> chunk_infos;
-    chunk_infos.emplace_back(chunk_index_meta);
+    chunk_infos.emplace_back(chunk_index_meta_info, chunk_id);
+
+    // Dump Mem Index
+    status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
+    if (!status.ok() && status.code() != ErrorCode::kEmptyMemIndex) {
+        return status;
+    }
 
     // Put the data into local txn store
     if (base_txn_store_ == nullptr) {
@@ -226,48 +233,6 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
         DumpMemIndexTxnStore *txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
         txn_store->segment_ids_.emplace_back(segment_id);
         txn_store->chunk_infos_in_segments_.emplace(segment_id, chunk_infos);
-    }
-
-    return Status::OK();
-}
-
-Status NewTxn::CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
-    Status status;
-    const std::string &db_name = dump_index_cmd->db_name_;
-    const std::string &table_name = dump_index_cmd->table_name_;
-    const std::string &index_name = dump_index_cmd->index_name_;
-    const SegmentID &segment_id = dump_index_cmd->segment_id_;
-
-    ChunkID chunk_id = dump_index_cmd->chunk_infos_[0].chunk_id_;
-
-    std::shared_ptr<DBMeeta> db_meta;
-    std::shared_ptr<TableMeeta> table_meta;
-    std::shared_ptr<TableIndexMeeta> table_index_meta;
-    std::string table_key;
-    std::string index_key;
-    status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
-    SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
-
-    // Dump Mem Index
-    status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
-    if (!status.ok() && status.code() != ErrorCode::kEmptyMemIndex) {
-        return status;
-    }
-
-    auto [index_base, status2] = table_index_meta->GetIndexBase();
-    if (!status2.ok()) {
-        return status2;
-    }
-    if (index_base->index_type_ == IndexType::kFullText) {
-        table_index_meta->table_meta().InvalidateFtIndexCache();
-    }
-
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    if (pm != nullptr) {
-        // When all data and index is write to disk, try to finalize the
-        PersistResultHandler handler(pm);
-        PersistWriteResult result = pm->CurrentObjFinalize();
-        handler.HandleWriteResult(result);
     }
 
     return Status::OK();
@@ -1124,10 +1089,7 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     if (!status.ok() && status.code_ != ErrorCode::kNotFound) {
         return status;
     }
-    std::shared_ptr<MemIndex> mem_index = segment_index_meta.PopMemIndex();
-    if (mem_index != nullptr) {
-        mem_index->ClearMemIndex();
-    }
+
     for (const WalChunkIndexInfo &chunk_info : dump_index_cmd->chunk_infos_) {
         status = NewCatalog::LoadFlushedChunkIndex1(segment_index_meta, chunk_info, this);
         if (!status.ok()) {
@@ -1151,6 +1113,11 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
         if (!status.ok()) {
             return status;
         }
+    }
+
+    std::shared_ptr<MemIndex> mem_index = segment_index_meta.PopMemIndex();
+    if (mem_index != nullptr) {
+        mem_index->ClearMemIndex();
     }
     return Status::OK();
 }
@@ -2192,6 +2159,15 @@ Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, K
         auto ts_str = std::to_string(commit_ts);
         kv_instance_->Put(KeyEncode::DropChunkIndexKey(db_id_str, table_id_str, index_id_str, segment_id, deprecate_id), ts_str);
     }
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    if (pm != nullptr) {
+        // When all data and index is write to disk, try to finalize the
+        PersistResultHandler handler(pm);
+        PersistWriteResult result = pm->CurrentObjFinalize();
+        handler.HandleWriteResult(result);
+    }
+
     return Status::OK();
 }
 

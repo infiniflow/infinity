@@ -248,6 +248,15 @@ WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta) : chunk_i
     deprecate_ts_ = UNCOMMIT_TS;
 }
 
+WalChunkIndexInfo::WalChunkIndexInfo(const ChunkIndexMetaInfo &chunk_index_meta_info, const ChunkID &chunk_id) : chunk_id_(chunk_id) {
+    base_name_ = chunk_index_meta_info.base_name_;
+    base_rowid_ = chunk_index_meta_info.base_row_id_;
+    row_count_ = chunk_index_meta_info.row_cnt_;
+    term_count_ = chunk_index_meta_info.term_cnt_;
+    index_size_ = chunk_index_meta_info.index_size_;
+    deprecate_ts_ = UNCOMMIT_TS;
+}
+
 bool WalChunkIndexInfo::operator==(const WalChunkIndexInfo &other) const {
     return chunk_id_ == other.chunk_id_ && base_name_ == other.base_name_ && base_rowid_ == other.base_rowid_ && row_count_ == other.row_count_ &&
            term_count_ == other.term_count_ && index_size_ == other.index_size_ && deprecate_ts_ == other.deprecate_ts_;
