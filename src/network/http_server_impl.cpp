@@ -1553,17 +1553,23 @@ public:
 
                             switch (sub_value.get_number_type()) {
                                 case simdjson::number_type::signed_integer: {
-                                    const_expr = new ConstantExpr(LiteralType::kIntegerArray);
+                                    if (const_expr == nullptr) {
+                                        const_expr = new ConstantExpr(LiteralType::kIntegerArray);
+                                    }
                                     const_expr->long_array_.emplace_back(sub_value.get<i64>());
                                     break;
                                 }
                                 case simdjson::number_type::unsigned_integer: {
-                                    const_expr = new ConstantExpr(LiteralType::kIntegerArray);
+                                    if (const_expr == nullptr) {
+                                        const_expr = new ConstantExpr(LiteralType::kIntegerArray);
+                                    }
                                     const_expr->long_array_.emplace_back(sub_value.get<u64>());
                                     break;
                                 }
                                 case simdjson::number_type::floating_point_number: {
-                                    const_expr = new ConstantExpr(LiteralType::kDoubleArray);
+                                    if (const_expr == nullptr) {
+                                        const_expr = new ConstantExpr(LiteralType::kDoubleArray);
+                                    }
                                     const_expr->double_array_.emplace_back(sub_value.get<double>());
                                     break;
                                 }

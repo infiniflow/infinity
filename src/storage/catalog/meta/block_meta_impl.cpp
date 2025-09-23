@@ -268,19 +268,24 @@ std::string BlockMeta::GetBlockTag(const std::string &tag) const {
 }
 
 std::tuple<size_t, Status> BlockMeta::GetRowCnt1() {
-    std::lock_guard<std::mutex> lock(mtx_);
-    if (row_cnt_) {
-        return {*row_cnt_, Status::OK()};
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        if (row_cnt_) {
+            return {*row_cnt_, Status::OK()};
+        }
     }
 #if 1
     TableMeeta &table_meta = segment_meta_.table_meta();
-    row_cnt_ = infinity::GetBlockRowCount(&kv_instance_,
-                                          table_meta.db_id_str(),
-                                          table_meta.table_id_str(),
-                                          segment_meta_.segment_id(),
-                                          block_id_,
-                                          begin_ts_,
-                                          commit_ts_);
+    auto row_cnt = infinity::GetBlockRowCount(&kv_instance_,
+                                              table_meta.db_id_str(),
+                                              table_meta.table_id_str(),
+                                              segment_meta_.segment_id(),
+                                              block_id_,
+                                              begin_ts_,
+                                              commit_ts_);
+
+    std::lock_guard<std::mutex> lock(mtx_);
+    row_cnt_ = row_cnt;
     return {*row_cnt_, Status::OK()};
 #else
     Status status;
