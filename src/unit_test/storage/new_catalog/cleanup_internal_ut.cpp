@@ -417,7 +417,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_table) {
     }
 }
 
-TEST_P(TestTxnCleanupInternal, DISABLED_XXX_test_cleanup_index) {
+TEST_P(TestTxnCleanupInternal, test_cleanup_index) {
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -576,7 +576,7 @@ TEST_P(TestTxnCleanupInternal, DISABLED_XXX_test_cleanup_index) {
     }
 }
 
-TEST_P(TestTxnCleanupInternal, DISABLED_XXX_test_cleanup_compact) {
+TEST_P(TestTxnCleanupInternal, test_cleanup_compact) {
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -683,7 +683,7 @@ TEST_P(TestTxnCleanupInternal, DISABLED_XXX_test_cleanup_compact) {
     CheckFilePaths(delete_file_paths_, exist_file_paths_);
 }
 
-TEST_P(TestTxnCleanupInternal, DISABLED_XXX_test_cleanup_optimize) {
+TEST_P(TestTxnCleanupInternal, test_cleanup_optimize) {
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -900,7 +900,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_drop_column) {
     CheckFilePaths(delete_file_paths_, exist_file_paths_);
 }
 
-TEST_P(TestTxnCleanupInternal, DISABLED_XXX_test_cleanup_drop_index_and_checkpoint_and_restart) {
+TEST_P(TestTxnCleanupInternal, test_cleanup_drop_index_and_checkpoint_and_restart) {
     // move it into restart test
     using namespace infinity;
 

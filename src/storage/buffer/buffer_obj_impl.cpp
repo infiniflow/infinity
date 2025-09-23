@@ -77,8 +77,12 @@ BufferHandle BufferObj::Load() {
     //     file_worker_->AllocateInMemory(); // when we call buffer_mgr::allocateBufferObj, memory is allocated.
     // } // we have no chance to remove status and types in buffer_obj
 
-    // file_worker_->ReadFromFile(true);
-
+    // try {
+    //     file_worker_->ReadFromFile(true);
+    // } catch (...) {
+    //     ;
+    // }
+    // file_worker_->Mmap();
     ++rc_;
     // if (file_worker_->GetData()== nullptr) {
     //     file_worker_

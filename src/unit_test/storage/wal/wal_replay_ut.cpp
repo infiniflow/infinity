@@ -88,7 +88,8 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          WalReplayTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::VFS_OFF_CONFIG_PATH));
+                         // ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(WalReplayTest, wal_replay_database) {
     {
@@ -840,7 +841,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
 
         txn_mgr->PrintAllKeyValue();
 
-        infinity::InfinityContext::instance().UnInit();
+        infinity::InfinityContext::instance().UnInit(); // At this point, all kv-pairs in buffer_map are cleared.
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
 #endif

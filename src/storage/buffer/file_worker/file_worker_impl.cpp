@@ -126,9 +126,6 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
 
 void FileWorker::ReadFromFile(bool from_spill) {
     auto [defer_fn, read_path] = GetFilePathInner(from_spill);
-    // if (read_path == "version") {
-    //     return;
-    // }
     if (!std::filesystem::exists(read_path)) {
         from_spill = !from_spill;
         auto[defer_fn, read_path] = GetFilePathInner(from_spill);
@@ -214,9 +211,6 @@ std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> FileWorker
     std::optional<DeferFn<std::function<void()>>> defer_fn;
     std::string read_path;
     read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
-    // if (*file_name_ == "version") {
-    //     return {{}, "version"};
-    // }
     if (use_object_cache) {
         PersistReadResult result = persistence_manager_->GetObjCache(read_path);
         defer_fn.emplace(([=, this]() {
