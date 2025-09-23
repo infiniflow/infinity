@@ -165,13 +165,7 @@ BufferObj *BufferManager::GetBufferObject(const std::string &file_path) {
 }
 
 void BufferManager::ChangeBufferObjectState(const std::string &file_path) {
-    std::unique_lock lock(w_locker_);
-
-    if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
-        BufferObj *buffer_obj = iter->second.get();
-        buffer_obj->SetType(BufferType::kPersistent);
-        buffer_obj->SetStatus(BufferStatus::kFreed);
-    }
+    // std::unique_lock lock(w_locker_);
 }
 
 std::vector<size_t> BufferManager::WaitingGCObjectCount() {
@@ -236,8 +230,6 @@ std::vector<BufferObjectInfo> BufferManager::GetBufferObjectsInfo() {
             BufferObjectInfo buffer_object_info;
             buffer_object_info.object_path_ = buffer_pair.first;
             BufferObj *buffer_object_ptr = buffer_pair.second.get();
-            buffer_object_info.buffered_status_ = buffer_object_ptr->status();
-            buffer_object_info.buffered_type_ = buffer_object_ptr->type();
             buffer_object_info.file_type_ = buffer_object_ptr->file_worker()->Type();
             buffer_object_info.object_size_ = buffer_object_ptr->GetBufferSize();
             result.emplace_back(buffer_object_info);

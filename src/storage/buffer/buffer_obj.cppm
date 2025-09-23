@@ -25,59 +25,11 @@ export class VarBuffer;
 class KVInstance;
 class Status;
 
-export enum class BufferStatus {
-    kLoaded,
-    kUnloaded,
-    kFreed,
-    kClean,
-    kNew,
-};
-
-export enum class BufferType {
-    kPersistent,
-    kEphemeral,
-    kTemp,
-    kToMmap,
-    kMmap,
-};
-
 export struct BufferObjectInfo {
     std::string object_path_{};
-    BufferStatus buffered_status_{BufferStatus::kNew};
-    BufferType buffered_type_{BufferType::kTemp};
     FileWorkerType file_type_{FileWorkerType::kInvalid};
     size_t object_size_{};
 };
-
-export std::string BufferStatusToString(BufferStatus status) {
-    switch (status) {
-        case BufferStatus::kLoaded:
-            return "Loaded";
-        case BufferStatus::kUnloaded:
-            return "Unloaded";
-        case BufferStatus::kFreed:
-            return "Freed";
-        case BufferStatus::kNew:
-            return "New";
-        case BufferStatus::kClean:
-            return "Clean";
-    }
-}
-
-export std::string BufferTypeToString(BufferType buffer_type) {
-    switch (buffer_type) {
-        case BufferType::kPersistent:
-            return "Persistent";
-        case BufferType::kEphemeral:
-            return "Ephemeral";
-        case BufferType::kTemp:
-            return "Temporary";
-        case BufferType::kToMmap:
-            return "ToMmap";
-        case BufferType::kMmap:
-            return "Mmap";
-    }
-}
 
 export class BufferObj {
 public:
@@ -134,12 +86,6 @@ private:
     bool AddBufferSize(size_t add_size);
 
 public:
-    // interface for unit test
-    BufferStatus status() const {
-        std::unique_lock<std::mutex> locker(w_locker_);
-        return status_;
-    }
-    BufferType type() const { return type_; }
     u64 rc() const { return rc_; }
     u32 id() const { return id_; }
 
@@ -148,20 +94,15 @@ public:
     void SubObjRc();
 
     // check the invalid state, only used in tests.
-    void CheckState() const;
 
     void SetData(void *data);
     void SetDataSize(size_t size);
-    void SetType(BufferType type);
-    void SetStatus(BufferStatus status);
 
 protected:
     mutable std::mutex w_locker_{};
 
     BufferManager *buffer_mgr_;
 
-    BufferStatus status_{BufferStatus::kNew};
-    BufferType type_{BufferType::kTemp};
     u64 rc_{0};
     std::unique_ptr<FileWorker> file_worker_;
 

@@ -529,11 +529,6 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     }
 
     buffer_obj->Save();
-    if (index_base->index_type_ == IndexType::kHnsw || index_base->index_type_ == IndexType::kBMP) {
-        if (buffer_obj->type() != BufferType::kMmap) {
-            buffer_obj->ToMmap();
-        }
-    }
 
     std::vector<WalChunkIndexInfo> chunk_infos;
     chunk_infos.emplace_back(*chunk_index_meta);
@@ -1901,17 +1896,11 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         case IndexType::kHnsw: {
             memory_hnsw_index->Dump(buffer_obj);
             buffer_obj->Save();
-            if (buffer_obj->type() != BufferType::kMmap) {
-                buffer_obj->ToMmap();
-            }
             break;
         }
         case IndexType::kBMP: {
             memory_bmp_index->Dump(buffer_obj);
             buffer_obj->Save();
-            if (buffer_obj->type() != BufferType::kMmap) {
-                buffer_obj->ToMmap();
-            }
             break;
         }
         case IndexType::kEMVB: {

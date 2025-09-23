@@ -5208,23 +5208,11 @@ void PhysicalShow::ExecuteShowBuffer(QueryContext *query_context, ShowOperatorSt
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
         }
         {
-            // status
-            Value value = Value::MakeVarchar(BufferStatusToString(buffer_object_info.buffered_status_));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-        }
-        {
             // size
             i64 buffer_object_size = static_cast<i64>(buffer_object_info.object_size_);
             Value value = Value::MakeBigInt(buffer_object_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
-        }
-        {
-            // buffered type
-            Value value = Value::MakeVarchar(BufferTypeToString(buffer_object_info.buffered_type_));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
         }
         {
             // type
