@@ -115,9 +115,8 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
             if (memory_indexer && memory_indexer->GetDocCount() != 0) {
                 RowID act_begin_row_id = memory_indexer->GetBeginRowID();
                 if (exp_begin_row_id != INVALID_ROWID && exp_begin_row_id != act_begin_row_id) {
-                    UnrecoverableError(fmt::format("memory index begin row id {} not match the expeced {}",
-                                                   act_begin_row_id.ToUint64(),
-                                                   exp_begin_row_id.ToUint64()));
+                    LOG_WARN(
+                        fmt::format("ColumnIndexReader::Open rows [{}, {}) are skipped", exp_begin_row_id.ToUint64(), act_begin_row_id.ToUint64()));
                 }
                 std::shared_ptr<InMemIndexSegmentReader> segment_reader = std::make_shared<InMemIndexSegmentReader>(segment_id, memory_indexer.get());
                 segment_readers_.push_back(std::move(segment_reader));
