@@ -1695,7 +1695,6 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
     }
 
     std::shared_ptr<SecondaryIndexInMem> memory_secondary_index = nullptr;
-    std::shared_ptr<MemoryIndexer> memory_indexer = nullptr;
     std::shared_ptr<IVFIndexInMem> memory_ivf_index = nullptr;
     std::shared_ptr<HnswIndexInMem> memory_hnsw_index = nullptr;
     std::shared_ptr<BMPIndexInMem> memory_bmp_index = nullptr;
@@ -1711,10 +1710,11 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
             break;
         }
         case IndexType::kFullText: {
-            memory_indexer = mem_index->GetFulltextIndex();
+            std::shared_ptr<MemoryIndexer> memory_indexer = mem_index->GetFulltextIndex();
             if (memory_indexer == nullptr) {
                 return Status::EmptyMemIndex();
             }
+            memory_indexer->Dump(false /*offline*/, false /*spill*/);
             break;
         }
         case IndexType::kIVF: {
@@ -1746,7 +1746,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
             break;
         }
         case IndexType::kDiskAnn: {
-            LOG_WARN("Not implemented yet");
+            UnrecoverableError("Not implemented yet");
             break;
         }
         default: {
@@ -1754,6 +1754,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         }
     }
 
+    // NOTE: ChunkIndexMetaInfo::term_cnt_ is unstalbe before MemoryIndexer::Dump()!
     ChunkIndexMetaInfo chunk_index_meta_info;
     if (mem_index->GetBaseMemIndex() != nullptr) {
         chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
@@ -1796,7 +1797,6 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
             break;
         }
         case IndexType::kFullText: {
-            memory_indexer->Dump(false /*offline*/, false /*spill*/);
             break;
         }
         case IndexType::kIVF: {
@@ -1829,6 +1829,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
             UnrecoverableError("Not implemented yet");
         }
     }
+
     mem_index->ClearMemIndex();
     auto *storage = InfinityContext::instance().storage();
     if (storage != nullptr) {

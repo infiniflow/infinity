@@ -5,6 +5,7 @@ from infinity import index
 import time
 import pathlib
 from infinity.common import ConflictType, SparseVector
+import pytest
 
 
 class TestMemIdx:
@@ -292,8 +293,6 @@ class TestMemIdx:
                 {"c1": 4, "c2": "this is definitely not a test text"},
                 {"c1": 5, "c2": "this is nothing but a test text"},
             ])
-            # wait for memindex dump done writing ft_0000000000000000.len
-            time.sleep(3)
 
         part1()
 
@@ -347,8 +346,6 @@ class TestMemIdx:
             table_obj = db_obj.get_table("test_mem_indexer")
 
             def check(rows):
-                data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
-                assert data_dict["count(star)"] == [rows]
                 data_dict, data_type_dict, _ = (
                     table_obj.output(["c1"])
                     .match_text('c2', 'this what', 3)
@@ -356,6 +353,9 @@ class TestMemIdx:
                 )
                 print(data_dict["c1"])
                 assert data_dict["c1"] == [7, 8, 10]
+
+                data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
+                assert data_dict["count(star)"] == [rows]
 
             check(11)
             table_obj.insert([
@@ -543,10 +543,10 @@ class TestMemIdx:
 
             # 2 chunk indexes for each index
             db1_dir = data_dir + "/db_2"
-            idx1_dirs = list(pathlib.Path(db1_dir).rglob("*chunk*"))
+            idx1_dirs = list(pathlib.Path(db1_dir).rglob(f"*chunk*"))
             assert len(idx1_dirs) == 2
             db2_dir = data_dir + "/db_3"
-            idx2_dirs = list(pathlib.Path(db2_dir).rglob("*chunk*"))
+            idx2_dirs = list(pathlib.Path(db2_dir).rglob(f"*chunk*"))
             assert len(idx2_dirs) == 2
 
         part1()
@@ -558,11 +558,11 @@ class TestMemIdx:
 
             # new chunk index is generated after optimize for each index
             db1_dir = data_dir + "/db_2"
-            idx1_dirs = list(pathlib.Path(db1_dir).rglob("*chunk*"))
+            idx1_dirs = list(pathlib.Path(db1_dir).rglob(f"*chunk*"))
             print(idx1_dirs)
             assert len(idx1_dirs) == 3
             db2_dir = data_dir + "/db_3"
-            idx2_dirs = list(pathlib.Path(db2_dir).rglob("*chunk*"))
+            idx2_dirs = list(pathlib.Path(db2_dir).rglob(f"*chunk*"))
             assert len(idx2_dirs) == 3
 
         part2()
@@ -573,11 +573,11 @@ class TestMemIdx:
 
             # after checkpoint (during restart) and cleanup, 2 old chunks of each index are removed
             db1_dir = data_dir + "/db_2"
-            idx1_dirs = list(pathlib.Path(db1_dir).rglob("*chunk*"))
+            idx1_dirs = list(pathlib.Path(db1_dir).rglob(f"*chunk*"))
             print(idx1_dirs)
             assert len(idx1_dirs) == 1
             db2_dir = data_dir + "/db_3"
-            idx2_dirs = list(pathlib.Path(db2_dir).rglob("*chunk*"))
+            idx2_dirs = list(pathlib.Path(db2_dir).rglob(f"*chunk*"))
             assert len(idx2_dirs) == 1
 
         part3()
