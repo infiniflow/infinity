@@ -4688,7 +4688,8 @@ Status NewTxn::Cleanup() {
     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
 
     if (last_cleanup_ts >= oldest_txn_begin_ts) {
-        LOG_TRACE("SKIP cleanup");
+        LOG_TRACE(fmt::format("SKIP cleanup. last_cleanup_ts: {}, oldest_txn_begin_ts: {}", last_cleanup_ts, oldest_txn_begin_ts));
+
         return Status::OK();
     }
 
