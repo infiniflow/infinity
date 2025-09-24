@@ -293,6 +293,7 @@ void Build(const BenchmarkOption &option) {
     if constexpr (std::is_same_v<HnswT, HnswT2>) {
         save(hnsw);
     } else {
+        profiler.Begin();
         std::unique_ptr<HnswT2> hnsw_compress;
         if constexpr (std::is_same_v<HnswT2, HnswLVQ>) {
             hnsw_compress = std::move(*hnsw).CompressToLVQ();
@@ -301,6 +302,8 @@ void Build(const BenchmarkOption &option) {
         } else {
             UnrecoverableError("Compress failed: Compress Type not exists!");
         }
+        profiler.End();
+        std::cout << "Compress time: " << profiler.ElapsedToString(1000) << std::endl;
         save(hnsw_compress);
     }
 }
@@ -318,7 +321,7 @@ void Query(const BenchmarkOption &option) {
 
     auto [query_num, query_dim, query_data] = benchmark::DecodeFvecsDataset<float>(option.query_path_);
     auto [gt_num, topk, gt_data] = benchmark::DecodeFvecsDataset<i32>(option.groundtruth_path_);
-    size_t query_topk = 10;
+    size_t query_topk = topk;
     if (option.query_topk_ != 0) {
         query_topk = option.query_topk_;
     }
@@ -327,11 +330,10 @@ void Query(const BenchmarkOption &option) {
     }
     std::vector<std::vector<LabelT>> results(query_num, std::vector<LabelT>());
 
-    auto test = [&](size_t i, const KnnSearchOption &search_option) {
+    auto test = [&](const KnnSearchOption &search_option) -> float {
         profiler.Begin();
         std::vector<std::thread> query_threads;
         std::atomic<i32> cur_i = 0;
-
         for (size_t i = 0; i < option.thread_n_; ++i) {
             query_threads.emplace_back([&] {
                 size_t i;
@@ -352,10 +354,9 @@ void Query(const BenchmarkOption &option) {
             thread.join();
         }
         profiler.End();
-
-        std::cout << fmt::format("Test {} / {}, Query time: {}", i + 1, option.test_n_, profiler.ElapsedToString(1000)) << std::endl;
+        return 1e9 * query_num / profiler.Elapsed();
     };
-    auto cal_recall = [&](const KnnSearchOption &search_option) {
+    auto cal_recall = [&]() -> float {
         i32 correct = 0;
         for (size_t i = 0; i < query_num; ++i) {
             std::unordered_set<LabelT> gt_set(gt_data.get() + i * topk, gt_data.get() + i * topk + query_topk);
@@ -365,22 +366,26 @@ void Query(const BenchmarkOption &option) {
                 }
             }
         }
-        float recall = float(correct) / (query_num * query_topk);
-        std::cout << fmt::format("ef: {}, recall@{}: {}", search_option.ef_, query_topk, recall) << std::endl;
+        return float(correct) / (query_num * query_topk);
     };
     if (option.ef_ == 0) {
+        std::cout << "test_n = " << option.test_n_ << std::endl;
         for (size_t ef = 100; ef <= 1000; ef += 100) {
             KnnSearchOption search_option{.ef_ = ef};
+            float QPS = 0;
             for (size_t i = 0; i < option.test_n_; ++i) {
-                test(i, search_option);
+                QPS += test(search_option);
             }
-            cal_recall(search_option);
+            QPS /= option.test_n_;
+            float recall = cal_recall();
+            std::cout << fmt::format("efsearch={},QPS={:.2f},Recall@{}={:.4f}", ef, QPS, query_topk, recall) << std::endl;
         }
     } else {
         for (size_t i = 0; i < option.test_n_; ++i) {
             KnnSearchOption search_option{.ef_ = option.ef_};
-            test(i, search_option);
-            cal_recall(search_option);
+            float QPS = test(search_option);
+            float recall = cal_recall();
+            std::cout << fmt::format("efsearch={},QPS={:.2f},Recall@{}={:.4f}", option.ef_, QPS, query_topk, recall) << std::endl;
         }
     }
 }
