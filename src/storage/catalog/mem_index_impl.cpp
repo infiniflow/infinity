@@ -257,4 +257,24 @@ void MemIndex::SetIsDumping(bool is_dumping) {
     is_dumping_ = is_dumping;
 }
 
+void MemIndex::UpdateBegin() {
+    std::unique_lock<std::mutex> lock(mtx_);
+    cv_.wait(lock, [this] { return !is_updating_; });
+    is_updating_ = true;
+}
+
+void MemIndex::UpdateEnd() {
+    std::unique_lock<std::mutex> lock(mtx_);
+    if (!is_updating_) {
+        LOG_CRITICAL("MemIndex::UpdateEnd is_updating_ is false");
+    }
+    is_updating_ = false;
+    cv_.notify_one();
+}
+
+void MemIndex::WaitUpdate() {
+    std::unique_lock<std::mutex> lock(mtx_);
+    cv_.wait(lock, [this] { return !is_updating_; });
+}
+
 } // namespace infinity

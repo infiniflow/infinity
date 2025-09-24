@@ -288,10 +288,10 @@ Status SegmentIndexMeta::UninitSet1(UsageFlag usage_flag) {
     return Status::OK();
 }
 
-std::shared_ptr<MemIndex> SegmentIndexMeta::GetMemIndex() {
+std::shared_ptr<MemIndex> SegmentIndexMeta::GetMemIndex(bool for_update) {
     std::string mem_index_key = GetSegmentIndexTag("mem_index");
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    return new_catalog->GetMemIndex(mem_index_key);
+    return new_catalog->GetMemIndex(mem_index_key, for_update);
 }
 
 std::shared_ptr<MemIndex> SegmentIndexMeta::PopMemIndex() {

@@ -736,8 +736,9 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
     if (!index_status.ok()) {
         return index_status;
     }
-    std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+    std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex(true);
     bool is_null = mem_index->IsNull();
+    LOG_TRACE(fmt::format("NewTxn::AppendMemIndex UpdateBegin mem_index {:p}, is_null {}", (void *)mem_index.get(), is_null));
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
             std::shared_ptr<SecondaryIndexInMem> memory_secondary_index;
@@ -874,6 +875,8 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
             UnrecoverableError("Not implemented yet");
         }
     }
+    mem_index->UpdateEnd();
+    LOG_TRACE(fmt::format("NewTxn::AppendMemIndex UpdateEnd mem_index {:p}", (void *)mem_index.get()));
 
     // Trigger dump if necessary
     if (!this->IsReplay()) {
@@ -1688,6 +1691,8 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
     if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
         return Status::EmptyMemIndex();
     }
+    mem_index->WaitUpdate();
+    LOG_TRACE(fmt::format("NewTxn::DumpSegmentMemIndex WaitUpdate mem_index {:p}", (void *)mem_index.get()));
     TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {

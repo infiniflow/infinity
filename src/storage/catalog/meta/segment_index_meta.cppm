@@ -65,7 +65,7 @@ public:
 
     Status UninitSet1(UsageFlag usage_flag);
 
-    std::shared_ptr<MemIndex> GetMemIndex();
+    std::shared_ptr<MemIndex> GetMemIndex(bool for_update = false);
     std::shared_ptr<MemIndex> PopMemIndex();
     bool HasMemIndex();
 

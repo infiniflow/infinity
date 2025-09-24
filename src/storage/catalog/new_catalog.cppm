@@ -173,7 +173,7 @@ private:
     std::unordered_map<std::string, std::shared_ptr<BlockLock>> block_lock_map_{};
 
 public:
-    std::shared_ptr<MemIndex> GetMemIndex(const std::string &mem_index_key);
+    std::shared_ptr<MemIndex> GetMemIndex(const std::string &mem_index_key, bool for_update);
     std::shared_ptr<MemIndex> PopMemIndex(const std::string &mem_index_key);
     bool HasMemIndex(const std::string &mem_index_key);
     Status DropMemIndexByMemIndexKey(const std::string &mem_index_key);
