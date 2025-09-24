@@ -66,6 +66,11 @@ def generate(generate_if_exist: bool, copy_dir: str):
             slt_file.write(";\n")
             slt_file.write("\n")
 
+        slt_file.write("# Wait HNSW index chunk creation done since the chunk rows are invisiable during dumping.\n")
+        slt_file.write("system ok\n")
+        slt_file.write("sleep 1\n")
+        slt_file.write("\n")
+
         for i in range(insert_n):
             row_id = i * batch_n + random.randint(0, batch_n - 1)
             slt_file.write("query I\n")
