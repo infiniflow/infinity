@@ -899,12 +899,6 @@ Status NewCatalog::AddNewBlockForTransform(SegmentMeta &segment_meta, TxnTimeSta
 
 Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockInfo &block_info, TxnTimeStamp checkpoint_ts) {
     Status status;
-
-    auto *pm = InfinityContext::instance().persistence_manager();
-    if (pm) {
-        block_info.addr_serializer_.AddToPersistenceManager(pm);
-    }
-
     BlockID block_id = 0;
     std::tie(block_id, status) = segment_meta.AddBlockID1(checkpoint_ts);
     if (!status.ok()) {
@@ -1100,6 +1094,7 @@ Status NewCatalog::AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
                                      ChunkID chunk_id,
                                      RowID base_row_id,
                                      size_t row_count,
+                                     size_t term_count,
                                      const std::string &base_name,
                                      size_t index_size,
                                      std::optional<ChunkIndexMeta> &chunk_index_meta) {
@@ -1107,6 +1102,7 @@ Status NewCatalog::AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
     chunk_info.base_name_ = base_name;
     chunk_info.base_row_id_ = base_row_id;
     chunk_info.row_cnt_ = row_count;
+    chunk_info.term_cnt_ = term_count;
     chunk_info.index_size_ = index_size;
     {
         chunk_index_meta.emplace(chunk_id, segment_index_meta);
@@ -1129,6 +1125,7 @@ Status NewCatalog::RestoreNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
                                          ChunkID chunk_id,
                                          RowID base_row_id,
                                          size_t row_count,
+                                         size_t term_count,
                                          const std::string &base_name,
                                          size_t index_size,
                                          std::optional<ChunkIndexMeta> &chunk_index_meta,
@@ -1137,6 +1134,7 @@ Status NewCatalog::RestoreNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
     chunk_info.base_name_ = base_name;
     chunk_info.base_row_id_ = base_row_id;
     chunk_info.row_cnt_ = row_count;
+    chunk_info.term_cnt_ = term_count;
     chunk_info.index_size_ = index_size;
     {
         chunk_index_meta.emplace(chunk_id, segment_index_meta);
@@ -1175,6 +1173,7 @@ Status NewCatalog::LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, 
         chunk_meta_info.base_name_ = chunk_info.base_name_;
         chunk_meta_info.base_row_id_ = chunk_info.base_rowid_;
         chunk_meta_info.row_cnt_ = chunk_info.row_count_;
+        chunk_meta_info.term_cnt_ = chunk_info.term_count_;
         chunk_meta_info.index_size_ = 0;
     }
     status = chunk_index_meta.SetChunkInfo(chunk_meta_info);
@@ -1184,11 +1183,6 @@ Status NewCatalog::LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, 
     status = chunk_index_meta.LoadSet();
     if (!status.ok()) {
         return status;
-    }
-
-    auto *pm = InfinityContext::instance().persistence_manager();
-    if (pm) {
-        chunk_info.addr_serializer_.AddToPersistenceManager(pm);
     }
     return Status::OK();
 }

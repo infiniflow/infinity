@@ -33,16 +33,18 @@ void PrintTransactionHistory() {
     }
     std::vector<std::shared_ptr<TxnContext>> txn_contexts = txn_manager->GetTxnContextHistories();
 
+    std::ostringstream oss;
     size_t history_count = txn_contexts.size();
     for (size_t idx = 0; idx < history_count; ++idx) {
         std::shared_ptr<TxnContext> txn_history = txn_contexts[idx];
-        LOG_CRITICAL(txn_history->ToString());
+        oss << txn_history->ToString() << "\n";
     }
+    LOG_CRITICAL(oss.str());
 }
 
 void PrintStacktrace(const std::string &err_msg) {
     LOG_CRITICAL(fmt::format("Error: {}", err_msg));
-    fmt::print("{}\n", to_string(std::stacktrace::current()));
+    LOG_CRITICAL(to_string(std::stacktrace::current()));
 }
 
 #define ADD_LOG_INFO
@@ -76,9 +78,7 @@ void UnrecoverableError(const std::string &message, const char *file_name, u32 l
     // }
     auto location_message = fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line);
     if (GetPrintStacktrace()) {
-        if (IS_LOGGER_INITIALIZED()) {
-            PrintStacktrace(location_message);
-        }
+        PrintStacktrace(location_message);
     }
     Logger::Flush();
     throw UnrecoverableException(location_message);

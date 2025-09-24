@@ -31,8 +31,6 @@ import :data_block;
 import :default_values;
 import :index_base;
 import :index_ivf;
-import :persistence_manager;
-import :kv_store;
 import :status;
 
 import global_resource_usage;
@@ -439,42 +437,6 @@ TEST_F(WalEntryTest, ReadWriteV2) {
     EXPECT_EQ(*entry == *entry2, true);
     EXPECT_EQ(ptr_r - buf_beg, exp_size);
     infinity::InfinityContext::instance().UnInit();
-}
-
-TEST_F(WalEntryTest, ReadWriteVFS) {
-    RemoveDbDirs();
-    std::shared_ptr<WalEntry> entry = std::make_shared<WalEntry>();
-
-    std::vector<std::string> paths = {"path1", "path2"};
-    std::string workspace = GetFullPersistDir();
-    std::string data_dir = GetFullDataDir();
-    size_t object_size_limit = 100;
-    auto kv_store = std::make_unique<KVStore>();
-    Status status = kv_store->Init(GetCatalogDir());
-    EXPECT_TRUE(status.ok());
-    PersistenceManager pm(infinity::InfinityContext::instance().storage(), workspace, data_dir, object_size_limit);
-    pm.SetKvStore(kv_store.get());
-
-    ObjAddr obj_addr0{.obj_key_ = "key1", .part_offset_ = 0, .part_size_ = 10};
-    ObjAddr obj_addr1{.obj_key_ = "key1", .part_offset_ = 10, .part_size_ = 20};
-    pm.SaveLocalPath(paths[0], obj_addr0);
-    pm.SaveLocalPath(paths[1], obj_addr1);
-
-    AddrSerializer addr_serializer;
-    addr_serializer.Initialize(&pm, paths);
-    size_t size = addr_serializer.GetSizeInBytes();
-    auto buffer = std::make_unique<char[]>(size);
-    char *ptr = buffer.get();
-    addr_serializer.WriteBufAdv(ptr);
-    size_t write_size = ptr - buffer.get();
-    ASSERT_EQ(write_size, size);
-
-    AddrSerializer addr_serializer1;
-    const char *ptr1 = buffer.get();
-    std::vector<std::string> paths1 = addr_serializer1.ReadBufAdv(ptr1);
-    size_t read_size = ptr1 - buffer.get();
-    ASSERT_EQ(read_size, size);
-    ASSERT_EQ(paths1, paths);
 }
 
 void Println(const std::string &message1, const std::string &message2) { std::cout << message1 << message2 << std::endl; }

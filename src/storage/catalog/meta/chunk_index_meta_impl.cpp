@@ -69,6 +69,7 @@ void ChunkIndexMetaInfo::ToJson(nlohmann::json &json) const {
     json["base_name"] = base_name_;
     json["base_row_id"] = base_row_id_.ToUint64();
     json["row_count"] = row_cnt_;
+    json["term_count"] = term_cnt_;
     json["index_size"] = index_size_;
 }
 
@@ -79,6 +80,7 @@ void ChunkIndexMetaInfo::FromJson(std::string_view json_str) {
     base_name_ = doc["base_name"].get<std::string>();
     base_row_id_ = RowID::FromUint64(doc["base_row_id"].get<u64>());
     row_cnt_ = doc["row_count"].get<u64>();
+    term_cnt_ = doc["term_count"].get<u64>();
     index_size_ = doc["index_size"].get<u64>();
 }
 
@@ -503,7 +505,6 @@ Status ChunkIndexMeta::RestoreSetFromSnapshot(const ChunkIndexMetaInfo &chunk_in
 }
 
 Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
-    auto *kv_store = InfinityContext::instance().storage()->kv_store();
     Status status = this->GetIndexBuffer(index_buffer_);
     if (!status.ok()) {
         return status;
@@ -537,10 +538,6 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
 
                 handler.HandleWriteResult(result1);
                 handler.HandleWriteResult(result2);
-
-                kv_store->Delete(KeyEncode::PMObjectKey(posting_file));
-                kv_store->Delete(KeyEncode::PMObjectKey(dict_file));
-
             } else {
                 std::string absolute_posting_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), posting_file);
                 std::string absolute_dict_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), dict_file);
@@ -572,11 +569,6 @@ Status ChunkIndexMeta::SetChunkInfo(const ChunkIndexMetaInfo &chunk_info) {
             return status;
         }
     }
-    return Status::OK();
-}
-
-Status ChunkIndexMeta::SetChunkInfoNoPutKV(const ChunkIndexMetaInfo &chunk_info) {
-    chunk_info_ = chunk_info;
     return Status::OK();
 }
 

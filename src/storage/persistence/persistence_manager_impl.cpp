@@ -98,7 +98,6 @@ PersistenceManager::PersistenceManager(Storage *storage,
     }
     std::string read_path_empty = GetObjPath(ObjAddr::KeyEmpty);
     VirtualStore::Truncate(read_path_empty, 0);
-
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("PersistenceManager");
 #endif
@@ -125,6 +124,10 @@ PersistWriteResult PersistenceManager::Persist(const std::string &file_path, con
     Status status = kv_store_->Get(pm_fp_key, pm_fp_value);
     if (status.ok()) {
         // Cleanup the file if it already exists in the KV
+        status = kv_store_->Delete(pm_fp_key, false);
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Failed to delete object for local path {}", local_path));
+        }
         ObjAddr obj_addr;
         obj_addr.Deserialize(pm_fp_value);
         CleanupNoLock(obj_addr, result.persist_keys_, result.drop_from_remote_keys_);
@@ -146,7 +149,7 @@ PersistWriteResult PersistenceManager::Persist(const std::string &file_path, con
         if (ec) {
             UnrecoverableError(fmt::format("Failed to remove {}", tmp_file_path));
         }
-        status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump());
+        status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump(), false);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -168,7 +171,7 @@ PersistWriteResult PersistenceManager::Persist(const std::string &file_path, con
         object_stats_->PutNew(obj_key, std::make_shared<ObjStat>(src_size, 1, 0));
         LOG_TRACE(fmt::format("Persist added dedicated object {}", obj_key));
 
-        status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump());
+        status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump(), false);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -197,7 +200,7 @@ PersistWriteResult PersistenceManager::Persist(const std::string &file_path, con
     object_stats_->PutNew(current_object_key_, std::make_shared<ObjStat>(current_object_size_, current_object_parts_, current_object_ref_count_));
     LOG_TRACE(fmt::format("Persist current object {}", current_object_key_));
 
-    status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump());
+    status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump(), false);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -588,7 +591,7 @@ void PersistenceManager::SaveObjStat(const std::string &obj_key, const std::shar
 void PersistenceManager::AddObjAddrToKVStore(const std::string &path, const ObjAddr &obj_addr) {
     std::string key = KeyEncode::PMObjectKey(RemovePrefix(path));
     std::string value = obj_addr.Serialize().dump();
-    Status status = kv_store_->Put(key, value);
+    Status status = kv_store_->Put(key, value, false);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -619,6 +622,11 @@ PersistWriteResult PersistenceManager::Cleanup(const std::string &file_path) {
         LOG_WARN(fmt::format("Failed to find object for local path {}", local_path));
         return result;
     }
+    status = kv_store_->Delete(pm_fp_key, false);
+    if (!status.ok()) {
+        LOG_CRITICAL(fmt::format("Failed to delete object for local path {}", local_path));
+        return result;
+    }
     ObjAddr obj_addr;
     obj_addr.Deserialize(value);
 
@@ -632,9 +640,6 @@ PersistWriteResult PersistenceManager::Cleanup(const std::string &file_path) {
 }
 
 void PersistenceManager::SetKvStore(KVStore *kv_store) {
-    if (kv_store_) {
-        UnrecoverableError("KVStore has been set");
-    }
     kv_store_ = kv_store;
     std::unique_ptr<KVInstance> kv_instance = kv_store_->GetInstance();
     object_stats_->Deserialize(kv_instance.get());
@@ -658,97 +663,6 @@ std::unordered_map<std::string, ObjAddr> PersistenceManager::GetAllFiles() const
         iter->Next();
     }
     return local_path_obj;
-}
-
-void AddrSerializer::Initialize(PersistenceManager *persistence_manager, const std::vector<std::string> &paths) {
-    if (persistence_manager == nullptr) {
-        return; // not use persistence manager
-    }
-    if (!paths_.empty()) {
-        UnrecoverableError("AddrSerializer has been initialized");
-    }
-    for (const std::string &path : paths) {
-        paths_.push_back(path);
-        ObjAddr obj_addr = persistence_manager->GetObjCacheWithoutCnt(path);
-        obj_addrs_.push_back(obj_addr);
-        if (!obj_addr.Valid()) {
-            // In ImportWal, version file is not flushed here, set before write wal
-            ObjStat invalid_stat;
-            obj_stats_.push_back(invalid_stat);
-        } else {
-            ObjStat obj_stat = persistence_manager->GetObjStatByObjAddr(obj_addr);
-            obj_stats_.push_back(obj_stat);
-        }
-    }
-}
-
-void AddrSerializer::InitializeValid(PersistenceManager *persistence_manager) {
-    if (persistence_manager == nullptr) {
-        return; // not use persistence manager
-    }
-    for (size_t i = 0; i < paths_.size(); ++i) {
-        if (obj_addrs_[i].Valid()) {
-            continue;
-        }
-
-        ObjAddr obj_addr = persistence_manager->GetObjCacheWithoutCnt(paths_[i]);
-
-        obj_addrs_[i] = obj_addr;
-        if (!obj_addr.Valid()) {
-            UnrecoverableError(fmt::format("Invalid object address for path {}", paths_[i]));
-        } else {
-            ObjStat obj_stat = persistence_manager->GetObjStatByObjAddr(obj_addr);
-            obj_stats_[i] = std::move(obj_stat);
-        }
-    }
-}
-
-size_t AddrSerializer::GetSizeInBytes() const {
-    size_t size = sizeof(size_t);
-    for (size_t i = 0; i < paths_.size(); ++i) {
-        size += sizeof(i32) + paths_[i].size();
-        size += obj_addrs_[i].GetSizeInBytes();
-        size += obj_stats_[i].GetSizeInBytes();
-    }
-    return size;
-}
-
-void AddrSerializer::WriteBufAdv(char *&buf) const {
-    ::infinity::WriteBufAdv(buf, paths_.size());
-    for (size_t i = 0; i < paths_.size(); ++i) {
-        ::infinity::WriteBufAdv(buf, paths_[i]);
-        if (!obj_addrs_[i].Valid()) {
-            UnrecoverableError(fmt::format("Invalid object address for path {}", paths_[i]));
-        }
-        obj_addrs_[i].WriteBufAdv(buf);
-        obj_stats_[i].WriteBufAdv(buf);
-    }
-}
-
-std::vector<std::string> AddrSerializer::ReadBufAdv(const char *&ptr) {
-    size_t path_count = ::infinity::ReadBufAdv<size_t>(ptr);
-    for (size_t i = 0; i < path_count; ++i) {
-        paths_.push_back(::infinity::ReadBufAdv<std::string>(ptr));
-        obj_addrs_.push_back(ObjAddr::ReadBufAdv(ptr));
-        obj_stats_.push_back(ObjStat::ReadBufAdv(ptr));
-    }
-    return paths_;
-}
-
-void AddrSerializer::AddToPersistenceManager(PersistenceManager *persistence_manager) const {
-    if (persistence_manager == nullptr) {
-        return;
-    }
-    for (size_t i = 0; i < paths_.size(); ++i) {
-        if (!obj_addrs_[i].Valid()) {
-            UnrecoverableError(fmt::format("Invalid object address for path {}", paths_[i]));
-        }
-        LOG_TRACE(fmt::format("Add path {} to persistence manager", paths_[i]));
-        persistence_manager->SaveLocalPath(paths_[i], obj_addrs_[i]);
-        std::shared_ptr<ObjStat> obj_stat = std::make_shared<ObjStat>();
-        *obj_stat = obj_stats_[i];
-        persistence_manager->SaveObjStat(obj_addrs_[i].obj_key_, obj_stat);
-    }
 }
 
 } // namespace infinity

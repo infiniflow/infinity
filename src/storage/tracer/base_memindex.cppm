@@ -83,7 +83,7 @@ public:
 
     const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override {
         std::lock_guard lck(mtx_);
-        return ChunkIndexMetaInfo{"chunk1", RowID(segment_id_, 0), row_cnt_, mem_used_};
+        return ChunkIndexMetaInfo{"chunk1", RowID(segment_id_, 0), row_cnt_, 0, mem_used_};
     }
 
     RowID GetBeginRowID() const override { return RowID{segment_id_, 0}; }

@@ -58,11 +58,15 @@ void TermDocIterator::InitBM25Info(std::unique_ptr<FullTextColumnLengthReader> &
                                    const float k1,
                                    const float b) {
     column_length_reader_ = std::move(column_length_reader);
-    avg_column_len_ = column_length_reader_->GetAvgColumnLength();
-    if (avg_column_len_ <= 1e-6f) {
-        UnrecoverableError("avg_column_len_ is 0.0f");
+    auto [doc_cnt, doc_len] = column_length_reader_->GetDocTermCount();
+    if (doc_cnt <= 0) {
+        UnrecoverableError("doc_cnt is <=0");
     }
-    total_df_ = column_length_reader_->GetTotalDF();
+    avg_column_len_ = doc_len * 1.0 / doc_cnt;
+    total_df_ = doc_cnt;
+    if (total_df_ < doc_freq_) {
+        UnrecoverableError(fmt::format("total_df_ {} is less than doc_freq_ {}", total_df_, doc_freq_));
+    }
     const float smooth_idf = std::log1p((total_df_ - doc_freq_ + 0.5F) / (doc_freq_ + 0.5F));
     bm25_common_score_ = weight_ * smooth_idf * (k1 + 1.0F);
     bm25_score_upper_bound_ = bm25_common_score_ * (avg_column_len_ / (avg_column_len_ + k1 * b) + delta / (k1 + 1.0F));
@@ -74,10 +78,11 @@ void TermDocIterator::InitBM25Info(std::unique_ptr<FullTextColumnLengthReader> &
         std::ostringstream oss;
         oss << "TermDocIterator: ";
         if (column_name_ptr_ != nullptr && term_ptr_ != nullptr) {
-            oss << "column: " << *column_name_ptr_ << ", term: " << *term_ptr_ << ",";
+            oss << "column: " << *column_name_ptr_ << ", term: " << *term_ptr_ << ", ";
         }
         oss << "bm25_common_score: " << bm25_common_score_ << ", bm25_score_upper_bound: " << bm25_score_upper_bound_
-            << ", avg_column_len: " << avg_column_len_ << ", f1: " << f1 << ", f2: " << f2 << '\n';
+            << ", avg_column_len: " << avg_column_len_ << ", f1: " << f1 << ", f2: " << f2 << ", f3: " << f3 << ", f4: " << f4
+            << ", total_df: " << total_df_ << ", doc_freq: " << doc_freq_ << ", smooth_idf: " << smooth_idf << ", weight: " << weight_;
         LOG_TRACE(std::move(oss).str());
     }
 }
@@ -105,10 +110,10 @@ bool TermDocIterator::Next(RowID doc_id) {
         if (doc_id_ == INVALID_ROWID)
             return false;
 
-        if (threshold_ <= 0.0f || BlockMaxBM25Score() > threshold_) {
+        if (threshold_ <= 0.0f || BM25Score() > threshold_) {
             return true;
         }
-        doc_id = BlockLastDocID() + 1;
+        doc_id = doc_id_ + 1;
     }
 }
 
@@ -143,6 +148,12 @@ float TermDocIterator::BM25Score() {
     const auto doc_len = column_length_reader_->GetColumnLength(doc_id_);
     const float p = f1 + f2 * doc_len;
     bm25_score_cache_ = bm25_common_score_ * (tf / (tf + p) + f4);
+    LOG_TRACE(fmt::format("TermDocIterator::BM25Score doc_id: {}, tf: {}, doc_len: {}, p: {}, bm25_score_cache: {}",
+                          doc_id_.ToUint64(),
+                          tf,
+                          doc_len,
+                          p,
+                          bm25_score_cache_));
     term_freq_ += tf;
     return bm25_score_cache_;
 }

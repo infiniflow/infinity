@@ -22,7 +22,6 @@ import :table_def;
 import :index_base;
 import :data_block;
 import :infinity_exception;
-import :persistence_manager;
 
 import std;
 
@@ -35,6 +34,7 @@ namespace infinity {
 
 enum class SegmentStatus : u8;
 class ChunkIndexMeta;
+class ChunkIndexMetaInfo;
 class BlockMeta;
 class SegmentMeta;
 struct EraseBaseCache;
@@ -117,9 +117,6 @@ export struct WalBlockInfo {
     u16 row_count_{};
     u16 row_capacity_{};
     std::vector<std::pair<u32, u64>> outline_infos_;
-    std::vector<std::string> paths_; // the last one is the block version file, previous ones are column files
-    AddrSerializer addr_serializer_;
-    mutable size_t pm_size_ = 0; // tmp for test. should delete when stable
 
     WalBlockInfo() = default;
 
@@ -181,17 +178,16 @@ export struct WalSegmentInfoV2 {
 export struct WalChunkIndexInfo {
     ChunkID chunk_id_{};
     std::string base_name_{};
-    std::vector<std::string> paths_{};
-    AddrSerializer addr_serializer_;
-    mutable size_t pm_size_; // tmp for test. should delete when stable
     RowID base_rowid_{};
     u32 row_count_{};
+    u32 term_count_{};
     u32 index_size_{};
     TxnTimeStamp deprecate_ts_{};
 
     WalChunkIndexInfo() = default;
 
     explicit WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta);
+    explicit WalChunkIndexInfo(const ChunkIndexMetaInfo &chunk_index_meta_info, const ChunkID &chunk_id);
 
     bool operator==(const WalChunkIndexInfo &other) const;
 
@@ -1254,16 +1250,6 @@ export struct WalCmdCreateTableSnapshot : public WalCmd {
 };
 
 export struct WalCmdRestoreTableSnapshot : public WalCmd {
-    explicit WalCmdRestoreTableSnapshot(const std::string &db_name,
-                                        const std::string &db_id,
-                                        const std::string &table_name,
-                                        const std::string &table_id,
-                                        const std::string &snapshot_name,
-                                        std::shared_ptr<TableDef> table_def_,
-                                        const std::vector<WalSegmentInfoV2> &segment_infos,
-                                        const std::vector<WalCmdCreateIndexV2> &index_cmds,
-                                        const std::vector<std::string> &files);
-
     WalCmdRestoreTableSnapshot(const std::string &db_name,
                                const std::string &db_id,
                                const std::string &table_name,
@@ -1272,11 +1258,9 @@ export struct WalCmdRestoreTableSnapshot : public WalCmd {
                                std::shared_ptr<TableDef> table_def_,
                                const std::vector<WalSegmentInfoV2> &segment_infos,
                                const std::vector<WalCmdCreateIndexV2> &index_cmds,
-                               const std::vector<std::string> &files,
-                               AddrSerializer addr_serializer)
+                               const std::vector<std::string> &files)
         : WalCmd(WalCommandType::RESTORE_TABLE_SNAPSHOT), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
-          snapshot_name_(snapshot_name), table_def_(table_def_), files_(files), segment_infos_(segment_infos), index_cmds_(index_cmds),
-          addr_serializer_(addr_serializer) {}
+          snapshot_name_(snapshot_name), table_def_(table_def_), files_(files), segment_infos_(segment_infos), index_cmds_(index_cmds) {}
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -1297,7 +1281,6 @@ export struct WalCmdRestoreTableSnapshot : public WalCmd {
     std::vector<std::string> files_;
     std::vector<WalSegmentInfoV2> segment_infos_; // eache segment has a vector of block ids(assuming same column count)
     std::vector<WalCmdCreateIndexV2> index_cmds_; // index commands to restore indexes
-    AddrSerializer addr_serializer_{};
 };
 
 export struct WalCmdRestoreDatabaseSnapshot : public WalCmd {

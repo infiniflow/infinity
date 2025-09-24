@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <csignal>
+#include <cstring>
 
 #ifdef ENABLE_JEMALLOC_PROF
 #include <jemalloc/jemalloc.h>
@@ -142,7 +143,7 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
         case SIGINT:
         case SIGQUIT:
         case SIGTERM: {
-            fmt::print("Shutdown infinity server ...\n");
+            infinity::LOG_CRITICAL(fmt::format("Shutdown infinity server due to signal {}", strsignal(signal_number)));
 
             std::unique_lock<std::mutex> lock(server_mutex);
             server_running = false;
@@ -153,7 +154,7 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
         case SIGSEGV:
         case SIGABRT: {
             // Print back strace
-            const char *signal_name = (signal_number == SIGSEGV) ? "SEGMENT FAULTS" : "ABORT SIGNAL";
+            const char *signal_name = strsignal(signal_number);
             infinity::PrintTransactionHistory();
             infinity::PrintStacktrace(signal_name);
 
@@ -171,13 +172,13 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
             // http://jemalloc.net/jemalloc.3.html
             malloc_stats_print(nullptr, nullptr, "admp");
             int rc = mallctl("prof.dump", nullptr, nullptr, nullptr, 0);
-            printf("Dump memory profile %d\n", rc);
+            infinity::LOG_INFO(fmt::format("Dump memory profile %d", rc));
             break;
         }
 #endif
         default: {
             // Ignore
-            printf("Other type of signal: %d\n", signal_number);
+            infinity::LOG_INFO(fmt::format("Other type of signal: {}", strsignal(signal_number)));
         }
     }
     //    exit(0);

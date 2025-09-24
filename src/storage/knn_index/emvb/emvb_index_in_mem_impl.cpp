@@ -166,5 +166,5 @@ std::variant<std::pair<u32, u32>, EMVBInMemQueryResultType> EMVBIndexInMem::Sear
     return std::make_pair(begin_row_id_.segment_offset_, row_count_);
 }
 
-const ChunkIndexMetaInfo EMVBIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), 0}; }
+const ChunkIndexMetaInfo EMVBIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), 0, 0}; }
 } // namespace infinity

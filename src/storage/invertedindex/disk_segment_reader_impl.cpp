@@ -122,6 +122,7 @@ bool DiskIndexSegmentReader::GetSegmentPosting(const std::string &term, SegmentP
     if (!dict_reader_.get() || !dict_reader_->Lookup(term, term_meta)) {
         return false;
     }
+    LOG_TRACE(fmt::format("DiskIndexSegmentReader::GetSegmentPosting term: {}, term_meta.doc_freq_: {}", term, term_meta.doc_freq_));
     u64 file_length = fetch_position ? (term_meta.pos_end_ - term_meta.doc_start_) : (term_meta.pos_start_ - term_meta.doc_start_);
     ByteSlice *slice = ByteSlice::NewSlice(data_ptr_ + term_meta.doc_start_, file_length);
     std::shared_ptr<ByteSliceList> byte_slice_list = std::make_shared<ByteSliceList>(slice);
