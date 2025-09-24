@@ -42,8 +42,8 @@ void PhraseDocIterator::InitBM25Info(std::unique_ptr<FullTextColumnLengthReader>
                                      const float k1,
                                      const float b) {
     column_length_reader_ = std::move(column_length_reader);
-    const u64 total_df = column_length_reader_->GetTotalDF();
-    const float avg_column_len = column_length_reader_->GetAvgColumnLength();
+    auto [total_df, term_cnt] = column_length_reader_->GetDocTermCount();
+    const float avg_column_len = term_cnt * 1.0 / total_df;
     float total_idf = 0.0f;
     for (const auto &iter : pos_iters_) {
         const auto doc_freq = iter->GetDocFreq();

@@ -47,15 +47,11 @@ public:
 
     std::tuple<std::vector<ChunkID> *, Status> GetChunkIDs1();
 
-    Status GetFtInfo(std::shared_ptr<SegmentIndexFtInfo> &ft_info);
-
     Status SetChunkIDs(const std::vector<ChunkID> &chunk_ids);
 
     Status RemoveChunkIDs(const std::vector<ChunkID> &chunk_ids);
 
     Status AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn);
-
-    Status UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt);
 
     Status SetNoMemIndex();
 
@@ -69,7 +65,7 @@ public:
 
     Status UninitSet1(UsageFlag usage_flag);
 
-    std::shared_ptr<MemIndex> GetMemIndex();
+    std::shared_ptr<MemIndex> GetMemIndex(bool for_update = false);
     std::shared_ptr<MemIndex> PopMemIndex();
     bool HasMemIndex();
 

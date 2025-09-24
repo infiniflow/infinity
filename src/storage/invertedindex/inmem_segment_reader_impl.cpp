@@ -32,6 +32,8 @@ bool InMemIndexSegmentReader::GetSegmentPosting(const std::string &term, Segment
     bool found = posting_table_->store_.Get(term, writer);
     if (found) {
         seg_posting.Init(base_row_id_, writer);
+        LOG_TRACE(
+            fmt::format("InMemIndexSegmentReader::GetSegmentPosting term: {}, term_meta.doc_freq_: {}", term, seg_posting.GetTermMeta().doc_freq_));
         return true;
     }
     return false;

@@ -25,7 +25,6 @@ static std::shared_ptr<spdlog::sinks::rotating_file_sink_mt> rotating_file_sinke
 std::shared_ptr<spdlog::logger> infinity_logger = nullptr;
 
 Status Logger::Initialize(Config *config_ptr) {
-
     size_t log_file_max_size = config_ptr->LogFileMaxSize();
     size_t log_file_rotate_count = config_ptr->LogFileRotateCount();
     bool log_stdout = config_ptr->LogToStdout();
@@ -41,29 +40,21 @@ Status Logger::Initialize(Config *config_ptr) {
             return Status::UnexpectedError(error_message);
         }
     }
+    std::vector<spdlog::sink_ptr> sinks{rotating_file_sinker};
 
     if (log_stdout) {
         if (stdout_sinker.get() == nullptr) {
             stdout_sinker = std::make_shared<spdlog::sinks::stdout_color_sink_mt>(); // NOLINT
         }
-        std::vector<spdlog::sink_ptr> sinks{stdout_sinker, rotating_file_sinker};
-
-        infinity_logger = std::make_shared<spdlog::logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
-        infinity_logger->set_pattern("[%H:%M:%S.%e] [%t] [%^%l%$] %v");
-        infinity_logger->flush_on(spdlog::level::warn);
-        spdlog::details::registry::instance().register_logger(infinity_logger);
-    } else {
-        std::vector<spdlog::sink_ptr> sinks{rotating_file_sinker};
-        infinity_logger = std::make_shared<spdlog::logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
-        infinity_logger->set_pattern("[%H:%M:%S.%e] [%t] [%^%l%$] %v");
-        infinity_logger->flush_on(spdlog::level::warn);
-        spdlog::details::registry::instance().register_logger(infinity_logger);
+        sinks.push_back(stdout_sinker);
     }
-
+    infinity_logger = std::make_shared<spdlog::logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
+    infinity_logger->set_pattern("[%H:%M:%S.%e] [%t] [%^%l%$] %v");
+    infinity_logger->flush_on(spdlog::level::warn);
+    spdlog::flush_every(std::chrono::seconds(3));
+    spdlog::details::registry::instance().register_logger(infinity_logger);
     SetLogLevel(config_ptr->GetLogLevel());
-
     LOG_TRACE("Logger is initialized.");
-
     return Status::OK();
 }
 

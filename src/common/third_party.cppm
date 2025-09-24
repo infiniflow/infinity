@@ -180,6 +180,7 @@ namespace spdlog {
 export using spdlog::shutdown;
 export using spdlog::logger;
 export using spdlog::sink_ptr;
+export using spdlog::flush_every;
 
 namespace sinks {
 export using spdlog::sinks::stdout_color_sink_mt;

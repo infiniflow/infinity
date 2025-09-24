@@ -1924,8 +1924,6 @@ Status NewTxn::AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segm
 Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta) {
     TxnTimeStamp save_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    auto *pm = InfinityContext::instance().persistence_manager();
-
     for (WalBlockInfo &block_info : segment_info.block_infos_) {
         BlockMeta block_meta(block_info.block_id_, segment_meta);
         std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
@@ -1950,10 +1948,6 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
             block_lock->min_ts_ = std::max(block_lock->min_ts_, commit_ts);
             block_lock->max_ts_ = std::max(block_lock->max_ts_, commit_ts);
             block_lock->checkpoint_ts_ = commit_ts;
-        }
-
-        if (pm) {
-            block_info.addr_serializer_.InitializeValid(pm);
         }
     }
 

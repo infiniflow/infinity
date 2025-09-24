@@ -132,7 +132,7 @@ void MemoryIndexer::Insert(std::shared_ptr<ColumnVector> column_vector, u32 row_
         inverter->InitAnalyzer(this->analyzer_);
         auto func = [this, task, inverter](int id) {
             size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
-            column_length_sum_ += column_length_sum;
+            term_cnt_ += column_length_sum;
             if (column_length_sum > 0) {
                 inverter->SortForOfflineDump();
             }
@@ -152,7 +152,7 @@ void MemoryIndexer::Insert(std::shared_ptr<ColumnVector> column_vector, u32 row_
         auto func = [this, task, inverter](int id) {
             // LOG_INFO(fmt::format("online inverter {} begin", id));
             size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
-            column_length_sum_ += column_length_sum;
+            term_cnt_ += column_length_sum;
             inverter->MergePrepare();
             inverter->Sort();
             this->ring_sorted_.Put(task->task_seq_, inverter);
@@ -211,7 +211,7 @@ void MemoryIndexer::AsyncInsertBottom(const std::shared_ptr<ColumnVector> &colum
     auto func = [this, task, inverter, append_batch](int id) {
         // LOG_INFO(fmt::format("online inverter {} begin", id));
         size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
-        column_length_sum_ += column_length_sum;
+        term_cnt_ += column_length_sum;
         inverter->MergePrepare();
         inverter->Sort();
         this->ring_sorted_.Put(task->task_seq_, inverter);
@@ -256,7 +256,7 @@ std::unique_ptr<std::binary_semaphore> MemoryIndexer::AsyncInsert(std::shared_pt
     auto func = [this, task, inverter](int id) {
         // LOG_INFO(fmt::format("online inverter {} begin", id));
         size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
-        column_length_sum_ += column_length_sum;
+        term_cnt_ += column_length_sum;
         inverter->MergePrepare();
         inverter->Sort();
         this->ring_sorted_.Put(task->task_seq_, inverter);
@@ -499,7 +499,7 @@ void MemoryIndexer::Load() {
     column_lengths.resize(doc_count_);
     file_handle->Read(&column_lengths[0], sizeof(column_lengths[0]) * column_lengths.size());
     u32 column_length_sum = column_lengths_.Sum();
-    column_length_sum_.store(column_length_sum);
+    term_cnt_.store(column_length_sum);
 
     is_spilled_ = false;
 }
@@ -534,7 +534,10 @@ MemIndexTracerInfo MemoryIndexer::GetInfo() const {
                               doc_count_);
 }
 
-const ChunkIndexMetaInfo MemoryIndexer::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{base_name_, base_row_id_, GetDocCount(), 0}; }
+const ChunkIndexMetaInfo MemoryIndexer::GetChunkIndexMetaInfo() const {
+    auto [doc_cnt, term_cnt] = GetDocTermCount();
+    return ChunkIndexMetaInfo{base_name_, base_row_id_, doc_cnt, term_cnt, 0};
+}
 
 size_t MemoryIndexer::MemUsed() const { return mem_used_; }
 

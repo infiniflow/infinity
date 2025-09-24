@@ -28,7 +28,6 @@ import :defer_op;
 import :logger;
 import :block_version;
 import :index_defines;
-import :persistence_manager;
 import :infinity_context;
 import :virtual_store;
 import :chunk_index_meta;
@@ -54,12 +53,6 @@ namespace infinity {
 
 WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_id()) {
     Status status;
-    // auto [row_count, status] = block_meta.GetRowCnt();
-    // if (!status.ok()) {
-    //     UnrecoverableError(status.message());
-    // }
-
-    // row_count_ = row_count;
     row_capacity_ = block_meta.block_capacity();
 
     std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs_ptr;
@@ -68,32 +61,11 @@ WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_i
         UnrecoverableError(status.message());
     }
     outline_infos_.resize(column_defs_ptr->size());
-    std::vector<std::string> paths;
     for (size_t column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
         ColumnMeta column_meta(column_idx, block_meta);
         size_t chunk_offset = 0;
-        // status = column_meta.GetChunkOffset(chunk_offset);
-        // if (!status.ok()) {
-        //     UnrecoverableError(status.message());
-        // }
         outline_infos_[column_idx] = {1, chunk_offset};
-
-        Status status = column_meta.FilePaths(paths);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-        paths_.insert(paths_.end(), paths.begin(), paths.end());
     }
-    paths = block_meta.FilePaths();
-    paths_.insert(paths_.end(), paths.begin(), paths.end());
-
-    auto *pm = InfinityContext::instance().persistence_manager();
-    addr_serializer_.Initialize(pm, paths_);
-#ifdef INFINITY_DEBUG
-    for (auto &pth : paths_) {
-        assert(!std::filesystem::path(pth).is_absolute());
-    }
-#endif
 }
 
 bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
@@ -104,22 +76,10 @@ bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
 i32 WalBlockInfo::GetSizeInBytes() const {
     i32 size = sizeof(BlockID) + sizeof(row_count_) + sizeof(row_capacity_);
     size += sizeof(i32) + outline_infos_.size() * (sizeof(u32) + sizeof(u64));
-
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-    if (use_object_cache) {
-        pm_size_ = addr_serializer_.GetSizeInBytes();
-        size += pm_size_;
-    }
     return size;
 }
 
 void WalBlockInfo::WriteBufferAdv(char *&buf) const {
-#ifdef INFINITY_DEBUG
-    for (auto &pth : paths_) {
-        assert(!std::filesystem::path(pth).is_absolute());
-    }
-#endif
     WriteBufAdv(buf, block_id_);
     WriteBufAdv(buf, row_count_);
     WriteBufAdv(buf, row_capacity_);
@@ -127,16 +87,6 @@ void WalBlockInfo::WriteBufferAdv(char *&buf) const {
     for (const auto &[idx, off] : outline_infos_) {
         WriteBufAdv(buf, idx);
         WriteBufAdv(buf, off);
-    }
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-    if (use_object_cache) {
-        char *start = buf;
-        addr_serializer_.WriteBufAdv(buf);
-        size_t size = buf - start;
-        if (size != pm_size_) {
-            UnrecoverableError(fmt::format("WriteBufferAdv size mismatch: expected {}, actual {}", pm_size_, size));
-        }
     }
 }
 
@@ -152,11 +102,6 @@ WalBlockInfo WalBlockInfo::ReadBufferAdv(const char *&ptr) {
         const auto buffer_cnt = ReadBufAdv<u32>(ptr);
         const auto last_chunk_offset = ReadBufAdv<u64>(ptr);
         outline_info = {buffer_cnt, last_chunk_offset};
-    }
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-    if (use_object_cache) {
-        block_info.paths_ = block_info.addr_serializer_.ReadBufAdv(ptr);
     }
     return block_info;
 }
@@ -298,55 +243,41 @@ WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta) : chunk_i
     base_name_ = chunk_info_ptr->base_name_;
     base_rowid_ = chunk_info_ptr->base_row_id_;
     row_count_ = chunk_info_ptr->row_cnt_;
+    term_count_ = chunk_info_ptr->term_cnt_;
     index_size_ = chunk_info_ptr->index_size_;
     deprecate_ts_ = UNCOMMIT_TS;
+}
 
-    // TODO
-
-    auto *pm = InfinityContext::instance().persistence_manager();
-    addr_serializer_.Initialize(pm, paths_);
+WalChunkIndexInfo::WalChunkIndexInfo(const ChunkIndexMetaInfo &chunk_index_meta_info, const ChunkID &chunk_id) : chunk_id_(chunk_id) {
+    base_name_ = chunk_index_meta_info.base_name_;
+    base_rowid_ = chunk_index_meta_info.base_row_id_;
+    row_count_ = chunk_index_meta_info.row_cnt_;
+    term_count_ = chunk_index_meta_info.term_cnt_;
+    index_size_ = chunk_index_meta_info.index_size_;
+    deprecate_ts_ = UNCOMMIT_TS;
 }
 
 bool WalChunkIndexInfo::operator==(const WalChunkIndexInfo &other) const {
     return chunk_id_ == other.chunk_id_ && base_name_ == other.base_name_ && base_rowid_ == other.base_rowid_ && row_count_ == other.row_count_ &&
-           index_size_ == other.index_size_ && deprecate_ts_ == other.deprecate_ts_;
+           term_count_ == other.term_count_ && index_size_ == other.index_size_ && deprecate_ts_ == other.deprecate_ts_;
 }
 
 i32 WalChunkIndexInfo::GetSizeInBytes() const {
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
     size_t size = 0;
-    if (use_object_cache) {
-        pm_size_ = addr_serializer_.GetSizeInBytes();
-        size += pm_size_;
-    }
-    return size + sizeof(ChunkID) + sizeof(i32) + base_name_.size() + sizeof(base_rowid_) + sizeof(row_count_) + sizeof(index_size_) +
-           sizeof(deprecate_ts_);
+    size += sizeof(ChunkID) + sizeof(i32) + base_name_.size();
+    size += sizeof(base_rowid_) + sizeof(row_count_) + sizeof(term_count_);
+    size += sizeof(index_size_) + sizeof(deprecate_ts_);
+    return size;
 }
 
 void WalChunkIndexInfo::WriteBufferAdv(char *&buf) const {
-#ifdef INFINITY_DEBUG
-    for (auto &pth : paths_) {
-        assert(!std::filesystem::path(pth).is_absolute());
-    }
-#endif
     WriteBufAdv(buf, chunk_id_);
     WriteBufAdv(buf, base_name_);
     WriteBufAdv(buf, base_rowid_);
     WriteBufAdv(buf, row_count_);
+    WriteBufAdv(buf, term_count_);
     WriteBufAdv(buf, index_size_);
     WriteBufAdv(buf, deprecate_ts_);
-
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-    if (use_object_cache) {
-        char *start = buf;
-        addr_serializer_.WriteBufAdv(buf);
-        size_t size = buf - start;
-        if (size != pm_size_) {
-            UnrecoverableError(fmt::format("WriteBufferAdv size mismatch: expected {}, actual {}", pm_size_, size));
-        }
-    }
 }
 
 WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(const char *&ptr) {
@@ -355,21 +286,16 @@ WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(const char *&ptr) {
     chunk_index_info.base_name_ = ReadBufAdv<std::string>(ptr);
     chunk_index_info.base_rowid_ = ReadBufAdv<RowID>(ptr);
     chunk_index_info.row_count_ = ReadBufAdv<u32>(ptr);
+    chunk_index_info.term_count_ = ReadBufAdv<u32>(ptr);
     chunk_index_info.index_size_ = ReadBufAdv<u32>(ptr);
     chunk_index_info.deprecate_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
-
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-    if (use_object_cache) {
-        chunk_index_info.paths_ = chunk_index_info.addr_serializer_.ReadBufAdv(ptr);
-    }
     return chunk_index_info;
 }
 
 std::string WalChunkIndexInfo::ToString() const {
     std::stringstream ss;
     ss << "chunk_id: " << chunk_id_ << ", base_name: " << base_name_ << ", base_rowid: " << base_rowid_.ToString() << ", row_count: " << row_count_
-       << ", index_size: " << index_size_ << ", deprecate_ts: " << deprecate_ts_;
+       << ", term_count: " << term_count_ << ", index_size: " << index_size_ << ", deprecate_ts: " << deprecate_ts_;
     return std::move(ss).str();
 }
 
@@ -974,12 +900,6 @@ std::shared_ptr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             for (i32 i = 0; i < file_n; ++i) {
                 files.push_back(ReadBufAdv<std::string>(ptr));
             }
-            AddrSerializer addr_serializer;
-            PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-            bool use_object_cache = pm != nullptr;
-            if (use_object_cache) {
-                addr_serializer.ReadBufAdv(ptr);
-            }
 
             cmd = std::make_shared<WalCmdRestoreTableSnapshot>(db_name,
                                                                db_id,
@@ -989,8 +909,7 @@ std::shared_ptr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
                                                                table_def,
                                                                segment_infos,
                                                                index_cmds,
-                                                               files,
-                                                               addr_serializer);
+                                                               files);
 
             break;
         }
@@ -1038,21 +957,6 @@ WalCmdCreateIndexV2 WalCmdCreateIndexV2::ReadBufferAdv(const char *&ptr, i32 max
     return cmd;
 }
 
-WalCmdRestoreTableSnapshot::WalCmdRestoreTableSnapshot(const std::string &db_name,
-                                                       const std::string &db_id,
-                                                       const std::string &table_name,
-                                                       const std::string &table_id,
-                                                       const std::string &snapshot_name,
-                                                       std::shared_ptr<TableDef> table_def_,
-                                                       const std::vector<WalSegmentInfoV2> &segment_infos,
-                                                       const std::vector<WalCmdCreateIndexV2> &index_cmds,
-                                                       const std::vector<std::string> &files)
-    : WalCmd(WalCommandType::RESTORE_TABLE_SNAPSHOT), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
-      snapshot_name_(snapshot_name), table_def_(table_def_), files_(files), segment_infos_(segment_infos), index_cmds_(index_cmds) {
-    PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
-    addr_serializer_.Initialize(persistence_manager, files);
-}
-
 WalCmdRestoreTableSnapshot WalCmdRestoreTableSnapshot::ReadBufferAdv(const char *&ptr, i32 max_bytes) {
     const char *const ptr_end = ptr + max_bytes;
     std::string db_name = ReadBufAdv<std::string>(ptr);
@@ -1078,22 +982,7 @@ WalCmdRestoreTableSnapshot WalCmdRestoreTableSnapshot::ReadBufferAdv(const char 
     for (i32 i = 0; i < files_n; ++i) {
         files.push_back(ReadBufAdv<std::string>(ptr));
     }
-    AddrSerializer addr_serializer;
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-    if (use_object_cache) {
-        addr_serializer.ReadBufAdv(ptr);
-    }
-    return WalCmdRestoreTableSnapshot(db_name,
-                                      db_id,
-                                      table_name,
-                                      table_id,
-                                      snapshot_name,
-                                      table_def,
-                                      segment_infos,
-                                      index_cmds,
-                                      files,
-                                      addr_serializer);
+    return WalCmdRestoreTableSnapshot(db_name, db_id, table_name, table_id, snapshot_name, table_def, segment_infos, index_cmds, files);
 }
 
 bool WalCmdCreateDatabase::operator==(const WalCmd &other) const {
@@ -1743,12 +1632,6 @@ i32 WalCmdRestoreTableSnapshot::GetSizeInBytes() const {
     for (const auto &file : files_) {
         size += sizeof(i32) + file.size();
     }
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-    if (use_object_cache) {
-        size_t pm_size = addr_serializer_.GetSizeInBytes();
-        size += pm_size;
-    }
     return size;
 }
 
@@ -1905,11 +1788,6 @@ void WalCmdRestoreTableSnapshot::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, static_cast<i32>(files_.size()));
     for (const auto &file : files_) {
         WriteBufAdv(buf, file);
-    }
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-    if (use_object_cache) {
-        addr_serializer_.WriteBufAdv(buf);
     }
 }
 

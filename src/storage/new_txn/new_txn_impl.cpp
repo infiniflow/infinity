@@ -2237,14 +2237,10 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::DUMP_INDEX_V2: {
-                // Commit of dump mem index command is handled in CommitBottom().
-                // Process dump mem index operation caused by other commands (import, compact, optimizeIndex) here.
                 auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
-                if (dump_index_cmd->dump_cause_ != DumpIndexCause::kDumpMemIndex) {
-                    Status status = PrepareCommitDumpIndex(dump_index_cmd, kv_instance_.get());
-                    if (!status.ok()) {
-                        return status;
-                    }
+                Status status = PrepareCommitDumpIndex(dump_index_cmd, kv_instance_.get());
+                if (!status.ok()) {
+                    return status;
                 }
                 break;
             }
@@ -4214,16 +4210,6 @@ void NewTxn::CommitBottom() {
                 }
                 break;
             }
-            case WalCommandType::DUMP_INDEX_V2: {
-                auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
-                if (dump_index_cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex && !IsReplay()) {
-                    auto status = CommitBottomDumpMemIndex(dump_index_cmd);
-                    if (!status.ok()) {
-                        UnrecoverableError(fmt::format("CommitBottomDumpMemIndex failed: {}", status.message()));
-                    }
-                }
-                break;
-            }
             case WalCommandType::CREATE_TABLE_SNAPSHOT: {
                 if (this->IsReplay()) {
                     break;
@@ -4338,13 +4324,11 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 Config *config = InfinityContext::instance().config();
                 std::string data_dir = config->DataDir();
                 PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-                auto *kv_store = InfinityContext::instance().storage()->kv_store();
                 if (pm != nullptr) {
                     for (auto &file_name : import_txn_store->import_file_names_) {
                         PersistResultHandler handler(pm);
                         PersistWriteResult result = pm->Cleanup(file_name);
                         handler.HandleWriteResult(result);
-                        kv_store->Delete(KeyEncode::PMObjectKey(file_name));
                     }
                 } else {
                     for (const auto &segment_info : import_txn_store->segment_infos_) {
@@ -5452,7 +5436,6 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     // Check persistence manager state during restore replay
     PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
     if (persistence_manager != nullptr) {
-        restore_table_cmd->addr_serializer_.AddToPersistenceManager(persistence_manager);
         std::unordered_map<std::string, ObjAddr> all_files = persistence_manager->GetAllFiles();
         LOG_DEBUG(fmt::format("Persistence manager has {} registered files during restore replay, commit ts: {}, txn: {}",
                               all_files.size(),

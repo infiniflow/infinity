@@ -4982,7 +4982,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index3(*index_name1, [&](const std::shared_ptr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
+        // Dump index only dumps rows before append, the rows appended by append still exist in mem index.
+        check_index1(*index_name1, [&](const std::shared_ptr<MemIndex> &mem_index) {
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
+            return std::make_pair(begin_id, row_cnt);
+        });
 
         drop_db(*db_name);
     }
@@ -5015,7 +5020,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index3(*index_name1, [&](const std::shared_ptr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
+        // Dump index only dumps rows before append, the rows appended by append still exist in mem index.
+        check_index1(*index_name1, [&](const std::shared_ptr<MemIndex> &mem_index) {
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
+            return std::make_pair(begin_id, row_cnt);
+        });
 
         drop_db(*db_name);
     }
@@ -5048,7 +5058,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index3(*index_name1, [&](const std::shared_ptr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
+        // Dump index only dumps rows before append, the rows appended by append still exist in mem index.
+        check_index1(*index_name1, [&](const std::shared_ptr<MemIndex> &mem_index) {
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
+            return std::make_pair(begin_id, row_cnt);
+        });
 
         drop_db(*db_name);
     }

@@ -240,11 +240,6 @@ Status FileWorker::CleanupFile() const {
             return Status::OK();
         }
         handler.HandleWriteResult(result); // Delete files
-        // Delete from RocksDB
-        auto *kv_store = InfinityContext::instance().storage()->kv_store();
-        std::string relevant_full_path = KeyEncode::PMObjectKey(fmt::format("{}/{}", *file_dir_, *file_name_));
-        kv_store->Delete(relevant_full_path);
-        LOG_TRACE(fmt::format("Fileworker: cleanup pm object key: {}", relevant_full_path));
         return Status::OK();
     }
 

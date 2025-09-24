@@ -176,8 +176,8 @@ void ColumnIndexMerger::MergeTerm(const std::string &term,
                                   const RowID &merge_base_rowid) {
     std::shared_ptr<PostingMerger> posting_merger = CreatePostingMerger();
     posting_merger->Merge(merging_term_postings, merge_base_rowid);
-
     posting_merger->Dump(posting_file_writer_, term_meta);
+    LOG_TRACE(fmt::format("ColumnIndexMerger::MergeTerm term: {}, term_meta.doc_freq_: {}", term, term_meta.doc_freq_));
 }
 
 } // namespace infinity

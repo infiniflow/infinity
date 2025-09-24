@@ -80,10 +80,15 @@ public:
 
     bool IsDumping() const;
     void SetIsDumping(bool is_dumping);
+    void UpdateBegin();
+    void UpdateEnd();
+    void WaitUpdate();
 
 private:
     mutable std::mutex mtx_; // Used by append / mem index dump / clear
+    std::condition_variable cv_;
     bool is_dumping_{false};
+    bool is_updating_{false};
 
     std::shared_ptr<HnswIndexInMem> memory_hnsw_index_{};
     std::shared_ptr<IVFIndexInMem> memory_ivf_index_{};

@@ -60,7 +60,7 @@ export struct MmapReader {
         idx_ = 0;
         data_len_ = len;
         if (rc < 0) {
-            UnrecoverableError("MmapFile failed");
+            UnrecoverableError(fmt::format("MmapPartFile failed, path: {}", filename));
         }
     }
 

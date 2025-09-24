@@ -343,7 +343,7 @@ MemIndexTracerInfo BMPIndexInMem::GetInfo() const {
 }
 
 const ChunkIndexMetaInfo BMPIndexInMem::GetChunkIndexMetaInfo() const {
-    return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), GetSizeInBytes()};
+    return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), 0, GetSizeInBytes()};
 }
 
 } // namespace infinity

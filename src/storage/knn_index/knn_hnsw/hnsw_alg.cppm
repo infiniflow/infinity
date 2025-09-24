@@ -590,7 +590,7 @@ public:
         auto data_store = DataStore::LoadFromPtr(ptr);
         Distance distance(data_store.dim());
         if (size_t diff = ptr_end - ptr; diff != 0) {
-            UnrecoverableError("LoadFromPtr failed");
+            UnrecoverableError(fmt::format("LoadFromPtr failed, ptr {:p}, ptr_end {:p}, diff {}", (const void *)ptr, (const void *)ptr_end, diff));
         }
         return std::make_unique<This>(M, ef_construction, std::move(data_store), std::move(distance));
     }
