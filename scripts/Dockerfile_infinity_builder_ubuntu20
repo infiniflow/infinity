@@ -159,6 +159,9 @@ ENV CMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake  \
     Python3_INCLUDE_DIR=/usr/local/include/python3.10 \
     Python3_LIBRARY=/usr/local/lib/libpython3.10.so
 
+# Add thrift compiler to PATH
+RUN ln -s /opt/vcpkg/vcpkg_installed/x64-linux/tools/thrift/thrift /usr/local/bin/thrift
+
 RUN pip3 config set global.index-url https://mirrors.aliyun.com/pypi/simple && pip3 config set global.trusted-host mirrors.aliyun.com
 
 # Install infinity python sdk and other packages for later use by infinity tests
