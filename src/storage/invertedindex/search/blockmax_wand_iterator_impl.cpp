@@ -26,7 +26,6 @@ import :logger;
 import :infinity_exception;
 
 import third_party;
-
 import internal_types;
 
 namespace infinity {
@@ -72,28 +71,37 @@ BlockMaxWandIterator::BlockMaxWandIterator(std::vector<std::unique_ptr<DocIterat
     // Initialize optimization structures for many keywords
     score_ub_prefix_sums_.reserve(num_iterators + 1);
     iterator_indices_.reserve(num_iterators);
-    
+
     // Pre-populate iterator indices for cache-friendly access
     for (size_t i = 0; i < num_iterators; i++) {
         iterator_indices_.push_back(i);
     }
     indices_valid_ = true;
-    
+
     UpdateScoreUpperBoundPrefixSums();
 }
 
-// Highly optimized pivot calculation with multiple strategies
+// Highly optimized pivot calculation with multiple strategies and improved safety
 size_t BlockMaxWandIterator::FindPivotOptimized(float threshold) {
     const size_t num_iterators = sorted_iterators_.size();
-    
+
+    // Safety check for empty iterator list
+    if (num_iterators == 0) {
+        return 0;
+    }
+
     // For very large sets, try fast estimation first
     if (num_iterators > FAST_PIVOT_THRESHOLD) {
         size_t estimated_pivot;
         if (TryFastPivotEstimation(threshold, estimated_pivot)) {
-            return estimated_pivot;
+            // Double-check the estimated pivot for safety
+            if (estimated_pivot < num_iterators) {
+                return estimated_pivot;
+            }
         }
     }
-    
+
+    // Ensure prefix sums are valid
     if (!prefix_sums_valid_) {
         UpdateScoreUpperBoundPrefixSums();
     }
@@ -108,19 +116,21 @@ size_t BlockMaxWandIterator::FindPivotOptimized(float threshold) {
             left = mid + 1;
         }
     }
-    return left;
+
+    // Safety check - ensure we don't return an out-of-bounds pivot
+    return std::min(left, num_iterators);
 }
 
 void BlockMaxWandIterator::UpdateScoreUpperBoundPrefixSums() {
     const size_t num_iterators = sorted_iterators_.size();
-    
+
     // Resize only if necessary to avoid memory allocations
     if (score_ub_prefix_sums_.size() != num_iterators + 1) {
         score_ub_prefix_sums_.resize(num_iterators + 1);
     }
-    
+
     score_ub_prefix_sums_[0] = 0.0f;
-    
+
     // Vectorized accumulation for better performance
     for (size_t i = 0; i < num_iterators; i++) {
         score_ub_prefix_sums_[i + 1] = score_ub_prefix_sums_[i] + sorted_iterators_[i]->BM25ScoreUpperBound();
@@ -142,7 +152,7 @@ bool BlockMaxWandIterator::ShouldSkipSort() const {
     if (consecutive_skips_ > 10) {
         adaptive_interval = std::min(adaptive_interval + 2, 8u);
     }
-    
+
     return iterations_since_sort_ < adaptive_interval;
 }
 
@@ -150,35 +160,70 @@ bool BlockMaxWandIterator::ShouldSkipSort() const {
 void BlockMaxWandIterator::OptimizedPartialSort(size_t limit) {
     const size_t num_iterators = sorted_iterators_.size();
     if (limit >= num_iterators) {
-        std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), 
-                  [](const auto &a, const auto &b) { return a->DocID() < b->DocID(); });
+        std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), [](const auto &a, const auto &b) { return a->DocID() < b->DocID(); });
     } else {
-        std::partial_sort(sorted_iterators_.begin(),
-                          sorted_iterators_.begin() + limit,
-                          sorted_iterators_.end(),
-                          [](const auto &a, const auto &b) { return a->DocID() < b->DocID(); });
+        std::partial_sort(sorted_iterators_.begin(), sorted_iterators_.begin() + limit, sorted_iterators_.end(), [](const auto &a, const auto &b) {
+            return a->DocID() < b->DocID();
+        });
     }
 }
 
-// Fast pivot estimation for very large keyword sets
-bool BlockMaxWandIterator::TryFastPivotEstimation(float threshold, size_t& estimated_pivot) {
+// Aggressively optimized pivot estimation with safety guarantees
+bool BlockMaxWandIterator::TryFastPivotEstimation(float threshold, size_t &estimated_pivot) {
     const size_t num_iterators = sorted_iterators_.size();
-    
-    // Sample-based estimation: check every Nth iterator
-    const size_t sample_step = std::max(1UL, num_iterators / 20); // Sample ~5% of iterators
-    float accumulated_score = 0.0f;
-    
-    for (size_t i = 0; i < num_iterators; i += sample_step) {
-        accumulated_score += sorted_iterators_[i]->BM25ScoreUpperBound();
-        if (accumulated_score > threshold) {
-            // Estimate the actual pivot position
-            estimated_pivot = std::min(i + sample_step, num_iterators - 1);
+    if (num_iterators <= FAST_PIVOT_THRESHOLD) {
+        return false;
+    }
+
+    // Level 1: Top 5 high-score terms check (hot path)
+    constexpr size_t TOP_K = 5;
+    float sum = 0.0f;
+    for (size_t i = 0; i < std::min(TOP_K, num_iterators); ++i) {
+        sum += sorted_iterators_[i]->BM25ScoreUpperBound();
+        if (sum > threshold) {
+            estimated_pivot = i;
             return true;
         }
     }
-    
-    estimated_pivot = num_iterators;
-    return false;
+
+    // Level 2: Strided sampling with early termination
+    const size_t stride = std::max<size_t>(1, num_iterators / 20); // 5% sampling
+    float prev_sum = sum;
+    size_t prev_i = TOP_K;
+
+    for (size_t i = TOP_K; i < num_iterators; i += stride) {
+        prev_sum = sum;
+        prev_i = i;
+        sum += sorted_iterators_[i]->BM25ScoreUpperBound();
+
+        if (sum > threshold) {
+            // Linear search backward to find exact pivot
+            for (size_t j = prev_i; j < i; ++j) {
+                prev_sum += sorted_iterators_[j]->BM25ScoreUpperBound();
+                if (prev_sum > threshold) {
+                    estimated_pivot = j;
+                    return true;
+                }
+            }
+            estimated_pivot = i;
+            return true;
+        }
+
+        // Early termination if remaining terms cannot reach threshold
+        float max_remaining = (num_iterators - i) * sorted_iterators_[i]->BM25ScoreUpperBound();
+        if (sum + max_remaining <= threshold) {
+            break;
+        }
+    }
+
+    // Fallback: Use prefix sums if available
+    if (prefix_sums_valid_) {
+        estimated_pivot = std::lower_bound(score_ub_prefix_sums_.begin(), score_ub_prefix_sums_.end(), threshold) - score_ub_prefix_sums_.begin();
+        estimated_pivot = std::min(estimated_pivot, num_iterators - 1);
+        return true;
+    }
+
+    return false; // Fall back to standard method
 }
 
 void BlockMaxWandIterator::UpdateScoreThreshold(const float threshold) {
@@ -221,7 +266,7 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
         if (should_sort) {
             next_sort_cnt_++;
             consecutive_skips_ = 0; // Reset consecutive skip counter
-            
+
             if (num_iterators > SORT_SKIP_THRESHOLD) {
                 // For large keyword sets, use intelligent partial sort
                 size_t sort_limit = num_iterators / PARTIAL_SORT_FACTOR + 5;
@@ -229,8 +274,7 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
                 OptimizedPartialSort(sort_limit);
             } else {
                 // For smaller keyword sets, use full sort
-                std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), 
-                          [](const auto &a, const auto &b) { return a->DocID() < b->DocID(); });
+                std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), [](const auto &a, const auto &b) { return a->DocID() < b->DocID(); });
             }
             iterations_since_sort_ = 0;
             prefix_sums_valid_ = false; // Invalidate prefix sums after sorting
@@ -250,12 +294,12 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
             bm25_score_upper_bound_ -= sorted_iterators_[i]->BM25ScoreUpperBound();
             write_pos = i;
         }
-        
+
         if (write_pos < num_iterators) {
             sorted_iterators_.erase(sorted_iterators_.begin() + write_pos, sorted_iterators_.end());
             num_iterators = sorted_iterators_.size();
             prefix_sums_valid_ = false; // Invalidate prefix sums when iterators are removed
-            indices_valid_ = false; // Invalidate indices cache
+            indices_valid_ = false;     // Invalidate indices cache
         }
         if (bm25_score_upper_bound_ <= threshold_) [[unlikely]] {
             doc_id_ = INVALID_ROWID;
@@ -276,13 +320,14 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
                     size_t estimated_limit = std::min(num_iterators, num_iterators / 4 + 10);
                     OptimizedPartialSort(estimated_limit);
                 } else {
-                    std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), 
-                              [](const auto &a, const auto &b) { return a->DocID() < b->DocID(); });
+                    std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), [](const auto &a, const auto &b) {
+                        return a->DocID() < b->DocID();
+                    });
                 }
                 iterations_since_sort_ = 0;
                 prefix_sums_valid_ = false;
             }
-            
+
             // Use optimized pivot calculation even for smaller sets
             if (prefix_sums_valid_ || num_iterators > 30) {
                 pivot = FindPivotOptimized(threshold_);
@@ -313,7 +358,7 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
         float sum_score_bm = 0.0f;
         bool found_exhausted_it = false;
         size_t exhausted_idx = 0;
-        
+
         for (size_t i = 0; i <= pivot; i++) {
             bool ok = sorted_iterators_[i]->NextShallow(d);
             if (ok) [[likely]] {
@@ -329,7 +374,7 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
                 break;
             }
         }
-        
+
         if (found_exhausted_it) [[unlikely]] {
             // Remove exhausted iterator and update bounds
             bm25_score_upper_bound_ -= sorted_iterators_[exhausted_idx]->BM25ScoreUpperBound();
