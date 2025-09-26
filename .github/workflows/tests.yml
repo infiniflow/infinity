@@ -23,7 +23,7 @@ concurrency:
 jobs:
   code_quality_analyze:
     name: code_quality_analyze
-    if: ${{ github.event_name == 'pull_request' }}
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     steps:
       - name: Ensure workspace ownership
