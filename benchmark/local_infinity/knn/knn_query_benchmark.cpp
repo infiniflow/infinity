@@ -111,8 +111,10 @@ int main(int argc, char *argv[]) {
     std::string table_name;
     if (dataset == "sift") {
         dimension = 128;
-        query_path += "/benchmark/sift_1m/sift_query.fvecs";
-        groundtruth_path += "/benchmark/sift_1m/sift_groundtruth.ivecs";
+        // query_path += "/benchmark/sift_1m/sift_query.fvecs";
+        // groundtruth_path += "/benchmark/sift_1m/sift_groundtruth.ivecs";
+        query_path = "/home/infiniflow/Downloads/dataset/sift10K/sift10K_query.fvecs";
+        groundtruth_path = "/home/infiniflow/Downloads/dataset/sift10K/sift10K_groundtruth.ivecs";
         table_name = "sift_benchmark";
     } else if (dataset == "gist") {
         dimension = 960;

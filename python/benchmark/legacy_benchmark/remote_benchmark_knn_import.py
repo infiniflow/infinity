@@ -159,6 +159,10 @@ def create_index(table_obj, m: int, ef_construction: int, build_type: str, encod
 
     assert res.error_code == ErrorCode.OK
 
+    res = table_obj.optimize("hnsw_index", {"compress_to_rabitq": "true"})
+
+    assert res.error_code == ErrorCode.OK
+
 
 def str2bool(value):
     if isinstance(value, bool):

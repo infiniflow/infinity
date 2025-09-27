@@ -25,10 +25,11 @@ namespace infinity {
 export template <typename Dist, typename VecStoreMeta>
 class LSGDistWrapper {
 public:
-    using StoreType = typename VecStoreMeta::StoreType;
+    using QueryType = typename VecStoreMeta::QueryType;
     using DistanceType = typename VecStoreMeta::DistanceType;
     using LSG = void;
     using LVQDist = typename Dist::LVQDist;
+    using RabitqDist = typename Dist::RabitqDist;
 
     LSGDistWrapper() = default;
     LSGDistWrapper(LSGDistWrapper &&other) : avg_(std::exchange(other.avg_, nullptr)), alpha_(other.alpha_), dist_(std::move(other.dist_)) {}
@@ -45,13 +46,7 @@ public:
     LSGDistWrapper(size_t dim) : dist_(dim) {}
 
     template <typename DataStore>
-    DistanceType operator()(VertexType v1_i, VertexType v2_i, const DataStore &data_store) const {
-        DistanceType d = dist_(v1_i, v2_i, data_store);
-        return Inner(d, avg_[v1_i], avg_[v2_i]);
-    }
-
-    template <typename DataStore>
-    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
+    DistanceType operator()(const QueryType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
         DistanceType d = dist_(v1, v2_i, data_store, v1_i);
         if (v1_i == kInvalidVertex || avg_ == nullptr) {
             return d;
@@ -64,11 +59,20 @@ public:
         avg_ = avg;
     }
 
+    // Discard LSG Wrapper after compression
     LVQDist ToLVQDistance(size_t dim) && {
         if constexpr (std::is_same_v<typename Dist::This, typename Dist::LVQDist>) {
             return std::move(dist_);
         } else {
             return std::move(dist_).ToLVQDistance(dim);
+        }
+    }
+
+    RabitqDist ToRabitqDistance(size_t dim) && {
+        if constexpr (std::is_same_v<typename Dist::This, typename Dist::RabitqDist>) {
+            return std::move(dist_);
+        } else {
+            return std::move(dist_).ToRabitqDistance(dim);
         }
     }
 
@@ -104,6 +108,15 @@ using LVQIPLSGDist = LSGDistWrapper<LVQIPDist<DataType, CompressType>, LVQVecSto
 
 export template <typename DataType, typename CompressType, typename LVQCache>
 using LVQCosLSGDist = LSGDistWrapper<LVQCosDist<DataType, CompressType>, LVQVecStoreMeta<DataType, CompressType, LVQCache, true>>;
+
+export template <typename DataType>
+using RabitqL2LSGDist = LSGDistWrapper<RabitqL2Dist<DataType>, RabitqVecStoreMeta<DataType, true>>;
+
+export template <typename DataType>
+using RabitqIPLSGDist = LSGDistWrapper<RabitqIPDist<DataType>, RabitqVecStoreMeta<DataType, true>>;
+
+export template <typename DataType>
+using RabitqCosLSGDist = LSGDistWrapper<RabitqCosDist<DataType>, RabitqVecStoreMeta<DataType, true>>;
 
 export template <typename Distance>
 concept IsLSGDistance = requires { typename Distance::LSG; };
