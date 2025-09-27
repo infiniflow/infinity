@@ -700,7 +700,9 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         std::vector<char *> result_dists_list;
         std::vector<RowID *> row_ids_list;
 
-        if (query_n > 1) {
+        // TODO: Add rerank by ColumnVector
+        bool rerank = true;
+        if (query_n > 1 || rerank) {
             merge_heap_hnsw->EndWithoutSort();
             std::vector<RowID> unique_row_ids = merge_heap_hnsw->GetUniqueIDs();
             for (size_t i = 0; i < unique_row_ids.size(); ++i) {

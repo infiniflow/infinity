@@ -535,6 +535,29 @@ void HnswHandler::CompressToLVQ() {
         hnsw_);
 }
 
+void HnswHandler::CompressToRabitq() {
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                UnrecoverableError("Invalid index type.");
+            } else {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    using HnswIndexDataType = IndexT::DataType;
+                    if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
+                        UnrecoverableError("Invalid index type.");
+                    } else {
+                        hnsw_ = std::move(*index).CompressToRabitq();
+                    }
+                } else {
+                    UnrecoverableError("Invalid index type.");
+                }
+            }
+        },
+        hnsw_);
+}
+
 HnswIndexInMem::~HnswIndexInMem() {
     size_t mem_usage = hnsw_handler_->MemUsage();
     if (own_memory_ && hnsw_handler_ != nullptr) {

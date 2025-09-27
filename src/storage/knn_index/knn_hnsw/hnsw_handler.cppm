@@ -303,6 +303,7 @@ public:
     void Build(VertexType vertex_i);
     void Optimize();
     void CompressToLVQ();
+    void CompressToRabitq();
 
 private:
     AbstractHnsw hnsw_ = nullptr;

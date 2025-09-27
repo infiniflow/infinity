@@ -1140,6 +1140,7 @@ A dictionary specifying the optimization parameters for the selected index type.
 
 - Parameters settings for an HNSW index:
   - `"compress_to_lvq"`: *Optional* - Defaults to `"false"`. Compress existing plain HNSW index to LVQ index.
+  - `"compress_to_rabitq"`: *Optional* - Defaults to `"false"`. Compress existing plain HNSW index to RaBitQ index.
   - `"lvq_avg"`: *Optional* - Defaults to `"false"`. Calculate the average of the LVQ index.
 - Parameters settings for an BMP index:
   - `"topk"`: *Optional* - Optimize bmp index for topk search.
