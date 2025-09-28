@@ -283,7 +283,10 @@ export struct OptimizeIndexTxnStore final : public BaseTxnStore {
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
-export struct AlterIndexStoreEntry {
+export struct AlterIndexTxnStore final : public BaseTxnStore {
+    AlterIndexTxnStore() : BaseTxnStore(TransactionType::kInvalid) {}
+    ~AlterIndexTxnStore() override = default;
+
     std::string db_name_{};
     std::string db_id_str_{};
     u64 db_id_{};
@@ -294,15 +297,6 @@ export struct AlterIndexStoreEntry {
     std::string index_id_str_{};
     u64 index_id_{};
     mutable std::vector<std::unique_ptr<InitParameter>> params_;
-};
-
-export struct AlterIndexTxnStore final : public BaseTxnStore {
-    AlterIndexTxnStore() : BaseTxnStore(TransactionType::kInvalid) {}
-    ~AlterIndexTxnStore() override = default;
-
-    std::vector<std::string> db_names_{};
-    std::map<std::string, std::vector<std::string>> table_names_in_db_{};
-    std::vector<AlterIndexStoreEntry> entries_;
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;

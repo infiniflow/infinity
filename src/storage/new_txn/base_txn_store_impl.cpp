@@ -341,50 +341,37 @@ std::vector<std::shared_ptr<EraseBaseCache>> OptimizeIndexTxnStore::ToCachedMeta
 
 std::string AlterIndexTxnStore::ToString() const {
     std::string result;
-    for (const auto &store_entry : entries_) {
-        size_t size = store_entry.params_.size();
-        std::vector<std::string> params(size);
-        for (size_t i = 0; i < size; ++i) {
-            params[i] = store_entry.params_[i]->ToString();
-        }
-        result += fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, index: {}, index_id: {}, raw_params: {{{}}}\n",
-                              TransactionType2Str(type_),
-                              store_entry.db_name_,
-                              store_entry.db_id_str_,
-                              store_entry.table_name_,
-                              store_entry.table_id_str_,
-                              store_entry.index_name_,
-                              store_entry.index_id_str_,
-                              fmt::join(params, ", "));
+    size_t size = params_.size();
+    std::vector<std::string> params(size);
+    for (size_t i = 0; i < size; ++i) {
+        params[i] = params_[i]->ToString();
     }
+    result = fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, index: {}, index_id: {}, raw_params: {{{}}}\n",
+                         TransactionType2Str(type_),
+                         db_name_,
+                         db_id_str_,
+                         table_name_,
+                         table_id_str_,
+                         index_name_,
+                         index_id_str_,
+                         fmt::join(params, ", "));
     return result;
 }
 
 std::shared_ptr<WalEntry> AlterIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     std::shared_ptr<WalEntry> wal_entry = std::make_shared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
-    std::shared_ptr<WalCmdOptimizeV2> opt_command;
-    for (const auto &store_entry : entries_) {
-        opt_command = std::make_shared<WalCmdOptimizeV2>(store_entry.db_name_,
-                                                         store_entry.db_id_str_,
-                                                         store_entry.table_name_,
-                                                         store_entry.table_id_str_,
-                                                         store_entry.index_name_,
-                                                         store_entry.index_id_str_,
-                                                         std::move(store_entry.params_));
-        wal_entry->cmds_.push_back(static_pointer_cast<WalCmd>(opt_command));
-    }
+    std::shared_ptr<WalCmdOptimizeV2> opt_command =
+        std::make_shared<WalCmdOptimizeV2>(db_name_, db_id_str_, table_name_, table_id_str_, index_name_, index_id_str_, std::move(params_));
+    wal_entry->cmds_.push_back(static_pointer_cast<WalCmd>(opt_command));
     return wal_entry;
 }
 
 std::vector<std::shared_ptr<EraseBaseCache>> AlterIndexTxnStore::ToCachedMeta(TxnTimeStamp commit_ts) const {
     std::vector<std::shared_ptr<EraseBaseCache>> cache_items;
-    cache_items.reserve(entries_.size());
-    for (const auto &entry : entries_) {
-        cache_items.push_back(std::make_shared<MetaEraseDbCache>(entry.db_name_));
-        cache_items.push_back(std::make_shared<MetaEraseTableCache>(entry.db_id_, entry.table_name_));
-        cache_items.push_back(std::make_shared<MetaEraseIndexCache>(entry.db_id_, entry.table_id_, entry.index_name_));
-    }
+    cache_items.push_back(std::make_shared<MetaEraseDbCache>(db_name_));
+    cache_items.push_back(std::make_shared<MetaEraseTableCache>(db_id_, table_name_));
+    cache_items.push_back(std::make_shared<MetaEraseIndexCache>(db_id_, table_id_, index_name_));
     return cache_items;
 }
 

@@ -628,25 +628,16 @@ Status NewTxn::OptimizeIndexByParams(const std::string &db_name,
     }
 
     AlterIndexTxnStore *alter_index_txn_store = static_cast<AlterIndexTxnStore *>(base_txn_store_.get());
-    if (std::find(alter_index_txn_store->db_names_.begin(), alter_index_txn_store->db_names_.end(), db_name) ==
-        alter_index_txn_store->db_names_.end()) {
-        alter_index_txn_store->db_names_.emplace_back(db_name);
-    }
-    if (std::find(alter_index_txn_store->table_names_in_db_[db_name].begin(), alter_index_txn_store->table_names_in_db_[db_name].end(), table_name) ==
-        alter_index_txn_store->table_names_in_db_[db_name].end()) {
-        alter_index_txn_store->table_names_in_db_[db_name].emplace_back(table_name);
-    }
-
-    alter_index_txn_store->entries_.emplace_back(db_name,
-                                                 db_meta->db_id_str(),
-                                                 std::stoull(db_meta->db_id_str()),
-                                                 table_name,
-                                                 table_meta_opt->table_id_str(),
-                                                 std::stoull(table_meta_opt->table_id_str()),
-                                                 index_name,
-                                                 table_index_meta_opt->index_id_str(),
-                                                 std::stoull(table_index_meta_opt->index_id_str()),
-                                                 std::move(raw_params));
+    alter_index_txn_store->db_name_ = db_name;
+    alter_index_txn_store->db_id_str_ = db_meta->db_id_str();
+    alter_index_txn_store->db_id_ = std::stoull(db_meta->db_id_str());
+    alter_index_txn_store->table_name_ = table_name;
+    alter_index_txn_store->table_id_str_ = table_meta_opt->table_id_str();
+    alter_index_txn_store->table_id_ = std::stoull(table_meta_opt->table_id_str());
+    alter_index_txn_store->index_name_ = index_name;
+    alter_index_txn_store->index_id_str_ = table_index_meta_opt->index_id_str();
+    alter_index_txn_store->index_id_ = std::stoull(table_index_meta_opt->index_id_str());
+    alter_index_txn_store->params_ = std::move(raw_params);
 
     return Status::OK();
 }
