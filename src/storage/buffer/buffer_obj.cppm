@@ -34,7 +34,7 @@ export struct BufferObjectInfo {
 export class BufferObj {
 public:
     // called by BufferMgr::Get or BufferMgr::Allocate
-    explicit BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, std::unique_ptr<FileWorker> file_worker, u32 id);
+    explicit BufferObj(BufferManager *buffer_mgr, std::unique_ptr<FileWorker> file_worker, u32 id);
 
     virtual ~BufferObj();
 
@@ -82,8 +82,6 @@ private:
     void UnloadInner();
 
     friend class VarBuffer;
-
-    bool AddBufferSize(size_t add_size);
 
 public:
     u64 rc() const { return rc_; }

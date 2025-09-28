@@ -29,32 +29,12 @@ class PersistenceManager;
 struct ObjAddr;
 class Status;
 
-class LRUCache {
-public:
-    void RemoveClean(const std::vector<BufferObj *> &buffer_obj);
-
-    size_t WaitingGCObjectCount();
-
-    size_t RequestSpace(size_t need_space);
-
-    void PushGCQueue(BufferObj *buffer_obj);
-
-    bool RemoveFromGCQueue(BufferObj *buffer_obj);
-
-private:
-    std::mutex locker_{};
-    using GCListIter = std::list<BufferObj *>::iterator;
-    std::unordered_map<BufferObj *, GCListIter> gc_map_{};
-    std::list<BufferObj *> gc_list_{};
-};
-
 export class BufferManager {
 public:
     explicit BufferManager(u64 memory_limit,
                            std::shared_ptr<std::string> data_dir,
                            std::shared_ptr<std::string> temp_dir,
-                           PersistenceManager *persistence_manager,
-                           size_t lru_count = DEFAULT_BUFFER_MANAGER_LRU_COUNT);
+                           PersistenceManager *persistence_manager);
 
     ~BufferManager();
 
@@ -72,20 +52,11 @@ public:
 
     BufferObj *GetBufferObject(const std::string &file_path);
 
-    void ChangeBufferObjectState(const std::string &file_path);
-
     std::shared_ptr<std::string> GetFullDataDir() const { return data_dir_; }
 
     std::shared_ptr<std::string> GetTempDir() const { return temp_dir_; }
 
-    u64 memory_limit() const {
-        // memory_limit is const var, no need to lock
-        return memory_limit_;
-    }
-
     u64 memory_usage() { return current_memory_size_; }
-
-    std::vector<size_t> WaitingGCObjectCount();
 
     size_t BufferedObjectCount();
 
@@ -102,17 +73,8 @@ public:
     inline u64 TotalRequestCount() { return total_request_count_; }
     inline u64 CacheMissCount() { return cache_miss_count_; }
 
-    bool RemoveFromGCQueue(BufferObj *buffer_obj);
-
 private:
     friend class BufferObj;
-
-    // BufferHandle calls it, before allocate memory. It will start GC if necessary.
-    // Return whether need_size is freed successfully.
-    bool RequestSpace(size_t need_size);
-
-    // BufferHandle calls it, after unload.
-    void PushGCQueue(BufferObj *buffer_obj);
 
     void AddToCleanList(BufferObj *buffer_obj, bool do_free);
 
@@ -124,14 +86,11 @@ private:
 
     void MoveTemp(BufferObj *buffer_obj);
 
-    size_t LRUIdx(BufferObj *buffer_obj) const;
-
-    std::unique_ptr<BufferObj> MakeBufferObj(std::unique_ptr<FileWorker> file_worker, bool is_ephemeral);
+    std::unique_ptr<BufferObj> MakeBufferObj(std::unique_ptr<FileWorker> file_worker);
 
 private:
     std::shared_ptr<std::string> data_dir_;
     std::shared_ptr<std::string> temp_dir_;
-    const u64 memory_limit_{};
     PersistenceManager *persistence_manager_;
     std::atomic<u64> current_memory_size_{};
 
@@ -140,8 +99,6 @@ private:
     std::atomic<u32> buffer_id_{};
 
     std::mutex gc_locker_{};
-    std::vector<LRUCache> lru_caches_{};
-    size_t round_robin_{};
 
     std::mutex clean_locker_{};
     std::vector<BufferObj *> clean_list_{};

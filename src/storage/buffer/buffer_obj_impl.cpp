@@ -36,7 +36,7 @@ import global_resource_usage;
 
 namespace infinity {
 
-BufferObj::BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, std::unique_ptr<FileWorker> file_worker, u32 id)
+BufferObj::BufferObj(BufferManager *buffer_mgr, std::unique_ptr<FileWorker> file_worker, u32 id)
     : buffer_mgr_(buffer_mgr), file_worker_(std::move(file_worker)), id_(id) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("BufferObj");
@@ -144,18 +144,6 @@ void *BufferObj::GetMutPointer() {
 }
 
 void BufferObj::UnloadInner() { std::unique_lock<std::mutex> locker(w_locker_); }
-
-bool BufferObj::AddBufferSize(size_t add_size) {
-    if (file_worker_->Type() != FileWorkerType::kVarFile) {
-        UnrecoverableError("Invalid file worker type");
-    }
-
-    bool free_success = buffer_mgr_->RequestSpace(add_size);
-    if (!free_success) {
-        LOG_WARN(fmt::format("Request memory {} failed, current memory usage: {}", add_size, buffer_mgr_->memory_usage()));
-    }
-    return free_success;
-}
 
 void BufferObj::AddObjRc() {
     std::unique_lock<std::mutex> locker(w_locker_);

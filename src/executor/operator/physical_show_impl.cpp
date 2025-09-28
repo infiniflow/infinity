@@ -3965,29 +3965,29 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
         }
-        case GlobalVariable::kBufferPoolUsage: {
-            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
-                std::make_shared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
-            };
-
-            std::shared_ptr<TableDef> table_def =
-                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
-            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
-
-            std::vector<std::shared_ptr<DataType>> output_column_types{
-                varchar_type,
-            };
-
-            output_block_ptr->Init(output_column_types);
-
-            BufferManager *buffer_manager = query_context->storage()->buffer_manager();
-            u64 memory_limit = buffer_manager->memory_limit();
-            u64 memory_usage = buffer_manager->memory_usage();
-            Value value = Value::MakeVarchar(fmt::format("{}/{}", Utility::FormatByteSize(memory_usage), Utility::FormatByteSize(memory_limit)));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-            break;
-        }
+        // case GlobalVariable::kBufferPoolUsage: {
+        //     std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+        //         std::make_shared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
+        //     };
+        //
+        //     std::shared_ptr<TableDef> table_def =
+        //         TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+        //     output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
+        //
+        //     std::vector<std::shared_ptr<DataType>> output_column_types{
+        //         varchar_type,
+        //     };
+        //
+        //     output_block_ptr->Init(output_column_types);
+        //
+        //     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+        //     u64 memory_limit = buffer_manager->memory_limit();
+        //     u64 memory_usage = buffer_manager->memory_usage();
+        //     Value value = Value::MakeVarchar(fmt::format("{}/{}", Utility::FormatByteSize(memory_usage), Utility::FormatByteSize(memory_limit)));
+        //     ValueExpression value_expr(value);
+        //     value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        //     break;
+        // }
         case GlobalVariable::kSchedulePolicy: {
             std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
                 std::make_shared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
@@ -4050,29 +4050,29 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
         }
-        case GlobalVariable::kUnusedBufferObjectCount: {
-            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
-                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
-            };
-
-            std::shared_ptr<TableDef> table_def =
-                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
-            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
-
-            std::vector<std::shared_ptr<DataType>> output_column_types{
-                integer_type,
-            };
-
-            output_block_ptr->Init(output_column_types);
-
-            BufferManager *buffer_manager = query_context->storage()->buffer_manager();
-            std::vector<size_t> size_list = buffer_manager->WaitingGCObjectCount();
-            size_t total_size = std::accumulate(size_list.begin(), size_list.end(), 0);
-            Value value = Value::MakeBigInt(total_size);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-            break;
-        }
+        // case GlobalVariable::kUnusedBufferObjectCount: {
+        //     std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+        //         std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+        //     };
+        //
+        //     std::shared_ptr<TableDef> table_def =
+        //         TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+        //     output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
+        //
+        //     std::vector<std::shared_ptr<DataType>> output_column_types{
+        //         integer_type,
+        //     };
+        //
+        //     output_block_ptr->Init(output_column_types);
+        //
+        //     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+        //     std::vector<size_t> size_list = buffer_manager->WaitingGCObjectCount();
+        //     size_t total_size = std::accumulate(size_list.begin(), size_list.end(), 0);
+        //     Value value = Value::MakeBigInt(total_size);
+        //     ValueExpression value_expr(value);
+        //     value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        //     break;
+        // }
         case GlobalVariable::kActiveTxnCount: {
             std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
                 std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
@@ -4591,31 +4591,31 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 break;
             }
-            case GlobalVariable::kBufferPoolUsage: {
-                {
-                    // option name
-                    Value value = Value::MakeVarchar(var_name);
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-                }
-                {
-                    // option value
-                    BufferManager *buffer_manager = query_context->storage()->buffer_manager();
-                    u64 memory_limit = buffer_manager->memory_limit();
-                    u64 memory_usage = buffer_manager->memory_usage();
-                    Value value =
-                        Value::MakeVarchar(fmt::format("{}/{}", Utility::FormatByteSize(memory_usage), Utility::FormatByteSize(memory_limit)));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-                }
-                {
-                    // option description
-                    Value value = Value::MakeVarchar("Buffer manager usage");
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
-                }
-                break;
-            }
+            // case GlobalVariable::kBufferPoolUsage: {
+            //     {
+            //         // option name
+            //         Value value = Value::MakeVarchar(var_name);
+            //         ValueExpression value_expr(value);
+            //         value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            //     }
+            //     {
+            //         // option value
+            //         BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+            //         u64 memory_limit = buffer_manager->memory_limit();
+            //         u64 memory_usage = buffer_manager->memory_usage();
+            //         Value value =
+            //             Value::MakeVarchar(fmt::format("{}/{}", Utility::FormatByteSize(memory_usage), Utility::FormatByteSize(memory_limit)));
+            //         ValueExpression value_expr(value);
+            //         value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            //     }
+            //     {
+            //         // option description
+            //         Value value = Value::MakeVarchar("Buffer manager usage");
+            //         ValueExpression value_expr(value);
+            //         value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            //     }
+            //     break;
+            // }
             case GlobalVariable::kSchedulePolicy: {
                 {
                     // option name
@@ -4681,30 +4681,30 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 break;
             }
-            case GlobalVariable::kUnusedBufferObjectCount: {
-                {
-                    // option name
-                    Value value = Value::MakeVarchar(var_name);
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-                }
-                {
-                    // option value
-                    BufferManager *buffer_manager = query_context->storage()->buffer_manager();
-                    std::vector<size_t> size_list = buffer_manager->WaitingGCObjectCount();
-                    size_t total_size = std::accumulate(size_list.begin(), size_list.end(), 0);
-                    Value value = Value::MakeVarchar(std::to_string(total_size));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-                }
-                {
-                    // option description
-                    Value value = Value::MakeVarchar("Unused object in buffer manager waiting for garbage collection");
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
-                }
-                break;
-            }
+            // case GlobalVariable::kUnusedBufferObjectCount: {
+            //     {
+            //         // option name
+            //         Value value = Value::MakeVarchar(var_name);
+            //         ValueExpression value_expr(value);
+            //         value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            //     }
+            //     {
+            //         // option value
+            //         BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+            //         std::vector<size_t> size_list = buffer_manager->WaitingGCObjectCount();
+            //         size_t total_size = std::accumulate(size_list.begin(), size_list.end(), 0);
+            //         Value value = Value::MakeVarchar(std::to_string(total_size));
+            //         ValueExpression value_expr(value);
+            //         value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            //     }
+            //     {
+            //         // option description
+            //         Value value = Value::MakeVarchar("Unused object in buffer manager waiting for garbage collection");
+            //         ValueExpression value_expr(value);
+            //         value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            //     }
+            //     break;
+            // }
             case GlobalVariable::kActiveTxnCount: {
                 {
                     // option name
