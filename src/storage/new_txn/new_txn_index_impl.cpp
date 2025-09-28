@@ -648,16 +648,6 @@ Status NewTxn::OptimizeIndexByParams(const std::string &db_name,
                                                  std::stoull(table_index_meta_opt->index_id_str()),
                                                  std::move(raw_params));
 
-    // txn_context_ptr_->AddOperation(std::make_shared<std::string>(wal_command->ToString()));
-
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    if (pm != nullptr) {
-        // When all data and index is write to disk, try to finalize the
-        PersistResultHandler handler(pm);
-        PersistWriteResult result = pm->CurrentObjFinalize();
-        handler.HandleWriteResult(result);
-    }
-
     return Status::OK();
 }
 
