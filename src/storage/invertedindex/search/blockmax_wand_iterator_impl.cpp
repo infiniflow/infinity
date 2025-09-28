@@ -175,6 +175,8 @@ bool BlockMaxWandIterator::TryFastPivotEstimation(float threshold, size_t &estim
         return false;
     }
 
+    estimated_pivot = num_iterators;
+
     // Level 1: Top 5 high-score terms check (hot path)
     constexpr size_t TOP_K = 5;
     float sum = 0.0f;
@@ -187,7 +189,7 @@ bool BlockMaxWandIterator::TryFastPivotEstimation(float threshold, size_t &estim
     }
 
     // Level 2: Strided sampling with early termination
-    const size_t stride = std::max<size_t>(1, num_iterators / 20); // 5% sampling
+    const size_t stride = std::max<size_t>(1, std::min(num_iterators / 20, (num_iterators - TOP_K) / 10));
     float prev_sum = sum;
     size_t prev_i = TOP_K;
 
@@ -197,8 +199,13 @@ bool BlockMaxWandIterator::TryFastPivotEstimation(float threshold, size_t &estim
         sum += sorted_iterators_[i]->BM25ScoreUpperBound();
 
         if (sum > threshold) {
+            if (prev_i >= i || prev_i >= num_iterators) {
+                estimated_pivot = i;
+                return true;
+            }
+
             // Linear search backward to find exact pivot
-            for (size_t j = prev_i; j < i; ++j) {
+            for (size_t j = prev_i; j < i && j < num_iterators; ++j) {
                 prev_sum += sorted_iterators_[j]->BM25ScoreUpperBound();
                 if (prev_sum > threshold) {
                     estimated_pivot = j;
@@ -209,21 +216,27 @@ bool BlockMaxWandIterator::TryFastPivotEstimation(float threshold, size_t &estim
             return true;
         }
 
-        // Early termination if remaining terms cannot reach threshold
-        float max_remaining = (num_iterators - i) * sorted_iterators_[i]->BM25ScoreUpperBound();
-        if (sum + max_remaining <= threshold) {
+        float max_remaining_score = 0.0f;
+        size_t remaining_count = num_iterators - i - 1;
+        size_t sample_size = std::min(remaining_count, size_t(10));
+
+        if (sample_size > 0) {
+            float max_score = 0.0f;
+            for (size_t s = 0; s < sample_size; ++s) {
+                size_t idx = i + 1 + (s * remaining_count / sample_size);
+                if (idx < num_iterators) {
+                    max_score = std::max(max_score, sorted_iterators_[idx]->BM25ScoreUpperBound());
+                }
+            }
+            max_remaining_score = remaining_count * max_score;
+        }
+
+        if (sum + max_remaining_score <= threshold) {
             break;
         }
     }
 
-    // Fallback: Use prefix sums if available
-    if (prefix_sums_valid_) {
-        estimated_pivot = std::lower_bound(score_ub_prefix_sums_.begin(), score_ub_prefix_sums_.end(), threshold) - score_ub_prefix_sums_.begin();
-        estimated_pivot = std::min(estimated_pivot, num_iterators - 1);
-        return true;
-    }
-
-    return false; // Fall back to standard method
+    return false;
 }
 
 void BlockMaxWandIterator::UpdateScoreThreshold(const float threshold) {
@@ -326,6 +339,10 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
                 }
                 iterations_since_sort_ = 0;
                 prefix_sums_valid_ = false;
+            }
+
+            if (!prefix_sums_valid_) {
+                UpdateScoreUpperBoundPrefixSums();
             }
 
             // Use optimized pivot calculation even for smaller sets
