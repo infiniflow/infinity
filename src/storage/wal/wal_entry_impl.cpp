@@ -3273,8 +3273,8 @@ void WalEntry::WriteAdv(char *&ptr) const {
 std::shared_ptr<WalEntry> WalEntry::ReadAdv(const char *&ptr, i32 max_bytes) {
     const char *const ptr_end = ptr + max_bytes;
     if (max_bytes <= 0) {
-        std::string error_message = "ptr goes out of range when reading WalEntry";
-        LOG_WARN(error_message);
+        std::string error_msg = "ptr goes out of range when reading WalEntry";
+        LOG_WARN(error_msg);
         return nullptr;
     }
     std::shared_ptr<WalEntry> entry = std::make_shared<WalEntry>();
@@ -3298,8 +3298,8 @@ std::shared_ptr<WalEntry> WalEntry::ReadAdv(const char *&ptr, i32 max_bytes) {
     for (i32 i = 0; i < cnt; i++) {
         max_bytes = ptr_end - ptr;
         if (max_bytes <= 0) {
-            std::string error_message = "ptr goes out of range when reading WalEntry";
-            LOG_WARN(error_message);
+            std::string error_msg = "ptr goes out of range when reading WalEntry";
+            LOG_WARN(error_msg);
             return nullptr;
         }
         std::shared_ptr<WalCmd> cmd = WalCmd::ReadAdv(ptr, max_bytes);
@@ -3308,8 +3308,8 @@ std::shared_ptr<WalEntry> WalEntry::ReadAdv(const char *&ptr, i32 max_bytes) {
     ptr += sizeof(i32);
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {
-        std::string error_message = "ptr goes out of range when reading WalEntry";
-        LOG_WARN(error_message);
+        std::string error_msg = "ptr goes out of range when reading WalEntry";
+        LOG_WARN(error_msg);
         return nullptr;
     }
     return entry;
@@ -3651,11 +3651,11 @@ void WalListIterator::PurgeBadEntriesAfterLatestCheckpoint() {
             }
         }
         if (bad_offset != i64(-1)) {
-            std::string error_message = fmt::format("Found bad wal entry {}@{}", *it, bad_offset);
-            LOG_WARN(error_message);
+            std::string error_msg = fmt::format("Found bad wal entry {}@{}", *it, bad_offset);
+            LOG_WARN(error_msg);
             if (bad_offset == 0) {
-                error_message = fmt::format("Remove wal log {}", *it);
-                LOG_WARN(error_message);
+                error_msg = fmt::format("Remove wal log {}", *it);
+                LOG_WARN(error_msg);
                 VirtualStore::DeleteFile(*it);
                 ++it;
                 for (size_t i = 0; i <= file_num; ++i) {
@@ -3664,8 +3664,8 @@ void WalListIterator::PurgeBadEntriesAfterLatestCheckpoint() {
                 file_num = 0;
             } else {
                 VirtualStore::Truncate(*it, bad_offset);
-                error_message = fmt::format("Truncated {}@{}", *it, bad_offset);
-                LOG_WARN(error_message);
+                error_msg = fmt::format("Truncated {}@{}", *it, bad_offset);
+                LOG_WARN(error_msg);
                 ++it;
                 for (size_t i = 0; i < file_num; ++i) {
                     wal_list_.pop_front();
@@ -3703,8 +3703,8 @@ std::shared_ptr<WalEntry> WalListIterator::Next() {
     auto entry = iter_->Next();
     if (entry.get() == nullptr) {
         auto off = iter_->GetOffset();
-        std::string error_message = fmt::format("Found bad wal entry {}@{}", wal_list_.front(), off);
-        LOG_WARN(error_message);
+        std::string error_msg = fmt::format("Found bad wal entry {}@{}", wal_list_.front(), off);
+        LOG_WARN(error_msg);
     }
     return entry;
 }

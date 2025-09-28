@@ -92,8 +92,8 @@ std::shared_ptr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &e
         return result;
     }
     if (!bind_context_ptr->aggregate_index_by_name_.empty() || !bind_context_ptr->group_index_by_name_.empty()) {
-        std::string error_message = fmt::format("Column: {} must appear in the GROUP BY clause or be used in an aggregate function", expr_name);
-        RecoverableError(Status::SyntaxError(error_message));
+        std::string error_msg = fmt::format("Column: {} must appear in the GROUP BY clause or be used in an aggregate function", expr_name);
+        RecoverableError(Status::SyntaxError(error_msg));
     }
 
     if (expr.type_ == ParsedExprType::kFunction or expr.type_ == ParsedExprType::kColumn) {

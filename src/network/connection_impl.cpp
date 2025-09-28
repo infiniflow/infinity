@@ -52,10 +52,10 @@ Connection::~Connection() {
     session_mgr->RemoveSessionByID(session_->session_id());
 }
 
-void Connection::HandleError(const char *error_message) {
+void Connection::HandleError(const char *error_msg) {
     std::unordered_map<PGMessageType, std::string> error_message_map;
-    error_message_map[PGMessageType::kHumanReadableError] = error_message;
-    LOG_ERROR(error_message);
+    error_message_map[PGMessageType::kHumanReadableError] = error_msg;
+    LOG_ERROR(error_msg);
     pg_handler_->send_error_response(error_message_map);
     pg_handler_->send_ready_for_query();
 }

@@ -405,8 +405,8 @@ void WalManager::FlushLogByReplication(const std::vector<std::string> &synced_lo
             while (iterator.HasNext()) {
                 auto wal_entry = iterator.Next();
                 if (wal_entry.get() == nullptr) {
-                    std::string error_message = "Found unexpected bad wal entry when got replicate logs";
-                    LOG_ERROR(error_message);
+                    std::string error_msg = "Found unexpected bad wal entry when got replicate logs";
+                    LOG_ERROR(error_msg);
                     break;
                 }
                 LOG_TRACE(wal_entry->ToString());

@@ -178,9 +178,9 @@ Status VirtualStore::DeleteFile(const std::string &file_name) {
         UnrecoverableError(fmt::format("Delete file {} exception: {}", file_name, strerror(errno)));
     }
     if (!is_deleted) {
-        std::string error_message = fmt::format("Failed to delete file: {}: {}", file_name, strerror(errno));
-        LOG_ERROR(error_message);
-        Status status = Status::IOError(error_message);
+        std::string error_msg = fmt::format("Failed to delete file: {}: {}", file_name, strerror(errno));
+        LOG_ERROR(error_msg);
+        Status status = Status::IOError(error_msg);
         return status;
     }
     LOG_DEBUG(fmt::format("Clean file: {}", file_name));
@@ -210,9 +210,9 @@ Status VirtualStore::MakeDirectory(const std::string &path) {
         if (std::filesystem::is_directory(path)) {
             return Status::OK();
         } else {
-            std::string error_message = fmt::format("Exists file: {}", path);
-            LOG_ERROR(error_message);
-            return Status::IOError(error_message);
+            std::string error_msg = fmt::format("Exists file: {}", path);
+            LOG_ERROR(error_msg);
+            return Status::IOError(error_msg);
         }
     }
 

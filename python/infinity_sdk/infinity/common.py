@@ -115,9 +115,9 @@ class SortType(object):
 
 
 class InfinityException(Exception):
-    def __init__(self, error_code=0, error_message=None):
+    def __init__(self, error_code=0, error_msg=None):
         self.error_code = error_code
-        self.error_message = error_message
+        self.error_msg = error_msg
 
 
 DEFAULT_MATCH_VECTOR_TOPN = 10

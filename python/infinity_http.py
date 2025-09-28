@@ -112,9 +112,9 @@ class http_network_util:
             if resp.status_code != 200:
                 if resp.status_code == 500:
                     resp_json = resp.json()
-                    if "error_message" in resp_json:
-                        print(500, resp_json["error_code"], resp_json["error_message"])
-                        raise InfinityException(resp_json["error_code"], resp_json["error_message"])
+                    if "error_msg" in resp_json:
+                        print(500, resp_json["error_code"], resp_json["error_msg"])
+                        raise InfinityException(resp_json["error_code"], resp_json["error_msg"])
                     else:
                         print(500, resp_json["error_code"])
                         raise InfinityException(resp_json["error_code"], "")
@@ -894,7 +894,6 @@ class table_http_result:
 
         # Add timing measurement for network transfer and JSON parsing
         import time
-        import json
 
         # Time the network transfer
         start_network = time.perf_counter()

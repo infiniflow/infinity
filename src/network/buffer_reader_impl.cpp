@@ -169,7 +169,7 @@ void BufferReader::receive_more(size_t bytes) {
     }
 
     if (boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset) {
-        std::string error_message = fmt::format("Client close the connection: {}", boost_error.message());
+        std::string error_msg = fmt::format("Client close the connection: {}", boost_error.message());
         RecoverableError(Status::ClientClose());
     }
 
