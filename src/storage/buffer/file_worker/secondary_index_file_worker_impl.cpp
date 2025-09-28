@@ -72,14 +72,14 @@ bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_succ
 }
 
 void SecondaryIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
-    if (!data_) [[likely]] {
+    // if (!data_) [[likely]] {
         auto index = GetSecondaryIndexData(column_def_->type(), row_count_, false);
         index->ReadIndexInner(*file_handle_);
         data_ = static_cast<void *>(index);
         LOG_TRACE("Finished ReadFromFileImpl().");
-    } else {
-        UnrecoverableError("ReadFromFileImpl: data_ is not nullptr");
-    }
+    // } else {
+    //     UnrecoverableError("ReadFromFileImpl: data_ is not nullptr");
+    // }
 }
 
 } // namespace infinity

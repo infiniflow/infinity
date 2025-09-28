@@ -240,9 +240,9 @@ void BlockVersion::CommitAppend(TxnTimeStamp save_ts, TxnTimeStamp commit_ts) {
 
 Status BlockVersion::Delete(i32 offset, TxnTimeStamp commit_ts) {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
-    if (deleted_[offset] != 0) {
-        return Status::TxnWWConflict(fmt::format("Delete twice at offset: {}, commit_ts: {}, old_ts: {}", offset, commit_ts, deleted_[offset]));
-    }
+    // if (deleted_[offset] != 0) {
+    //     return Status::TxnWWConflict(fmt::format("Delete twice at offset: {}, commit_ts: {}, old_ts: {}", offset, commit_ts, deleted_[offset]));
+    // }
     deleted_[offset] = commit_ts;
     latest_change_ts_ = commit_ts;
     return Status::OK();

@@ -137,7 +137,7 @@ public:
         BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
         for (auto &object_path : object_paths) {
             auto buf_obj = buffer_mgr->GetBufferObject(object_path);
-            buffer_mgr->RemoveFromGCQueue(buf_obj);
+            // buffer_mgr->RemoveFromGCQueue(buf_obj);
             buf_obj->Free();
         }
         buffer_mgr->RemoveBufferObjects(object_paths);

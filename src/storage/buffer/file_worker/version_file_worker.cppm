@@ -21,7 +21,7 @@ import :persistence_manager;
 
 namespace infinity {
 
-export struct VersionFileWorkerSaveCtx : public FileWorkerSaveCtx {
+export struct VersionFileWorkerSaveCtx final : public FileWorkerSaveCtx {
     VersionFileWorkerSaveCtx(TxnTimeStamp checkpoint_ts) : checkpoint_ts_(checkpoint_ts) {}
 
     TxnTimeStamp checkpoint_ts_{};

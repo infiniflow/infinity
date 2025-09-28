@@ -158,6 +158,7 @@ BufferObj *BufferManager::GetBufferObject(std::unique_ptr<FileWorker> file_worke
 BufferObj *BufferManager::GetBufferObject(const std::string &file_path) {
     std::unique_lock lock(w_locker_);
     if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
+        // iter->second->Load();
         return iter->second.get();
     }
     LOG_TRACE(fmt::format("BufferManager::GetBufferObject: file {} not found.", file_path));
@@ -286,9 +287,9 @@ void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool do_free) {
             current_memory_size_ = 0;
             // UnrecoverableError(err_msg);
         }
-        if (!RemoveFromGCQueue(buffer_obj)) {
-            UnrecoverableError(fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", buffer_obj->GetFilename()));
-        }
+        // if (!RemoveFromGCQueue(buffer_obj)) {
+        //     UnrecoverableError(fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", buffer_obj->GetFilename()));
+        // }
     }
 }
 

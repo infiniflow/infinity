@@ -126,33 +126,37 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
 
 void FileWorker::ReadFromFile(bool from_spill) {
     auto [defer_fn, read_path] = GetFilePathInner(from_spill);
-    if (!std::filesystem::exists(read_path)) {
-        from_spill = !from_spill;
-        auto[defer_fn, read_path] = GetFilePathInner(from_spill);
-        bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
-        size_t file_size = 0;
-        auto [file_handle, status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
-        if (!status.ok()) {
-            // UnrecoverableError(fmt::format("Read path: {}, error: {}", read_path, status.message()));
-            return;
-        }
-        if (use_object_cache) {
-            file_handle->Seek(obj_addr_.part_offset_);
-            file_size = obj_addr_.part_size_;
-        } else {
-            file_size = file_handle->FileSize();
-        }
-        file_handle_ = std::move(file_handle);
-        DeferFn defer_fn2([&]() { file_handle_ = nullptr; });
-        ReadFromFileImpl(file_size, from_spill);
-        return;
-    }
+    // if (!std::filesystem::exists(read_path)) {
+    //     from_spill = !from_spill;
+    //     auto [defer_fn, read_path] = GetFilePathInner(from_spill);
+    //     if (read_path.empty()) {
+    //         return;
+    //     }
+    //     bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
+    //     size_t file_size = 0;
+    //     auto [file_handle, status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
+    //     if (!status.ok()) {
+    //         // UnrecoverableError(fmt::format("Read path: {}, error: {}", read_path, status.message()));
+    //         return;
+    //     }
+    //     if (use_object_cache) { // must be pm addr
+    //         file_handle->Seek(obj_addr_.part_offset_);
+    //         file_size = obj_addr_.part_size_;
+    //     } else {
+    //         file_size = file_handle->FileSize();
+    //     }
+    //     file_handle_ = std::move(file_handle);
+    //     DeferFn defer_fn2([&]() { file_handle_ = nullptr; });
+    //     ReadFromFileImpl(file_size, from_spill);
+    //     return;
+    // }
+    // if
     bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
     size_t file_size = 0;
     auto [file_handle, status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
     if (!status.ok()) {
-        // UnrecoverableError(fmt::format("Read path: {}, error: {}", read_path, status.message()));
-        return;
+        UnrecoverableError(fmt::format("Read path: {}, error: {}", read_path, status.message()));
+        // return;
     }
     if (use_object_cache) {
         file_handle->Seek(obj_addr_.part_offset_);
@@ -209,10 +213,12 @@ std::string FileWorker::ChooseFileDir(bool spill) const {
 std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> FileWorker::GetFilePathInner(bool from_spill) {
     bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
     std::optional<DeferFn<std::function<void()>>> defer_fn;
-    std::string read_path;
-    read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
+    std::string read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
     if (use_object_cache) {
         PersistReadResult result = persistence_manager_->GetObjCache(read_path);
+        // if (!obj_addr_.Valid()) {
+        //     return {};
+        // }
         defer_fn.emplace(([=, this]() {
             if (use_object_cache && obj_addr_.Valid()) {
                 std::string read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
@@ -299,7 +305,9 @@ void FileWorker::Munmap() {
 void FileWorker::MmapNotNeed() {}
 
 bool FileWorker::ReadFromMmapImpl([[maybe_unused]] const void *ptr, [[maybe_unused]] size_t size) {
-    UnrecoverableError("Not implemented");
+    auto path = fmt::format("{}/{}/{}", *data_dir_, *file_dir_, *file_name_);
+    mmap_data_ = (u8 *)std::malloc(size * sizeof(u8));
+    std::memcpy(mmap_data_, mmap_addr_, size * sizeof(u8));
     return false;
 }
 

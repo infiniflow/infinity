@@ -28,6 +28,7 @@ import :file_worker_type;
 import :var_file_worker;
 import :kv_store;
 import :status;
+import :virtual_store;
 
 import third_party;
 
@@ -66,6 +67,22 @@ void BufferObj::UpdateFileWorkerInfo(std::unique_ptr<FileWorker> new_file_worker
 BufferHandle BufferObj::Load() {
     std::unique_lock<std::mutex> locker(w_locker_);
     ++rc_;
+    // auto path1 = file_worker_->GetFilePath();
+    auto data_dir = file_worker_->data_dir_;
+    auto temp_dir = file_worker_->temp_dir_;
+    auto file_dir = file_worker_->file_dir_;
+    auto file_name = file_worker_->file_name_;
+    std::string path1 = std::filesystem::path(*data_dir) / *file_dir / *file_name;
+    std::string path2 = std::filesystem::path(*temp_dir) / *file_dir / *file_name;
+    if (VirtualStore::Exists(path2)) {
+        file_worker_->ReadFromFile(true);
+    } else {
+        if (file_worker_->persistence_manager_ && file_worker_->persistence_manager_->GetObjCache(path1).obj_addr_.Valid()) {
+            file_worker_->ReadFromFile(false);
+        } else if (VirtualStore::Exists(path1)) {
+            file_worker_->ReadFromFile(false);
+        }
+    }
     void *data = file_worker_->GetData();
     return BufferHandle(this, data);
 }
@@ -84,8 +101,14 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
     if (file_worker_->GetData() == nullptr) {
         file_worker_->AllocateInMemory();
     }
+    // auto data_dir = file_worker_->data_dir_;
+    auto temp_dir = file_worker_->temp_dir_;
+    auto file_dir = file_worker_->file_dir_;
+    auto file_name = file_worker_->file_name_;
+    // std::string path1 = std::filesystem::path(*data_dir) / *file_dir / *file_name;
+    std::string path2 = std::filesystem::path(*temp_dir) / *file_dir / *file_name;
+    std::filesystem::remove(path2);
     [[maybe_unused]] bool all_save = file_worker_->WriteToFile(false, ctx);
-    // [[maybe_unused]] std::vector<rocksdb::ColumnFamilyDescriptor *> v;
 
     return write;
 }
@@ -107,7 +130,7 @@ void BufferObj::ToMmap() {
     if (file_worker_->GetData()) {
         file_worker_->AllocateInMemory();
     }
-    // file_worker_->Mmap();
+    file_worker_->Mmap();
 }
 
 void BufferObj::LoadInner() {
@@ -120,9 +143,7 @@ void *BufferObj::GetMutPointer() {
     return file_worker_->GetData();
 }
 
-void BufferObj::UnloadInner() {
-    std::unique_lock<std::mutex> locker(w_locker_);
-}
+void BufferObj::UnloadInner() { std::unique_lock<std::mutex> locker(w_locker_); }
 
 bool BufferObj::AddBufferSize(size_t add_size) {
     if (file_worker_->Type() != FileWorkerType::kVarFile) {

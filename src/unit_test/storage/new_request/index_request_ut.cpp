@@ -129,7 +129,7 @@ TEST_P(TestIndexRequest, fulltext_index_scan) {
     }
 }
 
-TEST_P(TestIndexRequest, DISABLED_XXX_vector_index_scan) {
+TEST_P(TestIndexRequest, vector_index_scan) {
     {
         std::string create_table_sql = "create table t1(c1 int, c2 embedding(float, 4))";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
@@ -183,7 +183,7 @@ TEST_P(TestIndexRequest, DISABLED_XXX_vector_index_scan) {
     search_vec("idx2");
 }
 
-TEST_P(TestIndexRequest, DISABLED_XXX_sparse_index_scan) {
+TEST_P(TestIndexRequest, sparse_index_scan) {
     {
         std::string create_table_sql = "create table t1(c1 int, c2 sparse(float, 100))";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();

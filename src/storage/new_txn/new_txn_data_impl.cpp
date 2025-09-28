@@ -393,6 +393,10 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
         auto vv = infinity::Partition(v[7], '_');
         auto seg = fmt::format("{}_{}", vv[0], stoull(vv[1]) + segment_ids[0]);
         path = fmt::format("/{}/{}/data/{}/{}/{}/{}/{}", v[1], v[2], v[5], v[6], seg, v[8], v[9]);
+        auto data_dir = "/var/infinity/data";
+        auto file_dir = fmt::format("{}/{}/{}/{}", v[5], v[6], seg, v[8]);
+        buffer_obj->file_worker()->data_dir_ = std::make_shared<std::string>(data_dir);
+        buffer_obj->file_worker()->file_dir_ = std::make_shared<std::string>(file_dir);
         buffer_map[path] = buffer_obj;
     }
 
@@ -979,6 +983,17 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
         BufferHandle buffer_handle = version_buffer->Load();
         auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
         block_version->Append(commit_ts, block_offset + append_rows);
+        VersionFileWorkerSaveCtx version_file_worker_save_ctx{commit_ts};
+        // [[maybe_unused]] std::unordered_map<std::string, ObjAddr> a = version_buffer->file_worker()->persistence_manager_->GetAllFiles();
+        // fmt::print("aaaaa:\n");
+        // for (auto &[path, obj_addr]: a) {
+        //     fmt::print("path: {}, obj_addr: {}\n", path, obj_addr.obj_key_);
+        // }
+        version_buffer->Save(version_file_worker_save_ctx);
+        // [[maybe_unused]] std::unordered_map<std::string, ObjAddr> b = version_buffer->file_worker()->persistence_manager_->GetAllFiles();
+        // for (auto &[path, obj_addr]: b) {
+        //     fmt::print("path: {}, obj_addr: {}\n", path, obj_addr.obj_key_);
+        // }
     }
     return Status::OK();
 }
@@ -1007,6 +1022,10 @@ NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t appen
         return status;
     }
     buffer_obj->SetDataSize(data_size);
+    buffer_obj->Save();
+    if (outline_buffer_obj != nullptr) {
+        outline_buffer_obj->Save();
+    }
 
     if (VarBufferManager *var_buffer_mgr = dest_vec.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
         //     Ensure buffer obj is loaded.
@@ -1049,6 +1068,8 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
             undo_block_offsets.push_back(block_offset);
         }
         block_lock->max_ts_ = std::max(block_lock->max_ts_, commit_ts); // FIXME: remove max_ts, undo delete should not revert max_ts
+        VersionFileWorkerSaveCtx version_file_worker_save_ctx{commit_ts};
+        version_buffer->Save(version_file_worker_save_ctx);
     }
     return Status::OK();
 }
@@ -1454,10 +1475,10 @@ Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &o
                     return status;
                 }
                 bool to_mmap = false;
-                status = TryToMmap(block_meta, option.checkpoint_ts_, &to_mmap);
-                if (!status.ok()) {
-                    return status;
-                }
+                // status = TryToMmap(block_meta, option.checkpoint_ts_, &to_mmap);
+                // if (!status.ok()) {
+                //     return status;
+                // }
                 if (to_mmap) {
                     LOG_INFO(fmt::format("Block {} to mmap, checkpoint ts: {}", block_meta.block_id(), option.checkpoint_ts_));
                 }
@@ -1967,7 +1988,7 @@ Status NewTxn::FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts) {
         }
     }
 
-    version_buffer->Save(VersionFileWorkerSaveCtx(save_ts));
+    // version_buffer->Save(VersionFileWorkerSaveCtx(save_ts));
     return Status::OK();
 }
 
@@ -1989,10 +2010,10 @@ Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
         if (!status.ok()) {
             return status;
         }
-        buffer_obj->Save();
-        if (outline_buffer_obj) {
-            outline_buffer_obj->Save();
-        }
+        // buffer_obj->Save();
+        // if (outline_buffer_obj) {
+        //     outline_buffer_obj->Save();
+        // }
     }
     LOG_TRACE("NewTxn::FlushColumnFiles end");
     return Status::OK();
@@ -2121,8 +2142,6 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
             outline_buffer_obj = buffer_mgr->AllocateBufferObject(std::move(file_worker2));
         }
 
-        col->SetToCatalog(buffer_obj, outline_buffer_obj, ColumnVectorMode::kReadWrite);
-
         size_t data_size = 0;
         if (col_def->type()->type() == LogicalType::kBoolean) {
             data_size = (row_cnt + 7) / 8;
@@ -2130,6 +2149,8 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
             data_size = row_cnt * col_def->type()->Size();
         }
         buffer_obj->SetDataSize(data_size);
+
+        col->SetToCatalog(buffer_obj, outline_buffer_obj, ColumnVectorMode::kReadWrite);
 
         buffer_obj->Save();
         if (outline_buffer_obj) {

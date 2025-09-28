@@ -197,6 +197,16 @@ size_t GetBlockRowCount(KVInstance *kv_instance,
     }
 
     BufferHandle buffer_handle = version_buffer->Load();
+    // version_buffer->ToMmap();
+
+    // auto file_worker = version_buffer->file_worker();
+
+    // auto data_dir = file_worker->data_dir_;
+    // auto file_dir = file_worker->file_dir_;
+    // auto file_name = file_worker->file_name_;
+
+    // const auto *block_version = reinterpret_cast<const BlockVersion *>(file_worker->GetMmapData());
+
     const auto *block_version = reinterpret_cast<const BlockVersion *>(buffer_handle.GetData());
 
     size_t row_cnt = 0;

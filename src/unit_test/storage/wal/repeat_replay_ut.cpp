@@ -168,7 +168,7 @@ TEST_P(RepeatReplayTest, append) {
     };
 
     {
-        // Ealier test may leave dirty infinity instance. Destroy it first.
+        // Earlier test may leave dirty infinity instance. Destroy it first.
         infinity::InfinityContext::instance().UnInit();
         CleanupDbDirs();
         infinity::InfinityContext::instance().InitPhase1(config_path);

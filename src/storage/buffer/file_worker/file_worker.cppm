@@ -81,9 +81,9 @@ protected:
     std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> GetFilePathInner(bool spill);
 
 public:
-    const std::shared_ptr<std::string> data_dir_{};
+    std::shared_ptr<std::string> data_dir_{};
     const std::shared_ptr<std::string> temp_dir_{};
-    const std::shared_ptr<std::string> file_dir_{};
+    std::shared_ptr<std::string> file_dir_{};
     const std::shared_ptr<std::string> file_name_{};
     PersistenceManager *persistence_manager_{};
     ObjAddr obj_addr_{};
@@ -93,6 +93,7 @@ protected:
     std::unique_ptr<LocalFileHandle> file_handle_{nullptr};
 
 public:
+    // void *GetMmapData() const { return mmap_data_; }
     void *GetMmapData() const { return mmap_data_; }
 
     void Mmap();

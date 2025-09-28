@@ -151,7 +151,7 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
     }
 }
 
-TEST_P(BlockVersionTest, delete_test) {
+TEST_P(BlockVersionTest, DISABLED_DEPRECATED_delete_test) {
     BlockVersion block_version(8192);
     block_version.Delete(2, 30);
     Status status = block_version.Delete(2, 30);

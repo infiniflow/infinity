@@ -106,9 +106,9 @@ bool BMPIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, c
 }
 
 void BMPIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
-    if (data_ != nullptr) {
-        UnrecoverableError("Data is already allocated.");
-    }
+    // if (data_ != nullptr) {
+    //     UnrecoverableError("Data is already allocated.");
+    // }
     data_ = static_cast<void *>(new BMPHandlerPtr(BMPHandler::Make(index_base_.get(), column_def_.get()).release()));
     auto *bmp_handler = reinterpret_cast<BMPHandlerPtr *>(data_);
     if (from_spill) {

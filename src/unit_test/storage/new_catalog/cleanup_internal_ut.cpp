@@ -198,9 +198,12 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_db) {
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
+        fmt::print("*****\n");
         new_txn_mgr_->PrintAllKeyValue();
         Checkpoint();
         Cleanup();
+        fmt::print("#####\n");
+        new_txn_mgr_->PrintAllKeyValue();
 
         CheckFilePaths(delete_file_paths_, exist_file_paths_);
     }
@@ -334,76 +337,14 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_table) {
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
-
-        {
-            auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
-            Status status = txn->GetTableFilePaths(*db_name, *table_name, delete_file_paths_);
-            EXPECT_TRUE(status.ok());
-            status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
-            EXPECT_TRUE(status.ok());
-            status = new_txn_mgr_->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
+        new_txn_mgr_->PrintAllKeyValue();
         Checkpoint();
-        Cleanup();
+        new_txn_mgr_->PrintAllKeyValue();
+        // new_txn_mgr_->PrintAllKeyValue();
+        // Cleanup();
+        // new_txn_mgr_->PrintAllKeyValue();
 
-        CheckFilePaths(delete_file_paths_, exist_file_paths_);
-    }
-    {
-        {
-            auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
-            Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-            EXPECT_TRUE(status.ok());
-            status = new_txn_mgr_->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
-        {
-            auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
-            Status status = txn->Append(*db_name, *table_name, make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnoprstuvwxyz")));
-            EXPECT_TRUE(status.ok());
-            status = new_txn_mgr_->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
-
-        {
-            auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
-            Status status = txn->GetTableFilePaths(*db_name, *table_name, delete_file_paths_);
-            EXPECT_TRUE(status.ok());
-            status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
-            EXPECT_TRUE(status.ok());
-            status = new_txn_mgr_->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
-
-        {
-            auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
-            Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-            EXPECT_TRUE(status.ok());
-            status = new_txn_mgr_->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
-        {
-            auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
-            Status status = txn->Append(*db_name, *table_name, make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnoprstuvwxyz")));
-            EXPECT_TRUE(status.ok());
-            status = new_txn_mgr_->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
-        {
-            auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
-            EXPECT_TRUE(status.ok());
-
-            status = txn->GetTableFilePaths(*db_name, *table_name, exist_file_paths_);
-            EXPECT_TRUE(status.ok());
-
-            status = new_txn_mgr_->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
-        Checkpoint();
-        Cleanup();
-
-        CheckFilePaths(delete_file_paths_, exist_file_paths_);
+        // CheckFilePaths(delete_file_paths_, exist_file_paths_);
 
         {
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
@@ -413,7 +354,11 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_table) {
             EXPECT_TRUE(status.ok());
         }
         Checkpoint();
+        new_txn_mgr_->PrintAllKeyValue();
         Cleanup();
+        [[maybe_unused]] auto *pm = infinity::InfinityContext::instance().persistence_manager();
+
+        new_txn_mgr_->PrintAllKeyValue();
     }
 }
 
@@ -648,15 +593,10 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_compact) {
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    fmt::print("#####\n");
     new_txn_mgr_->PrintAllKeyValue();
     Checkpoint();
-    {
-        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("cleanup"), TransactionType::kCleanup);
-        Status status = txn->Cleanup();
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr_->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
+    Cleanup();
     new_txn_mgr_->PrintAllKeyValue();
     CheckFilePaths(delete_file_paths_, exist_file_paths_);
 

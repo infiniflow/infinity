@@ -77,8 +77,17 @@ bool VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, co
         data->SpillToFile(file_handle_.get());
         return true;
     } else {
+        // const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
+        // auto ckp_ts = const_cast<TxnTimeStamp &>(ctx.checkpoint_ts_);
+        // bool is_full = data->SaveToFile(ckp_ts, *file_handle_);
+        // if (is_full) {
+        //     LOG_TRACE(fmt::format("Version file is full: {}", GetFilePath()));
+        //     // if the version file is full, return true to spill to file
+        //     return true;
+        // }
         const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
-        bool is_full = data->SaveToFile(ctx.checkpoint_ts_, *file_handle_);
+        TxnTimeStamp ckp_ts = ctx.checkpoint_ts_;
+        bool is_full = data->SaveToFile(ckp_ts, *file_handle_);
         if (is_full) {
             LOG_TRACE(fmt::format("Version file is full: {}", GetFilePath()));
             // if the version file is full, return true to spill to file
@@ -89,9 +98,9 @@ bool VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, co
 }
 
 void VersionFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
-    if (data_ != nullptr) {
-        UnrecoverableError("Data is already allocated.");
-    }
+    // if (data_ != nullptr) {
+    //     UnrecoverableError("Data is already allocated.");
+    // }
     auto *data = BlockVersion::LoadFromFile(file_handle_.get()).release();
     data_ = static_cast<void *>(data);
 }

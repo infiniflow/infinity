@@ -867,6 +867,12 @@ TEST_F(WalReplayTest, wal_replay_compact) {
                 EXPECT_EQ(table_info->segment_count_, 1);
             }
 
+            // {
+            //     auto [segment_info, status] = txn->GetSegmentInfo("default_db", "tbl1", 0);
+            //     EXPECT_TRUE(status.ok());
+            //     EXPECT_EQ(segment_info->row_count_, 8192);
+            // }
+
             {
                 auto [segment_info, status] = txn->GetSegmentInfo("default_db", "tbl1", 2);
                 EXPECT_TRUE(status.ok());

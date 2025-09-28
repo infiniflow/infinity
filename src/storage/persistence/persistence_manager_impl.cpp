@@ -289,7 +289,7 @@ void PersistenceManager::CurrentObjFinalizeNoLock(std::vector<std::string> &pers
         current_object_parts_ = 0;
         current_object_ref_count_ = 0;
     } else {
-        LOG_TRACE(fmt::format("CurrentObjFinalizeNoLock added empty object {}", current_object_key_));
+        LOG_INFO(fmt::format("CurrentObjFinalizeNoLock added empty object {}", current_object_key_));
     }
 }
 
@@ -298,7 +298,8 @@ PersistReadResult PersistenceManager::GetObjCache(const std::string &file_path) 
 
     std::string local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
-        UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
+        // UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
+        return result;
     }
 
     std::string pm_fp_key = KeyEncode::PMObjectKey(local_path);
@@ -559,11 +560,11 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
         if (object_addr.obj_key_.empty()) {
             UnrecoverableError(fmt::format("Failed to find object key"));
         }
-        if (check_ref_count) {
-            if (obj_stat->ref_count_ > 0) {
-                UnrecoverableError(fmt::format("CleanupNoLock object {} ref count is {}", object_addr.obj_key_, obj_stat->ref_count_));
-            }
-        }
+        // if (check_ref_count) {
+        //     if (obj_stat->ref_count_ > 0) {
+        //         UnrecoverableError(fmt::format("CleanupNoLock object {} ref count is {}", object_addr.obj_key_, obj_stat->ref_count_));
+        //     }
+        // }
         drop_from_remote_keys.emplace_back(object_addr.obj_key_);
         object_stats_->Invalidate(object_addr.obj_key_);
         LOG_TRACE(fmt::format("Deleted object {}", object_addr.obj_key_));
@@ -660,7 +661,7 @@ std::unordered_map<std::string, ObjAddr> PersistenceManager::GetAllFiles() const
         std::string path = iter->Key().ToString().substr(obj_prefix_len);
         ObjAddr obj_addr;
         obj_addr.Deserialize(iter->Value().ToString());
-        local_path_obj.emplace(path, obj_addr);
+        local_path_obj[path] = obj_addr;
         iter->Next();
     }
     return local_path_obj;
