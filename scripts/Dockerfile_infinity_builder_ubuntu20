@@ -160,13 +160,15 @@ ENV CMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake  \
     Python3_LIBRARY=/usr/local/lib/libpython3.10.so
 
 # Add thrift compiler to PATH
-RUN ln -s /opt/vcpkg/vcpkg_installed/x64-linux/tools/thrift/thrift /usr/local/bin/thrift
+RUN ln -s /opt/vcpkg/vcpkg_installed/x64-linux/tools/thrift/thrift /usr/local/bin/thrift \
+    && chmod 1777 /tmp
 
 RUN pip3 config set global.index-url https://mirrors.aliyun.com/pypi/simple && pip3 config set global.trusted-host mirrors.aliyun.com
 
 # Install infinity python sdk and other packages for later use by infinity tests
 RUN --mount=type=bind,source=python/requirements.txt,target=/root/requirements_1.txt --mount=type=bind,source=python/benchmark/requirements.txt,target=/root/requirements_2.txt  --mount=type=bind,source=python/restart_test/requirements.txt,target=/root/requirements_3.txt --mount=type=bind,source=python/test_cluster/requirements.txt,target=/root/requirements_4.txt \
-    pip3 install --no-input wheel auditwheel patchelf twine \
+    pip3 config set global.index-url https://mirrors.aliyun.com/pypi/simple && pip3 config set global.trusted-host mirrors.aliyun.com \
+    && pip3 install --no-input wheel auditwheel patchelf twine \
     && pip3 install --no-input -r /root/requirements_1.txt -r /root/requirements_2.txt -r /root/requirements_3.txt -r /root/requirements_4.txt
 
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]

@@ -13,7 +13,6 @@ import os
 import h5py
 from typing import Any
 import logging
-import requests
 
 import infinity
 import infinity.index as index
@@ -60,7 +59,7 @@ class InfinityClient(BaseClient):
         Upload data and build indexes (parameters are parsed by __init__).
         """
         db_obj = self.client.get_database("default_db")
-        db_obj.drop_table(self.table_name)
+        db_obj.drop_table(self.table_name, infinity.common.ConflictType.Ignore)
         db_obj.create_table(self.table_name, self.data["schema"])
         table_obj = db_obj.get_table(self.table_name)
         # create index
@@ -165,7 +164,7 @@ class InfinityClient(BaseClient):
         query = self.queries[query_id]
         table_obj = self.table_objs[client_id]
         if self.data_mode == "vector":
-            res, _ = (
+            res, res_type, extra_result = (
                 table_obj.output(["_row_id"])
                 .match_dense(
                     self.data["vector_name"],
@@ -178,7 +177,7 @@ class InfinityClient(BaseClient):
             )
             result = res["ROW_ID"]
         elif self.data_mode == "fulltext":
-            res, _ = (
+            res, res_type, extra_result = (
                 table_obj.output(["_row_id", "_score"])
                 .match_text(
                     "",
@@ -200,6 +199,6 @@ class InfinityClient(BaseClient):
                 self.data["topK"],
                 {"alpha": str(self.data["alpha"]), "beta": str(self.data["beta"])},
             )
-            res, _ = query_builder.to_result()
+            res, res_type, extra_result = query_builder.to_result()
             result = res["ROW_ID"]
         return result
