@@ -4431,6 +4431,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         }
         case TransactionType::kDumpMemIndex: {
             DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
+            std::vector<std::shared_ptr<MetaKey>> metas;
 
             std::shared_ptr<DBMeeta> db_meta;
             std::shared_ptr<TableMeeta> table_meta;
@@ -4456,6 +4457,17 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 if (mem_index != nullptr && mem_index->IsDumping()) {
                     mem_index->SetIsDumping(false);
                 }
+
+                metas.emplace_back(std::make_shared<ChunkIndexMetaKey>(dump_index_txn_store->db_id_str_,
+                                                                       dump_index_txn_store->table_id_str_,
+                                                                       dump_index_txn_store->index_id_str_,
+                                                                       segment_id,
+                                                                       dump_index_txn_store->chunk_infos_in_segments_[segment_id][0].chunk_id_));
+            }
+
+            status = CleanupInner(metas);
+            if (!status.ok()) {
+                UnrecoverableError("During PostRollback, cleanup failed.");
             }
             break;
         }
