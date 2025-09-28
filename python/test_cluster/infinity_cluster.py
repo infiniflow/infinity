@@ -3,7 +3,6 @@ import json
 import logging
 import subprocess
 import time
-import docker
 import tomli
 import sys
 import os

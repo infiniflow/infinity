@@ -20,8 +20,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  code_quality_analyze:
-    name: code_quality_analyze
+  code_static_check:
+    name: code_static_check
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     steps:
       - name: Ensure workspace ownership
@@ -42,7 +43,7 @@ jobs:
       - name: Backup code
         if: ${{ !cancelled() && !failure() && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci')) }}
         run: |
-          tar -czf infinity.tgz .git $(git ls-files)
+          tar --create --gzip --file=infinity.tgz .git $(git ls-files)
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
           mkdir -p ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
@@ -110,7 +111,7 @@ jobs:
           echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
 
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
@@ -126,7 +127,7 @@ jobs:
 
       - name: Upload artifacts
         if: ${{ !cancelled() && !failure() }}
-        run: tar -cf - cmake-build-debug/src/{infinity,test_main} | tar -C ${ARTIFACTS_DIR} -xf -
+        run: tar --create --file=- cmake-build-debug/src/{infinity,test_main} | tar --extract --directory=${ARTIFACTS_DIR} --file=-
 
       - name: Remove build container
         if: always()
@@ -145,7 +146,7 @@ jobs:
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/test_main | tar -xf -
+          tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug/src/test_main | tar --extract --file=-
 
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}
@@ -198,8 +199,8 @@ jobs:
           echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/infinity | tar -xf -
+          tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug/src/infinity | tar --extract --file=-
 
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}
@@ -268,7 +269,11 @@ jobs:
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
-        run: sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-debug/src/infinity --output_dir=/infinity_log --failure=${failure}
+        run: |
+          mkdir -p ${ARTIFACTS_DIR}/debug_restart_test
+          cp restart_test*.log* ${ARTIFACTS_DIR}/debug_restart_test/
+          echo 'debug_restart_test log(last 1000 lines):' && tail -n 1000 restart_test*.log*
+          rm -rf restart_test*.log*
 
       - name: Remove test container
         if: always()
