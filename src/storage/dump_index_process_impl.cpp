@@ -92,12 +92,12 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
         if (status.ok()) {
             commit_status = new_txn_mgr->CommitTxn(new_txn_shared.get());
             if (!commit_status.ok()) {
-                LOG_ERROR(fmt::format("Commit dump mem index {}.{}.{} in segment: failed: {}",
+                LOG_ERROR(fmt::format("Commit dump mem index {}.{}.{} in segment {} failed: {}",
                                       db_name,
                                       table_name,
                                       index_name,
                                       segment_id,
-                                      status.message()));
+                                      commit_status.message()));
             }
 
             DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(new_txn_shared->GetTxnStore());
