@@ -1917,6 +1917,16 @@ void NewTxn::SetTxnType(TransactionType type) {
             }
             break;
         }
+        case TransactionType::kOptimizeIndex: {
+            if (type == TransactionType::kAlterIndex) {
+                txn_context_ptr_->txn_type_ = type;
+            } else {
+                UnrecoverableError(fmt::format("Attempt to change transaction type from {} to {}",
+                                               TransactionType2Str(txn_context_ptr_->txn_type_),
+                                               TransactionType2Str(type)));
+            }
+            break;
+        }
         default: {
             std::string err_msg = fmt::format("Attempt to change transaction type from {} to {}",
                                               TransactionType2Str(txn_context_ptr_->txn_type_),

@@ -283,6 +283,32 @@ export struct OptimizeIndexTxnStore final : public BaseTxnStore {
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
+export struct AlterIndexStoreEntry {
+    std::string db_name_{};
+    std::string db_id_str_{};
+    u64 db_id_{};
+    std::string table_name_{};
+    std::string table_id_str_{};
+    u64 table_id_{};
+    std::string index_name_{};
+    std::string index_id_str_{};
+    u64 index_id_{};
+    mutable std::vector<std::unique_ptr<InitParameter>> params_;
+};
+
+export struct AlterIndexTxnStore final : public BaseTxnStore {
+    AlterIndexTxnStore() : BaseTxnStore(TransactionType::kInvalid) {}
+    ~AlterIndexTxnStore() override = default;
+
+    std::vector<std::string> db_names_{};
+    std::map<std::string, std::vector<std::string>> table_names_in_db_{};
+    std::vector<AlterIndexStoreEntry> entries_;
+
+    std::string ToString() const final;
+    std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+};
+
 export struct AppendTxnStore final : public BaseTxnStore {
     AppendTxnStore() : BaseTxnStore(TransactionType::kAppend) {}
     ~AppendTxnStore() override = default;
@@ -493,6 +519,7 @@ export struct FlushDataEntry {
     BlockID block_id_{};
     std::string to_flush_{};
 };
+
 export struct CheckpointTxnStore final : public BaseTxnStore {
     explicit CheckpointTxnStore(TxnTimeStamp checkpoint_ts, bool auto_checkpoint)
         : BaseTxnStore(TransactionType::kNewCheckpoint), max_commit_ts_(checkpoint_ts), auto_check_point_(auto_checkpoint) {}

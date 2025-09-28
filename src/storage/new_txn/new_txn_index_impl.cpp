@@ -622,15 +622,33 @@ Status NewTxn::OptimizeIndexByParams(const std::string &db_name,
         }
     }
 
-    std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdOptimizeV2>(db_name,
-                                                                             db_meta->db_id_str(),
-                                                                             table_name,
-                                                                             table_meta_opt->table_id_str(),
-                                                                             index_name,
-                                                                             table_index_meta_opt->index_id_str(),
-                                                                             std::move(raw_params));
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(std::make_shared<std::string>(wal_command->ToString()));
+    // Put the data into local txn store
+    if (base_txn_store_ == nullptr) {
+        base_txn_store_ = std::make_shared<AlterIndexTxnStore>();
+    }
+
+    AlterIndexTxnStore *alter_index_txn_store = static_cast<AlterIndexTxnStore *>(base_txn_store_.get());
+    if (std::find(alter_index_txn_store->db_names_.begin(), alter_index_txn_store->db_names_.end(), db_name) ==
+        alter_index_txn_store->db_names_.end()) {
+        alter_index_txn_store->db_names_.emplace_back(db_name);
+    }
+    if (std::find(alter_index_txn_store->table_names_in_db_[db_name].begin(), alter_index_txn_store->table_names_in_db_[db_name].end(), table_name) ==
+        alter_index_txn_store->table_names_in_db_[db_name].end()) {
+        alter_index_txn_store->table_names_in_db_[db_name].emplace_back(table_name);
+    }
+
+    alter_index_txn_store->entries_.emplace_back(db_name,
+                                                 db_meta->db_id_str(),
+                                                 std::stoull(db_meta->db_id_str()),
+                                                 table_name,
+                                                 table_meta_opt->table_id_str(),
+                                                 std::stoull(table_meta_opt->table_id_str()),
+                                                 index_name,
+                                                 table_index_meta_opt->index_id_str(),
+                                                 std::stoull(table_index_meta_opt->index_id_str()),
+                                                 std::move(raw_params));
+
+    // txn_context_ptr_->AddOperation(std::make_shared<std::string>(wal_command->ToString()));
 
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
