@@ -66,17 +66,17 @@ void VersionFileWorker::FreeInMemory() {
 // FIXME
 size_t VersionFileWorker::GetMemoryCost() const { return capacity_ * sizeof(TxnTimeStamp); }
 
-bool VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &base_ctx) {
+bool VersionFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &base_ctx) {
     if (data_ == nullptr) {
         UnrecoverableError("Data is not allocated.");
     }
     auto *data = static_cast<BlockVersion *>(data_);
 
     // if spill to file, return true if success
-    if (to_spill) {
-        data->SpillToFile(file_handle_.get());
-        return true;
-    } else {
+    // if (to_spill) {
+    //     data->SpillToFile(file_handle_.get());
+    //     return true;
+    // } else {
         // const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
         // auto ckp_ts = const_cast<TxnTimeStamp &>(ctx.checkpoint_ts_);
         // bool is_full = data->SaveToFile(ckp_ts, *file_handle_);
@@ -93,7 +93,7 @@ bool VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, co
             // if the version file is full, return true to spill to file
             return true;
         }
-    }
+    // }
     return false;
 }
 

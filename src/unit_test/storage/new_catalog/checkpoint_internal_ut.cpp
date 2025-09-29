@@ -496,8 +496,9 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint2) {
         EXPECT_TRUE(status.ok());
     }
 
-    for (auto i = 0; i < 1; i++)
+    for (auto i = 0; i < 1; i++) {
         append();
+    }
 
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
@@ -534,14 +535,14 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint2) {
                                                         std::set<ConstraintType>(),
                                                         "",
                                                         default_value1);
-        std::vector<std::shared_ptr<ColumnDef>> columns;
-        columns.emplace_back(column_def11);
-        columns.emplace_back(column_def22);
+        std::vector columns{column_def11, column_def22};
         Status status = txn->AddColumns(*db_name, *table_name, columns);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+
+    [[maybe_unused]] auto *buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
 
     checkpoint();
     RestartTxnMgr();

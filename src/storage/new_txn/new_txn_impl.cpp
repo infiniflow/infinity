@@ -777,7 +777,7 @@ Status NewTxn::AddColumns(const std::string &db_name, const std::string &table_n
     }
 
     base_txn_store_ = std::make_shared<AddColumnsTxnStore>();
-    AddColumnsTxnStore *txn_store = static_cast<AddColumnsTxnStore *>(base_txn_store_.get());
+    auto *txn_store = static_cast<AddColumnsTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_meta->db_id_str();
     txn_store->db_id_ = std::stoull(db_meta->db_id_str());

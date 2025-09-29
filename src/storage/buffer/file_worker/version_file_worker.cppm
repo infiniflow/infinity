@@ -48,7 +48,7 @@ public:
     FileWorkerType Type() const override { return FileWorkerType::kVersionDataFile; }
 
 protected:
-    bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
     void ReadFromFileImpl(size_t file_size, bool from_spill) override;
 

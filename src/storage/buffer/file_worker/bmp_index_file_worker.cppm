@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:bmp_index_file_worker;
 
 import :index_file_worker;
@@ -52,7 +50,7 @@ public:
     size_t GetMemoryCost() const override { return index_size_; }
 
 protected:
-    bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
     void ReadFromFileImpl(size_t file_size, bool from_spill) override;
 

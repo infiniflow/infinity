@@ -501,7 +501,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         }
     }
 
-    buffer_obj->Save();
+    buffer_obj->Save(false);
 
     std::vector<WalChunkIndexInfo> chunk_infos;
     chunk_infos.emplace_back(*chunk_index_meta);
@@ -1383,7 +1383,7 @@ Status NewTxn::PopulateIvfIndexInner(std::shared_ptr<IndexBase> index_base,
         auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_handle.GetDataMut());
         data_ptr->BuildIVFIndex(segment_meta, row_count, column_def);
     }
-    buffer_obj->Save();
+    buffer_obj->Save(false);
     return Status::OK();
 }
 
@@ -1430,7 +1430,7 @@ Status NewTxn::PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
         auto *data_ptr = static_cast<EMVBIndex *>(buffer_handle.GetDataMut());
         data_ptr->BuildEMVBIndex(base_row_id, row_count, segment_meta, column_def);
     }
-    buffer_obj->Save();
+    buffer_obj->Save(false);
     return Status::OK();
 }
 
@@ -1792,7 +1792,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
             memory_secondary_index->Dump(buffer_obj);
-            buffer_obj->Save();
+            buffer_obj->Save(false);
             break;
         }
         case IndexType::kFullText: {
@@ -1800,22 +1800,22 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         }
         case IndexType::kIVF: {
             memory_ivf_index->Dump(buffer_obj);
-            buffer_obj->Save();
+            buffer_obj->Save(false);
             break;
         }
         case IndexType::kHnsw: {
             memory_hnsw_index->Dump(buffer_obj);
-            buffer_obj->Save();
+            buffer_obj->Save(false);
             break;
         }
         case IndexType::kBMP: {
             memory_bmp_index->Dump(buffer_obj);
-            buffer_obj->Save();
+            buffer_obj->Save(false);
             break;
         }
         case IndexType::kEMVB: {
             memory_emvb_index->Dump(buffer_obj);
-            buffer_obj->Save();
+            buffer_obj->Save(false);
             break;
         }
         default: {

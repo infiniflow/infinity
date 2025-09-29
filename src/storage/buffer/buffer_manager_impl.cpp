@@ -55,7 +55,7 @@ void BufferManager::Start() {
         VirtualStore::MakeDirectory(*data_dir_);
     }
 
-    VirtualStore::CleanupDirectory(*temp_dir_);
+    // VirtualStore::CleanupDirectory(*temp_dir_);
 }
 
 void BufferManager::Stop() {
@@ -65,6 +65,22 @@ void BufferManager::Stop() {
 
 BufferObj *BufferManager::AllocateBufferObject(std::unique_ptr<FileWorker> file_worker) {
     std::string file_path = file_worker->GetFilePath();
+    auto buffer_obj = MakeBufferObj(std::move(file_worker));
+
+    BufferObj *res = buffer_obj.get();
+    {
+        std::unique_lock lock(w_locker_);
+        if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
+            UnrecoverableError(fmt::format("BufferManager::Allocate: file {} already exists.", file_path.c_str()));
+        }
+        buffer_map_.emplace(file_path, std::move(buffer_obj));
+    }
+
+    return res;
+}
+
+BufferObj *BufferManager::AllocateBufferObjectTmp(std::unique_ptr<FileWorker> file_worker) {
+    std::string file_path = file_worker->GetFilePathTmp();
     auto buffer_obj = MakeBufferObj(std::move(file_worker));
 
     BufferObj *res = buffer_obj.get();
@@ -240,12 +256,13 @@ std::unique_ptr<BufferObj> BufferManager::MakeBufferObj(std::unique_ptr<FileWork
 
 void BufferManager::RemoveBufferObjects(const std::vector<std::string> &object_paths) {
     std::unique_lock lock(w_locker_);
-    size_t erase_object = 0;
+    // size_t erase_object = 0;
     for (auto &object_path : object_paths) {
-        erase_object = buffer_map_.erase(object_path);
-        if (erase_object != 1) {
-            UnrecoverableError(fmt::format("BufferManager::RemoveBufferObjects: object {} not found.", object_path));
-        }
+        // erase_object = buffer_map_.erase(object_path);
+        buffer_map_.erase(object_path);
+        // if (erase_object != 1) {
+        //     UnrecoverableError(fmt::format("BufferManager::RemoveBufferObjects: object {} not found.", object_path));
+        // }
     }
 }
 

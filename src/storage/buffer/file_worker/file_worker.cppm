@@ -44,7 +44,7 @@ public:
     virtual ~FileWorker();
 
 public:
-    [[nodiscard]] bool WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx = {});
+    [[nodiscard]] bool WriteToTemp(const FileWorkerSaveCtx &ctx = {});
 
     void ReadFromFile(bool from_spill);
 
@@ -67,34 +67,36 @@ public:
     // Get an absolute file path. As key of a buffer handle.
     std::string GetFilePath() const;
 
+    std::string GetFilePathTmp() const;
+
     Status CleanupFile() const;
 
     void CleanupTempFile() const;
 
 protected:
-    virtual bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
+    virtual bool WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
 
     virtual void ReadFromFileImpl(size_t file_size, bool from_spill) = 0;
 
-    std::string ChooseFileDir(bool spill) const;
+    [[nodiscard]] std::string ChooseFileDir(bool is_temp) const;
 
     std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> GetFilePathInner(bool spill);
 
 public:
-    std::shared_ptr<std::string> data_dir_{};
-    const std::shared_ptr<std::string> temp_dir_{};
-    std::shared_ptr<std::string> file_dir_{};
-    const std::shared_ptr<std::string> file_name_{};
+    std::shared_ptr<std::string> data_dir_;
+    const std::shared_ptr<std::string> temp_dir_;
+    std::shared_ptr<std::string> file_dir_;
+    const std::shared_ptr<std::string> file_name_;
     PersistenceManager *persistence_manager_{};
-    ObjAddr obj_addr_{};
+    ObjAddr obj_addr_;
 
 protected:
-    void *data_{nullptr};
+    void *data_{};
     std::unique_ptr<LocalFileHandle> file_handle_{nullptr};
 
 public:
     // void *GetMmapData() const { return mmap_data_; }
-    void *GetMmapData() const { return mmap_data_; }
+    [[nodiscard]] void *GetMmapData() const { return mmap_data_; }
 
     void Mmap();
 

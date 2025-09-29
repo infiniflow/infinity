@@ -96,7 +96,7 @@ void HnswFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-bool HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool HnswFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (!data_) {
         UnrecoverableError("WriteToFileImpl: Data is not allocated.");
     }
@@ -112,9 +112,10 @@ void HnswFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     // }
     data_ = static_cast<void *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_).release()));
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
-    if (from_spill) {
-        (*hnsw_handler)->Load(*file_handle_);
-    } else {
+    // if (from_spill) {
+    //     (*hnsw_handler)->Load(*file_handle_);
+    // } else
+    {
         (*hnsw_handler)->LoadFromPtr(*file_handle_, file_size);
     }
 }

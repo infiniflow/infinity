@@ -47,6 +47,8 @@ public:
     // Create a new BufferHandle, or in replay process. (read data block from wal)
     BufferObj *AllocateBufferObject(std::unique_ptr<FileWorker> file_worker);
 
+    BufferObj *AllocateBufferObjectTmp(std::unique_ptr<FileWorker> file_worker);
+
     // Get an existing BufferHandle from memory or disk.
     BufferObj *GetBufferObject(std::unique_ptr<FileWorker> file_worker, bool restart = false);
 

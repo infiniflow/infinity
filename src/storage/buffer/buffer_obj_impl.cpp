@@ -88,15 +88,14 @@ BufferHandle BufferObj::Load() {
 }
 
 bool BufferObj::Free() {
-    std::unique_lock<std::mutex> locker(w_locker_, std::defer_lock);
-    if (!locker.try_lock()) {
-        return false; // when other thread is loading or cleaning, return false
-    }
+    // std::unique_lock<std::mutex> locker(w_locker_, std::defer_lock);
+    // if (!locker.try_lock()) {
+    //     return false; // when other thread is loading or cleaning, return false
+    // }
     return true;
 }
 
-bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
-    bool write = false;
+bool BufferObj::Save([[maybe_unused]] bool save_type, const FileWorkerSaveCtx &ctx) {
     std::unique_lock<std::mutex> locker(w_locker_);
     if (file_worker_->GetData() == nullptr) {
         file_worker_->AllocateInMemory();
@@ -108,9 +107,10 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
     // std::string path1 = std::filesystem::path(*data_dir) / *file_dir / *file_name;
     std::string path2 = std::filesystem::path(*temp_dir) / *file_dir / *file_name;
     std::filesystem::remove(path2);
-    [[maybe_unused]] bool all_save = file_worker_->WriteToFile(false, ctx);
+    // [[maybe_unused]] bool all_save = file_worker_->WriteToFile(false, ctx);
+    bool all_save = file_worker_->WriteToTemp(ctx);
 
-    return write;
+    return all_save;
 }
 
 void BufferObj::PickForCleanup() {
@@ -164,7 +164,7 @@ void BufferObj::SubObjRc() {
 void BufferObj::SetData(void *data) {
     std::unique_lock<std::mutex> locker(w_locker_);
     file_worker_->SetData(data);
-    [[maybe_unused]] auto foo = file_worker_->WriteToFile(true);
+    [[maybe_unused]] auto foo = file_worker_->WriteToTemp();
 }
 
 void BufferObj::SetDataSize(size_t size) {

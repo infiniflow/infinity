@@ -81,7 +81,7 @@ void EMVBIndexFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-bool EMVBIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool EMVBIndexFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     auto *index = static_cast<EMVBIndex *>(data_);
     index->SaveIndexInner(*file_handle_);
     prepare_success = true;
@@ -89,9 +89,9 @@ bool EMVBIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, 
 }
 
 void EMVBIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
-    if (data_) {
-        UnrecoverableError("Data is already allocated.");
-    }
+    // if (data_) {
+    //     UnrecoverableError("Data is already allocated.");
+    // }
     const auto column_embedding_dim = GetEmbeddingInfo()->Dimension();
     const auto *index_emvb = static_cast<IndexEMVB *>(index_base_.get());
     const auto residual_pq_subspace_num = index_emvb->residual_pq_subspace_num_;

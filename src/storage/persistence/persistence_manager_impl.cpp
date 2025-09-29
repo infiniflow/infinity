@@ -110,7 +110,7 @@ PersistenceManager::~PersistenceManager() {
 }
 
 PersistWriteResult PersistenceManager::Persist(const std::string &file_path, const std::string &tmp_file_path, bool try_compose) {
-    PersistWriteResult result;
+     PersistWriteResult result;
 
     std::error_code ec;
     fs::path src_fp = tmp_file_path;
@@ -605,7 +605,8 @@ std::string PersistenceManager::RemovePrefix(const std::string &path) {
     if (!path.starts_with("/")) {
         return path;
     }
-    return "";
+    // return "";
+    return path;
 }
 
 PersistWriteResult PersistenceManager::Cleanup(const std::string &file_path) {

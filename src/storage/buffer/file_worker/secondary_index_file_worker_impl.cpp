@@ -59,7 +59,7 @@ void SecondaryIndexFileWorker::FreeInMemory() {
     }
 }
 
-bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool SecondaryIndexFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (data_) [[likely]] {
         auto index = static_cast<SecondaryIndexData *>(data_);
         index->SaveIndexInner(*file_handle_);

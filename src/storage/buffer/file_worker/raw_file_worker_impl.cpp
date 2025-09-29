@@ -65,7 +65,7 @@ void RawFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-bool RawFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool RawFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     assert(data_ != nullptr && buffer_size_ > 0);
     auto status = file_handle_->Append(data_, buffer_size_);
     if (!status.ok()) {

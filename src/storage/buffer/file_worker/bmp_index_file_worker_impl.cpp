@@ -91,16 +91,16 @@ void BMPIndexFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-bool BMPIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool BMPIndexFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (!data_) {
         UnrecoverableError("Data is not allocated.");
     }
     auto *bmp_handler = reinterpret_cast<BMPHandlerPtr *>(data_);
-    if (to_spill) {
-        (*bmp_handler)->Save(*file_handle_);
-    } else {
+    // if (to_spill) {
+    //     (*bmp_handler)->Save(*file_handle_);
+    // } else {
         (*bmp_handler)->SaveToPtr(*file_handle_);
-    }
+    // }
     prepare_success = true;
     return true;
 }
@@ -111,11 +111,11 @@ void BMPIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     // }
     data_ = static_cast<void *>(new BMPHandlerPtr(BMPHandler::Make(index_base_.get(), column_def_.get()).release()));
     auto *bmp_handler = reinterpret_cast<BMPHandlerPtr *>(data_);
-    if (from_spill) {
-        (*bmp_handler)->Load(*file_handle_);
-    } else {
+    // if (from_spill) {
+    //     (*bmp_handler)->Load(*file_handle_);
+    // } else {
         (*bmp_handler)->LoadFromPtr(*file_handle_, file_size);
-    }
+    // }
 }
 
 bool BMPIndexFileWorker::ReadFromMmapImpl(const void *ptr, size_t size) {

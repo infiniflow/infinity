@@ -33,6 +33,11 @@ export struct BufferObjectInfo {
 
 export class BufferObj {
 public:
+    // enum class SaveT {
+    //     kTxn,
+    //     kCheckpoint,
+    // };
+
     // called by BufferMgr::Get or BufferMgr::Allocate
     explicit BufferObj(BufferManager *buffer_mgr, std::unique_ptr<FileWorker> file_worker, u32 id);
 
@@ -51,7 +56,8 @@ public:
     bool Free();
 
     // called when checkpoint. or in "IMPORT" operator.
-    bool Save(const FileWorkerSaveCtx &ctx = {});
+    // template <typename SaveType>
+    bool Save(bool save_type, const FileWorkerSaveCtx &ctx = {});
 
     void PickForCleanup();
 

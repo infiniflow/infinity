@@ -71,7 +71,7 @@ void DataFileWorker::FreeInMemory() {
 }
 
 // FIXME: to_spill
-bool DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool DataFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     // File structure:
     // - header: magic number
     // - header: buffer size

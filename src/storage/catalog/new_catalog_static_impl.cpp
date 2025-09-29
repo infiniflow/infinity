@@ -774,6 +774,7 @@ Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_t
     for (size_t column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
         std::shared_ptr<ColumnDef> &col_def = column_defs_ptr->at(column_idx);
         ColumnMeta column_meta(column_idx, *block_meta);
+        [[maybe_unused]] BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
         status = column_meta.InitSet(col_def);
         if (!status.ok()) {
             return status;

@@ -80,7 +80,7 @@ size_t VarFileWorker::GetMemoryCost() const {
     return buffer->TotalSize();
 }
 
-bool VarFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool VarFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (data_ == nullptr) {
         UnrecoverableError("Data is not allocated.");
     }
