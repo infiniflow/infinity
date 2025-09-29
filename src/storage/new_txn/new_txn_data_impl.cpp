@@ -151,9 +151,9 @@ struct NewTxnCompactState {
                 }
                 buffer_obj->SetDataSize(data_size);
 
-                buffer_obj->Save(false);
+                buffer_obj->Save();
                 if (outline_buffer_obj) {
-                    outline_buffer_obj->Save(false);
+                    outline_buffer_obj->Save();
                 }
             }
         }
@@ -977,7 +977,7 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
         // for (auto &[path, obj_addr]: a) {
         //     fmt::print("path: {}, obj_addr: {}\n", path, obj_addr.obj_key_);
         // }
-        version_buffer->Save(false, version_file_worker_save_ctx);
+        version_buffer->Save(version_file_worker_save_ctx);
         // [[maybe_unused]] std::unordered_map<std::string, ObjAddr> b = version_buffer->file_worker()->persistence_manager_->GetAllFiles();
         // for (auto &[path, obj_addr]: b) {
         //     fmt::print("path: {}, obj_addr: {}\n", path, obj_addr.obj_key_);
@@ -1010,9 +1010,9 @@ NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t appen
         return status;
     }
     buffer_obj->SetDataSize(data_size);
-    buffer_obj->Save(false);
+    buffer_obj->Save();
     if (outline_buffer_obj != nullptr) {
-        outline_buffer_obj->Save(false);
+        outline_buffer_obj->Save();
     }
 
     if (VarBufferManager *var_buffer_mgr = dest_vec.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
@@ -1057,7 +1057,7 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
         }
         block_lock->max_ts_ = std::max(block_lock->max_ts_, commit_ts); // FIXME: remove max_ts, undo delete should not revert max_ts
         VersionFileWorkerSaveCtx version_file_worker_save_ctx{commit_ts};
-        version_buffer->Save(false, version_file_worker_save_ctx);
+        version_buffer->Save(version_file_worker_save_ctx);
     }
     return Status::OK();
 }
@@ -1315,9 +1315,9 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
         }
         buffer_obj->SetDataSize(data_size);
 
-        buffer_obj->Save(false);
+        buffer_obj->Save();
         if (outline_buffer_obj) {
-            outline_buffer_obj->Save(false);
+            outline_buffer_obj->Save();
         }
 
         // if (auto *var_buffer_mgr = column_vector.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
@@ -1950,7 +1950,7 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
         auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
 
         block_version->CommitAppend(save_ts, commit_ts);
-        version_buffer->Save(false, VersionFileWorkerSaveCtx(commit_ts));
+        version_buffer->Save(VersionFileWorkerSaveCtx(commit_ts));
 
         std::shared_ptr<BlockLock> block_lock;
         status = block_meta.GetBlockLock(block_lock);
@@ -2016,39 +2016,6 @@ Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
         // }
     }
     LOG_TRACE("NewTxn::FlushColumnFiles end");
-    return Status::OK();
-}
-
-Status NewTxn::TryToMmap(BlockMeta &block_meta, TxnTimeStamp save_ts, bool *to_mmap_ptr) {
-    auto [row_cnt, status] = block_meta.GetRowCnt1();
-    if (!status.ok()) {
-        return status;
-    }
-    bool to_mmap = row_cnt >= block_meta.block_capacity();
-    if (to_mmap_ptr) {
-        *to_mmap_ptr = to_mmap;
-    }
-    if (to_mmap) {
-        std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs;
-        std::tie(column_defs, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
-        if (!status.ok()) {
-            return status;
-        }
-        for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
-            ColumnMeta column_meta(column_idx, block_meta);
-            BufferObj *buffer_obj = nullptr;
-            BufferObj *outline_buffer_obj = nullptr;
-
-            status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
-            if (!status.ok()) {
-                return status;
-            }
-            buffer_obj->ToMmap();
-            if (outline_buffer_obj) {
-                outline_buffer_obj->ToMmap();
-            }
-        }
-    }
     return Status::OK();
 }
 
@@ -2154,9 +2121,9 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
 
         col->SetToCatalog(buffer_obj, outline_buffer_obj, ColumnVectorMode::kReadWrite);
 
-        buffer_obj->Save(false);
+        buffer_obj->Save();
         if (outline_buffer_obj) {
-            outline_buffer_obj->Save(false);
+            outline_buffer_obj->Save();
         }
     }
 

@@ -95,11 +95,8 @@ bool BufferObj::Free() {
     return true;
 }
 
-bool BufferObj::Save([[maybe_unused]] bool save_type, const FileWorkerSaveCtx &ctx) {
+bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
     std::unique_lock<std::mutex> locker(w_locker_);
-    if (file_worker_->GetData() == nullptr) {
-        file_worker_->AllocateInMemory();
-    }
     // auto data_dir = file_worker_->data_dir_;
     auto temp_dir = file_worker_->temp_dir_;
     auto file_dir = file_worker_->file_dir_;
@@ -123,14 +120,6 @@ Status BufferObj::CleanupFile() const { return file_worker_->CleanupFile(); }
 void BufferObj::CleanupTempFile() const {
     std::unique_lock<std::mutex> locker(w_locker_);
     file_worker_->CleanupTempFile();
-}
-
-void BufferObj::ToMmap() {
-    std::unique_lock<std::mutex> locker(w_locker_);
-    if (file_worker_->GetData()) {
-        file_worker_->AllocateInMemory();
-    }
-    file_worker_->Mmap();
 }
 
 void BufferObj::LoadInner() {

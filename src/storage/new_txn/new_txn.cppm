@@ -599,13 +599,12 @@ private:
     Status PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files = false);
     Status PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd);
     Status CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
-    Status CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store);
+    Status CheckpointForSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store);
 
     Status AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
     Status CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
     Status FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts);
     Status FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts);
-    Status TryToMmap(BlockMeta &block_meta, TxnTimeStamp save_ts, bool *to_mmap = nullptr);
 
     Status IncrLatestID(std::string &id_str, std::string_view id_name) const;
 

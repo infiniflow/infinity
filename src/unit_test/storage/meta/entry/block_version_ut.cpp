@@ -95,7 +95,7 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
             block_version->Delete(5, 40);
         }
         {
-            buffer_obj->Save(true, VersionFileWorkerSaveCtx(15));
+            buffer_obj->Save(VersionFileWorkerSaveCtx(15));
         }
     }
     {
@@ -124,7 +124,7 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
             block_version->Delete(5, 40);
         }
         {
-            buffer_obj->Save(true, VersionFileWorkerSaveCtx(35));
+            buffer_obj->Save(VersionFileWorkerSaveCtx(35));
         }
     }
     {
