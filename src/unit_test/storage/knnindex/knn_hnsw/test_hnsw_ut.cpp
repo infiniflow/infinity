@@ -41,6 +41,8 @@ public:
 
     const std::string save_dir_ = GetFullTmpDir();
 
+    constexpr static i32 ef_search_ = 10;
+
     template <typename Hnsw>
     void TestSimple() {
 
@@ -66,17 +68,19 @@ public:
             // os.flush();
             hnsw_index->Check();
 
-            KnnSearchOption search_option{.ef_ = 10};
+            KnnSearchOption search_option{.ef_ = ef_search_};
             int correct = 0;
             for (int i = 0; i < element_size; ++i) {
                 const float *query = data.get() + i * dim;
-                auto result = hnsw_index->KnnSearchSorted(query, 1, search_option);
-                if (result[0].second == (LabelT)i) {
-                    ++correct;
+                auto result = hnsw_index->KnnSearchSorted(query, ef_search_, search_option);
+                for (auto item : result) {
+                    if (item.second == (LabelT)i) {
+                        ++correct;
+                    }
                 }
             }
             float correct_rate = float(correct) / element_size;
-            // std::printf("correct rate: %f\n", correct_rate);
+            std::printf("correct rate: %f\n", correct_rate);
             EXPECT_GE(correct_rate, 0.95);
         };
 
@@ -84,7 +88,8 @@ public:
         {
             auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
             auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
-            hnsw_index->InsertVecs(std::move(iter));
+            hnsw_index->InsertVecs(std::move(iter), {true});
+            // hnsw_index->Dump(std::cout);
 
             test_func(hnsw_index);
 
@@ -128,17 +133,19 @@ public:
         auto test_func = [&](auto &hnsw_index) {
             hnsw_index->Check();
 
-            KnnSearchOption search_option{.ef_ = 10};
+            KnnSearchOption search_option{.ef_ = ef_search_};
             int correct = 0;
             for (int i = 0; i < element_size; ++i) {
                 const float *query = data.get() + i * dim;
                 auto result = hnsw_index->KnnSearchSorted(query, 1, search_option);
-                if (result[0].second == (LabelT)i) {
-                    ++correct;
+                for (auto item : result) {
+                    if (item.second == (LabelT)i) {
+                        ++correct;
+                    }
                 }
             }
             float correct_rate = float(correct) / element_size;
-            // std::printf("correct rate: %f\n", correct_rate);
+            std::printf("correct rate: %f\n", correct_rate);
             EXPECT_GE(correct_rate, 0.95);
         };
 
@@ -146,7 +153,7 @@ public:
         {
             auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
             auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
-            hnsw_index->InsertVecs(std::move(iter));
+            hnsw_index->InsertVecs(std::move(iter), {true});
 
             auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kWrite);
             if (!status.ok()) {
@@ -211,18 +218,20 @@ public:
         auto test_func = [&](auto &hnsw_index) {
             hnsw_index->Check();
 
-            KnnSearchOption search_option{.ef_ = 10};
+            KnnSearchOption search_option{.ef_ = ef_search_};
 
             int correct = 0;
             for (int i = 0; i < element_size; ++i) {
                 const float *query = data.get() + i * dim;
                 auto result = hnsw_index->KnnSearchSorted(query, 1, search_option);
-                if (result[0].second == (LabelT)i) {
-                    ++correct;
+                for (auto item : result) {
+                    if (item.second == (LabelT)i) {
+                        ++correct;
+                    }
                 }
             }
             float correct_rate = float(correct) / element_size;
-            // std::printf("correct rate: %f\n", correct_rate);
+            std::printf("correct rate: %f\n", correct_rate);
             EXPECT_GE(correct_rate, 0.95);
         };
 
@@ -230,7 +239,7 @@ public:
             auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
 
             auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
-            hnsw_index->InsertVecs(std::move(iter));
+            hnsw_index->InsertVecs(std::move(iter), {true});
             {
                 // std::fstream os("./tmp/dump_1.txt", std::fstream::out);
                 // hnsw_index->Dump(os);
@@ -309,10 +318,8 @@ public:
             int start_i = 0, end_i = 0;
             {
                 auto w_lck = UniqueOptLck();
-                HnswInsertConfig config;
-                config.optimize_ = true;
                 auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size / 2);
-                std::tie(start_i, end_i) = hnsw_index->StoreData(std::move(iter));
+                std::tie(start_i, end_i) = hnsw_index->StoreData(std::move(iter), {true});
             }
             {
                 auto write_thread2 = std::thread([&] {
@@ -370,46 +377,62 @@ public:
     }
 };
 
-TEST_F(HnswAlgTest, test1) {
+TEST_F(HnswAlgTest, test_plain_1) {
     // NOTE: inner product correct rate is not 1. (the vector and itself's distance is not the smallest)
     using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
     TestSimple<Hnsw>();
 }
 
-TEST_F(HnswAlgTest, test2) {
-    using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
-    TestSimple<Hnsw>();
-}
-
-TEST_F(HnswAlgTest, test3) {
-    using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
-    TestParallel<Hnsw>();
-}
-
-TEST_F(HnswAlgTest, test4) {
-    using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
-    TestParallel<Hnsw>();
-}
-
-TEST_F(HnswAlgTest, test5) {
+TEST_F(HnswAlgTest, test_plain_2) {
     using Hnsw = KnnHnsw<PlainCosVecStoreType<float>, LabelT>;
     TestSimple<Hnsw>();
 }
 
-TEST_F(HnswAlgTest, test6) {
+TEST_F(HnswAlgTest, test_plain_3) {
     using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
-    using CompressedHnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
-    TestCompress<Hnsw, CompressedHnsw>();
+    TestParallel<Hnsw>();
 }
 
-TEST_F(HnswAlgTest, test7) {
+TEST_F(HnswAlgTest, test_plain_4) {
     using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
     using HnswLoad = KnnHnsw<PlainL2VecStoreType<float>, LabelT, false>;
     TestLoad<Hnsw, HnswLoad>();
 }
 
-TEST_F(HnswAlgTest, test8) {
+TEST_F(HnswAlgTest, test_lvq_1) {
+    using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
+    TestSimple<Hnsw>();
+}
+
+TEST_F(HnswAlgTest, test_lvq_2) {
+    using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
+    TestParallel<Hnsw>();
+}
+
+TEST_F(HnswAlgTest, test_lvq_3) {
     using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
     using HnswLoad = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT, false>;
     TestLoad<Hnsw, HnswLoad>();
+}
+
+TEST_F(HnswAlgTest, test_lvq_4) {
+    using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
+    using CompressedHnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
+    TestCompress<Hnsw, CompressedHnsw>();
+}
+
+TEST_F(HnswAlgTest, test_rabitq_1) {
+    using Hnsw = KnnHnsw<RabitqL2VecStoreType<float>, LabelT>;
+    TestSimple<Hnsw>();
+}
+
+TEST_F(HnswAlgTest, test_rabitq_2) {
+    using Hnsw = KnnHnsw<RabitqL2VecStoreType<float>, LabelT>;
+    using HnswLoad = KnnHnsw<RabitqL2VecStoreType<float>, LabelT, false>;
+    TestLoad<Hnsw, HnswLoad>();
+}
+
+TEST_F(HnswAlgTest, test_rabitq_3) {
+    using Hnsw = KnnHnsw<RabitqL2VecStoreType<float>, LabelT>;
+    TestParallel<Hnsw>();
 }

@@ -534,12 +534,8 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
     }
 
     // merge_heap for HNSW scan. For multivector maxsim, query_count could be larger than 1.
-    MergeKnn<ColumnDataType, C, DistanceDataType> *merge_heap_hnsw = nullptr;
-    if (knn_scan_shared_data->query_count_ > 1) {
-        merge_heap_hnsw = dynamic_cast<MergeKnn<ColumnDataType, C, DistanceDataType> *>(knn_scan_function_data->merge_knn_base_hnsw_.get());
-    } else {
-        merge_heap_hnsw = merge_heap;
-    }
+    bool is_rabitq = false;
+    auto merge_heap_hnsw = dynamic_cast<MergeKnn<ColumnDataType, C, DistanceDataType> *>(knn_scan_function_data->merge_knn_base_hnsw_.get());
 
     size_t index_task_n = knn_scan_shared_data->segment_index_metas_->size();
     size_t brute_task_n = knn_scan_shared_data->block_metas_->size();
@@ -673,6 +669,8 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                     break;
                 }
                 case IndexType::kHnsw: {
+                    const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
+                    is_rabitq = index_hnsw->encode_type_ == HnswEncodeType::kRabitq;
                     ExecuteHnswSearch<t, ColumnDataType, C, DistanceDataType>(query_context,
                                                                               knn_scan_operator_state,
                                                                               merge_heap_hnsw,
@@ -700,7 +698,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         std::vector<char *> result_dists_list;
         std::vector<RowID *> row_ids_list;
 
-        if (query_n > 1) {
+        if (query_n > 1 || is_rabitq) {
             merge_heap_hnsw->EndWithoutSort();
             std::vector<RowID> unique_row_ids = merge_heap_hnsw->GetUniqueIDs();
             for (size_t i = 0; i < unique_row_ids.size(); ++i) {
@@ -723,15 +721,30 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                     UnrecoverableError(status.message());
                 }
 
-                MultiVectorSearchOneLine<ColumnDataType, C, DistanceDataType>(merge_heap,
-                                                                              dist_func,
-                                                                              knn_query_ptr,
-                                                                              query_n,
-                                                                              embedding_dim,
-                                                                              column_vector,
-                                                                              segment_id,
-                                                                              segment_offset,
-                                                                              block_offset);
+                if (query_n > 1) {
+                    MultiVectorSearchOneLine<ColumnDataType, C, DistanceDataType>(merge_heap,
+                                                                                  dist_func,
+                                                                                  knn_query_ptr,
+                                                                                  query_n,
+                                                                                  embedding_dim,
+                                                                                  column_vector,
+                                                                                  segment_id,
+                                                                                  segment_offset,
+                                                                                  block_offset);
+                } else {
+                    const auto data_ptr =
+                        reinterpret_cast<const ColumnDataType *>(column_vector.data() + block_offset * column_vector.data_type_size_);
+                    DistanceDataType result_dist = dist_func->dist_func_(knn_query_ptr, data_ptr, embedding_dim);
+                    const RowID db_row_id(segment_id, segment_offset);
+                    merge_heap->Search(0, &result_dist, &db_row_id, 1);
+                }
+            }
+        } else {
+            auto result_n = merge_heap_hnsw->GetSize();
+            auto ids = merge_heap_hnsw->GetIDs();
+            auto dists = merge_heap_hnsw->GetDistances();
+            for (u32 i = 0; i < result_n; ++i) {
+                merge_heap->Search(0, &dists[i], &ids[i], 1);
             }
         }
 

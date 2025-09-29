@@ -29,13 +29,18 @@ export template <typename DataType, typename CompressType>
 class LVQCosDist;
 
 export template <typename DataType>
+class RabitqCosDist;
+
+export template <typename DataType>
 class PlainCosDist {
 public:
     using This = PlainCosDist<DataType>;
     using VecStoreMeta = PlainVecStoreMeta<DataType>;
     using StoreType = typename VecStoreMeta::StoreType;
+    using QueryType = typename VecStoreMeta::QueryType;
     using DistanceType = typename VecStoreMeta::DistanceType;
     using LVQDist = LVQCosDist<DataType, i8>;
+    using RabitqDist = RabitqCosDist<DataType>;
 
 private:
     using SIMDFuncType = f32 (*)(const DataType *, const DataType *, size_t);
@@ -68,19 +73,16 @@ public:
     }
 
     template <typename DataStore>
-    DistanceType operator()(VertexType v1_i, VertexType v2_i, const DataStore &data_store) const {
-        return Inner(data_store.GetVec(v1_i), data_store.GetVec(v2_i), data_store.dim());
-    }
-
-    template <typename DataStore>
-    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
+    DistanceType operator()(const QueryType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
         return Inner(v1, data_store.GetVec(v2_i), data_store.dim());
     }
 
     LVQDist ToLVQDistance(size_t dim) &&;
 
+    RabitqDist ToRabitqDistance(size_t dim) &&;
+
 private:
-    DistanceType Inner(const StoreType &v1, const StoreType &v2, size_t dim) const { return -SIMDFunc(v1, v2, dim); }
+    DistanceType Inner(const QueryType &v1, const StoreType &v2, size_t dim) const { return -SIMDFunc(v1, v2, dim); }
 };
 
 export template <typename DataType, typename CompressType>
@@ -123,8 +125,10 @@ class LVQCosDist {
 public:
     using This = LVQCosDist<DataType, CompressType>;
     using LVQDist = This;
+    using RabitqDist = This;
     using VecStoreMetaType = LVQVecStoreMetaType<DataType, CompressType, LVQCosCache<DataType, CompressType>>;
     using StoreType = typename VecStoreMetaType::StoreType;
+    using QueryType = typename VecStoreMetaType::QueryType;
     using DistanceType = typename VecStoreMetaType::DistanceType;
 
 private:
@@ -157,18 +161,13 @@ public:
     }
 
     template <typename DataStore>
-    DistanceType operator()(VertexType v1_i, VertexType v2_i, const DataStore &data_store) const {
-        return Inner(data_store.GetVec(v1_i), data_store.GetVec(v2_i), data_store.vec_store_meta());
-    }
-
-    template <typename DataStore>
-    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
+    DistanceType operator()(const QueryType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
         return Inner(v1, data_store.GetVec(v2_i), data_store.vec_store_meta());
     }
 
 private:
     template <typename VecStoreMeta>
-    DistanceType Inner(const StoreType &v1, const StoreType &v2, VecStoreMeta &vec_store_meta) const {
+    DistanceType Inner(const QueryType &v1, const StoreType &v2, VecStoreMeta &vec_store_meta) const {
         size_t dim = vec_store_meta.dim();
         i32 c1c2_ip = SIMDFunc(v1->compress_vec_, v2->compress_vec_, dim);
         auto scale1 = v1->scale_;
@@ -189,6 +188,7 @@ export template <typename DataType>
 class RabitqCosDist {
 public:
     using This = RabitqCosDist<DataType>;
+    using LVQDist = This;
     using RabitqDist = This;
     using MetaType = RabitqVecStoreMetaType<DataType>;
     using StoreType = typename MetaType::StoreType;
@@ -229,8 +229,8 @@ public:
     template <typename DataStore>
     DistanceType operator()(const QueryType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
         const StoreType &v2 = data_store.GetVec(v2_i);
-        size_t align_dim = data_store.align_dim();
-        return Inner(v1, v2, align_dim);
+        size_t dim = data_store.dim();
+        return Inner(v1, v2, dim);
     }
 
 private:
@@ -258,6 +258,11 @@ private:
 template <typename DataType>
 LVQCosDist<DataType, i8> PlainCosDist<DataType>::ToLVQDistance(size_t dim) && {
     return LVQCosDist<DataType, i8>(dim);
+}
+
+template <typename DataType>
+RabitqCosDist<DataType> PlainCosDist<DataType>::ToRabitqDistance(size_t dim) && {
+    return RabitqCosDist<DataType>(dim);
 }
 
 } // namespace infinity

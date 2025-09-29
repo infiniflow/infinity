@@ -39,6 +39,8 @@ HnswEncodeType StringToHnswEncodeType(const std::string &str) {
         return HnswEncodeType::kPlain;
     } else if (str == "lvq") {
         return HnswEncodeType::kLVQ;
+    } else if (str == "rabitq") {
+        return HnswEncodeType::kRabitq;
     } else {
         return HnswEncodeType::kInvalid;
     }
@@ -50,6 +52,8 @@ std::string HnswEncodeTypeToString(HnswEncodeType encode_type) {
             return "plain";
         case HnswEncodeType::kLVQ:
             return "lvq";
+        case HnswEncodeType::kRabitq:
+            return "rabitq";
         default:
             return "invalid";
     }
@@ -308,13 +312,16 @@ void IndexHnsw::ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base
     const auto embedding_info = dynamic_cast<const EmbeddingInfo *>(data_type_ptr->type_info().get());
     const EmbeddingDataType embedding_data_type = embedding_info->Type();
     for (const auto *param : index_param_list) {
-        if (param->param_name_ == "encode" && StringToHnswEncodeType(param->param_value_) == HnswEncodeType::kLVQ) {
-            // TODO: now only support float?
-            if (embedding_data_type != EmbeddingDataType::kElemFloat) {
-                RecoverableError(Status::InvalidIndexDefinition(
-                    fmt::format("Attempt to create HNSW index with LVQ encoding on column: {}, data type: {}. now only support float element type.",
-                                column_name,
-                                data_type_ptr->ToString())));
+        if (param->param_name_ == "encode") {
+            HnswEncodeType encode_type = StringToHnswEncodeType(param->param_value_);
+            if (encode_type == HnswEncodeType::kLVQ || encode_type == HnswEncodeType::kRabitq) {
+                // TODO: now only support float?
+                if (embedding_data_type != EmbeddingDataType::kElemFloat) {
+                    RecoverableError(Status::InvalidIndexDefinition(fmt::format(
+                        "Attempt to create HNSW index with LVQ encoding on column: {}, data type: {}. now only support float element type.",
+                        column_name,
+                        data_type_ptr->ToString())));
+                }
             }
         }
     }
