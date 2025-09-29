@@ -2309,10 +2309,6 @@ Status NewTxn::PrepareCommit() {
             }
             case WalCommandType::OPTIMIZE_V2: {
                 [[maybe_unused]] auto *optimize_cmd = static_cast<WalCmdOptimizeV2 *>(command.get());
-                Status status = ManualDumpIndex(optimize_cmd->db_name_, optimize_cmd->table_name_);
-                if (!status.ok()) {
-                    return status;
-                }
                 break;
             }
             case WalCommandType::CLEANUP: {
