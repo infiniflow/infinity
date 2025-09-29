@@ -426,7 +426,6 @@ void NewTxnManager::SetCurrentTransactionID(TransactionID current_transaction_id
 
 TxnTimeStamp NewTxnManager::GetOldestAliveTS() {
     std::lock_guard guard(locker_);
-    //    return begin_txns_.empty() ? current_ts_ + 1 : begin_txns_.begin()->first;
     return begin_txn_map_.empty() ? current_ts_ + 1 : begin_txn_map_.begin()->first;
 }
 

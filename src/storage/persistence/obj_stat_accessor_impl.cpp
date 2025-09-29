@@ -146,6 +146,9 @@ std::unordered_map<std::string, std::shared_ptr<ObjStat>> ObjectStats::GetAllObj
 }
 
 void ObjectStats::AddObjStatToKVStore(const std::string &key, const std::shared_ptr<ObjStat> &obj_stat) {
+    if (key == "KEY_EMPTY") {
+        return;
+    }
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     if (!pm) {
         return;

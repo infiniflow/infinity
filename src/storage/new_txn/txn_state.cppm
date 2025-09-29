@@ -59,9 +59,9 @@ export inline std::string TxnState2Str(TxnState txn_state) {
 }
 
 export enum class TransactionType {
-    kInvalid,    // Developer doesn't know what type is this txn
+    kInvalid,           // Developer doesn't know what type is this txn
     kSkippedCheckpoint, // Develop know it's a checkpoint txn
-    kRead,       // Developer know it's a read txn
+    kRead,              // Developer know it's a read txn
     kDummy,
     kReplay,
     kRecovery,
@@ -82,6 +82,7 @@ export enum class TransactionType {
     kDropIndex,
     kDumpMemIndex,
     kOptimizeIndex,
+    kAlterIndex,
     kAddColumn,
     kSetCommand,
     kDropColumn,
@@ -111,6 +112,9 @@ export inline std::string TransactionType2Str(TransactionType txn_type) {
         }
         case TransactionType::kOptimizeIndex: {
             return "optimize_index";
+        }
+        case TransactionType::kAlterIndex: {
+            return "alter_index";
         }
         case TransactionType::kCompact: {
             return "compact";

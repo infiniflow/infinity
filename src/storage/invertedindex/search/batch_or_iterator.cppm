@@ -45,10 +45,14 @@ public:
     void DecodeFrom(RowID buffer_start_doc_id);
 
 private:
+    // Dynamic batch sizing based on keyword count
+    u32 CalculateOptimalBatchSize(u32 num_keywords) const;
+
     std::vector<f32> f1_;
     std::vector<f32> f2_;
     std::vector<f32> bm25_common_score_;
     RowID buffer_start_doc_id_ = INVALID_ROWID;
+    u32 batch_size_ = 128; // Dynamic batch size instead of fixed BATCH_OR_LEN
     u32 memset_bytes_ = 0;
     void *aligned_buffer_ = nullptr;
     u32 *tf_ptr_ = nullptr;

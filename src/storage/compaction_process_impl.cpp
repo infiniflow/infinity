@@ -78,7 +78,7 @@ void CompactionProcessor::Stop() {
     LOG_INFO("Compaction processor is stopped.");
 }
 
-void CompactionProcessor::Submit(const std::shared_ptr<BGTask>& bg_task) {
+void CompactionProcessor::Submit(const std::shared_ptr<BGTask> &bg_task) {
     task_queue_.Enqueue(bg_task);
     ++task_count_;
 }
@@ -214,7 +214,7 @@ Status CompactionProcessor::NewManualCompact(const std::string &db_name, const s
     //    LOG_TRACE(fmt::format("Compact command triggered compaction: {}.{}", db_name, table_name));
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto *new_txn =
-        new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kCompact);
+        new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("Compact table {}.{}", db_name, table_name)), TransactionType::kCompact);
 
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
@@ -246,15 +246,17 @@ Status CompactionProcessor::NewManualCompact(const std::string &db_name, const s
     if (!compactible_segment_ids.empty()) {
         status = new_txn->Compact(db_name, table_name, compactible_segment_ids);
         if (!status.ok()) {
-            return status;
-        }
-        status = new_txn_mgr->CommitTxn(new_txn);
-        if (!status.ok()) {
+            new_txn_mgr->RollBackTxn(new_txn);
             return status;
         }
         result_msg = std::make_unique<std::string>(fmt::format("Compact segments {} into new segment", fmt::join(compactible_segment_ids, ",")));
     } else {
         result_msg = std::make_unique<std::string>("No segment to compact");
+    }
+
+    status = new_txn_mgr->CommitTxn(new_txn);
+    if (!status.ok()) {
+        return status;
     }
     return Status(ErrorCode::kOk, std::move(result_msg));
 }

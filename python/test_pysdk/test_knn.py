@@ -726,7 +726,7 @@ class TestInfinity:
         print('No operator option for query "TO BE OR NOT", expect throw:')
         with pytest.raises(InfinityException) as e_info:
             table_obj.output(["*", "_row_id", "_score"]).match_text("body^5", "TO BE OR NOT", 5).to_pl()
-        print(e_info.value.error_message)
+        print(e_info.value.error_msg)
         res = table_obj.drop_index("my_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         res = db_obj.drop_table("test_fulltext_operator_option" + suffix, ConflictType.Error)

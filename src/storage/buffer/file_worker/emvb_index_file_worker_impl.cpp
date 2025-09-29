@@ -64,10 +64,10 @@ void EMVBIndexFileWorker::AllocateInMemory() {
     const auto residual_pq_subspace_num = index_emvb->residual_pq_subspace_num_;
     const auto residual_pq_subspace_bits = index_emvb->residual_pq_subspace_bits_;
     if (column_embedding_dim % residual_pq_subspace_num != 0) {
-        const auto error_message = fmt::format("The dimension of the column embedding should be divisible by residual_pq_subspace_num: {} % {} != 0",
-                                               column_embedding_dim,
-                                               residual_pq_subspace_num);
-        RecoverableError(Status::InvalidParameter(error_message));
+        const auto error_msg = fmt::format("The dimension of the column embedding should be divisible by residual_pq_subspace_num: {} % {} != 0",
+                                           column_embedding_dim,
+                                           residual_pq_subspace_num);
+        RecoverableError(Status::InvalidParameter(error_msg));
     }
     data_ = static_cast<void *>(new EMVBIndex(start_segment_offset_, column_embedding_dim, residual_pq_subspace_num, residual_pq_subspace_bits));
 }

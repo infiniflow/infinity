@@ -251,6 +251,18 @@ def benchmark(threads, rounds, data_set, ef: int, remote: bool, path):
             print(f"Single-thread")
             print(f"Rounds: {rounds}")
             one_thread(rounds, query_path, ground_truth_path, ef, remote, f"sift_benchmark")
+    elif data_set == "sift_10k":
+        query_path = path + "/sift10k_query.fvecs"
+        ground_truth_path = path + "/sift10k_groundtruth.ivecs"
+        if threads > 1:
+            print(f"Multi-threads: {threads}")
+            print(f"Rounds: {rounds}")
+            process_pool(threads, rounds, query_path, ef, remote, f"sift_benchmark")
+
+        else:
+            print(f"Single-thread")
+            print(f"Rounds: {rounds}")
+            one_thread(rounds, query_path, ground_truth_path, ef, remote, f"sift_benchmark")
     elif data_set == "gist_1m":
         query_path = path + "/gist_query.fvecs"
         ground_truth_path = path + "/gist_groundtruth.ivecs"
@@ -295,7 +307,7 @@ if __name__ == '__main__':
 
     parser.add_argument("-t", "--threads", type=int, default=1, dest="threads")
     parser.add_argument("-r", "--rounds", type=int, default=5, dest="rounds")
-    parser.add_argument("-d", "--data", type=str, default='sift_1m', dest="data_set")  # sift_1m, gist_1m, msmarco_1m
+    parser.add_argument("-d", "--data", type=str, default='sift_1m', dest="data_set")  # sift_1m, gist_1m, msmarco_1m, sift_10k
     parser.add_argument("--ef", type=int, default=200, dest="ef")
     parser.add_argument("-R", "--remote", type=str2bool, default=True, dest="remote")
 

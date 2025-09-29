@@ -529,7 +529,7 @@ RegisterResponse::~RegisterResponse() noexcept {
 
 RegisterResponse::RegisterResponse() noexcept
    : error_code(0),
-     error_message(),
+     error_msg(),
      leader_name(),
      leader_term(0),
      heart_beat_interval(0) {
@@ -539,8 +539,8 @@ void RegisterResponse::__set_error_code(const int64_t val) {
   this->error_code = val;
 }
 
-void RegisterResponse::__set_error_message(const std::string& val) {
-  this->error_message = val;
+void RegisterResponse::__set_error_msg(const std::string& val) {
+  this->error_msg = val;
 }
 
 void RegisterResponse::__set_leader_name(const std::string& val) {
@@ -592,8 +592,8 @@ uint32_t RegisterResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 2:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
-          xfer += iprot->readString(this->error_message);
-          this->__isset.error_message = true;
+          xfer += iprot->readString(this->error_msg);
+          this->__isset.error_msg = true;
         } else {
           xfer += iprot->skip(ftype);
         }
@@ -643,8 +643,8 @@ uint32_t RegisterResponse::write(::apache::thrift::protocol::TProtocol* oprot) c
   xfer += oprot->writeI64(this->error_code);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("error_message", ::apache::thrift::protocol::T_STRING, 2);
-  xfer += oprot->writeString(this->error_message);
+  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->error_msg);
   xfer += oprot->writeFieldEnd();
 
   xfer += oprot->writeFieldBegin("leader_name", ::apache::thrift::protocol::T_STRING, 3);
@@ -667,7 +667,7 @@ uint32_t RegisterResponse::write(::apache::thrift::protocol::TProtocol* oprot) c
 void swap(RegisterResponse &a, RegisterResponse &b) {
   using ::std::swap;
   swap(a.error_code, b.error_code);
-  swap(a.error_message, b.error_message);
+  swap(a.error_msg, b.error_msg);
   swap(a.leader_name, b.leader_name);
   swap(a.leader_term, b.leader_term);
   swap(a.heart_beat_interval, b.heart_beat_interval);
@@ -678,7 +678,7 @@ bool RegisterResponse::operator==(const RegisterResponse & rhs) const
 {
   if (!(error_code == rhs.error_code))
     return false;
-  if (!(error_message == rhs.error_message))
+  if (!(error_msg == rhs.error_msg))
     return false;
   if (!(leader_name == rhs.leader_name))
     return false;
@@ -691,7 +691,7 @@ bool RegisterResponse::operator==(const RegisterResponse & rhs) const
 
 RegisterResponse::RegisterResponse(const RegisterResponse& other7) {
   error_code = other7.error_code;
-  error_message = other7.error_message;
+  error_msg = other7.error_msg;
   leader_name = other7.leader_name;
   leader_term = other7.leader_term;
   heart_beat_interval = other7.heart_beat_interval;
@@ -699,7 +699,7 @@ RegisterResponse::RegisterResponse(const RegisterResponse& other7) {
 }
 RegisterResponse& RegisterResponse::operator=(const RegisterResponse& other8) {
   error_code = other8.error_code;
-  error_message = other8.error_message;
+  error_msg = other8.error_msg;
   leader_name = other8.leader_name;
   leader_term = other8.leader_term;
   heart_beat_interval = other8.heart_beat_interval;
@@ -710,7 +710,7 @@ void RegisterResponse::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "RegisterResponse(";
   out << "error_code=" << to_string(error_code);
-  out << ", " << "error_message=" << to_string(error_message);
+  out << ", " << "error_msg=" << to_string(error_msg);
   out << ", " << "leader_name=" << to_string(leader_name);
   out << ", " << "leader_term=" << to_string(leader_term);
   out << ", " << "heart_beat_interval=" << to_string(heart_beat_interval);
@@ -825,15 +825,15 @@ UnregisterResponse::~UnregisterResponse() noexcept {
 
 UnregisterResponse::UnregisterResponse() noexcept
    : error_code(0),
-     error_message() {
+     error_msg() {
 }
 
 void UnregisterResponse::__set_error_code(const int64_t val) {
   this->error_code = val;
 }
 
-void UnregisterResponse::__set_error_message(const std::string& val) {
-  this->error_message = val;
+void UnregisterResponse::__set_error_msg(const std::string& val) {
+  this->error_msg = val;
 }
 std::ostream& operator<<(std::ostream& out, const UnregisterResponse& obj)
 {
@@ -873,8 +873,8 @@ uint32_t UnregisterResponse::read(::apache::thrift::protocol::TProtocol* iprot) 
         break;
       case 2:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
-          xfer += iprot->readString(this->error_message);
-          this->__isset.error_message = true;
+          xfer += iprot->readString(this->error_msg);
+          this->__isset.error_msg = true;
         } else {
           xfer += iprot->skip(ftype);
         }
@@ -900,8 +900,8 @@ uint32_t UnregisterResponse::write(::apache::thrift::protocol::TProtocol* oprot)
   xfer += oprot->writeI64(this->error_code);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("error_message", ::apache::thrift::protocol::T_STRING, 2);
-  xfer += oprot->writeString(this->error_message);
+  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->error_msg);
   xfer += oprot->writeFieldEnd();
 
   xfer += oprot->writeFieldStop();
@@ -912,7 +912,7 @@ uint32_t UnregisterResponse::write(::apache::thrift::protocol::TProtocol* oprot)
 void swap(UnregisterResponse &a, UnregisterResponse &b) {
   using ::std::swap;
   swap(a.error_code, b.error_code);
-  swap(a.error_message, b.error_message);
+  swap(a.error_msg, b.error_msg);
   swap(a.__isset, b.__isset);
 }
 
@@ -920,19 +920,19 @@ bool UnregisterResponse::operator==(const UnregisterResponse & rhs) const
 {
   if (!(error_code == rhs.error_code))
     return false;
-  if (!(error_message == rhs.error_message))
+  if (!(error_msg == rhs.error_msg))
     return false;
   return true;
 }
 
 UnregisterResponse::UnregisterResponse(const UnregisterResponse& other11) {
   error_code = other11.error_code;
-  error_message = other11.error_message;
+  error_msg = other11.error_msg;
   __isset = other11.__isset;
 }
 UnregisterResponse& UnregisterResponse::operator=(const UnregisterResponse& other12) {
   error_code = other12.error_code;
-  error_message = other12.error_message;
+  error_msg = other12.error_msg;
   __isset = other12.__isset;
   return *this;
 }
@@ -940,7 +940,7 @@ void UnregisterResponse::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "UnregisterResponse(";
   out << "error_code=" << to_string(error_code);
-  out << ", " << "error_message=" << to_string(error_message);
+  out << ", " << "error_msg=" << to_string(error_msg);
   out << ")";
 }
 
@@ -1146,7 +1146,7 @@ HeartBeatResponse::~HeartBeatResponse() noexcept {
 
 HeartBeatResponse::HeartBeatResponse() noexcept
    : error_code(0),
-     error_message(),
+     error_msg(),
      leader_term(0),
      sender_status(static_cast<NodeStatus::type>(0)) {
 }
@@ -1155,8 +1155,8 @@ void HeartBeatResponse::__set_error_code(const int64_t val) {
   this->error_code = val;
 }
 
-void HeartBeatResponse::__set_error_message(const std::string& val) {
-  this->error_message = val;
+void HeartBeatResponse::__set_error_msg(const std::string& val) {
+  this->error_msg = val;
 }
 
 void HeartBeatResponse::__set_leader_term(const int64_t val) {
@@ -1208,8 +1208,8 @@ uint32_t HeartBeatResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 2:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
-          xfer += iprot->readString(this->error_message);
-          this->__isset.error_message = true;
+          xfer += iprot->readString(this->error_msg);
+          this->__isset.error_msg = true;
         } else {
           xfer += iprot->skip(ftype);
         }
@@ -1273,8 +1273,8 @@ uint32_t HeartBeatResponse::write(::apache::thrift::protocol::TProtocol* oprot) 
   xfer += oprot->writeI64(this->error_code);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("error_message", ::apache::thrift::protocol::T_STRING, 2);
-  xfer += oprot->writeString(this->error_message);
+  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->error_msg);
   xfer += oprot->writeFieldEnd();
 
   xfer += oprot->writeFieldBegin("leader_term", ::apache::thrift::protocol::T_I64, 3);
@@ -1305,7 +1305,7 @@ uint32_t HeartBeatResponse::write(::apache::thrift::protocol::TProtocol* oprot) 
 void swap(HeartBeatResponse &a, HeartBeatResponse &b) {
   using ::std::swap;
   swap(a.error_code, b.error_code);
-  swap(a.error_message, b.error_message);
+  swap(a.error_msg, b.error_msg);
   swap(a.leader_term, b.leader_term);
   swap(a.other_nodes, b.other_nodes);
   swap(a.sender_status, b.sender_status);
@@ -1316,7 +1316,7 @@ bool HeartBeatResponse::operator==(const HeartBeatResponse & rhs) const
 {
   if (!(error_code == rhs.error_code))
     return false;
-  if (!(error_message == rhs.error_message))
+  if (!(error_msg == rhs.error_msg))
     return false;
   if (!(leader_term == rhs.leader_term))
     return false;
@@ -1329,7 +1329,7 @@ bool HeartBeatResponse::operator==(const HeartBeatResponse & rhs) const
 
 HeartBeatResponse::HeartBeatResponse(const HeartBeatResponse& other23) {
   error_code = other23.error_code;
-  error_message = other23.error_message;
+  error_msg = other23.error_msg;
   leader_term = other23.leader_term;
   other_nodes = other23.other_nodes;
   sender_status = other23.sender_status;
@@ -1337,7 +1337,7 @@ HeartBeatResponse::HeartBeatResponse(const HeartBeatResponse& other23) {
 }
 HeartBeatResponse& HeartBeatResponse::operator=(const HeartBeatResponse& other24) {
   error_code = other24.error_code;
-  error_message = other24.error_message;
+  error_msg = other24.error_msg;
   leader_term = other24.leader_term;
   other_nodes = other24.other_nodes;
   sender_status = other24.sender_status;
@@ -1348,7 +1348,7 @@ void HeartBeatResponse::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "HeartBeatResponse(";
   out << "error_code=" << to_string(error_code);
-  out << ", " << "error_message=" << to_string(error_message);
+  out << ", " << "error_msg=" << to_string(error_msg);
   out << ", " << "leader_term=" << to_string(leader_term);
   out << ", " << "other_nodes=" << to_string(other_nodes);
   out << ", " << "sender_status=" << to_string(sender_status);
@@ -1528,7 +1528,7 @@ SyncLogResponse::~SyncLogResponse() noexcept {
 
 SyncLogResponse::SyncLogResponse() noexcept
    : error_code(0),
-     error_message(),
+     error_msg(),
      txn_timestamp(0) {
 }
 
@@ -1536,8 +1536,8 @@ void SyncLogResponse::__set_error_code(const int64_t val) {
   this->error_code = val;
 }
 
-void SyncLogResponse::__set_error_message(const std::string& val) {
-  this->error_message = val;
+void SyncLogResponse::__set_error_msg(const std::string& val) {
+  this->error_msg = val;
 }
 
 void SyncLogResponse::__set_txn_timestamp(const int64_t val) {
@@ -1581,8 +1581,8 @@ uint32_t SyncLogResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 2:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
-          xfer += iprot->readString(this->error_message);
-          this->__isset.error_message = true;
+          xfer += iprot->readString(this->error_msg);
+          this->__isset.error_msg = true;
         } else {
           xfer += iprot->skip(ftype);
         }
@@ -1616,8 +1616,8 @@ uint32_t SyncLogResponse::write(::apache::thrift::protocol::TProtocol* oprot) co
   xfer += oprot->writeI64(this->error_code);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("error_message", ::apache::thrift::protocol::T_STRING, 2);
-  xfer += oprot->writeString(this->error_message);
+  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->error_msg);
   xfer += oprot->writeFieldEnd();
 
   xfer += oprot->writeFieldBegin("txn_timestamp", ::apache::thrift::protocol::T_I64, 3);
@@ -1632,7 +1632,7 @@ uint32_t SyncLogResponse::write(::apache::thrift::protocol::TProtocol* oprot) co
 void swap(SyncLogResponse &a, SyncLogResponse &b) {
   using ::std::swap;
   swap(a.error_code, b.error_code);
-  swap(a.error_message, b.error_message);
+  swap(a.error_msg, b.error_msg);
   swap(a.txn_timestamp, b.txn_timestamp);
   swap(a.__isset, b.__isset);
 }
@@ -1641,7 +1641,7 @@ bool SyncLogResponse::operator==(const SyncLogResponse & rhs) const
 {
   if (!(error_code == rhs.error_code))
     return false;
-  if (!(error_message == rhs.error_message))
+  if (!(error_msg == rhs.error_msg))
     return false;
   if (!(txn_timestamp == rhs.txn_timestamp))
     return false;
@@ -1650,13 +1650,13 @@ bool SyncLogResponse::operator==(const SyncLogResponse & rhs) const
 
 SyncLogResponse::SyncLogResponse(const SyncLogResponse& other33) {
   error_code = other33.error_code;
-  error_message = other33.error_message;
+  error_msg = other33.error_msg;
   txn_timestamp = other33.txn_timestamp;
   __isset = other33.__isset;
 }
 SyncLogResponse& SyncLogResponse::operator=(const SyncLogResponse& other34) {
   error_code = other34.error_code;
-  error_message = other34.error_message;
+  error_msg = other34.error_msg;
   txn_timestamp = other34.txn_timestamp;
   __isset = other34.__isset;
   return *this;
@@ -1665,7 +1665,7 @@ void SyncLogResponse::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "SyncLogResponse(";
   out << "error_code=" << to_string(error_code);
-  out << ", " << "error_message=" << to_string(error_message);
+  out << ", " << "error_msg=" << to_string(error_msg);
   out << ", " << "txn_timestamp=" << to_string(txn_timestamp);
   out << ")";
 }
@@ -1803,15 +1803,15 @@ ChangeRoleResponse::~ChangeRoleResponse() noexcept {
 
 ChangeRoleResponse::ChangeRoleResponse() noexcept
    : error_code(0),
-     error_message() {
+     error_msg() {
 }
 
 void ChangeRoleResponse::__set_error_code(const int64_t val) {
   this->error_code = val;
 }
 
-void ChangeRoleResponse::__set_error_message(const std::string& val) {
-  this->error_message = val;
+void ChangeRoleResponse::__set_error_msg(const std::string& val) {
+  this->error_msg = val;
 }
 std::ostream& operator<<(std::ostream& out, const ChangeRoleResponse& obj)
 {
@@ -1851,8 +1851,8 @@ uint32_t ChangeRoleResponse::read(::apache::thrift::protocol::TProtocol* iprot) 
         break;
       case 2:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
-          xfer += iprot->readString(this->error_message);
-          this->__isset.error_message = true;
+          xfer += iprot->readString(this->error_msg);
+          this->__isset.error_msg = true;
         } else {
           xfer += iprot->skip(ftype);
         }
@@ -1878,8 +1878,8 @@ uint32_t ChangeRoleResponse::write(::apache::thrift::protocol::TProtocol* oprot)
   xfer += oprot->writeI64(this->error_code);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("error_message", ::apache::thrift::protocol::T_STRING, 2);
-  xfer += oprot->writeString(this->error_message);
+  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->error_msg);
   xfer += oprot->writeFieldEnd();
 
   xfer += oprot->writeFieldStop();
@@ -1890,7 +1890,7 @@ uint32_t ChangeRoleResponse::write(::apache::thrift::protocol::TProtocol* oprot)
 void swap(ChangeRoleResponse &a, ChangeRoleResponse &b) {
   using ::std::swap;
   swap(a.error_code, b.error_code);
-  swap(a.error_message, b.error_message);
+  swap(a.error_msg, b.error_msg);
   swap(a.__isset, b.__isset);
 }
 
@@ -1898,19 +1898,19 @@ bool ChangeRoleResponse::operator==(const ChangeRoleResponse & rhs) const
 {
   if (!(error_code == rhs.error_code))
     return false;
-  if (!(error_message == rhs.error_message))
+  if (!(error_msg == rhs.error_msg))
     return false;
   return true;
 }
 
 ChangeRoleResponse::ChangeRoleResponse(const ChangeRoleResponse& other38) {
   error_code = other38.error_code;
-  error_message = other38.error_message;
+  error_msg = other38.error_msg;
   __isset = other38.__isset;
 }
 ChangeRoleResponse& ChangeRoleResponse::operator=(const ChangeRoleResponse& other39) {
   error_code = other39.error_code;
-  error_message = other39.error_message;
+  error_msg = other39.error_msg;
   __isset = other39.__isset;
   return *this;
 }
@@ -1918,7 +1918,7 @@ void ChangeRoleResponse::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "ChangeRoleResponse(";
   out << "error_code=" << to_string(error_code);
-  out << ", " << "error_message=" << to_string(error_message);
+  out << ", " << "error_msg=" << to_string(error_msg);
   out << ")";
 }
 

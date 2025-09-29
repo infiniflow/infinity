@@ -96,8 +96,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
 
                 auto iter = meta_tree->db_map_.find(table_key->db_id_str_);
                 if (iter == meta_tree->db_map_.end()) {
-                    std::string error_message = fmt::format("DB not found for table: {}, idx: {}", table_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("DB not found for table: {}, idx: {}", table_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // DB is dropped
                     continue;
                 }
@@ -114,8 +114,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto db_tag_key = static_cast<DBTagMetaKey *>(meta_key.get());
                 auto db_iter = meta_tree->db_map_.find(db_tag_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
-                    std::string error_message = fmt::format("DB not found for tag: {}, idx: {}", db_tag_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("DB not found for tag: {}, idx: {}", db_tag_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // DB is dropped
                     continue;
                 }
@@ -140,8 +140,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto segment_key = static_cast<SegmentMetaKey *>(meta_key.get());
                 auto db_iter = meta_tree->db_map_.find(segment_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
-                    std::string error_message = fmt::format("DB not found: {}, idx: {}", segment_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("DB not found: {}, idx: {}", segment_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // DB is dropped
                     continue;
                 }
@@ -149,8 +149,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(segment_key->table_id_str_);
                 if (table_iter == table_map.end()) {
-                    std::string error_message = fmt::format("Table not found: {}, idx: {}", segment_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("Table not found: {}, idx: {}", segment_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // The Table is dropped
                     continue;
                 }
@@ -169,8 +169,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto table_tag_key = static_cast<TableTagMetaKey *>(meta_key.get());
                 auto db_iter = meta_tree->db_map_.find(table_tag_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
-                    std::string error_message = fmt::format("DB not found: {}, idx: {}", table_tag_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("DB not found: {}, idx: {}", table_tag_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // DB is dropped
                     continue;
                 }
@@ -178,8 +178,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(table_tag_key->table_id_str_);
                 if (table_iter == table_map.end()) {
-                    std::string error_message = fmt::format("Table not found: {}, idx: {}", table_tag_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("Table not found: {}, idx: {}", table_tag_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // The Table is dropped
                     continue;
                 }
@@ -192,8 +192,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto table_index_meta_key = static_cast<TableIndexMetaKey *>(meta_key.get());
                 auto db_iter = meta_tree->db_map_.find(table_index_meta_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
-                    std::string error_message = fmt::format("DB not found: {}, idx: {}", table_index_meta_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("DB not found: {}, idx: {}", table_index_meta_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // DB is dropped
                     continue;
                 }
@@ -201,8 +201,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(table_index_meta_key->table_id_str_);
                 if (table_iter == table_map.end()) {
-                    std::string error_message = fmt::format("Table not found: {}, idx: {}", table_index_meta_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("Table not found: {}, idx: {}", table_index_meta_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // The Table is dropped
                     continue;
                 }
@@ -217,8 +217,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto table_column_meta_key = static_cast<TableColumnMetaKey *>(meta_key.get());
                 auto db_iter = meta_tree->db_map_.find(table_column_meta_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
-                    std::string error_message = fmt::format("DB not found: {}, idx: {}", table_column_meta_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("DB not found: {}, idx: {}", table_column_meta_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // DB is dropped
                     continue;
                 }
@@ -226,8 +226,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(table_column_meta_key->table_id_str_);
                 if (table_iter == table_map.end()) {
-                    std::string error_message = fmt::format("Table not found: {}, idx: {}", table_column_meta_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("Table not found: {}, idx: {}", table_column_meta_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // The Table is dropped
                     continue;
                 }
@@ -250,8 +250,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto block_key = static_cast<BlockMetaKey *>(meta_key.get());
                 auto db_iter = meta_tree->db_map_.find(block_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
-                    std::string error_message = fmt::format("DB not found: {}, idx: {}", block_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("DB not found: {}, idx: {}", block_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // DB is dropped
                     continue;
                 }
@@ -259,8 +259,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(block_key->table_id_str_);
                 if (table_iter == table_map.end()) {
-                    std::string error_message = fmt::format("Table not found: {}, idx: {}", block_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("Table not found: {}, idx: {}", block_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // The Table is dropped
                     continue;
                 }
@@ -269,8 +269,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto &segment_map = table_object->segment_map_;
                 auto segment_iter = segment_map.find(block_key->segment_id_);
                 if (segment_iter == segment_map.end()) {
-                    std::string error_message = fmt::format("Segment not found: {}, idx: {}", block_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("Segment not found: {}, idx: {}", block_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     continue;
                 }
 
@@ -284,8 +284,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto segment_tag = static_cast<SegmentTagMetaKey *>(meta_key.get());
                 auto db_iter = meta_tree->db_map_.find(segment_tag->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
-                    std::string error_message = fmt::format("DB not found: {}, idx: {}", segment_tag->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("DB not found: {}, idx: {}", segment_tag->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // DB is dropped
                     continue;
                 }
@@ -293,8 +293,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(segment_tag->table_id_str_);
                 if (table_iter == table_map.end()) {
-                    std::string error_message = fmt::format("Table not found: {}, idx: {}", segment_tag->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("Table not found: {}, idx: {}", segment_tag->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // The Table is dropped
                     continue;
                 }
@@ -303,8 +303,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto &segment_map = table_object->segment_map_;
                 auto segment_iter = segment_map.find(segment_tag->segment_id_);
                 if (segment_iter == segment_map.end()) {
-                    std::string error_message = fmt::format("Segment not found: {}, idx: {}", segment_tag->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("Segment not found: {}, idx: {}", segment_tag->ToString(), idx);
+                    LOG_WARN(error_msg);
                     continue;
                 }
 
@@ -326,8 +326,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto block_key = static_cast<BlockMetaKey *>(meta_key.get());
                 auto db_iter = meta_tree->db_map_.find(block_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
-                    std::string error_message = fmt::format("DB not found: {}, idx: {}", block_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("DB not found: {}, idx: {}", block_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // DB is dropped
                     continue;
                 }
@@ -335,8 +335,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(block_key->table_id_str_);
                 if (table_iter == table_map.end()) {
-                    std::string error_message = fmt::format("Table not found: {}, idx: {}", block_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("Table not found: {}, idx: {}", block_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // The Table is dropped
                     continue;
                 }
@@ -358,8 +358,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto block_tag = static_cast<BlockTagMetaKey *>(meta_key.get());
                 auto db_iter = meta_tree->db_map_.find(block_tag->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
-                    std::string error_message = fmt::format("DB not found: {}, idx: {}", block_tag->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("DB not found: {}, idx: {}", block_tag->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // DB is dropped
                     continue;
                 }
@@ -367,8 +367,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(block_tag->table_id_str_);
                 if (table_iter == table_map.end()) {
-                    std::string error_message = fmt::format("Table not found: {}, idx: {}", block_tag->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("Table not found: {}, idx: {}", block_tag->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // The Table is dropped
                     continue;
                 }
@@ -378,8 +378,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto segment_iter = segment_map.find(block_tag->segment_id_);
                 if (segment_iter == segment_map.end()) {
                     // Segment is compacted
-                    std::string error_message = fmt::format("Segment not found, maybe is compacted: {}, idx: {}", block_tag->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("Segment not found, maybe is compacted: {}, idx: {}", block_tag->ToString(), idx);
+                    LOG_WARN(error_msg);
                     continue;
                 }
 
@@ -408,8 +408,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto segment_index_key = static_cast<SegmentIndexMetaKey *>(meta_key.get());
                 auto db_iter = meta_tree->db_map_.find(segment_index_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
-                    std::string error_message = fmt::format("DB not found: {}, idx: {}", segment_index_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("DB not found: {}, idx: {}", segment_index_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // DB is dropped
                     continue;
                 }
@@ -417,8 +417,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(segment_index_key->table_id_str_);
                 if (table_iter == table_map.end()) {
-                    std::string error_message = fmt::format("Table not found: {}, idx: {}", segment_index_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("Table not found: {}, idx: {}", segment_index_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // The Table is dropped
                     continue;
                 }
@@ -427,8 +427,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto &index_map = table_object->index_map_;
                 auto table_index_iter = index_map.find(segment_index_key->index_id_str_);
                 if (table_index_iter == index_map.end()) {
-                    std::string error_message = fmt::format("Table index not found: {}, idx: {}", segment_index_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("Table index not found: {}, idx: {}", segment_index_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // Table index is dropped
                     continue;
                 }
@@ -442,8 +442,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto table_index_tag_key = static_cast<TableIndexTagMetaKey *>(meta_key.get());
                 auto db_iter = meta_tree->db_map_.find(table_index_tag_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
-                    std::string error_message = fmt::format("DB not found: {}, idx: {}", table_index_tag_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("DB not found: {}, idx: {}", table_index_tag_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // DB is dropped
                     continue;
                 }
@@ -451,8 +451,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(table_index_tag_key->table_id_str_);
                 if (table_iter == table_map.end()) {
-                    std::string error_message = fmt::format("Table not found: {}, idx: {}", table_index_tag_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("Table not found: {}, idx: {}", table_index_tag_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // The Table is dropped
                     continue;
                 }
@@ -461,8 +461,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto &index_map = table_object->index_map_;
                 auto table_index_iter = index_map.find(table_index_tag_key->index_id_str_);
                 if (table_index_iter == index_map.end()) {
-                    std::string error_message = fmt::format("Table index not found: {}, idx: {}", table_index_tag_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("Table index not found: {}, idx: {}", table_index_tag_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // Table index is dropped.
                     continue;
                 }
@@ -485,8 +485,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto chunk_index_key = static_cast<ChunkIndexMetaKey *>(meta_key.get());
                 auto db_iter = meta_tree->db_map_.find(chunk_index_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
-                    std::string error_message = fmt::format("DB not found: {}, idx: {}", chunk_index_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("DB not found: {}, idx: {}", chunk_index_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // DB is dropped
                     continue;
                 }
@@ -494,8 +494,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(chunk_index_key->table_id_str_);
                 if (table_iter == table_map.end()) {
-                    std::string error_message = fmt::format("Table not found: {}, idx: {}", chunk_index_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("Table not found: {}, idx: {}", chunk_index_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // The Table is dropped
                     continue;
                 }
@@ -504,8 +504,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto &index_map = table_object->index_map_;
                 auto table_index_iter = index_map.find(chunk_index_key->index_id_str_);
                 if (table_index_iter == index_map.end()) {
-                    std::string error_message = fmt::format("Table index not found: {}, idx: {}", chunk_index_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("Table index not found: {}, idx: {}", chunk_index_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     // The Table is dropped
                     continue;
                 }
@@ -514,8 +514,8 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 auto &segment_map = table_index_object->segment_map_;
                 auto segment_index_iter = segment_map.find(chunk_index_key->segment_id_);
                 if (segment_index_iter == segment_map.end()) {
-                    std::string error_message = fmt::format("Segment index not found: {}, idx: {}", chunk_index_key->ToString(), idx);
-                    LOG_WARN(error_message);
+                    std::string error_msg = fmt::format("Segment index not found: {}, idx: {}", chunk_index_key->ToString(), idx);
+                    LOG_WARN(error_msg);
                     continue;
                 }
 
@@ -694,9 +694,9 @@ SegmentID MetaTableObject::GetUnsealedSegmentID() const {
     auto meta_iter = tag_map_.find("unsealed_segment_id");
     if (meta_iter == tag_map_.end()) {
         SegmentID next_segment_id = this->GetNextSegmentID();
-        std::string error_message =
+        std::string error_msg =
             fmt::format("Can't find 'unsealed_segment_id' in table: {}, use next segment id: {}", meta_key_->ToString(), next_segment_id);
-        LOG_WARN(error_message);
+        LOG_WARN(error_msg);
         return next_segment_id;
     }
     MetaKey *meta_key = meta_iter->second.get();
@@ -718,8 +718,8 @@ size_t MetaTableObject::GetCurrentSegmentRowCount(Storage *storage_ptr) const {
     SegmentID unsealed_segment_id = this->GetUnsealedSegmentID();
     auto seg_iter = segment_map_.find(unsealed_segment_id);
     if (seg_iter == segment_map_.end()) {
-        std::string error_message = fmt::format("Can't find unsealed segment id: {}, table: {}", unsealed_segment_id, meta_key_->ToString());
-        LOG_WARN(error_message);
+        std::string error_msg = fmt::format("Can't find unsealed segment id: {}, table: {}", unsealed_segment_id, meta_key_->ToString());
+        LOG_WARN(error_msg);
         return 0;
     }
     auto segment_object = static_cast<MetaSegmentObject *>(seg_iter->second.get());

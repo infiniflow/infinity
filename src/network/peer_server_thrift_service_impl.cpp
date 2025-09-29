@@ -71,11 +71,11 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
         } else {
             LOG_ERROR(fmt::format("Node: {} fail to register with leader, error: {}", request.node_name, status.message()));
             response.error_code = static_cast<i64>(status.code());
-            response.error_message = status.message();
+            response.error_msg = status.message();
         }
     } else {
         response.error_code = static_cast<i64>(ErrorCode::kInvalidNodeRole);
-        response.error_message = "Attempt to register with a non-leader node";
+        response.error_msg = "Attempt to register with a non-leader node";
     }
 
     return;
@@ -88,12 +88,12 @@ void PeerServerThriftService::Unregister(infinity_peer_server::UnregisterRespons
         Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(request.node_name, UpdateNodeOp::kRemove);
         if (!status.ok()) {
             response.error_code = static_cast<i64>(status.code_);
-            response.error_message = status.message();
+            response.error_msg = status.message();
         }
         LOG_INFO(fmt::format("Node: {} unregistered from leader.", request.node_name));
     } else {
         response.error_code = static_cast<i64>(ErrorCode::kInvalidNodeRole);
-        response.error_message = "Attempt to unregister from a non-leader node";
+        response.error_msg = "Attempt to unregister from a non-leader node";
     }
     return;
 }
@@ -138,12 +138,12 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
                                                                                                  response.sender_status);
         if (!status.ok()) {
             response.error_code = static_cast<i64>(status.code());
-            response.error_message = status.message();
+            response.error_msg = status.message();
         }
     } else {
         response.error_code = static_cast<i64>(ErrorCode::kInvalidNodeRole);
         response.sender_status = infinity_peer_server::NodeStatus::type::kRemoved;
-        response.error_message = fmt::format("Attempt to heartbeat from a non-leader node: {}", ToString(this_server_role));
+        response.error_msg = fmt::format("Attempt to heartbeat from a non-leader node: {}", ToString(this_server_role));
     }
     return;
 }
@@ -165,7 +165,7 @@ void PeerServerThriftService::SyncLog(infinity_peer_server::SyncLogResponse &res
 
     if (!status.ok()) {
         response.error_code = static_cast<i64>(status.code());
-        response.error_message = status.message();
+        response.error_msg = status.message();
     }
     return;
 }
@@ -184,7 +184,7 @@ void PeerServerThriftService::ChangeRole(infinity_peer_server::ChangeRoleRespons
 
     if (!status.ok()) {
         response.error_code = static_cast<i64>(status.code());
-        response.error_message = status.message();
+        response.error_msg = status.message();
     }
     return;
 }

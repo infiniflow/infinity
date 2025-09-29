@@ -55,7 +55,7 @@ class mocked_http_network(http_network_util):
             )
         except subprocess.CalledProcessError as e:
             raise InfinityException(
-                error_code=ErrorCode.INFINITY_IS_INITING, error_message=str(e)
+                error_code=ErrorCode.INFINITY_IS_INITING, error_msg=str(e)
             )
         if len(result.stdout) == 0:
             return http_result(0, None)
@@ -71,7 +71,7 @@ class mocked_http_network(http_network_util):
         if resp.error_code != 0:
             self.logger.error(resp)
             raise InfinityException(
-                error_code=resp.error_code, error_message=resp.json()["error_message"]
+                error_code=resp.error_code, error_msg=resp.json()["error_msg"]
             )
 
 

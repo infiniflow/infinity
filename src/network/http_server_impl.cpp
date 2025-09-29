@@ -261,7 +261,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -299,13 +299,13 @@ public:
                     options.conflict_type_ = ConflictType::kReplace;
                 } else {
                     json_response["error_code"] = 3074;
-                    json_response["error_message"] = fmt::format("Invalid create option: {}", option);
+                    json_response["error_msg"] = fmt::format("Invalid create option: {}", option);
                     http_status = HTTPStatus::CODE_500;
                     return ResponseFactory::createResponse(http_status, json_response.dump());
                 }
             } else {
                 json_response["error_code"] = 3074;
-                json_response["error_message"] = "'CREATE OPTION' field value should be string type";
+                json_response["error_msg"] = "'CREATE OPTION' field value should be string type";
                 http_status = HTTPStatus::CODE_500;
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
@@ -324,7 +324,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -358,13 +358,13 @@ public:
                     options.conflict_type_ = ConflictType::kError;
                 } else {
                     json_response["error_code"] = 3075;
-                    json_response["error_message"] = fmt::format("Invalid drop option: {}", option);
+                    json_response["error_msg"] = fmt::format("Invalid drop option: {}", option);
                     http_status = HTTPStatus::CODE_500;
                     return ResponseFactory::createResponse(http_status, json_response.dump());
                 }
             } else {
                 json_response["error_code"] = 3075;
-                json_response["error_message"] = "'DROP OPTION' field value should be string type";
+                json_response["error_msg"] = "'DROP OPTION' field value should be string type";
                 http_status = HTTPStatus::CODE_500;
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
@@ -377,7 +377,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -423,7 +423,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -454,7 +454,7 @@ public:
         if (fields.type() != simdjson::json_type::array) {
             infinity::Status status = infinity::Status::InvalidColumnDefinition("Expect json array in column definitions");
             json_response["error_code"] = status.code();
-            json_response["error_message"] = status.message();
+            json_response["error_msg"] = status.message();
             HTTPStatus http_status;
             http_status = HTTPStatus::CODE_500;
             return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -474,7 +474,7 @@ public:
         });
         if (infinity::Status status = ParseColumnDefs(fields.raw_json(), column_definitions); !status.ok()) {
             json_response["error_code"] = status.code();
-            json_response["error_message"] = status.message();
+            json_response["error_msg"] = status.message();
             HTTPStatus http_status;
             http_status = HTTPStatus::CODE_500;
             return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -492,12 +492,12 @@ public:
                     options.conflict_type_ = ConflictType::kReplace;
                 } else {
                     json_response["error_code"] = 3074;
-                    json_response["error_message"] = fmt::format("Invalid create option: {}", option);
+                    json_response["error_msg"] = fmt::format("Invalid create option: {}", option);
                     http_status = HTTPStatus::CODE_500;
                 }
             } else {
                 json_response["error_code"] = 3074;
-                json_response["error_message"] = "'CREATE OPTION' field value should be string type";
+                json_response["error_msg"] = "'CREATE OPTION' field value should be string type";
                 http_status = HTTPStatus::CODE_500;
             }
         }
@@ -511,7 +511,7 @@ public:
                 http_status = HTTPStatus::CODE_200;
             } else {
                 json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
+                json_response["error_msg"] = result.ErrorMsg();
                 http_status = HTTPStatus::CODE_500;
             }
         }
@@ -542,7 +542,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -578,12 +578,12 @@ public:
                     options.conflict_type_ = ConflictType::kError;
                 } else {
                     json_response["error_code"] = 3075;
-                    json_response["error_message"] = fmt::format("Invalid drop option: {}", option);
+                    json_response["error_msg"] = fmt::format("Invalid drop option: {}", option);
                     http_status = HTTPStatus::CODE_500;
                 }
             } else {
                 json_response["error_code"] = 3075;
-                json_response["error_message"] = "'DROP OPTION' field value should be string type";
+                json_response["error_msg"] = "'DROP OPTION' field value should be string type";
                 http_status = HTTPStatus::CODE_500;
             }
         }
@@ -595,7 +595,7 @@ public:
                 http_status = HTTPStatus::CODE_200;
             } else {
                 json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
+                json_response["error_msg"] = result.ErrorMsg();
                 http_status = HTTPStatus::CODE_500;
             }
         }
@@ -630,7 +630,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -674,7 +674,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -710,7 +710,7 @@ public:
                 export_options.copy_file_type_ = CopyFileType::kFVECS;
             } else {
                 json_response["error_code"] = ErrorCode::kNotSupported;
-                json_response["error_message"] = fmt::format("Not supported file type {}", file_type_str);
+                json_response["error_msg"] = fmt::format("Not supported file type {}", file_type_str);
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
 
@@ -731,7 +731,7 @@ public:
                     std::string delimiter = val.get<std::string>();
                     if (delimiter.size() != 1) {
                         json_response["error_code"] = ErrorCode::kNotSupported;
-                        json_response["error_message"] = fmt::format("Not supported delimiter: {}", delimiter);
+                        json_response["error_msg"] = fmt::format("Not supported delimiter: {}", delimiter);
                         return ResponseFactory::createResponse(http_status, json_response.dump());
                     }
                     export_options.delimiter_ = delimiter[0];
@@ -778,7 +778,7 @@ public:
                         }
                     } else {
                         json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-                        json_response["error_message"] = "Export data isn't a column";
+                        json_response["error_msg"] = "Export data isn't a column";
                     }
                 }
             }
@@ -791,12 +791,12 @@ public:
                 http_status = HTTPStatus::CODE_200;
             } else {
                 json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
+                json_response["error_msg"] = result.ErrorMsg();
                 http_status = HTTPStatus::CODE_500;
             }
         } catch (simdjson::simdjson_error &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-            json_response["error_message"] = e.what();
+            json_response["error_msg"] = e.what();
         }
 
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -836,7 +836,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -874,7 +874,7 @@ public:
                 import_options.copy_file_type_ = CopyFileType::kFVECS;
             } else {
                 json_response["error_code"] = ErrorCode::kNotSupported;
-                json_response["error_message"] = fmt::format("Not supported file type {}", file_type_str);
+                json_response["error_msg"] = fmt::format("Not supported file type {}", file_type_str);
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
 
@@ -886,7 +886,7 @@ public:
                     std::string delimiter = val.get<std::string>();
                     if (delimiter.size() != 1) {
                         json_response["error_code"] = ErrorCode::kNotSupported;
-                        json_response["error_message"] = fmt::format("Not supported delimiter: {}", delimiter);
+                        json_response["error_msg"] = fmt::format("Not supported delimiter: {}", delimiter);
                         return ResponseFactory::createResponse(http_status, json_response.dump());
                     }
                     import_options.delimiter_ = delimiter[0];
@@ -902,12 +902,12 @@ public:
                 http_status = HTTPStatus::CODE_200;
             } else {
                 json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
+                json_response["error_msg"] = result.ErrorMsg();
                 http_status = HTTPStatus::CODE_500;
             }
         } catch (simdjson::simdjson_error &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-            json_response["error_message"] = e.what();
+            json_response["error_msg"] = e.what();
         }
 
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -931,7 +931,7 @@ public:
 
             if (!(doc.type() == simdjson::json_type::array && doc.count_elements() > 0)) {
                 json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-                json_response["error_message"] = fmt::format("Invalid json format: {}", data_body);
+                json_response["error_msg"] = fmt::format("Invalid json format: {}", data_body);
             }
             auto *insert_rows = new std::vector<InsertRowExpr *>();
             DeferFn free_insert_rows([&]() {
@@ -951,7 +951,7 @@ public:
                     ToLower(key);
                     if (const auto [_, success] = column_name_set.insert(key); !success) {
                         json_response["error_code"] = ErrorCode::kDuplicateColumnName;
-                        json_response["error_message"] = fmt::format("Duplicated column name: {}", key);
+                        json_response["error_msg"] = fmt::format("Duplicated column name: {}", key);
                         return ResponseFactory::createResponse(http_status, json_response.dump());
                     }
                     insert_one_row->columns_.emplace_back(key);
@@ -989,7 +989,7 @@ public:
                                 }
                                 default: {
                                     json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = "Embedding element type can only be integer or float";
+                                    json_response["error_msg"] = "Embedding element type can only be integer or float";
                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
                             }
@@ -1005,8 +1005,7 @@ public:
                             size_t dimension = value.count_elements();
                             if (dimension == 0) {
                                 json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                json_response["error_message"] =
-                                    fmt::format("Empty embedding data: {}", std::string((std::string_view)value.raw_json()));
+                                json_response["error_msg"] = fmt::format("Empty embedding data: {}", std::string((std::string_view)value.raw_json()));
                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                             }
 
@@ -1020,7 +1019,7 @@ public:
                                         size_t subdimension = sub_value.count_elements();
                                         if (subdimension == 0) {
                                             json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                            json_response["error_message"] =
+                                            json_response["error_msg"] =
                                                 fmt::format("Empty tensor array: {}", std::string((std::string_view)sub_value.raw_json()));
                                             return ResponseFactory::createResponse(http_status, json_response.dump());
                                         }
@@ -1035,7 +1034,7 @@ public:
                                                     size_t subsubdimension = sub_sub_value.count_elements();
                                                     if (subsubdimension == 0) {
                                                         json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                        json_response["error_message"] =
+                                                        json_response["error_msg"] =
                                                             fmt::format("Empty tensor array: {}",
                                                                         std::string((std::string_view)sub_sub_value.raw_json()));
                                                         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -1045,7 +1044,7 @@ public:
                                                     for (auto sub_sub_sub_value : sub_sub_value.get_array()) {
                                                         if (sub_sub_sub_value.type() != simdjson::json_type::number) {
                                                             json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                            json_response["error_message"] =
+                                                            json_response["error_msg"] =
                                                                 "Embedding element type can only be integer or float or tensor or tensor array";
                                                             return ResponseFactory::createResponse(http_status, json_response.dump());
                                                         }
@@ -1074,7 +1073,7 @@ public:
                                                             }
                                                             default: {
                                                                 json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                                json_response["error_message"] =
+                                                                json_response["error_msg"] =
                                                                     "Embedding element type can only be integer or float or tensor or tensor array";
                                                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                                                             }
@@ -1108,7 +1107,7 @@ public:
                                                         }
                                                         default: {
                                                             json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                            json_response["error_message"] =
+                                                            json_response["error_msg"] =
                                                                 "Embedding element type can only be integer or float or tensor or tensor array";
                                                             return ResponseFactory::createResponse(http_status, json_response.dump());
                                                         }
@@ -1117,7 +1116,7 @@ public:
                                                 }
                                                 default: {
                                                     json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                    json_response["error_message"] =
+                                                    json_response["error_msg"] =
                                                         "Embedding element type can only be integer or float or tensor or tensor array";
                                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                                 }
@@ -1153,7 +1152,7 @@ public:
                                             }
                                             default: {
                                                 json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                json_response["error_message"] =
+                                                json_response["error_msg"] =
                                                     "Embedding element type can only be integer or float or tensor or tensor array";
                                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                                             }
@@ -1162,8 +1161,7 @@ public:
                                     }
                                     default: {
                                         json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                        json_response["error_message"] =
-                                            "Embedding element type can only be integer or float or tensor or tensor array";
+                                        json_response["error_msg"] = "Embedding element type can only be integer or float or tensor or tensor array";
                                         return ResponseFactory::createResponse(http_status, json_response.dump());
                                     }
                                 }
@@ -1186,7 +1184,7 @@ public:
 
                                     if (tensor_data_result.error() != simdjson::SUCCESS || target_dim_result.error() != simdjson::SUCCESS) {
                                         json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-                                        json_response["error_message"] =
+                                        json_response["error_msg"] =
                                             fmt::format("FDE function requires 'tensor_data' (array) and 'target_dimension' (number) "
                                                         "parameters. tensor_result: {}, dim_result: {}",
                                                         static_cast<int>(tensor_data_result.error()),
@@ -1210,7 +1208,7 @@ public:
                                         auto row_array_result = row.get_array();
                                         if (row_array_result.error() != simdjson::SUCCESS) {
                                             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-                                            json_response["error_message"] = "FDE tensor_data must be a 2D array";
+                                            json_response["error_msg"] = "FDE tensor_data must be a 2D array";
                                             return ResponseFactory::createResponse(http_status, json_response.dump());
                                         }
 
@@ -1221,7 +1219,7 @@ public:
                                         for (auto element : row_array) {
                                             if (element.type() != simdjson::json_type::number) {
                                                 json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-                                                json_response["error_message"] = "FDE tensor elements must be numbers";
+                                                json_response["error_msg"] = "FDE tensor elements must be numbers";
                                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                                             }
                                             sub_array_expr->double_array_.emplace_back(element.get<double>());
@@ -1240,7 +1238,7 @@ public:
                                     break;
                                 } else {
                                     json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-                                    json_response["error_message"] = fmt::format("Unsupported function: {}", func_name);
+                                    json_response["error_msg"] = fmt::format("Unsupported function: {}", func_name);
                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
                             }
@@ -1256,7 +1254,7 @@ public:
                                     array_expr = std::move(array_result);
                                 } catch (std::exception &e) {
                                     json_response["error_code"] = ErrorCode::kSyntaxError;
-                                    json_response["error_message"] = fmt::format("Error when parsing array value: {}", e.what());
+                                    json_response["error_msg"] = fmt::format("Error when parsing array value: {}", e.what());
                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
                                 auto const_expr = std::make_unique<ConstantExpr>(std::move(*array_expr));
@@ -1266,7 +1264,7 @@ public:
                             std::unique_ptr<ConstantExpr> const_sparse_expr = {};
                             if (value_obj.count_fields() == 0) {
                                 json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                json_response["error_message"] = "Empty sparse vector, cannot decide type";
+                                json_response["error_msg"] = "Empty sparse vector, cannot decide type";
                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                             }
                             for (std::unordered_set<i64> key_set; auto sparse_it : value_obj) {
@@ -1276,7 +1274,7 @@ public:
 
                                 if (sparse_v.type() != simdjson::json_type::number) {
                                     json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = "Sparse value element type error";
+                                    json_response["error_msg"] = "Sparse value element type error";
                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
 
@@ -1293,7 +1291,7 @@ public:
                                         }
                                         default: {
                                             json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                            json_response["error_message"] = "Sparse value element type error";
+                                            json_response["error_msg"] = "Sparse value element type error";
                                             return ResponseFactory::createResponse(http_status, json_response.dump());
                                         }
                                     }
@@ -1301,7 +1299,7 @@ public:
 
                                 if (const auto [_, insert_ok] = key_set.insert(key_val); !insert_ok) {
                                     json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = fmt::format("Duplicate key {} in sparse array!", key);
+                                    json_response["error_msg"] = fmt::format("Duplicate key {} in sparse array!", key);
                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
                                 bool good_v = false;
@@ -1329,7 +1327,7 @@ public:
                                 }
                                 if (!good_v) {
                                     json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = "Sparse value element type error";
+                                    json_response["error_msg"] = "Sparse value element type error";
                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
                             }
@@ -1338,7 +1336,7 @@ public:
                         }
                         default: {
                             json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                            json_response["error_message"] = "Embedding element type can only be integer or float";
+                            json_response["error_msg"] = "Embedding element type can only be integer or float";
                             return ResponseFactory::createResponse(http_status, json_response.dump());
                         }
                     }
@@ -1355,13 +1353,13 @@ public:
                 http_status = HTTPStatus::CODE_200;
             } else {
                 json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
+                json_response["error_msg"] = result.ErrorMsg();
                 http_status = HTTPStatus::CODE_500;
             }
 
         } catch (simdjson::simdjson_error &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-            json_response["error_message"] = e.what();
+            json_response["error_msg"] = e.what();
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
@@ -1388,7 +1386,7 @@ public:
                 expr_parser.Parse(filter_string, expr_parsed_result.get());
                 if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
                     json_response["error_code"] = ErrorCode::kInvalidFilterExpression;
-                    json_response["error_message"] = fmt::format("Invalid filter expression: {}", filter_string);
+                    json_response["error_msg"] = fmt::format("Invalid filter expression: {}", filter_string);
                     return ResponseFactory::createResponse(http_status, json_response.dump());
                 }
 
@@ -1408,7 +1406,7 @@ public:
                     json_response["deleted_rows"] = value.value_.big_int;
                 } else {
                     json_response["error_code"] = result.ErrorCode();
-                    json_response["error_message"] = result.ErrorMsg();
+                    json_response["error_msg"] = result.ErrorMsg();
                     http_status = HTTPStatus::CODE_500;
                 }
             } else {
@@ -1427,13 +1425,13 @@ public:
                     json_response["deleted_rows"] = value.value_.big_int;
                 } else {
                     json_response["error_code"] = result.ErrorCode();
-                    json_response["error_message"] = result.ErrorMsg();
+                    json_response["error_msg"] = result.ErrorMsg();
                     http_status = HTTPStatus::CODE_500;
                 }
             }
         } catch (simdjson::simdjson_error &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-            json_response["error_message"] = e.what();
+            json_response["error_msg"] = e.what();
         }
 
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -1515,7 +1513,7 @@ public:
                             }
                             default: {
                                 json_response["error_code"] = ErrorCode::kInvalidExpression;
-                                json_response["error_message"] = "Invalid update set expression";
+                                json_response["error_msg"] = "Invalid update set expression";
                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                             }
                         }
@@ -1533,7 +1531,7 @@ public:
                         size_t dimension = value.count_elements();
                         if (dimension == 0) {
                             json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                            json_response["error_message"] = fmt::format("Empty embedding data: {}", std::string((std::string_view)value.raw_json()));
+                            json_response["error_msg"] = fmt::format("Empty embedding data: {}", std::string((std::string_view)value.raw_json()));
                             return ResponseFactory::createResponse(http_status, json_response.dump());
                         }
 
@@ -1547,7 +1545,7 @@ public:
                         for (auto sub_value : value.get_array()) {
                             if (sub_value.type() != simdjson::json_type::number) {
                                 json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                json_response["error_message"] = "Embedding element type can only be integer or float";
+                                json_response["error_msg"] = "Embedding element type can only be integer or float";
                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                             }
 
@@ -1575,7 +1573,7 @@ public:
                                 }
                                 default: {
                                     json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = "Embedding element type can only be integer or float";
+                                    json_response["error_msg"] = "Embedding element type can only be integer or float";
                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
                             }
@@ -1586,7 +1584,7 @@ public:
                     }
                     default: {
                         json_response["error_code"] = ErrorCode::kInvalidExpression;
-                        json_response["error_message"] = "Invalid update set expression";
+                        json_response["error_msg"] = "Invalid update set expression";
                         return ResponseFactory::createResponse(http_status, json_response.dump());
                     }
                 }
@@ -1598,7 +1596,7 @@ public:
             auto filter_value = doc.find_field("filter");
             if (filter_value.is_null()) {
                 json_response["error_code"] = ErrorCode::kSyntaxError;
-                json_response["error_message"] = "No filter in update clause";
+                json_response["error_msg"] = "No filter in update clause";
                 http_status = HTTPStatus::CODE_500;
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
@@ -1610,7 +1608,7 @@ public:
             expr_parser.Parse(where_clause, expr_parsed_result.get());
             if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
                 json_response["error_code"] = ErrorCode::kInvalidFilterExpression;
-                json_response["error_message"] = fmt::format("Invalid filter expression: {}", where_clause);
+                json_response["error_msg"] = fmt::format("Invalid filter expression: {}", where_clause);
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
 
@@ -1626,13 +1624,13 @@ public:
                 http_status = HTTPStatus::CODE_200;
             } else {
                 json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
+                json_response["error_msg"] = result.ErrorMsg();
                 http_status = HTTPStatus::CODE_500;
             }
 
         } catch (simdjson::simdjson_error &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-            json_response["error_message"] = e.what();
+            json_response["error_msg"] = e.what();
         }
 
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -1728,7 +1726,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -1767,7 +1765,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -1807,7 +1805,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -1847,7 +1845,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -1885,12 +1883,12 @@ public:
                     options.conflict_type_ = ConflictType::kError;
                 } else {
                     json_response["error_code"] = 3075;
-                    json_response["error_message"] = fmt::format("Invalid drop option: {}", option);
+                    json_response["error_msg"] = fmt::format("Invalid drop option: {}", option);
                     http_status = HTTPStatus::CODE_500;
                 }
             } else {
                 json_response["error_code"] = 3075;
-                json_response["error_message"] = "'DROP OPTION' field value should be string type";
+                json_response["error_msg"] = "'DROP OPTION' field value should be string type";
                 http_status = HTTPStatus::CODE_500;
             }
         }
@@ -1902,7 +1900,7 @@ public:
                 http_status = HTTPStatus::CODE_200;
             } else {
                 json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
+                json_response["error_msg"] = result.ErrorMsg();
                 http_status = HTTPStatus::CODE_500;
             }
         }
@@ -1947,12 +1945,12 @@ public:
                     options.conflict_type_ = ConflictType::kReplace;
                 } else {
                     json_response["error_code"] = 3074;
-                    json_response["error_message"] = fmt::format("Invalid create option: {}", option);
+                    json_response["error_msg"] = fmt::format("Invalid create option: {}", option);
                     http_status = HTTPStatus::CODE_500;
                 }
             } else {
                 json_response["error_code"] = 3074;
-                json_response["error_message"] = "'CREATE OPTION' field value should be string type";
+                json_response["error_msg"] = "'CREATE OPTION' field value should be string type";
                 http_status = HTTPStatus::CODE_500;
             }
         }
@@ -1994,7 +1992,7 @@ public:
                     index_info->index_type_ = IndexInfo::StringToIndexType(version_str);
                     if (index_info->index_type_ == IndexType::kInvalid) {
                         json_response["error_code"] = ErrorCode::kInvalidIndexType;
-                        json_response["error_message"] = fmt::format("Invalid index type: {}", name);
+                        json_response["error_msg"] = fmt::format("Invalid index type: {}", name);
                         http_status = HTTPStatus::CODE_500;
                         return ResponseFactory::createResponse(http_status, json_response.dump());
                     }
@@ -2015,7 +2013,7 @@ public:
                 http_status = HTTPStatus::CODE_200;
             } else {
                 json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
+                json_response["error_msg"] = result.ErrorMsg();
                 http_status = HTTPStatus::CODE_500;
             }
         }
@@ -2048,7 +2046,7 @@ public:
         if (simdjson::value val; doc["optimize_options"].get(val) == simdjson::SUCCESS) {
             if (val.type() != simdjson::json_type::object) {
                 json_response["error_code"] = ErrorCode::kInvalidParameterValue;
-                json_response["error_message"] = "Optimize options should be key value pairs!";
+                json_response["error_msg"] = "Optimize options should be key value pairs!";
                 http_status = HTTPStatus::CODE_500;
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
@@ -2068,7 +2066,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -2102,7 +2100,7 @@ public:
         });
         if (infinity::Status status = ParseColumnDefs(doc["fields"].raw_json(), column_def_ptrs); !status.ok()) {
             json_response["error_code"] = status.code();
-            json_response["error_message"] = status.message();
+            json_response["error_msg"] = status.message();
             http_status = HTTPStatus::CODE_500;
             return ResponseFactory::createResponse(http_status, json_response.dump());
         }
@@ -2118,7 +2116,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -2155,7 +2153,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -2196,7 +2194,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -2240,7 +2238,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -2286,7 +2284,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -2327,7 +2325,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -2374,7 +2372,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -2408,7 +2406,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -2445,7 +2443,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -2480,7 +2478,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -2509,7 +2507,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -2533,7 +2531,7 @@ public:
             simdjson::document doc = parser.iterate(json_pad);
             if (doc.count_fields() != 1) {
                 json_response["error_code"] = 3076;
-                json_response["error_message"] = "No variable will be set";
+                json_response["error_msg"] = "No variable will be set";
                 http_status = HTTPStatus::CODE_500;
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
@@ -2566,7 +2564,7 @@ public:
                             }
                             default: {
                                 json_response["error_code"] = ErrorCode::kInvalidExpression;
-                                json_response["error_message"] = "Invalid set variable expression";
+                                json_response["error_msg"] = "Invalid set variable expression";
                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                             }
                         }
@@ -2578,21 +2576,21 @@ public:
                     }
                     default: {
                         json_response["error_code"] = ErrorCode::kInvalidExpression;
-                        json_response["error_message"] = "Invalid set variable expression";
+                        json_response["error_msg"] = "Invalid set variable expression";
                         return ResponseFactory::createResponse(http_status, json_response.dump());
                     }
                 }
             }
         } catch (simdjson::simdjson_error &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-            json_response["error_message"] = e.what();
+            json_response["error_msg"] = e.what();
         }
         if (result.IsOk()) {
             json_response["error_code"] = 0;
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -2627,7 +2625,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -2656,7 +2654,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -2680,7 +2678,7 @@ public:
             simdjson::document doc = parser.iterate(json_pad);
             if (doc.count_fields() != 1) {
                 json_response["error_code"] = 3076;
-                json_response["error_message"] = "No variable will be set";
+                json_response["error_msg"] = "No variable will be set";
                 http_status = HTTPStatus::CODE_500;
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
@@ -2713,7 +2711,7 @@ public:
                             }
                             default: {
                                 json_response["error_code"] = ErrorCode::kInvalidExpression;
-                                json_response["error_message"] = "Invalid set variable expression";
+                                json_response["error_msg"] = "Invalid set variable expression";
                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                             }
                         }
@@ -2725,21 +2723,21 @@ public:
                     }
                     default: {
                         json_response["error_code"] = ErrorCode::kInvalidExpression;
-                        json_response["error_message"] = "Invalid set variable expression";
+                        json_response["error_msg"] = "Invalid set variable expression";
                         return ResponseFactory::createResponse(http_status, json_response.dump());
                     }
                 }
             }
         } catch (simdjson::simdjson_error &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-            json_response["error_message"] = e.what();
+            json_response["error_msg"] = e.what();
         }
         if (result.IsOk()) {
             json_response["error_code"] = 0;
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -2763,7 +2761,7 @@ public:
             simdjson::document doc = parser.iterate(json_pad);
             if (doc.count_fields() != 1) {
                 json_response["error_code"] = 3076;
-                json_response["error_message"] = "No config will be set";
+                json_response["error_msg"] = "No config will be set";
                 http_status = HTTPStatus::CODE_500;
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
@@ -2796,7 +2794,7 @@ public:
                             }
                             default: {
                                 json_response["error_code"] = ErrorCode::kInvalidExpression;
-                                json_response["error_message"] = "Invalid set config expression";
+                                json_response["error_msg"] = "Invalid set config expression";
                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                             }
                         }
@@ -2808,21 +2806,21 @@ public:
                     }
                     default: {
                         json_response["error_code"] = ErrorCode::kInvalidExpression;
-                        json_response["error_message"] = "Invalid set config expression";
+                        json_response["error_msg"] = "Invalid set config expression";
                         return ResponseFactory::createResponse(http_status, json_response.dump());
                     }
                 }
             }
         } catch (simdjson::simdjson_error &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-            json_response["error_message"] = e.what();
+            json_response["error_msg"] = e.what();
         }
         if (result.IsOk()) {
             json_response["error_code"] = 0;
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -2860,7 +2858,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
 
@@ -2899,7 +2897,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
 
@@ -2938,7 +2936,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
 
@@ -2977,7 +2975,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
 
@@ -3016,7 +3014,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
 
@@ -3050,7 +3048,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
 
@@ -3089,7 +3087,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
 
@@ -3123,7 +3121,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
 
@@ -3162,7 +3160,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
 
@@ -3196,7 +3194,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
 
@@ -3235,7 +3233,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
 
@@ -3273,7 +3271,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
 
@@ -3312,7 +3310,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -3349,7 +3347,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -3371,7 +3369,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -3396,7 +3394,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -3426,7 +3424,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -3454,7 +3452,7 @@ class RestoreTableSnapshotHandler final : public HttpRequestHandler {
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -3479,7 +3477,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -3500,7 +3498,7 @@ public:
 
         if (result.IsOk()) {
             json_response["error_code"] = 0;
-            json_response["error_message"] = "";
+            json_response["error_msg"] = "";
 
             // Convert QueryResult to JSON format
             nlohmann::json snapshots_array = nlohmann::json::array();
@@ -3561,7 +3559,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
 
@@ -3583,7 +3581,7 @@ public:
         // Validate snapshot name
         if (snapshot_name.empty()) {
             json_response["error_code"] = 3001;
-            json_response["error_message"] = "Snapshot name is required";
+            json_response["error_msg"] = "Snapshot name is required";
             http_status = HTTPStatus::CODE_400;
             return ResponseFactory::createResponse(http_status, json_response.dump());
         }
@@ -3593,7 +3591,7 @@ public:
 
         if (result.IsOk()) {
             json_response["error_code"] = 0;
-            json_response["error_message"] = "";
+            json_response["error_msg"] = "";
 
             // Convert QueryResult to JSON format
             nlohmann::json snapshot_obj;
@@ -3653,7 +3651,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
 
@@ -3682,7 +3680,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -3710,7 +3708,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -3738,7 +3736,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -3766,7 +3764,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -3805,7 +3803,7 @@ public:
 
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -3843,7 +3841,7 @@ public:
             json_response["error_code"] = ErrorCode::kOk;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
 
@@ -3901,7 +3899,7 @@ public:
             json_response["nodes"] = nodes_json;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -3928,7 +3926,7 @@ public:
             if (simdjson::value val; doc["role"].get(val) != simdjson::SUCCESS || !val.is_string()) {
                 http_status = HTTPStatus::CODE_500;
                 json_response["error_code"] = ErrorCode::kInvalidCommand;
-                json_response["error_message"] = "Field 'role' is required";
+                json_response["error_msg"] = "Field 'role' is required";
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
 
@@ -3948,7 +3946,7 @@ public:
             } else {
                 http_status = HTTPStatus::CODE_500;
                 json_response["error_code"] = ErrorCode::kInvalidNodeRole;
-                json_response["error_message"] = fmt::format("Invalid node role {}", role);
+                json_response["error_msg"] = fmt::format("Invalid node role {}", role);
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
 
@@ -3958,12 +3956,12 @@ public:
             } else {
                 http_status = HTTPStatus::CODE_500;
                 json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
+                json_response["error_msg"] = result.ErrorMsg();
             }
         } catch (simdjson::simdjson_error &e) {
             http_status = HTTPStatus::CODE_500;
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-            json_response["error_message"] = e.what();
+            json_response["error_msg"] = e.what();
             return ResponseFactory::createResponse(http_status, json_response.dump());
         }
 
@@ -3998,7 +3996,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -4031,7 +4029,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -4055,7 +4053,7 @@ public:
             DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
             if (data_block->row_count() == 0) {
                 json_response["error_code"] = ErrorCode::kNoSuchSystemVar;
-                json_response["error_message"] = fmt::format("variable does not exist : {}.", variable_name);
+                json_response["error_msg"] = fmt::format("variable does not exist : {}.", variable_name);
                 http_status = HTTPStatus::CODE_500;
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
@@ -4065,7 +4063,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -4107,7 +4105,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
 
@@ -4133,7 +4131,7 @@ public:
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());

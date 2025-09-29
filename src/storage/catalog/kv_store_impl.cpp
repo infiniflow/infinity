@@ -359,6 +359,10 @@ Status KVStore::Put(const std::string &key, const std::string &value, bool disab
     if (!s.ok()) {
         return Status::RocksDBError(std::move(s), fmt::format("rocksdb::TransactionDB::Put key: {}, value: {}", key, value));
     }
+
+    if (!disable_wal) {
+        transaction_db_->FlushWAL(false);
+    }
     return Status::OK();
 }
 
@@ -368,6 +372,10 @@ Status KVStore::Delete(const std::string &key, bool disable_wal) {
     rocksdb::Status s = transaction_db_->Delete(write_options, key);
     if (!s.ok()) {
         return Status::RocksDBError(std::move(s), fmt::format("rocksdb::TransactionDB::Delete key: {}", key));
+    }
+
+    if (!disable_wal) {
+        transaction_db_->FlushWAL(false);
     }
     return Status::OK();
 }
@@ -393,6 +401,10 @@ Status KVStore::Merge(const std::string &key, const std::string &value, bool dis
     rocksdb::Status s = transaction_db_->Merge(write_options, nullptr, key, value);
     if (!s.ok()) {
         return Status::RocksDBError(std::move(s), fmt::format("rocksdb::TransactionDB::Merge key: {}, value: {}", key, value));
+    }
+
+    if (!disable_wal) {
+        transaction_db_->FlushWAL(false);
     }
     return Status::OK();
 }

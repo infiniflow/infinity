@@ -24,21 +24,23 @@ from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.table import RemoteTable
 
 
-def import_data(path, dataset: str, m: int, ef_construction: int, build_type: str, encode_type: str, remote: bool):
+def import_data(path, dataset: str, m: int, ef_construction: int, build_type: str, encode_type: str, compress_type: str, remote: bool):
     print(
         f"dataset: {dataset}, m: {m}, ef_construction: {ef_construction}, remote: {remote}"
     )
     if dataset == "sift_1m":
-        import_sift_1m(path + "/sift_base.fvecs", m, ef_construction, build_type, encode_type, remote)
+        import_sift_1m(path + "/sift_base.fvecs", m, ef_construction, build_type, encode_type, compress_type, remote)
+    elif dataset == "sift_10k":
+        import_sift_1m(path + "/sift10k_base.fvecs", m, ef_construction, build_type, encode_type, compress_type, remote)
     elif dataset == "gist_1m":
-        import_gist_1m(path + "/gist_base.fvecs", m, ef_construction, build_type, encode_type, remote)
+        import_gist_1m(path + "/gist_base.fvecs", m, ef_construction, build_type, encode_type, compress_type, remote)
     elif dataset == "msmarco_1m":
-        import_msmarco_1m(path + "/msmarco_base.fvecs", m, ef_construction, build_type, encode_type, remote)
+        import_msmarco_1m(path + "/msmarco_base.fvecs", m, ef_construction, build_type, encode_type, compress_type, remote)
     else:
         raise Exception("Invalid data set")
 
 
-def import_sift_1m(path, m: int, ef_construction: int, build_type: str, encode_type: str, remote: bool):
+def import_sift_1m(path, m: int, ef_construction: int, build_type: str, encode_type: str, compress_type: str, remote: bool):
     infinity_obj = None
     if remote:
         infinity_obj = infinity.connect(LOCAL_HOST)
@@ -65,13 +67,13 @@ def import_sift_1m(path, m: int, ef_construction: int, build_type: str, encode_t
     assert res.error_code == ErrorCode.OK
 
     start = time.time()
-    create_index(table_obj, m, ef_construction, build_type, encode_type)
+    create_index(table_obj, m, ef_construction, build_type, encode_type, compress_type)
     end = time.time()
     dur = end - start
     print(f"Create index on sift_1m cost time: {dur} s")
 
 
-def import_gist_1m(path, m: int, ef_construction: int, build_type: str, encode_type: str, remote: bool):
+def import_gist_1m(path, m: int, ef_construction: int, build_type: str, encode_type: str, compress_type: str, remote: bool):
     infinity_obj = None
     if remote:
         infinity_obj = infinity.connect(LOCAL_HOST)
@@ -98,13 +100,13 @@ def import_gist_1m(path, m: int, ef_construction: int, build_type: str, encode_t
     assert res.error_code == ErrorCode.OK
 
     start = time.time()
-    create_index(table_obj, m, ef_construction, build_type, encode_type)
+    create_index(table_obj, m, ef_construction, build_type, encode_type, compress_type)
     end = time.time()
     dur = end - start
     print(f"Create index on gist_1m cost time: {dur} s")
 
 
-def import_msmarco_1m(path, m: int, ef_construction: int, build_type: str, encode_type: str, remote: bool):
+def import_msmarco_1m(path, m: int, ef_construction: int, build_type: str, encode_type: str, compress_type: str, remote: bool):
     infinity_obj = None
     if remote:
         infinity_obj = infinity.connect(LOCAL_HOST)
@@ -131,13 +133,13 @@ def import_msmarco_1m(path, m: int, ef_construction: int, build_type: str, encod
     assert res.error_code == ErrorCode.OK
 
     start = time.time()
-    create_index(table_obj, m, ef_construction, build_type, encode_type)
+    create_index(table_obj, m, ef_construction, build_type, encode_type, compress_type)
     end = time.time()
     dur = end - start
     print(f"Create index on msmarco_1m cost time: {dur} s")
 
 
-def create_index(table_obj, m: int, ef_construction: int, build_type: str, encode_type: str):
+def create_index(table_obj, m: int, ef_construction: int, build_type: str, encode_type: str, compress_type: str):
     res = table_obj.drop_index("hnsw_index", ConflictType.Ignore)
 
     assert res.error_code == ErrorCode.OK
@@ -156,6 +158,11 @@ def create_index(table_obj, m: int, ef_construction: int, build_type: str, encod
             },
         )
     )
+
+    assert res.error_code == ErrorCode.OK
+
+    if compress_type == "lvq":
+        res = table_obj.optimize("hnsw_index", {"compress_to_lvq": "true"})
 
     assert res.error_code == ErrorCode.OK
 
@@ -181,6 +188,7 @@ if __name__ == "__main__":
     parser.add_argument("--efc", type=int, default=200, dest="ef_construction")
     parser.add_argument("-b", "--build", type=str, default="plain", dest="build_type")  # plain, lsg
     parser.add_argument("-e", "--encode", type=str, default="lvq", dest="encode_type")  # plain, lvq
+    parser.add_argument("-C", "--compress", type=str, default="plain", dest="compress_type")  # plain, lvq
     parser.add_argument("-R", "--remote", type=str2bool, default=True, dest="remote")
 
     args = parser.parse_args()
@@ -188,4 +196,4 @@ if __name__ == "__main__":
     data_dir = current_path + "/test/data/benchmark/" + args.data_set
     print(f"Data Dir: {data_dir}")
 
-    import_data(data_dir, args.data_set, args.m, args.ef_construction, args.build_type, args.encode_type, args.remote)
+    import_data(data_dir, args.data_set, args.m, args.ef_construction, args.build_type, args.encode_type, args.compress_type, args.remote)

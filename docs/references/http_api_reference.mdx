@@ -86,14 +86,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 3016,
-    "error_message": "Duplicate database: {database_name}."
+    "error_msg": "Duplicate database: {database_name}."
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -163,14 +163,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 3021,
-    "error_message": "{database_name} doesn't exist."
+    "error_msg": "{database_name} doesn't exist."
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -283,14 +283,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 3021,
-    "error_message": "{database_name} doesn't exist."
+    "error_msg": "{database_name} doesn't exist."
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -509,14 +509,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 3017,
-    "error_message": "Duplicate table: {table_name} in {database_name}."
+    "error_msg": "Duplicate table: {table_name} in {database_name}."
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -588,14 +588,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 3022,
-    "error_message": "Table {table_name} doesn't exist in {database_name}."
+    "error_msg": "Table {table_name} doesn't exist in {database_name}."
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -712,14 +712,14 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 ```shell
 {
     "error_code": 3022,
-    "error_message": "Table {table_name} doesn't exist in {database_name}."
+    "error_msg": "Table {table_name} doesn't exist in {database_name}."
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -803,14 +803,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 3022,
-    "error_message": "Table {table_name} doesn't exist in {database_name}."
+    "error_msg": "Table {table_name} doesn't exist in {database_name}."
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -1027,14 +1027,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 3018,
-    "error_message": "Duplicate index: {index} in {table_name}."
+    "error_msg": "Duplicate index: {index} in {table_name}."
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -1108,14 +1108,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 3018,
-    "error_message": "Index {index_name} doesn't exist in {table_name}."
+    "error_msg": "Index {index_name} doesn't exist in {table_name}."
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -1248,14 +1248,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 3018,
-    "error_message": "Index {index_name} doesn't exist in {table_name}."
+    "error_msg": "Index {index_name} doesn't exist in {table_name}."
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -1350,14 +1350,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 3032,
-    "error_message": "Not supported file type: docx"
+    "error_msg": "Not supported file type: docx"
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -1459,14 +1459,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 7002,
-    "error_message": "File already existed: /var/infinity/filename.csv"
+    "error_msg": "File already existed: /var/infinity/filename.csv"
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -1635,14 +1635,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 3005,
-    "error_message": "Column {column_name} doesn't exist in {table_name}."
+    "error_msg": "Column {column_name} doesn't exist in {table_name}."
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -1722,14 +1722,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 3005,
-    "error_message": "Column {column_name} doesn't exist in {table_name}."
+    "error_msg": "Column {column_name} doesn't exist in {table_name}."
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -1809,14 +1809,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 3005,
-    "error_message": "Column {column_name} doesn't exist in {table_name}."
+    "error_msg": "Column {column_name} doesn't exist in {table_name}."
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -2172,14 +2172,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 3005,
-    "error_message": "Column {column_name} doesn't exist in {table_name}."
+    "error_msg": "Column {column_name} doesn't exist in {table_name}."
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -2257,14 +2257,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 3076,
-    "error_message": "Invalid command: unknown global variable {variable_name}"
+    "error_msg": "Invalid command: unknown global variable {variable_name}"
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -2377,14 +2377,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 3027,
-    "error_message": "No such system variable {variable_name}."
+    "error_msg": "No such system variable {variable_name}."
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -2451,14 +2451,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 3028,
-    "error_message": "log level value range is trace, debug, info, warning, error, critical"
+    "error_msg": "log level value range is trace, debug, info, warning, error, critical"
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -2580,14 +2580,14 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 ```shell
 {
     "error_code": 1008,
-    "error_message": "Attempt to get option: {config_name} which doesn't exist."
+    "error_msg": "Attempt to get option: {config_name} which doesn't exist."
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -2666,14 +2666,14 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 ```shell
 {
     "error_code": 2005,
-    "error_message": "Not support in maintenance mode"
+    "error_msg": "Not support in maintenance mode"
 }
 ```
 
 - `"error_code"`: `integer`
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -2744,14 +2744,14 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 ```shell
 {
     "error_code": 2005,
-    "error_message": "Not support in maintenance mode"
+    "error_msg": "Not support in maintenance mode"
 }
 ```
 
 - `"error_code"`: `integer`
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -2816,14 +2816,14 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 ```shell
 {
     "error_code": 2005,
-    "error_message": "Not support in maintenance mode"
+    "error_msg": "Not support in maintenance mode"
 }
 ```
 
 - `"error_code"`: `integer`
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -2889,14 +2889,14 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 ```shell
 {
     "error_code": 2005,
-    "error_message": "Not support in maintenance mode"
+    "error_msg": "Not support in maintenance mode"
 }
 ```
 
 - `"error_code"`: `integer`
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -2961,14 +2961,14 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 ```shell
 {
     "error_code": 2005,
-    "error_message": "Not support in maintenance mode"
+    "error_msg": "Not support in maintenance mode"
 }
 ```
 
 - `"error_code"`: `integer`
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -3185,14 +3185,14 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 ```shell
 {
     "error_code": 7008, 
-    "error_message": "File: {object_name} isn't found@src/executor/operator/physical_show.cpp:5631@src/scheduler/fragment_context.cpp:1417"
+    "error_msg": "File: {object_name} isn't found@src/executor/operator/physical_show.cpp:5631@src/scheduler/fragment_context.cpp:1417"
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -3478,14 +3478,14 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 ```shell
 {
     "error_code":3022,
-    "error_message":"Table id_timep doesn't exist@src/planner/query_binder.cpp:423"
+    "error_msg":"Table id_timep doesn't exist@src/planner/query_binder.cpp:423"
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -3564,14 +3564,14 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 ```shell
 {
     "error_code":7020
-    "error_message" : "Duplicate node: following"
+    "error_msg" : "Duplicate node: following"
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -3631,14 +3631,14 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 ```shell
 {
     "error_code":7020
-    "error_message" : "Duplicate node: following"
+    "error_msg" : "Duplicate node: following"
 }
 ```
 
 - `"error_code"`: `integer`
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -3808,14 +3808,14 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code" : 3027,
-    "error_message":"variable does not exist : role."
+    "error_msg":"variable does not exist : role."
 }
 ```
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>
@@ -3927,8 +3927,8 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>
 </Tabs>

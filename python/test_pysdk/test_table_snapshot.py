@@ -1,17 +1,11 @@
 import sys
 import os
-import concurrent.futures
-import threading
 import pytest
-import polars as pl
 from common import common_values
 from infinity.common import ConflictType, InfinityException, SparseVector
 import infinity
 from infinity.errors import ErrorCode
-from common.utils import trace_expected_exceptions
 import random
-import json
-import base64
 import time
 import infinity.index as index
 
@@ -64,46 +58,6 @@ class TestSnapshot:
     DEFAULT_RETRY_DELAY = 2
     LARGE_TABLE_MAX_RETRIES = 5
     LARGE_TABLE_RETRY_DELAY = 3
-
-    def create_snapshot_with_retry(self, db_obj, snapshot_name, table_name, max_retries=None, retry_delay=None):
-        """Create snapshot with retry logic for checkpoint failures"""
-        if max_retries is None:
-            max_retries = self.DEFAULT_MAX_RETRIES
-        if retry_delay is None:
-            retry_delay = self.DEFAULT_RETRY_DELAY
-
-        for attempt in range(max_retries):
-            try:
-                snapshot_result = db_obj.create_table_snapshot(snapshot_name, table_name)
-
-                if snapshot_result.error_code == ErrorCode.OK:
-                    print(f"Snapshot created successfully on attempt {attempt + 1}")
-                    return snapshot_result
-
-                # Check if failure is checkpoint-related
-                if snapshot_result.error_code == ErrorCode.CHECKPOINTING:
-                    if attempt < max_retries - 1:
-                        print(f"Attempt {attempt + 1}: System is checkpointing, retrying in {retry_delay}s...")
-                        time.sleep(retry_delay)
-                        continue
-                    else:
-                        print(f"All {max_retries} attempts failed due to checkpointing")
-                        return snapshot_result
-                else:
-                    # Non-checkpoint failure, don't retry
-                    print(f"Non-checkpoint failure on attempt {attempt + 1}: {snapshot_result.error_msg}")
-                    return snapshot_result
-
-            except Exception as e:
-                if "checkpoint" in str(e).lower() and attempt < max_retries - 1:
-                    print(f"Attempt {attempt + 1}: Checkpoint exception, retrying in {retry_delay}s...")
-                    time.sleep(retry_delay)
-                    continue
-                else:
-                    raise
-
-        # Should not reach here, but just in case
-        return snapshot_result
 
     def handle_snapshot_result(self, snapshot_result, operation_name="Snapshot operation", skip_on_checkpoint=True):
         """Handle snapshot operation results with consistent error handling"""
@@ -201,7 +155,7 @@ class TestSnapshot:
             # Verify insert
             verify_result, extra_result = restored_table.output(["id", "name"]).filter("id = 999999").to_df()
             assert len(verify_result) > 0, "Inserted row not found"
-            print(f"   Insert verification: OK")
+            print("   Insert verification: OK")
 
         except Exception as e:
             print(f"   ERROR in insert operations: {e}")
@@ -223,9 +177,9 @@ class TestSnapshot:
                 remaining_response = restored_table.list_indexes().index_names
                 # remaining_indexes = [index["index_name"] for index in remaining_response]
                 assert 'idx_name_fts' not in remaining_response, "Index not dropped"
-                print(f"   Index drop verification: OK")
+                print("   Index drop verification: OK")
             else:
-                print(f"   Index 'idx_name_fts' not found, skipping drop test")
+                print("   Index 'idx_name_fts' not found, skipping drop test")
 
             # Add a new index
             new_index_result = restored_table.create_index("idx_test_new",
@@ -254,7 +208,7 @@ class TestSnapshot:
             # Verify deletion
             verify_delete, extra_result = restored_table.output(["id"]).filter("id = 999999").to_df()
             assert len(verify_delete) == 0, "Row not deleted"
-            print(f"   Delete verification: OK")
+            print("   Delete verification: OK")
 
         except Exception as e:
             print(f"   ERROR in delete operations: {e}")
@@ -264,7 +218,7 @@ class TestSnapshot:
         print("6. Testing column operations...")
         try:
             # Test drop column operation
-            print(f"   Testing drop column operation...")
+            print("   Testing drop column operation...")
 
             # Add a test column first
             add_columns_result = restored_table.add_columns({"test_col": {"type": "int", "default": 0}})
@@ -286,7 +240,7 @@ class TestSnapshot:
             try:
                 columns_result = restored_table.show_columns()
                 column_names = columns_result["name"].to_list()
-                print(f"   Column drop verification: OK - table structure updated")
+                print("   Column drop verification: OK - table structure updated")
             except Exception as e:
                 print(f"   Column drop verification failed: {e}")
 
@@ -427,39 +381,21 @@ class TestSnapshot:
     #     # Drop table
     #     db_obj.drop_table(table_name, ConflictType.Error)
 
-    def create_snapshot_with_retry(self, db_obj, snapshot_name, table_name, max_retries=3, retry_delay=2):
+    def create_snapshot_with_retry(self, db_obj, snapshot_name, table_name, max_retries=3, retry_delay=2) -> InfinityException:
         """Create snapshot with retry logic for checkpoint failures"""
+        assert max_retries > 0, "max_retries must be greater than 0"
+        snapshot_result = InfinityException(ErrorCode.OK, "")
         for attempt in range(max_retries):
             try:
-                snapshot_result = db_obj.create_table_snapshot(snapshot_name, table_name)
-
-                if snapshot_result.error_code == ErrorCode.OK:
-                    print(f"Snapshot created successfully on attempt {attempt + 1}")
+                _ = db_obj.create_table_snapshot(snapshot_name, table_name)
+                print(f"Snapshot created successfully on attempt {attempt + 1}")
+                return snapshot_result
+            except InfinityException as e:
+                snapshot_result = e
+                if e.error_code != ErrorCode.CHECKPOINTING:
                     return snapshot_result
-
-                # Check if failure is checkpoint-related
-                if snapshot_result.error_code == ErrorCode.CHECKPOINTING:
-                    if attempt < max_retries - 1:
-                        print(f"Attempt {attempt + 1}: System is checkpointing, retrying in {retry_delay}s...")
-                        time.sleep(retry_delay)
-                        continue
-                    else:
-                        print(f"All {max_retries} attempts failed due to checkpointing")
-                        return snapshot_result
-                else:
-                    # Non-checkpoint failure, don't retry
-                    print(f"Non-checkpoint failure on attempt {attempt + 1}: {snapshot_result.error_msg}")
-                    return snapshot_result
-
-            except Exception as e:
-                if "checkpoint" in str(e).lower() and attempt < max_retries - 1:
-                    print(f"Attempt {attempt + 1}: Checkpoint exception, retrying in {retry_delay}s...")
-                    time.sleep(retry_delay)
-                    continue
-                else:
-                    raise
-
-        # Should not reach here, but just in case
+                print(f"Attempt {attempt + 1}: Checkpoint exception, retrying in {retry_delay}s...")
+                time.sleep(retry_delay)
         return snapshot_result
 
     def test_basic_snapshot_operations(self, suffix):
@@ -746,8 +682,8 @@ class TestSnapshot:
         )
 
         # Create snapshot
-        res = db_obj.create_table_snapshot(f"restore_snap_{suffix}", f"test_table_{suffix}")
-        assert res.error_code == ErrorCode.OK
+        snapshot_result = self.create_snapshot_with_retry(db_obj, f"restore_snap_{suffix}", f"test_table_{suffix}")
+        self.handle_snapshot_result(snapshot_result, "test_restore_table_snapshot_table_exists")
 
         # Try to restore without dropping original table
         with pytest.raises(InfinityException):

@@ -57,7 +57,7 @@ private:
 
     void SendQueryResponse(const QueryResult &query_result);
 
-    void HandleError(const char *error_message);
+    void HandleError(const char *error_msg);
 
 private:
     const std::shared_ptr<boost::asio::ip::tcp::socket> socket_{};

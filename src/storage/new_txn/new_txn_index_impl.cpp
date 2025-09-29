@@ -617,23 +617,22 @@ Status NewTxn::OptimizeIndexByParams(const std::string &db_name,
         }
     }
 
-    std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdOptimizeV2>(db_name,
-                                                                             db_meta->db_id_str(),
-                                                                             table_name,
-                                                                             table_meta_opt->table_id_str(),
-                                                                             index_name,
-                                                                             table_index_meta_opt->index_id_str(),
-                                                                             std::move(raw_params));
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(std::make_shared<std::string>(wal_command->ToString()));
-
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    if (pm != nullptr) {
-        // When all data and index is write to disk, try to finalize the
-        PersistResultHandler handler(pm);
-        PersistWriteResult result = pm->CurrentObjFinalize();
-        handler.HandleWriteResult(result);
+    // Put the data into local txn store
+    if (base_txn_store_ == nullptr) {
+        base_txn_store_ = std::make_shared<AlterIndexTxnStore>();
     }
+
+    AlterIndexTxnStore *alter_index_txn_store = static_cast<AlterIndexTxnStore *>(base_txn_store_.get());
+    alter_index_txn_store->db_name_ = db_name;
+    alter_index_txn_store->db_id_str_ = db_meta->db_id_str();
+    alter_index_txn_store->db_id_ = std::stoull(db_meta->db_id_str());
+    alter_index_txn_store->table_name_ = table_name;
+    alter_index_txn_store->table_id_str_ = table_meta_opt->table_id_str();
+    alter_index_txn_store->table_id_ = std::stoull(table_meta_opt->table_id_str());
+    alter_index_txn_store->index_name_ = index_name;
+    alter_index_txn_store->index_id_str_ = table_index_meta_opt->index_id_str();
+    alter_index_txn_store->index_id_ = std::stoull(table_index_meta_opt->index_id_str());
+    alter_index_txn_store->params_ = std::move(raw_params);
 
     return Status::OK();
 }

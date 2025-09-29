@@ -12,7 +12,7 @@ commands = [
 
 LOG_PATH = "/var/infinity/log/infinity.log"
 # TEST_SEC = 3600 # 1 hour
-TEST_SEC = 10 # run once
+TEST_SEC = 10  # run once
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pytest Parallel Continuous")
@@ -36,9 +36,13 @@ if __name__ == "__main__":
                         if stderr:
                             print(f"Command '{command}' error:\n{stderr}")
                             command_failed = True
+                            break
                     except RuntimeError as e:
                         print(e)
                         command_failed = True
+                        break
+                if command_failed:
+                    break
 
     except Exception as e:
         print(e)

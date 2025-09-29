@@ -92,13 +92,18 @@ def process_test(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: s
     print("Finished {} tests.".format(test_cnt))
 
 
-# copy data
+# Flatten files under data_dir into copy_dir, ignoring symlinks
 def copy_all(data_dir, copy_dir):
     if not os.path.exists(copy_dir):
         os.makedirs(copy_dir)
     for dirpath, dirnames, filenames in os.walk(data_dir):
+        # Filter out symlink directories so os.walk will not recurse into them
+        dirnames[:] = [d for d in dirnames if not os.path.islink(os.path.join(dirpath, d))]
         for filename in filenames:
             src_path = os.path.join(dirpath, filename)
+            # Skip symbolic links to avoid copying link targets or broken links
+            if os.path.islink(src_path):
+                continue
             dest_path = os.path.join(copy_dir, filename)
             copyfile(src_path, dest_path)
     print("Finished copying all files.")
