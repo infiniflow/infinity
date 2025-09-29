@@ -23,7 +23,8 @@ using namespace infinity;
 enum class ModeType : i8 {
     BUILD,
     QUERY,
-    COMPRESS,
+    CompressLVQ,
+    CompressRabitq,
 };
 
 enum class BenchmarkType : i8 {
@@ -43,10 +44,14 @@ std::string BenchmarkTypeToString(BenchmarkType benchmark_type) {
 enum class BuildType : i8 {
     PLAIN,
     LVQ,
+    Rabitq,
     CompressToLVQ,
+    CompressToRabitq,
     LSGBuild,
     LSGLVQBuild,
     LSGCompressToLVQ,
+    LSGRabitqBuild,
+    LSGCompressToRabitq
 };
 
 std::string BuildTypeToString(BuildType build_type) {
@@ -55,14 +60,22 @@ std::string BuildTypeToString(BuildType build_type) {
             return "plain";
         case BuildType::LVQ:
             return "lvq";
+        case BuildType::Rabitq:
+            return "rabitq";
         case BuildType::CompressToLVQ:
             return "clvq";
+        case BuildType::CompressToRabitq:
+            return "crabitq";
         case BuildType::LSGBuild:
             return "lsg";
         case BuildType::LSGLVQBuild:
             return "lvq_lsg";
         case BuildType::LSGCompressToLVQ:
             return "clvq_lsg";
+        case BuildType::LSGRabitqBuild:
+            return "rabitq_lsg";
+        case BuildType::LSGCompressToRabitq:
+            return "crabitq_lsg";
     }
 }
 
@@ -75,15 +88,22 @@ public:
     }
 
     void Parse(int argc, char *argv[]) {
-        std::map<std::string, ModeType> mode_map = {{"build", ModeType::BUILD}, {"query", ModeType::QUERY}, {"compress", ModeType::COMPRESS}};
+        std::map<std::string, ModeType> mode_map = {{"build", ModeType::BUILD},
+                                                    {"query", ModeType::QUERY},
+                                                    {"clvq", ModeType::CompressLVQ},
+                                                    {"crabitq", ModeType::CompressRabitq}};
         std::map<std::string, BenchmarkType> benchmark_type_map = {{"sift", BenchmarkType::SIFT}, {"gist", BenchmarkType::GIST}};
         std::map<std::string, BuildType> build_type_map = {
             {"plain", BuildType::PLAIN},
             {"lvq", BuildType::LVQ},
+            {"rabitq", BuildType::Rabitq},
             {"clvq", BuildType::CompressToLVQ},
+            {"crabitq", BuildType::CompressToRabitq},
             {"lsg", BuildType::LSGBuild},
             {"lvq_lsg", BuildType::LSGLVQBuild},
             {"clvq_lsg", BuildType::LSGCompressToLVQ},
+            {"rabitq_lsg", BuildType::LSGRabitqBuild},
+            {"crabitq_lsg", BuildType::LSGCompressToRabitq},
         };
 
         app_.add_option("--mode", mode_type_, "mode")->required()->transform(CLI::CheckedTransformer(mode_map, CLI::ignore_case));
@@ -116,13 +136,13 @@ public:
         std::string index_name = IndexName(benchmark_type_, build_type_, M_, ef_construction_);
         switch (benchmark_type_) {
             case BenchmarkType::SIFT: {
-                data_path_ = "test/data/benchmark/sift_1m/sift_base.fvecs";
+                base_path_ = "test/data/benchmark/sift_1m/sift_base.fvecs";
                 query_path_ = "test/data/benchmark/sift_1m/sift_query.fvecs";
                 groundtruth_path_ = "test/data/benchmark/sift_1m/sift_groundtruth.ivecs";
                 break;
             }
             case BenchmarkType::GIST: {
-                data_path_ = "./test/data/benchmark/gist_1m/gist_base.fvecs";
+                base_path_ = "./test/data/benchmark/gist_1m/gist_base.fvecs";
                 query_path_ = "./test/data/benchmark/gist_1m/gist_query.fvecs";
                 groundtruth_path_ = "./test/data/benchmark/gist_1m/gist_groundtruth.ivecs";
                 break;
@@ -149,7 +169,7 @@ public:
     size_t query_topk_ = 0;
 
 public:
-    std::filesystem::path data_path_;
+    std::filesystem::path base_path_;
     std::filesystem::path query_path_;
     std::filesystem::path groundtruth_path_;
     std::filesystem::path index_dir_ = std::filesystem::path(tmp_data_path());
@@ -164,6 +184,8 @@ using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
 using HnswLSG = KnnHnsw<PlainL2VecStoreType<float, true>, LabelT>;
 using HnswLVQ = KnnHnsw<LVQL2VecStoreType<float, i8>, LabelT>;
 using HnswLVQLSG = KnnHnsw<LVQL2VecStoreType<float, i8, true>, LabelT>;
+using HnswRabitq = KnnHnsw<RabitqL2VecStoreType<float>, LabelT>;
+using HnswRabitqLSG = KnnHnsw<RabitqL2VecStoreType<float, true>, LabelT>;
 
 std::unique_ptr<float[]> GetAvgBF(size_t vec_num, size_t dim, const float *data, size_t ls_k, size_t sample_num) {
     auto avg = std::make_unique<float[]>(vec_num);
@@ -216,38 +238,38 @@ template <typename HnswT, typename HnswT2>
 void Build(const BenchmarkOption &option) {
     BaseProfiler profiler;
 
-    auto [vec_num, dim, data] = benchmark::DecodeFvecsDataset<float>(option.data_path_);
+    auto [base_num, base_dim, base_data] = benchmark::DecodeFvecsDataset<float>(option.base_path_);
 
     profiler.Begin();
-    auto hnsw = HnswT::Make(option.chunk_size_, option.max_chunk_num_, dim, option.M_, option.ef_construction_);
+    auto hnsw = HnswT::Make(option.chunk_size_, option.max_chunk_num_, base_dim, option.M_, option.ef_construction_);
 
     std::unique_ptr<float[]> avg;
-    if constexpr (std::is_same_v<HnswT, HnswLSG> || std::is_same_v<HnswT, HnswLVQLSG>) {
-        size_t sample_num = vec_num * 0.01;
+    if constexpr (std::is_same_v<HnswT, HnswLSG> || std::is_same_v<HnswT, HnswLVQLSG> || std::is_same_v<HnswT, HnswRabitqLSG>) {
+        size_t sample_num = base_num * 0.01;
         size_t ls_k = 10;
-        avg = GetAvgBF(vec_num, dim, data.get(), ls_k, sample_num);
+        avg = GetAvgBF(base_num, base_dim, base_data.get(), ls_k, sample_num);
 
         float alpha = 1.0;
         hnsw->distance().SetLSGParam(alpha, avg.get());
     }
 
-    DenseVectorIter<float, LabelT> iter(data.get(), dim, vec_num);
+    DenseVectorIter<float, LabelT> iter(base_data.get(), base_dim, base_num);
     hnsw->StoreData(iter);
-    data.reset();
+    base_data.reset();
 
     std::vector<std::thread> build_threads;
     const size_t kBuildBucketSize = 1024;
-    size_t bucket_size = std::max(kBuildBucketSize, vec_num / option.thread_n_);
-    size_t bucket_num = (vec_num - 1) / bucket_size + 1;
+    size_t bucket_size = std::max(kBuildBucketSize, base_num / option.thread_n_);
+    size_t bucket_num = (base_num - 1) / bucket_size + 1;
     assert(bucket_num <= option.thread_n_);
 
     for (size_t i = 0; i < bucket_num; ++i) {
         size_t i1 = i * bucket_size;
-        size_t i2 = std::min(i1 + bucket_size, vec_num);
+        size_t i2 = std::min(i1 + bucket_size, base_num);
         build_threads.emplace_back([&, i1, i2] {
             for (size_t j = i1; j < i2; ++j) {
                 if (j % 10000 == 0) {
-                    std::cout << fmt::format("Build {} / {}", j, vec_num) << std::endl;
+                    std::cout << fmt::format("Build {} / {}", j, base_num) << std::endl;
                 }
                 hnsw->Build(j);
             }
@@ -259,7 +281,7 @@ void Build(const BenchmarkOption &option) {
     build_threads.clear();
 
     profiler.End();
-    std::cout << "Build time: " << profiler.ElapsedToString(1000) << std::endl;
+    std::cout << "Build time: " << profiler.ElapsedToString(10) << std::endl;
 
     auto save = [&](auto &hnsw) {
         auto [index_file, index_status] = VirtualStore::Open(option.index_save_path_.string(), FileAccessMode::kWrite);
@@ -271,8 +293,18 @@ void Build(const BenchmarkOption &option) {
     if constexpr (std::is_same_v<HnswT, HnswT2>) {
         save(hnsw);
     } else {
-        auto hnsw_lvq = std::move(*hnsw).CompressToLVQ();
-        save(hnsw_lvq);
+        profiler.Begin();
+        std::unique_ptr<HnswT2> hnsw_compress;
+        if constexpr (std::is_same_v<HnswT2, HnswLVQ>) {
+            hnsw_compress = std::move(*hnsw).CompressToLVQ();
+        } else if (std::is_same_v<HnswT2, HnswRabitq>) {
+            hnsw_compress = std::move(*hnsw).CompressToRabitq();
+        } else {
+            UnrecoverableError("Compress failed: Compress Type not exists!");
+        }
+        profiler.End();
+        std::cout << "Compress time: " << profiler.ElapsedToString(10) << std::endl;
+        save(hnsw_compress);
     }
 }
 
@@ -287,6 +319,7 @@ void Query(const BenchmarkOption &option) {
 
     auto hnsw = HnswT::Load(*index_file);
 
+    auto [base_num, base_dim, base_data] = benchmark::DecodeFvecsDataset<float>(option.base_path_);
     auto [query_num, query_dim, query_data] = benchmark::DecodeFvecsDataset<float>(option.query_path_);
     auto [gt_num, topk, gt_data] = benchmark::DecodeFvecsDataset<i32>(option.groundtruth_path_);
     size_t query_topk = topk;
@@ -297,18 +330,28 @@ void Query(const BenchmarkOption &option) {
         UnrecoverableError("gt_num != query_num");
     }
     std::vector<std::vector<LabelT>> results(query_num, std::vector<LabelT>(query_topk));
-
-    auto test = [&](size_t i, const KnnSearchOption &search_option) {
+    auto rerank = [&](const float *query_vec, std::vector<std::pair<float, LabelT>> &pairs) -> void {
+        auto l2_distance = GetSIMD_FUNCTIONS().L2Distance_func_ptr_;
+        for (size_t i = 0; i < pairs.size(); ++i) {
+            const auto &base_id = pairs[i].second;
+            const auto &base_vec = base_data.get() + base_id * base_dim;
+            pairs[i].first = l2_distance(query_vec, base_vec, base_dim);
+        }
+        std::sort(pairs.begin(), pairs.end());
+    };
+    auto test = [&](const KnnSearchOption &search_option) -> float {
         profiler.Begin();
         std::vector<std::thread> query_threads;
         std::atomic<i32> cur_i = 0;
-
         for (size_t i = 0; i < option.thread_n_; ++i) {
             query_threads.emplace_back([&] {
                 size_t i;
                 while ((i = cur_i.fetch_add(1)) < query_num) {
                     const float *query = query_data.get() + i * query_dim;
                     std::vector<std::pair<float, LabelT>> pairs = hnsw->KnnSearchSorted(query, query_topk, search_option);
+                    if (std::is_same_v<HnswT, HnswRabitq> || std::is_same_v<HnswT, HnswRabitqLSG>) {
+                        rerank(query, pairs);
+                    }
                     if (pairs.size() < query_topk) {
                         UnrecoverableError("result_n != topk");
                     }
@@ -322,35 +365,38 @@ void Query(const BenchmarkOption &option) {
             thread.join();
         }
         profiler.End();
-
-        std::cout << fmt::format("Test {} / {}, Query time: {}", i + 1, option.test_n_, profiler.ElapsedToString(1000)) << std::endl;
+        return 1e9 * query_num / profiler.Elapsed();
     };
-    auto cal_recall = [&](const KnnSearchOption &search_option) {
+    auto cal_recall = [&]() -> float {
         i32 correct = 0;
         for (size_t i = 0; i < query_num; ++i) {
             std::unordered_set<LabelT> gt_set(gt_data.get() + i * topk, gt_data.get() + i * topk + query_topk);
-            for (size_t j = 0; j < query_topk; ++j) {
+            for (size_t j = 0; j < results[i].size(); ++j) {
                 if (gt_set.contains(results[i][j])) {
                     correct++;
                 }
             }
         }
-        float recall = float(correct) / (query_num * query_topk);
-        std::cout << fmt::format("ef: {}, recall: {}", search_option.ef_, recall) << std::endl;
+        return float(correct) / (query_num * query_topk);
     };
     if (option.ef_ == 0) {
+        std::cout << "test_n = " << option.test_n_ << std::endl;
         for (size_t ef = 100; ef <= 1000; ef += 100) {
             KnnSearchOption search_option{.ef_ = ef};
+            float QPS = 0;
             for (size_t i = 0; i < option.test_n_; ++i) {
-                test(i, search_option);
+                QPS += test(search_option);
             }
-            cal_recall(search_option);
+            QPS /= option.test_n_;
+            float recall = cal_recall();
+            std::cout << fmt::format("efsearch={},QPS={:.2f},Recall@{}={:.4f}", ef, QPS, query_topk, recall) << std::endl;
         }
     } else {
         for (size_t i = 0; i < option.test_n_; ++i) {
             KnnSearchOption search_option{.ef_ = option.ef_};
-            test(i, search_option);
-            cal_recall(search_option);
+            float QPS = test(search_option);
+            float recall = cal_recall();
+            std::cout << fmt::format("efsearch={},QPS={:.2f},Recall@{}={:.4f}", option.ef_, QPS, query_topk, recall) << std::endl;
         }
     }
 }
@@ -377,12 +423,19 @@ void Compress(const BenchmarkOption &option) {
     }
     std::filesystem::path new_index_save_path = option.index_dir_ / fmt::format("{}.bin", new_index_name);
 
-    auto hnsw_lvq = std::move(*hnsw).CompressToLVQ();
-    auto [index_file_lvq, index_status_lvq] = VirtualStore::Open(new_index_save_path.string(), FileAccessMode::kWrite);
-    if (!index_status_lvq.ok()) {
-        UnrecoverableError(index_status_lvq.message());
+    std::unique_ptr<HnswT2> hnsw_compress;
+    if constexpr (std::is_same_v<HnswT2, HnswLVQ>) {
+        hnsw_compress = std::move(*hnsw).CompressToLVQ();
+    } else if (std::is_same_v<HnswT2, HnswRabitq>) {
+        hnsw_compress = std::move(*hnsw).CompressToRabitq();
+    } else {
+        UnrecoverableError("Compress failed: Compress Type not exists!");
     }
-    hnsw_lvq->Save(*index_file_lvq);
+    auto [index_file_compress, index_status_compress] = VirtualStore::Open(new_index_save_path.string(), FileAccessMode::kWrite);
+    if (!index_status_compress.ok()) {
+        UnrecoverableError(index_status_compress.message());
+    }
+    hnsw_compress->Save(*index_file_compress);
 }
 
 int main(int argc, char *argv[]) {
@@ -399,8 +452,16 @@ int main(int argc, char *argv[]) {
                     Build<HnswLVQ, HnswLVQ>(option);
                     break;
                 }
+                case BuildType::Rabitq: {
+                    Build<HnswRabitq, HnswRabitq>(option);
+                    break;
+                }
                 case BuildType::CompressToLVQ: {
                     Build<Hnsw, HnswLVQ>(option);
+                    break;
+                }
+                case BuildType::CompressToRabitq: {
+                    Build<Hnsw, HnswRabitq>(option);
                     break;
                 }
                 case BuildType::LSGBuild: {
@@ -413,6 +474,14 @@ int main(int argc, char *argv[]) {
                 }
                 case BuildType::LSGCompressToLVQ: {
                     Build<HnswLSG, HnswLVQ>(option);
+                    break;
+                }
+                case BuildType::LSGRabitqBuild: {
+                    Build<HnswRabitqLSG, HnswRabitqLSG>(option);
+                    break;
+                }
+                case BuildType::LSGCompressToRabitq: {
+                    Build<HnswLSG, HnswRabitq>(option);
                     break;
                 }
             }
@@ -430,6 +499,12 @@ int main(int argc, char *argv[]) {
                     Query<HnswLVQ>(option);
                     break;
                 }
+                case BuildType::Rabitq:
+                case BuildType::CompressToRabitq:
+                case BuildType::LSGCompressToRabitq: {
+                    Query<HnswRabitq>(option);
+                    break;
+                }
                 case BuildType::LSGBuild: {
                     Query<HnswLSG>(option);
                     break;
@@ -438,10 +513,14 @@ int main(int argc, char *argv[]) {
                     Query<HnswLVQLSG>(option);
                     break;
                 }
+                case BuildType::LSGRabitqBuild: {
+                    Query<HnswRabitqLSG>(option);
+                    break;
+                }
             }
             break;
         }
-        case ModeType::COMPRESS: {
+        case ModeType::CompressLVQ: {
             switch (option.build_type_) {
                 case BuildType::PLAIN: {
                     Compress<Hnsw, HnswLVQ>(option);
@@ -449,6 +528,22 @@ int main(int argc, char *argv[]) {
                 }
                 case BuildType::LSGBuild: {
                     Compress<HnswLSG, HnswLVQ>(option);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Unsupport compress type");
+                }
+            }
+            break;
+        }
+        case ModeType::CompressRabitq: {
+            switch (option.build_type_) {
+                case BuildType::PLAIN: {
+                    Compress<Hnsw, HnswRabitq>(option);
+                    break;
+                }
+                case BuildType::LSGBuild: {
+                    Compress<HnswLSG, HnswRabitq>(option);
                     break;
                 }
                 default: {
