@@ -65,95 +65,25 @@ bool FileWorker::WriteToTemp(const FileWorkerSaveCtx &ctx) {
         UnrecoverableError("No data will be written.");
     }
 
-    // bool tmpfile = data_dir_->starts_with(*temp_dir_ + "/import");
+    std::string write_dir = ChooseFileDir(true);
+    if (!VirtualStore::Exists(write_dir)) {
+        VirtualStore::MakeDirectory(write_dir);
+    }
+    std::string write_path = fmt::format("{}/{}", write_dir, *file_name_);
 
-    // if (is_temp) {
-        std::string write_dir = ChooseFileDir(true);
-        if (!VirtualStore::Exists(write_dir)) {
-            VirtualStore::MakeDirectory(write_dir);
-        }
-        std::string write_path = fmt::format("{}/{}", write_dir, *file_name_);
+    auto [file_handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    file_handle_ = std::move(file_handle);
 
-        auto [file_handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-        file_handle_ = std::move(file_handle);
-        DeferFn defer_fn([&]() { file_handle_ = nullptr; });
+    bool prepare_success = false;
 
-        // if (is_temp) {
-        //     LOG_TRACE(fmt::format("Open spill file: {}, fd: {}", write_path, file_handle_->FileDescriptor()));
-        // }
-        bool prepare_success = false;
-
-        bool all_save = WriteToTempImpl(prepare_success, ctx);
-        if (prepare_success) {
-            // if (is_temp) {
-            //     LOG_TRACE(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));
-            // }
-            file_handle_->Sync();
-        }
-        return all_save;
-    // } else {
-    //
-    // }
-
-    // if (persistence_manager_ && !is_temp && !tmpfile) {
-    //     std::string write_dir = *file_dir_;
-    //     std::string write_path = std::filesystem::path(*data_dir_) / write_dir / *file_name_;
-    //     std::string tmp_write_path = std::filesystem::path(*temp_dir_) / StringTransform(write_path, "/", "_");
-    //
-    //     auto [file_handle, status] = VirtualStore::Open(tmp_write_path, FileAccessMode::kWrite);
-    //     if (!status.ok()) {
-    //         UnrecoverableError(status.message());
-    //     }
-    //     file_handle_ = std::move(file_handle);
-    //     DeferFn defer_fn([&]() { file_handle_ = nullptr; });
-    //
-    //     bool prepare_success = false;
-    //
-    //     bool all_save = WriteToFileImpl(is_temp, prepare_success, ctx);
-    //     if (prepare_success) {
-    //         file_handle_->Sync();
-    //     }
-    //
-    //     file_handle_->Sync();
-    //
-    //     PersistResultHandler handler(persistence_manager_);
-    //     PersistWriteResult persist_result = persistence_manager_->Persist(write_path, tmp_write_path);
-    //     handler.HandleWriteResult(persist_result);
-    //
-    //     obj_addr_ = persist_result.obj_addr_;
-    //
-    //     return all_save;
-    // } else {
-    //     std::string write_dir = ChooseFileDir(is_temp);
-    //     if (!VirtualStore::Exists(write_dir)) {
-    //         VirtualStore::MakeDirectory(write_dir);
-    //     }
-    //     std::string write_path = fmt::format("{}/{}", write_dir, *file_name_);
-    //
-    //     auto [file_handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
-    //     if (!status.ok()) {
-    //         UnrecoverableError(status.message());
-    //     }
-    //     file_handle_ = std::move(file_handle);
-    //     DeferFn defer_fn([&]() { file_handle_ = nullptr; });
-    //
-    //     if (is_temp) {
-    //         LOG_TRACE(fmt::format("Open spill file: {}, fd: {}", write_path, file_handle_->FileDescriptor()));
-    //     }
-    //     bool prepare_success = false;
-    //
-    //     bool all_save = WriteToFileImpl(is_temp, prepare_success, ctx);
-    //     if (prepare_success) {
-    //         if (is_temp) {
-    //             LOG_TRACE(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));
-    //         }
-    //         file_handle_->Sync();
-    //     }
-    //     return all_save;
-    // }
+    bool all_save = WriteToTempImpl(prepare_success, ctx);
+    if (prepare_success) {
+        file_handle_->Sync();
+    }
+    return all_save;
 }
 
 void FileWorker::ReadFromFile(bool from_spill) {
@@ -190,7 +120,6 @@ void FileWorker::MoveFile() {
             VirtualStore::MakeDirectory(dest_dir);
         }
         // if (fs.Exists(dest_path)) {
-
         //     UnrecoverableError(fmt::format("File {} was already been created before.", dest_path));
         // }
         VirtualStore::Rename(src_path, dest_path);
@@ -208,12 +137,7 @@ void FileWorker::MoveFile() {
     }
 }
 
-void FileWorker::SetData(void *data) {
-    // if (data_ != nullptr) {
-    //     UnrecoverableError("Data has been set.");
-    // }
-    data_ = data;
-}
+void FileWorker::SetData(void *data) { data_ = data; }
 
 void FileWorker::SetDataSize(size_t size) { UnrecoverableError("Not implemented"); }
 
@@ -232,9 +156,6 @@ std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> FileWorker
     std::string read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
     if (use_object_cache) {
         PersistReadResult result = persistence_manager_->GetObjCache(read_path);
-        // if (!obj_addr_.Valid()) {
-        //     return {};
-        // }
         defer_fn.emplace(([=, this]() {
             if (use_object_cache && obj_addr_.Valid()) {
                 std::string read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
@@ -325,8 +246,6 @@ void FileWorker::Munmap() {
     mmap_addr_ = nullptr;
     mmap_data_ = nullptr;
 }
-
-void FileWorker::MmapNotNeed() {}
 
 bool FileWorker::ReadFromMmapImpl([[maybe_unused]] const void *ptr, [[maybe_unused]] size_t size) {
     auto path = fmt::format("{}/{}/{}", *data_dir_, *file_dir_, *file_name_);

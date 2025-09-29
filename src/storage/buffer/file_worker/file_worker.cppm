@@ -100,8 +100,6 @@ public:
 
     void Munmap();
 
-    void MmapNotNeed();
-
 protected:
     virtual bool ReadFromMmapImpl([[maybe_unused]] const void *ptr, [[maybe_unused]] size_t size);
 

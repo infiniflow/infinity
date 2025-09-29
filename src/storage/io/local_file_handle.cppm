@@ -43,7 +43,7 @@ public:
     Status Sync();
 
 public:
-    i32 FileDescriptor() const { return fd_; }
+    i32 fd() const { return fd_; }
 
     std::string Path() const { return path_; }
 
