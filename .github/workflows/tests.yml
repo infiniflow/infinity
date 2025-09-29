@@ -173,6 +173,11 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > debug_unit_test_stdout.log 2> debug_unit_test_stderr.log"
 
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
