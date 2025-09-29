@@ -71,6 +71,7 @@ void PhysicalOptimize::OptIndex(QueryContext *query_context, OperatorState *oper
     LOG_INFO(fmt::format("OptimizeIndex {}.{}::{} begin", db_name_, table_name_, index_name_));
 
     NewTxn *new_txn = query_context->GetNewTxn();
+    new_txn->SetTxnType(TransactionType::kAlterIndex);
     Status status = new_txn->OptimizeIndexByParams(db_name_, table_name_, index_name_, std::move(opt_params_));
     if (!status.ok()) {
         operator_state->status_ = status;
