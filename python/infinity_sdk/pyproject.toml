@@ -1,6 +1,6 @@
 [project]
 name = "infinity-sdk"
-version = "0.6.0.dev5"
+version = "0.6.0.dev6"
 requires-python = ">=3.10"
 dependencies = [
     "sqlglot>=27.10.0",
