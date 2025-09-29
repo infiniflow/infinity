@@ -87,27 +87,14 @@ BufferHandle BufferObj::Load() {
     return BufferHandle(this, data);
 }
 
-bool BufferObj::Free() {
-    // std::unique_lock<std::mutex> locker(w_locker_, std::defer_lock);
-    // if (!locker.try_lock()) {
-    //     return false; // when other thread is loading or cleaning, return false
-    // }
-    return true;
-}
-
 bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
     std::unique_lock<std::mutex> locker(w_locker_);
     // auto data_dir = file_worker_->data_dir_;
     auto temp_dir = file_worker_->temp_dir_;
     auto file_dir = file_worker_->file_dir_;
     auto file_name = file_worker_->file_name_;
-    // std::string path1 = std::filesystem::path(*data_dir) / *file_dir / *file_name;
     std::string path2 = std::filesystem::path(*temp_dir) / *file_dir / *file_name;
-    std::filesystem::remove(path2);
-    // [[maybe_unused]] bool all_save = file_worker_->WriteToFile(false, ctx);
-    bool all_save = file_worker_->WriteToTemp(ctx);
-
-    return all_save;
+    return file_worker_->WriteToTemp(ctx);
 }
 
 void BufferObj::PickForCleanup() {

@@ -47,9 +47,6 @@ public:
     // called by ObjectHandle when load first time for that ObjectHandle
     BufferHandle Load();
 
-    // called by BufferMgr in GC process.
-    bool Free();
-
     // called when checkpoint. or in "IMPORT" operator.
     // template <typename SaveType>
     bool Save(const FileWorkerSaveCtx &ctx = {});
