@@ -308,7 +308,7 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const std::shared_ptr<NodeInfo>
         i64 other_node_port = other_node->node_port();
         if (other_node_name == non_leader_node->node_name()) {
             if (other_node_ip != non_leader_node->node_ip() or other_node_port != non_leader_node->node_port()) {
-                std::string error_message =
+                std::string error_msg =
                     fmt::format("Node {}, IP address: {} or port: {} is changed.", other_node_name, other_node_ip, other_node->node_port());
                 sender_status = infinity_peer_server::NodeStatus::type::kTimeout;
                 return Status::NodeInfoUpdated(ToString(other_node->node_role()));
@@ -366,7 +366,7 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const std::shared_ptr<NodeInfo>
                     break;
                 }
                 default: {
-                    std::string error_message = fmt::format("Invalid node role of node: {}", other_node_name);
+                    std::string error_msg = fmt::format("Invalid node role of node: {}", other_node_name);
                     return Status::InvalidNodeRole(ToString(other_node_role));
                 }
             }
@@ -381,8 +381,8 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const std::shared_ptr<NodeInfo>
                     break;
                 }
                 default: {
-                    std::string error_message = fmt::format("Invalid node status : {} of node: {}", ToString(other_node_status), other_node_name);
-                    return Status::InvalidNodeStatus(error_message);
+                    std::string error_msg = fmt::format("Invalid node status : {} of node: {}", ToString(other_node_status), other_node_name);
+                    return Status::InvalidNodeStatus(error_msg);
                 }
             }
 

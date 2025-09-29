@@ -204,9 +204,9 @@ void swap(RegisterRequest &a, RegisterRequest &b);
 std::ostream& operator<<(std::ostream& out, const RegisterRequest& obj);
 
 typedef struct _RegisterResponse__isset {
-  _RegisterResponse__isset() : error_code(false), error_message(false), leader_name(false), leader_term(false), heart_beat_interval(false) {}
+  _RegisterResponse__isset() : error_code(false), error_msg(false), leader_name(false), leader_term(false), heart_beat_interval(false) {}
   bool error_code :1;
-  bool error_message :1;
+  bool error_msg :1;
   bool leader_name :1;
   bool leader_term :1;
   bool heart_beat_interval :1;
@@ -221,7 +221,7 @@ class RegisterResponse : public virtual ::apache::thrift::TBase {
 
   virtual ~RegisterResponse() noexcept;
   int64_t error_code;
-  std::string error_message;
+  std::string error_msg;
   std::string leader_name;
   int64_t leader_term;
   int64_t heart_beat_interval;
@@ -230,7 +230,7 @@ class RegisterResponse : public virtual ::apache::thrift::TBase {
 
   void __set_error_code(const int64_t val);
 
-  void __set_error_message(const std::string& val);
+  void __set_error_msg(const std::string& val);
 
   void __set_leader_name(const std::string& val);
 
@@ -292,9 +292,9 @@ void swap(UnregisterRequest &a, UnregisterRequest &b);
 std::ostream& operator<<(std::ostream& out, const UnregisterRequest& obj);
 
 typedef struct _UnregisterResponse__isset {
-  _UnregisterResponse__isset() : error_code(false), error_message(false) {}
+  _UnregisterResponse__isset() : error_code(false), error_msg(false) {}
   bool error_code :1;
-  bool error_message :1;
+  bool error_msg :1;
 } _UnregisterResponse__isset;
 
 class UnregisterResponse : public virtual ::apache::thrift::TBase {
@@ -306,13 +306,13 @@ class UnregisterResponse : public virtual ::apache::thrift::TBase {
 
   virtual ~UnregisterResponse() noexcept;
   int64_t error_code;
-  std::string error_message;
+  std::string error_msg;
 
   _UnregisterResponse__isset __isset;
 
   void __set_error_code(const int64_t val);
 
-  void __set_error_message(const std::string& val);
+  void __set_error_msg(const std::string& val);
 
   bool operator == (const UnregisterResponse & rhs) const;
   bool operator != (const UnregisterResponse &rhs) const {
@@ -388,9 +388,9 @@ void swap(HeartBeatRequest &a, HeartBeatRequest &b);
 std::ostream& operator<<(std::ostream& out, const HeartBeatRequest& obj);
 
 typedef struct _HeartBeatResponse__isset {
-  _HeartBeatResponse__isset() : error_code(false), error_message(false), leader_term(false), other_nodes(false), sender_status(false) {}
+  _HeartBeatResponse__isset() : error_code(false), error_msg(false), leader_term(false), other_nodes(false), sender_status(false) {}
   bool error_code :1;
-  bool error_message :1;
+  bool error_msg :1;
   bool leader_term :1;
   bool other_nodes :1;
   bool sender_status :1;
@@ -405,7 +405,7 @@ class HeartBeatResponse : public virtual ::apache::thrift::TBase {
 
   virtual ~HeartBeatResponse() noexcept;
   int64_t error_code;
-  std::string error_message;
+  std::string error_msg;
   int64_t leader_term;
   std::vector<NodeInfo>  other_nodes;
   /**
@@ -418,7 +418,7 @@ class HeartBeatResponse : public virtual ::apache::thrift::TBase {
 
   void __set_error_code(const int64_t val);
 
-  void __set_error_message(const std::string& val);
+  void __set_error_msg(const std::string& val);
 
   void __set_leader_term(const int64_t val);
 
@@ -488,9 +488,9 @@ void swap(SyncLogRequest &a, SyncLogRequest &b);
 std::ostream& operator<<(std::ostream& out, const SyncLogRequest& obj);
 
 typedef struct _SyncLogResponse__isset {
-  _SyncLogResponse__isset() : error_code(false), error_message(false), txn_timestamp(false) {}
+  _SyncLogResponse__isset() : error_code(false), error_msg(false), txn_timestamp(false) {}
   bool error_code :1;
-  bool error_message :1;
+  bool error_msg :1;
   bool txn_timestamp :1;
 } _SyncLogResponse__isset;
 
@@ -503,14 +503,14 @@ class SyncLogResponse : public virtual ::apache::thrift::TBase {
 
   virtual ~SyncLogResponse() noexcept;
   int64_t error_code;
-  std::string error_message;
+  std::string error_msg;
   int64_t txn_timestamp;
 
   _SyncLogResponse__isset __isset;
 
   void __set_error_code(const int64_t val);
 
-  void __set_error_message(const std::string& val);
+  void __set_error_msg(const std::string& val);
 
   void __set_txn_timestamp(const int64_t val);
 
@@ -576,9 +576,9 @@ void swap(ChangeRoleRequest &a, ChangeRoleRequest &b);
 std::ostream& operator<<(std::ostream& out, const ChangeRoleRequest& obj);
 
 typedef struct _ChangeRoleResponse__isset {
-  _ChangeRoleResponse__isset() : error_code(false), error_message(false) {}
+  _ChangeRoleResponse__isset() : error_code(false), error_msg(false) {}
   bool error_code :1;
-  bool error_message :1;
+  bool error_msg :1;
 } _ChangeRoleResponse__isset;
 
 class ChangeRoleResponse : public virtual ::apache::thrift::TBase {
@@ -590,13 +590,13 @@ class ChangeRoleResponse : public virtual ::apache::thrift::TBase {
 
   virtual ~ChangeRoleResponse() noexcept;
   int64_t error_code;
-  std::string error_message;
+  std::string error_msg;
 
   _ChangeRoleResponse__isset __isset;
 
   void __set_error_code(const int64_t val);
 
-  void __set_error_message(const std::string& val);
+  void __set_error_msg(const std::string& val);
 
   bool operator == (const ChangeRoleResponse & rhs) const;
   bool operator != (const ChangeRoleResponse &rhs) const {

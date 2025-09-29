@@ -1463,16 +1463,16 @@ ParquetEmbeddingHandler(std::shared_ptr<LstArray> list_array, const EmbeddingInf
     i64 start_offset = list_array->value_offset(value_idx);
     i64 end_offset = list_array->value_offset(value_idx + 1);
     if (end_offset - start_offset != (i64)dim) {
-        std::string error_message = fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, end_offset - start_offset);
-        LOG_ERROR(error_message);
-        UnrecoverableError(error_message);
+        std::string error_msg = fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, end_offset - start_offset);
+        LOG_ERROR(error_msg);
+        UnrecoverableError(error_msg);
     }
     switch (embedding_info->Type()) {
         case EmbeddingDataType::kElemBit: {
             if (dim == 0 or dim % 8 != 0) {
-                std::string error_message = fmt::format("Invalid bit embedding dimension: {}", dim);
-                LOG_ERROR(error_message);
-                UnrecoverableError(error_message);
+                std::string error_msg = fmt::format("Invalid bit embedding dimension: {}", dim);
+                LOG_ERROR(error_msg);
+                UnrecoverableError(error_msg);
             }
             const size_t byte_size = dim / 8;
             auto embedding = std::make_unique<char[]>(byte_size);

@@ -38,7 +38,7 @@ struct RegisterRequest {
 
 struct RegisterResponse {
 1: i64 error_code,
-2: string error_message,
+2: string error_msg,
 3: string leader_name,
 4: i64 leader_term,
 5: i64 heart_beat_interval, // microseconds
@@ -50,7 +50,7 @@ struct UnregisterRequest {
 
 struct UnregisterResponse {
 1: i64 error_code,
-2: string error_message,
+2: string error_msg,
 }
 
 struct HeartBeatRequest {
@@ -63,7 +63,7 @@ struct HeartBeatRequest {
 
 struct HeartBeatResponse {
 1: i64 error_code,
-2: string error_message,
+2: string error_msg,
 3: i64 leader_term,
 4: list<NodeInfo> other_nodes,
 5: NodeStatus sender_status
@@ -77,7 +77,7 @@ struct SyncLogRequest {
 
 struct SyncLogResponse {
 1: i64 error_code,
-2: string error_message,
+2: string error_msg,
 3: i64 txn_timestamp,
 }
 
@@ -88,7 +88,7 @@ struct ChangeRoleRequest {
 
 struct ChangeRoleResponse {
 1: i64 error_code,
-2: string error_message,
+2: string error_msg,
 }
 
 struct NewLeaderRequest {

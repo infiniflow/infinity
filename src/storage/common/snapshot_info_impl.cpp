@@ -298,8 +298,8 @@ Status TableSnapshotInfo::Serialize(const std::string &save_dir, TransactionID t
             if (!obj_addr.Valid()) {
                 // Clean up temp directory on failure
                 VirtualStore::RemoveDirectory(temp_snapshot_dir);
-                std::string error_message = fmt::format("Failed to find object for local path {}", file);
-                return Status::FileNotFound(error_message);
+                std::string error_msg = fmt::format("Failed to find object for local path {}", file);
+                return Status::FileNotFound(error_msg);
             }
             std::string read_path = persistence_manager->GetObjPath(obj_addr.obj_key_);
             LOG_INFO(fmt::format("READ: {} from {}", file, read_path));
@@ -790,8 +790,8 @@ Status DatabaseSnapshotInfo::Serialize(const std::string &save_dir, TxnTimeStamp
             if (!obj_addr.Valid()) {
                 // Clean up temp directory on failure
                 VirtualStore::RemoveDirectory(temp_snapshot_dir);
-                std::string error_message = fmt::format("Failed to find object for local path {}", file);
-                return Status::FileNotFound(error_message);
+                std::string error_msg = fmt::format("Failed to find object for local path {}", file);
+                return Status::FileNotFound(error_msg);
             }
             std::string read_path = persistence_manager->GetObjPath(obj_addr.obj_key_);
             LOG_INFO(fmt::format("READ: {} from {}", file, read_path));

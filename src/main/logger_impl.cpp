@@ -35,9 +35,9 @@ Status Logger::Initialize(Config *config_ptr) {
                                                                                           log_file_max_size,
                                                                                           log_file_rotate_count); // NOLINT
         } catch (const std::exception &e) {
-            std::string error_message = fmt::format("Error to create log sinker, cause: {}", e.what());
-            fmt::print("{}", error_message);
-            return Status::UnexpectedError(error_message);
+            std::string error_msg = fmt::format("Error to create log sinker, cause: {}", e.what());
+            fmt::print("{}", error_msg);
+            return Status::UnexpectedError(error_msg);
         }
     }
     std::vector<spdlog::sink_ptr> sinks{rotating_file_sinker};

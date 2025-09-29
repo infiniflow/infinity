@@ -116,13 +116,13 @@ void ObjStat::CheckValid(const std::string &obj_key, size_t current_object_size)
         auto it2 = std::next(it1);
         while (it2 != deleted_ranges.end()) {
             if (it1->end_ >= it2->start_) {
-                std::string error_message = fmt::format("CurrentObjFinalize Object {} deleted ranges intersect: [{}, {}), [{}, {})",
-                                                        obj_key,
-                                                        it1->start_,
-                                                        it1->end_,
-                                                        it2->start_,
-                                                        it2->end_);
-                LOG_ERROR(error_message);
+                std::string error_msg = fmt::format("CurrentObjFinalize Object {} deleted ranges intersect: [{}, {}), [{}, {})",
+                                                    obj_key,
+                                                    it1->start_,
+                                                    it1->end_,
+                                                    it2->start_,
+                                                    it2->end_);
+                LOG_ERROR(error_msg);
             }
             it1 = it2;
             it2 = std::next(it2);
@@ -130,8 +130,8 @@ void ObjStat::CheckValid(const std::string &obj_key, size_t current_object_size)
     } else if (deleted_ranges.size() == 1) {
         auto it1 = deleted_ranges.begin();
         if (it1->start_ == 0 && it1->end_ == current_object_size) {
-            std::string error_message = fmt::format("CurrentObjFinalize Object {} is fully deleted", obj_key);
-            LOG_ERROR(error_message);
+            std::string error_msg = fmt::format("CurrentObjFinalize Object {} is fully deleted", obj_key);
+            LOG_ERROR(error_msg);
         }
     }
 }

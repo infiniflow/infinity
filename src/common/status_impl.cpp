@@ -406,8 +406,8 @@ Status Status::InsertWithoutValues() {
 
 Status Status::InvalidConflictType() { return Status(ErrorCode::kInvalidConflictType, std::make_unique<std::string>("invalid conflict type")); }
 
-Status Status::InvalidJsonFormat(const std::string &error_message) {
-    return Status(ErrorCode::kInvalidJsonFormat, std::make_unique<std::string>(fmt::format("Invalid format json: {}", error_message)));
+Status Status::InvalidJsonFormat(const std::string &error_msg) {
+    return Status(ErrorCode::kInvalidJsonFormat, std::make_unique<std::string>(fmt::format("Invalid format json: {}", error_msg)));
 }
 
 Status Status::DuplicateColumnName(const std::string &column_name) {

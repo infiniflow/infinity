@@ -66,12 +66,12 @@ class TestSnapshot:
             return True
         elif snapshot_result.error_code == ErrorCode.CHECKPOINTING:
             if skip_on_checkpoint:
-                pytest.skip(f"{operation_name} failed due to checkpointing: {snapshot_result.error_message}")
+                pytest.skip(f"{operation_name} failed due to checkpointing: {snapshot_result.error_msg}")
             else:
-                print(f"Warning: {operation_name} failed due to checkpointing: {snapshot_result.error_message}")
+                print(f"Warning: {operation_name} failed due to checkpointing: {snapshot_result.error_msg}")
                 return False
         else:
-            assert False, f"{operation_name} failed with error: {snapshot_result.error_message}"
+            assert False, f"{operation_name} failed with error: {snapshot_result.error_msg}"
 
     def verify_restored_table_functionality(self, table_name: str, db_obj, expected_row_count: int = None):
         """
@@ -503,7 +503,7 @@ class TestSnapshot:
         if self.handle_snapshot_result(snapshot_result, "Large table snapshot creation", skip_on_checkpoint=False):
             print(f"Snapshot creation time: {snapshot_time:.2f} seconds")
         else:
-            pytest.skip(f"Large table snapshot failed due to checkpointing after retries: {snapshot_result.error_message}")
+            pytest.skip(f"Large table snapshot failed due to checkpointing after retries: {snapshot_result.error_msg}")
 
         # Drop table
         db_obj.drop_table(table_name, ConflictType.Error)
@@ -567,7 +567,7 @@ class TestSnapshot:
 
             if not self.handle_snapshot_result(result, f"Snapshot creation with name '{snapshot_name}'",
                                                skip_on_checkpoint=False):
-                pytest.skip(f"Snapshot with name '{snapshot_name}' failed due to checkpointing: {result.error_message}")
+                pytest.skip(f"Snapshot with name '{snapshot_name}' failed due to checkpointing: {result.error_msg}")
 
             db_obj.drop_table(table_name, ConflictType.Error)
 

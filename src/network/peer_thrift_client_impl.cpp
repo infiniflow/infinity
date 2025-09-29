@@ -256,7 +256,7 @@ void PeerClient::Register(RegisterPeerTask *peer_task) {
     if (response.error_code != 0) {
         // Error
         peer_task->error_code_ = response.error_code;
-        peer_task->error_message_ = response.error_message;
+        peer_task->error_message_ = response.error_msg;
     } else {
         peer_task->leader_name_ = response.leader_name;
         peer_task->leader_term_ = response.leader_term;
@@ -292,7 +292,7 @@ void PeerClient::Unregister(UnregisterPeerTask *peer_task) {
     if (response.error_code != 0) {
         // Error
         peer_task->error_code_ = response.error_code;
-        peer_task->error_message_ = response.error_message;
+        peer_task->error_message_ = response.error_msg;
     }
 }
 
@@ -345,7 +345,7 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
     if (response.error_code != 0) {
         // Error
         peer_task->error_code_ = response.error_code;
-        peer_task->error_message_ = response.error_message;
+        peer_task->error_message_ = response.error_msg;
         if (response.sender_status == infinity_peer_server::NodeStatus::type::kLostConnection) {
             peer_task->leader_term_ = response.leader_term;
             peer_task->sender_status_ = NodeStatus::kLostConnection;
@@ -449,7 +449,7 @@ void PeerClient::SyncLogs(SyncLogTask *peer_task) {
         if (response.error_code != 0) {
             // Error
             peer_task->error_code_ = response.error_code;
-            peer_task->error_message_ = response.error_message;
+            peer_task->error_message_ = response.error_msg;
             LOG_ERROR(fmt::format("Sync log to node: {}, error: {}", peer_task->node_name_, peer_task->error_message_));
         }
     } catch (apache::thrift::transport::TTransportException &thrift_exception) {
@@ -491,7 +491,7 @@ void PeerClient::ChangeRole(ChangeRoleTask *change_role_task) {
         if (response.error_code != 0) {
             // Error
             change_role_task->error_code_ = response.error_code;
-            change_role_task->error_message_ = response.error_message;
+            change_role_task->error_message_ = response.error_msg;
             LOG_ERROR(fmt::format("Sync log to node: {}, error: {}", change_role_task->node_name_, change_role_task->error_message_));
         }
     } catch (apache::thrift::transport::TTransportException &thrift_exception) {
