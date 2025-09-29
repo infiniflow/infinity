@@ -52,6 +52,10 @@ std::string ShowStatement::ToString() const {
             ss << "Show index segment, database: " << schema_name_ << ", table_name: " << table_name_;
             break;
         }
+        case ShowStmtType::kIndexChunks: {
+            ss << "Show index chunks, database: " << schema_name_ << ", table_name: " << table_name_;
+            break;
+        }
         case ShowStmtType::kIndexChunk: {
             ss << "Show index chunk, database: " << schema_name_ << ", table_name: " << table_name_;
             break;
