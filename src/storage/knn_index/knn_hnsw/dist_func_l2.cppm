@@ -28,6 +28,9 @@ export template <typename DataType, typename CompressType>
 class LVQL2Dist;
 
 export template <typename DataType>
+class RabitqL2Dist;
+
+export template <typename DataType>
 class PlainLSL2Dist;
 
 export template <typename DataType>
@@ -36,8 +39,10 @@ public:
     using This = PlainL2Dist<DataType>;
     using VecStoreMeta = PlainVecStoreMeta<DataType>;
     using StoreType = typename VecStoreMeta::StoreType;
+    using QueryType = typename VecStoreMeta::QueryType;
     using DistanceType = typename VecStoreMeta::DistanceType;
     using LVQDist = LVQL2Dist<DataType, i8>;
+    using RabitqDist = RabitqL2Dist<DataType>;
 
 private:
     using SIMDFuncType = std::conditional_t<std::is_same_v<DataType, float>, f32, i32> (*)(const DataType *, const DataType *, size_t);
@@ -86,19 +91,16 @@ public:
     }
 
     template <typename DataStore>
-    DistanceType operator()(VertexType v1_i, VertexType v2_i, const DataStore &data_store) const {
-        return Inner(data_store.GetVec(v1_i), data_store.GetVec(v2_i), data_store.dim());
-    }
-
-    template <typename DataStore>
-    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
+    DistanceType operator()(const QueryType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
         return Inner(v1, data_store.GetVec(v2_i), data_store.dim());
     }
 
     LVQDist ToLVQDistance(size_t dim) &&;
 
+    RabitqDist ToRabitqDistance(size_t dim) &&;
+
 private:
-    DistanceType Inner(const StoreType &v1, const StoreType &v2, size_t dim) const { return SIMDFunc(v1, v2, dim); }
+    DistanceType Inner(const QueryType &v1, const StoreType &v2, size_t dim) const { return SIMDFunc(v1, v2, dim); }
 };
 
 export template <typename DataType, typename CompressType>
@@ -133,8 +135,10 @@ class LVQL2Dist {
 public:
     using This = LVQL2Dist<DataType, CompressType>;
     using LVQDist = This;
+    using RabitqDist = This;
     using VecStoreMetaType = LVQVecStoreMetaType<DataType, CompressType, LVQL2Cache<DataType, CompressType>>;
     using StoreType = typename VecStoreMetaType::StoreType;
+    using QueryType = typename VecStoreMetaType::QueryType;
     using DistanceType = typename VecStoreMetaType::DistanceType;
 
 private:
@@ -167,22 +171,14 @@ public:
     }
 
     template <typename DataStore>
-    DistanceType operator()(VertexType v1_i, VertexType v2_i, const DataStore &data_store) const {
-        const StoreType &v1 = data_store.GetVec(v1_i);
-        const StoreType &v2 = data_store.GetVec(v2_i);
-        size_t dim = data_store.dim();
-        return Inner(v1, v2, dim);
-    }
-
-    template <typename DataStore>
-    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
+    DistanceType operator()(const QueryType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
         const StoreType &v2 = data_store.GetVec(v2_i);
         size_t dim = data_store.dim();
         return Inner(v1, v2, dim);
     }
 
 private:
-    DistanceType Inner(const StoreType &v1, const StoreType &v2, size_t dim) const {
+    DistanceType Inner(const QueryType &v1, const StoreType &v2, size_t dim) const {
         i32 c1c2_ip = SIMDFunc(v1->compress_vec_, v2->compress_vec_, dim);
         auto scale1 = v1->scale_;
         auto scale2 = v2->scale_;
@@ -199,6 +195,7 @@ export template <typename DataType>
 class RabitqL2Dist {
 public:
     using This = RabitqL2Dist<DataType>;
+    using LVQDist = This;
     using RabitqDist = This;
     using MetaType = RabitqVecStoreMetaType<DataType>;
     using StoreType = typename MetaType::StoreType;
@@ -259,6 +256,11 @@ private:
 template <typename DataType>
 LVQL2Dist<DataType, i8> PlainL2Dist<DataType>::ToLVQDistance(size_t dim) && {
     return LVQL2Dist<DataType, i8>(dim);
+}
+
+template <typename DataType>
+RabitqL2Dist<DataType> PlainL2Dist<DataType>::ToRabitqDistance(size_t dim) && {
+    return RabitqL2Dist<DataType>(dim);
 }
 
 } // namespace infinity

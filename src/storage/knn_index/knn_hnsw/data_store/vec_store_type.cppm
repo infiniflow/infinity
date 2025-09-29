@@ -39,6 +39,15 @@ export template <typename DataT, typename CompressT, bool LSG = false>
 class LVQIPVecStoreType;
 
 export template <typename DataT, bool LSG = false>
+class RabitqCosVecStoreType;
+
+export template <typename DataT, bool LSG = false>
+class RabitqL2VecStoreType;
+
+export template <typename DataT, bool LSG = false>
+class RabitqIPVecStoreType;
+
+export template <typename DataT, bool LSG = false>
 class PlainCosVecStoreType {
     // friend infinity::DataType;
 public:
@@ -59,6 +68,8 @@ public:
     static constexpr LVQCosVecStoreType<DataType, CompressType> ToLVQ() {
         return {};
     }
+
+    static constexpr RabitqCosVecStoreType<DataType> ToRabitq() { return {}; }
 };
 
 export template <typename DataT, bool LSG = false>
@@ -81,6 +92,8 @@ public:
     static constexpr LVQL2VecStoreType<DataType, CompressType> ToLVQ() {
         return {};
     }
+
+    static constexpr RabitqL2VecStoreType<DataType> ToRabitq() { return {}; }
 };
 
 export template <typename DataT, bool LSG = false>
@@ -103,11 +116,14 @@ public:
     static constexpr LVQIPVecStoreType<DataType, CompressType> ToLVQ() {
         return {};
     }
+
+    static constexpr RabitqIPVecStoreType<DataType> ToRabitq() { return {}; }
 };
 
 export template <typename DataT, typename IndexT>
 class SparseIPVecStoreType {
 public:
+    using This = SparseIPVecStoreType<DataT, IndexT>;
     using DataType = DataT;
     using CompressType = void;
     template <bool OwnMem>
@@ -122,14 +138,17 @@ public:
     static constexpr bool HasOptimize = false;
 
     template <typename CompressType>
-    static constexpr SparseIPVecStoreType<DataType, IndexT> ToLVQ() {
+    static constexpr This ToLVQ() {
         return {};
     }
+
+    static constexpr This ToRabitq() { return {}; }
 };
 
 export template <typename DataT, typename CompressT, bool LSG = false>
 class LVQCosVecStoreType {
 public:
+    using This = LVQCosVecStoreType<DataT, CompressT, LSG>;
     using DataType = DataT;
     using CompressType = CompressT;
     using LVQCacheType = LVQCosCache<DataType, CompressType>;
@@ -146,14 +165,17 @@ public:
     static constexpr bool HasOptimize = true;
 
     template <typename CompressType>
-    static constexpr LVQCosVecStoreType<DataType, CompressType, LSG> ToLVQ() {
+    static constexpr This ToLVQ() {
         return {};
     }
+
+    static constexpr This ToRabitq() { return {}; }
 };
 
 export template <typename DataT, typename CompressT, bool LSG = false>
 class LVQL2VecStoreType {
 public:
+    using This = LVQL2VecStoreType<DataT, CompressT, LSG>;
     using DataType = DataT;
     using CompressType = CompressT;
     using LVQCacheType = LVQL2Cache<DataType, CompressType>;
@@ -170,14 +192,17 @@ public:
     static constexpr bool HasOptimize = true;
 
     template <typename CompressType>
-    static constexpr LVQL2VecStoreType<DataType, CompressType, LSG> ToLVQ() {
+    static constexpr This ToLVQ() {
         return {};
     }
+
+    static constexpr This ToRabitq() { return {}; }
 };
 
 export template <typename DataT, typename CompressT, bool LSG = false>
 class LVQIPVecStoreType {
 public:
+    using This = LVQIPVecStoreType<DataT, CompressT, LSG>;
     using DataType = DataT;
     using CompressType = CompressT;
     using LVQCacheType = LVQIPCache<DataType, CompressType>;
@@ -194,14 +219,17 @@ public:
     static constexpr bool HasOptimize = true;
 
     template <typename CompressType>
-    static constexpr LVQIPVecStoreType<DataType, CompressType, LSG> ToLVQ() {
+    static constexpr This ToLVQ() {
         return {};
     }
+
+    static constexpr This ToRabitq() { return {}; }
 };
 
-export template <typename DataT>
+export template <typename DataT, bool LSG = false>
 class RabitqCosVecStoreType {
 public:
+    using This = RabitqCosVecStoreType<DataT, LSG>;
     using DataType = DataT;
     template <bool OwnMem>
     using Meta = RabitqVecStoreMeta<DataType, OwnMem>;
@@ -211,14 +239,22 @@ public:
     using MetaType = RabitqVecStoreMetaType<DataType>;
     using StoreType = typename MetaType::StoreType;
     using QueryType = typename MetaType::QueryType;
-    using Distance = RabitqCosDist<DataType>;
+    using Distance = std::conditional_t<LSG, RabitqCosLSGDist<DataType>, RabitqCosDist<DataType>>;
 
     static constexpr bool HasOptimize = true;
+
+    template <typename CompressType>
+    static constexpr This ToLVQ() {
+        return {};
+    }
+
+    static constexpr This ToRabitq() { return {}; }
 };
 
-export template <typename DataT>
+export template <typename DataT, bool LSG = false>
 class RabitqL2VecStoreType {
 public:
+    using This = RabitqL2VecStoreType<DataT, LSG>;
     using DataType = DataT;
     template <bool OwnMem>
     using Meta = RabitqVecStoreMeta<DataType, OwnMem>;
@@ -228,14 +264,22 @@ public:
     using MetaType = RabitqVecStoreMetaType<DataType>;
     using StoreType = typename MetaType::StoreType;
     using QueryType = typename MetaType::QueryType;
-    using Distance = RabitqL2Dist<DataType>;
+    using Distance = std::conditional_t<LSG, RabitqL2LSGDist<DataType>, RabitqL2Dist<DataType>>;
 
     static constexpr bool HasOptimize = true;
+
+    template <typename CompressType>
+    static constexpr This ToLVQ() {
+        return {};
+    }
+
+    static constexpr This ToRabitq() { return {}; }
 };
 
-export template <typename DataT>
+export template <typename DataT, bool LSG = false>
 class RabitqIPVecStoreType {
 public:
+    using This = RabitqIPVecStoreType<DataT, LSG>;
     using DataType = DataT;
     template <bool OwnMem>
     using Meta = RabitqVecStoreMeta<DataType, OwnMem>;
@@ -245,9 +289,16 @@ public:
     using MetaType = RabitqVecStoreMetaType<DataType>;
     using StoreType = typename MetaType::StoreType;
     using QueryType = typename MetaType::QueryType;
-    using Distance = RabitqIPDist<DataType>;
+    using Distance = std::conditional_t<LSG, RabitqIPLSGDist<DataType>, RabitqIPDist<DataType>>;
 
     static constexpr bool HasOptimize = true;
+
+    template <typename CompressType>
+    static constexpr This ToLVQ() {
+        return {};
+    }
+
+    static constexpr This ToRabitq() { return {}; }
 };
 
 } // namespace infinity
