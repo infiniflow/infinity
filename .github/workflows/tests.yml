@@ -123,7 +123,7 @@ jobs:
 
       - name: Build debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity test_main"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCODE_COVERAGE=ON -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity test_main"
 
       - name: Upload artifacts
         if: ${{ !cancelled() && !failure() }}
@@ -171,11 +171,21 @@ jobs:
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > debug_unit_test_stdout.log 2> debug_unit_test_stderr.log"
+        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mkdir -p /var/infinity && cd /infinity/ && export LLVM_PROFILE_FILE="infinity-%p.profraw" && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > debug_unit_test_stdout.log 2> debug_unit_test_stderr.log"
+
+      - name: Generate LCOV report
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata
+          llvm-cov-20 export cmake-build-debug/src/test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*' > coverage.lcov
+          head -10 coverage.lcov
+          echo "LCOV file lines: $(wc -l < coverage.lcov)"
+>>>>>>> 50d541284 (more)
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
+          file: coverage.lcov
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Collect infinity log
