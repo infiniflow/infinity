@@ -854,8 +854,7 @@ jobs:
           RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
           echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
           chmod +x ./tools/ci_tools/check_benchmark_result.py
-          rm -rf test/data/benchmark && mkdir -p test/data/benchmark
-          ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark/sift1M test/data/benchmark/sift_1m
+          rm -rf test/data/benchmark && ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark test/data/benchmark
 
       - name: Golden benchmark sift
         if: ${{ !cancelled() && !failure() }}

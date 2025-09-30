@@ -24,7 +24,7 @@ class TestFullText:
     )
     def test_fulltext(self, infinity_runner: InfinityRunner, config: str):
         # should add symbolic link in advance
-        enwiki_path = "test/data/benchmark/enwiki-10w.csv"
+        enwiki_path = "test/data/benchmark/enwiki/enwiki-10w.csv"
         enwiki_size = 10000
 
         table_name = "test_fulltext"

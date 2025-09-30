@@ -145,8 +145,7 @@ jobs:
       - name: Prepare restart test data
         if: ${{ !cancelled() && !failure() }}
         run: |
-          tar --directory=${RUNNER_WORKSPACE_PREFIX} --create --file=- benchmark/sift1M/{sift_base.fvecs,sift_query.fvecs} | tar --directory=test/data --extract --file=-
-          cp ${RUNNER_WORKSPACE_PREFIX}/benchmark/enwiki/enwiki-10w.csv test/data/benchmark/enwiki-10w.csv
+          tar --directory=${RUNNER_WORKSPACE_PREFIX} --create --file=- benchmark/sift_1m/{sift_base.fvecs,sift_query.fvecs} benchmark/enwiki/enwiki-10w.csv | tar --directory=test/data --extract --file=-
 
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}
@@ -257,10 +256,10 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'debug tsan parallel log' && tail -n 1000 debug_tsan_parallel_tsan.log
           mkdir -p ${ARTIFACTS_DIR}/debug_tsan_parallel_test
           cp debug_tsan_parallel*.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
           sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
+          echo 'debug tsan parallel log' && tail -n 1000 debug_tsan_parallel*.log
 
       - name: Remove test container
         if: always()
@@ -407,8 +406,7 @@ jobs:
       - name: Prepare restart test data
         if: ${{ !cancelled() && !failure() }}
         run: |
-          tar --directory=${RUNNER_WORKSPACE_PREFIX} --create --file=- benchmark/sift1M/{sift_base.fvecs,sift_query.fvecs} | tar --directory=test/data --extract --file=-
-          cp ${RUNNER_WORKSPACE_PREFIX}/benchmark/enwiki/enwiki-10w.csv test/data/benchmark/enwiki-10w.csv
+          tar --directory=${RUNNER_WORKSPACE_PREFIX} --create --file=- benchmark/sift_1m/{sift_base.fvecs,sift_query.fvecs} benchmark/enwiki/enwiki-10w.csv | tar --directory=test/data --extract --file=-
 
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}
