@@ -524,7 +524,7 @@ jobs:
 
   reldeb_build:
     name: reldeb_build
-    if: 0
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-build" ]
     needs: code_static_check
     steps:
