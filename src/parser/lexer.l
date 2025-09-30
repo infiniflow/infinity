@@ -58,6 +58,7 @@ CATALOGS        { return CATALOGS; }
 CHECK           { return CHECK; }
 CHECKPOINT      { return CHECKPOINT; }
 CHUNK           { return CHUNK; }
+CHUNKS          { return CHUNKS; }
 CIRCLE          { return CIRCLE; }
 CLEAN           { return CLEAN; }
 DUMP            { return DUMP; }

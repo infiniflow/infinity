@@ -81,6 +81,8 @@ private:
 
     void ExecuteShowIndexSegment(QueryContext *query_context, ShowOperatorState *operator_state);
 
+    void ExecuteShowIndexChunks(QueryContext *query_context, ShowOperatorState *operator_state);
+
     void ExecuteShowIndexChunk(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowDatabases(QueryContext *query_context, ShowOperatorState *operator_state);

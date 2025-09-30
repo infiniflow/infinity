@@ -38,6 +38,8 @@ std::string ToString(ShowStmtType type) {
             return "Show index segment";
         case ShowStmtType::kIndexChunk:
             return "Show index chunk";
+        case ShowStmtType::kIndexChunks:
+            return "Show index chunks";
         case ShowStmtType::kTables:
             return "Show tables";
         case ShowStmtType::kTasks:

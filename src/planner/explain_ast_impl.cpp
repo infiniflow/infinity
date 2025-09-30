@@ -553,6 +553,19 @@ ExplainAST::BuildShow(const ShowStatement *show_statement, std::shared_ptr<std::
             result->emplace_back(std::make_shared<std::string>(index_segment));
             break;
         }
+        case ShowStmtType::kIndexChunks: {
+            result->emplace_back(std::make_shared<std::string>("SHOW INDEX CHUNKS: "));
+            intent_size += 2;
+            std::string schema_name = std::string(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(std::make_shared<std::string>(schema_name));
+            std::string table_name = std::string(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(std::make_shared<std::string>(table_name));
+            std::string index_name = std::string(intent_size, ' ') + "index: " + show_statement->index_name_.value();
+            result->emplace_back(std::make_shared<std::string>(index_name));
+            std::string index_segment = std::string(intent_size, ' ') + "segment: " + std::to_string(show_statement->segment_id_.value());
+            result->emplace_back(std::make_shared<std::string>(index_segment));
+            break;
+        }
         case ShowStmtType::kIndexChunk: {
             result->emplace_back(std::make_shared<std::string>("SHOW INDEX CHUNK: "));
             intent_size += 2;

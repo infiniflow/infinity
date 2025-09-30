@@ -316,7 +316,7 @@ typedef enum yysymbol_kind_t yysymbol_kind_t;
 
 
 /* Unqualified %code blocks.  */
-#line 79 "expression_parser.y"
+#line 78 "expression_parser.y"
 
 // Avoid warnings with the error counter.
 #if defined(__GNUC__) || defined(__clang__)
@@ -724,15 +724,15 @@ static const yytype_uint8 yytranslate[] =
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int16 yyrline[] =
 {
-       0,   169,   169,   177,   181,   186,   192,   196,   197,   198,
-     199,   201,   204,   207,   208,   209,   210,   211,   213,   221,
-     232,   238,   247,   253,   262,   270,   278,   287,   294,   301,
-     308,   315,   322,   330,   338,   346,   354,   362,   370,   378,
-     386,   394,   402,   410,   418,   448,   456,   465,   473,   482,
-     490,   496,   503,   510,   517,   522,   532,   537,   542,   547,
-     552,   557,   562,   567,   572,   577,   580,   583,   586,   590,
-     594,   599,   604,   608,   613,   618,   624,   630,   636,   642,
-     648,   654,   660,   666,   672,   678,   684
+       0,   168,   168,   176,   180,   185,   191,   195,   196,   197,
+     198,   200,   203,   206,   207,   208,   209,   210,   212,   220,
+     231,   237,   246,   252,   261,   269,   277,   286,   293,   300,
+     307,   314,   321,   329,   337,   345,   353,   361,   369,   377,
+     385,   393,   401,   409,   417,   447,   455,   464,   472,   481,
+     489,   495,   502,   509,   516,   521,   531,   536,   541,   546,
+     551,   556,   561,   566,   571,   576,   579,   582,   585,   589,
+     593,   598,   603,   607,   612,   617,   623,   629,   635,   641,
+     647,   653,   659,   665,   671,   677,   683
 };
 #endif
 
@@ -1553,7 +1553,7 @@ yydestruct (const char *yymsg,
   switch (yykind)
     {
     case YYSYMBOL_expr_array: /* expr_array  */
-#line 97 "expression_parser.y"
+#line 96 "expression_parser.y"
             {
     fprintf(stderr, "destroy expression array\n");
     if ((((*yyvaluep).expr_array_t)) != nullptr) {
@@ -1567,7 +1567,7 @@ yydestruct (const char *yymsg,
         break;
 
     case YYSYMBOL_expr_alias: /* expr_alias  */
-#line 107 "expression_parser.y"
+#line 106 "expression_parser.y"
             {
     delete (((*yyvaluep).expr_t));
 }
@@ -1575,7 +1575,7 @@ yydestruct (const char *yymsg,
         break;
 
     case YYSYMBOL_expr: /* expr  */
-#line 107 "expression_parser.y"
+#line 106 "expression_parser.y"
             {
     delete (((*yyvaluep).expr_t));
 }
@@ -1583,7 +1583,7 @@ yydestruct (const char *yymsg,
         break;
 
     case YYSYMBOL_operand: /* operand  */
-#line 107 "expression_parser.y"
+#line 106 "expression_parser.y"
             {
     delete (((*yyvaluep).expr_t));
 }
@@ -1591,7 +1591,7 @@ yydestruct (const char *yymsg,
         break;
 
     case YYSYMBOL_match_expr: /* match_expr  */
-#line 107 "expression_parser.y"
+#line 106 "expression_parser.y"
             {
     delete (((*yyvaluep).expr_t));
 }
@@ -1599,7 +1599,7 @@ yydestruct (const char *yymsg,
         break;
 
     case YYSYMBOL_query_expr: /* query_expr  */
-#line 107 "expression_parser.y"
+#line 106 "expression_parser.y"
             {
     delete (((*yyvaluep).expr_t));
 }
@@ -1607,7 +1607,7 @@ yydestruct (const char *yymsg,
         break;
 
     case YYSYMBOL_fusion_expr: /* fusion_expr  */
-#line 107 "expression_parser.y"
+#line 106 "expression_parser.y"
             {
     delete (((*yyvaluep).expr_t));
 }
@@ -1615,7 +1615,7 @@ yydestruct (const char *yymsg,
         break;
 
     case YYSYMBOL_function_expr: /* function_expr  */
-#line 107 "expression_parser.y"
+#line 106 "expression_parser.y"
             {
     delete (((*yyvaluep).expr_t));
 }
@@ -1623,7 +1623,7 @@ yydestruct (const char *yymsg,
         break;
 
     case YYSYMBOL_conjunction_expr: /* conjunction_expr  */
-#line 107 "expression_parser.y"
+#line 106 "expression_parser.y"
             {
     delete (((*yyvaluep).expr_t));
 }
@@ -1631,7 +1631,7 @@ yydestruct (const char *yymsg,
         break;
 
     case YYSYMBOL_between_expr: /* between_expr  */
-#line 107 "expression_parser.y"
+#line 106 "expression_parser.y"
             {
     delete (((*yyvaluep).expr_t));
 }
@@ -1639,7 +1639,7 @@ yydestruct (const char *yymsg,
         break;
 
     case YYSYMBOL_in_expr: /* in_expr  */
-#line 107 "expression_parser.y"
+#line 106 "expression_parser.y"
             {
     delete (((*yyvaluep).expr_t));
 }
@@ -1647,7 +1647,7 @@ yydestruct (const char *yymsg,
         break;
 
     case YYSYMBOL_column_expr: /* column_expr  */
-#line 107 "expression_parser.y"
+#line 106 "expression_parser.y"
             {
     delete (((*yyvaluep).expr_t));
 }
@@ -1655,7 +1655,7 @@ yydestruct (const char *yymsg,
         break;
 
     case YYSYMBOL_constant_expr: /* constant_expr  */
-#line 111 "expression_parser.y"
+#line 110 "expression_parser.y"
             {
     delete (((*yyvaluep).const_expr_t));
 }
@@ -1663,7 +1663,7 @@ yydestruct (const char *yymsg,
         break;
 
     case YYSYMBOL_long_array_expr: /* long_array_expr  */
-#line 111 "expression_parser.y"
+#line 110 "expression_parser.y"
             {
     delete (((*yyvaluep).const_expr_t));
 }
@@ -1671,7 +1671,7 @@ yydestruct (const char *yymsg,
         break;
 
     case YYSYMBOL_unclosed_long_array_expr: /* unclosed_long_array_expr  */
-#line 111 "expression_parser.y"
+#line 110 "expression_parser.y"
             {
     delete (((*yyvaluep).const_expr_t));
 }
@@ -1679,7 +1679,7 @@ yydestruct (const char *yymsg,
         break;
 
     case YYSYMBOL_double_array_expr: /* double_array_expr  */
-#line 111 "expression_parser.y"
+#line 110 "expression_parser.y"
             {
     delete (((*yyvaluep).const_expr_t));
 }
@@ -1687,7 +1687,7 @@ yydestruct (const char *yymsg,
         break;
 
     case YYSYMBOL_unclosed_double_array_expr: /* unclosed_double_array_expr  */
-#line 111 "expression_parser.y"
+#line 110 "expression_parser.y"
             {
     delete (((*yyvaluep).const_expr_t));
 }
@@ -1695,7 +1695,7 @@ yydestruct (const char *yymsg,
         break;
 
     case YYSYMBOL_interval_expr: /* interval_expr  */
-#line 111 "expression_parser.y"
+#line 110 "expression_parser.y"
             {
     delete (((*yyvaluep).const_expr_t));
 }
@@ -1796,7 +1796,7 @@ YYLTYPE yylloc = yyloc_default;
 
 
 /* User initialization code.  */
-#line 69 "expression_parser.y"
+#line 68 "expression_parser.y"
 {
   // Initialize
   yylloc.first_column = 0;
@@ -2018,7 +2018,7 @@ yyreduce:
   switch (yyn)
     {
   case 2: /* input_pattern: expr_array  */
-#line 169 "expression_parser.y"
+#line 168 "expression_parser.y"
                            {
     result->exprs_ptr_ = (yyvsp[0].expr_array_t);
 }
@@ -2026,7 +2026,7 @@ yyreduce:
     break;
 
   case 3: /* expr_array: expr_alias  */
-#line 177 "expression_parser.y"
+#line 176 "expression_parser.y"
                         {
     (yyval.expr_array_t) = new std::vector<infinity::ParsedExpr*>();
     (yyval.expr_array_t)->emplace_back((yyvsp[0].expr_t));
@@ -2035,7 +2035,7 @@ yyreduce:
     break;
 
   case 4: /* expr_array: expr_array ',' expr_alias  */
-#line 181 "expression_parser.y"
+#line 180 "expression_parser.y"
                             {
     (yyvsp[-2].expr_array_t)->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_array_t) = (yyvsp[-2].expr_array_t);
@@ -2044,7 +2044,7 @@ yyreduce:
     break;
 
   case 5: /* expr_alias: expr AS IDENTIFIER  */
-#line 186 "expression_parser.y"
+#line 185 "expression_parser.y"
                                 {
     (yyval.expr_t) = (yyvsp[-2].expr_t);
     ParserHelper::ToLower((yyvsp[0].str_value));
@@ -2055,7 +2055,7 @@ yyreduce:
     break;
 
   case 6: /* expr_alias: expr  */
-#line 192 "expression_parser.y"
+#line 191 "expression_parser.y"
        {
     (yyval.expr_t) = (yyvsp[0].expr_t);
 }
@@ -2063,7 +2063,7 @@ yyreduce:
     break;
 
   case 11: /* operand: '(' expr ')'  */
-#line 201 "expression_parser.y"
+#line 200 "expression_parser.y"
                       {
    (yyval.expr_t) = (yyvsp[-1].expr_t);
 }
@@ -2071,7 +2071,7 @@ yyreduce:
     break;
 
   case 12: /* operand: constant_expr  */
-#line 204 "expression_parser.y"
+#line 203 "expression_parser.y"
                 {
     (yyval.expr_t) = (yyvsp[0].const_expr_t);
 }
@@ -2079,7 +2079,7 @@ yyreduce:
     break;
 
   case 18: /* match_expr: MATCH '(' STRING ',' STRING ')'  */
-#line 213 "expression_parser.y"
+#line 212 "expression_parser.y"
                                              {
     infinity::MatchExpr* match_expr = new infinity::MatchExpr();
     match_expr->fields_ = std::string((yyvsp[-3].str_value));
@@ -2092,7 +2092,7 @@ yyreduce:
     break;
 
   case 19: /* match_expr: MATCH '(' STRING ',' STRING ',' STRING ')'  */
-#line 221 "expression_parser.y"
+#line 220 "expression_parser.y"
                                              {
     infinity::MatchExpr* match_expr = new infinity::MatchExpr();
     match_expr->fields_ = std::string((yyvsp[-5].str_value));
@@ -2107,7 +2107,7 @@ yyreduce:
     break;
 
   case 20: /* query_expr: QUERY '(' STRING ')'  */
-#line 232 "expression_parser.y"
+#line 231 "expression_parser.y"
                                   {
     infinity::MatchExpr* match_expr = new infinity::MatchExpr();
     match_expr->matching_text_ = std::string((yyvsp[-1].str_value));
@@ -2118,7 +2118,7 @@ yyreduce:
     break;
 
   case 21: /* query_expr: QUERY '(' STRING ',' STRING ')'  */
-#line 238 "expression_parser.y"
+#line 237 "expression_parser.y"
                                   {
     infinity::MatchExpr* match_expr = new infinity::MatchExpr();
     match_expr->matching_text_ = std::string((yyvsp[-3].str_value));
@@ -2131,7 +2131,7 @@ yyreduce:
     break;
 
   case 22: /* fusion_expr: FUSION '(' STRING ')'  */
-#line 247 "expression_parser.y"
+#line 246 "expression_parser.y"
                                     {
     infinity::FusionExpr* fusion_expr = new infinity::FusionExpr();
     fusion_expr->method_ = std::string((yyvsp[-1].str_value));
@@ -2142,7 +2142,7 @@ yyreduce:
     break;
 
   case 23: /* fusion_expr: FUSION '(' STRING ',' STRING ')'  */
-#line 253 "expression_parser.y"
+#line 252 "expression_parser.y"
                                    {
     infinity::FusionExpr* fusion_expr = new infinity::FusionExpr();
     fusion_expr->method_ = std::string((yyvsp[-3].str_value));
@@ -2155,7 +2155,7 @@ yyreduce:
     break;
 
   case 24: /* function_expr: IDENTIFIER '(' ')'  */
-#line 262 "expression_parser.y"
+#line 261 "expression_parser.y"
                                    {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     ParserHelper::ToLower((yyvsp[-2].str_value));
@@ -2168,7 +2168,7 @@ yyreduce:
     break;
 
   case 25: /* function_expr: IDENTIFIER '(' expr_array ')'  */
-#line 270 "expression_parser.y"
+#line 269 "expression_parser.y"
                                 {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     ParserHelper::ToLower((yyvsp[-3].str_value));
@@ -2181,7 +2181,7 @@ yyreduce:
     break;
 
   case 26: /* function_expr: IDENTIFIER '(' DISTINCT expr_array ')'  */
-#line 278 "expression_parser.y"
+#line 277 "expression_parser.y"
                                          {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     ParserHelper::ToLower((yyvsp[-4].str_value));
@@ -2195,7 +2195,7 @@ yyreduce:
     break;
 
   case 27: /* function_expr: operand IS NOT NULLABLE  */
-#line 287 "expression_parser.y"
+#line 286 "expression_parser.y"
                           {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "is_not_null";
@@ -2207,7 +2207,7 @@ yyreduce:
     break;
 
   case 28: /* function_expr: operand IS NULLABLE  */
-#line 294 "expression_parser.y"
+#line 293 "expression_parser.y"
                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "is_null";
@@ -2219,7 +2219,7 @@ yyreduce:
     break;
 
   case 29: /* function_expr: NOT operand  */
-#line 301 "expression_parser.y"
+#line 300 "expression_parser.y"
               {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "not";
@@ -2231,7 +2231,7 @@ yyreduce:
     break;
 
   case 30: /* function_expr: '-' operand  */
-#line 308 "expression_parser.y"
+#line 307 "expression_parser.y"
               {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "-";
@@ -2243,7 +2243,7 @@ yyreduce:
     break;
 
   case 31: /* function_expr: '+' operand  */
-#line 315 "expression_parser.y"
+#line 314 "expression_parser.y"
               {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "+";
@@ -2255,7 +2255,7 @@ yyreduce:
     break;
 
   case 32: /* function_expr: operand '-' operand  */
-#line 322 "expression_parser.y"
+#line 321 "expression_parser.y"
                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "-";
@@ -2268,7 +2268,7 @@ yyreduce:
     break;
 
   case 33: /* function_expr: operand '+' operand  */
-#line 330 "expression_parser.y"
+#line 329 "expression_parser.y"
                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "+";
@@ -2281,7 +2281,7 @@ yyreduce:
     break;
 
   case 34: /* function_expr: operand '*' operand  */
-#line 338 "expression_parser.y"
+#line 337 "expression_parser.y"
                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "*";
@@ -2294,7 +2294,7 @@ yyreduce:
     break;
 
   case 35: /* function_expr: operand '/' operand  */
-#line 346 "expression_parser.y"
+#line 345 "expression_parser.y"
                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "/";
@@ -2307,7 +2307,7 @@ yyreduce:
     break;
 
   case 36: /* function_expr: operand '%' operand  */
-#line 354 "expression_parser.y"
+#line 353 "expression_parser.y"
                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "%";
@@ -2320,7 +2320,7 @@ yyreduce:
     break;
 
   case 37: /* function_expr: operand '=' operand  */
-#line 362 "expression_parser.y"
+#line 361 "expression_parser.y"
                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "=";
@@ -2333,7 +2333,7 @@ yyreduce:
     break;
 
   case 38: /* function_expr: operand EQUAL operand  */
-#line 370 "expression_parser.y"
+#line 369 "expression_parser.y"
                         {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "=";
@@ -2346,7 +2346,7 @@ yyreduce:
     break;
 
   case 39: /* function_expr: operand NOT_EQ operand  */
-#line 378 "expression_parser.y"
+#line 377 "expression_parser.y"
                          {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "<>";
@@ -2359,7 +2359,7 @@ yyreduce:
     break;
 
   case 40: /* function_expr: operand '<' operand  */
-#line 386 "expression_parser.y"
+#line 385 "expression_parser.y"
                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "<";
@@ -2372,7 +2372,7 @@ yyreduce:
     break;
 
   case 41: /* function_expr: operand '>' operand  */
-#line 394 "expression_parser.y"
+#line 393 "expression_parser.y"
                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = ">";
@@ -2385,7 +2385,7 @@ yyreduce:
     break;
 
   case 42: /* function_expr: operand LESS_EQ operand  */
-#line 402 "expression_parser.y"
+#line 401 "expression_parser.y"
                           {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "<=";
@@ -2398,7 +2398,7 @@ yyreduce:
     break;
 
   case 43: /* function_expr: operand GREATER_EQ operand  */
-#line 410 "expression_parser.y"
+#line 409 "expression_parser.y"
                              {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = ">=";
@@ -2411,7 +2411,7 @@ yyreduce:
     break;
 
   case 44: /* function_expr: EXTRACT '(' STRING FROM operand ')'  */
-#line 418 "expression_parser.y"
+#line 417 "expression_parser.y"
                                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     ParserHelper::ToLower((yyvsp[-3].str_value));
@@ -2446,7 +2446,7 @@ yyreduce:
     break;
 
   case 45: /* function_expr: operand LIKE operand  */
-#line 448 "expression_parser.y"
+#line 447 "expression_parser.y"
                        {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "like";
@@ -2459,7 +2459,7 @@ yyreduce:
     break;
 
   case 46: /* function_expr: operand NOT LIKE operand  */
-#line 456 "expression_parser.y"
+#line 455 "expression_parser.y"
                            {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "not_like";
@@ -2472,7 +2472,7 @@ yyreduce:
     break;
 
   case 47: /* conjunction_expr: expr AND expr  */
-#line 465 "expression_parser.y"
+#line 464 "expression_parser.y"
                                 {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "and";
@@ -2485,7 +2485,7 @@ yyreduce:
     break;
 
   case 48: /* conjunction_expr: expr OR expr  */
-#line 473 "expression_parser.y"
+#line 472 "expression_parser.y"
                {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "or";
@@ -2498,7 +2498,7 @@ yyreduce:
     break;
 
   case 49: /* between_expr: operand BETWEEN operand AND operand  */
-#line 482 "expression_parser.y"
+#line 481 "expression_parser.y"
                                                   {
     infinity::BetweenExpr* between_expr = new infinity::BetweenExpr();
     between_expr->value_ = (yyvsp[-4].expr_t);
@@ -2510,7 +2510,7 @@ yyreduce:
     break;
 
   case 50: /* in_expr: operand IN '(' expr_array ')'  */
-#line 490 "expression_parser.y"
+#line 489 "expression_parser.y"
                                        {
     infinity::InExpr* in_expr = new infinity::InExpr(true);
     in_expr->left_ = (yyvsp[-4].expr_t);
@@ -2521,7 +2521,7 @@ yyreduce:
     break;
 
   case 51: /* in_expr: operand NOT IN '(' expr_array ')'  */
-#line 496 "expression_parser.y"
+#line 495 "expression_parser.y"
                                     {
     infinity::InExpr* in_expr = new infinity::InExpr(false);
     in_expr->left_ = (yyvsp[-5].expr_t);
@@ -2532,7 +2532,7 @@ yyreduce:
     break;
 
   case 52: /* column_expr: IDENTIFIER  */
-#line 503 "expression_parser.y"
+#line 502 "expression_parser.y"
                          {
     infinity::ColumnExpr* column_expr = new infinity::ColumnExpr();
     ParserHelper::ToLower((yyvsp[0].str_value));
@@ -2544,7 +2544,7 @@ yyreduce:
     break;
 
   case 53: /* column_expr: column_expr '.' IDENTIFIER  */
-#line 510 "expression_parser.y"
+#line 509 "expression_parser.y"
                              {
     infinity::ColumnExpr* column_expr = (infinity::ColumnExpr*)(yyvsp[-2].expr_t);
     ParserHelper::ToLower((yyvsp[0].str_value));
@@ -2556,7 +2556,7 @@ yyreduce:
     break;
 
   case 54: /* column_expr: '*'  */
-#line 517 "expression_parser.y"
+#line 516 "expression_parser.y"
       {
     infinity::ColumnExpr* column_expr = new infinity::ColumnExpr();
     column_expr->star_ = true;
@@ -2566,7 +2566,7 @@ yyreduce:
     break;
 
   case 55: /* column_expr: column_expr '.' '*'  */
-#line 522 "expression_parser.y"
+#line 521 "expression_parser.y"
                       {
     infinity::ColumnExpr* column_expr = (infinity::ColumnExpr*)(yyvsp[-2].expr_t);
     if(column_expr->star_) {
@@ -2580,7 +2580,7 @@ yyreduce:
     break;
 
   case 56: /* constant_expr: STRING  */
-#line 532 "expression_parser.y"
+#line 531 "expression_parser.y"
                       {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kString);
     const_expr->str_value_ = (yyvsp[0].str_value);
@@ -2590,7 +2590,7 @@ yyreduce:
     break;
 
   case 57: /* constant_expr: TRUE  */
-#line 537 "expression_parser.y"
+#line 536 "expression_parser.y"
        {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kBoolean);
     const_expr->bool_value_ = true;
@@ -2600,7 +2600,7 @@ yyreduce:
     break;
 
   case 58: /* constant_expr: FALSE  */
-#line 542 "expression_parser.y"
+#line 541 "expression_parser.y"
         {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kBoolean);
     const_expr->bool_value_ = false;
@@ -2610,7 +2610,7 @@ yyreduce:
     break;
 
   case 59: /* constant_expr: DOUBLE_VALUE  */
-#line 547 "expression_parser.y"
+#line 546 "expression_parser.y"
                {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDouble);
     const_expr->double_value_ = (yyvsp[0].double_value);
@@ -2620,7 +2620,7 @@ yyreduce:
     break;
 
   case 60: /* constant_expr: LONG_VALUE  */
-#line 552 "expression_parser.y"
+#line 551 "expression_parser.y"
              {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInteger);
     const_expr->integer_value_ = (yyvsp[0].long_value);
@@ -2630,7 +2630,7 @@ yyreduce:
     break;
 
   case 61: /* constant_expr: DATE STRING  */
-#line 557 "expression_parser.y"
+#line 556 "expression_parser.y"
               {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDate);
     const_expr->date_value_ = (yyvsp[0].str_value);
@@ -2640,7 +2640,7 @@ yyreduce:
     break;
 
   case 62: /* constant_expr: TIME STRING  */
-#line 562 "expression_parser.y"
+#line 561 "expression_parser.y"
               {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kTime);
     const_expr->date_value_ = (yyvsp[0].str_value);
@@ -2650,7 +2650,7 @@ yyreduce:
     break;
 
   case 63: /* constant_expr: DATETIME STRING  */
-#line 567 "expression_parser.y"
+#line 566 "expression_parser.y"
                   {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDateTime);
     const_expr->date_value_ = (yyvsp[0].str_value);
@@ -2660,7 +2660,7 @@ yyreduce:
     break;
 
   case 64: /* constant_expr: TIMESTAMP STRING  */
-#line 572 "expression_parser.y"
+#line 571 "expression_parser.y"
                    {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kTimestamp);
     const_expr->date_value_ = (yyvsp[0].str_value);
@@ -2670,7 +2670,7 @@ yyreduce:
     break;
 
   case 65: /* constant_expr: INTERVAL interval_expr  */
-#line 577 "expression_parser.y"
+#line 576 "expression_parser.y"
                          {
     (yyval.const_expr_t) = (yyvsp[0].const_expr_t);
 }
@@ -2678,7 +2678,7 @@ yyreduce:
     break;
 
   case 66: /* constant_expr: interval_expr  */
-#line 580 "expression_parser.y"
+#line 579 "expression_parser.y"
                 {
     (yyval.const_expr_t) = (yyvsp[0].const_expr_t);
 }
@@ -2686,7 +2686,7 @@ yyreduce:
     break;
 
   case 67: /* constant_expr: long_array_expr  */
-#line 583 "expression_parser.y"
+#line 582 "expression_parser.y"
                   {
     (yyval.const_expr_t) = (yyvsp[0].const_expr_t);
 }
@@ -2694,7 +2694,7 @@ yyreduce:
     break;
 
   case 68: /* constant_expr: double_array_expr  */
-#line 586 "expression_parser.y"
+#line 585 "expression_parser.y"
                     {
     (yyval.const_expr_t) = (yyvsp[0].const_expr_t);
 }
@@ -2702,7 +2702,7 @@ yyreduce:
     break;
 
   case 69: /* long_array_expr: unclosed_long_array_expr ']'  */
-#line 590 "expression_parser.y"
+#line 589 "expression_parser.y"
                                               {
     (yyval.const_expr_t) = (yyvsp[-1].const_expr_t);
 }
@@ -2710,7 +2710,7 @@ yyreduce:
     break;
 
   case 70: /* unclosed_long_array_expr: '[' LONG_VALUE  */
-#line 594 "expression_parser.y"
+#line 593 "expression_parser.y"
                                          {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kIntegerArray);
     const_expr->long_array_.emplace_back((yyvsp[0].long_value));
@@ -2720,7 +2720,7 @@ yyreduce:
     break;
 
   case 71: /* unclosed_long_array_expr: unclosed_long_array_expr ',' LONG_VALUE  */
-#line 599 "expression_parser.y"
+#line 598 "expression_parser.y"
                                           {
     (yyvsp[-2].const_expr_t)->long_array_.emplace_back((yyvsp[0].long_value));
     (yyval.const_expr_t) = (yyvsp[-2].const_expr_t);
@@ -2729,7 +2729,7 @@ yyreduce:
     break;
 
   case 72: /* double_array_expr: unclosed_double_array_expr ']'  */
-#line 604 "expression_parser.y"
+#line 603 "expression_parser.y"
                                                   {
     (yyval.const_expr_t) = (yyvsp[-1].const_expr_t);
 }
@@ -2737,7 +2737,7 @@ yyreduce:
     break;
 
   case 73: /* unclosed_double_array_expr: '[' DOUBLE_VALUE  */
-#line 608 "expression_parser.y"
+#line 607 "expression_parser.y"
                                              {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDoubleArray);
     const_expr->double_array_.emplace_back((yyvsp[0].double_value));
@@ -2747,7 +2747,7 @@ yyreduce:
     break;
 
   case 74: /* unclosed_double_array_expr: unclosed_double_array_expr ',' DOUBLE_VALUE  */
-#line 613 "expression_parser.y"
+#line 612 "expression_parser.y"
                                               {
     (yyvsp[-2].const_expr_t)->double_array_.emplace_back((yyvsp[0].double_value));
     (yyval.const_expr_t) = (yyvsp[-2].const_expr_t);
@@ -2756,7 +2756,7 @@ yyreduce:
     break;
 
   case 75: /* interval_expr: LONG_VALUE SECONDS  */
-#line 618 "expression_parser.y"
+#line 617 "expression_parser.y"
                                   {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kSecond;
@@ -2767,7 +2767,7 @@ yyreduce:
     break;
 
   case 76: /* interval_expr: LONG_VALUE SECOND  */
-#line 624 "expression_parser.y"
+#line 623 "expression_parser.y"
                     {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kSecond;
@@ -2778,7 +2778,7 @@ yyreduce:
     break;
 
   case 77: /* interval_expr: LONG_VALUE MINUTES  */
-#line 630 "expression_parser.y"
+#line 629 "expression_parser.y"
                      {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kMinute;
@@ -2789,7 +2789,7 @@ yyreduce:
     break;
 
   case 78: /* interval_expr: LONG_VALUE MINUTE  */
-#line 636 "expression_parser.y"
+#line 635 "expression_parser.y"
                     {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kMinute;
@@ -2800,7 +2800,7 @@ yyreduce:
     break;
 
   case 79: /* interval_expr: LONG_VALUE HOURS  */
-#line 642 "expression_parser.y"
+#line 641 "expression_parser.y"
                    {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kHour;
@@ -2811,7 +2811,7 @@ yyreduce:
     break;
 
   case 80: /* interval_expr: LONG_VALUE HOUR  */
-#line 648 "expression_parser.y"
+#line 647 "expression_parser.y"
                   {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kHour;
@@ -2822,7 +2822,7 @@ yyreduce:
     break;
 
   case 81: /* interval_expr: LONG_VALUE DAYS  */
-#line 654 "expression_parser.y"
+#line 653 "expression_parser.y"
                   {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kDay;
@@ -2833,7 +2833,7 @@ yyreduce:
     break;
 
   case 82: /* interval_expr: LONG_VALUE DAY  */
-#line 660 "expression_parser.y"
+#line 659 "expression_parser.y"
                  {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kDay;
@@ -2844,7 +2844,7 @@ yyreduce:
     break;
 
   case 83: /* interval_expr: LONG_VALUE MONTHS  */
-#line 666 "expression_parser.y"
+#line 665 "expression_parser.y"
                     {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kMonth;
@@ -2855,7 +2855,7 @@ yyreduce:
     break;
 
   case 84: /* interval_expr: LONG_VALUE MONTH  */
-#line 672 "expression_parser.y"
+#line 671 "expression_parser.y"
                    {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kMonth;
@@ -2866,7 +2866,7 @@ yyreduce:
     break;
 
   case 85: /* interval_expr: LONG_VALUE YEARS  */
-#line 678 "expression_parser.y"
+#line 677 "expression_parser.y"
                    {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kYear;
@@ -2877,7 +2877,7 @@ yyreduce:
     break;
 
   case 86: /* interval_expr: LONG_VALUE YEAR  */
-#line 684 "expression_parser.y"
+#line 683 "expression_parser.y"
                   {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kYear;
@@ -3117,7 +3117,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 691 "expression_parser.y"
+#line 690 "expression_parser.y"
 
 
 void

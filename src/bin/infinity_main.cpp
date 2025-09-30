@@ -143,7 +143,7 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
         case SIGINT:
         case SIGQUIT:
         case SIGTERM: {
-            infinity::LOG_CRITICAL(fmt::format("Shutdown infinity server due to signal {}", strsignal(signal_number)));
+            infinity::LOG_INFO(fmt::format("Shutdown infinity server due to signal {}", strsignal(signal_number)));
 
             std::unique_lock<std::mutex> lock(server_mutex);
             server_running = false;

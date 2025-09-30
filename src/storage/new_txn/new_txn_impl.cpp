@@ -1341,6 +1341,37 @@ NewTxn::GetSegmentIndexInfo(const std::string &db_name, const std::string &table
     return {std::move(segment_index_info), Status::OK()};
 }
 
+std::tuple<std::vector<std::pair<ChunkID, std::shared_ptr<ChunkIndexMetaInfo>>>, Status>
+NewTxn::GetChunkIndexesInfo(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id) {
+    std::vector<std::pair<ChunkID, std::shared_ptr<ChunkIndexMetaInfo>>> chunk_index_infos;
+    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<TableIndexMeeta> table_index_meta;
+    std::string table_key;
+    std::string index_key;
+    Status status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
+    if (!status.ok()) {
+        return {std::move(chunk_index_infos), status};
+    }
+
+    SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+    auto [chunk_ids, chunk_status] = segment_index_meta.GetChunkIDs1();
+    if (!chunk_status.ok()) {
+        return {std::move(chunk_index_infos), chunk_status};
+    }
+
+    for (auto &chunk_id : *chunk_ids) {
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+        ChunkIndexMetaInfo *chunk_index_info_ptr;
+        status = chunk_index_meta.GetChunkInfo(chunk_index_info_ptr);
+        if (!status.ok()) {
+            return {std::move(chunk_index_infos), status};
+        }
+        chunk_index_infos.emplace_back(chunk_id, std::make_shared<ChunkIndexMetaInfo>(*chunk_index_info_ptr));
+    }
+    return {std::move(chunk_index_infos), Status::OK()};
+}
+
 std::tuple<std::shared_ptr<ChunkIndexMetaInfo>, Status> NewTxn::GetChunkIndexInfo(const std::string &db_name,
                                                                                   const std::string &table_name,
                                                                                   const std::string &index_name,

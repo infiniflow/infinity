@@ -133,6 +133,18 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowStmtType::kIndexChunks: {
+            output_names_->reserve(3);
+            output_types_->reserve(3);
+            output_names_->emplace_back("id");
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("row_count");
+
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            break;
+        }
         case ShowStmtType::kIndexChunk: {
             output_names_->reserve(2);
             output_types_->reserve(2);
@@ -754,6 +766,10 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowStmtType::kIndexSegment: {
             ExecuteShowIndexSegment(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kIndexChunks: {
+            ExecuteShowIndexChunks(query_context, show_operator_state);
             break;
         }
         case ShowStmtType::kIndexChunk: {
@@ -1461,6 +1477,44 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(segment_index_info->chunk_count_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
+void PhysicalShow::ExecuteShowIndexChunks(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+    NewTxn *txn = query_context->GetNewTxn();
+    auto [chunk_index_infos, status] = txn->GetChunkIndexesInfo(db_name_, *object_name_, index_name_.value(), segment_id_.value());
+    if (!status.ok()) {
+        RecoverableError(status);
+        return;
+    }
+
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(*output_types_);
+
+    for (auto &chunk_index_info : chunk_index_infos) {
+        size_t column_id = 0;
+        {
+            Value value = Value::MakeBigInt(chunk_index_info.first);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(chunk_index_info.second->base_name_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeBigInt(chunk_index_info.second->row_cnt_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }

@@ -125,6 +125,9 @@ statement ok
 SHOW TABLE tb1 INDEX idx1 SEGMENT 0;
 
 statement ok
+SHOW TABLE tb1 INDEX idx1 SEGMENT 0 CHUNKS;
+
+statement ok
 SHOW TABLE tb1 INDEX idx1 SEGMENT 0 CHUNK 0;
 
 statement ok

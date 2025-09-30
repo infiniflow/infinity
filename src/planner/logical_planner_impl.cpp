@@ -1516,6 +1516,20 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, std::shared_ptr<BindC
                                                                 statement->index_name_);
             break;
         }
+        case ShowStmtType::kIndexChunks: {
+            this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                ShowStmtType::kIndexChunks,
+                                                                statement->schema_name_,
+                                                                statement->table_name_,
+                                                                bind_context_ptr->GenerateTableIndex(),
+                                                                std::nullopt,
+                                                                statement->segment_id_,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                std::nullopt,
+                                                                statement->index_name_);
+            break;
+        }
         case ShowStmtType::kIndexChunk: {
             this->logical_plan_ = std::make_shared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                 ShowStmtType::kIndexChunk,
