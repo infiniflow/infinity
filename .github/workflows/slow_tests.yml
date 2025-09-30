@@ -113,14 +113,13 @@ jobs:
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter=*SLOW_* > debug_unittest_stdout.log 2> debug_unittest_stderr.log"
+        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter=*SLOW_* > debug_unit_test_stdout.log 2> debug_unit_test_stderr.log"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'debug unittest stdout' && tail -n 1000 debug_unittest_stdout.log &&
-          echo 'debug unittest stderr' && tail -n 1000 debug_unittest_stderr.log
-          cp debug_unittest_stdout.log debug_unittest_stderr.log ${ARTIFACTS_DIR}
+          mkdir -p ${ARTIFACTS_DIR}/debug_unit_test && cp debug_unit_test*.log ${ARTIFACTS_DIR}/debug_unit_test/
+          echo 'debug unit test log' && tail -n 1000 debug_unit_test*.log
 
       - name: Remove test container
         if: always()
@@ -163,15 +162,13 @@ jobs:
 
       - name: Run restart test
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 TSAN_OPTIONS=log_path=debug_tsan_restart_test_tsan.log python3 tools/run_restart_test.py --infinity_path=cmake-build-debug-tsan/src/infinity"
+        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 TSAN_OPTIONS=log_path=restart_test_tsan.log python3 tools/run_restart_test.py --infinity_path=cmake-build-debug-tsan/src/infinity"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          mkdir -p ${ARTIFACTS_DIR}/debug_tsan_restart_test
-          cp restart_test*.log* ${ARTIFACTS_DIR}/debug_tsan_restart_test/
+          mkdir -p ${ARTIFACTS_DIR}/debug_tsan_restart_test && cp restart_test*.log* ${ARTIFACTS_DIR}/debug_tsan_restart_test/
           echo 'restart_test log(last 1000 lines):' && tail -n 1000 restart_test*.log*
-          rm -rf restart_test*.log*
 
       - name: Remove test container
         if: always()
@@ -260,10 +257,10 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'debug tsan parallel stdout' && tail -n 1000 debug_tsan_parallel_stdout.log &&
-          echo 'debug tsan parallel stderr' && tail -n 1000 debug_tsan_parallel_stderr.log &&
-          cp debug_tsan_parallel_stdout.log debug_tsan_parallel_stderr.log ${ARTIFACTS_DIR}
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_tsan_parallel_infinity.log
+          echo 'debug tsan parallel log' && tail -n 1000 debug_tsan_parallel_tsan.log
+          mkdir -p ${ARTIFACTS_DIR}/debug_tsan_parallel_test
+          cp debug_tsan_parallel*.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
+          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
 
       - name: Remove test container
         if: always()
@@ -328,14 +325,13 @@ jobs:
 
       - name: Unit test reldeb version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-reldeb/src/test_main --gtest_also_run_disabled_tests --gtest_filter=*SLOW_* > reldeb_unittest_stdout.log 2> reldeb_unittest_stderr.log"
+        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-reldeb/src/test_main --gtest_also_run_disabled_tests --gtest_filter=*SLOW_* > reldeb_unit_test_stdout.log 2> reldeb_unit_test_stderr.log"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'reldeb unittest stdout' && tail -n 1000 reldeb_unittest_stdout.log &&
-          echo 'reldeb unittest stderr' && tail -n 1000 reldeb_unittest_stderr.log
-          cp reldeb_unittest_stdout.log reldeb_unittest_stderr.log ${ARTIFACTS_DIR}
+          mkdir -p ${ARTIFACTS_DIR}/reldeb_unit_test && cp reldeb_unit_test*.log ${ARTIFACTS_DIR}/reldeb_unit_test/
+          echo 'reldeb unit test log' && tail -n 1000 reldeb_unit_test*.log
 
       - name: Remove test container
         if: always()
@@ -384,10 +380,10 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'reldeb parallel stdout' && tail -n 1000 reldeb_parallel_stdout.log &&
-          echo 'reldeb parallel stderr' && tail -n 1000 reldeb_parallel_stderr.log &&
-          cp reldeb_parallel_stdout.log reldeb_parallel_stderr.log ${ARTIFACTS_DIR}
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_parallel_infinity.log
+          echo 'reldeb parallel stdout' && tail -n 1000 reldeb_parallel*.log
+          mkdir -p ${ARTIFACTS_DIR}/reldeb_parallel_test
+          cp reldeb_parallel_stdout.log reldeb_parallel_stderr.log ${ARTIFACTS_DIR}/reldeb_parallel_test/
+          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_parallel_test/
 
       - name: Remove test container
         if: always()
@@ -436,7 +432,6 @@ jobs:
           mkdir -p ${ARTIFACTS_DIR}/reldeb_restart_test
           cp restart_test*.log* ${ARTIFACTS_DIR}/reldeb_restart_test/
           echo 'reldeb_restart_test log(last 1000 lines):' && tail -n 1000 restart_test*.log*
-          rm -rf reldeb_restart_test*.log*
 
       - name: Remove test container
         if: always()
