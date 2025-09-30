@@ -103,7 +103,7 @@ jobs:
     name: debug_build
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-build" ]
-    needs: code_quality_analyze
+    needs: code_static_check
     steps:
       - name: Prepare code
         if: ${{ !cancelled() && !failure() }}
@@ -427,7 +427,7 @@ jobs:
     name: reldeb_build
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-build" ]
-    needs: code_quality_analyze
+    needs: code_static_check
     steps:
       - name: Prepare code
         if: ${{ !cancelled() && !failure() }}
