@@ -177,7 +177,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*' > coverage.lcov"
-          mkdir -p ${ARTIFACTS_DIR}/debug_unit_test && copy coverage.lcov ${ARTIFACTS_DIR}/debug_unit_test/
+          mkdir -p ${ARTIFACTS_DIR}/debug_unit_test && cp coverage.lcov ${ARTIFACTS_DIR}/debug_unit_test/
           head -10 coverage.lcov
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
 >>>>>>> 50d541284 (more)
