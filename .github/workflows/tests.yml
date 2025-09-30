@@ -225,9 +225,9 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'debug sqllogictest log' && tail -n 1000 debug_sqllogictest*.log
           mkdir -p ${ARTIFACTS_DIR}/debug_sqllogic_test/ && cp debug_sqllogictest*.log ${ARTIFACTS_DIR}/debug_sqllogic_test/
           sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_sqllogic_test/infinity.log
+          echo 'debug sqllogictest log' && tail -n 1000 debug_sqllogictest*.log
 
       - name: Remove test container
         if: always()
@@ -315,9 +315,8 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_pysdk_test && cp debug_pysdk*.log ${ARTIFACTS_DIR}/debug_pysdk_test/
-          echo 'debug pysdk log' && tail -n 1000 debug_pysdk*.log
-          cp debug_pysdk*.log ${ARTIFACTS_DIR}/debug_pysdk_test/
           sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_pysdk_test/
+          echo 'debug pysdk log' && tail -n 1000 debug_pysdk*.log
 
       - name: Remove test container
         if: always()
@@ -598,7 +597,7 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          mkdir -p ${ARTIFACTS_DIR}/reldeb_pysdk_test && cp reldeb_pysdk_test*.log ${ARTIFACTS_DIR}/reldeb_pysdk_test/
+          mkdir -p ${ARTIFACTS_DIR}/reldeb_pysdk_test && cp reldeb_pysdk*.log ${ARTIFACTS_DIR}/reldeb_pysdk_test/
           sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_pysdk_test/
           echo 'reldeb pysdk log' && tail -n 1000 reldeb_pysdk*.log
 
@@ -764,7 +763,6 @@ jobs:
         run: |
           sudo docker rm -f -v ${MINIO_CONTAINER_NAME} ${TEST_CONTAINER_NAME}
           rm -rf ${MINIO_CONTAINER_NAME}
-
 
   reldeb_minio_parallel_test:
     name: reldeb_minio_parallel_test
