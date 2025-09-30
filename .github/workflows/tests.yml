@@ -330,7 +330,7 @@ jobs:
       - name: Stop infinity debug version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "kill `ps aux | grep cmake-build-debug/src/infinity | grep -v grep | awk '{print $2}'`"
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "kill `ps aux | grep cmake-build-debug/src/infinity | grep -v bash | grep -v grep | awk '{print $2}'`"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
