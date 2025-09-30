@@ -8,16 +8,15 @@ from infinity.common import InfinityException
 from infinity.errors import ErrorCode
 from infinity.connection_pool import ConnectionPool
 
-PYTEST_LOG_FILE = "restart_test.py.log"
-
 
 class InfinityRunner:
-    def __init__(self, infinity_path: str, config_path: str, *, logger=None):
+    def __init__(self, infinity_path: str, config_path: str, logger=None):
         self.data_dir = "/var/infinity"
         self.default_config_path = config_path
 
         self.script_path = "./scripts/timeout_kill.sh"
         self.infinity_path = infinity_path
+        self.pytest_log_path = "restart_test_pytest.log"
 
         if not os.access(self.infinity_path, os.X_OK):
             raise Exception(f"{self.infinity_path} is not executable.")
@@ -37,7 +36,7 @@ class InfinityRunner:
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
 
-            handler = logging.FileHandler(PYTEST_LOG_FILE, delay=True)
+            handler = logging.FileHandler(self.pytest_log_path, delay=True)
             handler.setLevel(logging.DEBUG)
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
@@ -46,8 +45,8 @@ class InfinityRunner:
         os.system(
             f"rm -rf {self.data_dir}/catalog {self.data_dir}/data {self.data_dir}/log {self.data_dir}/persistence {self.data_dir}/tmp {self.data_dir}/wal"
         )
-        os.system("rm -rf restart_test.log.*")
-        os.system(f"rm -rf {PYTEST_LOG_FILE}")
+        os.system("rm -rf restart_test_infinity.log.*")
+        os.system(f"rm -rf {self.pytest_log_path}")
         self.logger.info(f"clear infinity data dir {self.data_dir}")
         self.i = 0
 
@@ -56,7 +55,7 @@ class InfinityRunner:
         if config_path is None:
             config_path = self.default_config_path
 
-        cmd = f"{self.infinity_path} --config={config_path} > restart_test.log.{self.i} 2>&1"
+        cmd = f"{self.infinity_path} --config={config_path} > restart_test_infinity.log.{self.i} 2>&1"
 
         pids = [
             proc.pid

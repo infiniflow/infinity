@@ -20,8 +20,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  code_quality_analyze:
-    name: code_quality_analyze
+  code_static_check:
+    name: code_static_check
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     steps:
       - name: Ensure workspace ownership
@@ -42,7 +43,7 @@ jobs:
       - name: Backup code
         if: ${{ !cancelled() && !failure() && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci')) }}
         run: |
-          tar -czf infinity.tgz .git $(git ls-files)
+          tar --create --gzip --file=infinity.tgz .git $(git ls-files)
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
           mkdir -p ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
@@ -110,7 +111,7 @@ jobs:
           echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
 
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
@@ -126,7 +127,7 @@ jobs:
 
       - name: Upload artifacts
         if: ${{ !cancelled() && !failure() }}
-        run: tar -cf - cmake-build-debug/src/{infinity,test_main} | tar -C ${ARTIFACTS_DIR} -xf -
+        run: tar --create --file=- cmake-build-debug/src/{infinity,test_main} | tar --extract --directory=${ARTIFACTS_DIR} --file=-
 
       - name: Remove build container
         if: always()
@@ -145,7 +146,7 @@ jobs:
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/test_main | tar -xf -
+          tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug/src/test_main | tar --extract --file=-
 
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}
@@ -170,15 +171,13 @@ jobs:
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > debug_unittest_stdout.log 2> debug_unittest_stderr.log"
+        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > debug_unit_test_stdout.log 2> debug_unit_test_stderr.log"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'debug unittest stdout' && tail -n 1000 debug_unittest_stdout.log &&
-          echo 'debug unittest stderr' && tail -n 1000 debug_unittest_stderr.log
-          cp debug_unittest_stdout.log debug_unittest_stderr.log ${ARTIFACTS_DIR}
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_unittest_infinity.log
+          echo 'debug unit test stdout' && tail -n 1000 debug_unit_test*.log
+          mkdir -p ${ARTIFACTS_DIR}/debug_unit_test/ && cp debug_unit_test*.log ${ARTIFACTS_DIR}/debug_unit_test/
 
       - name: Remove test container
         if: always()
@@ -198,8 +197,8 @@ jobs:
           echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/infinity | tar -xf -
+          tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug/src/infinity | tar --extract --file=-
 
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}
@@ -226,10 +225,9 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'debug sqllogictest stdout' && tail -n 1000 debug_sqllogictest_stdout.log
-          echo 'debug sqllogictest stderr' && tail -n 1000 debug_sqllogictest_stderr.log
-          cp debug_sqllogictest_stdout.log debug_sqllogictest_stderr.log ${ARTIFACTS_DIR}
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_sqllogictest_infinity.log
+          echo 'debug sqllogictest log' && tail -n 1000 debug_sqllogictest*.log
+          mkdir -p ${ARTIFACTS_DIR}/debug_sqllogic_test/ && cp debug_sqllogictest*.log ${ARTIFACTS_DIR}/debug_sqllogic_test/
+          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_sqllogic_test/infinity.log
 
       - name: Remove test container
         if: always()
@@ -268,7 +266,9 @@ jobs:
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
-        run: sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-debug/src/infinity --output_dir=/infinity_log --failure=${failure}
+        run: |
+          mkdir -p ${ARTIFACTS_DIR}/debug_restart_test && cp restart_test*.log* ${ARTIFACTS_DIR}/debug_restart_test/
+          echo 'debug_restart_test log(last 1000 lines):' && tail -n 1000 restart_test*.log*
 
       - name: Remove test container
         if: always()
@@ -314,10 +314,10 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'debug pysdk stdout' && tail -n 1000 debug_pysdk_stdout.log &&
-          echo 'pysdk debug error log' && tail -n 1000 debug_pysdk_stderr.log
-          cp debug_pysdk_stdout.log debug_pysdk_stderr.log ${ARTIFACTS_DIR}
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_pysdk_infinity.log
+          mkdir -p ${ARTIFACTS_DIR}/debug_pysdk_test && cp debug_pysdk*.log ${ARTIFACTS_DIR}/debug_pysdk_test/
+          echo 'debug pysdk log' && tail -n 1000 debug_pysdk*.log
+          cp debug_pysdk*.log ${ARTIFACTS_DIR}/debug_pysdk_test/
+          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_pysdk_test/
 
       - name: Remove test container
         if: always()
@@ -364,10 +364,9 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'debug http stdout' && tail -n 1000 debug_http_stdout.log &&
-          echo 'debug http stderr' && tail -n 1000 debug_http_stderr.log &&
-          cp debug_http_stdout.log debug_http_stderr.log ${ARTIFACTS_DIR}
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_http_infinity.log
+          mkdir -p ${ARTIFACTS_DIR}/debug_http_test && cp debug_http*.log ${ARTIFACTS_DIR}/debug_http_test/
+          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_http_test/
+          echo 'debug http log' && tail -n 1000 debug_http*.log
 
       - name: Remove test container
         if: always()
@@ -415,10 +414,9 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'debug parallel stdout' && tail -n 1000 debug_parallel_stdout.log &&
-          echo 'debug parallel stderr' && tail -n 1000 debug_parallel_stderr.log &&
-          cp debug_parallel_stdout.log debug_parallel_stderr.log ${ARTIFACTS_DIR}
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_parallel_infinity.log
+          mkdir -p ${ARTIFACTS_DIR}/debug_parallel_test && cp debug_parallel_stdout.log debug_parallel_stderr.log ${ARTIFACTS_DIR}/debug_parallel_test/
+          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_parallel_test/
+          echo 'debug parallel log' && tail -n 1000 debug_parallel*.log
 
       - name: Remove test container
         if: always()
@@ -497,15 +495,13 @@ jobs:
 
       - name: Unit test reldeb version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-reldeb/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > reldeb_unittest_stdout.log 2> reldeb_unittest_stderr.log"
+        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-reldeb/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > reldeb_unit_test_stdout.log 2> reldeb_unit_test_stderr.log"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'reldeb unittest stdout' && tail -n 1000 reldeb_unittest_stdout.log &&
-          echo 'reldeb unittest stderr' && tail -n 1000 reldeb_unittest_stderr.log
-          cp reldeb_unittest_stdout.log reldeb_unittest_stderr.log ${ARTIFACTS_DIR}
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_unittest_infinity.log
+          mkdir -p ${ARTIFACTS_DIR}/reldeb_unit_test && cp reldeb_unit_test*.log ${ARTIFACTS_DIR}/reldeb_unit_test/
+          echo 'reldeb unit test log' && tail -n 1000 reldeb_unit_test*.log
 
       - name: Remove test container
         if: always()
@@ -542,7 +538,7 @@ jobs:
 
       - name: Start infinity reldeb version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > reldeb_sqllogictest_stdout.log 2> reldeb_sqllogictest_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > reldeb_sqllogic_test_stdout.log 2> reldeb_sqllogic_test_stderr.log"
 
       - name: Run sqllogictest reldeb version
         if: ${{ !cancelled() && !failure() }}
@@ -553,10 +549,10 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'reldeb sqllogictest stdout' && tail -n 1000 reldeb_sqllogictest_stdout.log
-          echo 'reldeb sqllogictest stderr' && tail -n 1000 reldeb_sqllogictest_stderr.log
-          cp reldeb_sqllogictest_stdout.log reldeb_sqllogictest_stderr.log ${ARTIFACTS_DIR}
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_sqllogictest_infinity.log
+          mkdir -p ${ARTIFACTS_DIR}/reldeb_sqllogic_test && cp reldeb_sqllogic_test*.log ${ARTIFACTS_DIR}/reldeb_sqllogic_test/
+          cp reldeb_sqllogic_test* ${ARTIFACTS_DIR}/reldeb_sqllogic_test/
+          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_sqllogic_test/
+          echo 'reldeb sqllogic test log' && tail -n 1000 reldeb_sqllogic_test*.log
 
       - name: Remove test container
         if: always()
@@ -602,10 +598,9 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'reldeb pysdk stdout' && tail -n 1000 reldeb_pysdk_stdout.log &&
-          echo 'reldeb pysdk stderr' && tail -n 1000 reldeb_pysdk_stderr.log
-          cp reldeb_pysdk_stdout.log reldeb_pysdk_stderr.log ${ARTIFACTS_DIR}
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_pysdk_infinity.log
+          mkdir -p ${ARTIFACTS_DIR}/reldeb_pysdk_test && cp reldeb_pysdk_test*.log ${ARTIFACTS_DIR}/reldeb_pysdk_test/
+          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_pysdk_test/
+          echo 'reldeb pysdk log' && tail -n 1000 reldeb_pysdk*.log
 
       - name: Remove test container
         if: always()
@@ -651,10 +646,9 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'reldeb http stdout' && tail -n 1000 reldeb_http_stdout.log &&
-          echo 'reldeb http stderr' && tail -n 1000 reldeb_http_stderr.log
-          cp reldeb_http_stdout.log reldeb_http_stderr.log ${ARTIFACTS_DIR}
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_http_infinity.log
+          mkdir -p ${ARTIFACTS_DIR}/reldeb_http_test && cp reldeb_http*.log ${ARTIFACTS_DIR}/reldeb_http_test/
+          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_http_test/
+          echo 'reldeb http log' && tail -n 1000 reldeb_http*.log
 
       - name: Remove test container
         if: always()
@@ -689,7 +683,7 @@ jobs:
 
       - name: Start infinity reldeb version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > reldeb_parallel_stdout.log 2> reldeb_parallel_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > reldeb_pysdk_parallel_stdout.log 2> reldeb_pysdk_parallel_stderr.log"
 
       - name: Run parallel test reldeb version
         if: ${{ !cancelled() && !failure() }}
@@ -700,10 +694,9 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'reldeb parallel stdout' && tail -n 1000 reldeb_parallel_stdout.log &&
-          echo 'reldeb parallel stderr' && tail -n 1000 reldeb_parallel_stderr.log
-          cp reldeb_parallel_stdout.log reldeb_parallel_stderr.log ${ARTIFACTS_DIR}
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_parallel_infinity.log
+          mkdir -p ${ARTIFACTS_DIR}/reldeb_pysdk_parallel_test && cp reldeb_pysdk_parallel*.log ${ARTIFACTS_DIR}/reldeb_pysdk_parallel_test/
+          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_pysdk_parallel_test/
+          echo 'reldeb parallel log' && tail -n 1000 reldeb_pysdk_parallel*.log
 
       - name: Remove test container
         if: always()
@@ -762,10 +755,9 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'reldeb minio pysdk stdout' && tail -n 1000 reldeb_minio_pysdk_stdout.log &&
-          echo 'reldeb minio pysdk stderr' && tail -n 1000 reldeb_minio_pysdk_stderr.log
-          cp reldeb_minio_pysdk_stdout.log reldeb_minio_pysdk_stderr.log ${ARTIFACTS_DIR}
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_minio_pysdk_infinity.log
+          mkdir -p ${ARTIFACTS_DIR}/reldeb_minio_pysdk_test && cp reldeb_minio_pysdk*.log ${ARTIFACTS_DIR}/reldeb_minio_pysdk_test/
+          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_minio_pysdk_test/
+          echo 'reldeb minio pysdk log' && tail -n 1000 reldeb_minio_pysdk*.log
 
       - name: Remove test container
         if: always()
@@ -831,10 +823,9 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'reldeb minio parallel stdout' && tail -n 1000 reldeb_minio_parallel_stdout.log &&
-          echo 'reldeb minio parallel stderr' && tail -n 1000 reldeb_minio_parallel_stderr.log
-          cp reldeb_minio_parallel_stdout.log reldeb_minio_parallel_stderr.log ${ARTIFACTS_DIR}
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_minio_parallel_infinity.log
+          mkdir -p ${ARTIFACTS_DIR}/reldeb_minio_parallel_test && cp reldeb_minio_parallel*.log ${ARTIFACTS_DIR}/reldeb_minio_parallel_test/
+          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_minio_parallel_test/
+          echo 'reldeb minio parallel log' && tail -n 1000 reldeb_minio_parallel*.log
 
       - name: Remove test container
         if: always()
@@ -863,8 +854,7 @@ jobs:
           RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
           echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
           chmod +x ./tools/ci_tools/check_benchmark_result.py
-          rm -rf test/data/benchmark && mkdir -p test/data/benchmark
-          ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark/sift1M test/data/benchmark/sift_1m
+          rm -rf test/data/benchmark && ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark test/data/benchmark
 
       - name: Golden benchmark sift
         if: ${{ !cancelled() && !failure() }}
