@@ -185,19 +185,15 @@ jobs:
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
           head -10 coverage.lcov
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
-          mkdir -p ${ARTIFACTS_DIR}/debug_unit_test && cp coverage.lcov ${ARTIFACTS_DIR}/debug_unit_test/
+          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_unit_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_unit_test
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
           file: coverage.lcov
+          flags: debug unit test
+          name: debug_unit_test_coverage
           token: ${{ secrets.CODECOV_TOKEN }}
-
-      - name: Collect infinity log
-        if: ${{ !cancelled() }}
-        run: |
-          echo 'debug unit test stdout' && tail -n 1000 debug_unit_test*.log
-          mkdir -p ${ARTIFACTS_DIR}/debug_unit_test/ && cp debug_unit_test*.log ${ARTIFACTS_DIR}/debug_unit_test/
 
       - name: Remove test container
         if: always()
@@ -323,7 +319,7 @@ jobs:
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > debug_pysdk_stdout.log 2> debug_pysdk_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && export LLVM_PROFILE_FILE="infinity-%p.profraw" && export LLVM_PROFILE_DUMP_ON_EXIT=1 && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > debug_pysdk_stdout.log 2> debug_pysdk_stderr.log"
 
       - name: Run pysdk remote infinity test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -331,12 +327,33 @@ jobs:
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && python3 tools/run_pysdk_remote_infinity_test.py"
           sleep 1s
 
+      - name: Stop infinity debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "kill `ps aux | grep cmake-build-debug/src/infinity | grep -v grep | awk '{print $2}'`"
+
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_pysdk_test && cp debug_pysdk*.log ${ARTIFACTS_DIR}/debug_pysdk_test/
           sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_pysdk_test/
           echo 'debug pysdk log' && tail -n 1000 debug_pysdk*.log
+
+      - name: Generate LCOV report
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
+          head -10 coverage.lcov
+          echo "LCOV file lines: $(wc -l < coverage.lcov)"
+          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_pysdk_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_pysdk_test
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          file: coverage.lcov
+          flags: debug pysdk test
+          name: debug_pysdk_test_coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Remove test container
         if: always()
