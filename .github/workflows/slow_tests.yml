@@ -166,7 +166,7 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          mkdir -p ${ARTIFACTS_DIR}/debug_tsan_restart_test && cp restart_test*.log* ${ARTIFACTS_DIR}/debug_tsan_restart_test/
+          mkdir -p ${ARTIFACTS_DIR}/debug_tsan_restart_test && sudo chown -R $USER . && cp restart_test*.log* ${ARTIFACTS_DIR}/debug_tsan_restart_test/
           echo 'restart_test log(last 1000 lines):' && tail -n 1000 restart_test*.log*
 
       - name: Remove test container
@@ -256,8 +256,7 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          mkdir -p ${ARTIFACTS_DIR}/debug_tsan_parallel_test
-          cp debug_tsan_parallel*.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
+          mkdir -p ${ARTIFACTS_DIR}/debug_tsan_parallel_test && sudo chown -R $USER . && cp debug_tsan_parallel*.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
           sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
           echo 'debug tsan parallel log' && tail -n 1000 debug_tsan_parallel*.log
 
