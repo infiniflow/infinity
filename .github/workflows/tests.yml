@@ -176,7 +176,7 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'debug unit test stdout' && tail -n 1000 debug_unit_test*.log
+          echo 'debug unit test log' && tail -n 1000 debug_unit_test*.log
           mkdir -p ${ARTIFACTS_DIR}/debug_unit_test/ && cp debug_unit_test*.log ${ARTIFACTS_DIR}/debug_unit_test/
 
       - name: Generate LCOV report
@@ -230,7 +230,7 @@ jobs:
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && export LLVM_PROFILE_FILE="infinity-%p.profraw" && export LLVM_PROFILE_DUMP_ON_EXIT=1 && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > debug_sqllogictest_stdout.log 2> debug_sqllogictest_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && export LLVM_PROFILE_FILE="infinity-%p.profraw" && export LLVM_PROFILE_DUMP_ON_EXIT=1 && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> debug_sqllogictest_stderr.log"
 
       - name: Run sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
@@ -340,7 +340,7 @@ jobs:
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && export LLVM_PROFILE_FILE="infinity-%p.profraw" && export LLVM_PROFILE_DUMP_ON_EXIT=1 && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > debug_pysdk_stdout.log 2> debug_pysdk_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && export LLVM_PROFILE_FILE="infinity-%p.profraw" && export LLVM_PROFILE_DUMP_ON_EXIT=1 && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> debug_pysdk_stderr.log"
 
       - name: Run pysdk remote infinity test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -410,7 +410,7 @@ jobs:
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && export LLVM_PROFILE_FILE="infinity-%p.profraw" && export LLVM_PROFILE_DUMP_ON_EXIT=1 && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > debug_http_stdout.log 2> debug_http_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && export LLVM_PROFILE_FILE="infinity-%p.profraw" && export LLVM_PROFILE_DUMP_ON_EXIT=1 && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> debug_http_stderr.log"
 
       - name: Run HTTP infinity test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -481,7 +481,7 @@ jobs:
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && export LLVM_PROFILE_FILE="infinity-%p.profraw" && export LLVM_PROFILE_DUMP_ON_EXIT=1 && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > debug_parallel_stdout.log 2> debug_parallel_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && export LLVM_PROFILE_FILE="infinity-%p.profraw" && export LLVM_PROFILE_DUMP_ON_EXIT=1 && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> debug_parallel_stderr.log"
 
       - name: Run HTTP infinity test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -497,7 +497,7 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          mkdir -p ${ARTIFACTS_DIR}/debug_parallel_test && cp debug_parallel_stdout.log debug_parallel_stderr.log ${ARTIFACTS_DIR}/debug_parallel_test/
+          mkdir -p ${ARTIFACTS_DIR}/debug_parallel_test && cp debug_parallel_stderr.log ${ARTIFACTS_DIR}/debug_parallel_test/
           sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_parallel_test/
           echo 'debug parallel log' && tail -n 1000 debug_parallel*.log
 
@@ -637,7 +637,7 @@ jobs:
 
       - name: Start infinity reldeb version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > reldeb_sqllogic_test_stdout.log 2> reldeb_sqllogic_test_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> reldeb_sqllogic_test_stderr.log"
 
       - name: Run sqllogictest reldeb version
         if: ${{ !cancelled() && !failure() }}
@@ -686,7 +686,7 @@ jobs:
 
       - name: Start infinity reldeb version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > reldeb_pysdk_stdout.log 2> reldeb_pysdk_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> reldeb_pysdk_stderr.log"
 
       - name: Run pysdk remote infinity test reldeb version
         if: ${{ !cancelled() && !failure() }}
@@ -734,7 +734,7 @@ jobs:
 
       - name: Start infinity reldeb version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > reldeb_http_stdout.log 2> reldeb_http_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> reldeb_http_stderr.log"
 
       - name: Run http api test reldeb version
         if: ${{ !cancelled() && !failure() }}
@@ -782,7 +782,7 @@ jobs:
 
       - name: Start infinity reldeb version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > reldeb_pysdk_parallel_stdout.log 2> reldeb_pysdk_parallel_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> reldeb_pysdk_parallel_stderr.log"
 
       - name: Run parallel test reldeb version
         if: ${{ !cancelled() && !failure() }}
@@ -843,7 +843,7 @@ jobs:
 
       - name: Start infinity reldeb version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_minio.toml > reldeb_minio_pysdk_stdout.log 2> reldeb_minio_pysdk_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_minio.toml 2> reldeb_minio_pysdk_stderr.log"
 
       - name: Run minio pysdk infinity test reldeb version
         if: ${{ !cancelled() && !failure() }}
@@ -910,7 +910,7 @@ jobs:
 
       - name: Start infinity reldeb version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_minio.toml > reldeb_minio_parallel_stdout.log 2> reldeb_minio_parallel_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_minio.toml 2> reldeb_minio_parallel_stderr.log"
 
       - name: Run minio parallel test
         if: ${{ !cancelled() && !failure() }}

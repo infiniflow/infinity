@@ -245,7 +245,7 @@ jobs:
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 TSAN_OPTIONS=log_path=debug_tsan_parallel_tsan.log cmake-build-debug-tsan/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > debug_tsan_parallel_stdout.log 2> debug_tsan_parallel_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 TSAN_OPTIONS=log_path=debug_tsan_parallel_tsan.log cmake-build-debug-tsan/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> debug_tsan_parallel_stderr.log"
 
       - name: Run HTTP infinity test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -367,7 +367,7 @@ jobs:
 
       - name: Start infinity reldeb version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > reldeb_parallel_stdout.log 2> reldeb_parallel_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> reldeb_parallel_stderr.log"
 
       - name: Run HTTP infinity reldeb version
         if: ${{ !cancelled() && !failure() }}
@@ -378,10 +378,9 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          echo 'reldeb parallel stdout' && tail -n 1000 reldeb_parallel*.log
-          mkdir -p ${ARTIFACTS_DIR}/reldeb_parallel_test
-          cp reldeb_parallel_stdout.log reldeb_parallel_stderr.log ${ARTIFACTS_DIR}/reldeb_parallel_test/
+          mkdir -p ${ARTIFACTS_DIR}/reldeb_parallel_test && cp reldeb_parallel_stderr.log ${ARTIFACTS_DIR}/reldeb_parallel_test/
           sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_parallel_test/
+          echo 'reldeb parallel log' && tail -n 1000 reldeb_parallel*.log
 
       - name: Remove test container
         if: always()
