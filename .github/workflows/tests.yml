@@ -58,8 +58,8 @@ jobs:
                 HEAD_SHA=$(git rev-parse HEAD^{tree})
                 if [[ ${HEAD_SHA} == ${PR_SHA} ]]; then
                   echo "Cancel myself since the workspace content hash is the same with PR #${PR_NUMBER} merged."
-                  gh run cancel ${GITHUB_RUN_ID} --force
-                  sleep 60
+                  gh run cancel ${GITHUB_RUN_ID}
+                  sleep 20
                   exit 0
                 fi
               fi
