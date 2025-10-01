@@ -51,26 +51,30 @@ jobs:
             echo "HEAD=${HEAD}"
             echo "PR_NUMBER=${PR_NUMBER}"
             if [[ -n ${PR_NUMBER} ]]; then
-              PR_SHA_FP=${RUNNER_WORKSPACE_PREFIX}/artifacts/PR_${PR_NUMBER}.hash
+              PR_SHA_FP=${RUNNER_WORKSPACE_PREFIX}/artifacts/PR_${PR_NUMBER}
               if [[ -f ${PR_SHA_FP} ]]; then
-                PR_SHA=$(cat ${PR_SHA_FP})
+                read -r PR_SHA PR_RUN_ID < "${PR_SHA_FP}"
                 # Calculate the hash of the current workspace content
                 HEAD_SHA=$(git rev-parse HEAD^{tree})
                 if [[ ${HEAD_SHA} == ${PR_SHA} ]]; then
-                  echo "Cancel myself since the workspace content hash is the same with PR #${PR_NUMBER} merged."
+                  echo "Cancel myself since the workspace content hash is the same with PR #${PR_NUMBER} merged. See ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${PR_RUN_ID} for details."
                   gh run cancel ${GITHUB_RUN_ID}
-                  sleep 20
-                  exit 0
+                  while true; do
+                    status=$(gh run view ${GITHUB_RUN_ID} --json status -q .status)
+                    [ "$status" = "completed" ] && break
+                    sleep 5
+                  done
+                  exit 1
                 fi
               fi
             fi
           else
             PR_NUMBER=${{ github.event.pull_request.number }}
-            PR_SHA_FP=${RUNNER_WORKSPACE_PREFIX}/artifacts/PR_${PR_NUMBER}.hash
+            PR_SHA_FP=${RUNNER_WORKSPACE_PREFIX}/artifacts/PR_${PR_NUMBER}
             # Calculate the hash of the current workspace content
             PR_SHA=$(git rev-parse HEAD^{tree})
             echo "PR #${PR_NUMBER} workspace content hash: ${PR_SHA}"
-            echo "${PR_SHA}" > ${PR_SHA_FP}
+            echo "${PR_SHA} ${GITHUB_RUN_ID}" > ${PR_SHA_FP}
           fi
           tar --create --gzip --file=infinity.tgz .git $(git ls-files)
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_RUN_ID}
