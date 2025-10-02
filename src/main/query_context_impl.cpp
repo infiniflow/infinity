@@ -358,69 +358,6 @@ void QueryContext::StopProfile() {
     }
 }
 
-bool QueryContext::ExecuteBGStatement(BaseStatement *base_statement, BGQueryState &state) {
-    QueryResult query_result;
-    try {
-        std::shared_ptr<BindContext> bind_context;
-        if (auto status = logical_planner_->Build(base_statement, bind_context); !status.ok()) {
-            RecoverableError(status);
-        }
-        current_max_node_id_ = bind_context->GetNewLogicalNodeId();
-        state.logical_plans = logical_planner_->LogicalPlans();
-
-        for (auto &logical_plan : state.logical_plans) {
-            auto physical_plan = physical_planner_->BuildPhysicalOperator(logical_plan);
-            state.physical_plans.push_back(std::move(physical_plan));
-        }
-
-        {
-            std::vector<PhysicalOperator *> physical_plan_ptrs;
-            for (auto &physical_plan : state.physical_plans) {
-                physical_plan_ptrs.push_back(physical_plan.get());
-            }
-            state.plan_fragment = fragment_builder_->BuildFragment(physical_plan_ptrs);
-        }
-
-        state.notifier = std::make_unique<Notifier>();
-        FragmentContext::BuildTask(this, nullptr, state.plan_fragment.get(), state.notifier.get());
-
-        scheduler_->Schedule(state.plan_fragment.get(), base_statement);
-    } catch (RecoverableException &e) {
-        this->RollbackTxn();
-        query_result.result_table_ = nullptr;
-        query_result.status_.Init(e.ErrorCode(), e.what());
-        return false;
-
-    } catch (UnrecoverableException &e) {
-        LOG_CRITICAL(e.what());
-        raise(SIGUSR1);
-    }
-    return true;
-}
-
-bool QueryContext::JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts, bool rollback) {
-    QueryResult query_result;
-    if (rollback) {
-        query_result.result_table_ = state.plan_fragment->GetResult();
-        this->RollbackTxn();
-        return false;
-    }
-    try {
-        query_result.result_table_ = state.plan_fragment->GetResult();
-        query_result.root_operator_type_ = state.logical_plans.back()->operator_type();
-        commit_ts = this->CommitTxn();
-    } catch (RecoverableException &e) {
-        query_result.result_table_ = nullptr;
-        query_result.status_.Init(e.ErrorCode(), e.what());
-        this->RollbackTxn();
-        return false;
-    } catch (UnrecoverableException &e) {
-        LOG_CRITICAL(e.what());
-        raise(SIGUSR1);
-    }
-    return true;
-}
-
 QueryResult QueryContext::HandleAdminStatement(const AdminStatement *admin_statement) { return AdminExecutor::Execute(this, admin_statement); }
 
 void QueryContext::BeginTxn(const BaseStatement *base_statement) {
