@@ -14,7 +14,7 @@
 
 export module infinity_core:match_sparse_scan_function_data;
 
-import :table_function;
+import :table_function_data;
 import :global_block_id;
 import :merge_knn;
 import :data_block;

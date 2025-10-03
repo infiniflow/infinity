@@ -15,7 +15,7 @@
 export module infinity_core:table_scan_function_data;
 
 import :function_data;
-import :table_function;
+import :table_function_data;
 import :global_block_id;
 import :new_catalog;
 

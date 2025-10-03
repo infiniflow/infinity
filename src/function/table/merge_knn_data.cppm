@@ -14,7 +14,7 @@
 
 export module infinity_core:merge_knn_data;
 
-import :table_function;
+import :table_function_data;
 import :base_table_ref;
 import :merge_knn;
 

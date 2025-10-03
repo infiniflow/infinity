@@ -18,7 +18,7 @@ module infinity_core:compact_state_data.impl;
 
 import :compact_state_data;
 import :block_index;
-
+import :logger;
 import std;
 
 import row_id;

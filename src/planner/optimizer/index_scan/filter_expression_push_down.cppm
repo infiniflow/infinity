@@ -23,7 +23,7 @@ import :roaring_bitmap;
 namespace infinity {
 
 class NewTxn;
-
+class QueryContext;
 // TODO: equivalent expression rewrite optimization
 
 // TODO: now do not support "not" expression in index scan

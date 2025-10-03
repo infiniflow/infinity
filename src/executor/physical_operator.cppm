@@ -17,7 +17,7 @@ export module infinity_core:physical_operator;
 import :physical_operator_type;
 import :base_table_ref;
 import :infinity_type;
-
+import global_resource_usage;
 import std;
 
 import data_type;

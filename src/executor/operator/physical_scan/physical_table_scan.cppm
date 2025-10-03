@@ -19,7 +19,7 @@ import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :global_block_id;
-import :table_function;
+import :table_function_data;
 import :base_table_ref;
 import :meta_info;
 import :load_meta;
