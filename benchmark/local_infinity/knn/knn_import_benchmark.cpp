@@ -36,6 +36,7 @@ enum class EncodeType : i8 {
     PLAIN,
     LVQ,
     CompressToLVQ,
+    CompressToRabitq,
 };
 
 struct BenchmarkArgs {
@@ -106,6 +107,7 @@ const std::map<std::string, EncodeType> BenchmarkArgs::encode_type_map = {
     {"plain", EncodeType::PLAIN},
     {"lvq", EncodeType::LVQ},
     {"compress_to_lvq", EncodeType::CompressToLVQ},
+    {"compress_to_rabitq", EncodeType::CompressToRabitq},
 };
 
 int main(int argc, char *argv[]) {
@@ -180,7 +182,8 @@ int main(int argc, char *argv[]) {
             index_param_list->emplace_back(new InitParameter("metric", "l2"));
             if (args.encode_type_ == EncodeType::LVQ) {
                 index_param_list->emplace_back(new InitParameter("encode", "lvq"));
-            } else if (args.encode_type_ == EncodeType::PLAIN || args.encode_type_ == EncodeType::CompressToLVQ) {
+            } else if (args.encode_type_ == EncodeType::PLAIN || args.encode_type_ == EncodeType::CompressToLVQ ||
+                       args.encode_type_ == EncodeType::CompressToRabitq) {
                 index_param_list->emplace_back(new InitParameter("encode", "plain"));
             } else {
                 UnrecoverableError("Invalid encode type");
@@ -200,10 +203,14 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        if (args.encode_type_ == EncodeType::CompressToLVQ) {
+        if (args.encode_type_ == EncodeType::CompressToLVQ || args.encode_type_ == EncodeType::CompressToRabitq) {
             OptimizeOptions options;
             options.index_name_ = index_name;
-            options.opt_params_.emplace_back(new InitParameter("compress_to_lvq"));
+            if (args.encode_type_ == EncodeType::CompressToLVQ) {
+                options.opt_params_.emplace_back(new InitParameter("compress_to_lvq"));
+            } else {
+                options.opt_params_.emplace_back(new InitParameter("compress_to_rabitq"));
+            }
             query_result = infinity->Optimize(db_name, table_name, options);
             if (!query_result.IsOk()) {
                 std::cout << "Fail to optimize index." << profiler.ElapsedToString() << std::endl;

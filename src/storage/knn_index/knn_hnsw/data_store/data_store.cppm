@@ -325,6 +325,11 @@ public:
         return inner.GetVec(idx, this->vec_store_meta_);
     }
 
+    typename VecStoreT::QueryType GetVecToQuery(size_t vec_i) const {
+        const auto &[inner, idx] = GetInner(vec_i);
+        return inner.GetVecToQuery(idx, this->vec_store_meta_);
+    }
+
     // Graph store
     void AddVertex(VertexType vec_i, i32 layer_n) {
         auto [inner, idx] = GetInner(vec_i);
@@ -369,6 +374,9 @@ public:
 
     template <typename CompressVecStoreType>
     DataStore<CompressVecStoreType, LabelType, OwnMem> CompressToLVQ() &&;
+
+    template <typename CompressVecStoreType>
+    DataStore<CompressVecStoreType, LabelType, OwnMem> CompressToRabitq() &&;
 
 private:
     std::pair<Inner &, size_t> GetInner(size_t vec_i) { return {inners_[vec_i >> chunk_shift_], vec_i & (chunk_size_ - 1)}; }
@@ -562,6 +570,10 @@ public:
 
     // vec store
     typename VecStoreT::StoreType GetVec(VertexType vec_i, const VecStoreMeta &meta) const { return vec_store_inner_.GetVec(vec_i, meta); }
+
+    typename VecStoreT::QueryType GetVecToQuery(VertexType vec_i, const VecStoreMeta &meta) const {
+        return vec_store_inner_.GetVecToQuery(vec_i, meta);
+    }
 
     void PrefetchVec(VertexType vec_i, const VecStoreMeta &meta) const { vec_store_inner_.Prefetch(vec_i, meta); }
 
@@ -806,6 +818,29 @@ private:
 template <typename VecStoreT, typename LabelType, bool OwnMem>
 template <typename CompressVecStoreType>
 DataStore<CompressVecStoreType, LabelType, OwnMem> DataStore<VecStoreT, LabelType, OwnMem>::CompressToLVQ() && {
+    if constexpr (std::is_same_v<CompressVecStoreType, VecStoreT>) {
+        return std::move(*this);
+    } else {
+        const auto [chunk_num, last_chunk_size] = this->ChunkInfo(this->cur_vec_num());
+        std::vector<GraphStoreInner<OwnMem>> graph_inners;
+        for (size_t i = 0; i < chunk_num; ++i) {
+            graph_inners.emplace_back(std::move(*this->inners_[i].graph_store_inner()));
+        }
+        auto ret = DataStore<CompressVecStoreType, LabelType, OwnMem>::Make(this->chunk_size_,
+                                                                            this->max_chunk_n_,
+                                                                            this->vec_store_meta_.dim(),
+                                                                            this->Mmax0(),
+                                                                            this->Mmax());
+        ret.OptAddVec(DataStoreIter<VecStoreT, LabelType>(this));
+        ret.SetGraph(std::move(this->graph_store_meta_), std::move(graph_inners));
+        this->inners_ = nullptr;
+        return ret;
+    }
+}
+
+template <typename VecStoreT, typename LabelType, bool OwnMem>
+template <typename CompressVecStoreType>
+DataStore<CompressVecStoreType, LabelType, OwnMem> DataStore<VecStoreT, LabelType, OwnMem>::CompressToRabitq() && {
     if constexpr (std::is_same_v<CompressVecStoreType, VecStoreT>) {
         return std::move(*this);
     } else {

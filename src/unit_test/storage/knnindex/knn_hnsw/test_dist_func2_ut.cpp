@@ -43,7 +43,8 @@ TEST_F(DistFuncTest2, test2) {
     using VecStoreType = LVQIPVecStoreType<float, int8_t>;
     using DataStore = DataStore<VecStoreType, LabelT>;
     using Distance = typename VecStoreType::Distance;
-    using LVQ8Data = typename VecStoreType::StoreType;
+    using StoreType = typename VecStoreType::StoreType;
+    using QueryType = typename VecStoreType::QueryType;
 
     size_t dim = 128;
     size_t vec_n = 8192;
@@ -73,12 +74,11 @@ TEST_F(DistFuncTest2, test2) {
     for (size_t i = 0; i < vec_n; ++i) {
         const float *v2 = vecs2.get() + i * dim;
 
-        auto query = lvq_store.MakeQuery(v2);
-        LVQ8Data lvq1 = query;
-        LVQ8Data lvq2 = lvq_store.GetVec(i);
+        QueryType lvq1 = lvq_store.MakeQuery(v2);
+        StoreType lvq2 = lvq_store.GetVec(i);
 
         const auto &vec_store_meta = lvq_store.vec_store_meta();
-        float dist1 = distance(query, i, lvq_store);
+        float dist1 = distance(lvq1, i, lvq_store);
 
         std::vector<float> qv1(dim);
         std::vector<float> qv2(dim);

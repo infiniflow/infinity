@@ -24,6 +24,7 @@ import statement_common;
 namespace infinity {
 
 export struct HnswOptimizeOptions {
+    bool compress_to_rabitq = false;
     bool compress_to_lvq = false;
     bool lvq_avg = false;
 };
@@ -32,16 +33,21 @@ export struct HnswUtil {
     static std::optional<HnswOptimizeOptions> ParseOptimizeOptions(const std::vector<std::unique_ptr<InitParameter>> &opt_params) {
         HnswOptimizeOptions options;
         for (const auto &param : opt_params) {
-            if (param->param_name_ == "compress_to_lvq") {
+            if (param->param_name_ == "compress_to_rabitq") {
+                options.compress_to_rabitq = true;
+            } else if (param->param_name_ == "compress_to_lvq") {
                 options.compress_to_lvq = true;
             } else if (param->param_name_ == "lvq_avg") {
                 options.lvq_avg = true;
             }
         }
+        if (options.compress_to_rabitq && (options.compress_to_lvq || options.lvq_avg)) {
+            RecoverableError(Status::InvalidIndexParam("multiple compress type: rabitq and lvq cannot be set at the same time"));
+        }
         if (options.compress_to_lvq && options.lvq_avg) {
             RecoverableError(Status::InvalidIndexParam("compress_to_lvq and lvq_avg cannot be set at the same time"));
         }
-        if (!options.compress_to_lvq && !options.lvq_avg) {
+        if (!options.compress_to_rabitq && !options.compress_to_lvq && !options.lvq_avg) {
             return std::nullopt;
         }
         return options;

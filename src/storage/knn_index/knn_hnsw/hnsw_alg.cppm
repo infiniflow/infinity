@@ -54,7 +54,6 @@ public:
     using This = KnnHnswBase<VecStoreType, LabelType, OwnMem>;
     using DataType = typename VecStoreType::DataType;
     using QueryVecType = typename VecStoreType::QueryVecType;
-    using StoreType = typename VecStoreType::StoreType;
     using QueryType = typename VecStoreType::QueryType;
     using DataStore = DataStore<VecStoreType, LabelType, OwnMem>;
     using Distance = typename VecStoreType::Distance;
@@ -122,7 +121,7 @@ protected:
               LogicalType ColumnLogicalType = LogicalType::kEmbedding,
               typename MultiVectorInnerTopnIndexType = void>
     std::tuple<size_t, std::unique_ptr<DistanceType[]>, std::unique_ptr<SearchLayerReturnParam3T<ColumnLogicalType>[]>>
-    SearchLayer(VertexType enter_point, const StoreType &query, VertexType query_i, i32 layer_idx, size_t result_n, const Filter &filter) const {
+    SearchLayer(VertexType enter_point, const QueryType &query, VertexType query_i, i32 layer_idx, size_t result_n, const Filter &filter) const {
         static_assert(ColumnLogicalType == LogicalType::kEmbedding || ColumnLogicalType == LogicalType::kMultiVector);
         auto d_ptr = std::make_unique_for_overwrite<DistanceType[]>(result_n);
         auto i_ptr = std::make_unique_for_overwrite<SearchLayerReturnParam3T<ColumnLogicalType>[]>(result_n);
@@ -202,7 +201,7 @@ protected:
     }
 
     template <bool WithLock>
-    VertexType SearchLayerNearest(VertexType enter_point, const StoreType &query, VertexType query_i, i32 layer_idx) const {
+    VertexType SearchLayerNearest(VertexType enter_point, const QueryType &query, VertexType query_i, i32 layer_idx) const {
         VertexType cur_p = enter_point;
         auto cur_dist = distance_(query, cur_p, data_store_, query_i);
         bool check = true;
@@ -241,7 +240,7 @@ protected:
             while (!candidates.empty() && size_t(result_size) < M) {
                 std::pop_heap(candidates.begin(), candidates.end(), CMPReverse());
                 const auto &[c_dist, c_idx] = candidates.back();
-                StoreType c_data = data_store_.GetVec(c_idx);
+                QueryType c_data = data_store_.GetVecToQuery(c_idx);
                 bool check = true;
                 for (size_t i = 0; i < size_t(result_size); ++i) {
                     VertexType r_idx = result_p[i];
@@ -275,7 +274,7 @@ protected:
                 *n_neighbor_size_p = n_neighbor_size + 1;
                 continue;
             }
-            StoreType n_data = data_store_.GetVec(n_idx);
+            QueryType n_data = data_store_.GetVecToQuery(n_idx);
             auto n_dist = distance_(n_data, vertex_i, data_store_, n_idx);
 
             std::vector<PDV> candidates;
@@ -290,7 +289,7 @@ protected:
     }
 
     template <bool WithLock, FilterConcept<LabelType> Filter, LogicalType ColumnLogicalType>
-    auto SearchLayerHelper(VertexType enter_point, const StoreType &query, i32 layer_idx, size_t result_n, const Filter &filter) const {
+    auto SearchLayerHelper(VertexType enter_point, const QueryType &query, i32 layer_idx, size_t result_n, const Filter &filter) const {
         if constexpr (ColumnLogicalType == LogicalType::kEmbedding) {
             return SearchLayer<WithLock, Filter, ColumnLogicalType>(enter_point, query, kInvalidVertex, layer_idx, result_n, filter);
         } else if constexpr (ColumnLogicalType == LogicalType::kMultiVector) {
@@ -394,7 +393,7 @@ public:
         i32 q_layer = GenerateRandomLayer();
         auto [max_layer, ep] = data_store_.TryUpdateEnterPoint(q_layer, vertex_i);
 
-        StoreType query = data_store_.GetVec(vertex_i);
+        QueryType query = data_store_.GetVecToQuery(vertex_i);
 
         data_store_.AddVertex(vertex_i, q_layer);
 
@@ -499,7 +498,8 @@ public:
     using This = KnnHnsw<VecStoreType, LabelType, OwnMem>;
     using DataStore = DataStore<VecStoreType, LabelType, OwnMem>;
     using Distance = typename VecStoreType::Distance;
-    using CompressVecStoreType = decltype(VecStoreType::template ToLVQ<i8>());
+    using CompressLVQVecStoreType = decltype(VecStoreType::template ToLVQ<i8>());
+    using CompressRabitqVecStoreType = decltype(VecStoreType::ToRabitq());
     constexpr static bool kOwnMem = OwnMem;
 
     KnnHnsw(size_t M, size_t ef_construction, DataStore data_store, Distance distance) {
@@ -544,17 +544,31 @@ public:
         return std::make_unique<This>(M, ef_construction, std::move(data_store), std::move(distance));
     }
 
-    std::unique_ptr<KnnHnsw<CompressVecStoreType, LabelType>> CompressToLVQ() && {
-        if constexpr (std::is_same_v<VecStoreType, CompressVecStoreType>) {
+    std::unique_ptr<KnnHnsw<CompressLVQVecStoreType, LabelType>> CompressToLVQ() && {
+        if constexpr (std::is_same_v<VecStoreType, CompressLVQVecStoreType>) {
             return std::make_unique<This>(std::move(*this));
         } else {
-            using CompressedDistance = typename CompressVecStoreType::Distance;
+            using CompressedDistance = typename CompressLVQVecStoreType::Distance;
             CompressedDistance distance = std::move(this->distance_).ToLVQDistance(this->data_store_.dim());
-            auto compressed_datastore = std::move(this->data_store_).template CompressToLVQ<CompressVecStoreType>();
-            return std::make_unique<KnnHnsw<CompressVecStoreType, LabelType>>(this->M_,
-                                                                              this->ef_construction_,
-                                                                              std::move(compressed_datastore),
-                                                                              std::move(distance));
+            auto compressed_datastore = std::move(this->data_store_).template CompressToLVQ<CompressLVQVecStoreType>();
+            return std::make_unique<KnnHnsw<CompressLVQVecStoreType, LabelType>>(this->M_,
+                                                                                 this->ef_construction_,
+                                                                                 std::move(compressed_datastore),
+                                                                                 std::move(distance));
+        }
+    }
+
+    std::unique_ptr<KnnHnsw<CompressRabitqVecStoreType, LabelType>> CompressToRabitq() && {
+        if constexpr (std::is_same_v<VecStoreType, CompressRabitqVecStoreType>) {
+            return std::make_unique<This>(std::move(*this));
+        } else {
+            using CompressedDistance = typename CompressRabitqVecStoreType::Distance;
+            CompressedDistance distance = std::move(this->distance_).ToRabitqDistance(this->data_store_.dim());
+            auto compressed_datastore = std::move(this->data_store_).template CompressToRabitq<CompressRabitqVecStoreType>();
+            return std::make_unique<KnnHnsw<CompressRabitqVecStoreType, LabelType>>(this->M_,
+                                                                                    this->ef_construction_,
+                                                                                    std::move(compressed_datastore),
+                                                                                    std::move(distance));
         }
     }
 };
