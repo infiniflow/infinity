@@ -67,12 +67,12 @@ class BufferObj;
 class ColumnMeta;
 class BlockMeta;
 class SegmentMeta;
-class TableMeeta;
+class TableMeta;
 class ChunkIndexMeta;
 class ChunkIndexMetaInfo;
 class SegmentIndexMeta;
-class TableIndexMeeta;
-class DBMeeta;
+class TableIndexMeta;
+class DBMeta;
 struct MemIndex;
 
 struct NewTxnCompactState;
@@ -284,7 +284,7 @@ public:
 
     Status RestoreTableSnapshot(const std::string &db_name, const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info);
 
-    Status RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const std::vector<WalCmdCreateIndexV2> &index_cmds, bool is_link_files = false);
+    Status RestoreTableIndexesFromSnapshot(TableMeta &table_meta, const std::vector<WalCmdCreateIndexV2> &index_cmds, bool is_link_files = false);
 
     std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> GetDatabaseSnapshotInfo(const std::string &db_name);
 
@@ -345,17 +345,17 @@ private:
     Status AppendInner(const std::string &db_name,
                        const std::string &table_name,
                        const std::string &table_key,
-                       TableMeeta &table_meta,
+                       TableMeta &table_meta,
                        const std::shared_ptr<DataBlock> &input_block);
 
-    Status DeleteInner(const std::string &db_name, const std::string &table_name, TableMeeta &table_meta, const std::vector<RowID> &row_ids);
+    Status DeleteInner(const std::string &db_name, const std::string &table_name, TableMeta &table_meta, const std::vector<RowID> &row_ids);
 
 public:
     Status Delete(const std::string &db_name, const std::string &table_name, const std::vector<RowID> &row_ids);
 
     Status Compact(const std::string &db_name, const std::string &table_name, const std::vector<SegmentID> &segment_ids);
 
-    Status CheckTableIfDelete(TableMeeta &table_meta, bool &has_delete);
+    Status CheckTableIfDelete(TableMeta &table_meta, bool &has_delete);
 
     Status Cleanup();
 
@@ -444,33 +444,33 @@ private:
     void CheckTxn(const std::string &db_name);
 
 public:
-    Status GetDBMeta(const std::string &db_name, std::shared_ptr<DBMeeta> &db_meta, TxnTimeStamp &db_create_ts, std::string *db_key = nullptr);
+    Status GetDBMeta(const std::string &db_name, std::shared_ptr<DBMeta> &db_meta, TxnTimeStamp &db_create_ts, std::string *db_key = nullptr);
 
     Status GetTableMeta(const std::string &db_name,
                         const std::string &table_name,
-                        std::shared_ptr<DBMeeta> &db_meta,
-                        std::shared_ptr<TableMeeta> &table_meta,
+                        std::shared_ptr<DBMeta> &db_meta,
+                        std::shared_ptr<TableMeta> &table_meta,
                         TxnTimeStamp &create_timestamp,
                         std::string *table_key = nullptr);
 
     Status GetTableMeta(const std::string &table_name,
-                        std::shared_ptr<DBMeeta> &db_meta,
-                        std::shared_ptr<TableMeeta> &table_meta,
+                        std::shared_ptr<DBMeta> &db_meta,
+                        std::shared_ptr<TableMeta> &table_meta,
                         TxnTimeStamp &create_timestamp,
                         std::string *table_key = nullptr);
 
     Status GetTableIndexMeta(const std::string &db_name,
                              const std::string &table_name,
                              const std::string &index_name,
-                             std::shared_ptr<DBMeeta> &db_meta,
-                             std::shared_ptr<TableMeeta> &table_meta,
-                             std::shared_ptr<TableIndexMeeta> &table_index_meta,
+                             std::shared_ptr<DBMeta> &db_meta,
+                             std::shared_ptr<TableMeta> &table_meta,
+                             std::shared_ptr<TableIndexMeta> &table_index_meta,
                              std::string *table_key,
                              std::string *index_key);
 
     Status GetTableIndexMeta(const std::string &index_name,
-                             TableMeeta &table_meta,
-                             std::shared_ptr<TableIndexMeeta> &table_index_meta,
+                             TableMeta &table_meta,
+                             std::shared_ptr<TableIndexMeta> &table_index_meta,
                              std::string *index_key = nullptr);
 
 private:
@@ -489,8 +489,7 @@ private:
 
     Status CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_state);
 
-    Status
-    AddColumnsData(TableMeeta &table_meta, const std::vector<std::shared_ptr<ColumnDef>> &column_defs, const std::vector<u32> &column_idx_list);
+    Status AddColumnsData(TableMeta &table_meta, const std::vector<std::shared_ptr<ColumnDef>> &column_defs, const std::vector<u32> &column_idx_list);
 
     Status AddColumnsDataInSegment(SegmentMeta &segment_meta,
                                    const std::vector<std::shared_ptr<ColumnDef>> &column_defs,
@@ -502,9 +501,9 @@ private:
                                  const std::vector<u32> &column_idx_list,
                                  const std::vector<Value> &default_values);
 
-    Status DropColumnsData(TableMeeta &table_meta, const std::vector<ColumnID> &column_ids);
+    Status DropColumnsData(TableMeta &table_meta, const std::vector<ColumnID> &column_ids);
 
-    Status AppendIndex(TableIndexMeeta &table_index_meta, const std::pair<RowID, u64> &append_range);
+    Status AppendIndex(TableIndexMeta &table_index_meta, const std::pair<RowID, u64> &append_range);
 
     Status AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt);
 
@@ -512,7 +511,7 @@ private:
                          const std::string &table_name,
                          const std::string &index_name,
                          const std::string &table_key,
-                         TableIndexMeeta &table_index_meta,
+                         TableIndexMeta &table_index_meta,
                          SegmentMeta &segment_meta,
                          size_t segment_row_cnt,
                          DumpIndexCause dump_index_cause,
@@ -563,17 +562,17 @@ private:
 
     Status DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id);
 
-    Status CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
+    Status CheckpointDB(DBMeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
 
-    Status CheckpointTable(TableMeeta &table_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
+    Status CheckpointTable(TableMeta &table_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
 
     Status
     CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, std::vector<std::pair<RowID, u64>> &append_ranges);
 
 public:
-    Status RecoverMemIndex(TableIndexMeeta &table_index_meta);
+    Status RecoverMemIndex(TableIndexMeta &table_index_meta);
 
-    Status CommitMemIndex(TableIndexMeeta &table_index_meta);
+    Status CommitMemIndex(TableIndexMeta &table_index_meta);
 
     Status GetFullTextIndexReader(const std::string &db_name, const std::string &table_name, std::shared_ptr<IndexReader> &index_reader);
 
@@ -595,9 +594,9 @@ private:
     Status PrepareCommitCompact(WalCmdCompactV2 *compact_cmd);
     Status PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVInstance *kv_instance);
     Status PrepareCommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd);
-    Status CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
-    Status CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
-    Status CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp checkpoint_ts);
+    Status CommitCheckpointDB(DBMeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
+    Status CommitCheckpointTable(TableMeta &table_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
+    Status CommitCheckpointTableData(TableMeta &table_meta, TxnTimeStamp checkpoint_ts);
     Status PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
     Status PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files = false);
     Status PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd);
@@ -680,7 +679,7 @@ public:
                                           const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info,
                                           const std::string &snapshot_name,
                                           RestoreTableTxnStore *txn_store);
-    Status RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, DBMeeta &db_meta, bool is_link_files = false);
+    Status RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, DBMeta &db_meta, bool is_link_files = false);
     Status ManualDumpIndex(const std::string &db_name, const std::string &table_name);
 
     Status Dummy();

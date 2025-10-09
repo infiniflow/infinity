@@ -30,9 +30,9 @@ import :data_block;
 import :column_vector;
 import :value;
 import :new_txn;
-import :db_meeta;
-import :table_meeta;
-import :table_index_meeta;
+import :db_meta;
+import :table_meta;
+import :table_index_meta;
 import :column_meta;
 import :table_def;
 import :segment_meta;
@@ -126,8 +126,8 @@ TEST_P(TestTxnColumn, test_add_columns) {
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());

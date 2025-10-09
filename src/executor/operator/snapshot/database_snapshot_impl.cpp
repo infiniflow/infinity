@@ -22,8 +22,8 @@ import :status;
 import :config;
 import :infinity_exception;
 import :snapshot_info;
-import :db_meeta;
-import :table_meeta;
+import :db_meta;
+import :table_meta;
 import :txn_state;
 import :logger;
 

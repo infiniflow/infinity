@@ -37,8 +37,8 @@ import :txn_state;
 import :data_block;
 import :new_txn_manager;
 import :new_txn;
-import :db_meeta;
-import :table_meeta;
+import :db_meta;
+import :table_meta;
 
 import global_resource_usage;
 import logical_type;
@@ -106,8 +106,8 @@ TEST_P(CompactTaskTest, DISABLED_SLOW_bg_compact) {
 
         // Check if the segment count has been reduced
         auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());

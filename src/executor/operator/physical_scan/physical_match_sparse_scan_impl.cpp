@@ -44,13 +44,13 @@ import :knn_filter;
 import :bmp_handler;
 import :status;
 import :buffer_obj;
-import :table_meeta;
-import :table_index_meeta;
+import :table_meta;
+import :table_index_meta;
 import :segment_index_meta;
 import :chunk_index_meta;
 import :segment_meta;
 import :block_meta;
-import :table_meeta;
+import :table_meta;
 import :new_txn;
 import :new_catalog;
 import :column_meta;
@@ -126,7 +126,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
     size_t search_column_id = match_sparse_expr_->column_expr_->binding().column_idx;
     auto &search_column_name = base_table_ref_->table_info_->column_defs_[search_column_id]->name();
 
-    TableMeeta *table_meta = table_meta = base_table_ref_->block_index_->table_meta_.get();
+    TableMeta *table_meta = table_meta = base_table_ref_->block_index_->table_meta_.get();
 
     std::vector<std::string> *index_id_strs_ptr = nullptr;
     std::vector<std::string> *index_names_ptr = nullptr;
@@ -138,7 +138,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
         for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
             const std::string &index_id_str = (*index_id_strs_ptr)[i];
             const std::string &index_name = (*index_names_ptr)[i];
-            auto table_index_meta = std::make_shared<TableIndexMeeta>(index_id_str, index_name, *table_meta);
+            auto table_index_meta = std::make_shared<TableIndexMeta>(index_id_str, index_name, *table_meta);
 
             std::shared_ptr<IndexBase> index_base;
             std::tie(index_base, status) = table_index_meta->GetIndexBase();
@@ -167,7 +167,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
         }
         const std::string &index_id_str = (*index_id_strs_ptr)[iter - index_names_ptr->begin()];
         const std::string &index_name = match_sparse_expr_->index_name_;
-        auto table_index_meta = std::make_shared<TableIndexMeeta>(index_id_str, index_name, *table_meta);
+        auto table_index_meta = std::make_shared<TableIndexMeta>(index_id_str, index_name, *table_meta);
 
         std::shared_ptr<IndexBase> index_base;
         std::tie(index_base, status) = table_index_meta->GetIndexBase();

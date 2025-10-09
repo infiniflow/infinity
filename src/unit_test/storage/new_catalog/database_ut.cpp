@@ -30,7 +30,7 @@ import :data_block;
 import :column_vector;
 import :value;
 import :new_txn;
-import :db_meeta;
+import :db_meta;
 
 import extra_ddl_info;
 

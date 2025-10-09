@@ -32,12 +32,12 @@ import :column_vector;
 import :value;
 import :new_txn;
 import :logger;
-import :db_meeta;
-import :table_meeta;
+import :db_meta;
+import :table_meta;
 import :segment_meta;
 import :block_meta;
 import :mem_index;
-import :table_index_meeta;
+import :table_index_meta;
 import :segment_index_meta;
 import :chunk_index_meta;
 import :buffer_obj;
@@ -302,7 +302,7 @@ TEST_P(TestTxnCleanup, cleanup_with_drop_db) {
     validity_function_ = [this] {
         { // check drop db
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("get db"), TransactionType::kRead);
-            std::shared_ptr<DBMeeta> db_meta;
+            std::shared_ptr<DBMeta> db_meta;
             TxnTimeStamp db_create_ts;
             auto status = txn->GetDBMeta(*db_name_, db_meta, db_create_ts);
             EXPECT_FALSE(status.ok());
@@ -331,8 +331,8 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_table) {
     validity_function_ = [this] {
         { // check drop table
             auto txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kRead);
-            std::shared_ptr<DBMeeta> db_meta;
-            std::shared_ptr<TableMeeta> table_meta;
+            std::shared_ptr<DBMeta> db_meta;
+            std::shared_ptr<TableMeta> table_meta;
             TxnTimeStamp create_timestamp;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta, create_timestamp);
             EXPECT_FALSE(status.ok());
@@ -366,8 +366,8 @@ TEST_P(TestTxnCleanup, cleanup_and_add_columns) {
     validity_function_ = [this] {
         { // check add column
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("get column"), TransactionType::kRead);
-            std::shared_ptr<DBMeeta> db_meta;
-            std::shared_ptr<TableMeeta> table_meta;
+            std::shared_ptr<DBMeta> db_meta;
+            std::shared_ptr<TableMeta> table_meta;
             std::string table_key;
             TxnTimeStamp create_timestamp;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta, create_timestamp);
@@ -415,8 +415,8 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_columns) {
         { // check drop column
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kRead);
 
-            std::shared_ptr<DBMeeta> db_meta;
-            std::shared_ptr<TableMeeta> table_meta;
+            std::shared_ptr<DBMeta> db_meta;
+            std::shared_ptr<TableMeta> table_meta;
             std::string table_key;
             TxnTimeStamp create_timestamp;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta, create_timestamp);
@@ -461,8 +461,8 @@ TEST_P(TestTxnCleanup, cleanup_and_rename_table) {
     validity_function_ = [&, this] {
         { // check rename table
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("get table"), TransactionType::kRead);
-            std::shared_ptr<DBMeeta> db_meta;
-            std::shared_ptr<TableMeeta> table_meta;
+            std::shared_ptr<DBMeta> db_meta;
+            std::shared_ptr<TableMeta> table_meta;
             TxnTimeStamp create_timestamp;
             auto status = txn->GetTableMeta(*db_name_, *new_table_name, db_meta, table_meta, create_timestamp);
             EXPECT_TRUE(status.ok());
@@ -498,8 +498,8 @@ TEST_P(TestTxnCleanup, cleanup_and_compact) {
     validity_function_ = [this] {
         { // check clean & compact
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("get segment"), TransactionType::kRead);
-            std::shared_ptr<DBMeeta> db_meta;
-            std::shared_ptr<TableMeeta> table_meta;
+            std::shared_ptr<DBMeta> db_meta;
+            std::shared_ptr<TableMeta> table_meta;
             TxnTimeStamp create_timestamp;
             auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta, create_timestamp);
             EXPECT_TRUE(status.ok());
@@ -536,8 +536,8 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_index) {
         {
             // check drop index
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("get index"), TransactionType::kRead);
-            std::shared_ptr<DBMeeta> db_meta;
-            std::shared_ptr<TableMeeta> table_meta;
+            std::shared_ptr<DBMeta> db_meta;
+            std::shared_ptr<TableMeta> table_meta;
             std::string table_key;
             TxnTimeStamp create_timestamp;
             Status status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta, create_timestamp);
@@ -565,7 +565,9 @@ TEST_P(TestTxnCleanup, cleanup_and_optimize_index) {
     Status status;
     auto new_table_name = std::make_shared<std::string>("tb2");
 
-    auto other_begin = [this] { txn_other_ = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kOptimizeIndex); };
+    auto other_begin = [this] {
+        txn_other_ = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("optimize index"), TransactionType::kOptimizeIndex);
+    };
     auto other = [&, this] {
         SegmentID segment_id = 0;
         status = txn_other_->OptimizeIndex(*db_name_, *table_name_, *index_name1_, segment_id);
@@ -604,9 +606,9 @@ TEST_P(TestTxnCleanup, cleanup_and_optimize_index) {
         { // check optimize index
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
             size_t block_row_cnt = 2;
-            std::shared_ptr<DBMeeta> db_meta;
-            std::shared_ptr<TableMeeta> table_meta;
-            std::shared_ptr<TableIndexMeeta> table_index_meta;
+            std::shared_ptr<DBMeta> db_meta;
+            std::shared_ptr<TableMeta> table_meta;
+            std::shared_ptr<TableIndexMeta> table_index_meta;
             std::string table_key;
             std::string index_key;
             auto status =
@@ -668,8 +670,8 @@ TEST_P(TestTxnCleanup, cleanup_and_append) {
             // check append
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
 
-            std::shared_ptr<DBMeeta> db_meta;
-            std::shared_ptr<TableMeeta> table_meta;
+            std::shared_ptr<DBMeta> db_meta;
+            std::shared_ptr<TableMeta> table_meta;
             TxnTimeStamp create_timestamp;
             auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta, create_timestamp);
             EXPECT_TRUE(status.ok());
@@ -735,8 +737,8 @@ TEST_P(TestTxnCleanup, cleanup_and_delete) {
         {
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
 
-            std::shared_ptr<DBMeeta> db_meta;
-            std::shared_ptr<TableMeeta> table_meta;
+            std::shared_ptr<DBMeta> db_meta;
+            std::shared_ptr<TableMeta> table_meta;
             TxnTimeStamp create_timestamp;
             auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta, create_timestamp);
             EXPECT_TRUE(status.ok());
@@ -806,8 +808,8 @@ TEST_P(TestTxnCleanup, cleanup_and_update) {
         { // check update
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
 
-            std::shared_ptr<DBMeeta> db_meta;
-            std::shared_ptr<TableMeeta> table_meta;
+            std::shared_ptr<DBMeta> db_meta;
+            std::shared_ptr<TableMeta> table_meta;
             TxnTimeStamp create_timestamp;
             auto status = txn->GetTableMeta(*db_name_, *table_name_, db_meta, table_meta, create_timestamp);
             EXPECT_TRUE(status.ok());
@@ -859,9 +861,9 @@ TEST_P(TestTxnCleanup, cleanup_and_dump_index) {
     validity_function_ = [&, this] {
         { // check dump index
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
-            std::shared_ptr<DBMeeta> db_meta;
-            std::shared_ptr<TableMeeta> table_meta;
-            std::shared_ptr<TableIndexMeeta> table_index_meta;
+            std::shared_ptr<DBMeta> db_meta;
+            std::shared_ptr<TableMeta> table_meta;
+            std::shared_ptr<TableIndexMeta> table_index_meta;
             std::string table_key;
             std::string index_key;
             auto status =

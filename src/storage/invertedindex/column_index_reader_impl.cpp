@@ -30,8 +30,8 @@ import :index_full_text;
 import :term_doc_iterator;
 import :default_values;
 import :logger;
-import :table_meeta;
-import :table_index_meeta;
+import :table_meta;
+import :table_index_meta;
 import :segment_index_meta;
 import :chunk_index_meta;
 import :new_txn;
@@ -51,7 +51,7 @@ namespace infinity {
 
 ColumnIndexReader::~ColumnIndexReader() = default;
 
-Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_meta) {
+Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeta &table_index_meta) {
     flag_ = flag;
     Status status;
 
@@ -194,7 +194,7 @@ std::shared_ptr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) 
     index_reader->column_index_readers_ =
         std::make_shared<FlatHashMap<u64, std::shared_ptr<std::map<std::string, std::shared_ptr<ColumnIndexReader>>>, detail::Hash<u64>>>();
 
-    TableMeeta table_meta(db_id_str_, table_id_str_, table_name_, txn);
+    TableMeta table_meta(db_id_str_, table_id_str_, table_name_, txn);
     std::vector<std::string> *index_id_strs = nullptr;
     std::vector<std::string> *index_name_strs = nullptr;
     {
@@ -208,7 +208,7 @@ std::shared_ptr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) 
         const std::string &index_id_str = index_id_strs->at(idx);
         const std::string &index_name_str = index_name_strs->at(idx);
 
-        TableIndexMeeta table_index_meta(index_id_str, index_name_str, table_meta);
+        TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
         auto [index_base, index_status] = table_index_meta.GetIndexBase();
         if (!index_status.ok()) {
             UnrecoverableError("Fail to get index definition");

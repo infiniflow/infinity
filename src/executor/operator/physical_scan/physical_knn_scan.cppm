@@ -32,7 +32,7 @@ import :value;
 namespace infinity {
 
 class BlockMeta;
-class TableIndexMeeta;
+class TableIndexMeta;
 class SegmentIndexMeta;
 
 export class PhysicalKnnScan final : public PhysicalFilterScanBase {
@@ -94,7 +94,7 @@ public:
     u32 index_entries_size_ = 0;
 
     std::unique_ptr<std::vector<BlockMeta *>> block_metas_{};
-    std::shared_ptr<TableIndexMeeta> table_index_meta_{};
+    std::shared_ptr<TableIndexMeta> table_index_meta_{};
     std::unique_ptr<std::vector<std::shared_ptr<SegmentIndexMeta>>> segment_index_metas_{};
 
 private:

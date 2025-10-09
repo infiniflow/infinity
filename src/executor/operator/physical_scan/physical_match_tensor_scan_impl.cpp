@@ -53,13 +53,13 @@ import :simd_functions;
 import :knn_expression;
 import :result_cache_manager;
 import :buffer_obj;
-import :table_meeta;
-import :table_index_meeta;
+import :table_meta;
+import :table_index_meta;
 import :segment_index_meta;
 import :chunk_index_meta;
 import :segment_meta;
 import :block_meta;
-import :table_meeta;
+import :table_meta;
 import :new_txn;
 import :new_catalog;
 import :index_base;
@@ -176,7 +176,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
     block_metas_ = std::make_unique<std::vector<BlockMeta *>>();
     segment_index_metas_ = std::make_unique<std::vector<std::shared_ptr<SegmentIndexMeta>>>();
 
-    TableMeeta *table_meta = base_table_ref_->block_index_->table_meta_.get();
+    TableMeta *table_meta = base_table_ref_->block_index_->table_meta_.get();
 
     std::set<SegmentID> index_entry_map;
 
@@ -193,7 +193,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
             for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
                 const std::string &index_id_str = (*index_id_strs_ptr)[i];
                 const std::string &index_name_str = (*index_names_ptr)[i];
-                auto table_index_meta = std::make_unique<TableIndexMeeta>(index_id_str, index_name_str, *table_meta);
+                auto table_index_meta = std::make_unique<TableIndexMeta>(index_id_str, index_name_str, *table_meta);
 
                 std::shared_ptr<IndexBase> index_base;
                 std::tie(index_base, status) = table_index_meta->GetIndexBase();
@@ -221,7 +221,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                 RecoverableError(std::move(status));
             }
             const std::string &index_id_str = (*index_id_strs_ptr)[iter - index_names_ptr->begin()];
-            auto table_index_meta = std::make_unique<TableIndexMeeta>(index_id_str, src_match_tensor_expr_->index_name_, *table_meta);
+            auto table_index_meta = std::make_unique<TableIndexMeta>(index_id_str, src_match_tensor_expr_->index_name_, *table_meta);
 
             std::shared_ptr<IndexBase> index_base;
             std::tie(index_base, status) = table_index_meta->GetIndexBase();

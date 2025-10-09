@@ -24,20 +24,20 @@ import third_party;
 namespace infinity {
 
 class KVInstance;
-class TableIndexMeeta;
+class TableIndexMeta;
 struct MemIndex;
 // struct SegmentIndexFtInfo;
 class NewTxn;
 
 export class SegmentIndexMeta {
 public:
-    SegmentIndexMeta(SegmentID segment_id, TableIndexMeeta &table_index_meta);
+    SegmentIndexMeta(SegmentID segment_id, TableIndexMeta &table_index_meta);
 
     ~SegmentIndexMeta();
 
     SegmentID segment_id() const { return segment_id_; }
 
-    TableIndexMeeta &table_index_meta() const { return table_index_meta_; }
+    TableIndexMeta &table_index_meta() const { return table_index_meta_; }
 
     KVInstance &kv_instance() const { return kv_instance_; }
 
@@ -90,7 +90,7 @@ private:
     TxnTimeStamp begin_ts_;
     TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;
-    TableIndexMeeta &table_index_meta_;
+    TableIndexMeta &table_index_meta_;
     SegmentID segment_id_{};
 
     std::optional<std::vector<ChunkID>> chunk_ids_{};

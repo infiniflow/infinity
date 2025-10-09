@@ -55,7 +55,7 @@ import :plan_fragment;
 import :aggregate_expression;
 import :expression_state;
 import :block_index;
-import :table_index_meeta;
+import :table_index_meta;
 import :segment_index_meta;
 import :block_meta;
 

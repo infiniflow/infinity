@@ -52,8 +52,8 @@ import :defer_op;
 import :highlighter;
 import :meta_info;
 import :new_txn;
-import :db_meeta;
-import :table_meeta;
+import :db_meta;
+import :table_meta;
 import :new_catalog;
 import :kv_store;
 
@@ -428,8 +428,8 @@ std::shared_ptr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_co
     std::shared_ptr<TableInfo> table_info;
     Status status;
     NewTxn *new_txn = query_context->GetNewTxn();
-    std::shared_ptr<DBMeeta> db_meta;
-    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<DBMeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta;
     TxnTimeStamp create_timestamp;
     status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {

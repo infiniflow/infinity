@@ -27,7 +27,7 @@ import :new_catalog;
 import :status;
 import :value;
 import :meta_tree;
-import :db_meeta;
+import :db_meta;
 
 import std;
 import third_party;
@@ -135,7 +135,7 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
     //     schema_name = "default_db";
     // }
 
-    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<DBMeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = new_txn->GetDBMeta(schema_name, db_meta, db_create_ts);
 
