@@ -38,11 +38,11 @@ import :buffer_obj;
 import :segment_meta;
 import :block_meta;
 import :column_meta;
-import :table_meeta;
-import :table_index_meeta;
+import :table_meta;
+import :table_index_meta;
 import :segment_index_meta;
 import :chunk_index_meta;
-import :db_meeta;
+import :db_meta;
 import :logger;
 
 import extra_ddl_info;
@@ -123,8 +123,8 @@ TEST_P(TestTxnAlter, add_column0) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -253,8 +253,8 @@ TEST_P(TestTxnAlter, drop_column0) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());

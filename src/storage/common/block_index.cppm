@@ -20,12 +20,12 @@ import std;
 
 namespace infinity {
 
-class DBMeeta;
-class TableMeeta;
+class DBMeta;
+class TableMeta;
 class SegmentMeta;
 class BlockMeta;
 class NewTxn;
-class TableIndexMeeta;
+class TableIndexMeta;
 class SegmentIndexMeta;
 
 export struct NewSegmentSnapshot {
@@ -44,7 +44,7 @@ public:
 
     ~BlockIndex();
 
-    void NewInit(const std::shared_ptr<TableMeeta> &table_meta);
+    void NewInit(const std::shared_ptr<TableMeta> &table_meta);
 
     size_t BlockCount() const;
 
@@ -59,20 +59,20 @@ public:
     bool IsEmpty() const;
 
 public:
-    std::vector<std::shared_ptr<TableIndexMeeta>> table_index_meta_map_;
-    std::shared_ptr<TableMeeta> table_meta_;
+    std::vector<std::shared_ptr<TableIndexMeta>> table_index_meta_map_;
+    std::shared_ptr<TableMeta> table_meta_;
     std::map<SegmentID, NewSegmentSnapshot> new_segment_block_index_;
 };
 
 export struct NewIndexSnapshot {
-    std::shared_ptr<TableIndexMeeta> table_index_meta_;
+    std::shared_ptr<TableIndexMeta> table_index_meta_;
 
     std::map<SegmentID, std::unique_ptr<SegmentIndexMeta>> segment_index_metas_;
 };
 
 export struct IndexIndex {
 public:
-    std::shared_ptr<NewIndexSnapshot> Insert(const std::string &index_name, std::shared_ptr<TableIndexMeeta> table_index_meta);
+    std::shared_ptr<NewIndexSnapshot> Insert(const std::string &index_name, std::shared_ptr<TableIndexMeta> table_index_meta);
 
     void Insert(std::string index_name, std::shared_ptr<NewIndexSnapshot> new_index_snapshot);
 

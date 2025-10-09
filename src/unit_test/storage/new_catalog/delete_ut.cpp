@@ -34,11 +34,11 @@ import :new_txn;
 import :segment_meta;
 import :block_meta;
 import :column_meta;
-import :table_meeta;
-import :table_index_meeta;
+import :table_meta;
+import :table_index_meta;
 import :segment_index_meta;
 import :chunk_index_meta;
-import :db_meeta;
+import :db_meta;
 import :default_values;
 import :logger;
 import :index_secondary;
@@ -129,8 +129,8 @@ TEST_P(TestTxnDelete, test_delete) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -182,8 +182,8 @@ TEST_P(TestTxnDelete, test_delete) {
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -277,8 +277,8 @@ TEST_P(TestTxnDelete, test_delete_multiple_blocks) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -355,8 +355,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -437,8 +437,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -494,8 +494,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -548,8 +548,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -602,8 +602,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -653,8 +653,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -735,8 +735,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
@@ -799,8 +799,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
@@ -860,8 +860,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
@@ -921,8 +921,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
@@ -979,8 +979,8 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -1081,8 +1081,8 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -1155,8 +1155,8 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -1229,8 +1229,8 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -1302,8 +1302,8 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -1374,8 +1374,8 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -1444,8 +1444,8 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -1515,8 +1515,8 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -1584,8 +1584,8 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -1637,8 +1637,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -1734,8 +1734,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -1803,8 +1803,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -1872,8 +1872,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -1940,8 +1940,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -2007,8 +2007,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -2075,8 +2075,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -2144,8 +2144,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -2211,8 +2211,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -2264,8 +2264,8 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, "table2", db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -2359,8 +2359,8 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -2426,8 +2426,8 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -2493,8 +2493,8 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -2559,8 +2559,8 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -2627,8 +2627,8 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -2693,8 +2693,8 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -2760,8 +2760,8 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -2825,8 +2825,8 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -2878,8 +2878,8 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -2975,8 +2975,8 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -3044,8 +3044,8 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -3113,8 +3113,8 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -3181,8 +3181,8 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -3251,8 +3251,8 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -3319,8 +3319,8 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -3388,8 +3388,8 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -3455,8 +3455,8 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -3508,8 +3508,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -3612,8 +3612,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -3688,8 +3688,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -3764,8 +3764,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -3839,8 +3839,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -3916,8 +3916,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -3991,8 +3991,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -4067,8 +4067,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -4141,8 +4141,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -4220,8 +4220,8 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -4356,8 +4356,8 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -4433,8 +4433,8 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -4510,8 +4510,8 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -4586,8 +4586,8 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -4664,8 +4664,8 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -4741,8 +4741,8 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -4819,8 +4819,8 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -4895,8 +4895,8 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -4974,8 +4974,8 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -5100,8 +5100,8 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -5176,8 +5176,8 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -5252,8 +5252,8 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -5327,8 +5327,8 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -5404,8 +5404,8 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -5480,8 +5480,8 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -5557,8 +5557,8 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -5632,8 +5632,8 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -5685,8 +5685,8 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -5793,8 +5793,8 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -5871,8 +5871,8 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -5948,8 +5948,8 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -6023,8 +6023,8 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -6101,8 +6101,8 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -6179,8 +6179,8 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
 
         // Check the appended data.
         auto *txn8 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn8->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -6259,8 +6259,8 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -6297,8 +6297,8 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
     auto CheckTableNoCompact = [&](const std::vector<SegmentID> &segment_ids) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -6313,8 +6313,8 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
     auto CheckTableCompactedWithoutDelete = [&](const std::vector<SegmentID> &segment_ids) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -6702,8 +6702,8 @@ TEST_P(TestTxnDelete, test_delete_and_optimize_index) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());

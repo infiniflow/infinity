@@ -35,11 +35,11 @@ import :secondary_index_data;
 import :segment_meta;
 import :block_meta;
 import :column_meta;
-import :table_meeta;
-import :table_index_meeta;
+import :table_meta;
+import :table_index_meta;
 import :segment_index_meta;
 import :chunk_index_meta;
-import :db_meeta;
+import :db_meta;
 import :catalog_meta;
 import :mem_index;
 import :roaring_bitmap;
@@ -198,9 +198,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -248,9 +248,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
     auto check_index = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -728,9 +728,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -779,9 +779,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
     auto check_index = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -1344,9 +1344,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -1395,9 +1395,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
     auto check_index = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -1977,9 +1977,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -2028,9 +2028,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
     auto check_index = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -2570,9 +2570,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -2621,9 +2621,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
     auto check_index = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -3118,9 +3118,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -3169,9 +3169,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
     auto check_index = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -3401,9 +3401,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -3452,9 +3452,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
     auto check_index = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -3954,9 +3954,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -4005,9 +4005,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
     auto check_index1 = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -4055,9 +4055,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
     auto check_index2 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -4106,9 +4106,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
     auto check_index3 = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -4705,9 +4705,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -4756,9 +4756,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     auto check_index1 = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -4806,9 +4806,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     auto check_index3 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -5311,9 +5311,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -5364,8 +5364,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -5906,9 +5906,9 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
     auto check_index0 = [&](const std::string &index_name, std::function<void(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -5957,9 +5957,9 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
     auto check_index1 = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -6345,13 +6345,13 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_test_dump_index_and_optimize_index) {
     auto CheckTable = [&](const std::vector<SegmentID> &segment_ids, const std::vector<ChunkID> &chunk_ids) { //
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         status = txn->GetTableIndexMeta(*index_name1, *table_meta, table_index_meta);
         EXPECT_TRUE(status.ok());
 
@@ -6698,13 +6698,13 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
     auto CheckTable = [&](const std::vector<SegmentID> &segment_ids, SegmentID dump_segment_id, const std::vector<ChunkID> &chunk_ids) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         status = txn->GetTableIndexMeta(*index_name1, *table_meta, table_index_meta);
         EXPECT_TRUE(status.ok());
 

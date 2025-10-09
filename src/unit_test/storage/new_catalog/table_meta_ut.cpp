@@ -16,7 +16,7 @@ module;
 
 #include "unit_test/gtest_expand.h"
 
-module infinity_core:ut.table_meeta;
+module infinity_core:ut.table_meta;
 
 import :ut.base_test;
 
@@ -29,7 +29,7 @@ import :infinity_context;
 import :table_def;
 import :txn_state;
 import :segment_meta;
-import :table_meeta;
+import :table_meta;
 import :block_meta;
 import :meta_cache;
 
@@ -40,13 +40,13 @@ import extra_ddl_info;
 
 using namespace infinity;
 
-class TestTxnTableMeeta : public BaseTestParamStr {};
+class TestTxnTableMeta : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TestTxnTableMeeta,
+                         TestTxnTableMeta,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestTxnTableMeeta, table_meeta) {
+TEST_P(TestTxnTableMeta, table_meta) {
     using namespace infinity;
 
     Status status;
@@ -96,13 +96,13 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
     EXPECT_TRUE(get_status.ok());
 
     std::unique_ptr<KVInstance> kv_instance = infinity::InfinityContext::instance().storage()->KVInstance();
-    TableMeeta table_meta(table_info->db_id_,
-                          table_info->table_id_,
-                          *table_info->table_name_,
-                          kv_instance.get(),
-                          txn2->BeginTS(),
-                          txn2->CommitTS(),
-                          meta_cache);
+    TableMeta table_meta(table_info->db_id_,
+                         table_info->table_id_,
+                         *table_info->table_name_,
+                         kv_instance.get(),
+                         txn2->BeginTS(),
+                         txn2->CommitTS(),
+                         meta_cache);
 
     {
         {

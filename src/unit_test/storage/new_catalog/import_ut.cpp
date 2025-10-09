@@ -38,11 +38,11 @@ import :buffer_obj;
 import :segment_meta;
 import :block_meta;
 import :column_meta;
-import :table_meeta;
-import :table_index_meeta;
+import :table_meta;
+import :table_index_meta;
 import :segment_index_meta;
 import :chunk_index_meta;
-import :db_meeta;
+import :db_meta;
 
 import extra_ddl_info;
 import column_def;
@@ -126,8 +126,8 @@ TEST_P(TestTxnImport, test_import1) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -228,8 +228,8 @@ TEST_P(TestTxnImport, test_import_with_index) {
         EXPECT_TRUE(status.ok());
     }
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn =
-            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kCreateIndex);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
+                                          TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -276,9 +276,9 @@ TEST_P(TestTxnImport, test_import_with_index) {
     auto check_index = [&](const std::string &index_name) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -356,8 +356,8 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
         EXPECT_TRUE(status.ok());
     }
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn =
-            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kCreateIndex);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
+                                          TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -427,8 +427,8 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -501,9 +501,9 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
     auto check_index = [&](const std::string &index_name) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index1"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -621,8 +621,8 @@ TEST_P(TestTxnImport, test_insert_and_import) {
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -656,8 +656,8 @@ TEST_P(TestTxnImport, test_insert_and_import) {
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -785,7 +785,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
             check_block(block_meta, begin_ts, commit_ts);
         }
     };
-    auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
+    auto check_table_2segments = [&](TableMeta &table_meta, NewTxn *txn) {
         auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, std::vector<SegmentID>({0, 1}));
@@ -795,7 +795,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
             check_segment(segment_meta, txn);
         }
     };
-    auto check_table_1segment = [&](TableMeeta &table_meta, NewTxn *txn) {
+    auto check_table_1segment = [&](TableMeta &table_meta, NewTxn *txn) {
         auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, std::vector<SegmentID>({0}));
@@ -835,8 +835,8 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -891,8 +891,8 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -948,8 +948,8 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -1005,8 +1005,8 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -1052,8 +1052,8 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -1099,8 +1099,8 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -1147,8 +1147,8 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -1193,8 +1193,8 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
@@ -1332,7 +1332,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
             check_block(block_meta, begin_ts, commit_ts);
         }
     };
-    auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
+    auto check_table_2segments = [&](TableMeta &table_meta, NewTxn *txn) {
         auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, std::vector<SegmentID>({0, 1}));
@@ -1342,7 +1342,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
             check_segment(segment_meta, txn);
         }
     };
-    auto check_table_1segment = [&](TableMeeta &table_meta, NewTxn *txn) {
+    auto check_table_1segment = [&](TableMeta &table_meta, NewTxn *txn) {
         auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, std::vector<SegmentID>({0}));
@@ -1382,8 +1382,8 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -1444,8 +1444,8 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -1507,8 +1507,8 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -1570,8 +1570,8 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
@@ -1623,8 +1623,8 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
@@ -1676,8 +1676,8 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
@@ -1730,8 +1730,8 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
@@ -1782,8 +1782,8 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_EQ(status.code(), ErrorCode::kTableNotExist);
@@ -1935,7 +1935,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
             check_block(block_meta, begin_ts, commit_ts);
         }
     };
-    auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
+    auto check_table_2segments = [&](TableMeta &table_meta, NewTxn *txn) {
         auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, std::vector<SegmentID>({0, 1}));
@@ -1945,7 +1945,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
             check_segment(segment_meta, txn);
         }
     };
-    auto check_table_1segment = [&](TableMeeta &table_meta, NewTxn *txn) {
+    auto check_table_1segment = [&](TableMeta &table_meta, NewTxn *txn) {
         auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, std::vector<SegmentID>({0}));
@@ -1999,8 +1999,8 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -2060,8 +2060,8 @@ TEST_P(TestTxnImport, test_import_add_columns) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -2121,8 +2121,8 @@ TEST_P(TestTxnImport, test_import_add_columns) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -2181,8 +2181,8 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -2241,8 +2241,8 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -2301,8 +2301,8 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         status = new_txn_mgr->CommitTxn(txn5);
@@ -2361,8 +2361,8 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         status = new_txn_mgr->CommitTxn(txn5);
@@ -2418,8 +2418,8 @@ TEST_P(TestTxnImport, test_import_add_columns) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         status = new_txn_mgr->CommitTxn(txn5);
@@ -2562,7 +2562,7 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
             check_block(block_meta, begin_ts, commit_ts);
         }
     };
-    auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
+    auto check_table_2segments = [&](TableMeta &table_meta, NewTxn *txn) {
         auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, std::vector<SegmentID>({0, 1}));
@@ -2572,7 +2572,7 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
             check_segment(segment_meta, txn);
         }
     };
-    auto check_table_1segment = [&](TableMeeta &table_meta, NewTxn *txn) {
+    auto check_table_1segment = [&](TableMeta &table_meta, NewTxn *txn) {
         auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, std::vector<SegmentID>({0}));
@@ -2621,8 +2621,8 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -2677,8 +2677,8 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -2733,8 +2733,8 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -2788,8 +2788,8 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -2843,8 +2843,8 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -2898,8 +2898,8 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         status = new_txn_mgr->CommitTxn(txn5);
@@ -2953,8 +2953,8 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         status = new_txn_mgr->CommitTxn(txn5);
@@ -3005,8 +3005,8 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         status = new_txn_mgr->CommitTxn(txn5);
@@ -3124,8 +3124,8 @@ TEST_P(TestTxnImport, test_import) {
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -3185,7 +3185,7 @@ TEST_P(TestTxnImport, test_import) {
             }
         };
 
-        auto check_table = [&](TableMeeta &table_meta) {
+        auto check_table = [&](TableMeta &table_meta) {
             auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, std::vector<SegmentID>({0, 1}));
@@ -3298,7 +3298,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         }
     };
 
-    auto check_table = [&](TableMeeta &table_meta, NewTxn *txn, const std::vector<SegmentID> &segment_ids) {
+    auto check_table = [&](TableMeta &table_meta, NewTxn *txn, const std::vector<SegmentID> &segment_ids) {
         auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
@@ -3363,8 +3363,8 @@ TEST_P(TestTxnImport, test_import_append_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -3418,8 +3418,8 @@ TEST_P(TestTxnImport, test_import_append_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -3473,8 +3473,8 @@ TEST_P(TestTxnImport, test_import_append_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -3527,8 +3527,8 @@ TEST_P(TestTxnImport, test_import_append_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -3583,8 +3583,8 @@ TEST_P(TestTxnImport, test_import_append_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -3639,8 +3639,8 @@ TEST_P(TestTxnImport, test_import_append_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -3695,8 +3695,8 @@ TEST_P(TestTxnImport, test_import_append_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -3749,8 +3749,8 @@ TEST_P(TestTxnImport, test_import_append_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -3801,8 +3801,8 @@ TEST_P(TestTxnImport, test_import_append_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -3918,7 +3918,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
         }
     };
 
-    auto check_table = [&](TableMeeta &table_meta, NewTxn *txn, std::vector<SegmentID> segment_ids) {
+    auto check_table = [&](TableMeta &table_meta, NewTxn *txn, std::vector<SegmentID> segment_ids) {
         new_txn_mgr->PrintAllKeyValue();
 
         auto [seg_ids, seg_status] = table_meta.GetSegmentIDs1();
@@ -3983,8 +3983,8 @@ TEST_P(TestTxnImport, test_import_import_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -4038,8 +4038,8 @@ TEST_P(TestTxnImport, test_import_import_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -4093,8 +4093,8 @@ TEST_P(TestTxnImport, test_import_import_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -4150,8 +4150,8 @@ TEST_P(TestTxnImport, test_import_import_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -4206,8 +4206,8 @@ TEST_P(TestTxnImport, test_import_import_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -4262,8 +4262,8 @@ TEST_P(TestTxnImport, test_import_import_table) {
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -4767,7 +4767,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         }
     };
 
-    auto check_table = [&](TableMeeta &table_meta, NewTxn *txn, const std::vector<SegmentID> &segment_ids) {
+    auto check_table = [&](TableMeta &table_meta, NewTxn *txn, const std::vector<SegmentID> &segment_ids) {
         auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
@@ -4785,7 +4785,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_EQ(index_names_ptr->size(), 1);
         EXPECT_EQ(index_names_ptr->at(0), "idx1");
 
-        TableIndexMeeta table_index_meta(index_id_strs_ptr->at(0), index_names_ptr->at(0), table_meta);
+        TableIndexMeta table_index_meta(index_id_strs_ptr->at(0), index_names_ptr->at(0), table_meta);
         auto [index_base, index_status] = table_index_meta.GetIndexBase();
         EXPECT_TRUE(index_status.ok());
         EXPECT_EQ(*index_base->index_name_, std::string("idx1"));
@@ -4796,7 +4796,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(index_segment_ids_ptr->size(), 1);
     };
-    auto check_no_index = [&](TableMeeta &table_meta, NewTxn *txn, const std::vector<SegmentID> &segment_ids) {
+    auto check_no_index = [&](TableMeta &table_meta, NewTxn *txn, const std::vector<SegmentID> &segment_ids) {
         auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
@@ -4812,7 +4812,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_id_strs_ptr, std::vector<std::string>({}));
     };
-    auto check_no_data = [&](TableMeeta &table_meta, NewTxn *txn) {
+    auto check_no_data = [&](TableMeta &table_meta, NewTxn *txn) {
         auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids_ptr, std::vector<SegmentID>({}));
@@ -4879,8 +4879,8 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -4936,8 +4936,8 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -4993,8 +4993,8 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -5049,8 +5049,8 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -5108,8 +5108,8 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -5165,8 +5165,8 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -5223,8 +5223,8 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -5279,8 +5279,8 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -5395,7 +5395,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         }
     };
 
-    auto check_table = [&](TableMeeta &table_meta, NewTxn *txn, const std::vector<SegmentID> &segment_ids) {
+    auto check_table = [&](TableMeta &table_meta, NewTxn *txn, const std::vector<SegmentID> &segment_ids) {
         auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
@@ -5475,8 +5475,8 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -5539,8 +5539,8 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -5603,8 +5603,8 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -5666,8 +5666,8 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -5731,8 +5731,8 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -5794,8 +5794,8 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -5858,8 +5858,8 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -5920,8 +5920,8 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -6014,13 +6014,13 @@ TEST_P(TestTxnImport, test_import_and_compact) {
     auto CheckTable = [&](const std::vector<SegmentID> &segment_ids) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         status = txn->GetTableIndexMeta(*index_name1, *table_meta, table_index_meta);
         EXPECT_TRUE(status.ok());
 
@@ -6386,8 +6386,8 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
     auto CheckTable = [&](std::vector<ColumnID> column_idxes) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -6399,7 +6399,7 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
         std::vector<SegmentID> expected_segments{0, 1};
         EXPECT_EQ(*segment_ids_ptr, expected_segments);
 
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         status = txn->GetTableIndexMeta(*index_name1, *table_meta, table_index_meta);
         EXPECT_TRUE(status.ok());
 

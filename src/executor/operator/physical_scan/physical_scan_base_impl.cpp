@@ -39,7 +39,7 @@ import :physical_merge_match_tensor;
 import :physical_index_scan;
 import :meta_info;
 import :result_cache_manager;
-import :table_meeta;
+import :table_meta;
 import :segment_meta;
 import :block_meta;
 import :new_txn;

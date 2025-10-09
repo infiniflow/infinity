@@ -39,9 +39,9 @@ import :ivf_index_data_in_mem;
 import :ivf_index_data;
 import :ivf_index_search;
 import :new_txn;
-import :table_index_meeta;
+import :table_index_meta;
 import :segment_index_meta;
-import :table_meeta;
+import :table_meta;
 import :segment_meta;
 import :block_meta;
 import :column_meta;
@@ -399,7 +399,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     block_metas_ = std::make_unique<std::vector<BlockMeta *>>();
     segment_index_metas_ = std::make_unique<std::vector<std::shared_ptr<SegmentIndexMeta>>>();
 
-    TableMeeta *table_meta = base_table_ref_->block_index_->table_meta_.get();
+    TableMeta *table_meta = base_table_ref_->block_index_->table_meta_.get();
 
     std::set<SegmentID> index_entry_map;
 
@@ -709,7 +709,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                 BlockID block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
                 BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
 
-                TableMeeta *table_meta = base_table_ref_->block_index_->table_meta_.get();
+                TableMeta *table_meta = base_table_ref_->block_index_->table_meta_.get();
                 SegmentMeta segment_meta(segment_id, *table_meta);
                 BlockMeta block_meta(block_id, segment_meta);
                 ColumnMeta column_meta(knn_column_id, block_meta);

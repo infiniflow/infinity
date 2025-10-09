@@ -19,8 +19,8 @@ module infinity_core:segment_index_meta.impl;
 import :segment_index_meta;
 import :kv_code;
 import :kv_store;
-import :table_index_meeta;
-import :table_meeta;
+import :table_index_meta;
+import :table_meta;
 import :infinity_context;
 import :new_catalog;
 import :mem_index;
@@ -41,7 +41,7 @@ import create_index_info;
 
 namespace infinity {
 
-SegmentIndexMeta::SegmentIndexMeta(SegmentID segment_id, TableIndexMeeta &table_index_meta)
+SegmentIndexMeta::SegmentIndexMeta(SegmentID segment_id, TableIndexMeta &table_index_meta)
     : begin_ts_(table_index_meta.table_meta().begin_ts()), commit_ts_(table_index_meta.table_meta().commit_ts()),
       kv_instance_(table_index_meta.kv_instance()), table_index_meta_(table_index_meta), segment_id_(segment_id) {}
 
@@ -104,7 +104,7 @@ std::tuple<std::vector<ChunkID> *, Status> SegmentIndexMeta::GetChunkIDs1() {
 }
 
 Status SegmentIndexMeta::RemoveChunkIDs(const std::vector<ChunkID> &chunk_ids) {
-    TableMeeta &table_meta = table_index_meta_.table_meta();
+    TableMeta &table_meta = table_index_meta_.table_meta();
     for (ChunkID chunk_id : chunk_ids) {
         std::string chunk_id_key =
             KeyEncode::CatalogIdxChunkKey(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_, chunk_id);
@@ -125,7 +125,7 @@ Status SegmentIndexMeta::RemoveChunkIDs(const std::vector<ChunkID> &chunk_ids) {
 
 Status SegmentIndexMeta::AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn) {
 
-    TableMeeta &table_meta = table_index_meta_.table_meta();
+    TableMeta &table_meta = table_index_meta_.table_meta();
     std::string chunk_id_key =
         KeyEncode::CatalogIdxChunkKey(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_, chunk_id);
     std::string commit_ts_str;
@@ -233,7 +233,7 @@ Status SegmentIndexMeta::UninitSet(UsageFlag usage_flag) {
 Status SegmentIndexMeta::UninitSet1(UsageFlag usage_flag) {
     {
         // Remove all chunk ids
-        TableMeeta &table_meta = table_index_meta_.table_meta();
+        TableMeta &table_meta = table_index_meta_.table_meta();
         std::string chunk_id_prefix =
             KeyEncode::CatalogIdxChunkPrefix(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_);
         auto iter = kv_instance_.GetIterator();
@@ -312,7 +312,7 @@ Status SegmentIndexMeta::LoadChunkIDs1() {
     TxnTimeStamp begin_ts = table_index_meta_.table_meta().begin_ts();
     TxnTimeStamp commit_ts = table_index_meta_.table_meta().commit_ts();
 
-    TableMeeta &table_meta = table_index_meta_.table_meta();
+    TableMeta &table_meta = table_index_meta_.table_meta();
     std::string chunk_id_prefix =
         KeyEncode::CatalogIdxChunkPrefix(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_);
     auto iter = kv_instance_.GetIterator();
@@ -348,7 +348,7 @@ Status SegmentIndexMeta::LoadNextChunkID() {
 }
 
 std::string SegmentIndexMeta::GetSegmentIndexTag(const std::string &tag) {
-    const TableMeeta &table_meta = table_index_meta_.table_meta();
+    const TableMeta &table_meta = table_index_meta_.table_meta();
     return KeyEncode::CatalogIdxSegmentTagKey(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_, tag);
 }
 

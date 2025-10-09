@@ -31,14 +31,14 @@ import internal_types;
 namespace infinity {
 
 class BlockMeta;
-class TableIndexMeeta;
+class TableIndexMeta;
 class SegmentIndexMeta;
 
 export class KnnScanSharedData {
 public:
     KnnScanSharedData(std::shared_ptr<BaseTableRef> table_ref,
                       std::unique_ptr<std::vector<BlockMeta *>> block_metas,
-                      std::shared_ptr<TableIndexMeeta> table_index_meta,
+                      std::shared_ptr<TableIndexMeta> table_index_meta,
                       std::unique_ptr<std::vector<std::shared_ptr<SegmentIndexMeta>>> segment_index_metas,
                       std::vector<InitParameter> opt_params,
                       i64 topk,
@@ -54,7 +54,7 @@ public:
     const std::shared_ptr<BaseTableRef> table_ref_{};
 
     std::unique_ptr<std::vector<BlockMeta *>> block_metas_{};
-    std::shared_ptr<TableIndexMeeta> table_index_meta_{};
+    std::shared_ptr<TableIndexMeta> table_index_meta_{};
     std::unique_ptr<std::vector<std::shared_ptr<SegmentIndexMeta>>> segment_index_metas_{};
 
     const std::vector<InitParameter> opt_params_{};

@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module infinity_core:db_meeta.impl;
+module infinity_core:db_meta.impl;
 
-import :db_meeta;
+import :db_meta;
 import :kv_code;
 import :kv_store;
 import :infinity_exception;
@@ -31,7 +31,7 @@ import third_party;
 
 namespace infinity {
 
-DBMeeta::DBMeeta(const std::string &db_id_str, const std::string &db_name, NewTxn *txn) : db_id_str_(db_id_str), db_name_(db_name), txn_(txn) {
+DBMeta::DBMeta(const std::string &db_id_str, const std::string &db_name, NewTxn *txn) : db_id_str_(db_id_str), db_name_(db_name), txn_(txn) {
     if (txn == nullptr) {
         UnrecoverableError("Null txn pointer");
     }
@@ -40,12 +40,12 @@ DBMeeta::DBMeeta(const std::string &db_id_str, const std::string &db_name, NewTx
     meta_cache_ = txn_->txn_mgr()->storage()->meta_cache();
 }
 
-DBMeeta::DBMeeta(const std::string &db_id_str, const std::string &db_name, KVInstance *kv_instance, MetaCache *meta_cache)
+DBMeta::DBMeta(const std::string &db_id_str, const std::string &db_name, KVInstance *kv_instance, MetaCache *meta_cache)
     : db_id_str_(db_id_str), db_name_(db_name), txn_begin_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance}, meta_cache_(meta_cache) {}
 
-const std::string &DBMeeta::db_id_str() const { return db_id_str_; }
+const std::string &DBMeta::db_id_str() const { return db_id_str_; }
 
-Status DBMeeta::InitSet(const std::string *comment) {
+Status DBMeta::InitSet(const std::string *comment) {
     if (comment) {
         std::string db_comment_key = GetDBTag("comment");
         Status status = kv_instance_->Put(db_comment_key, *comment);
@@ -64,7 +64,7 @@ Status DBMeeta::InitSet(const std::string *comment) {
     return Status::OK();
 }
 
-Status DBMeeta::UninitSet(UsageFlag usage_flag) {
+Status DBMeta::UninitSet(UsageFlag usage_flag) {
     // called by cleanup to clean all data of the database.
 
     Status status;
@@ -98,7 +98,7 @@ Status DBMeeta::UninitSet(UsageFlag usage_flag) {
     return Status::OK();
 }
 
-Status DBMeeta::GetComment(std::string *&comment) {
+Status DBMeta::GetComment(std::string *&comment) {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!comment_) {
         std::shared_ptr<MetaDbCache> db_cache = nullptr;
@@ -132,7 +132,7 @@ Status DBMeeta::GetComment(std::string *&comment) {
     return Status::OK();
 }
 
-Status DBMeeta::GetTableIDs(std::vector<std::string> *&table_id_strs, std::vector<std::string> **table_names) {
+Status DBMeta::GetTableIDs(std::vector<std::string> *&table_id_strs, std::vector<std::string> **table_names) {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!table_id_strs_ || !table_names_) {
         Status status = LoadTableIDs();
@@ -147,7 +147,7 @@ Status DBMeeta::GetTableIDs(std::vector<std::string> *&table_id_strs, std::vecto
     return Status::OK();
 }
 
-Status DBMeeta::GetTableID(const std::string &table_name, std::string &table_key, std::string &table_id_str, TxnTimeStamp &create_table_ts) {
+Status DBMeta::GetTableID(const std::string &table_name, std::string &table_key, std::string &table_id_str, TxnTimeStamp &create_table_ts) {
 
     u64 db_id = std::stoull(db_id_str_);
     if (txn_ != nullptr and txn_->readonly()) {
@@ -220,7 +220,7 @@ Status DBMeeta::GetTableID(const std::string &table_name, std::string &table_key
     return Status::OK();
 }
 
-std::tuple<std::shared_ptr<DatabaseInfo>, Status> DBMeeta::GetDatabaseInfo() {
+std::tuple<std::shared_ptr<DatabaseInfo>, Status> DBMeta::GetDatabaseInfo() {
     Status status;
 
     std::string *db_comment = nullptr;
@@ -237,7 +237,7 @@ std::tuple<std::shared_ptr<DatabaseInfo>, Status> DBMeeta::GetDatabaseInfo() {
     return {db_info, Status::OK()};
 }
 
-std::tuple<std::string, Status> DBMeeta::GetNextTableID() {
+std::tuple<std::string, Status> DBMeta::GetNextTableID() {
     std::string next_table_id_key = GetDBTag(NEXT_TABLE_ID.data());
     std::string next_table_id_str;
     Status status = kv_instance_->Get(next_table_id_key, next_table_id_str);
@@ -254,7 +254,7 @@ std::tuple<std::string, Status> DBMeeta::GetNextTableID() {
     return {next_table_id_str, Status::OK()};
 }
 
-Status DBMeeta::LoadTableIDs() {
+Status DBMeta::LoadTableIDs() {
     table_id_strs_ = std::vector<std::string>();
     table_names_ = std::vector<std::string>();
 
@@ -304,9 +304,9 @@ Status DBMeeta::LoadTableIDs() {
     return Status::OK();
 }
 
-std::string DBMeeta::GetDBTag(const std::string &tag) const { return KeyEncode::CatalogDbTagKey(db_id_str_, tag); }
+std::string DBMeta::GetDBTag(const std::string &tag) const { return KeyEncode::CatalogDbTagKey(db_id_str_, tag); }
 
-Status DBMeeta::SetNextTableID(const std::string &table_id_str) {
+Status DBMeta::SetNextTableID(const std::string &table_id_str) {
     std::string next_table_id_key = GetDBTag(NEXT_TABLE_ID.data());
     Status status = kv_instance_->Put(next_table_id_key, table_id_str);
     if (!status.ok()) {
@@ -315,6 +315,6 @@ Status DBMeeta::SetNextTableID(const std::string &table_id_str) {
     return Status::OK();
 }
 
-MetaCache *DBMeeta::meta_cache() const { return meta_cache_; }
+MetaCache *DBMeta::meta_cache() const { return meta_cache_; }
 
 } // namespace infinity

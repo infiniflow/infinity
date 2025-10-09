@@ -109,13 +109,11 @@ jobs:
 
               for file in "${files[@]}"; do
                 if [ -f "$file" ]; then
-                  echo "Checking formatting: $file"
-                  sudo docker exec ${CHECK_CONTAINER} bash -c "cd /infinity; clang-format-20 $file > ${file}.formatted; diff $file ${file}.formatted 2>/dev/null"
-                  if [ $? -ne 0 ]; then
-                    echo "❌ $file needs formatting"
-                    HAS_ERROR=1
+                  if sudo docker exec ${CHECK_CONTAINER} bash -c "cd /infinity; clang-format-20 $file > ${file}.formatted; diff $file ${file}.formatted 2>/dev/null"; then
+                    echo "✅ $file"
                   else
-                    echo "✅ $file is properly formatted"
+                    echo "❌ $file"
+                    HAS_ERROR=1
                   fi
                   rm -f "${file}.formatted"
                 fi

@@ -43,7 +43,7 @@ import :index_defines;
 import :logger;
 import :new_txn;
 import :status;
-import :table_meeta;
+import :table_meta;
 import :segment_meta;
 import :block_meta;
 import :column_meta;

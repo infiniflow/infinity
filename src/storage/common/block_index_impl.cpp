@@ -20,12 +20,12 @@ import :default_values;
 import :status;
 import :infinity_exception;
 import :new_txn;
-import :db_meeta;
-import :table_meeta;
+import :db_meta;
+import :table_meta;
 import :segment_meta;
 import :block_meta;
 import :kv_store;
-import :table_index_meeta;
+import :table_index_meta;
 import :segment_index_meta;
 
 import std;
@@ -59,7 +59,7 @@ BlockIndex::BlockIndex() = default;
 
 BlockIndex::~BlockIndex() = default;
 
-void BlockIndex::NewInit(const std::shared_ptr<TableMeeta> &table_meta) {
+void BlockIndex::NewInit(const std::shared_ptr<TableMeta> &table_meta) {
     table_meta_ = table_meta;
     Status status = Status::OK();
     std::vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -118,7 +118,7 @@ void IndexIndex::Insert(std::string index_name, std::shared_ptr<NewIndexSnapshot
     new_index_snapshots_.emplace(std::move(index_name), new_index_snapshot);
 }
 
-std::shared_ptr<NewIndexSnapshot> IndexIndex::Insert(const std::string &index_name, std::shared_ptr<TableIndexMeeta> table_index_meta) {
+std::shared_ptr<NewIndexSnapshot> IndexIndex::Insert(const std::string &index_name, std::shared_ptr<TableIndexMeta> table_index_meta) {
     auto index_snapshot = std::make_shared<NewIndexSnapshot>();
     index_snapshot->table_index_meta_ = table_index_meta;
 

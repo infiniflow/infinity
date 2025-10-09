@@ -29,12 +29,12 @@ import :new_txn;
 import :data_access_state;
 import :roaring_bitmap;
 import :catalog_meta;
-import :db_meeta;
-import :table_meeta;
+import :db_meta;
+import :table_meta;
 import :segment_meta;
 import :block_meta;
 import :column_meta;
-import :table_index_meeta;
+import :table_index_meta;
 import :segment_index_meta;
 import :chunk_index_meta;
 import :mem_index;
@@ -168,7 +168,7 @@ Status NewCatalog::InitCatalog(MetaCache *meta_cache, KVInstance *kv_instance, T
         }
         return Status::OK();
     };
-    auto InitSegmentIndex = [&](SegmentID segment_id, TableIndexMeeta &table_index_meta) {
+    auto InitSegmentIndex = [&](SegmentID segment_id, TableIndexMeta &table_index_meta) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
         status = segment_index_meta.LoadSet();
         if (!status.ok()) {
@@ -187,8 +187,8 @@ Status NewCatalog::InitCatalog(MetaCache *meta_cache, KVInstance *kv_instance, T
         }
         return Status::OK();
     };
-    auto InitTableIndex = [&](const std::string &index_id_str, const std::string &index_name_str, TableMeeta &table_meta) {
-        TableIndexMeeta table_index_meta(index_id_str, index_name_str, table_meta);
+    auto InitTableIndex = [&](const std::string &index_id_str, const std::string &index_name_str, TableMeta &table_meta) {
+        TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
 
         std::vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
@@ -203,8 +203,8 @@ Status NewCatalog::InitCatalog(MetaCache *meta_cache, KVInstance *kv_instance, T
         }
         return Status::OK();
     };
-    auto InitTable = [&](const std::string &table_id_str, const std::string &table_name, DBMeeta &db_meta) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, table_name, kv_instance, checkpoint_ts, MAX_TIMESTAMP, meta_cache);
+    auto InitTable = [&](const std::string &table_id_str, const std::string &table_name, DBMeta &db_meta) {
+        TableMeta table_meta(db_meta.db_id_str(), table_id_str, table_name, kv_instance, checkpoint_ts, MAX_TIMESTAMP, meta_cache);
 
         std::vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
@@ -244,7 +244,7 @@ Status NewCatalog::InitCatalog(MetaCache *meta_cache, KVInstance *kv_instance, T
     };
 
     auto InitDB = [&](const std::string &db_id_str, const std::string &db_name) {
-        DBMeeta db_meta(db_id_str, db_name, kv_instance, meta_cache);
+        DBMeta db_meta(db_id_str, db_name, kv_instance, meta_cache);
 
         std::vector<std::string> *table_id_strs_ptr = nullptr;
         std::vector<std::string> *table_names_ptr = nullptr;
@@ -286,7 +286,7 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn) {
     if (!status.ok()) {
         return status;
     }
-    auto IndexRecoverTable = [&](TableMeeta &table_meta) {
+    auto IndexRecoverTable = [&](TableMeta &table_meta) {
         std::vector<std::string> *index_id_strs_ptr = nullptr;
         std::vector<std::string> *index_name_strs_ptr = nullptr;
         status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
@@ -297,7 +297,7 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn) {
         for (size_t idx = 0; idx < index_count; ++idx) {
             const std::string &index_id_str = index_id_strs_ptr->at(idx);
             const std::string &index_name_str = index_name_strs_ptr->at(idx);
-            TableIndexMeeta table_index_meta(index_id_str, index_name_str, table_meta);
+            TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
             status = txn->RecoverMemIndex(table_index_meta);
             if (!status.ok()) {
                 return status;
@@ -305,7 +305,7 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn) {
         }
         return Status::OK();
     };
-    auto IndexRecoverDB = [&](DBMeeta &db_meta) {
+    auto IndexRecoverDB = [&](DBMeta &db_meta) {
         std::vector<std::string> *table_id_strs_ptr = nullptr;
         std::vector<std::string> *table_names_ptr = nullptr;
         status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
@@ -317,7 +317,7 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn) {
         for (size_t idx = 0; idx < table_count; ++idx) {
             const std::string &table_id_str = table_id_strs_ptr->at(idx);
             const std::string &table_name = table_names_ptr->at(idx);
-            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, table_name, txn);
+            TableMeta table_meta(db_meta.db_id_str(), table_id_str, table_name, txn);
             status = IndexRecoverTable(table_meta);
             if (!status.ok()) {
                 return status;
@@ -331,7 +331,7 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn) {
         const std::string &db_id_str = db_id_strs_ptr->at(idx);
         const std::string &db_name = db_names_ptr->at(idx);
 
-        DBMeeta db_meta(db_id_str, db_name, txn);
+        DBMeta db_meta(db_id_str, db_name, txn);
         status = IndexRecoverDB(db_meta);
         if (!status.ok()) {
             return status;
@@ -349,7 +349,7 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
     if (!status.ok()) {
         return status;
     }
-    auto IndexCommitTable = [&](TableMeeta &table_meta) {
+    auto IndexCommitTable = [&](TableMeta &table_meta) {
         std::vector<std::string> *index_id_strs_ptr = nullptr;
         std::vector<std::string> *index_name_strs_ptr = nullptr;
         status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
@@ -361,7 +361,7 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
             const std::string &index_id_str = index_id_strs_ptr->at(idx);
             const std::string &index_name_str = index_name_strs_ptr->at(idx);
 
-            TableIndexMeeta table_index_meta(index_id_str, index_name_str, table_meta);
+            TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
             status = new_txn->CommitMemIndex(table_index_meta);
             if (!status.ok()) {
                 return status;
@@ -369,7 +369,7 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
         }
         return Status::OK();
     };
-    auto IndexCommitDB = [&](DBMeeta &db_meta) {
+    auto IndexCommitDB = [&](DBMeta &db_meta) {
         std::vector<std::string> *table_id_strs_ptr = nullptr;
         std::vector<std::string> *table_names_ptr = nullptr;
         status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
@@ -381,7 +381,7 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
         for (size_t idx = 0; idx < table_count; ++idx) {
             const std::string &table_id_str = table_id_strs_ptr->at(idx);
             const std::string &table_name = table_names_ptr->at(idx);
-            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, table_name, new_txn);
+            TableMeta table_meta(db_meta.db_id_str(), table_id_str, table_name, new_txn);
             status = IndexCommitTable(table_meta);
             if (!status.ok()) {
                 return status;
@@ -394,7 +394,7 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
     for (size_t idx = 0; idx < db_count; ++idx) {
         const std::string &db_id_str = db_id_strs_ptr->at(idx);
         const std::string &db_name = db_names_ptr->at(idx);
-        DBMeeta db_meta(db_id_str, db_name, new_txn);
+        DBMeta db_meta(db_id_str, db_name, new_txn);
         status = IndexCommitDB(db_meta);
         if (!status.ok()) {
             return status;
@@ -405,7 +405,7 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
 
 Status NewCatalog::GetAllMemIndexes(NewTxn *txn, std::vector<std::shared_ptr<MemIndex>> &mem_indexes, std::vector<MemIndexID> &mem_index_ids) {
     auto TraverseTableIndex =
-        [&](TableIndexMeeta &table_index_meta, const std::string &db_name, const std::string &table_name, const std::string &index_name) {
+        [&](TableIndexMeta &table_index_meta, const std::string &db_name, const std::string &table_name, const std::string &index_name) {
             auto [index_segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
             if (!status.ok()) {
                 return status;
@@ -422,7 +422,7 @@ Status NewCatalog::GetAllMemIndexes(NewTxn *txn, std::vector<std::shared_ptr<Mem
             }
             return Status::OK();
         };
-    auto TraverseTable = [&](TableMeeta &table_meta, const std::string &db_name, const std::string &table_name) {
+    auto TraverseTable = [&](TableMeta &table_meta, const std::string &db_name, const std::string &table_name) {
         std::vector<std::string> *index_id_strs_ptr = nullptr;
         std::vector<std::string> *index_names_ptr = nullptr;
         Status status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
@@ -432,7 +432,7 @@ Status NewCatalog::GetAllMemIndexes(NewTxn *txn, std::vector<std::shared_ptr<Mem
         for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
             const std::string &index_id_str = (*index_id_strs_ptr)[i];
             const std::string &index_name = (*index_names_ptr)[i];
-            TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta);
+            TableIndexMeta table_index_meta(index_id_str, index_name, table_meta);
             status = TraverseTableIndex(table_index_meta, db_name, table_name, index_name);
             if (!status.ok()) {
                 return status;
@@ -440,7 +440,7 @@ Status NewCatalog::GetAllMemIndexes(NewTxn *txn, std::vector<std::shared_ptr<Mem
         }
         return Status::OK();
     };
-    auto TraverseDB = [&](DBMeeta &db_meta, const std::string &db_name) {
+    auto TraverseDB = [&](DBMeta &db_meta, const std::string &db_name) {
         std::vector<std::string> *table_id_strs_ptr = nullptr;
         std::vector<std::string> *table_names_ptr = nullptr;
         Status status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
@@ -451,7 +451,7 @@ Status NewCatalog::GetAllMemIndexes(NewTxn *txn, std::vector<std::shared_ptr<Mem
         for (size_t i = 0; i < table_id_strs_ptr->size(); ++i) {
             const std::string &table_id_str = (*table_id_strs_ptr)[i];
             const std::string &table_name = (*table_names_ptr)[i];
-            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, table_name, txn);
+            TableMeta table_meta(db_meta.db_id_str(), table_id_str, table_name, txn);
             status = TraverseTable(table_meta, db_name, table_name);
             if (!status.ok()) {
                 return status;
@@ -469,7 +469,7 @@ Status NewCatalog::GetAllMemIndexes(NewTxn *txn, std::vector<std::shared_ptr<Mem
     for (size_t i = 0; i < db_id_strs_ptr->size(); ++i) {
         const std::string &db_id_str = (*db_id_strs_ptr)[i];
         const std::string &db_name = (*db_names_ptr)[i];
-        DBMeeta db_meta(db_id_str, db_name, txn);
+        DBMeta db_meta(db_id_str, db_name, txn);
         status = TraverseDB(db_meta, db_name);
         if (!status.ok()) {
             return status;
@@ -483,7 +483,7 @@ Status NewCatalog::AddNewDB(NewTxn *txn,
                             TxnTimeStamp commit_ts,
                             const std::string &db_name,
                             const std::string *db_comment,
-                            std::shared_ptr<DBMeeta> &db_meta) {
+                            std::shared_ptr<DBMeta> &db_meta) {
     KVInstance *kv_instance = txn->kv_instance();
 
     std::string db_key = KeyEncode::CatalogDbKey(db_name, commit_ts);
@@ -492,7 +492,7 @@ Status NewCatalog::AddNewDB(NewTxn *txn,
         return status;
     }
 
-    db_meta = std::make_shared<DBMeeta>(db_id_str, db_name, txn);
+    db_meta = std::make_shared<DBMeta>(db_id_str, db_name, txn);
     status = db_meta->InitSet(db_comment);
     if (!status.ok()) {
         return status;
@@ -501,7 +501,7 @@ Status NewCatalog::AddNewDB(NewTxn *txn,
     return Status::OK();
 }
 
-Status NewCatalog::CleanDB(DBMeeta &db_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag) {
+Status NewCatalog::CleanDB(DBMeta &db_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag) {
     LOG_TRACE(fmt::format("CleanDB: cleaning db_id: {}", db_meta.db_id_str()));
 
     Status status;
@@ -516,7 +516,7 @@ Status NewCatalog::CleanDB(DBMeeta &db_meta, TxnTimeStamp begin_ts, UsageFlag us
     for (size_t i = 0; i < table_id_strs_ptr->size(); ++i) {
         const std::string &table_id_str = (*table_id_strs_ptr)[i];
         const std::string &table_name = (*table_names_ptr)[i];
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, table_name, db_meta.kv_instance(), begin_ts, MAX_TIMESTAMP, db_meta.meta_cache());
+        TableMeta table_meta(db_meta.db_id_str(), table_id_str, table_name, db_meta.kv_instance(), begin_ts, MAX_TIMESTAMP, db_meta.meta_cache());
         status = NewCatalog::CleanTable(table_meta, begin_ts, usage_flag);
         if (!status.ok()) {
             return status;
@@ -531,12 +531,12 @@ Status NewCatalog::CleanDB(DBMeeta &db_meta, TxnTimeStamp begin_ts, UsageFlag us
     return Status::OK();
 }
 
-Status NewCatalog::AddNewTable(DBMeeta &db_meta,
+Status NewCatalog::AddNewTable(DBMeta &db_meta,
                                const std::string &table_id_str,
                                TxnTimeStamp begin_ts,
                                TxnTimeStamp commit_ts,
                                const std::shared_ptr<TableDef> &table_def,
-                               std::shared_ptr<TableMeeta> &table_meta) {
+                               std::shared_ptr<TableMeta> &table_meta) {
     // Create table a key value pair
     KVInstance *kv_instance = db_meta.kv_instance();
     const std::string &table_name = *table_def->table_name();
@@ -546,7 +546,7 @@ Status NewCatalog::AddNewTable(DBMeeta &db_meta,
         return status;
     }
 
-    table_meta = std::make_shared<TableMeeta>(db_meta.db_id_str(), table_id_str, table_name, kv_instance, begin_ts, commit_ts, db_meta.meta_cache());
+    table_meta = std::make_shared<TableMeta>(db_meta.db_id_str(), table_id_str, table_name, kv_instance, begin_ts, commit_ts, db_meta.meta_cache());
     status = table_meta->InitSet(table_def);
     if (!status.ok()) {
         return status;
@@ -554,7 +554,7 @@ Status NewCatalog::AddNewTable(DBMeeta &db_meta,
     return status;
 }
 
-Status NewCatalog::CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag) {
+Status NewCatalog::CleanTable(TableMeta &table_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag) {
     LOG_TRACE(fmt::format("CleanTable: cleaning table_id: {}", table_meta.table_id_str()));
 
     Status status;
@@ -581,7 +581,7 @@ Status NewCatalog::CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts, Usa
     for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
         const std::string &index_id_str = (*index_id_strs_ptr)[i];
         const std::string &index_name_str = (*index_names_ptr)[i];
-        TableIndexMeeta table_index_meta(index_id_str, index_name_str, table_meta);
+        TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
         status = NewCatalog::CleanTableIndex(table_index_meta, usage_flag);
         if (!status.ok()) {
             return status;
@@ -596,11 +596,11 @@ Status NewCatalog::CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts, Usa
     return Status::OK();
 }
 
-Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
+Status NewCatalog::AddNewTableIndex(TableMeta &table_meta,
                                     const std::string &index_id_str,
                                     TxnTimeStamp commit_ts,
                                     const std::shared_ptr<IndexBase> &index_base,
-                                    std::shared_ptr<TableIndexMeeta> &table_index_meta_ptr) {
+                                    std::shared_ptr<TableIndexMeta> &table_index_meta_ptr) {
     // Create index a key value pair
     KVInstance *kv_instance = table_meta.kv_instance();
     const std::string &index_name = *index_base->index_name_;
@@ -610,7 +610,7 @@ Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
         return status;
     }
 
-    table_index_meta_ptr = std::make_shared<TableIndexMeeta>(index_id_str, index_name, table_meta);
+    table_index_meta_ptr = std::make_shared<TableIndexMeta>(index_id_str, index_name, table_meta);
     status = table_index_meta_ptr->InitSet1(index_base, this);
     if (!status.ok()) {
         return status;
@@ -618,7 +618,7 @@ Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
     return Status::OK();
 }
 
-Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, UsageFlag usage_flag) {
+Status NewCatalog::CleanTableIndex(TableIndexMeta &table_index_meta, UsageFlag usage_flag) {
     LOG_TRACE(fmt::format("CleanTableIndex: cleaning table id: {}, index_id: {}",
                           table_index_meta.table_meta().table_id_str(),
                           table_index_meta.index_id_str()));
@@ -644,7 +644,7 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, UsageFlag 
 }
 
 Status
-NewCatalog::AddNewSegmentWithID(TableMeeta &table_meta, TxnTimeStamp commit_ts, std::optional<SegmentMeta> &segment_meta, SegmentID segment_id) {
+NewCatalog::AddNewSegmentWithID(TableMeta &table_meta, TxnTimeStamp commit_ts, std::optional<SegmentMeta> &segment_meta, SegmentID segment_id) {
     Status status = table_meta.AddSegmentWithID(commit_ts, segment_id);
     if (!status.ok()) {
         return status;
@@ -653,7 +653,7 @@ NewCatalog::AddNewSegmentWithID(TableMeeta &table_meta, TxnTimeStamp commit_ts, 
     return segment_meta->InitSet();
 }
 
-Status NewCatalog::LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
+Status NewCatalog::LoadFlushedSegment1(TableMeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
     Status status;
 
     SegmentID segment_id = 0;
@@ -677,7 +677,7 @@ Status NewCatalog::LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentI
     return Status::OK();
 }
 
-Status NewCatalog::LoadFlushedSegment2(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
+Status NewCatalog::LoadFlushedSegment2(TableMeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
     Status status = table_meta.AddSegmentWithID(checkpoint_ts, segment_info.segment_id_);
     if (!status.ok()) {
         return status;
@@ -732,7 +732,7 @@ Status NewCatalog::CleanSegment(SegmentMeta &segment_meta, TxnTimeStamp commit_t
 //     }
 //     size_t column_num = 0;
 //     {
-//         TableMeeta &table_meta = segment_meta.table_meta();
+//         TableMeta &table_meta = segment_meta.table_meta();
 //         auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
 //         if (!status.ok()) {
 //             return status;
@@ -764,7 +764,7 @@ Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_t
     }
     std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs_ptr;
     {
-        TableMeeta &table_meta = segment_meta.table_meta();
+        TableMeta &table_meta = segment_meta.table_meta();
         std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
         if (!status.ok()) {
             return status;
@@ -782,7 +782,7 @@ Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_t
     return Status::OK();
 }
 
-Status NewCatalog::LoadImportedOrCompactedSegment(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts) {
+Status NewCatalog::LoadImportedOrCompactedSegment(TableMeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts) {
     for (const WalBlockInfo &block_info : segment_info.block_infos_) {
         BlockID block_id = block_info.block_id_;
         SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
@@ -795,7 +795,7 @@ Status NewCatalog::LoadImportedOrCompactedSegment(TableMeeta &table_meta, const 
 
         std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs_ptr;
         {
-            TableMeeta &table_meta = segment_meta.table_meta();
+            TableMeta &table_meta = segment_meta.table_meta();
             std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
             if (!status.ok()) {
                 return status;
@@ -821,7 +821,7 @@ Status NewCatalog::LoadImportedOrCompactedSegment(TableMeeta &table_meta, const 
     for (size_t idx = 0; idx < index_count; ++idx) {
         const std::string &index_id_str = index_id_strs_ptr->at(idx);
         const std::string &index_name_str = index_name_strs_ptr->at(idx);
-        TableIndexMeeta table_index_meta(index_id_str, index_name_str, table_meta);
+        TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
         SegmentIndexMeta segment_index_meta(segment_info.segment_id_, table_index_meta);
         status = segment_index_meta.LoadSet();
         if (!status.ok()) {
@@ -856,7 +856,7 @@ Status NewCatalog::AddNewBlockWithID(SegmentMeta &segment_meta, TxnTimeStamp com
     }
     std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs_ptr;
     {
-        TableMeeta &table_meta = segment_meta.table_meta();
+        TableMeta &table_meta = segment_meta.table_meta();
         std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
         if (!status.ok()) {
             return status;
@@ -890,7 +890,7 @@ Status NewCatalog::AddNewBlockForTransform(SegmentMeta &segment_meta, TxnTimeSta
     return Status::OK();
 }
 //
-// Status NewCatalog::AddNewTableIndexForTransform(TableMeeta &table_meta, TxnTimeStamp commit_ts, std::optional<TableIndexMeta> &table_index_meta) {
+// Status NewCatalog::AddNewTableIndexForTransform(TableMeta &table_meta, TxnTimeStamp commit_ts, std::optional<TableIndexMeta> &table_index_meta) {
 //     Status status;
 //     BlockID block_id;
 //     std::tie(block_id, status) = table_meta.AddBlockID1(commit_ts);
@@ -916,7 +916,7 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
 
     std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs_ptr;
     {
-        TableMeeta &table_meta = segment_meta.table_meta();
+        TableMeta &table_meta = segment_meta.table_meta();
         std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
         if (!status.ok()) {
             return status;
@@ -947,7 +947,7 @@ Status NewCatalog::CleanBlock(BlockMeta &block_meta, UsageFlag usage_flag) {
     Status status;
     std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs_ptr;
 
-    TableMeeta &table_meta = block_meta.segment_meta().table_meta();
+    TableMeta &table_meta = block_meta.segment_meta().table_meta();
     std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
     if (!status.ok()) {
         return status;
@@ -1019,7 +1019,7 @@ Status NewCatalog::CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *co
     return Status::OK();
 }
 
-Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
+Status NewCatalog::AddNewSegmentIndex1(TableIndexMeta &table_index_meta,
                                        NewTxn *new_txn,
                                        SegmentID segment_id,
                                        std::optional<SegmentIndexMeta> &segment_index_meta) {
@@ -1037,7 +1037,7 @@ Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
 }
 
 // TODO: add next_chunk_id to this logic
-Status NewCatalog::RestoreNewSegmentIndex1(TableIndexMeeta &table_index_meta,
+Status NewCatalog::RestoreNewSegmentIndex1(TableIndexMeta &table_index_meta,
                                            NewTxn *new_txn,
                                            SegmentID segment_id,
                                            std::optional<SegmentIndexMeta> &segment_index_meta,
@@ -1062,7 +1062,7 @@ Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, Usage
                           segment_index_meta.table_index_meta().index_id_str()));
     if (usage_flag != UsageFlag::kTransform) {
         // Invalidate the fulltext index cache for this segment
-        TableMeeta &table_meta = segment_index_meta.table_index_meta().table_meta();
+        TableMeta &table_meta = segment_index_meta.table_index_meta().table_meta();
         Status status = table_meta.InvalidateFtIndexCache();
         if (!status.ok()) {
             return status;
@@ -1286,7 +1286,7 @@ Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, size_t offset, size_
     return Status::OK();
 }
 
-Status NewCatalog::GetDBFilePaths(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, DBMeeta &db_meta, std::vector<std::string> &file_paths) {
+Status NewCatalog::GetDBFilePaths(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, DBMeta &db_meta, std::vector<std::string> &file_paths) {
     std::vector<std::string> *table_id_strs_ptr = nullptr;
     std::vector<std::string> *table_names_ptr = nullptr;
     Status status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
@@ -1298,7 +1298,7 @@ Status NewCatalog::GetDBFilePaths(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts,
     for (size_t idx = 0; idx < table_count; ++idx) {
         const std::string &table_id_str = table_id_strs_ptr->at(idx);
         const std::string &table_name = table_names_ptr->at(idx);
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, table_name, db_meta.kv_instance(), begin_ts, commit_ts, db_meta.meta_cache());
+        TableMeta table_meta(db_meta.db_id_str(), table_id_str, table_name, db_meta.kv_instance(), begin_ts, commit_ts, db_meta.meta_cache());
         status = GetTableFilePaths(begin_ts, table_meta, file_paths);
         if (!status.ok()) {
             return status;
@@ -1308,7 +1308,7 @@ Status NewCatalog::GetDBFilePaths(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts,
 }
 
 Status NewCatalog::GetTableFilePaths(TxnTimeStamp begin_ts,
-                                     TableMeeta &table_meta,
+                                     TableMeta &table_meta,
                                      std::vector<std::string> &file_paths,
                                      std::shared_ptr<ColumnDef> column_def) {
     std::vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -1335,7 +1335,7 @@ Status NewCatalog::GetTableFilePaths(TxnTimeStamp begin_ts,
     for (size_t idx = 0; idx < index_count; ++idx) {
         const std::string &index_id_str = index_id_strs_ptr->at(idx);
         const std::string &index_name_str = index_name_strs_ptr->at(idx);
-        TableIndexMeeta table_index_meta(index_id_str, index_name_str, table_meta);
+        TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
         status = GetTableIndexFilePaths(table_index_meta, file_paths);
         if (!status.ok()) {
             return status;
@@ -1403,13 +1403,13 @@ Status NewCatalog::GetBlockColumnFilePaths(ColumnMeta &column_meta, std::vector<
 }
 
 Status NewCatalog::GetColumnFilePaths(TxnTimeStamp begin_ts,
-                                      TableMeeta &table_meta,
+                                      TableMeta &table_meta,
                                       std::shared_ptr<ColumnDef> column_def,
                                       std::vector<std::string> &file_paths) {
     return NewCatalog::GetTableFilePaths(begin_ts, table_meta, file_paths, column_def);
 }
 
-Status NewCatalog::GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, std::vector<std::string> &file_paths) {
+Status NewCatalog::GetTableIndexFilePaths(TableIndexMeta &table_index_meta, std::vector<std::string> &file_paths) {
 
     auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
     if (!status.ok()) {
@@ -1450,7 +1450,7 @@ Status NewCatalog::GetChunkIndexFilePaths(ChunkIndexMeta &chunk_index_meta, std:
     return Status::OK();
 }
 
-Status NewCatalog::CheckColumnIfIndexed(TableMeeta &table_meta, ColumnID column_id, bool &has_index) {
+Status NewCatalog::CheckColumnIfIndexed(TableMeta &table_meta, ColumnID column_id, bool &has_index) {
     std::vector<std::string> *index_id_strs_ptr = nullptr;
 
     std::vector<std::string> *index_name_strs_ptr = nullptr;
@@ -1462,7 +1462,7 @@ Status NewCatalog::CheckColumnIfIndexed(TableMeeta &table_meta, ColumnID column_
     for (size_t idx = 0; idx < index_count; ++idx) {
         const std::string &index_id_str = index_id_strs_ptr->at(idx);
         const std::string &index_name_str = index_name_strs_ptr->at(idx);
-        TableIndexMeeta table_index_meta(index_id_str, index_name_str, table_meta);
+        TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
         std::shared_ptr<IndexBase> index_base;
         std::tie(index_base, status) = table_index_meta.GetIndexBase();
         if (!status.ok()) {
@@ -1482,7 +1482,7 @@ Status NewCatalog::CheckColumnIfIndexed(TableMeeta &table_meta, ColumnID column_
     return Status::OK();
 }
 
-Status NewCatalog::CheckTableIfDelete(TableMeeta &table_meta, TxnTimeStamp begin_ts, bool &has_delete) {
+Status NewCatalog::CheckTableIfDelete(TableMeta &table_meta, TxnTimeStamp begin_ts, bool &has_delete) {
     Status status;
     std::vector<SegmentID> *segment_ids_ptr = nullptr;
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();

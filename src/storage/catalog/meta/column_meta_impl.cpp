@@ -21,7 +21,7 @@ import :kv_store;
 import :kv_code;
 import :block_meta;
 import :segment_meta;
-import :table_meeta;
+import :table_meta;
 import :infinity_context;
 import :buffer_manager;
 import :data_file_worker;
@@ -359,7 +359,7 @@ Status ColumnMeta::LoadColumnBuffer(const ColumnDef *col_def) {
 
 std::string ColumnMeta::GetColumnTag(const std::string &tag) const {
     SegmentMeta &segment_meta = block_meta_.segment_meta();
-    TableMeeta &table_meta = segment_meta.table_meta();
+    TableMeta &table_meta = segment_meta.table_meta();
     return KeyEncode::CatalogTableSegmentBlockColumnTagKey(table_meta.db_id_str(),
                                                            table_meta.table_id_str(),
                                                            segment_meta.segment_id(),

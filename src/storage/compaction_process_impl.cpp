@@ -27,8 +27,8 @@ import :txn_state;
 import :new_txn_manager;
 import :new_txn;
 import :new_compaction_alg;
-import :table_meeta;
-import :db_meeta;
+import :table_meta;
+import :db_meta;
 import :segment_meta;
 import :bg_task;
 import :base_txn_store;
@@ -153,8 +153,8 @@ void CompactionProcessor::NewDoCompact() {
             }
         });
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = new_txn_shared->GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
         if (!status.ok()) {
@@ -212,8 +212,8 @@ void CompactionProcessor::NewDoCompact() {
 Status CompactionProcessor::NewManualCompact(NewTxn *new_txn, const std::string &db_name, const std::string &table_name) {
     std::unique_ptr<std::string> result_msg;
     //    LOG_TRACE(fmt::format("Compact command triggered compaction: {}.{}", db_name, table_name));
-    std::shared_ptr<DBMeeta> db_meta;
-    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<DBMeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta;
     TxnTimeStamp create_timestamp;
     Status status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
@@ -380,7 +380,7 @@ void CompactionProcessor::Process() {
     }
 }
 
-std::vector<SegmentID> CompactionProcessor::GetCompactableSegments(TableMeeta &table_meta, const std::vector<SegmentID> &segment_ids) {
+std::vector<SegmentID> CompactionProcessor::GetCompactableSegments(TableMeta &table_meta, const std::vector<SegmentID> &segment_ids) {
     auto compaction_alg = NewCompactionAlg::GetInstance();
 
     for (SegmentID segment_id : segment_ids) {

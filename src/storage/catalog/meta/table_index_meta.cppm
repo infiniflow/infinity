@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export module infinity_core:table_index_meeta;
+export module infinity_core:table_index_meta;
 
 import :status;
 import :meta_info;
@@ -24,7 +24,7 @@ import column_def;
 namespace infinity {
 
 class KVInstance;
-class TableMeeta;
+class TableMeta;
 class IndexBase;
 // struct SegmentUpdateTS;
 // class NewCatalog;
@@ -34,15 +34,15 @@ class NewTxn;
 // Enum for secondary index cardinality
 export enum class SecondaryIndexCardinality : u8 { kHighCardinality = 0, kLowCardinality = 1, kInvalid = 255 };
 
-export class TableIndexMeeta {
+export class TableIndexMeta {
 public:
-    TableIndexMeeta(const std::string &index_id_str, const std::string &index_name, TableMeeta &table_meta);
+    TableIndexMeta(const std::string &index_id_str, const std::string &index_name, TableMeta &table_meta);
 
-    ~TableIndexMeeta();
+    ~TableIndexMeta();
 
     KVInstance &kv_instance() const { return kv_instance_; }
 
-    TableMeeta &table_meta() const { return table_meta_; }
+    TableMeta &table_meta() const { return table_meta_; }
 
     const std::string &index_id_str() const { return index_id_str_; }
 
@@ -95,7 +95,7 @@ private:
     mutable std::mutex mtx_;
 
     KVInstance &kv_instance_;
-    TableMeeta &table_meta_;
+    TableMeta &table_meta_;
     std::string index_id_str_;
     std::string index_name_str_;
 
