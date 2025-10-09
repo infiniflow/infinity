@@ -474,7 +474,8 @@ jobs:
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ls -lh *profraw && sync && ls -lh *profraw && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov && llvm-cov-20 report cmake-build-debug/src/infinity -instr-profile=coverage.profdata > report.txt"
+          sudo sync
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ls -lh *profraw && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov && llvm-cov-20 report cmake-build-debug/src/infinity -instr-profile=coverage.profdata > report.txt"
           head -10 coverage.lcov
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
           ls -lh *profraw
