@@ -66,7 +66,6 @@ void BufferObj::UpdateFileWorkerInfo(std::unique_ptr<FileWorker> new_file_worker
 
 BufferHandle BufferObj::Load() {
     std::unique_lock<std::mutex> locker(w_locker_);
-    ++rc_;
     // auto path1 = file_worker_->GetFilePath();
     auto data_dir = file_worker_->data_dir_;
     auto temp_dir = file_worker_->temp_dir_;
@@ -111,7 +110,6 @@ void BufferObj::CleanupTempFile() const {
 
 void BufferObj::LoadInner() {
     std::unique_lock<std::mutex> locker(w_locker_);
-    ++rc_;
 }
 
 void *BufferObj::GetMutPointer() {

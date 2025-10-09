@@ -80,7 +80,6 @@ private:
     friend class VarBuffer;
 
 public:
-    u64 rc() const { return rc_; }
     u32 id() const { return id_; }
 
     // check the invalid state, only used in tests.
@@ -93,13 +92,10 @@ protected:
 
     BufferManager *buffer_mgr_;
 
-    u64 rc_{0};
     std::unique_ptr<FileWorker> file_worker_;
 
 private:
     u32 id_;
-
-    u32 obj_rc_ = 0;
 };
 
 } // namespace infinity
