@@ -6,6 +6,7 @@ from sqlglot import condition
 from infinity.remote_thrift.table import traverse_conditions
 import infinity
 from infinity.errors import ErrorCode
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
@@ -31,12 +32,19 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     def test_condition(self):
-        res = (condition("c1 > 1 and c2 < 2 or c3 = 3.3"))
-        print(res)
-        res = traverse_conditions(condition("c1 = 1"))
-        print(res)
-        res = traverse_conditions(condition("-8 < c1 and c1 <= -7"))
-        print(res)
-        res = traverse_conditions(
-            condition("(-7 < c1 or 9 <= c1) and (c1 = 3)"))
-        print(res)
+        for cond_str in [
+            "c1 = 1",
+            "c1 != 1",
+            "c1 > 1 and c2 < 2 or c3 = 3.3",
+            "-8 < c1 and c1 <= -7",
+            "(-7 < c1 or 9 <= c1) and (c1 = 3)",
+            "!(9 <= c1)",
+            "c1 IN (1,2,3)",
+            "c1 NOT IN (1,2,3)",
+        ]:
+            print(cond_str)
+            cond = condition(cond_str)
+            print(cond)
+            res = traverse_conditions(cond)
+            print(res)
+            assert res
