@@ -55,6 +55,8 @@ public:
 protected:
     bool WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
+    bool CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+
     void ReadFromFileImpl(size_t file_size, bool from_spill) override;
 };
 

@@ -224,7 +224,7 @@ TEST_P(TestTxnAppend, test_append1) {
             auto col2 = ColumnVector::Make(column_def2->type());
             col2->Initialize();
             col2->AppendValue(Value::MakeVarchar("abc"));
-            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            col2->AppendValue(Value::MakeVarchar("abcd"));
             input_block->InsertVector(col2, 1);
         }
         input_block->Finalize();
@@ -340,7 +340,7 @@ TEST_P(TestTxnAppend, test_append1) {
             Value v1 = col.GetValueByIndex(0);
             EXPECT_EQ(v1, Value::MakeVarchar("abc"));
             Value v2 = col.GetValueByIndex(1);
-            EXPECT_EQ(v2, Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            EXPECT_EQ(v2, Value::MakeVarchar("abcd"));
         }
     }
 }

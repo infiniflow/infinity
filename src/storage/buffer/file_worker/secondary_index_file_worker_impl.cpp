@@ -71,6 +71,8 @@ bool SecondaryIndexFileWorker::WriteToTempImpl(bool &prepare_success, const File
     return true;
 }
 
+bool SecondaryIndexFileWorker::CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) { return true; }
+
 void SecondaryIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     // if (!data_) [[likely]] {
         auto index = GetSecondaryIndexData(column_def_->type(), row_count_, false);

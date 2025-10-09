@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <boost/asio/registered_buffer.hpp>
+#include <sys/mman.h>
+
 module infinity_core:data_file_worker.impl;
 
 import :data_file_worker;
@@ -78,52 +83,40 @@ bool DataFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSave
     // - data buffer
     // - footer: checksum
 
-    u64 magic_number = 0x00dd3344;
-    Status status = file_handle_->Append(&magic_number, sizeof(magic_number));
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
+    size_t mmap_len = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
+    auto fd = file_handle_->fd();
+    ftruncate(fd, mmap_len);
+    void *ret = mmap(nullptr, mmap_len, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+    size_t offset{};
 
-    status = file_handle_->Append(const_cast<size_t *>(&buffer_size_), sizeof(buffer_size_));
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
+    u64 magic_number = 0x00dd3344;
+    std::memcpy((char *)ret + offset, &magic_number, sizeof(u64));
+    offset += sizeof(u64);
+
+    std::memcpy((char *)ret + offset, &buffer_size_, sizeof(buffer_size_));
+    offset += sizeof(buffer_size_);
 
     size_t data_size = data_size_.load();
-    status = file_handle_->Append(data_, data_size);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
-
-    // Record data_[:min(512,data_size)] to log
-    std::ostringstream hex_stream;
-    hex_stream << std::hex << std::setfill('0');
-    size_t log_size = std::min(data_size, static_cast<size_t>(512));
-    for (size_t i = 0; i < log_size; ++i) {
-        hex_stream << std::setw(2) << static_cast<unsigned int>(static_cast<const u8 *>(data_)[i]);
-        if ((i + 1) % 8 == 0 && i + 1 < log_size) { // insert a space every 8 bytes
-            hex_stream << " ";
-        }
-    }
-    if (data_size > log_size) {
-        hex_stream << "... (truncated)";
-    }
-    LOG_TRACE(fmt::format("DataFileWorker::WriteToFileImpl data: data_={:p}, size={}, hex={}", data_, data_size, hex_stream.str()));
+    std::memcpy((char *)ret + offset, data_, data_size);
+    offset += data_size;
 
     size_t unused_size = buffer_size_ - data_size;
     if (unused_size > 0) {
         std::string str(unused_size, '\0');
-        file_handle_->Append(str, unused_size);
+        std::memcpy((char *)ret + offset, str.c_str(), unused_size);
+        offset += unused_size;
     }
 
     u64 checksum{};
-    status = file_handle_->Append(&checksum, sizeof(checksum));
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
+    std::memcpy((char *)ret + offset, &checksum, sizeof(checksum));
+    offset += sizeof(u64);
+
     prepare_success = true; // Not run defer_fn
+    munmap(ret, mmap_len);
     return true;
 }
+
+bool DataFileWorker::CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) { return true; }
 
 void DataFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
 

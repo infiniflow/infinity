@@ -72,30 +72,18 @@ bool VersionFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerS
     }
     auto *data = static_cast<BlockVersion *>(data_);
 
-    // if spill to file, return true if success
-    // if (to_spill) {
-    //     data->SpillToFile(file_handle_.get());
-    //     return true;
-    // } else {
-        // const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
-        // auto ckp_ts = const_cast<TxnTimeStamp &>(ctx.checkpoint_ts_);
-        // bool is_full = data->SaveToFile(ckp_ts, *file_handle_);
-        // if (is_full) {
-        //     LOG_TRACE(fmt::format("Version file is full: {}", GetFilePath()));
-        //     // if the version file is full, return true to spill to file
-        //     return true;
-        // }
-        const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
-        TxnTimeStamp ckp_ts = ctx.checkpoint_ts_;
-        bool is_full = data->SaveToFile(ckp_ts, *file_handle_);
-        if (is_full) {
-            LOG_TRACE(fmt::format("Version file is full: {}", GetFilePath()));
-            // if the version file is full, return true to spill to file
-            return true;
-        }
-    // }
+    const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
+    TxnTimeStamp ckp_ts = ctx.checkpoint_ts_;
+    bool is_full = data->SaveToFile(ckp_ts, *file_handle_);
+    if (is_full) {
+        LOG_TRACE(fmt::format("Version file is full: {}", GetFilePath()));
+        // if the version file is full, return true to spill to file
+        return true;
+    }
     return false;
 }
+
+bool VersionFileWorker::CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) { return true; }
 
 void VersionFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     // if (data_ != nullptr) {

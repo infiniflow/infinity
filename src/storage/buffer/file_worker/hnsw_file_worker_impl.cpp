@@ -106,6 +106,8 @@ bool HnswFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSave
     return true;
 }
 
+bool HnswFileWorker::CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) { return true; }
+
 void HnswFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     // if (data_ != nullptr) {
     //     UnrecoverableError("Data is already allocated.");

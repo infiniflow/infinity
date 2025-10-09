@@ -65,7 +65,7 @@ bool FileWorker::WriteToTemp(const FileWorkerSaveCtx &ctx) {
         UnrecoverableError("No data will be written.");
     }
 
-    std::string write_dir = ChooseFileDir(true);
+    std::string write_dir = ChooseFileDir(true /* is_temp */);
     if (!VirtualStore::Exists(write_dir)) {
         VirtualStore::MakeDirectory(write_dir);
     }
@@ -77,9 +77,11 @@ bool FileWorker::WriteToTemp(const FileWorkerSaveCtx &ctx) {
     }
     file_handle_ = std::move(file_handle);
 
+
     bool prepare_success = false;
 
     bool all_save = WriteToTempImpl(prepare_success, ctx);
+    // bool all_save1 = CopyToMmapImpl(prepare_success, ctx);
     if (prepare_success) {
         file_handle_->Sync();
     }

@@ -105,6 +105,8 @@ bool BMPIndexFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorker
     return true;
 }
 
+bool BMPIndexFileWorker::CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) { return true; }
+
 void BMPIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     // if (data_ != nullptr) {
     //     UnrecoverableError("Data is already allocated.");

@@ -88,6 +88,8 @@ bool EMVBIndexFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorke
     return true;
 }
 
+bool EMVBIndexFileWorker::CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) { return true; }
+
 void EMVBIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     // if (data_) {
     //     UnrecoverableError("Data is already allocated.");

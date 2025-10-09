@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <sys/mman.h>
+#include <unistd.h>
+
 module infinity_core:block_version.impl;
 
 import :block_version;
@@ -124,22 +129,38 @@ bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
         is_modified = true;
     }
 
-    file_handle.Append(&create_size, sizeof(create_size));
+    BlockOffset capacity = deleted_.size();
+    auto fd = file_handle.fd();
+    auto file_len = sizeof(create_size) + sizeof(capacity) + (2 * create_size + capacity) * sizeof(TxnTimeStamp);
+    ftruncate(fd, file_len);
+    size_t offset{};
+    auto *ret = mmap(nullptr, file_len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+
+    std::memcpy((char *)ret + offset, &create_size, sizeof(create_size));
+    offset += sizeof(create_size);
+
     for (size_t j = 0; j < create_size; ++j) {
-        created_[j].SaveToFile(&file_handle);
+        std::memcpy((char *)ret + offset, &created_[j].create_ts_, sizeof(TxnTimeStamp));
+        offset += sizeof(TxnTimeStamp);
+
+        std::memcpy((char *)ret + offset, &created_[j].row_count_, sizeof(TxnTimeStamp));
+        offset += sizeof(TxnTimeStamp);
     }
 
-    BlockOffset capacity = deleted_.size();
-    file_handle.Append(&capacity, sizeof(capacity));
+    std::memcpy((char *)ret + offset, &capacity, sizeof(capacity));
+    offset += sizeof(capacity);
+
     TxnTimeStamp dump_ts = 0;
     u32 deleted_row_count = 0;
     for (const auto &ts : deleted_) {
         if (ts <= checkpoint_ts) {
             ++deleted_row_count;
-            file_handle.Append(&ts, sizeof(ts));
+            std::memcpy((char *)ret + offset, &ts, sizeof(ts));
+            offset += sizeof(ts);
         } else {
             is_modified = true;
-            file_handle.Append(&dump_ts, sizeof(dump_ts));
+            std::memcpy((char *)ret + offset, &dump_ts, sizeof(dump_ts));
+            offset += sizeof(dump_ts);
         }
     }
 

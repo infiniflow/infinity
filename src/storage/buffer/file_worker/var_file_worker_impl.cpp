@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <sys/mman.h>
+#include <unistd.h>
+
 module infinity_core:var_file_worker.impl;
 
 import :var_file_worker;
@@ -90,14 +95,19 @@ bool VarFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveC
     char *ptr = buffer_data.get();
     buffer->Write(ptr);
 
-    Status status = file_handle_->Append(buffer_data.get(), data_size);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
+    auto fd = file_handle_->fd();
+    ftruncate(fd, data_size);
+
+    auto *ret = mmap(nullptr, data_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+
+    std::memcpy(ret, buffer_data.get(), data_size);
+
     prepare_success = true;
     buffer_size_ = data_size;
     return true;
 }
+
+bool VarFileWorker::CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) { return true; }
 
 void VarFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     // if (data_ != nullptr) {

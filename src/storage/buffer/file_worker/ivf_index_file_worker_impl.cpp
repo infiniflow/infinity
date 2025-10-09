@@ -66,6 +66,8 @@ bool IVFIndexFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorker
     return true;
 }
 
+bool IVFIndexFileWorker::CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) { return true; }
+
 void IVFIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     // if (!data_) {
         auto index = IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get());

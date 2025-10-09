@@ -74,6 +74,8 @@ public:
 protected:
     virtual bool WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
 
+    virtual bool CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
+
     virtual void ReadFromFileImpl(size_t file_size, bool from_spill) = 0;
 
     [[nodiscard]] std::string ChooseFileDir(bool is_temp) const;

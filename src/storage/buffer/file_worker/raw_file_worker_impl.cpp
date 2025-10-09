@@ -75,6 +75,8 @@ bool RawFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveC
     return true;
 }
 
+bool RawFileWorker::CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) { return true; }
+
 void RawFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     buffer_size_ = file_handle_->FileSize();
     data_ = static_cast<void *>(new char[buffer_size_]);
