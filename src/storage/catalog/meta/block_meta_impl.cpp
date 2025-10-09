@@ -91,7 +91,6 @@ Status BlockMeta::InitSet() {
         if (!version_buffer_) {
             return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
         }
-        version_buffer_->AddObjRc();
     }
     return Status::OK();
 }
@@ -117,7 +116,6 @@ Status BlockMeta::LoadSet(TxnTimeStamp checkpoint_ts) {
     if (!version_buffer_) {
         return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
     }
-    version_buffer_->AddObjRc();
 
     return Status::OK();
 }
@@ -137,7 +135,6 @@ Status BlockMeta::RestoreSet() {
         if (!version_buffer_) {
             return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
         }
-        version_buffer_->AddObjRc();
     }
     return Status::OK();
 }
@@ -163,7 +160,6 @@ Status BlockMeta::RestoreSetFromSnapshot() {
     if (!version_buffer_) {
         return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
     }
-    version_buffer_->AddObjRc();
 
     BufferHandle buffer_handle = version_buffer_->Load();
     auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());

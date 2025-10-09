@@ -235,7 +235,6 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
         if (index_buffer_ == nullptr) {
             return Status::BufferManagerError("AllocateBufferObject failed");
         }
-        index_buffer_->AddObjRc();
     }
 
     return Status::OK();
@@ -351,7 +350,6 @@ Status ChunkIndexMeta::LoadSet() {
     if (index_buffer_ == nullptr) {
         return Status::BufferManagerError("GetBufferObject failed");
     }
-    index_buffer_->AddObjRc();
     return Status::OK();
 }
 
@@ -459,7 +457,6 @@ Status ChunkIndexMeta::RestoreSet() {
     auto *buffer_obj = buffer_mgr->GetBufferObject(index_file_worker->GetFilePath());
     if (buffer_obj == nullptr) {
         index_buffer_ = buffer_mgr->GetBufferObject(std::move(index_file_worker));
-        index_buffer_->AddObjRc();
     }
     if (index_buffer_ == nullptr) {
         return Status::BufferManagerError("GetBufferObject failed");

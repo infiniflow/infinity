@@ -96,7 +96,6 @@ Status ColumnMeta::InitSet(const std::shared_ptr<ColumnDef> &col_def) {
         if (!column_buffer_) {
             return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", file_worker->GetFilePath()));
         }
-        // column_buffer_->AddObjRc();
     }
     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
     if (buffer_type == VectorBufferType::kVarBuffer) {
@@ -111,7 +110,6 @@ Status ColumnMeta::InitSet(const std::shared_ptr<ColumnDef> &col_def) {
         if (!outline_buffer_) {
             return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", outline_file_worker->GetFilePath()));
         }
-        // outline_buffer_->AddObjRc();
     }
     return Status::OK();
 }
@@ -148,7 +146,6 @@ Status ColumnMeta::LoadSet() {
         if (!column_buffer_) {
             return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", file_worker->GetFilePath()));
         }
-        column_buffer_->AddObjRc();
     }
     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
     if (buffer_type == VectorBufferType::kVarBuffer) {
@@ -170,7 +167,6 @@ Status ColumnMeta::LoadSet() {
         if (!outline_buffer_) {
             return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", outline_file_worker->GetFilePath()));
         }
-        outline_buffer_->AddObjRc();
     }
     return Status::OK();
 }
@@ -200,7 +196,6 @@ Status ColumnMeta::RestoreSet(const ColumnDef *column_def) {
             if (!column_buffer_) {
                 return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", file_worker->GetFilePath()));
             }
-            column_buffer_->AddObjRc();
         }
     }
     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*column_def->type());
@@ -228,7 +223,6 @@ Status ColumnMeta::RestoreSet(const ColumnDef *column_def) {
             if (!outline_buffer_) {
                 return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", outline_file_worker->GetFilePath()));
             }
-            outline_buffer_->AddObjRc();
         }
     }
     return Status::OK();

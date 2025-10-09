@@ -83,10 +83,6 @@ public:
     u64 rc() const { return rc_; }
     u32 id() const { return id_; }
 
-    void AddObjRc();
-
-    void SubObjRc();
-
     // check the invalid state, only used in tests.
 
     void SetData(void *data);

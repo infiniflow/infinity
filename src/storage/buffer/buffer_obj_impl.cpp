@@ -121,22 +121,6 @@ void *BufferObj::GetMutPointer() {
 
 void BufferObj::UnloadInner() { std::unique_lock<std::mutex> locker(w_locker_); }
 
-void BufferObj::AddObjRc() {
-    std::unique_lock<std::mutex> locker(w_locker_);
-    obj_rc_++;
-}
-
-void BufferObj::SubObjRc() {
-    std::unique_lock<std::mutex> locker(w_locker_);
-    if (obj_rc_ == 0) {
-        UnrecoverableError(fmt::format("SubObjRc: obj_rc_ is 0, buffer: {}", GetFilename()));
-    }
-    --obj_rc_;
-    if (obj_rc_ == 0) {
-        buffer_mgr_->AddToCleanList(this, false /*do_free*/);
-    }
-}
-
 void BufferObj::SetData(void *data) {
     std::unique_lock<std::mutex> locker(w_locker_);
     file_worker_->SetData(data);
