@@ -225,7 +225,7 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
-          file: coverage.lcov
+          files: coverage.lcov
           flags: debug unit test
           name: debug_unit_test_coverage
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -277,6 +277,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "pkill infinity"
+          sleep 5s
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -299,7 +300,7 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
-          file: coverage.lcov
+          files: coverage.lcov
           flags: debug sqllogical test
           name: debug_sqllogical_test_coverage
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -390,6 +391,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "pkill infinity"
+          sleep 5s
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -412,7 +414,7 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
-          file: coverage.lcov
+          files: coverage.lcov
           flags: debug pysdk test
           name: debug_pysdk_test_coverage
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -463,6 +465,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "pkill infinity"
+          sleep 5s
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -485,7 +488,7 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
-          file: coverage.lcov
+          files: coverage.lcov
           flags: debug http test
           name: debug_http_test_coverage
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -537,6 +540,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "pkill infinity"
+          sleep 5s
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -560,7 +564,7 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
-          file: coverage.lcov
+          files: coverage.lcov
           flags: debug parallel test
           name: debug_parallel_test_coverage
           token: ${{ secrets.CODECOV_TOKEN }}
