@@ -1,0 +1,434 @@
+name: slow_tests
+
+on:
+  # Schedule the workflow to run at 00:30 UTC+8 every day
+  # https://docs.github.com/zh/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#schedule
+  schedule:
+    - cron: '30 16 * * *' # utc-8: 16:30
+  # The "create tags" trigger is specifically focused on the creation of new tags, while the "push tags" trigger is activated when tags are pushed, including both new tag creations and updates to existing tags.
+  create:
+    tags:
+      - "v*.*.*"                  # normal release
+      - "nightly"                 # mutable tag
+      - "slow-test"               # mutable tag
+  pull_request:
+    types: [ opened, synchronize, reopened, labeled ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+
+# https://docs.github.com/en/actions/using-jobs/using-concurrency
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  download_code:
+    name: download_code
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
+    runs-on: [ "self-hosted", "slow-test" ]
+    steps:
+      - name: Ensure workspace ownership
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "Workflow triggered by ${{ github.event_name }}"
+          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
+          fi
+          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+
+      - name: Check out code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: false
+
+      - name: Backup code
+        run: |
+          tar --create --gzip --file=infinity.tgz .git $(git ls-files)
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          mkdir -p ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
+
+  debug_build:
+    name: debug_build
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
+    runs-on: [ "self-hosted", "slow-test" ]
+    needs: download_code
+    steps:
+      - name: Prepare code
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+
+      - name: Start builder container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Build debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j 6 --target infinity test_main"
+
+      - name: Build debug-tsan version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug-tsan && mkdir -p cmake-build-debug-tsan && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZER_THREAD=ON -S /infinity -B /infinity/cmake-build-debug-tsan && cmake --build /infinity/cmake-build-debug-tsan -j 6 --target infinity"
+
+      - name: Upload artifacts
+        if: ${{ !cancelled() && !failure() }}
+        run: tar --create --file=- cmake-build-debug/src/{infinity,test_main} cmake-build-debug-tsan/src/infinity | tar --extract --directory=${ARTIFACTS_DIR} --file=-
+
+      - name: Remove build container
+        if: always()
+        run: sudo docker rm -f -v ${BUILDER_CONTAINER}
+
+  debug_unit_test:
+    name: debug_unit_test
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
+    runs-on: [ "self-hosted", "slow-test" ]
+    needs: debug_build
+    steps:
+      - name: Prepare code and artifacts
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug/src/test_main | tar --extract --file=-
+
+      - name: Start test container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Unit test debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter=*SLOW_* > debug_unit_test_stdout.log 2> debug_unit_test_stderr.log"
+
+      - name: Collect infinity log
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p ${ARTIFACTS_DIR}/debug_unit_test && cp debug_unit_test*.log ${ARTIFACTS_DIR}/debug_unit_test/
+          echo 'debug unit test log' && tail -n 1000 debug_unit_test*.log
+
+      - name: Remove test container
+        if: always()
+        run: |
+          sudo docker rm -f -v ${MINIO_CONTAINER_NAME} ${TEST_CONTAINER_NAME}
+          rm -rf ${MINIO_CONTAINER_NAME}
+
+  debug_tsan_restart_test:
+    name: debug_tsan_restart_test
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
+    runs-on: [ "self-hosted", "slow-test" ]
+    needs: debug_build
+    steps:
+      - name: Prepare code and artifacts
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug-tsan/src/infinity | tar --extract --file=-
+
+      - name: Prepare restart test data
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          tar --directory=${RUNNER_WORKSPACE_PREFIX} --create --file=- benchmark/sift_1m/{sift_base.fvecs,sift_query.fvecs} benchmark/enwiki/enwiki-10w.csv | tar --directory=test/data --extract --file=-
+
+      - name: Start test container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Install pysdk
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+
+      - name: Run restart test
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 TSAN_OPTIONS=log_path=restart_test_tsan.log python3 tools/run_restart_test.py --infinity_path=cmake-build-debug-tsan/src/infinity"
+
+      - name: Collect infinity log
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p ${ARTIFACTS_DIR}/debug_tsan_restart_test && sudo chown -R $USER . && cp restart_test*.log* ${ARTIFACTS_DIR}/debug_tsan_restart_test/
+          echo 'restart_test log(last 1000 lines):' && tail -n 1000 restart_test*.log*
+
+      - name: Remove test container
+        if: always()
+        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+
+  debug_tsan_cluster_test:
+    name: debug_tsan_cluster_test
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
+    runs-on: [ "self-hosted", "slow-test" ]
+    needs: debug_build
+    steps:
+      - name: Prepare code and artifacts
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug-tsan/src/infinity | tar --extract --file=-
+
+      - name: Start test container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Install pysdk
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+
+      - name: Run cluster test
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && rm -fr /var/infinity && python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug-tsan/src/infinity"
+
+      - name: Collect infinity log
+        if: ${{ !cancelled() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "find /var/infinity/ -name '*.log' -type f | tar --create --gzip --file=/infinity/cluster_test.tgz --files-from=-"
+          mkdir -p ${ARTIFACTS_DIR}/debug_tsan_cluster_test
+          tar --directory=${ARTIFACTS_DIR}/debug_tsan_cluster_test --strip-components=2 --extract --gzip --file=cluster_test.tgz
+
+      - name: Remove test container
+        if: always()
+        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+
+  debug_tsan_parallel_test:
+    name: debug_tsan_parallel_test
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
+    runs-on: [ "self-hosted", "slow-test" ]
+    needs:
+      - debug_build
+    steps:
+      - name: Prepare code and artifacts
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug-tsan/src/infinity | tar -xf -
+
+      - name: Start test container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Install pysdk
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+
+      - name: Start infinity debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 TSAN_OPTIONS=log_path=debug_tsan_parallel_tsan.log cmake-build-debug-tsan/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> debug_tsan_parallel_stderr.log"
+
+      - name: Run HTTP infinity test debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && python3 tools/run_parallel_test.py"
+          sleep 1s
+
+      - name: Collect infinity log
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p ${ARTIFACTS_DIR}/debug_tsan_parallel_test && sudo chown -R $USER . && cp debug_tsan_parallel*.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
+          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
+          echo 'debug tsan parallel log' && tail -n 1000 debug_tsan_parallel*.log
+
+      - name: Remove test container
+        if: always()
+        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+
+  reldeb_build:
+    name: reldeb_build
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
+    runs-on: [ "self-hosted", "slow-test" ]
+    needs: download_code
+    steps:
+      - name: Prepare code
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+
+      - name: Start builder container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Build reldeb version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb -j 6 --target infinity test_main"
+
+      - name: Upload artifacts
+        if: ${{ !cancelled() && !failure() }}
+        run: tar --create --file=- cmake-build-reldeb/src/{infinity,test_main} | tar --extract --directory=${ARTIFACTS_DIR} --file=-
+
+      - name: Remove build container
+        if: always()
+        run: sudo docker rm -f -v ${BUILDER_CONTAINER}
+
+  reldeb_unit_test:
+    name: reldeb_unit_test
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
+    runs-on: [ "self-hosted", "slow-test" ]
+    needs: reldeb_build
+    steps:
+      - name: Prepare code and artifacts
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-reldeb/src/test_main | tar --extract --file=-
+
+      - name: Start test container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Unit test reldeb version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-reldeb/src/test_main --gtest_also_run_disabled_tests --gtest_filter=*SLOW_* > reldeb_unit_test_stdout.log 2> reldeb_unit_test_stderr.log"
+
+      - name: Collect infinity log
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p ${ARTIFACTS_DIR}/reldeb_unit_test && cp reldeb_unit_test*.log ${ARTIFACTS_DIR}/reldeb_unit_test/
+          echo 'reldeb unit test log' && tail -n 1000 reldeb_unit_test*.log
+
+      - name: Remove test container
+        if: always()
+        run: |
+          sudo docker rm -f -v ${MINIO_CONTAINER_NAME} ${TEST_CONTAINER_NAME}
+          rm -rf ${MINIO_CONTAINER_NAME}
+
+  reldeb_parallel_test:
+    name: reldeb_parallel_test
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
+    runs-on: [ "self-hosted", "slow-test" ]
+    needs:
+      - reldeb_build
+    steps:
+      - name: Prepare code and artifacts
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-reldeb/src/infinity | tar --extract --file=-
+
+      - name: Start test container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Install pysdk
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+
+      - name: Start infinity reldeb version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> reldeb_parallel_stderr.log"
+
+      - name: Run HTTP infinity reldeb version
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && python3 tools/run_pytest_parallel_continuous.py"
+          sleep 1s
+
+      - name: Collect infinity log
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p ${ARTIFACTS_DIR}/reldeb_parallel_test && cp reldeb_parallel_stderr.log ${ARTIFACTS_DIR}/reldeb_parallel_test/
+          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_parallel_test/
+          echo 'reldeb parallel log' && tail -n 1000 reldeb_parallel*.log
+
+      - name: Remove test container
+        if: always()
+        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+
+  reldeb_restart_test:
+    name: reldeb_restart_test
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
+    runs-on: [ "self-hosted", "slow-test" ]
+    needs: reldeb_build
+    steps:
+      - name: Prepare code and artifacts
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/infinity | tar -xf -
+
+      - name: Prepare restart test data
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          tar --directory=${RUNNER_WORKSPACE_PREFIX} --create --file=- benchmark/sift_1m/{sift_base.fvecs,sift_query.fvecs} benchmark/enwiki/enwiki-10w.csv | tar --directory=test/data --extract --file=-
+
+      - name: Start test container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
+      - name: Install pysdk
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+
+      - name: Run restart test
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && python3 tools/run_restart_test_continuously.py --infinity_path=cmake-build-reldeb/src/infinity"
+
+      - name: Collect infinity log
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p ${ARTIFACTS_DIR}/reldeb_restart_test
+          cp restart_test*.log* ${ARTIFACTS_DIR}/reldeb_restart_test/
+          echo 'reldeb_restart_test log(last 1000 lines):' && tail -n 1000 restart_test*.log*
+
+      - name: Remove test container
+        if: always()
+        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}

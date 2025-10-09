@@ -634,6 +634,28 @@ Infinity::ShowIndexSegment(const std::string &db_name, const std::string &table_
     return result;
 }
 
+QueryResult
+Infinity::ShowIndexChunks(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id) {
+    std::unique_ptr<QueryContext> query_context_ptr;
+    GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
+    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
+    show_statement->schema_name_ = db_name;
+    ToLower(show_statement->schema_name_);
+
+    show_statement->table_name_ = table_name;
+    ToLower(show_statement->table_name_);
+
+    std::string index_name_internal = index_name;
+    ToLower(index_name_internal);
+
+    show_statement->index_name_ = index_name_internal;
+
+    show_statement->segment_id_ = segment_id;
+    show_statement->show_type_ = ShowStmtType::kIndexChunks;
+    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
+    return result;
+}
+
 QueryResult Infinity::ShowIndexChunk(const std::string &db_name,
                                      const std::string &table_name,
                                      const std::string &index_name,

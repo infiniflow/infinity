@@ -209,13 +209,9 @@ void CompactionProcessor::NewDoCompact() {
     }
 }
 
-Status CompactionProcessor::NewManualCompact(const std::string &db_name, const std::string &table_name) {
+Status CompactionProcessor::NewManualCompact(NewTxn *new_txn, const std::string &db_name, const std::string &table_name) {
     std::unique_ptr<std::string> result_msg;
     //    LOG_TRACE(fmt::format("Compact command triggered compaction: {}.{}", db_name, table_name));
-    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    auto *new_txn =
-        new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("Compact table {}.{}", db_name, table_name)), TransactionType::kCompact);
-
     std::shared_ptr<DBMeeta> db_meta;
     std::shared_ptr<TableMeeta> table_meta;
     TxnTimeStamp create_timestamp;
@@ -246,7 +242,6 @@ Status CompactionProcessor::NewManualCompact(const std::string &db_name, const s
     if (!compactible_segment_ids.empty()) {
         status = new_txn->Compact(db_name, table_name, compactible_segment_ids);
         if (!status.ok()) {
-            new_txn_mgr->RollBackTxn(new_txn);
             return status;
         }
         result_msg = std::make_unique<std::string>(fmt::format("Compact segments {} into new segment", fmt::join(compactible_segment_ids, ",")));
@@ -254,10 +249,6 @@ Status CompactionProcessor::NewManualCompact(const std::string &db_name, const s
         result_msg = std::make_unique<std::string>("No segment to compact");
     }
 
-    status = new_txn_mgr->CommitTxn(new_txn);
-    if (!status.ok()) {
-        return status;
-    }
     return Status(ErrorCode::kOk, std::move(result_msg));
 }
 
@@ -340,7 +331,7 @@ void CompactionProcessor::Process() {
 
                         auto *compact_task = static_cast<NewCompactTask *>(bg_task.get());
 
-                        compact_task->result_status_ = NewManualCompact(compact_task->db_name_, compact_task->table_name_);
+                        compact_task->result_status_ = NewManualCompact(compact_task->new_txn_, compact_task->db_name_, compact_task->table_name_);
 
                         LOG_DEBUG("Command compact end.");
                     }

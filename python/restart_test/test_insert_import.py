@@ -221,7 +221,7 @@ class TestInsertImport:
             (
                 EnwikiGenerator.columns(),
                 EnwikiGenerator.index(),
-                EnwikiGenerator.gen_factory("test/data/benchmark/enwiki-10w.csv"),
+                EnwikiGenerator.gen_factory("test/data/benchmark/enwiki/enwiki-10w.csv"),
                 "test/data/csv/enwiki_99.csv",
                 99,
                 {"file_type": "csv", "delimiter": "\t"},
@@ -272,7 +272,7 @@ class TestInsertImport:
 
         part1()
 
-        infinity_runner.logger.debug(f"Finish create table and index")
+        infinity_runner.logger.debug("Finish create table and index")
 
         self.insert_import_inner(
             infinity_runner,
@@ -285,7 +285,7 @@ class TestInsertImport:
             import_options,
         )
 
-        infinity_runner.logger.debug(f"Finish insert and import data")
+        infinity_runner.logger.debug("Finish insert and import data")
 
         @decorator
         def part2(infinity_obj):
@@ -294,4 +294,4 @@ class TestInsertImport:
 
         part2()
 
-        infinity_runner.logger.debug(f"Finish drop table")
+        infinity_runner.logger.debug("Finish drop table")

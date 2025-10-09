@@ -1,4 +1,3 @@
-import random
 import pytest
 from common import common_values
 from infinity.common import ConflictType
@@ -127,7 +126,7 @@ class TestInsert:
             ),
             (
                 EnwikiGenerator.columns(),
-                EnwikiGenerator.gen_factory("test/data/benchmark/enwiki-10w.csv"),
+                EnwikiGenerator.gen_factory("test/data/benchmark/enwiki/enwiki-10w.csv"),
             ),
             (
                 SiftGenerator.columns(),
@@ -182,7 +181,7 @@ class TestInsert:
             (
                 EnwikiGenerator.columns(),
                 EnwikiGenerator.index(),
-                EnwikiGenerator.gen_factory("test/data/benchmark/enwiki-10w.csv"),
+                EnwikiGenerator.gen_factory("test/data/benchmark/enwiki/enwiki-10w.csv"),
             ),
             (
                 SiftGenerator.columns(),

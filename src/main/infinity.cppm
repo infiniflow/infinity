@@ -146,6 +146,8 @@ public:
 
     QueryResult ShowIndexSegment(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id);
 
+    QueryResult ShowIndexChunks(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id);
+
     QueryResult
     ShowIndexChunk(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id, ChunkID chunk_id);
 

@@ -71,10 +71,6 @@ public:
 
     QueryResult QueryStatementInternal(const BaseStatement *statement);
 
-    bool ExecuteBGStatement(BaseStatement *statement, BGQueryState &state);
-
-    bool JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts, bool rollback = false);
-
     inline void set_current_schema(const std::string &current_schema) { session_ptr_->set_current_schema(current_schema); }
 
     [[nodiscard]] inline const std::string &schema_name() const { return session_ptr_->current_database(); }

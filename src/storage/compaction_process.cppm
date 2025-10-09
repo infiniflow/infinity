@@ -60,7 +60,7 @@ public:
 
     void NewDoCompact();
 
-    Status NewManualCompact(const std::string &db_name, const std::string &table_name);
+    Status NewManualCompact(NewTxn *new_txn, const std::string &db_name, const std::string &table_name);
 
     u64 RunningTaskCount() const { return task_count_; }
 

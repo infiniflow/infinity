@@ -99,7 +99,7 @@ struct EXPRESSION_LTYPE {
         }                                         \
     }
 
-#line 104 "expression_parser.h"
+#line 103 "expression_parser.h"
 
 /* Token kinds.  */
 #ifndef EXPRESSIONTOKENTYPE
@@ -281,7 +281,7 @@ struct EXPRESSION_LTYPE {
 #if ! defined EXPRESSIONSTYPE && ! defined EXPRESSIONSTYPE_IS_DECLARED
 union EXPRESSIONSTYPE
 {
-#line 86 "expression_parser.y"
+#line 85 "expression_parser.y"
 
     bool    bool_value;
     char*   str_value;
@@ -292,7 +292,7 @@ union EXPRESSIONSTYPE
     infinity::ConstantExpr*           const_expr_t;
     std::vector<infinity::ParsedExpr*>*    expr_array_t;
 
-#line 297 "expression_parser.h"
+#line 296 "expression_parser.h"
 
 };
 typedef union EXPRESSIONSTYPE EXPRESSIONSTYPE;
