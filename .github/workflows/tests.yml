@@ -265,7 +265,7 @@ jobs:
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && export LLVM_PROFILE_FILE="infinity-%p.profraw" && export LLVM_PROFILE_DUMP_ON_EXIT=1 && export LLVM_PROFILE_SIGNAL=SIGRTMIN+1 && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> debug_sqllogictest_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && export LLVM_PROFILE_FILE="infinity-%p.profraw" && export LLVM_PROFILE_DUMP_ON_EXIT=1 && export LLVM_PROFILE_SIGNAL=34 && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> debug_sqllogictest_stderr.log"
 
       - name: Run sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
@@ -276,7 +276,7 @@ jobs:
       - name: Stop infinity debug version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "pkill -SIGRTMIN+1 infinity"
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "pkill -34 infinity"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -378,7 +378,7 @@ jobs:
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && export LLVM_PROFILE_FILE="infinity-%p.profraw" && export LLVM_PROFILE_DUMP_ON_EXIT=1 && export LLVM_PROFILE_SIGNAL=SIGRTMIN+1 && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> debug_pysdk_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && export LLVM_PROFILE_FILE="infinity-%p.profraw" && export LLVM_PROFILE_DUMP_ON_EXIT=1 && export LLVM_PROFILE_SIGNAL=34 && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> debug_pysdk_stderr.log"
 
       - name: Run pysdk remote infinity test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -389,7 +389,7 @@ jobs:
       - name: Stop infinity debug version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "pkill -SIGRTMIN+1 infinity"
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "pkill -34 infinity"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -451,7 +451,7 @@ jobs:
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && export LLVM_PROFILE_FILE="infinity-%p.profraw" && export LLVM_PROFILE_DUMP_ON_EXIT=1 && export LLVM_PROFILE_SIGNAL=SIGRTMIN+1  &&  cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> debug_http_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && export LLVM_PROFILE_FILE="infinity-%p.profraw" && export LLVM_PROFILE_DUMP_ON_EXIT=1 && export LLVM_PROFILE_SIGNAL=34  &&  cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> debug_http_stderr.log"
 
       - name: Run HTTP infinity test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -462,7 +462,7 @@ jobs:
       - name: Stop infinity debug version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "pkill -SIGRTMIN+1 infinity"
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "pkill -34 infinity"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -525,7 +525,7 @@ jobs:
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && export LLVM_PROFILE_FILE="infinity-%p.profraw" && export LLVM_PROFILE_DUMP_ON_EXIT=1 && export LLVM_PROFILE_SIGNAL=SIGRTMIN+1 && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> debug_parallel_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && export LLVM_PROFILE_FILE="infinity-%p.profraw" && export LLVM_PROFILE_DUMP_ON_EXIT=1 && export LLVM_PROFILE_SIGNAL=34 && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> debug_parallel_stderr.log"
 
       - name: Run HTTP infinity test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -536,7 +536,7 @@ jobs:
       - name: Stop infinity debug version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "pkill -SIGRTMIN+1 infinity"
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "pkill -34 infinity"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
