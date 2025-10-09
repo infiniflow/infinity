@@ -214,13 +214,13 @@ jobs:
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ls -lh *profraw && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ls -lh *profraw && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov && llvm-cov-20 report cmake-build-debug/src/test_main -instr-profile=coverage.profdata > report.txt"
           head -10 coverage.lcov
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
           ls -lh *profraw
           ls -lh coverage.profdata
           ls -lh coverage.lcov
-          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_unit_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_unit_test && cp *profraw ${ARTIFACTS_DIR}/coverage/debug_unit_test
+          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_unit_test && cp coverage.lcov *profraw report.txt  ${ARTIFACTS_DIR}/coverage/debug_unit_test
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
@@ -288,13 +288,13 @@ jobs:
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ls -lh *profraw && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ls -lh *profraw && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov && llvm-cov-20 report cmake-build-debug/src/infinity -instr-profile=coverage.profdata > report.txt"
           head -10 coverage.lcov
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
           ls -lh *profraw
           ls -lh coverage.profdata
           ls -lh coverage.lcov
-          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_sqllogical_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_sqllogical_test && cp *profraw ${ARTIFACTS_DIR}/coverage/debug_sqllogical_test
+          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_sqllogical_test && cp coverage.lcov *profraw report.txt ${ARTIFACTS_DIR}/coverage/debug_sqllogical_test
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
@@ -401,13 +401,13 @@ jobs:
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ls -lh *profraw && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ls -lh *profraw && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov && llvm-cov-20 report cmake-build-debug/src/infinity -instr-profile=coverage.profdata > report.txt"
           head -10 coverage.lcov
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
           ls -lh *profraw
           ls -lh coverage.profdata
           ls -lh coverage.lcov
-          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_pysdk_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_pysdk_test && cp *profraw ${ARTIFACTS_DIR}/coverage/debug_pysdk_test
+          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_pysdk_test && cp coverage.lcov *profraw report.txt ${ARTIFACTS_DIR}/coverage/debug_pysdk_test
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
@@ -474,13 +474,13 @@ jobs:
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ls -lh *profraw && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ls -lh *profraw && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov && llvm-cov-20 report cmake-build-debug/src/infinity -instr-profile=coverage.profdata > report.txt"
           head -10 coverage.lcov
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
           ls -lh *profraw
           ls -lh coverage.profdata
           ls -lh coverage.lcov
-          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_http_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_http_test && cp *profraw ${ARTIFACTS_DIR}/coverage/debug_http_test
+          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_http_test && cp coverage.lcov *profraw report.txt  ${ARTIFACTS_DIR}/coverage/debug_http_test
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
@@ -549,13 +549,13 @@ jobs:
 
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ls -lh *profraw && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ls -lh *profraw && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov && llvm-cov-20 report cmake-build-debug/src/infinity -instr-profile=coverage.profdata > report.txt"
           head -10 coverage.lcov
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
           ls -lh *profraw
           ls -lh coverage.profdata
           ls -lh coverage.lcov
-          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_parallel_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_parallel_test && cp *profraw ${ARTIFACTS_DIR}/coverage/debug_parallel_test
+          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_parallel_test && cp coverage.lcov *profraw report.txt ${ARTIFACTS_DIR}/coverage/debug_parallel_test
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
