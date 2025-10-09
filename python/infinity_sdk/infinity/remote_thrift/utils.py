@@ -101,7 +101,7 @@ def parsed_expression_to_string(expr: ttypes.ParsedExpr) -> str:
         return f"fusion(method={expr_type.fusion_expr.method}, options={expr_type.fusion_expr.options_text})"
 
     if expr_type.search_expr:
-        return f"search()"
+        return "search()"
 
     if expr_type.in_expr:
         arguments_str = str
@@ -180,7 +180,7 @@ def generic_match_to_string(generic_match_expr: ttypes.GenericMatchExpr) -> str:
         return f"match_text(column={column_expr_str}, top={generic_match_expr.match_text_expr.topn})"
 
 
-def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
+def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
     if isinstance(cons, exp.Alias):
         expr = traverse_conditions(cons.args['this'])
         expr.alias_name = cons.alias
@@ -213,24 +213,22 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
         parsed_expr.type = parser_expr_type
 
         return parsed_expr
-    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.In) == False:
+    elif isinstance(cons, exp.Not) and not isinstance(cons.args['this'], exp.In):
         parsed_expr = ttypes.ParsedExpr()
         function_expr = ttypes.FunctionExpr()
         function_expr.function_name = "not"
         arguments = []
-        for value in cons.hashable_args:
-            if fn:
-                expr = fn(value)
-            else:
-                expr = traverse_conditions(value)
-            arguments.append(expr)
+        if fn:
+            expr = fn(cons.this)
+        else:
+            expr = traverse_conditions(cons.this)
+        arguments.append(expr)
         function_expr.arguments = arguments
         parser_expr_type = ttypes.ParsedExprType()
         parser_expr_type.function_expr = function_expr
         parsed_expr.type = parser_expr_type
         return parsed_expr
     elif isinstance(cons, exp.Column):
-
         match cons.alias_or_name:
             case "_row_id":
                 func_expr = ttypes.FunctionExpr(function_name="row_id", arguments=[])
@@ -328,8 +326,7 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
         return parsed_expr
 
     elif isinstance(cons, exp.Paren):
-        for value in cons.hashable_args:
-            return traverse_conditions(value)
+        return traverse_conditions(cons.this)
     elif isinstance(cons, exp.Neg):
         func_expr = ttypes.FunctionExpr(
             function_name='-',
@@ -659,7 +656,7 @@ def name_validity_check(arg_name: str, name_type: str = "Table"):
             try:
                 check_valid_name(name, name_type)
                 return func(*args, **kwargs)
-            except ValueError as e:
+            except ValueError:
                 raise
 
         return wrapper
@@ -809,7 +806,7 @@ def get_sparse_type(column_big_info: list[str]) -> ttypes.DataType:
 
 def get_data_type(column_info: dict) -> ttypes.DataType:
     if "type" not in column_info:
-        raise InfinityException(ErrorCode.NO_COLUMN_DEFINED, f"Column definition without data type")
+        raise InfinityException(ErrorCode.NO_COLUMN_DEFINED, "Column definition without data type")
     datatype = column_info["type"].lower()
     column_big_info = [item.strip() for item in datatype.split(",")]
     return get_data_type_from_column_big_info(column_big_info)
@@ -828,7 +825,7 @@ def get_data_type_from_column_big_info(column_big_info: list) -> ttypes.DataType
             # return get_sparse_info(column_info, column_defs, column_name, index)
         case "array":
             if len(column_big_info) < 2:
-                raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"No element type for array!")
+                raise InfinityException(ErrorCode.INVALID_DATA_TYPE, "No element type for array!")
             array_type = ttypes.DataType()
             array_type.logic_type = ttypes.LogicType.Array
             array_type.physical_type = ttypes.PhysicalType()
