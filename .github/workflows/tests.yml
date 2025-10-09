@@ -465,7 +465,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "pkill infinity"
-          sleep 5s
+          sleep 10s
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -485,6 +485,7 @@ jobs:
           ls -lh coverage.lcov
           mkdir -p ${ARTIFACTS_DIR}/coverage/debug_http_test && cp coverage.lcov *profraw report.txt  ${ARTIFACTS_DIR}/coverage/debug_http_test
 
+          sleep 300s
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
