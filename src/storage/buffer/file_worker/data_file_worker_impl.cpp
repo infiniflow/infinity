@@ -14,8 +14,8 @@
 
 module;
 
-#include <boost/asio/registered_buffer.hpp>
 #include <sys/mman.h>
+#include <unistd.h>
 
 module infinity_core:data_file_worker.impl;
 
@@ -86,33 +86,33 @@ bool DataFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSave
     size_t mmap_len = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
     auto fd = file_handle_->fd();
     ftruncate(fd, mmap_len);
-    void *ret = mmap(nullptr, mmap_len, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+    mmap_true_ = mmap(nullptr, mmap_len, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
     size_t offset{};
 
     u64 magic_number = 0x00dd3344;
-    std::memcpy((char *)ret + offset, &magic_number, sizeof(u64));
+    std::memcpy((char *)mmap_true_ + offset, &magic_number, sizeof(u64));
     offset += sizeof(u64);
 
-    std::memcpy((char *)ret + offset, &buffer_size_, sizeof(buffer_size_));
+    std::memcpy((char *)mmap_true_ + offset, &buffer_size_, sizeof(buffer_size_));
     offset += sizeof(buffer_size_);
 
     size_t data_size = data_size_.load();
-    std::memcpy((char *)ret + offset, data_, data_size);
+    std::memcpy((char *)mmap_true_ + offset, data_, data_size);
     offset += data_size;
 
     size_t unused_size = buffer_size_ - data_size;
     if (unused_size > 0) {
         std::string str(unused_size, '\0');
-        std::memcpy((char *)ret + offset, str.c_str(), unused_size);
+        std::memcpy((char *)mmap_true_ + offset, str.c_str(), unused_size);
         offset += unused_size;
     }
 
     u64 checksum{};
-    std::memcpy((char *)ret + offset, &checksum, sizeof(checksum));
+    std::memcpy((char *)mmap_true_ + offset, &checksum, sizeof(checksum));
     offset += sizeof(u64);
 
     prepare_success = true; // Not run defer_fn
-    munmap(ret, mmap_len);
+    // munmap(mmap_true_, mmap_len);
     return true;
 }
 
@@ -167,6 +167,66 @@ void DataFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
         Status status = Status::DataIOError(fmt::format("Incorrect file checksum length: {}.", nbytes4));
         RecoverableError(status);
     }
+    //
+    //
+    //
+    //
+    // if (file_size < sizeof(u64) * 3) {
+    //     Status status = Status::DataIOError(fmt::format("Incorrect file length {}.", file_size));
+    //     RecoverableError(status);
+    // }
+    //
+    // size_t offset{};
+    //
+    // // file header: magic number, buffer_size
+    // u64 magic_number{0};
+    // std::memcpy(&magic_number, (char *)mmap_true_ + offset, sizeof(magic_number));
+    // offset += sizeof(magic_number);
+    // // auto [nbytes1, status1] = file_handle_->Read(&magic_number, sizeof(magic_number));
+    // // if (!status1.ok()) {
+    // //     RecoverableError(status1);
+    // // }
+    // // if (nbytes1 != sizeof(magic_number)) {
+    // //     Status status = Status::DataIOError(fmt::format("Read magic number which length isn't {}.", nbytes1));
+    // //     RecoverableError(status);
+    // // }
+    // if (magic_number != 0x00dd3344) {
+    //     Status status = Status::DataIOError(fmt::format("Read magic error, {} != 0x00dd3344.", magic_number));
+    //     RecoverableError(status);
+    // }
+    //
+    // u64 buffer_size_{};
+    // std::memcpy(&buffer_size_, (char *)mmap_true_ + offset, sizeof(buffer_size_));
+    // offset += sizeof(buffer_size_);
+    // // auto [nbytes2, status2] = file_handle_->Read(&buffer_size_, sizeof(buffer_size_));
+    // // if (nbytes2 != sizeof(buffer_size_)) {
+    // //     Status status = Status::DataIOError(fmt::format("Unmatched buffer length: {} / {}", nbytes2, buffer_size_));
+    // //     RecoverableError(status2);
+    // // }
+    //
+    // if (file_size != buffer_size_ + 3 * sizeof(u64)) {
+    //     Status status = Status::DataIOError(fmt::format("File size: {} isn't matched with {}.", file_size, buffer_size_ + 3 * sizeof(u64)));
+    //     RecoverableError(status);
+    // }
+    //
+    // // file body
+    // data_ = static_cast<void *>(new char[buffer_size_]);
+    // std::memcpy(data_, (char *)mmap_true_ + offset, buffer_size_);
+    // offset += buffer_size_;
+    // // // auto [nbytes3, status3] = file_handle_->Read(data_, buffer_size_);
+    // // if (nbytes3 != buffer_size_) {
+    // //     Status status = Status::DataIOError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes3));
+    // //     RecoverableError(status);
+    // // }
+    //
+    // // file footer: checksum
+    // u64 checksum{0};
+    // std::memcpy(&checksum, (char *)mmap_true_ + offset, sizeof(checksum));
+    // // auto [nbytes4, status4] = file_handle_->Read(&checksum, sizeof(checksum));
+    // // if (nbytes4 != sizeof(checksum)) {
+    // //     Status status = Status::DataIOError(fmt::format("Incorrect file checksum length: {}.", nbytes4));
+    // //     RecoverableError(status);
+    // // }
 }
 
 bool DataFileWorker::ReadFromMmapImpl(const void *p, size_t file_size) {

@@ -77,25 +77,22 @@ bool FileWorker::WriteToTemp(const FileWorkerSaveCtx &ctx) {
     }
     file_handle_ = std::move(file_handle);
 
-
     bool prepare_success = false;
 
     bool all_save = WriteToTempImpl(prepare_success, ctx);
-    // bool all_save1 = CopyToMmapImpl(prepare_success, ctx);
     if (prepare_success) {
         file_handle_->Sync();
     }
     return all_save;
 }
 
-void FileWorker::ReadFromFile(bool from_spill) {
-    auto [defer_fn, read_path] = GetFilePathInner(from_spill);
-    bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
+void FileWorker::ReadFromFile([[maybe_unused]] bool is_temp) {
+    auto [defer_fn, read_path] = GetFilePathInner(is_temp);
+    bool use_object_cache = !is_temp && persistence_manager_ != nullptr;
     size_t file_size = 0;
     auto [file_handle, status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Read path: {}, error: {}", read_path, status.message()));
-        // return;
     }
     if (use_object_cache) {
         file_handle->Seek(obj_addr_.part_offset_);
@@ -105,7 +102,7 @@ void FileWorker::ReadFromFile(bool from_spill) {
     }
     file_handle_ = std::move(file_handle);
     DeferFn defer_fn2([&]() { file_handle_ = nullptr; });
-    ReadFromFileImpl(file_size, from_spill);
+    ReadFromFileImpl(file_size, is_temp);
 }
 
 void FileWorker::MoveFile() {

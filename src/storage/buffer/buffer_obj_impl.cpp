@@ -73,6 +73,9 @@ BufferHandle BufferObj::Load() {
     auto file_name = file_worker_->file_name_;
     std::string path1 = std::filesystem::path(*data_dir) / *file_dir / *file_name;
     std::string path2 = std::filesystem::path(*temp_dir) / *file_dir / *file_name;
+    // if (file_worker_->mmap_true_) {
+    //     file_worker_->ReadFromFile(true);
+    // }
     if (VirtualStore::Exists(path2)) {
         file_worker_->ReadFromFile(true);
     } else {

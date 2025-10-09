@@ -52,7 +52,7 @@ export struct BlockVersion {
 
     std::tuple<i32, Status> GetRowCountForUpdate(TxnTimeStamp begin_ts) const;
 
-    bool SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
+    bool SaveToFile(void* mmap_true ,TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
 
     void SpillToFile(LocalFileHandle *file_handle) const;
     static std::unique_ptr<BlockVersion> LoadFromFile(LocalFileHandle *file_handle);

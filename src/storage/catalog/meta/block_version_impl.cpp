@@ -120,7 +120,7 @@ std::tuple<i32, Status> BlockVersion::GetRowCountForUpdate(TxnTimeStamp begin_ts
     return {row_count, Status::OK()};
 }
 
-bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
+bool BlockVersion::SaveToFile(void *mmap_true, TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
     bool is_modified = false;
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     BlockOffset create_size = created_.size();
@@ -134,20 +134,20 @@ bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
     auto file_len = sizeof(create_size) + sizeof(capacity) + (2 * create_size + capacity) * sizeof(TxnTimeStamp);
     ftruncate(fd, file_len);
     size_t offset{};
-    auto *ret = mmap(nullptr, file_len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    mmap_true = mmap(nullptr, file_len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
-    std::memcpy((char *)ret + offset, &create_size, sizeof(create_size));
+    std::memcpy((char *)mmap_true + offset, &create_size, sizeof(create_size));
     offset += sizeof(create_size);
 
     for (size_t j = 0; j < create_size; ++j) {
-        std::memcpy((char *)ret + offset, &created_[j].create_ts_, sizeof(TxnTimeStamp));
+        std::memcpy((char *)mmap_true + offset, &created_[j].create_ts_, sizeof(TxnTimeStamp));
         offset += sizeof(TxnTimeStamp);
 
-        std::memcpy((char *)ret + offset, &created_[j].row_count_, sizeof(TxnTimeStamp));
+        std::memcpy((char *)mmap_true + offset, &created_[j].row_count_, sizeof(TxnTimeStamp));
         offset += sizeof(TxnTimeStamp);
     }
 
-    std::memcpy((char *)ret + offset, &capacity, sizeof(capacity));
+    std::memcpy((char *)mmap_true + offset, &capacity, sizeof(capacity));
     offset += sizeof(capacity);
 
     TxnTimeStamp dump_ts = 0;
@@ -155,11 +155,11 @@ bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
     for (const auto &ts : deleted_) {
         if (ts <= checkpoint_ts) {
             ++deleted_row_count;
-            std::memcpy((char *)ret + offset, &ts, sizeof(ts));
+            std::memcpy((char *)mmap_true + offset, &ts, sizeof(ts));
             offset += sizeof(ts);
         } else {
             is_modified = true;
-            std::memcpy((char *)ret + offset, &dump_ts, sizeof(dump_ts));
+            std::memcpy((char *)mmap_true + offset, &dump_ts, sizeof(dump_ts));
             offset += sizeof(dump_ts);
         }
     }

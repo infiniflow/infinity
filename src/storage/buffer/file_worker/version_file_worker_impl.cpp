@@ -74,7 +74,7 @@ bool VersionFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerS
 
     const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
     TxnTimeStamp ckp_ts = ctx.checkpoint_ts_;
-    bool is_full = data->SaveToFile(ckp_ts, *file_handle_);
+    bool is_full = data->SaveToFile(mmap_true_, ckp_ts, *file_handle_);
     if (is_full) {
         LOG_TRACE(fmt::format("Version file is full: {}", GetFilePath()));
         // if the version file is full, return true to spill to file

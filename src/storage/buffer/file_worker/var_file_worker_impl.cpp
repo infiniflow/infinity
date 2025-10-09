@@ -98,9 +98,9 @@ bool VarFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveC
     auto fd = file_handle_->fd();
     ftruncate(fd, data_size);
 
-    auto *ret = mmap(nullptr, data_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    mmap_true_ = mmap(nullptr, data_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
-    std::memcpy(ret, buffer_data.get(), data_size);
+    std::memcpy(mmap_true_, buffer_data.get(), data_size);
 
     prepare_success = true;
     buffer_size_ = data_size;

@@ -44,7 +44,7 @@ public:
 public:
     [[nodiscard]] bool WriteToTemp(const FileWorkerSaveCtx &ctx = {});
 
-    void ReadFromFile(bool from_spill);
+    void ReadFromFile(bool is_temp);
 
     void MoveFile();
 
@@ -89,6 +89,7 @@ public:
     const std::shared_ptr<std::string> file_name_;
     PersistenceManager *persistence_manager_{};
     ObjAddr obj_addr_;
+    void *mmap_true_{};
 
 protected:
     void *data_{};
@@ -110,5 +111,6 @@ protected:
 protected:
     u8 *mmap_addr_{nullptr};
     u8 *mmap_data_{nullptr};
+
 };
 } // namespace infinity
