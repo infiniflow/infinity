@@ -214,7 +214,7 @@ jobs:
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov && llvm-cov-20 report cmake-build-debug/src/test_main -instr-profile=coverage.profdata > report.txt"
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
           head -10 coverage.lcov
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
           mkdir -p ${ARTIFACTS_DIR}/coverage/debug_unit_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_unit_test
@@ -288,10 +288,11 @@ jobs:
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          until find . -name "infinity*.profraw" -size +0 | grep -q . || [ $count -ge 30 ]; do
-          sleep 1s
-          count=$((count + 1))
-          done
+          timeout 30s bash -c '
+            until find . -name "infinity*.profraw" -size +0 | grep -q .; do
+              sleep 1s
+            done
+          '
           ls -lh infinity*.profraw
           
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
@@ -407,10 +408,11 @@ jobs:
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          until find . -name "infinity*.profraw" -size +0 | grep -q . || [ $count -ge 30 ]; do
-          sleep 1s
-          count=$((count + 1))
-          done
+          timeout 30s bash -c '
+            until find . -name "infinity*.profraw" -size +0 | grep -q .; do
+              sleep 1s
+            done
+          '
           ls -lh infinity*.profraw
           
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
@@ -486,10 +488,11 @@ jobs:
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          until find . -name "infinity*.profraw" -size +0 | grep -q . || [ $count -ge 30 ]; do
-          sleep 1s
-          count=$((count + 1))
-          done
+          timeout 30s bash -c '
+            until find . -name "infinity*.profraw" -size +0 | grep -q .; do
+              sleep 1s
+            done
+          '
           ls -lh infinity*.profraw
           
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
@@ -566,10 +569,11 @@ jobs:
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          until find . -name "infinity*.profraw" -size +0 | grep -q . || [ $count -ge 30 ]; do
-          sleep 1s
-          count=$((count + 1))
-          done
+          timeout 30s bash -c '
+            until find . -name "infinity*.profraw" -size +0 | grep -q .; do
+              sleep 1s
+            done
+          '
           ls -lh infinity*.profraw
           
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
