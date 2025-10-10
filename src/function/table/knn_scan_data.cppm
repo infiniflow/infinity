@@ -14,7 +14,7 @@
 
 export module infinity_core:knn_scan_data;
 
-import :table_function;
+import :table_function_data;
 import :global_block_id;
 import :merge_knn;
 import :roaring_bitmap;
