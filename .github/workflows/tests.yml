@@ -214,7 +214,6 @@ jobs:
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          ls -lh infinity.*profraw
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov && llvm-cov-20 report cmake-build-debug/src/test_main -instr-profile=coverage.profdata > report.txt"
           head -10 coverage.lcov
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
@@ -222,6 +221,9 @@ jobs:
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TIMEOUT: 60
+          CODECOV_MAX_ATTEMPTS: 5
         with:
           files: coverage.lcov
           flags: debug unit test
@@ -299,6 +301,9 @@ jobs:
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TIMEOUT: 60
+          CODECOV_MAX_ATTEMPTS: 5
         with:
           files: coverage.lcov
           flags: debug sqllogical test
@@ -415,6 +420,9 @@ jobs:
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TIMEOUT: 60
+          CODECOV_MAX_ATTEMPTS: 5
         with:
           files: coverage.lcov
           flags: debug pysdk test
@@ -491,6 +499,9 @@ jobs:
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TIMEOUT: 60
+          CODECOV_MAX_ATTEMPTS: 5
         with:
           files: coverage.lcov
           flags: debug http test
@@ -568,6 +579,9 @@ jobs:
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TIMEOUT: 60
+          CODECOV_MAX_ATTEMPTS: 5
         with:
           files: coverage.lcov
           flags: debug parallel test
