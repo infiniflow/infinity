@@ -211,7 +211,6 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
     }
 
     NewTxn *txn = query_context->GetNewTxn();
-    txn->SetTxnType(TransactionType::kImport);
 
     ImportOperatorState *import_op_state = static_cast<ImportOperatorState *>(operator_state);
 

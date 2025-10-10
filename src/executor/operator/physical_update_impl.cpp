@@ -57,7 +57,6 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
     }
 
     NewTxn *new_txn = query_context->GetNewTxn();
-    new_txn->SetTxnType(TransactionType::kUpdate);
 
     OperatorState *prev_op_state = operator_state->prev_op_state_;
     size_t input_data_block_count = prev_op_state->data_block_array_.size();

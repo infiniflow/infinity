@@ -258,7 +258,6 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     }
 
     NewTxn *new_txn = query_context->GetNewTxn();
-    new_txn->SetTxnType(TransactionType::kAppend);
     Status status = new_txn->Append(*table_info_, output_block);
     if (!status.ok()) {
         operator_state->status_ = status;
