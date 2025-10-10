@@ -33,12 +33,12 @@ namespace infinity {
 class NewTxn;
 struct MemIndex;
 class TableIndexReaderCache;
-export class DBMeeta;
-export class TableMeeta;
+export class DBMeta;
+export class TableMeta;
 export class SegmentMeta;
 export class BlockMeta;
 export class ColumnMeta;
-export class TableIndexMeeta;
+export class TableIndexMeta;
 export class SegmentIndexMeta;
 export class ChunkIndexMeta;
 class BufferObj;
@@ -250,32 +250,32 @@ public:
                            TxnTimeStamp commit_ts,
                            const std::string &db_name,
                            const std::string *db_comment,
-                           std::shared_ptr<DBMeeta> &db_meta);
+                           std::shared_ptr<DBMeta> &db_meta);
 
-    static Status CleanDB(DBMeeta &db_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
+    static Status CleanDB(DBMeta &db_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
-    static Status AddNewTable(DBMeeta &db_meta,
+    static Status AddNewTable(DBMeta &db_meta,
                               const std::string &table_id_str,
                               TxnTimeStamp begin_ts,
                               TxnTimeStamp commit_ts,
                               const std::shared_ptr<TableDef> &table_def,
-                              std::shared_ptr<TableMeeta> &table_meta);
+                              std::shared_ptr<TableMeta> &table_meta);
 
-    static Status CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
+    static Status CleanTable(TableMeta &table_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
-    Status AddNewTableIndex(TableMeeta &table_meta,
+    Status AddNewTableIndex(TableMeta &table_meta,
                             const std::string &index_id_str,
                             TxnTimeStamp commit_ts,
                             const std::shared_ptr<IndexBase> &index_base,
-                            std::shared_ptr<TableIndexMeeta> &table_index_meta);
+                            std::shared_ptr<TableIndexMeta> &table_index_meta);
 
-    static Status CleanTableIndex(TableIndexMeeta &table_index_meta, UsageFlag usage_flag);
+    static Status CleanTableIndex(TableIndexMeta &table_index_meta, UsageFlag usage_flag);
 
-    static Status AddNewSegmentWithID(TableMeeta &table_meta, TxnTimeStamp commit_ts, std::optional<SegmentMeta> &segment_meta, SegmentID segment_id);
+    static Status AddNewSegmentWithID(TableMeta &table_meta, TxnTimeStamp commit_ts, std::optional<SegmentMeta> &segment_meta, SegmentID segment_id);
 
-    static Status LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts);
+    static Status LoadFlushedSegment1(TableMeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts);
 
-    static Status LoadFlushedSegment2(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts);
+    static Status LoadFlushedSegment2(TableMeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts);
 
     static Status CleanSegment(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
@@ -283,7 +283,7 @@ public:
 
     static Status AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, std::optional<BlockMeta> &block_meta);
 
-    static Status LoadImportedOrCompactedSegment(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts);
+    static Status LoadImportedOrCompactedSegment(TableMeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts);
 
     static Status AddNewBlockWithID(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, std::optional<BlockMeta> &block_meta, BlockID block_id);
 
@@ -301,16 +301,14 @@ public:
 
     static Status CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag);
 
-    static Status RestoreNewSegmentIndex1(TableIndexMeeta &table_index_meta,
+    static Status RestoreNewSegmentIndex1(TableIndexMeta &table_index_meta,
                                           NewTxn *new_txn,
                                           SegmentID segment_id,
                                           std::optional<SegmentIndexMeta> &segment_index_meta,
                                           ChunkID next_chunk_id);
 
-    static Status AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
-                                      NewTxn *new_txn,
-                                      SegmentID segment_id,
-                                      std::optional<SegmentIndexMeta> &segment_index_meta);
+    static Status
+    AddNewSegmentIndex1(TableIndexMeta &table_index_meta, NewTxn *new_txn, SegmentID segment_id, std::optional<SegmentIndexMeta> &segment_index_meta);
 
     static Status CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, UsageFlag usage_flag);
 
@@ -351,10 +349,10 @@ public:
 
     static Status GetDeleteTSVector(BlockMeta &block_meta, size_t offset, size_t row_count, ColumnVector &column_vector);
 
-    static Status GetDBFilePaths(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, DBMeeta &db_meta, std::vector<std::string> &file_paths);
+    static Status GetDBFilePaths(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, DBMeta &db_meta, std::vector<std::string> &file_paths);
 
     static Status GetTableFilePaths(TxnTimeStamp begin_ts,
-                                    TableMeeta &table_meta,
+                                    TableMeta &table_meta,
                                     std::vector<std::string> &file_paths,
                                     std::shared_ptr<ColumnDef> column_def = nullptr);
 
@@ -368,17 +366,17 @@ public:
     static Status GetBlockColumnFilePaths(ColumnMeta &column_meta, std::vector<std::string> &file_paths);
 
     static Status
-    GetColumnFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, std::shared_ptr<ColumnDef> column_def, std::vector<std::string> &file_paths);
+    GetColumnFilePaths(TxnTimeStamp begin_ts, TableMeta &table_meta, std::shared_ptr<ColumnDef> column_def, std::vector<std::string> &file_paths);
 
-    static Status GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, std::vector<std::string> &file_paths);
+    static Status GetTableIndexFilePaths(TableIndexMeta &table_index_meta, std::vector<std::string> &file_paths);
 
     static Status GetSegmentIndexFilepaths(SegmentIndexMeta &segment_index_meta, std::vector<std::string> &file_paths);
 
     static Status GetChunkIndexFilePaths(ChunkIndexMeta &chunk_index_meta, std::vector<std::string> &file_paths);
 
-    static Status CheckColumnIfIndexed(TableMeeta &table_meta, ColumnID column_id, bool &has_index);
+    static Status CheckColumnIfIndexed(TableMeta &table_meta, ColumnID column_id, bool &has_index);
 
-    static Status CheckTableIfDelete(TableMeeta &table_meta, TxnTimeStamp begin_ts, bool &has_delete);
+    static Status CheckTableIfDelete(TableMeta &table_meta, TxnTimeStamp begin_ts, bool &has_delete);
 
     static Status SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask);
 

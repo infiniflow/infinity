@@ -30,8 +30,8 @@ import :value;
 import :infinity_exception;
 import :status;
 import :txn_state;
-import :db_meeta;
-import :table_meeta;
+import :db_meta;
+import :table_meta;
 
 import compilation_config;
 import column_def;
@@ -110,8 +110,8 @@ protected:
     void CheckRowCnt(const std::string &db_name, const std::string &table_name, size_t expected_row_cnt) {
         auto *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("Check row count"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export module infinity_core:db_meeta;
+export module infinity_core:db_meta;
 
 import :status;
 import :new_catalog;
@@ -25,10 +25,10 @@ class NewTxn;
 class MetaCache;
 class MetaTableCache;
 
-export class DBMeeta {
+export class DBMeta {
 public:
-    DBMeeta(const std::string &db_id_str, const std::string &db_name, NewTxn *txn);
-    DBMeeta(const std::string &db_id_str, const std::string &db_name, KVInstance *kv_instance, MetaCache *meta_cache);
+    DBMeta(const std::string &db_id_str, const std::string &db_name, NewTxn *txn);
+    DBMeta(const std::string &db_id_str, const std::string &db_name, KVInstance *kv_instance, MetaCache *meta_cache);
 
     const std::string &db_id_str() const;
 

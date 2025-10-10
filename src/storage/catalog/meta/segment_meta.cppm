@@ -24,7 +24,7 @@ namespace infinity {
 
 class KVInstance;
 // class ColumnDef;
-class TableMeeta;
+class TableMeta;
 export struct SegmentInfo;
 class FastRoughFilter;
 
@@ -53,7 +53,7 @@ export std::string ToString(SegmentStatus segment_status) {
 
 export class SegmentMeta {
 public:
-    SegmentMeta(SegmentID segment_id, TableMeeta &table_meta);
+    SegmentMeta(SegmentID segment_id, TableMeta &table_meta);
 
     TxnTimeStamp begin_ts() const { return begin_ts_; }
     TxnTimeStamp commit_ts() const { return commit_ts_; }
@@ -62,7 +62,7 @@ public:
 
     KVInstance &kv_instance() { return kv_instance_; }
 
-    TableMeeta &table_meta() { return table_meta_; }
+    TableMeta &table_meta() { return table_meta_; }
 
     SegmentID segment_id() const { return segment_id_; }
 
@@ -129,7 +129,7 @@ private:
     TxnTimeStamp begin_ts_;
     TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;
-    TableMeeta &table_meta_;
+    TableMeta &table_meta_;
     SegmentID segment_id_;
     std::optional<std::string> segment_dir_; // TODO: check if it is no longer in use
 

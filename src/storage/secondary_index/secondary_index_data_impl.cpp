@@ -27,7 +27,7 @@ import :secondary_index_pgm;
 import :logger;
 import :buffer_handle;
 import :buffer_obj;
-import :table_index_meeta;
+import :table_index_meta;
 
 import std;
 import third_party;
@@ -445,16 +445,16 @@ GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(const std::shared_ptr<Da
     }
 }
 
-void *GetSecondaryIndexDataWithMeeta(const std::shared_ptr<DataType> &data_type,
-                                     const u32 chunk_row_count,
-                                     const bool allocate,
-                                     TableIndexMeeta *table_index_meeta) {
-    if (!table_index_meeta) {
-        // Default to HighCardinality if no meeta provided
+void *GetSecondaryIndexDataWithMeta(const std::shared_ptr<DataType> &data_type,
+                                    const u32 chunk_row_count,
+                                    const bool allocate,
+                                    TableIndexMeta *table_index_meta) {
+    if (!table_index_meta) {
+        // Default to HighCardinality if no Meta provided
         return static_cast<void *>(GetSecondaryIndexData(data_type, chunk_row_count, allocate));
     }
 
-    auto [cardinality, status] = table_index_meeta->GetSecondaryIndexCardinality();
+    auto [cardinality, status] = table_index_meta->GetSecondaryIndexCardinality();
     if (!status.ok()) {
         // Default to HighCardinality if unable to determine
         cardinality = SecondaryIndexCardinality::kHighCardinality;

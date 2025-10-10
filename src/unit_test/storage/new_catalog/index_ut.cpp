@@ -30,9 +30,9 @@ import :data_block;
 import :column_vector;
 import :value;
 import :new_txn;
-import :db_meeta;
-import :table_meeta;
-import :table_index_meeta;
+import :db_meta;
+import :table_meta;
+import :table_index_meta;
 import :column_meta;
 import :index_base;
 import :index_secondary;
@@ -103,9 +103,9 @@ TEST_P(TestTxnIndex, index_test1) {
         auto *txn3_1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get index"), TransactionType::kRead);
         std::shared_ptr<IndexBase> index_def1;
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn3_1->GetTableIndexMeta(*db_name, *table_name, *index_name, db_meta, table_meta, index_meta, &table_key, &index_key);

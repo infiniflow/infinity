@@ -49,11 +49,11 @@ import :secondary_index_data;
 import :segment_meta;
 import :block_meta;
 import :column_meta;
-import :table_meeta;
-import :table_index_meeta;
+import :table_meta;
+import :table_index_meta;
 import :segment_index_meta;
 import :chunk_index_meta;
-import :db_meeta;
+import :db_meta;
 import :catalog_meta;
 import :mem_index;
 import :roaring_bitmap;
@@ -119,8 +119,8 @@ protected:
     void CheckDataAfterSuccesfulCompact() {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -174,9 +174,9 @@ protected:
     void CheckIndexAfterSuccessfulCompact(const std::string &index_name) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -215,8 +215,8 @@ protected:
     void CheckDataAfterFailedCompact() {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -270,9 +270,9 @@ protected:
     void CheckIndexAfterFailedCompact(const std::string &index_name) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -339,8 +339,8 @@ TEST_P(TestTxnCompact, compact_with_index_commit) {
     auto index_name2 = std::make_shared<std::string>("index2");
     auto index_def2 = IndexFullText::Make(index_name2, std::make_shared<std::string>(), "file_name", {column_def2->name()}, {});
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn =
-            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kCreateIndex);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
+                                          TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -368,8 +368,8 @@ TEST_P(TestTxnCompact, compact_with_index_rollback) {
     auto index_name = std::make_shared<std::string>("index2");
     auto index_def = IndexFullText::Make(index_name, std::make_shared<std::string>(), "file_name", {column_def2->name()}, {});
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn =
-            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kCreateIndex);
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
+                                          TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
@@ -724,8 +724,8 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
 
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -781,8 +781,8 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
 
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -992,8 +992,8 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
 
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -1386,8 +1386,8 @@ TEST_P(TestTxnCompact, compact_and_compact) {
     auto CheckTable = [&] {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -1511,8 +1511,8 @@ TEST_P(TestTxnCompact, compact_and_create_index) {
     auto CheckTable = [&](const std::vector<SegmentID> &segment_ids = {2}) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -1527,7 +1527,7 @@ TEST_P(TestTxnCompact, compact_and_create_index) {
         status = table_meta->GetIndexIDs(index_ids_strs_ptr, &index_names_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_names_ptr, std::vector<std::string>({*index_name1}));
-        TableIndexMeeta table_index_meta((*index_ids_strs_ptr)[0], (*index_names_ptr)[0], *table_meta);
+        TableIndexMeta table_index_meta((*index_ids_strs_ptr)[0], (*index_names_ptr)[0], *table_meta);
 
         std::shared_ptr<IndexBase> index_base;
         std::tie(index_base, status) = table_index_meta.GetIndexBase();
@@ -1546,8 +1546,8 @@ TEST_P(TestTxnCompact, compact_and_create_index) {
     auto CheckWithNoIndex = [&] {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -1725,8 +1725,8 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
     [[maybe_unused]] auto CheckTable = [&](const std::vector<SegmentID> &segment_ids = {2}) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -1741,7 +1741,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = table_meta->GetIndexIDs(index_ids_strs_ptr, &index_names_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_names_ptr, std::vector<std::string>({*index_name1}));
-        TableIndexMeeta table_index_meta((*index_ids_strs_ptr)[0], (*index_names_ptr)[0], *table_meta);
+        TableIndexMeta table_index_meta((*index_ids_strs_ptr)[0], (*index_names_ptr)[0], *table_meta);
 
         std::shared_ptr<IndexBase> index_base;
         std::tie(index_base, status) = table_index_meta.GetIndexBase();
@@ -1760,8 +1760,8 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
     auto CheckWithNoIndex = [&](const std::vector<SegmentID> &segment_ids) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());

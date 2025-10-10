@@ -14,11 +14,11 @@
 
 module;
 
-module infinity_core:table_index_meeta.impl;
+module infinity_core:table_index_meta.impl;
 
-import :table_index_meeta;
+import :table_index_meta;
 import :kv_store;
-import :table_meeta;
+import :table_meta;
 import :kv_code;
 import :index_base;
 import :meta_info;
@@ -41,7 +41,7 @@ import create_index_info;
 
 namespace infinity {
 
-TableIndexMeeta::TableIndexMeeta(const std::string &index_id_str, const std::string &index_name, TableMeeta &table_meta)
+TableIndexMeta::TableIndexMeta(const std::string &index_id_str, const std::string &index_name, TableMeta &table_meta)
     : kv_instance_(*table_meta.kv_instance()), table_meta_(table_meta), index_id_str_(index_id_str), index_name_str_(index_name) {
     if (index_name_str_.empty()) {
         index_def_ =
@@ -50,9 +50,9 @@ TableIndexMeeta::TableIndexMeeta(const std::string &index_id_str, const std::str
     }
 }
 
-TableIndexMeeta::~TableIndexMeeta() = default;
+TableIndexMeta::~TableIndexMeta() = default;
 
-std::tuple<std::shared_ptr<IndexBase>, Status> TableIndexMeeta::GetIndexBase() {
+std::tuple<std::shared_ptr<IndexBase>, Status> TableIndexMeta::GetIndexBase() {
     std::lock_guard<std::mutex> lock(mtx_);
     if (index_def_.get() != nullptr) {
         return {index_def_, Status::OK()};
@@ -80,7 +80,7 @@ std::tuple<std::shared_ptr<IndexBase>, Status> TableIndexMeeta::GetIndexBase() {
     return {index_def_, Status::OK()};
 }
 
-Status TableIndexMeeta::SetIndexBase(const std::shared_ptr<IndexBase> &index_base) {
+Status TableIndexMeta::SetIndexBase(const std::shared_ptr<IndexBase> &index_base) {
     std::string index_def_key = GetTableIndexTag("index_base");
     Status status = kv_instance_.Put(index_def_key, index_base->Serialize().dump());
     if (!status.ok()) {
@@ -89,12 +89,12 @@ Status TableIndexMeeta::SetIndexBase(const std::shared_ptr<IndexBase> &index_bas
     return Status::OK();
 }
 
-std::shared_ptr<std::string> TableIndexMeeta::GetTableIndexDir() {
+std::shared_ptr<std::string> TableIndexMeta::GetTableIndexDir() {
     return std::make_shared<std::string>(
         fmt::format("db_{}/tbl_{}/idx_{}", table_meta_.db_id_str(), table_meta_.GetTableDir()->c_str(), index_id_str_));
 }
 
-std::tuple<std::shared_ptr<ColumnDef>, Status> TableIndexMeeta::GetColumnDef() {
+std::tuple<std::shared_ptr<ColumnDef>, Status> TableIndexMeta::GetColumnDef() {
     auto [index_base, status] = GetIndexBase();
     if (!status.ok()) {
         return {nullptr, status};
@@ -103,7 +103,7 @@ std::tuple<std::shared_ptr<ColumnDef>, Status> TableIndexMeeta::GetColumnDef() {
     return table_meta_.GetColumnDefByColumnName(index_base->column_name());
 }
 
-std::tuple<std::vector<SegmentID> *, Status> TableIndexMeeta::GetSegmentIndexIDs1() {
+std::tuple<std::vector<SegmentID> *, Status> TableIndexMeta::GetSegmentIndexIDs1() {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!segment_ids_) {
         segment_ids_ = infinity::GetTableIndexSegments(&kv_instance_,
@@ -116,7 +116,7 @@ std::tuple<std::vector<SegmentID> *, Status> TableIndexMeeta::GetSegmentIndexIDs
     return {&*segment_ids_, Status::OK()};
 }
 
-bool TableIndexMeeta::HasSegmentIndexID(SegmentID segment_id) {
+bool TableIndexMeta::HasSegmentIndexID(SegmentID segment_id) {
     auto [segment_ids_ptr, status] = GetSegmentIndexIDs1();
     if (!status.ok()) {
         return false;
@@ -128,7 +128,7 @@ bool TableIndexMeeta::HasSegmentIndexID(SegmentID segment_id) {
     return true;
 }
 
-Status TableIndexMeeta::SetSegmentIDs(const std::vector<SegmentID> &segment_ids) {
+Status TableIndexMeta::SetSegmentIDs(const std::vector<SegmentID> &segment_ids) {
     std::string segment_ids_key = GetTableIndexTag("segment_ids");
     std::string segment_ids_str = nlohmann::json(segment_ids).dump();
     Status status = kv_instance_.Put(segment_ids_key, segment_ids_str);
@@ -138,7 +138,7 @@ Status TableIndexMeeta::SetSegmentIDs(const std::vector<SegmentID> &segment_ids)
     return Status::OK();
 }
 
-Status TableIndexMeeta::AddSegmentID(SegmentID segment_id) {
+Status TableIndexMeta::AddSegmentID(SegmentID segment_id) {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!segment_ids_) {
         Status status = LoadSegmentIDs();
@@ -154,7 +154,7 @@ Status TableIndexMeeta::AddSegmentID(SegmentID segment_id) {
     return Status::OK();
 }
 
-Status TableIndexMeeta::AddSegmentIndexID1(SegmentID segment_id, NewTxn *new_txn) {
+Status TableIndexMeta::AddSegmentIndexID1(SegmentID segment_id, NewTxn *new_txn) {
 
     std::string segment_id_key = KeyEncode::CatalogIdxSegmentKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, segment_id);
     std::string commit_ts_str;
@@ -180,7 +180,7 @@ Status TableIndexMeeta::AddSegmentIndexID1(SegmentID segment_id, NewTxn *new_txn
     return kv_instance_.Put(segment_id_key, commit_ts_str);
 }
 
-Status TableIndexMeeta::RemoveSegmentIndexIDs(const std::vector<SegmentID> &segment_ids) {
+Status TableIndexMeta::RemoveSegmentIndexIDs(const std::vector<SegmentID> &segment_ids) {
 
     for (SegmentID segment_id : segment_ids) {
         std::string segment_id_key = KeyEncode::CatalogIdxSegmentKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, segment_id);
@@ -192,7 +192,7 @@ Status TableIndexMeeta::RemoveSegmentIndexIDs(const std::vector<SegmentID> &segm
     return Status::OK();
 }
 
-Status TableIndexMeeta::GetSegmentUpdateTS(std::shared_ptr<SegmentUpdateTS> &segment_update_ts) {
+Status TableIndexMeta::GetSegmentUpdateTS(std::shared_ptr<SegmentUpdateTS> &segment_update_ts) {
     if (segment_update_ts_) {
         segment_update_ts = segment_update_ts_;
         return Status::OK();
@@ -207,7 +207,7 @@ Status TableIndexMeeta::GetSegmentUpdateTS(std::shared_ptr<SegmentUpdateTS> &seg
     return Status::OK();
 }
 
-Status TableIndexMeeta::InitSet1(const std::shared_ptr<IndexBase> &index_base, NewCatalog *new_catalog) {
+Status TableIndexMeta::InitSet1(const std::shared_ptr<IndexBase> &index_base, NewCatalog *new_catalog) {
     {
         Status status = SetIndexBase(index_base);
         if (!status.ok()) {
@@ -225,7 +225,7 @@ Status TableIndexMeeta::InitSet1(const std::shared_ptr<IndexBase> &index_base, N
     return Status::OK();
 }
 
-Status TableIndexMeeta::UninitSet1(UsageFlag usage_flag) {
+Status TableIndexMeta::UninitSet1(UsageFlag usage_flag) {
     Status status;
 
     std::shared_ptr<IndexBase> index_base;
@@ -265,7 +265,7 @@ Status TableIndexMeeta::UninitSet1(UsageFlag usage_flag) {
     return Status::OK();
 }
 
-Status TableIndexMeeta::LoadSegmentIDs() {
+Status TableIndexMeta::LoadSegmentIDs() {
     std::string segment_ids_key = GetTableIndexTag("segment_ids");
     std::string segment_ids_str;
     Status status = kv_instance_.Get(segment_ids_key, segment_ids_str);
@@ -280,13 +280,13 @@ Status TableIndexMeeta::LoadSegmentIDs() {
     return Status::OK();
 }
 
-std::string TableIndexMeeta::GetTableIndexTag(const std::string &tag) const {
+std::string TableIndexMeta::GetTableIndexTag(const std::string &tag) const {
     return KeyEncode::CatalogIndexTagKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, tag);
 }
 
-std::string TableIndexMeeta::FtIndexCacheTag() const { return GetTableIndexTag("ft_cache"); }
+std::string TableIndexMeta::FtIndexCacheTag() const { return GetTableIndexTag("ft_cache"); }
 
-Status TableIndexMeeta::GetTableIndexInfo(TableIndexInfo &table_index_info) {
+Status TableIndexMeta::GetTableIndexInfo(TableIndexInfo &table_index_info) {
     Status status;
     if (!segment_ids_) {
         segment_ids_ = infinity::GetTableIndexSegments(&kv_instance_,
@@ -319,7 +319,7 @@ Status TableIndexMeeta::GetTableIndexInfo(TableIndexInfo &table_index_info) {
     return Status::OK();
 }
 
-std::tuple<std::shared_ptr<TableIndexSnapshotInfo>, Status> TableIndexMeeta::MapMetaToSnapShotInfo() {
+std::tuple<std::shared_ptr<TableIndexSnapshotInfo>, Status> TableIndexMeta::MapMetaToSnapShotInfo() {
     std::shared_ptr<TableIndexSnapshotInfo> table_index_snapshot_info = std::make_shared<TableIndexSnapshotInfo>();
     table_index_snapshot_info->index_dir_ = GetTableIndexDir();
     table_index_snapshot_info->index_id_str_ = std::make_shared<std::string>(index_id_str_);
@@ -347,7 +347,7 @@ std::tuple<std::shared_ptr<TableIndexSnapshotInfo>, Status> TableIndexMeeta::Map
     return {table_index_snapshot_info, Status::OK()};
 }
 
-Status TableIndexMeeta::SetSecondaryIndexCardinality(SecondaryIndexCardinality cardinality) {
+Status TableIndexMeta::SetSecondaryIndexCardinality(SecondaryIndexCardinality cardinality) {
     std::string cardinality_key = GetTableIndexTag("cardinality");
     u8 cardinality_value = static_cast<u8>(cardinality);
     Status status = kv_instance_.Put(cardinality_key, std::string(reinterpret_cast<const char *>(&cardinality_value), sizeof(cardinality_value)));
@@ -357,7 +357,7 @@ Status TableIndexMeeta::SetSecondaryIndexCardinality(SecondaryIndexCardinality c
     return Status::OK();
 }
 
-std::tuple<SecondaryIndexCardinality, Status> TableIndexMeeta::GetSecondaryIndexCardinality() {
+std::tuple<SecondaryIndexCardinality, Status> TableIndexMeta::GetSecondaryIndexCardinality() {
     std::string cardinality_key = GetTableIndexTag("cardinality");
     std::string cardinality_value_str;
     Status status = kv_instance_.Get(cardinality_key, cardinality_value_str);

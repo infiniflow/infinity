@@ -35,7 +35,7 @@ struct LoadMeta;
 struct BlockIndex;
 
 class BlockMeta;
-class TableIndexMeeta;
+class TableIndexMeta;
 class SegmentIndexMeta;
 
 export class PhysicalMatchTensorScan final : public PhysicalFilterScanBase {
@@ -101,7 +101,7 @@ private:
     ColumnID search_column_id_ = 0;
 
     std::unique_ptr<std::vector<BlockMeta *>> block_metas_{};
-    std::unique_ptr<TableIndexMeeta> table_index_meta_{};
+    std::unique_ptr<TableIndexMeta> table_index_meta_{};
     std::unique_ptr<std::vector<std::shared_ptr<SegmentIndexMeta>>> segment_index_metas_{};
 
     mutable std::atomic_uint32_t task_executed_ = 0;

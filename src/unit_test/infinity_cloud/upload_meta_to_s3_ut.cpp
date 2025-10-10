@@ -9,7 +9,7 @@ import :new_txn_manager;
 import :new_txn;
 import :kv_store;
 import :utility;
-import :table_meeta;
+import :table_meta;
 import :segment_meta;
 import :block_meta;
 import :default_values;
@@ -118,8 +118,8 @@ TEST_P(UploadMetaToS3, DISABLED_MINIO_test1) {
     {
         auto *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());

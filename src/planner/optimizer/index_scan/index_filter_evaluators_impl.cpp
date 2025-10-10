@@ -32,7 +32,7 @@ import :infinity_exception;
 import :status;
 import :doc_iterator;
 import :score_threshold_iterator;
-import :table_index_meeta;
+import :table_index_meta;
 import :segment_index_meta;
 import :chunk_index_meta;
 import :mem_index;
@@ -378,12 +378,12 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
     IndexFilterEvaluatorSecondaryT(const BaseExpression *src_expr,
                                    const ColumnID column_id,
                                    const LogicalType column_logical_type,
-                                   std::shared_ptr<TableIndexMeeta> new_secondary_index)
+                                   std::shared_ptr<TableIndexMeta> new_secondary_index)
         : IndexFilterEvaluatorSecondary(src_expr, column_id, column_logical_type, new_secondary_index) {}
 
     static std::unique_ptr<IndexFilterEvaluatorSecondaryT> Make(const BaseExpression *src_expr,
                                                                 const ColumnID column_id,
-                                                                std::shared_ptr<TableIndexMeeta> new_secondary_index,
+                                                                std::shared_ptr<TableIndexMeta> new_secondary_index,
                                                                 const FilterCompareType compare_type,
                                                                 const Value &val) {
         constexpr auto expect_logical_type = GetLogicalType<ColumnValueT>;
@@ -412,7 +412,7 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
 
 std::unique_ptr<IndexFilterEvaluatorSecondary> IndexFilterEvaluatorSecondary::Make(const BaseExpression *src_expr,
                                                                                    ColumnID column_id,
-                                                                                   std::shared_ptr<TableIndexMeeta> new_secondary_index,
+                                                                                   std::shared_ptr<TableIndexMeta> new_secondary_index,
                                                                                    FilterCompareType compare_type,
                                                                                    const Value &val) {
     ColumnDef *column_def;

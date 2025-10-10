@@ -46,8 +46,8 @@ import :wal_manager;
 import :segment_meta;
 import :block_meta;
 import :column_meta;
-import :table_meeta;
-import :db_meeta;
+import :table_meta;
+import :db_meta;
 import :new_catalog;
 
 import global_resource_usage;
@@ -476,8 +476,8 @@ TEST_P(WalReplayTest, wal_replay_append) {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
             Status status;
 
-            std::shared_ptr<DBMeeta> db_meta;
-            std::shared_ptr<TableMeeta> table_meta;
+            std::shared_ptr<DBMeta> db_meta;
+            std::shared_ptr<TableMeta> table_meta;
             TxnTimeStamp create_timestamp;
             status = txn->GetTableMeta("default_db", "tbl4", db_meta, table_meta, create_timestamp);
             EXPECT_TRUE(status.ok());
@@ -693,8 +693,8 @@ TEST_P(WalReplayTest, wal_replay_import) {
                 auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
                 Status status;
 
-                std::shared_ptr<DBMeeta> db_meta;
-                std::shared_ptr<TableMeeta> table_meta;
+                std::shared_ptr<DBMeta> db_meta;
+                std::shared_ptr<TableMeta> table_meta;
                 TxnTimeStamp create_timestamp;
                 status = txn->GetTableMeta("default_db", "tbl3", db_meta, table_meta, create_timestamp);
                 EXPECT_TRUE(status.ok());

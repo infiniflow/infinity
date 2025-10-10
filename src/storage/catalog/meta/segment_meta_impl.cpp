@@ -20,7 +20,7 @@ import :segment_meta;
 import :kv_store;
 import :kv_code;
 import :default_values;
-import :table_meeta;
+import :table_meta;
 import :infinity_exception;
 import :block_meta;
 import :meta_info;
@@ -39,7 +39,7 @@ import column_def;
 
 namespace infinity {
 
-SegmentMeta::SegmentMeta(SegmentID segment_id, TableMeeta &table_meta)
+SegmentMeta::SegmentMeta(SegmentID segment_id, TableMeta &table_meta)
     : begin_ts_(table_meta.begin_ts()), commit_ts_(table_meta.commit_ts()), kv_instance_(*table_meta.kv_instance()), table_meta_(table_meta),
       segment_id_(segment_id) {}
 
