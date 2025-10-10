@@ -38,8 +38,8 @@ import third_party;
 import :segment_meta;
 import :block_meta;
 import :column_meta;
-import :table_meeta;
-import :db_meeta;
+import :table_meta;
+import :db_meta;
 import :new_catalog;
 
 import extra_ddl_info;
@@ -59,8 +59,8 @@ public:
         auto begin_ts = txn->BeginTS();
         auto commit_ts = txn->CommitTS();
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta("default_db", "t1", db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());

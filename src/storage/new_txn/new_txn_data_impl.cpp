@@ -34,12 +34,12 @@ import :data_access_state;
 import :column_meta;
 import :block_meta;
 import :segment_meta;
-import :table_meeta;
-import :table_index_meeta;
+import :table_meta;
+import :table_index_meta;
 import :segment_index_meta;
 import :new_catalog;
 import :meta_key;
-import :db_meeta;
+import :db_meta;
 import :build_fast_rough_filter_task;
 import :base_expression;
 import :cast_expression;
@@ -75,7 +75,7 @@ namespace infinity {
 struct NewTxnCompactState {
     NewTxnCompactState() = default;
 
-    static Status Make(TableMeeta &table_meta, TxnTimeStamp commit_ts, NewTxnCompactState &state, SegmentID segment_id) {
+    static Status Make(TableMeta &table_meta, TxnTimeStamp commit_ts, NewTxnCompactState &state, SegmentID segment_id) {
         Status status = NewCatalog::AddNewSegmentWithID(table_meta, commit_ts, state.new_segment_meta_, segment_id);
         if (!status.ok()) {
             return status;
@@ -208,15 +208,15 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
     std::string import_tmp_dir = "import" + std::to_string(TxnID());
     std::string import_tmp_path = InfinityContext::instance().config()->TempDir() + "/" + import_tmp_dir;
 
-    std::shared_ptr<DBMeeta> db_meta;
-    std::shared_ptr<TableMeeta> table_meta_opt;
+    std::shared_ptr<DBMeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta_opt;
     std::string table_key;
     TxnTimeStamp create_timestamp;
     status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, create_timestamp, &table_key);
     if (!status.ok()) {
         return status;
     }
-    TableMeeta &table_meta = *table_meta_opt;
+    TableMeta &table_meta = *table_meta_opt;
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
     u64 db_id = std::stoull(table_meta.db_id_str());
@@ -348,7 +348,7 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
     for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
         const std::string &index_id_str = (*index_id_strs_ptr)[i];
         const std::string &index_name = (*index_names_ptr)[i];
-        TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta);
+        TableIndexMeta table_index_meta(index_id_str, index_name, table_meta);
 
         for (size_t segment_idx = 0; segment_idx < segment_count; ++segment_idx) {
             size_t segment_row_cnt = segment_row_cnts[segment_idx];
@@ -411,14 +411,14 @@ Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, 
             const WalSegmentInfo &segment_info = import_cmd->segment_info_;
             TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
-            std::shared_ptr<DBMeeta> db_meta;
-            std::shared_ptr<TableMeeta> table_meta_opt;
+            std::shared_ptr<DBMeta> db_meta;
+            std::shared_ptr<TableMeta> table_meta_opt;
             TxnTimeStamp create_timestamp;
             status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt, create_timestamp);
             if (!status.ok()) {
                 return status;
             }
-            TableMeeta &table_meta = *table_meta_opt;
+            TableMeta &table_meta = *table_meta_opt;
             status = NewCatalog::LoadImportedOrCompactedSegment(table_meta, segment_info, fake_commit_ts);
             if (!status.ok()) {
                 return status;
@@ -439,14 +439,14 @@ Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, 
 
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
-    std::shared_ptr<DBMeeta> db_meta;
-    std::shared_ptr<TableMeeta> table_meta_opt;
+    std::shared_ptr<DBMeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta_opt;
     TxnTimeStamp create_timestamp;
     status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt, create_timestamp);
     if (!status.ok()) {
         return status;
     }
-    TableMeeta &table_meta = *table_meta_opt;
+    TableMeta &table_meta = *table_meta_opt;
 
     const WalSegmentInfo &segment_info = import_cmd->segment_info_;
 
@@ -461,8 +461,8 @@ Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, 
 Status NewTxn::Append(const std::string &db_name, const std::string &table_name, const std::shared_ptr<DataBlock> &input_block) {
     this->CheckTxn(db_name);
 
-    std::shared_ptr<DBMeeta> db_meta;
-    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<DBMeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta;
     std::string table_key;
     TxnTimeStamp create_timestamp;
     auto status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp, &table_key);
@@ -501,7 +501,7 @@ Status NewTxn::ReplayAppend(WalCmdAppendV2 *append_cmd, TxnTimeStamp commit_ts, 
 Status NewTxn::AppendInner(const std::string &db_name,
                            const std::string &table_name,
                            const std::string &table_key,
-                           TableMeeta &table_meta,
+                           TableMeta &table_meta,
                            const std::shared_ptr<DataBlock> &input_block) {
 
     std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs{nullptr};
@@ -536,8 +536,8 @@ Status NewTxn::AppendInner(const std::string &db_name,
 Status NewTxn::Delete(const std::string &db_name, const std::string &table_name, const std::vector<RowID> &row_ids) {
     this->CheckTxn(db_name);
 
-    std::shared_ptr<DBMeeta> db_meta;
-    std::shared_ptr<TableMeeta> table_meta_opt;
+    std::shared_ptr<DBMeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta_opt;
     std::string table_key;
     TxnTimeStamp create_timestamp;
     auto status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, create_timestamp, &table_key);
@@ -566,8 +566,8 @@ Status NewTxn::Delete(const std::string &db_name, const std::string &table_name,
 }
 
 Status NewTxn::ReplayDelete(WalCmdDeleteV2 *delete_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
-    std::shared_ptr<DBMeeta> db_meta;
-    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<DBMeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta;
     TxnTimeStamp create_timestamp;
     Status status = GetTableMeta(delete_cmd->db_name_, delete_cmd->table_name_, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
@@ -584,7 +584,7 @@ Status NewTxn::ReplayDelete(WalCmdDeleteV2 *delete_cmd, TxnTimeStamp commit_ts, 
     return PrepareCommitDelete(delete_cmd);
 }
 
-Status NewTxn::DeleteInner(const std::string &db_name, const std::string &table_name, TableMeeta &table_meta, const std::vector<RowID> &row_ids) {
+Status NewTxn::DeleteInner(const std::string &db_name, const std::string &table_name, TableMeta &table_meta, const std::vector<RowID> &row_ids) {
     auto delete_command = std::make_shared<WalCmdDeleteV2>(db_name, table_meta.db_id_str(), table_name, table_meta.table_id_str(), row_ids);
     auto wal_command = static_pointer_cast<WalCmd>(delete_command);
     wal_entry_->cmds_.push_back(wal_command);
@@ -599,8 +599,8 @@ Status NewTxn::Update(const std::string &db_name,
                       const std::vector<RowID> &row_ids) {
     this->CheckTxn(db_name);
 
-    std::shared_ptr<DBMeeta> db_meta;
-    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<DBMeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta;
     std::string table_key;
     TxnTimeStamp create_timestamp;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp, &table_key);
@@ -659,8 +659,8 @@ Status NewTxn::Compact(const std::string &db_name, const std::string &table_name
 
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
 
-    std::shared_ptr<DBMeeta> db_meta;
-    std::shared_ptr<TableMeeta> table_meta_opt;
+    std::shared_ptr<DBMeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta_opt;
     std::string table_key;
     TxnTimeStamp create_timestamp;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, create_timestamp, &table_key);
@@ -668,7 +668,7 @@ Status NewTxn::Compact(const std::string &db_name, const std::string &table_name
         return status;
     }
 
-    TableMeeta &table_meta = *table_meta_opt;
+    TableMeta &table_meta = *table_meta_opt;
     status = table_meta.CheckSegments(segment_ids);
     if (!status.ok()) {
         return status;
@@ -789,7 +789,7 @@ Status NewTxn::Compact(const std::string &db_name, const std::string &table_name
     for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
         const std::string &index_id_str = (*index_id_strs_ptr)[i];
         const std::string &index_name = (*index_name_ptr)[i];
-        TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta);
+        TableIndexMeta table_index_meta(index_id_str, index_name, table_meta);
 
         status = this->PopulateIndex(db_name,
                                      table_name,
@@ -807,7 +807,7 @@ Status NewTxn::Compact(const std::string &db_name, const std::string &table_name
     return Status::OK();
 }
 
-Status NewTxn::CheckTableIfDelete(TableMeeta &table_meta, bool &has_delete) {
+Status NewTxn::CheckTableIfDelete(TableMeta &table_meta, bool &has_delete) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     Status status = NewCatalog::CheckTableIfDelete(table_meta, begin_ts, has_delete);
     if (!status.ok()) {
@@ -820,14 +820,14 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd) {
     Status status;
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
-    std::shared_ptr<DBMeeta> db_meta;
-    std::shared_ptr<TableMeeta> table_meta_opt;
+    std::shared_ptr<DBMeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta_opt;
     TxnTimeStamp create_timestamp;
     status = GetTableMeta(compact_cmd->db_name_, compact_cmd->table_name_, db_meta, table_meta_opt, create_timestamp);
     if (!status.ok()) {
         return status;
     }
-    TableMeeta &table_meta = *table_meta_opt;
+    TableMeta &table_meta = *table_meta_opt;
 
     for (const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
         status = NewCatalog::LoadFlushedSegment2(table_meta, segment_info, fake_commit_ts);
@@ -870,14 +870,14 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_t
                 for (const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
                     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
-                    std::shared_ptr<DBMeeta> db_meta;
-                    std::shared_ptr<TableMeeta> table_meta_opt;
+                    std::shared_ptr<DBMeta> db_meta;
+                    std::shared_ptr<TableMeta> table_meta_opt;
                     TxnTimeStamp create_timestamp;
                     status = GetTableMeta(compact_cmd->db_name_, compact_cmd->table_name_, db_meta, table_meta_opt, create_timestamp);
                     if (!status.ok()) {
                         return status;
                     }
-                    TableMeeta &table_meta = *table_meta_opt;
+                    TableMeta &table_meta = *table_meta_opt;
                     status = NewCatalog::LoadImportedOrCompactedSegment(table_meta, segment_info, fake_commit_ts);
                     if (!status.ok()) {
                         return status;
@@ -905,14 +905,14 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_t
 
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
-    std::shared_ptr<DBMeeta> db_meta;
-    std::shared_ptr<TableMeeta> table_meta_opt;
+    std::shared_ptr<DBMeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta_opt;
     TxnTimeStamp create_timestamp;
     Status status = GetTableMeta(compact_cmd->db_name_, compact_cmd->table_name_, db_meta, table_meta_opt, create_timestamp);
     if (!status.ok()) {
         return status;
     }
-    TableMeeta &table_meta = *table_meta_opt;
+    TableMeta &table_meta = *table_meta_opt;
 
     for (const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
         status = NewCatalog::LoadFlushedSegment2(table_meta, segment_info, fake_commit_ts);
@@ -1183,7 +1183,7 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
         }
 
         std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs_ptr;
-        TableMeeta &table_meta = block_meta.segment_meta().table_meta();
+        TableMeta &table_meta = block_meta.segment_meta().table_meta();
         std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
         if (!status.ok()) {
             return status;
@@ -1200,7 +1200,7 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
 }
 
 Status
-NewTxn::AddColumnsData(TableMeeta &table_meta, const std::vector<std::shared_ptr<ColumnDef>> &column_defs, const std::vector<u32> &column_idx_list) {
+NewTxn::AddColumnsData(TableMeta &table_meta, const std::vector<std::shared_ptr<ColumnDef>> &column_defs, const std::vector<u32> &column_idx_list) {
     Status status;
     std::vector<SegmentID> *segment_ids_ptr = nullptr;
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
@@ -1352,7 +1352,7 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
     return Status::OK();
 }
 
-Status NewTxn::DropColumnsData(TableMeeta &table_meta, const std::vector<ColumnID> &column_ids) {
+Status NewTxn::DropColumnsData(TableMeta &table_meta, const std::vector<ColumnID> &column_ids) {
     Status status;
     std::vector<SegmentID> *segment_ids_ptr;
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
@@ -1418,7 +1418,7 @@ Status NewTxn::DropColumnsData(TableMeeta &table_meta, const std::vector<ColumnI
     return Status::OK();
 }
 
-Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store) {
+Status NewTxn::CheckpointTable(TableMeta &table_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store) {
     Status status;
 
     std::vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -1513,7 +1513,7 @@ Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
     const std::string &table_name = import_cmd->table_name_;
 
     WalSegmentInfo &segment_info = import_cmd->segment_info_;
-    TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
+    TableMeta table_meta(db_id_str, table_id_str, table_name, this);
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
 
     Status status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);
@@ -1553,7 +1553,7 @@ Status NewTxn::PrepareCommitReplayImport(WalCmdImportV2 *import_cmd) {
     const std::string &table_name = import_cmd->table_name_;
 
     WalSegmentInfo &segment_info = import_cmd->segment_info_;
-    TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
+    TableMeta table_meta(db_id_str, table_id_str, table_name, this);
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
 
     Status status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);
@@ -1588,7 +1588,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     const std::string &db_id_str = append_cmd->db_id_;
     const std::string &table_id_str = append_cmd->table_id_;
     TxnTimeStamp commit_ts = CommitTS();
-    TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
+    TableMeta table_meta(db_id_str, table_id_str, table_name, this);
     table_meta.SetDBTableName(db_name, table_name);
     std::optional<SegmentMeta> segment_meta;
     std::optional<BlockMeta> block_meta;
@@ -1598,7 +1598,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     if (!status.ok()) {
         return status;
     }
-    std::vector<std::shared_ptr<TableIndexMeeta>> table_index_metas;
+    std::vector<std::shared_ptr<TableIndexMeta>> table_index_metas;
     std::vector<std::string> *index_name_strs = nullptr;
     if (!this->IsReplay()) {
         std::vector<std::string> *index_id_strs = nullptr;
@@ -1611,7 +1611,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
         for (size_t i = 0; i < index_id_strs->size(); ++i) {
             const std::string &index_id_str = (*index_id_strs)[i];
             const std::string &index_name_str = (*index_name_strs)[i];
-            table_index_metas.push_back(std::make_shared<TableIndexMeeta>(index_id_str, index_name_str, table_meta));
+            table_index_metas.push_back(std::make_shared<TableIndexMeta>(index_id_str, index_name_str, table_meta));
         }
     }
 
@@ -1711,7 +1711,7 @@ Status NewTxn::PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd) {
     const std::string &table_id_str = delete_cmd->table_id_;
     const std::string &table_name = delete_cmd->table_name_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
+    TableMeta table_meta(db_id_str, table_id_str, table_name, this);
 
     std::optional<SegmentMeta> segment_meta;
     std::optional<BlockMeta> block_meta;
@@ -1763,7 +1763,7 @@ Status NewTxn::RollbackDelete(const DeleteTxnStore *delete_txn_store) {
     const std::string &table_id_str = delete_txn_store->table_id_str_;
     const std::string &table_name = delete_txn_store->table_name_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
+    TableMeta table_meta(db_id_str, table_id_str, table_name, this);
 
     std::optional<SegmentMeta> segment_meta;
     std::optional<BlockMeta> block_meta;
@@ -1808,7 +1808,7 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
     WalSegmentInfo &segment_info = segment_infos[0];
     std::vector<SegmentID> new_segment_ids{segment_info.segment_id_};
 
-    TableMeeta table_meta(db_id_str, table_id_str, table_name, this);
+    TableMeta table_meta(db_id_str, table_id_str, table_name, this);
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
 
     status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);
@@ -1848,7 +1848,7 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
             const std::string &index_id_str = index_id_strs_ptr->at(idx);
             const std::string &index_name_str = index_name_strs_ptr->at(idx);
 
-            TableIndexMeeta table_index_meta(index_id_str, index_name_str, table_meta);
+            TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
             std::vector<SegmentID> *segment_ids_ptr = nullptr;
             std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
             if (!status.ok()) {
@@ -1883,7 +1883,7 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp checkpoint_ts) {
+Status NewTxn::CommitCheckpointTableData(TableMeta &table_meta, TxnTimeStamp checkpoint_ts) {
     Status status;
 
     std::vector<SegmentID> *segment_ids_ptr = nullptr;

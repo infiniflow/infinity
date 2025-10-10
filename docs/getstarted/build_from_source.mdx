@@ -254,10 +254,10 @@ cmake --build . -t test_main
   </TabItem>
   <TabItem value="codecoverage">
 
-1. Install the `Gcovr` dependency:
+1. Install the `llvm-20` dependency:
 
    ```shell
-   pip install gcovr
+   sudo apt install llvm-20
    ```
 
 2. Build and run the unit tests with code coverage enabled:
@@ -265,15 +265,16 @@ cmake --build . -t test_main
    ```shell
    cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
    cmake --build . -t test_main
-   find . -name "*.gcda"  | xargs rm -f
+   find . -name "infinity*.profraw" | xargs rm -f
+   export LLVM_PROFILE_FILE="infinity-%p.profraw"
    ./cmake-build-debug/src/test_main
    ```
 
-3. Use Gcovr to generate summarized code coverage results:
+3. Use llvm-cov-20 to generate summarized code coverage results:
 
    ```shell
-   cd ./cmake-build-debug/src/CMakeFiles/unit_test.dir
-   gcovr --gcov-executable "llvm-cov gcov" -r "YOUR_ABSOLUTE_PATH_OF_THE_PROJECT/infinity/src" --gcov-exclude-directories ${PWD}'/unit_test' . --html unit_test_html.html
+   llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata
+   llvm-cov-20 export cmake-build-debug/src/test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
    ```
 
   </TabItem>
@@ -299,7 +300,7 @@ cmake --build . -t test_main
 
 2. Install Python sdk of infinity:
    ```bash
-   pip install infinity-sdk==0.6.0.dev6
+   pip install infinity-sdk==0.6.0.dev7
    ```
 
 3. Run the functional tests:
@@ -311,7 +312,7 @@ cmake --build . -t test_main
   </TabItem>
   <TabItem value="ubuntu">
 
-1. Build and start up the Infinity server with code coverage enabled:
+1. Build and start up the Infinity server:
 
    ```shell
    cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
@@ -321,7 +322,7 @@ cmake --build . -t test_main
 
 2. Install Python sdk of infinity:
    ```bash
-   pip install infinity-sdk==0.6.0.dev6
+   pip install infinity-sdk==0.6.0.dev7
    ```
 
 3. Run the functional tests: 
@@ -338,13 +339,15 @@ cmake --build . -t test_main
    ```shell
    cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
    cmake --build . -t infinity
-   find . -name "*.gcda"  | xargs rm -f
+   find . -name "infinity*.profraw"  | xargs rm -f
+   export LLVM_PROFILE_FILE="infinity-%p.profraw"
+   export LLVM_PROFILE_DUMP_ON_EXIT=1
    ./cmake-build-debug/src/infinity
    ```
 
 2. Install Python sdk of infinity:
    ```bash
-   pip install infinity-sdk==0.6.0.dev6
+   pip install infinity-sdk==0.6.0.dev7
    ```
 
 3. Run the functional tests: 
@@ -356,14 +359,14 @@ cmake --build . -t test_main
 4. Shut down the Infinity server:
 
    ```shell
-   kill -15 `pidof infinity`
+   kill `pidof infinity`
    ```
 
-5. Use Gcovr to generate summarized code coverage results:
+5. Use llvm-cov-20 to generate summarized code coverage results:
 
    ```shell
-   cd ./cmake-build-debug/src/CMakeFiles
-   gcovr --gcov-executable "llvm-cov gcov" -r "YOUR_ABSOLUTE_PATH_OF_THE_PROJECT/infinity/src" --gcov-exclude-directories ${PWD}'/unit_test' . --html function_test_html.html
+      llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata
+      llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
    ```
 
   </TabItem>

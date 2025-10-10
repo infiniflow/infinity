@@ -27,7 +27,7 @@ import :index_base;
 import :emvb_product_quantization;
 import :column_vector;
 import :block_index;
-import :table_meeta;
+import :table_meta;
 import :segment_meta;
 import :new_txn;
 import :buffer_obj;
@@ -91,7 +91,7 @@ void EMVBIndexInMem::Insert(const ColumnVector &column_vector,
                                                       residual_pq_subspace_num_,
                                                       residual_pq_subspace_bits_);
 
-            TableMeeta table_meta(db_id_str_, table_id_str_, table_name_, &kv_instance, begin_ts, MAX_TIMESTAMP, meta_cache);
+            TableMeta table_meta(db_id_str_, table_id_str_, table_name_, &kv_instance, begin_ts, MAX_TIMESTAMP, meta_cache);
             SegmentMeta segment_meta(segment_id_, table_meta);
             emvb_index_->BuildEMVBIndex(begin_row_id_, row_count_, segment_meta, column_def_);
             if (emvb_index_->GetDocNum() != row_count_ || emvb_index_->GetTotalEmbeddingNum() != embedding_count_) {

@@ -20,7 +20,7 @@ import :block_meta;
 import :kv_code;
 import :kv_store;
 import :segment_meta;
-import :table_meeta;
+import :table_meta;
 import :new_catalog;
 import :infinity_context;
 import :buffer_manager;
@@ -206,7 +206,7 @@ std::tuple<BufferObj *, Status> BlockMeta::GetVersionBuffer() {
 
         // Get block directory without acquiring lock again (avoid recursive lock)
         if (block_dir_ == nullptr) {
-            TableMeeta &table_meta = segment_meta_.table_meta();
+            TableMeta &table_meta = segment_meta_.table_meta();
             block_dir_ = std::make_shared<std::string>(
                 fmt::format("db_{}/tbl_{}/seg_{}/blk_{}", table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_));
         }
@@ -232,7 +232,7 @@ std::vector<std::string> BlockMeta::FilePaths() {
 std::shared_ptr<std::string> BlockMeta::GetBlockDir() {
     std::lock_guard<std::mutex> lock(mtx_);
     if (block_dir_ == nullptr) {
-        TableMeeta &table_meta = segment_meta_.table_meta();
+        TableMeta &table_meta = segment_meta_.table_meta();
         block_dir_ = std::make_shared<std::string>(
             fmt::format("db_{}/tbl_{}/seg_{}/blk_{}", table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_));
     }
@@ -259,7 +259,7 @@ std::tuple<std::vector<ColumnID> *, Status> BlockMeta::GetBlockColumnIDs1() {
 }
 
 std::string BlockMeta::GetBlockTag(const std::string &tag) const {
-    TableMeeta &table_meta = segment_meta_.table_meta();
+    TableMeta &table_meta = segment_meta_.table_meta();
     return KeyEncode::CatalogTableSegmentBlockTagKey(table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_, tag);
 }
 
@@ -271,7 +271,7 @@ std::tuple<size_t, Status> BlockMeta::GetRowCnt1() {
         }
     }
 #if 1
-    TableMeeta &table_meta = segment_meta_.table_meta();
+    TableMeta &table_meta = segment_meta_.table_meta();
     auto row_cnt = infinity::GetBlockRowCount(&kv_instance_,
                                               table_meta.db_id_str(),
                                               table_meta.table_id_str(),

@@ -38,9 +38,9 @@ import :inmem_index_segment_reader;
 import :segment_posting;
 import :infinity_context;
 import third_party;
-import :db_meeta;
-import :table_meeta;
-import :table_index_meeta;
+import :db_meta;
+import :table_meta;
+import :table_index_meta;
 import :new_txn;
 import :txn_state;
 import :new_txn_manager;
@@ -71,9 +71,9 @@ protected:
     optionflag_t flag_{OPTION_FLAG_ALL};
     std::vector<std::string> wiki_paragraphs_;
     std::vector<ExpectedPosting> expected_postings_;
-    std::shared_ptr<DBMeeta> db_meta_;
-    std::shared_ptr<TableMeeta> table_meta_;
-    std::shared_ptr<TableIndexMeeta> index_meta_;
+    std::shared_ptr<DBMeta> db_meta_;
+    std::shared_ptr<TableMeta> table_meta_;
+    std::shared_ptr<TableIndexMeta> index_meta_;
 
 public:
     void SetUp() override {

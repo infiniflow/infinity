@@ -43,10 +43,10 @@ import :status;
 import :parse_fulltext_options;
 import :block_index;
 import :new_txn;
-import :table_index_meeta;
+import :table_index_meta;
 import :segment_index_meta;
-import :table_meeta;
-import :db_meeta;
+import :table_meta;
+import :db_meta;
 import :kv_store;
 import :utility;
 
@@ -86,14 +86,14 @@ struct ExpressionIndexScanInfo {
     };
 
     // for index scan
-    TableMeeta *table_meta_ = nullptr;
-    std::unordered_map<ColumnID, std::shared_ptr<TableIndexMeeta>> new_candidate_column_index_map_;
+    TableMeta *table_meta_ = nullptr;
+    std::unordered_map<ColumnID, std::shared_ptr<TableIndexMeta>> new_candidate_column_index_map_;
 
     inline void NewInitColumnIndexEntries(TableInfo *table_info, NewTxn *new_txn, BaseTableRef *base_table_ref) {
         Status status;
         if (!base_table_ref->block_index_->table_meta_) {
             base_table_ref->block_index_->table_meta_ =
-                std::make_unique<TableMeeta>(table_info->db_id_, table_info->table_id_, *table_info->table_name_, new_txn);
+                std::make_unique<TableMeta>(table_info->db_id_, table_info->table_id_, *table_info->table_name_, new_txn);
         }
         table_meta_ = base_table_ref->block_index_->table_meta_.get();
         auto &table_index_meta_map = base_table_ref->block_index_->table_index_meta_map_;
@@ -111,10 +111,10 @@ struct ExpressionIndexScanInfo {
             const std::string &index_id_str = (*index_id_strs_ptr)[i];
             const std::string &index_name_str = (*index_name_strs_ptr)[i];
             if (table_index_meta_map.size() <= i) {
-                auto table_index_meta = std::make_shared<TableIndexMeeta>(index_id_str, index_name_str, *table_meta_);
+                auto table_index_meta = std::make_shared<TableIndexMeta>(index_id_str, index_name_str, *table_meta_);
                 table_index_meta_map.emplace_back(std::move(table_index_meta));
             }
-            std::shared_ptr<TableIndexMeeta> &it = table_index_meta_map[i];
+            std::shared_ptr<TableIndexMeta> &it = table_index_meta_map[i];
 
             std::shared_ptr<IndexBase> index_base;
             std::tie(index_base, status) = it->GetIndexBase();
@@ -452,7 +452,7 @@ private:
                         case FilterCompareType::kEqual:
                         case FilterCompareType::kLessEqual:
                         case FilterCompareType::kGreaterEqual: {
-                            std::shared_ptr<TableIndexMeeta> secondary_index = tree_info_.new_candidate_column_index_map_.at(column_id);
+                            std::shared_ptr<TableIndexMeta> secondary_index = tree_info_.new_candidate_column_index_map_.at(column_id);
                             return IndexFilterEvaluatorSecondary::Make(function_expression, column_id, secondary_index, compare_type, value);
                         }
                         case FilterCompareType::kAlwaysTrue: {

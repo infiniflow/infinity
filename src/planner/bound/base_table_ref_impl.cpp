@@ -16,7 +16,7 @@ module infinity_core:base_table_ref.impl;
 
 import :base_table_ref;
 import :table_ref;
-import :table_function;
+import :table_function_data;
 import :infinity_exception;
 import :meta_info;
 import :status;

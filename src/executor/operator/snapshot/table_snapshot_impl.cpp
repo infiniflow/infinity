@@ -22,8 +22,8 @@ import :status;
 import :config;
 import :infinity_exception;
 import :snapshot_info;
-import :db_meeta;
-import :table_meeta;
+import :db_meta;
+import :table_meta;
 import :txn_state;
 import :logger;
 
@@ -67,7 +67,7 @@ Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const std::st
     // Start timing for overall snapshot restoration
     // auto snapshot_restoration_start = std::chrono::high_resolution_clock::now();
 
-    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<DBMeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = txn_ptr->GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {

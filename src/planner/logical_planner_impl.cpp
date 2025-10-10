@@ -76,8 +76,8 @@ import :infinity_context;
 import :block_index;
 import :new_txn;
 import :meta_info;
-import :db_meeta;
-import :table_meeta;
+import :db_meta;
+import :table_meta;
 import :new_catalog;
 import :kv_store;
 import :query_context;
@@ -294,8 +294,8 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, std::s
 
     std::shared_ptr<TableInfo> table_info;
     NewTxn *new_txn = query_context_ptr_->GetNewTxn();
-    std::shared_ptr<DBMeeta> db_meta;
-    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<DBMeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta;
     std::string table_key;
     TxnTimeStamp create_timestamp;
     Status status = new_txn->GetTableMeta(schema_name, table_name, db_meta, table_meta, create_timestamp, &table_key);
@@ -457,8 +457,8 @@ Status LogicalPlanner::BuildInsertSelect(const InsertStatement *statement, std::
 
     std::shared_ptr<TableInfo> table_info;
     NewTxn *new_txn = query_context_ptr_->GetNewTxn();
-    std::shared_ptr<DBMeeta> db_meta;
-    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<DBMeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta;
     std::string table_key;
     TxnTimeStamp create_timestamp;
     Status status = new_txn->GetTableMeta(schema_name, table_name, db_meta, table_meta, create_timestamp, &table_key);
@@ -817,8 +817,8 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
     std::unique_ptr<QueryBinder> query_binder_ptr = std::make_unique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
 
-    std::shared_ptr<DBMeeta> db_meta;
-    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<DBMeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta;
     TxnTimeStamp create_timestamp;
     Status status = new_txn->GetTableMeta(*base_table_ref->table_info_->db_name_,
                                           *base_table_ref->table_info_->table_name_,
@@ -1083,8 +1083,8 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, std::shared_p
     std::shared_ptr<TableInfo> table_info;
     Status status;
     NewTxn *new_txn = query_context_ptr_->GetNewTxn();
-    std::shared_ptr<DBMeeta> db_meta;
-    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<DBMeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta;
     TxnTimeStamp create_timestamp;
     status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
@@ -1236,8 +1236,8 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, std::shared_p
     // Check the table existence
     std::shared_ptr<TableInfo> table_info;
     NewTxn *new_txn = query_context_ptr_->GetNewTxn();
-    std::shared_ptr<DBMeeta> db_meta;
-    std::shared_ptr<TableMeeta> table_meta;
+    std::shared_ptr<DBMeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta;
     TxnTimeStamp create_timestamp;
     Status status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
@@ -1274,8 +1274,8 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, std::shared_ptr<Bin
     }
     NewTxn *new_txn = query_context_ptr_->GetNewTxn();
     Status status;
-    std::shared_ptr<TableMeeta> table_meta;
-    std::shared_ptr<DBMeeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta;
+    std::shared_ptr<DBMeta> db_meta;
     TxnTimeStamp create_timestamp;
     status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
@@ -1393,8 +1393,8 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, s
         case CommandType::kCheckTable: {
             CheckTable *check_table = (CheckTable *)(command_statement->command_info_.get());
             auto *new_txn = query_context_ptr_->GetNewTxn();
-            std::shared_ptr<DBMeeta> db_meta;
-            std::shared_ptr<TableMeeta> table_meta;
+            std::shared_ptr<DBMeta> db_meta;
+            std::shared_ptr<TableMeta> table_meta;
             TxnTimeStamp create_timestamp;
             Status status =
                 new_txn->GetTableMeta(query_context_ptr_->schema_name(), check_table->table_name(), db_meta, table_meta, create_timestamp);
@@ -2180,8 +2180,8 @@ Status LogicalPlanner::BuildCheck(const CheckStatement *statement, std::shared_p
             }
 
             NewTxn *new_txn = query_context_ptr_->GetNewTxn();
-            std::shared_ptr<DBMeeta> db_meta;
-            std::shared_ptr<TableMeeta> table_meta;
+            std::shared_ptr<DBMeta> db_meta;
+            std::shared_ptr<TableMeta> table_meta;
             std::string table_key;
 
             if (!statement->schema_name_.has_value()) {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export module infinity_core:table_meeta;
+export module infinity_core:table_meta;
 
 import :status;
 import :new_catalog;
@@ -33,18 +33,18 @@ class NewTxn;
 struct TableDetail;
 class MetaTableCache;
 
-export class TableMeeta {
+export class TableMeta {
 public:
-    // TableMeeta(const std::string &db_id_str, const std::string &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts, UsageEnum usage);
-    TableMeeta(const std::string &db_id_str,
-               const std::string &table_id_str,
-               const std::string &table_name,
-               KVInstance *kv_instance,
-               TxnTimeStamp begin_ts,
-               TxnTimeStamp commit_ts,
-               MetaCache *meta_cache);
+    // TableMeta(const std::string &db_id_str, const std::string &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts, UsageEnum usage);
+    TableMeta(const std::string &db_id_str,
+              const std::string &table_id_str,
+              const std::string &table_name,
+              KVInstance *kv_instance,
+              TxnTimeStamp begin_ts,
+              TxnTimeStamp commit_ts,
+              MetaCache *meta_cache);
 
-    TableMeeta(const std::string &db_id_str, const std::string &table_id_str, const std::string &table_name, NewTxn *txn);
+    TableMeta(const std::string &db_id_str, const std::string &table_id_str, const std::string &table_name, NewTxn *txn);
 
     TxnTimeStamp begin_ts() const { return begin_ts_; }
     TxnTimeStamp commit_ts() const { return commit_ts_; }

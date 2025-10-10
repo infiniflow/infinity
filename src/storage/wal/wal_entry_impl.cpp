@@ -31,7 +31,7 @@ import :index_defines;
 import :infinity_context;
 import :virtual_store;
 import :chunk_index_meta;
-import :table_meeta;
+import :table_meta;
 import :segment_meta;
 import :block_meta;
 import :column_meta;

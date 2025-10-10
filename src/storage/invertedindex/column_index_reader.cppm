@@ -30,7 +30,7 @@ namespace infinity {
 export class TermDocIterator;
 class NewTxn;
 class MemoryIndexer;
-class TableIndexMeeta;
+class TableIndexMeta;
 class BufferObj;
 struct SegmentIndexFtInfo;
 
@@ -47,7 +47,7 @@ export class ColumnIndexReader {
 public:
     ~ColumnIndexReader();
 
-    Status Open(optionflag_t flag, TableIndexMeeta &table_index_meta);
+    Status Open(optionflag_t flag, TableIndexMeta &table_index_meta);
 
     std::unique_ptr<PostingIterator> Lookup(const std::string &term, bool fetch_position = true);
 

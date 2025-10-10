@@ -26,7 +26,7 @@ import :expression_state;
 import :status;
 import :logger;
 import :simd_functions;
-import :table_index_meeta;
+import :table_index_meta;
 import :segment_index_meta;
 import :block_meta;
 
@@ -51,7 +51,7 @@ std::unique_ptr<KnnDistanceBase1> InitDistanceBase(KnnDistanceType distance_type
 
 KnnScanSharedData::KnnScanSharedData(std::shared_ptr<BaseTableRef> table_ref,
                                      std::unique_ptr<std::vector<BlockMeta *>> block_metas,
-                                     std::shared_ptr<TableIndexMeeta> table_index_meta,
+                                     std::shared_ptr<TableIndexMeta> table_index_meta,
                                      std::unique_ptr<std::vector<std::shared_ptr<SegmentIndexMeta>>> segment_index_metas,
                                      std::vector<InitParameter> opt_params,
                                      i64 topk,

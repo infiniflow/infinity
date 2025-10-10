@@ -31,7 +31,7 @@ import data_type;
 namespace infinity {
 
 class BufferObj;
-class TableIndexMeeta;
+class TableIndexMeta;
 
 template <typename T>
 concept KeepOrderedSelf = IsAnyOf<T, TinyIntT, SmallIntT, IntegerT, BigIntT, FloatT, DoubleT>;
@@ -192,8 +192,8 @@ export template <typename CardinalityTag>
 SecondaryIndexDataBase<CardinalityTag> *
 GetSecondaryIndexDataWithCardinality(const std::shared_ptr<DataType> &data_type, u32 chunk_row_count, bool allocate);
 
-// Factory function that determines cardinality from TableIndexMeeta
+// Factory function that determines cardinality from TableIndexMeta
 export void *
-GetSecondaryIndexDataWithMeeta(const std::shared_ptr<DataType> &data_type, u32 chunk_row_count, bool allocate, TableIndexMeeta *table_index_meeta);
+GetSecondaryIndexDataWithMeta(const std::shared_ptr<DataType> &data_type, u32 chunk_row_count, bool allocate, TableIndexMeta *table_index_meta);
 
 } // namespace infinity

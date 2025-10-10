@@ -33,12 +33,12 @@ import :data_block;
 import :column_vector;
 import :value;
 import :new_catalog;
-import :db_meeta;
-import :table_meeta;
+import :db_meta;
+import :table_meta;
 import :segment_meta;
 import :block_meta;
 import :column_meta;
-import :table_index_meeta;
+import :table_index_meta;
 import :segment_index_meta;
 import :chunk_index_meta;
 import :catalog_meta;
@@ -981,8 +981,8 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_append) {
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
@@ -1116,9 +1116,9 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_dump_index) {
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, "index_name", db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -1262,9 +1262,9 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_optimize_index) {
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, "index_name", db_meta, table_meta, table_index_meta, &table_key, &index_key);

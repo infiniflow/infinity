@@ -26,7 +26,7 @@ import :column_index_reader;
 import :value;
 import :doc_iterator;
 import :parse_fulltext_options;
-import :table_index_meeta;
+import :table_index_meta;
 
 import logical_type;
 
@@ -59,14 +59,14 @@ export struct IndexFilterEvaluatorSecondary : IndexFilterEvaluator {
     std::vector<const BaseExpression *> src_filter_secondary_index_expressions_;
     ColumnID column_id_ = std::numeric_limits<ColumnID>::max();
     LogicalType column_logical_type_ = LogicalType::kInvalid;
-    std::shared_ptr<TableIndexMeeta> new_secondary_index_ = nullptr;
+    std::shared_ptr<TableIndexMeta> new_secondary_index_ = nullptr;
 
     ColumnID column_id() const { return column_id_; }
     virtual bool IsValid() const = 0;
     virtual void Merge(IndexFilterEvaluatorSecondary &other, Type op) = 0;
     static std::unique_ptr<IndexFilterEvaluatorSecondary> Make(const BaseExpression *src_filter_secondary_index_expressions,
                                                                ColumnID column_id,
-                                                               std::shared_ptr<TableIndexMeeta> new_secondary_index,
+                                                               std::shared_ptr<TableIndexMeta> new_secondary_index,
                                                                FilterCompareType compare_type,
                                                                const Value &val);
 
@@ -74,7 +74,7 @@ protected:
     IndexFilterEvaluatorSecondary(const BaseExpression *src_expr,
                                   const ColumnID column_id,
                                   const LogicalType column_logical_type,
-                                  std::shared_ptr<TableIndexMeeta> new_secondary_index)
+                                  std::shared_ptr<TableIndexMeta> new_secondary_index)
         : IndexFilterEvaluator(Type::kSecondaryIndex), src_filter_secondary_index_expressions_({src_expr}), column_id_(column_id),
           column_logical_type_(column_logical_type), new_secondary_index_(std::move(new_secondary_index)) {}
 };

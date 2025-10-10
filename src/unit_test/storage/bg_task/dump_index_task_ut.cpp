@@ -36,9 +36,9 @@ import :txn_state;
 import :data_block;
 import :new_txn_manager;
 import :new_txn;
-import :db_meeta;
-import :table_meeta;
-import :table_index_meeta;
+import :db_meta;
+import :table_meta;
+import :table_index_meta;
 import :segment_index_meta;
 import :chunk_index_meta;
 import :index_secondary;
@@ -118,9 +118,9 @@ TEST_P(DumpMemIndexTaskTest, DISABLED_SLOW_row_cnt_exceed_memindex_capacity) {
         auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         auto status = txn->GetTableIndexMeta(*db_name, *table_name, *index_name1, db_meta, table_meta, table_index_meta, &table_key, &index_key);
@@ -169,9 +169,9 @@ TEST_P(DumpMemIndexTaskTest, DISABLED_SLOW_row_cnt_exceed_memindex_capacity) {
         auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kRead);
 
-        std::shared_ptr<DBMeeta> db_meta;
-        std::shared_ptr<TableMeeta> table_meta;
-        std::shared_ptr<TableIndexMeeta> table_index_meta;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
         auto status = txn->GetTableIndexMeta(*db_name, *table_name, *index_name1, db_meta, table_meta, table_index_meta, &table_key, &index_key);

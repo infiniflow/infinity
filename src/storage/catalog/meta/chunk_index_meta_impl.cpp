@@ -19,8 +19,8 @@ module infinity_core:chunk_index_meta.impl;
 import :chunk_index_meta;
 import :kv_code;
 import :kv_store;
-import :table_meeta;
-import :table_index_meeta;
+import :table_meta;
+import :table_index_meta;
 import :segment_index_meta;
 import :index_base;
 import :index_defines;
@@ -122,7 +122,7 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
         }
     }
 
-    TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
+    TableIndexMeta &table_index_meta = segment_index_meta_.table_index_meta();
 
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
@@ -242,7 +242,7 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
 
 Status ChunkIndexMeta::LoadSet() {
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-    TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
+    TableIndexMeta &table_index_meta = segment_index_meta_.table_index_meta();
 
     ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
     Status status = this->GetChunkInfo(chunk_info_ptr);
@@ -355,7 +355,7 @@ Status ChunkIndexMeta::LoadSet() {
 
 Status ChunkIndexMeta::RestoreSet() {
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-    TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
+    TableIndexMeta &table_index_meta = segment_index_meta_.table_index_meta();
 
     ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
     Status status = this->GetChunkInfo(chunk_info_ptr);
@@ -477,7 +477,7 @@ Status ChunkIndexMeta::RestoreSetFromSnapshot(const ChunkIndexMetaInfo &chunk_in
         }
     }
 
-    TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
+    TableIndexMeta &table_index_meta = segment_index_meta_.table_index_meta();
 
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
@@ -508,7 +508,7 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
     }
     index_buffer_->PickForCleanup();
 
-    TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
+    TableIndexMeta &table_index_meta = segment_index_meta_.table_index_meta();
     auto [index_def, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
         return index_status;
@@ -571,7 +571,7 @@ Status ChunkIndexMeta::SetChunkInfo(const ChunkIndexMetaInfo &chunk_info) {
 
 Status ChunkIndexMeta::FilePaths(std::vector<std::string> &paths) {
     Status status;
-    TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
+    TableIndexMeta &table_index_meta = segment_index_meta_.table_index_meta();
     auto [index_def, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
         return index_status;
@@ -619,7 +619,7 @@ Status ChunkIndexMeta::LoadChunkInfo() {
 }
 
 Status ChunkIndexMeta::LoadIndexBuffer() {
-    TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
+    TableIndexMeta &table_index_meta = segment_index_meta_.table_index_meta();
 
     std::string index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), segment_index_meta_.GetSegmentIndexDir()->c_str());
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
@@ -666,8 +666,8 @@ Status ChunkIndexMeta::LoadIndexBuffer() {
 }
 
 std::string ChunkIndexMeta::GetChunkIndexTag(const std::string &tag) const {
-    const TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
-    const TableMeeta &table_meta = table_index_meta.table_meta();
+    const TableIndexMeta &table_index_meta = segment_index_meta_.table_index_meta();
+    const TableMeta &table_meta = table_index_meta.table_meta();
     return KeyEncode::CatalogIdxChunkTagKey(table_meta.db_id_str(),
                                             table_meta.table_id_str(),
                                             table_index_meta.index_id_str(),
@@ -690,7 +690,7 @@ std::tuple<std::shared_ptr<ChunkIndexSnapshotInfo>, Status> ChunkIndexMeta::MapM
     chunk_index_snapshot_info->index_size_ = chunk_info_->index_size_;
 
     chunk_index_snapshot_info->index_filename_ = IndexFileName(chunk_id);
-    TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
+    TableIndexMeta &table_index_meta = segment_index_meta_.table_index_meta();
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
         return {nullptr, index_status};

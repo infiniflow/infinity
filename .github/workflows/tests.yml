@@ -109,13 +109,11 @@ jobs:
 
               for file in "${files[@]}"; do
                 if [ -f "$file" ]; then
-                  echo "Checking formatting: $file"
-                  sudo docker exec ${CHECK_CONTAINER} bash -c "cd /infinity; clang-format-20 $file > ${file}.formatted; diff $file ${file}.formatted 2>/dev/null"
-                  if [ $? -ne 0 ]; then
-                    echo "❌ $file needs formatting"
-                    HAS_ERROR=1
+                  if sudo docker exec ${CHECK_CONTAINER} bash -c "cd /infinity; clang-format-20 $file > ${file}.formatted; diff $file ${file}.formatted 2>/dev/null"; then
+                    echo "✅ $file"
                   else
-                    echo "✅ $file is properly formatted"
+                    echo "❌ $file"
+                    HAS_ERROR=1
                   fi
                   rm -f "${file}.formatted"
                 fi
@@ -223,8 +221,11 @@ jobs:
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TIMEOUT: 60
+          CODECOV_MAX_ATTEMPTS: 5
         with:
-          file: coverage.lcov
+          files: coverage.lcov
           flags: debug unit test
           name: debug_unit_test_coverage
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -287,15 +288,25 @@ jobs:
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
+          timeout 30s bash -c '
+            until find . -name "infinity*.profraw" -size +0 | grep -q .; do
+              sleep 1s
+            done
+          '
+          ls -lh infinity*.profraw
+          
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
           head -10 coverage.lcov
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
           mkdir -p ${ARTIFACTS_DIR}/coverage/debug_sqllogical_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_sqllogical_test
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TIMEOUT: 60
+          CODECOV_MAX_ATTEMPTS: 5
         with:
-          file: coverage.lcov
+          files: coverage.lcov
           flags: debug sqllogical test
           name: debug_sqllogical_test_coverage
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -397,15 +408,25 @@ jobs:
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
+          timeout 30s bash -c '
+            until find . -name "infinity*.profraw" -size +0 | grep -q .; do
+              sleep 1s
+            done
+          '
+          ls -lh infinity*.profraw
+          
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
           head -10 coverage.lcov
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
           mkdir -p ${ARTIFACTS_DIR}/coverage/debug_pysdk_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_pysdk_test
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TIMEOUT: 60
+          CODECOV_MAX_ATTEMPTS: 5
         with:
-          file: coverage.lcov
+          files: coverage.lcov
           flags: debug pysdk test
           name: debug_pysdk_test_coverage
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -467,15 +488,25 @@ jobs:
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
+          timeout 30s bash -c '
+            until find . -name "infinity*.profraw" -size +0 | grep -q .; do
+              sleep 1s
+            done
+          '
+          ls -lh infinity*.profraw
+          
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
           head -10 coverage.lcov
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
           mkdir -p ${ARTIFACTS_DIR}/coverage/debug_http_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_http_test
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TIMEOUT: 60
+          CODECOV_MAX_ATTEMPTS: 5
         with:
-          file: coverage.lcov
+          files: coverage.lcov
           flags: debug http test
           name: debug_http_test_coverage
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -538,15 +569,25 @@ jobs:
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
+          timeout 30s bash -c '
+            until find . -name "infinity*.profraw" -size +0 | grep -q .; do
+              sleep 1s
+            done
+          '
+          ls -lh infinity*.profraw
+          
+          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
           head -10 coverage.lcov
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
           mkdir -p ${ARTIFACTS_DIR}/coverage/debug_parallel_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_parallel_test
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TIMEOUT: 60
+          CODECOV_MAX_ATTEMPTS: 5
         with:
-          file: coverage.lcov
+          files: coverage.lcov
           flags: debug parallel test
           name: debug_parallel_test_coverage
           token: ${{ secrets.CODECOV_TOKEN }}
