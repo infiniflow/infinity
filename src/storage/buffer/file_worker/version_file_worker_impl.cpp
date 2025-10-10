@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <sys/mman.h>
+#include <unistd.h>
+
 module infinity_core:version_file_worker.impl;
 
 import :version_file_worker;
@@ -67,6 +72,11 @@ void VersionFileWorker::FreeInMemory() {
 size_t VersionFileWorker::GetMemoryCost() const { return capacity_ * sizeof(TxnTimeStamp); }
 
 bool VersionFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &base_ctx) {
+    if (mmap_true_) {
+        // return true;
+        munmap(mmap_true_, mmap_true_size_);
+    }
+
     if (data_ == nullptr) {
         UnrecoverableError("Data is not allocated.");
     }
@@ -74,7 +84,7 @@ bool VersionFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerS
 
     const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
     TxnTimeStamp ckp_ts = ctx.checkpoint_ts_;
-    bool is_full = data->SaveToFile(mmap_true_, ckp_ts, *file_handle_);
+    bool is_full = data->SaveToFile(mmap_true_, mmap_true_size_, ckp_ts, *file_handle_);
     if (is_full) {
         LOG_TRACE(fmt::format("Version file is full: {}", GetFilePath()));
         // if the version file is full, return true to spill to file
@@ -89,7 +99,7 @@ void VersionFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     // if (data_ != nullptr) {
     //     UnrecoverableError("Data is already allocated.");
     // }
-    auto *data = BlockVersion::LoadFromFile(file_handle_.get()).release();
+    auto *data = BlockVersion::LoadFromFile(mmap_true_, file_handle_.get()).release();
     data_ = static_cast<void *>(data);
 }
 

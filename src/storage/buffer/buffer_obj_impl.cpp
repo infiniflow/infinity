@@ -111,16 +111,10 @@ void BufferObj::CleanupTempFile() const {
     file_worker_->CleanupTempFile();
 }
 
-void BufferObj::LoadInner() {
-    std::unique_lock<std::mutex> locker(w_locker_);
-}
-
 void *BufferObj::GetMutPointer() {
     std::unique_lock<std::mutex> locker(w_locker_);
     return file_worker_->GetData();
 }
-
-void BufferObj::UnloadInner() { std::unique_lock<std::mutex> locker(w_locker_); }
 
 void BufferObj::SetData(void *data) {
     std::unique_lock<std::mutex> locker(w_locker_);

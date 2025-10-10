@@ -86,24 +86,28 @@ size_t VarFileWorker::GetMemoryCost() const {
 }
 
 bool VarFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+    if (mmap_true_) {
+        // return true;
+        munmap(mmap_true_, mmap_true_size_);
+    }
     if (data_ == nullptr) {
         UnrecoverableError("Data is not allocated.");
     }
     const auto *buffer = static_cast<const VarBuffer *>(data_);
-    size_t data_size = buffer->TotalSize();
-    auto buffer_data = std::make_unique<char[]>(data_size);
+    mmap_true_size_ = buffer->TotalSize();
+    auto buffer_data = std::make_unique<char[]>(mmap_true_size_);
     char *ptr = buffer_data.get();
     buffer->Write(ptr);
 
     auto fd = file_handle_->fd();
-    ftruncate(fd, data_size);
+    ftruncate(fd, mmap_true_size_);
 
-    mmap_true_ = mmap(nullptr, data_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    mmap_true_ = mmap(nullptr, mmap_true_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
-    std::memcpy(mmap_true_, buffer_data.get(), data_size);
+    std::memcpy(mmap_true_, buffer_data.get(), mmap_true_size_);
 
     prepare_success = true;
-    buffer_size_ = data_size;
+    buffer_size_ = mmap_true_size_;
     return true;
 }
 
@@ -113,22 +117,36 @@ void VarFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     // if (data_ != nullptr) {
     //     UnrecoverableError("Data is not allocated.");
     // }
-    if (file_size < buffer_size_) {
-        UnrecoverableError(fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_));
-    } else {
-        buffer_size_ = file_size;
-    }
+    if (!mmap_true_) {
+        if (file_size < buffer_size_) {
+            UnrecoverableError(fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_));
+        } else {
+            buffer_size_ = file_size;
+        }
 
-    auto buffer = std::make_unique<char[]>(buffer_size_);
-    auto [nbytes, status] = file_handle_->Read(buffer.get(), buffer_size_);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
+        auto buffer = std::make_unique<char[]>(buffer_size_);
+        auto [nbytes, status] = file_handle_->Read(buffer.get(), buffer_size_);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        if (nbytes != buffer_size_) {
+            UnrecoverableError(fmt::format("Read {} bytes from file failed, only {} bytes read.", buffer_size_, nbytes));
+        }
+        auto *var_buffer = new VarBuffer(buffer_obj_, std::move(buffer), buffer_size_);
+        data_ = static_cast<void *>(var_buffer);
+    } else {
+        if (file_size < buffer_size_) {
+            UnrecoverableError(fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_));
+        } else {
+            buffer_size_ = file_size;
+        }
+
+        size_t offset{};
+        auto buffer = std::make_unique<char[]>(buffer_size_);
+        std::memcpy(buffer.get(), (char *)mmap_true_ + offset, buffer_size_);
+        auto *var_buffer = new VarBuffer(buffer_obj_, std::move(buffer), buffer_size_);
+        data_ = static_cast<void *>(var_buffer);
     }
-    if (nbytes != buffer_size_) {
-        UnrecoverableError(fmt::format("Read {} bytes from file failed, only {} bytes read.", buffer_size_, nbytes));
-    }
-    auto *var_buffer = new VarBuffer(buffer_obj_, std::move(buffer), buffer_size_);
-    data_ = static_cast<void *>(var_buffer);
 }
 
 bool VarFileWorker::ReadFromMmapImpl(const void *ptr, size_t file_size) {

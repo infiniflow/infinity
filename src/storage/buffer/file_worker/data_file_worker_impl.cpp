@@ -83,10 +83,14 @@ bool DataFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSave
     // - data buffer
     // - footer: checksum
 
-    size_t mmap_len = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
+    // if (mmap_true_) {
+    //     return true;
+    // }
+
+    mmap_true_size_ = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
     auto fd = file_handle_->fd();
-    ftruncate(fd, mmap_len);
-    mmap_true_ = mmap(nullptr, mmap_len, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+    ftruncate(fd, mmap_true_size_);
+    mmap_true_ = mmap(nullptr, mmap_true_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
     size_t offset{};
 
     u64 magic_number = 0x00dd3344;
@@ -119,114 +123,90 @@ bool DataFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSave
 bool DataFileWorker::CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) { return true; }
 
 void DataFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
+    if (!mmap_true_) {
+        if (file_size < sizeof(u64) * 3) {
+            Status status = Status::DataIOError(fmt::format("Incorrect file length {}.", file_size));
+            RecoverableError(status);
+        }
 
-    if (file_size < sizeof(u64) * 3) {
-        Status status = Status::DataIOError(fmt::format("Incorrect file length {}.", file_size));
-        RecoverableError(status);
-    }
+        // file header: magic number, buffer_size
+        u64 magic_number{0};
+        auto [nbytes1, status1] = file_handle_->Read(&magic_number, sizeof(magic_number));
+        if (!status1.ok()) {
+            RecoverableError(status1);
+        }
+        if (nbytes1 != sizeof(magic_number)) {
+            Status status = Status::DataIOError(fmt::format("Read magic number which length isn't {}.", nbytes1));
+            RecoverableError(status);
+        }
+        if (magic_number != 0x00dd3344) {
+            Status status = Status::DataIOError(fmt::format("Read magic error, {} != 0x00dd3344.", magic_number));
+            RecoverableError(status);
+        }
 
-    // file header: magic number, buffer_size
-    u64 magic_number{0};
-    auto [nbytes1, status1] = file_handle_->Read(&magic_number, sizeof(magic_number));
-    if (!status1.ok()) {
-        RecoverableError(status1);
-    }
-    if (nbytes1 != sizeof(magic_number)) {
-        Status status = Status::DataIOError(fmt::format("Read magic number which length isn't {}.", nbytes1));
-        RecoverableError(status);
-    }
-    if (magic_number != 0x00dd3344) {
-        Status status = Status::DataIOError(fmt::format("Read magic error, {} != 0x00dd3344.", magic_number));
-        RecoverableError(status);
-    }
+        u64 buffer_size_{};
+        auto [nbytes2, status2] = file_handle_->Read(&buffer_size_, sizeof(buffer_size_));
+        if (nbytes2 != sizeof(buffer_size_)) {
+            Status status = Status::DataIOError(fmt::format("Unmatched buffer length: {} / {}", nbytes2, buffer_size_));
+            RecoverableError(status2);
+        }
 
-    u64 buffer_size_{};
-    auto [nbytes2, status2] = file_handle_->Read(&buffer_size_, sizeof(buffer_size_));
-    if (nbytes2 != sizeof(buffer_size_)) {
-        Status status = Status::DataIOError(fmt::format("Unmatched buffer length: {} / {}", nbytes2, buffer_size_));
-        RecoverableError(status2);
-    }
+        if (file_size != buffer_size_ + 3 * sizeof(u64)) {
+            Status status = Status::DataIOError(fmt::format("File size: {} isn't matched with {}.", file_size, buffer_size_ + 3 * sizeof(u64)));
+            RecoverableError(status);
+        }
 
-    if (file_size != buffer_size_ + 3 * sizeof(u64)) {
-        Status status = Status::DataIOError(fmt::format("File size: {} isn't matched with {}.", file_size, buffer_size_ + 3 * sizeof(u64)));
-        RecoverableError(status);
-    }
+        // file body
+        data_ = static_cast<void *>(new char[buffer_size_]);
+        auto [nbytes3, status3] = file_handle_->Read(data_, buffer_size_);
+        if (nbytes3 != buffer_size_) {
+            Status status = Status::DataIOError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes3));
+            RecoverableError(status);
+        }
 
-    // file body
-    data_ = static_cast<void *>(new char[buffer_size_]);
-    auto [nbytes3, status3] = file_handle_->Read(data_, buffer_size_);
-    if (nbytes3 != buffer_size_) {
-        Status status = Status::DataIOError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes3));
-        RecoverableError(status);
-    }
+        // file footer: checksum
+        u64 checksum{0};
+        auto [nbytes4, status4] = file_handle_->Read(&checksum, sizeof(checksum));
+        if (nbytes4 != sizeof(checksum)) {
+            Status status = Status::DataIOError(fmt::format("Incorrect file checksum length: {}.", nbytes4));
+            RecoverableError(status);
+        }
 
-    // file footer: checksum
-    u64 checksum{0};
-    auto [nbytes4, status4] = file_handle_->Read(&checksum, sizeof(checksum));
-    if (nbytes4 != sizeof(checksum)) {
-        Status status = Status::DataIOError(fmt::format("Incorrect file checksum length: {}.", nbytes4));
-        RecoverableError(status);
+    } else {
+        if (file_size < sizeof(u64) * 3) {
+            Status status = Status::DataIOError(fmt::format("Incorrect file length {}.", file_size));
+            RecoverableError(status);
+        }
+
+        size_t offset{};
+
+        // file header: magic number, buffer_size
+        u64 magic_number{0};
+        std::memcpy(&magic_number, (char *)mmap_true_ + offset, sizeof(magic_number));
+        offset += sizeof(magic_number);
+        if (magic_number != 0x00dd3344) {
+            Status status = Status::DataIOError(fmt::format("Read magic error, {} != 0x00dd3344.", magic_number));
+            RecoverableError(status);
+        }
+
+        u64 buffer_size_{};
+        std::memcpy(&buffer_size_, (char *)mmap_true_ + offset, sizeof(buffer_size_));
+        offset += sizeof(buffer_size_);
+
+        if (file_size != buffer_size_ + 3 * sizeof(u64)) {
+            Status status = Status::DataIOError(fmt::format("File size: {} isn't matched with {}.", file_size, buffer_size_ + 3 * sizeof(u64)));
+            RecoverableError(status);
+        }
+
+        // file body
+        data_ = static_cast<void *>(new char[buffer_size_]);
+        std::memcpy(data_, (char *)mmap_true_ + offset, buffer_size_);
+        offset += buffer_size_;
+
+        // file footer: checksum
+        u64 checksum{0};
+        std::memcpy(&checksum, (char *)mmap_true_ + offset, sizeof(checksum));
     }
-    //
-    //
-    //
-    //
-    // if (file_size < sizeof(u64) * 3) {
-    //     Status status = Status::DataIOError(fmt::format("Incorrect file length {}.", file_size));
-    //     RecoverableError(status);
-    // }
-    //
-    // size_t offset{};
-    //
-    // // file header: magic number, buffer_size
-    // u64 magic_number{0};
-    // std::memcpy(&magic_number, (char *)mmap_true_ + offset, sizeof(magic_number));
-    // offset += sizeof(magic_number);
-    // // auto [nbytes1, status1] = file_handle_->Read(&magic_number, sizeof(magic_number));
-    // // if (!status1.ok()) {
-    // //     RecoverableError(status1);
-    // // }
-    // // if (nbytes1 != sizeof(magic_number)) {
-    // //     Status status = Status::DataIOError(fmt::format("Read magic number which length isn't {}.", nbytes1));
-    // //     RecoverableError(status);
-    // // }
-    // if (magic_number != 0x00dd3344) {
-    //     Status status = Status::DataIOError(fmt::format("Read magic error, {} != 0x00dd3344.", magic_number));
-    //     RecoverableError(status);
-    // }
-    //
-    // u64 buffer_size_{};
-    // std::memcpy(&buffer_size_, (char *)mmap_true_ + offset, sizeof(buffer_size_));
-    // offset += sizeof(buffer_size_);
-    // // auto [nbytes2, status2] = file_handle_->Read(&buffer_size_, sizeof(buffer_size_));
-    // // if (nbytes2 != sizeof(buffer_size_)) {
-    // //     Status status = Status::DataIOError(fmt::format("Unmatched buffer length: {} / {}", nbytes2, buffer_size_));
-    // //     RecoverableError(status2);
-    // // }
-    //
-    // if (file_size != buffer_size_ + 3 * sizeof(u64)) {
-    //     Status status = Status::DataIOError(fmt::format("File size: {} isn't matched with {}.", file_size, buffer_size_ + 3 * sizeof(u64)));
-    //     RecoverableError(status);
-    // }
-    //
-    // // file body
-    // data_ = static_cast<void *>(new char[buffer_size_]);
-    // std::memcpy(data_, (char *)mmap_true_ + offset, buffer_size_);
-    // offset += buffer_size_;
-    // // // auto [nbytes3, status3] = file_handle_->Read(data_, buffer_size_);
-    // // if (nbytes3 != buffer_size_) {
-    // //     Status status = Status::DataIOError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes3));
-    // //     RecoverableError(status);
-    // // }
-    //
-    // // file footer: checksum
-    // u64 checksum{0};
-    // std::memcpy(&checksum, (char *)mmap_true_ + offset, sizeof(checksum));
-    // // auto [nbytes4, status4] = file_handle_->Read(&checksum, sizeof(checksum));
-    // // if (nbytes4 != sizeof(checksum)) {
-    // //     Status status = Status::DataIOError(fmt::format("Incorrect file checksum length: {}.", nbytes4));
-    // //     RecoverableError(status);
-    // // }
 }
 
 bool DataFileWorker::ReadFromMmapImpl(const void *p, size_t file_size) {

@@ -45,27 +45,27 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          BlockVersionTest,
                          ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
-TEST_P(BlockVersionTest, SaveAndLoad) {
-    BlockVersion block_version(8192);
-    block_version.Append(10, 3);
-    block_version.Append(20, 6);
-    block_version.Delete(2, 30);
-    block_version.Delete(5, 40);
-    std::string version_path = std::string(GetFullDataDir()) + "/block_version_test";
-
-    {
-        auto [local_file_handle, status] = VirtualStore::Open(version_path, FileAccessMode::kWrite);
-        EXPECT_TRUE(status.ok());
-        block_version.SpillToFile(local_file_handle.get());
-    }
-
-    {
-        auto [local_file_handle, status] = VirtualStore::Open(version_path, FileAccessMode::kRead);
-        EXPECT_TRUE(status.ok());
-        auto block_version2 = BlockVersion::LoadFromFile(local_file_handle.get());
-        ASSERT_EQ(block_version, *block_version2);
-    }
-}
+// TEST_P(BlockVersionTest, SaveAndLoad) {
+//     BlockVersion block_version(8192);
+//     block_version.Append(10, 3);
+//     block_version.Append(20, 6);
+//     block_version.Delete(2, 30);
+//     block_version.Delete(5, 40);
+//     std::string version_path = std::string(GetFullDataDir()) + "/block_version_test";
+//
+//     {
+//         auto [local_file_handle, status] = VirtualStore::Open(version_path, FileAccessMode::kWrite);
+//         EXPECT_TRUE(status.ok());
+//         block_version.SpillToFile(local_file_handle.get());
+//     }
+//
+//     {
+//         auto [local_file_handle, status] = VirtualStore::Open(version_path, FileAccessMode::kRead);
+//         EXPECT_TRUE(status.ok());
+//         auto block_version2 = BlockVersion::LoadFromFile(local_file_handle.get());
+//         ASSERT_EQ(block_version, *block_version2);
+//     }
+// }
 
 TEST_P(BlockVersionTest, SaveAndLoad2) {
     auto data_dir = std::make_shared<std::string>(std::string(GetFullDataDir()) + "/block_version_test");

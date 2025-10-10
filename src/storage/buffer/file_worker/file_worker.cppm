@@ -90,6 +90,7 @@ public:
     PersistenceManager *persistence_manager_{};
     ObjAddr obj_addr_;
     void *mmap_true_{};
+    size_t mmap_true_size_{};
 
 protected:
     void *data_{};
