@@ -105,23 +105,6 @@ NewTxn::NewTxn(NewTxnManager *txn_manager,
     txn_context_ptr_->txn_type_ = txn_type;
 }
 
-NewTxn::NewTxn(BufferManager *buffer_mgr,
-               NewTxnManager *txn_mgr,
-               TransactionID txn_id,
-               TxnTimeStamp begin_ts,
-               std::unique_ptr<KVInstance> kv_instance,
-               TransactionType txn_type)
-    : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), wal_entry_(std::make_shared<WalEntry>()), kv_instance_(std::move(kv_instance)) {
-    new_catalog_ = InfinityContext::instance().storage()->new_catalog();
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount("NewTxn");
-#endif
-    txn_context_ptr_ = TxnContext::Make();
-    txn_context_ptr_->txn_id_ = txn_id;
-    txn_context_ptr_->begin_ts_ = begin_ts;
-    txn_context_ptr_->txn_type_ = txn_type;
-}
-
 std::unique_ptr<NewTxn> NewTxn::NewReplayTxn(NewTxnManager *txn_mgr,
                                              TransactionID txn_id,
                                              TxnTimeStamp begin_ts,
@@ -150,9 +133,6 @@ NewTxn::~NewTxn() {
 
 TransactionID NewTxn::TxnID() const { return txn_context_ptr_->txn_id_; }
 
-void NewTxn::AddOperation(const std::shared_ptr<std::string> &operation_text) { txn_context_ptr_->AddOperation(operation_text); }
-std::vector<std::shared_ptr<std::string>> NewTxn::GetOperations() const { return txn_context_ptr_->GetOperations(); }
-
 void NewTxn::CheckTxnStatus() {
     TxnState txn_state = this->GetTxnState();
     if (txn_state != TxnState::kStarted) {
@@ -172,8 +152,6 @@ void NewTxn::CheckTxn(const std::string &db_name) {
 
 // Database OPs
 Status NewTxn::CreateDatabase(const std::string &db_name, ConflictType conflict_type, const std::shared_ptr<std::string> &comment) {
-    this->SetTxnType(TransactionType::kCreateDB);
-
     if (conflict_type == ConflictType::kReplace) {
         return Status::NotSupport("ConflictType::kReplace");
     }
@@ -271,8 +249,6 @@ Status NewTxn::ReplayCreateDb(WalCmdCreateDatabaseV2 *create_db_cmd, TxnTimeStam
 }
 
 Status NewTxn::DropDatabase(const std::string &db_name, ConflictType conflict_type) {
-    this->SetTxnType(TransactionType::kDropDB);
-
     if (conflict_type == ConflictType::kReplace) {
         return Status::NotSupport("ConflictType::kReplace");
     }
@@ -410,8 +386,6 @@ Status NewTxn::GetTables(const std::string &db_name, std::vector<std::shared_ptr
 }
 
 Status NewTxn::CreateTable(const std::string &db_name, const std::shared_ptr<TableDef> &table_def, ConflictType conflict_type) {
-    this->SetTxnType(TransactionType::kCreateTable);
-
     if (conflict_type == ConflictType::kReplace) {
         return Status::NotSupport("ConflictType::kReplace");
     }
@@ -536,8 +510,6 @@ Status NewTxn::ReplayCreateTable(WalCmdCreateTableV2 *create_table_cmd, TxnTimeS
 }
 
 Status NewTxn::DropTable(const std::string &db_name, const std::string &table_name, ConflictType conflict_type) {
-    this->SetTxnType(TransactionType::kDropTable);
-
     if (conflict_type == ConflictType::kReplace) {
         return Status::NotSupport("ConflictType::kReplace");
     }
@@ -635,8 +607,6 @@ Status NewTxn::ReplayDropTable(WalCmdDropTableV2 *drop_table_cmd, TxnTimeStamp c
 }
 
 Status NewTxn::RenameTable(const std::string &db_name, const std::string &old_table_name, const std::string &new_table_name) {
-    this->SetTxnType(TransactionType::kRenameTable);
-
     this->CheckTxnStatus();
     this->CheckTxn(db_name);
 
@@ -791,56 +761,6 @@ Status NewTxn::AddColumns(const std::string &db_name, const std::string &table_n
     return Status::OK();
 }
 
-Status NewTxn::ReplayAddColumns(WalCmdAddColumnsV2 *add_columns_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
-    // This implementation might have error, since not check the column id and create timestamp
-
-    std::shared_ptr<DBMeta> db_meta;
-    std::shared_ptr<TableMeta> table_meta;
-    std::string table_key;
-    TxnTimeStamp create_timestamp;
-    Status status = GetTableMeta(add_columns_cmd->db_name_, add_columns_cmd->table_name_, db_meta, table_meta, create_timestamp, &table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    // Construct added columns name map
-    std::set<size_t> column_idx_set;
-    std::set<std::string> column_name_set;
-    for (const auto &column_def : add_columns_cmd->column_defs_) {
-        column_idx_set.insert(column_def->id());
-        column_name_set.insert(column_def->name());
-    }
-
-    std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> old_column_defs;
-    std::tie(old_column_defs, status) = table_meta->GetColumnDefs();
-    if (!status.ok()) {
-        return status;
-    }
-
-    // TODO: TS also needed, check the column name / id / ts, Skip if they are same.
-    for (auto &column_def : *old_column_defs) {
-        if (column_name_set.contains(column_def->name())) {
-            LOG_WARN(fmt::format("Skipping replay add columns: Duplicate column name: {} in table: {}.{}.",
-                                 column_def->name(),
-                                 add_columns_cmd->db_name_,
-                                 add_columns_cmd->table_name_));
-            return Status::OK();
-        }
-        if (column_idx_set.contains(column_def->id())) {
-            return Status::DuplicateColumnIndex(fmt::format("Duplicate table column index: {}", column_def->id()));
-        }
-    }
-
-    // If columns don't exist, create them
-    status = PrepareCommitAddColumns(add_columns_cmd);
-    if (!status.ok()) {
-        return status;
-    }
-
-    LOG_TRACE(fmt::format("Replay add columns to table: {}.{}.", add_columns_cmd->db_name_, add_columns_cmd->table_name_));
-    return Status::OK();
-}
-
 Status NewTxn::DropColumns(const std::string &db_name, const std::string &table_name, const std::vector<std::string> &column_names) {
 
     if (column_names.empty()) {
@@ -940,68 +860,6 @@ Status NewTxn::DropColumns(const std::string &db_name, const std::string &table_
     return Status::OK();
 }
 
-Status NewTxn::ReplayDropColumns(WalCmdDropColumnsV2 *drop_columns_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
-
-    const std::string &db_name = drop_columns_cmd->db_name_;
-    const std::string &table_name = drop_columns_cmd->table_name_;
-
-    std::shared_ptr<DBMeta> db_meta;
-    std::shared_ptr<TableMeta> table_meta;
-    TxnTimeStamp create_timestamp;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
-    if (!status.ok()) {
-        return status;
-    }
-
-    for (size_t i = 0; i < drop_columns_cmd->column_names_.size(); ++i) {
-        const std::string &column_key = drop_columns_cmd->column_keys_[i];
-        TxnTimeStamp create_ts = infinity::GetTimestampFromKey(column_key);
-        std::string drop_column_key =
-            KeyEncode::DropTableColumnKey(drop_columns_cmd->db_id_, drop_columns_cmd->table_id_, drop_columns_cmd->column_names_[i], create_ts);
-        std::string drop_column_commit_ts_str;
-        status = kv_instance_->Get(drop_column_key, drop_column_commit_ts_str);
-        if (status.ok()) {
-            TxnTimeStamp drop_column_commit_ts = std::stoull(drop_column_commit_ts_str);
-            if (drop_column_commit_ts == commit_ts) {
-                LOG_WARN(fmt::format("Skipping replay drop column: Column {} created at {} in table {}.{} already dropped, commit ts: {}, txn: {}.",
-                                     drop_columns_cmd->column_names_[i],
-                                     create_ts,
-                                     db_name,
-                                     table_name,
-                                     commit_ts,
-                                     txn_id));
-                continue;
-            } else {
-                LOG_ERROR(fmt::format("Replay drop column: Column {} created at {} in table {}.{} already dropped with different "
-                                      "commit ts {}, commit ts: {}, txn: {}.",
-                                      drop_columns_cmd->column_names_[i],
-                                      create_ts,
-                                      db_name,
-                                      table_name,
-                                      drop_column_commit_ts,
-                                      commit_ts,
-                                      txn_id));
-                return Status::UnexpectedError("Column commit timestamp mismatch during replay of column drop.");
-            }
-        }
-    }
-
-    status = this->DropColumnsData(*table_meta, drop_columns_cmd->column_ids_);
-    if (!status.ok()) {
-        return status;
-    }
-
-    auto ts_str = std::to_string(commit_ts);
-    for (size_t i = 0; i < drop_columns_cmd->column_names_.size(); ++i) {
-        const std::string &column_key = drop_columns_cmd->column_keys_[i];
-        TxnTimeStamp create_ts = infinity::GetTimestampFromKey(column_key);
-        kv_instance_->Put(
-            KeyEncode::DropTableColumnKey(drop_columns_cmd->db_id_, drop_columns_cmd->table_id_, drop_columns_cmd->column_names_[i], create_ts),
-            ts_str);
-    }
-    return Status::OK();
-}
-
 Status NewTxn::ListTable(const std::string &db_name, std::vector<std::string> &table_names) {
     std::shared_ptr<DBMeta> db_meta;
     TxnTimeStamp db_create_ts;
@@ -1024,8 +882,6 @@ Status NewTxn::CreateIndex(const std::string &db_name,
                            const std::string &table_name,
                            const std::shared_ptr<IndexBase> &index_base,
                            ConflictType conflict_type) {
-    this->SetTxnType(TransactionType::kCreateIndex);
-
     if (conflict_type == ConflictType::kReplace) {
         return Status::NotSupport("ConflictType::kReplace");
     }
@@ -1519,7 +1375,6 @@ NewTxn::GetBlockColumnInfo(const std::string &db_name, const std::string &table_
 
 Status NewTxn::CreateTableSnapshot(const std::string &db_name, const std::string &table_name, const std::string &snapshot_name) {
     // Check if the DB is valid
-    this->SetTxnType(TransactionType::kCreateTableSnapshot);
     this->CheckTxn(db_name);
 
     std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
@@ -1588,7 +1443,6 @@ std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSna
 
 Status NewTxn::RestoreTableSnapshot(const std::string &db_name, const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info) {
     // Cleanup();
-    this->SetTxnType(TransactionType::kRestoreTable);
     const std::string &table_name = table_snapshot_info->table_name_;
     this->CheckTxn(db_name);
 
@@ -1668,7 +1522,6 @@ Status NewTxn::RestoreTableSnapshot(const std::string &db_name, const std::share
 
 Status NewTxn::RestoreDatabaseSnapshot(const std::shared_ptr<DatabaseSnapshotInfo> &database_snapshot_info) {
     // Cleanup();
-    this->SetTxnType(TransactionType::kRestoreDatabase);
     const std::string &db_name = database_snapshot_info->db_name_;
 
     std::shared_ptr<DBMeta> db_meta;
@@ -1936,16 +1789,6 @@ void NewTxn::SetTxnType(TransactionType type) {
     switch (txn_context_ptr_->txn_type_) {
         case TransactionType::kInvalid: {
             txn_context_ptr_->txn_type_ = type;
-            break;
-        }
-        case TransactionType::kUpdate: {
-            if (type == TransactionType::kAppend or type == TransactionType::kDelete) {
-                break;
-            } else {
-                UnrecoverableError(fmt::format("Attempt to change transaction type from {} to {}",
-                                               TransactionType2Str(txn_context_ptr_->txn_type_),
-                                               TransactionType2Str(type)));
-            }
             break;
         }
         case TransactionType::kOptimizeIndex: {
@@ -2944,14 +2787,6 @@ bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *pr
     const std::string &db_name = txn_store.db_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
-        case TransactionType::kCreateDB: {
-            CreateDBTxnStore *create_db_txn_store = static_cast<CreateDBTxnStore *>(previous_txn->base_txn_store_.get());
-            if (create_db_txn_store->db_name_ == db_name) {
-                retry_query = false;
-                conflict = true;
-            }
-            break;
-        }
         case TransactionType::kRestoreDatabase: {
             RestoreDatabaseTxnStore *restore_database_txn_store = static_cast<RestoreDatabaseTxnStore *>(previous_txn->base_txn_store_.get());
             if (restore_database_txn_store->db_name_ == db_name) {
@@ -3045,14 +2880,6 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn 
     const std::string &table_name = txn_store.table_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
-        case TransactionType::kCreateTable: {
-            CreateTableTxnStore *create_table_txn_store = static_cast<CreateTableTxnStore *>(previous_txn->base_txn_store_.get());
-            if (create_table_txn_store->db_name_ == db_name && create_table_txn_store->table_name_ == table_name) {
-                retry_query = false;
-                conflict = true;
-            }
-            break;
-        }
         case TransactionType::kRenameTable: {
             RenameTableTxnStore *rename_table_txn_store = static_cast<RenameTableTxnStore *>(previous_txn->base_txn_store_.get());
             if (rename_table_txn_store->db_name_ == db_name && rename_table_txn_store->new_table_name_ == table_name) {
@@ -5126,12 +4953,7 @@ Status NewTxn::ReplayWalCmd(const std::shared_ptr<WalCmd> &command, TxnTimeStamp
             break;
         }
         case WalCommandType::CHECKPOINT_V2: {
-            auto *checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(command.get());
-            Status status = PrepareCommitCheckpoint(checkpoint_cmd);
-            if (!status.ok()) {
-                return status;
-            }
-            break;
+            UnrecoverableError("Checkpoint should not be replayed.");
         }
         case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
             auto *restore_table_cmd = static_cast<WalCmdRestoreTableSnapshot *>(command.get());

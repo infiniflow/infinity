@@ -156,7 +156,7 @@ TEST_P(TestTxnTable, table_test2) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestTxnTable, DISABLED_SLOW_createtable_createtable) {
+TEST_P(TestTxnTable, createtable_createtable) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -189,7 +189,7 @@ TEST_P(TestTxnTable, DISABLED_SLOW_createtable_createtable) {
         EXPECT_TRUE(status.ok());
 
         status = txn3->CreateTable(*db_name, std::move(table_def1), ConflictType::kError);
-        EXPECT_FALSE(status.ok());
+        EXPECT_FALSE(status.ok()); // kRocksDBError
 
         status = new_txn_mgr->RollBackTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -1970,7 +1970,9 @@ TEST_P(TestTxnTable, rename_table_test) {
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
-    auto new_table_name = "table2";
+    auto new_table_name = std::make_shared<std::string>("tb2");
+    ;
+    auto table_def2 = TableDef::Make(db_name, new_table_name, std::make_shared<std::string>(), {column_def1, column_def2});
     // Success rename
     {
         //    t1      create  commit (success)
@@ -1995,7 +1997,7 @@ TEST_P(TestTxnTable, rename_table_test) {
 
         // rename table
         auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kRenameTable);
-        status = txn3->RenameTable(*db_name, *table_name, new_table_name);
+        status = txn3->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -2004,7 +2006,7 @@ TEST_P(TestTxnTable, rename_table_test) {
 
         // drop table
         auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
-        status = txn4->DropTable(*db_name, new_table_name, ConflictType::kError);
+        status = txn4->DropTable(*db_name, *new_table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -2040,14 +2042,14 @@ TEST_P(TestTxnTable, rename_table_test) {
 
         // rename table
         auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kRenameTable);
-        status = txn3->RenameTable(*db_name, *table_name, new_table_name);
+        status = txn3->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
         // rename table again
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kRenameTable);
-        status = txn5->RenameTable(*db_name, *table_name, new_table_name);
+        status = txn5->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_FALSE(status.ok());
         status = new_txn_mgr->RollBackTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -2056,7 +2058,7 @@ TEST_P(TestTxnTable, rename_table_test) {
 
         // drop table
         auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
-        status = txn4->DropTable(*db_name, new_table_name, ConflictType::kError);
+        status = txn4->DropTable(*db_name, *new_table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -2092,7 +2094,7 @@ TEST_P(TestTxnTable, rename_table_test) {
 
         // rename table
         auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kRenameTable);
-        status = txn3->RenameTable(*db_name, *table_name, new_table_name);
+        status = txn3->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
 
         // rename table again
@@ -2101,7 +2103,7 @@ TEST_P(TestTxnTable, rename_table_test) {
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        status = txn5->RenameTable(*db_name, *table_name, new_table_name);
+        status = txn5->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_FALSE(status.ok());
@@ -2110,7 +2112,7 @@ TEST_P(TestTxnTable, rename_table_test) {
 
         // drop table
         auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
-        status = txn4->DropTable(*db_name, new_table_name, ConflictType::kError);
+        status = txn4->DropTable(*db_name, *new_table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -2149,10 +2151,10 @@ TEST_P(TestTxnTable, rename_table_test) {
         // rename table again
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kRenameTable);
 
-        status = txn3->RenameTable(*db_name, *table_name, new_table_name);
+        status = txn3->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
 
-        status = txn5->RenameTable(*db_name, *table_name, new_table_name);
+        status = txn5->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
@@ -2165,7 +2167,7 @@ TEST_P(TestTxnTable, rename_table_test) {
 
         // drop table
         auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
-        status = txn4->DropTable(*db_name, new_table_name, ConflictType::kError);
+        status = txn4->DropTable(*db_name, *new_table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
@@ -2204,10 +2206,10 @@ TEST_P(TestTxnTable, rename_table_test) {
         // rename table again
         auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kRenameTable);
 
-        status = txn3->RenameTable(*db_name, *table_name, new_table_name);
+        status = txn3->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
 
-        status = txn5->RenameTable(*db_name, *table_name, new_table_name);
+        status = txn5->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn5);
@@ -2220,12 +2222,104 @@ TEST_P(TestTxnTable, rename_table_test) {
 
         // drop table
         auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
-        status = txn4->DropTable(*db_name, new_table_name, ConflictType::kError);
+        status = txn4->DropTable(*db_name, *new_table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // drop db1
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
+        status = txn6->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+    }
+
+    // with create table
+    {
+        //    t1      rename            commit (fail)
+        //    |----------|--------------------|
+        //            |-------|-----------|
+        //           t2     create table commit (success)
+        // create db1
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        new_txn_mgr->PrintAllKeyValue();
+
+        // rename table
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kRenameTable);
+        // create table
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+
+        status = txn3->RenameTable(*db_name, *table_name, *new_table_name);
+        EXPECT_TRUE(status.ok());
+
+        status = txn4->CreateTable(*db_name, std::move(table_def2), ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_FALSE(status.ok());
+
+        auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
+        status = txn6->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+    }
+
+    // with create table
+    {
+        //    t1      rename       commit (success)
+        //    |----------|------------|
+        //            |-------|---------------|
+        //           t2     create table     commit (fail)
+        // create db1
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        new_txn_mgr->PrintAllKeyValue();
+
+        // rename table
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kRenameTable);
+        // create table
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+
+        status = txn3->RenameTable(*db_name, *table_name, *new_table_name);
+        EXPECT_TRUE(status.ok());
+
+        status = txn4->CreateTable(*db_name, std::move(table_def2), ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_FALSE(status.ok());
+
         auto *txn6 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn6->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -2260,7 +2354,7 @@ TEST_P(TestTxnTable, rename_table_test) {
         // drop db1
         auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
 
-        status = txn3->RenameTable(*db_name, *table_name, new_table_name);
+        status = txn3->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
 
         status = txn4->DropDatabase("db1", ConflictType::kError);
@@ -2299,7 +2393,7 @@ TEST_P(TestTxnTable, rename_table_test) {
         // drop table
         auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
 
-        status = txn3->RenameTable(*db_name, *table_name, new_table_name);
+        status = txn3->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
 
         status = txn4->DropTable(*db_name, *table_name, ConflictType::kError);
@@ -2345,7 +2439,7 @@ TEST_P(TestTxnTable, rename_table_test) {
         // drop table
         auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
 
-        status = txn3->RenameTable(*db_name, *table_name, new_table_name);
+        status = txn3->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
 
         status = txn4->DropTable(*db_name, *table_name, ConflictType::kError);
@@ -2389,7 +2483,7 @@ TEST_P(TestTxnTable, rename_table_test) {
         auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename table"), TransactionType::kRenameTable);
         auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
 
-        status = txn3->RenameTable(*db_name, *table_name, new_table_name);
+        status = txn3->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
 
         auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
@@ -2446,7 +2540,7 @@ TEST_P(TestTxnTable, rename_table_test) {
         status = txn4->AddColumns(*db_name, *table_name, columns);
         EXPECT_TRUE(status.ok());
 
-        status = txn3->RenameTable(*db_name, *table_name, new_table_name);
+        status = txn3->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
@@ -2492,7 +2586,7 @@ TEST_P(TestTxnTable, rename_table_test) {
         status = txn4->DropColumns(*db_name, *table_name, column_names);
         EXPECT_TRUE(status.ok());
 
-        status = txn3->RenameTable(*db_name, *table_name, new_table_name);
+        status = txn3->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
@@ -2534,7 +2628,7 @@ TEST_P(TestTxnTable, rename_table_test) {
         // drop columns
         auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
 
-        status = txn3->RenameTable(*db_name, *table_name, new_table_name);
+        status = txn3->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
 
         std::vector<std::string> column_names;

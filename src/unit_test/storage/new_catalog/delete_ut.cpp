@@ -168,6 +168,11 @@ TEST_P(TestTxnDelete, test_delete) {
             has_next = state.Next(offset, range);
             EXPECT_FALSE(has_next);
         }
+
+        txn->PrintVersionInBlock(block_meta, std::vector<BlockOffset>{1, 3}, false);
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
     }
 
     {

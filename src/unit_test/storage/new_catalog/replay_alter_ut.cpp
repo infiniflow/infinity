@@ -242,3 +242,41 @@ TEST_P(TestTxnReplayAlter, test_drop_column) {
         EXPECT_EQ(column_defs->size(), 1);
     }
 }
+
+TEST_P(TestTxnReplayAlter, test_rename) {
+    using namespace infinity;
+
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
+    auto new_table_name = std::make_shared<std::string>("tb2");
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+        Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename"), TransactionType::kRenameTable);
+        Status status = txn->RenameTable(*db_name, *table_name, *new_table_name);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+
+    RestartTxnMgr();
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        TxnTimeStamp create_timestamp;
+        Status status = txn->GetTableMeta(*db_name, *new_table_name, db_meta, table_meta, create_timestamp);
+        EXPECT_TRUE(status.ok());
+    }
+}
