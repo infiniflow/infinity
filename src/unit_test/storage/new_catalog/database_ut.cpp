@@ -42,7 +42,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnDatabase,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestTxnDatabase, DISABLED_SLOW_createdb_createdb_test) {
+TEST_P(TestTxnDatabase, createdb_createdb_test) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -108,7 +108,7 @@ TEST_P(TestTxnDatabase, DISABLED_SLOW_createdb_createdb_test) {
         Status status = txn1->CreateDatabase("db1", ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = txn2->CreateDatabase("db1", ConflictType::kError, std::make_shared<std::string>());
-        EXPECT_FALSE(status.ok());
+        EXPECT_FALSE(status.ok()); // kRocksDbError
 
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());

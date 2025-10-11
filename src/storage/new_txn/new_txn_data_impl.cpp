@@ -642,8 +642,6 @@ Status NewTxn::Compact(const std::string &db_name, const std::string &table_name
     //    LOG_INFO(fmt::format("Start to compact segment ids: {}", segment_ids.size()));
     LOG_INFO(fmt::format("Compact db_name: {}, table_name: {}, segment ids: {}", db_name, table_name, fmt::join(segment_ids, " ")));
 
-    this->SetTxnType(TransactionType::kCompact);
-
     this->CheckTxn(db_name);
     if (segment_ids.empty()) {
         return Status::UnexpectedError("No segment is given in compact operation");
@@ -805,37 +803,6 @@ Status NewTxn::CheckTableIfDelete(TableMeta &table_meta, bool &has_delete) {
     if (!status.ok()) {
         return status;
     }
-    return Status::OK();
-}
-
-Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd) {
-    Status status;
-    TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
-
-    std::shared_ptr<DBMeta> db_meta;
-    std::shared_ptr<TableMeta> table_meta_opt;
-    TxnTimeStamp create_timestamp;
-    status = GetTableMeta(compact_cmd->db_name_, compact_cmd->table_name_, db_meta, table_meta_opt, create_timestamp);
-    if (!status.ok()) {
-        return status;
-    }
-    TableMeta &table_meta = *table_meta_opt;
-
-    for (const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
-        status = NewCatalog::LoadFlushedSegment2(table_meta, segment_info, fake_commit_ts);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-
-    {
-        std::vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-
     return Status::OK();
 }
 

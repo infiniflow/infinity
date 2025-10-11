@@ -143,14 +143,6 @@ public:
                     std::shared_ptr<std::string> txn_text,
                     TransactionType txn_type);
 
-    // For replay txn
-    explicit NewTxn(BufferManager *buffer_mgr,
-                    NewTxnManager *txn_mgr,
-                    TransactionID txn_id,
-                    TxnTimeStamp begin_ts,
-                    std::unique_ptr<KVInstance> kv_instance,
-                    TransactionType txn_type);
-
     virtual ~NewTxn();
 
     static std::unique_ptr<NewTxn> NewReplayTxn(NewTxnManager *txn_mgr,
@@ -317,8 +309,6 @@ private:
     Status ReplayCreateTable(WalCmdCreateTableV2 *create_table_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayDropTable(WalCmdDropTableV2 *drop_table_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayRenameTable(WalCmdRenameTableV2 *rename_table_cmd, TxnTimeStamp commit_ts, i64 txn_id);
-    Status ReplayAddColumns(WalCmdAddColumnsV2 *add_columns_cmd, TxnTimeStamp commit_ts, i64 txn_id);
-    Status ReplayDropColumns(WalCmdDropColumnsV2 *drop_columns_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayCreateIndex(WalCmdCreateIndexV2 *create_index_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayDumpIndex(WalCmdDumpIndexV2 *dump_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayDropIndex(WalCmdDropIndexV2 *drop_index_cmd, TxnTimeStamp commit_ts, i64 txn_id);
@@ -360,8 +350,6 @@ public:
     Status Cleanup();
 
 private:
-    Status ReplayCompact(WalCmdCompactV2 *compact_cmd);
-
     Status CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas);
 
 public:
@@ -429,8 +417,6 @@ public:
     BaseTxnStore *GetTxnStore() const { return base_txn_store_.get(); }
 
     std::shared_ptr<TxnContext> txn_context() const { return txn_context_ptr_; }
-    void AddOperation(const std::shared_ptr<std::string> &operation_text);
-    std::vector<std::shared_ptr<std::string>> GetOperations() const;
 
     KVInstance *kv_instance() const { return kv_instance_.get(); }
 
@@ -484,8 +470,6 @@ private:
     Status DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffset> &block_offsets, std::vector<BlockOffset> &undo_block_offsets);
 
     Status RollbackDeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffset> &block_offsets);
-
-    Status PrintVersionInBlock(BlockMeta &block_meta, const std::vector<BlockOffset> &block_offsets, bool ignore_invisible);
 
     Status CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_state);
 
@@ -701,6 +685,8 @@ public:
                                 std::shared_ptr<DataBlock> input_block,
                                 const u64 &input_block_idx,
                                 std::vector<std::string> *object_paths = nullptr);
+
+    Status PrintVersionInBlock(BlockMeta &block_meta, const std::vector<BlockOffset> &block_offsets, bool ignore_invisible);
 
 private:
     // Reference to external class

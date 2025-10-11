@@ -80,8 +80,6 @@ import embedding_info;
 namespace infinity {
 
 Status NewTxn::DumpMemIndex(const std::string &db_name, const std::string &table_name, const std::string &index_name) {
-    this->SetTxnType(TransactionType::kDumpMemIndex);
-
     Status status;
 
     std::shared_ptr<DBMeta> db_meta;
@@ -314,8 +312,6 @@ Status NewTxn::OptimizeTableIndexes(const std::string &db_name, const std::strin
 }
 
 Status NewTxn::OptimizeIndex(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id) {
-    this->SetTxnType(TransactionType::kOptimizeIndex);
-
     Status status = Status::OK();
 
     std::shared_ptr<DBMeta> db_meta;

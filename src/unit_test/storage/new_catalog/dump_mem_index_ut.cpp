@@ -511,8 +511,15 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         SegmentID segment_id = 0;
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
+        ChunkID chunk_id = 0;
+        std::vector<std::string> delete_file_paths;
+        std::vector<std::string> exist_file_paths;
+        status = txn->GetChunkIndexFilePaths(*db_name, *table_name, *index_name1, segment_id, chunk_id, delete_file_paths);
+        EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_FALSE(status.ok());
+
+        CheckFilePaths(delete_file_paths, exist_file_paths);
 
         auto *txn7 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get db"), TransactionType::kRead);
         auto [db_info, db_status] = txn7->GetDatabaseInfo(*db_name);
