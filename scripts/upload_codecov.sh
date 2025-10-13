@@ -6,7 +6,7 @@ upload_file() {
   local file="$3"
   echo "Uploading report with flag $flag..."
 
-  if [ ! -f "file" ]; then
+  if [ ! -f "$file" ]; then
       echo "$file does not exist"
       return 1
   fi
