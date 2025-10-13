@@ -5,6 +5,12 @@ upload_file() {
   local flag="$2"
   local file="$3"
   echo "Uploading report with flag $flag..."
+
+  if [ ! -f "file" ]; then
+      echo "$file does not exist"
+      return 1
+  fi
+
   RETRY_COUNT=0
   while [ $RETRY_COUNT -lt 5 ]; do
     if codecov upload-process --disable-search --fail-on-error -t "$CODECOV_TOKEN" -n "$name" -F "$flag" -f "$file"; then
