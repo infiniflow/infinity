@@ -60,6 +60,7 @@ jobs:
                   echo "The workspace content hash is the same with PR #${PR_NUMBER} merged. See ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${PR_RUN_ID} for details."
                   echo "Upload coverage report of PR #${PR_NUMBER}"
                   ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${PR_RUN_ID}
+                  echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
                   ./scripts/upload_codecov.sh
                   echo "Cancel myself"
                   gh run cancel ${GITHUB_RUN_ID}
