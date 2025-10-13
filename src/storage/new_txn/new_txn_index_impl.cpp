@@ -588,6 +588,19 @@ Status NewTxn::OptimizeIndexByParams(const std::string &db_name,
                     new_index_hnsw->build_type_ = HnswBuildType::kPlain;
                 }
                 new_index_base = std::move(new_index_hnsw);
+            } else if (params->compress_to_rabitq) {
+                auto *hnsw_index = static_cast<IndexHnsw *>(index_base.get());
+                if (hnsw_index->encode_type_ != HnswEncodeType::kPlain) {
+                    LOG_WARN("Not implemented");
+                    break;
+                }
+                auto new_index_hnsw = std::make_shared<IndexHnsw>(*hnsw_index);
+                // IndexHnsw old_index_hnsw = *hnsw_index;
+                new_index_hnsw->encode_type_ = HnswEncodeType::kRabitq;
+                if (new_index_hnsw->build_type_ == HnswBuildType::kLSG) {
+                    new_index_hnsw->build_type_ = HnswBuildType::kPlain;
+                }
+                new_index_base = std::move(new_index_hnsw);
             }
             break;
         }
@@ -1648,6 +1661,8 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
                 HnswHandlerPtr hnsw_handler = *static_cast<HnswHandlerPtr *>(buffer_handle.GetDataMut());
                 if (params->compress_to_lvq) {
                     hnsw_handler->CompressToLVQ();
+                } else if (params->compress_to_rabitq) {
+                    hnsw_handler->CompressToRabitq();
                 }
                 if (params->lvq_avg) {
                     hnsw_handler->Optimize();
@@ -1659,6 +1674,8 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
                     HnswHandlerPtr hnsw_handler = memory_hnsw_index->get();
                     if (params->compress_to_lvq) {
                         hnsw_handler->CompressToLVQ();
+                    } else if (params->compress_to_rabitq) {
+                        hnsw_handler->CompressToRabitq();
                     }
                     if (params->lvq_avg) {
                         hnsw_handler->Optimize();

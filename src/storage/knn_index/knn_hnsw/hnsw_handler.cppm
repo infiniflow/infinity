@@ -48,6 +48,9 @@ using AbstractHnsw = std::variant<std::unique_ptr<KnnHnsw<PlainCosVecStoreType<f
                                   std::unique_ptr<KnnHnsw<LVQCosVecStoreType<float, i8>, SegmentOffset>>,
                                   std::unique_ptr<KnnHnsw<LVQIPVecStoreType<float, i8>, SegmentOffset>>,
                                   std::unique_ptr<KnnHnsw<LVQL2VecStoreType<float, i8>, SegmentOffset>>,
+                                  std::unique_ptr<KnnHnsw<RabitqCosVecStoreType<float>, SegmentOffset>>,
+                                  std::unique_ptr<KnnHnsw<RabitqIPVecStoreType<float>, SegmentOffset>>,
+                                  std::unique_ptr<KnnHnsw<RabitqL2VecStoreType<float>, SegmentOffset>>,
                                   std::unique_ptr<KnnHnsw<PlainCosVecStoreType<float, true>, SegmentOffset>>,
                                   std::unique_ptr<KnnHnsw<PlainIPVecStoreType<float, true>, SegmentOffset>>,
                                   std::unique_ptr<KnnHnsw<PlainL2VecStoreType<float, true>, SegmentOffset>>,
@@ -60,6 +63,9 @@ using AbstractHnsw = std::variant<std::unique_ptr<KnnHnsw<PlainCosVecStoreType<f
                                   std::unique_ptr<KnnHnsw<LVQCosVecStoreType<float, i8, true>, SegmentOffset>>,
                                   std::unique_ptr<KnnHnsw<LVQIPVecStoreType<float, i8, true>, SegmentOffset>>,
                                   std::unique_ptr<KnnHnsw<LVQL2VecStoreType<float, i8, true>, SegmentOffset>>,
+                                  std::unique_ptr<KnnHnsw<RabitqCosVecStoreType<float, true>, SegmentOffset>>,
+                                  std::unique_ptr<KnnHnsw<RabitqIPVecStoreType<float, true>, SegmentOffset>>,
+                                  std::unique_ptr<KnnHnsw<RabitqL2VecStoreType<float, true>, SegmentOffset>>,
 
                                   std::unique_ptr<KnnHnsw<PlainCosVecStoreType<float>, SegmentOffset, false>>,
                                   std::unique_ptr<KnnHnsw<PlainIPVecStoreType<float>, SegmentOffset, false>>,
@@ -73,6 +79,9 @@ using AbstractHnsw = std::variant<std::unique_ptr<KnnHnsw<PlainCosVecStoreType<f
                                   std::unique_ptr<KnnHnsw<LVQCosVecStoreType<float, i8>, SegmentOffset, false>>,
                                   std::unique_ptr<KnnHnsw<LVQIPVecStoreType<float, i8>, SegmentOffset, false>>,
                                   std::unique_ptr<KnnHnsw<LVQL2VecStoreType<float, i8>, SegmentOffset, false>>,
+                                  std::unique_ptr<KnnHnsw<RabitqCosVecStoreType<float>, SegmentOffset, false>>,
+                                  std::unique_ptr<KnnHnsw<RabitqIPVecStoreType<float>, SegmentOffset, false>>,
+                                  std::unique_ptr<KnnHnsw<RabitqL2VecStoreType<float>, SegmentOffset, false>>,
                                   std::unique_ptr<KnnHnsw<PlainCosVecStoreType<float, true>, SegmentOffset, false>>,
                                   std::unique_ptr<KnnHnsw<PlainIPVecStoreType<float, true>, SegmentOffset, false>>,
                                   std::unique_ptr<KnnHnsw<PlainL2VecStoreType<float, true>, SegmentOffset, false>>,
@@ -85,6 +94,9 @@ using AbstractHnsw = std::variant<std::unique_ptr<KnnHnsw<PlainCosVecStoreType<f
                                   std::unique_ptr<KnnHnsw<LVQCosVecStoreType<float, i8, true>, SegmentOffset, false>>,
                                   std::unique_ptr<KnnHnsw<LVQIPVecStoreType<float, i8, true>, SegmentOffset, false>>,
                                   std::unique_ptr<KnnHnsw<LVQL2VecStoreType<float, i8, true>, SegmentOffset, false>>,
+                                  std::unique_ptr<KnnHnsw<RabitqCosVecStoreType<float, true>, SegmentOffset, false>>,
+                                  std::unique_ptr<KnnHnsw<RabitqIPVecStoreType<float, true>, SegmentOffset, false>>,
+                                  std::unique_ptr<KnnHnsw<RabitqL2VecStoreType<float, true>, SegmentOffset, false>>,
                                   std::nullptr_t>;
 
 export struct HnswHandler {
@@ -291,6 +303,7 @@ public:
     void Build(VertexType vertex_i);
     void Optimize();
     void CompressToLVQ();
+    void CompressToRabitq();
 
 private:
     AbstractHnsw hnsw_ = nullptr;
