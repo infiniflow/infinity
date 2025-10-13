@@ -23,11 +23,11 @@ upload_file() {
 }
 
 success=true
-upload_file "debug_unit_test_coverage" "debug unit test" "${ARTIFACTS_DIR}/coverage/debug_unit_test/coverage.lcov" || success=false
-upload_file "debug_sqllogical_test_coverage" "debug sqllogical test" "${ARTIFACTS_DIR}/coverage/debug_sqllogical_test/coverage.lcov" || success=false
-upload_file "debug_pysdk_test_coverage" "debug pysdk test" "${ARTIFACTS_DIR}/coverage/debug_pysdk_test/coverage.lcov" || success=false
-upload_file "debug_http_test_coverage" "debug http test" "${ARTIFACTS_DIR}/coverage/debug_http_test/coverage.lcov" || success=false
-upload_file "debug_parallel_test_coverage" "debug parallel test" "${ARTIFACTS_DIR}/coverage/debug_parallel_test/coverage.lcov" || success=false
+#upload_file "debug_unit_test_coverage" "debug unit test" "${ARTIFACTS_DIR}/coverage/debug_unit_test/coverage.lcov" || success=false
+#upload_file "debug_sqllogical_test_coverage" "debug sqllogical test" "${ARTIFACTS_DIR}/coverage/debug_sqllogical_test/coverage.lcov" || success=false
+#upload_file "debug_pysdk_test_coverage" "debug pysdk test" "${ARTIFACTS_DIR}/coverage/debug_pysdk_test/coverage.lcov" || success=false
+#upload_file "debug_http_test_coverage" "debug http test" "${ARTIFACTS_DIR}/coverage/debug_http_test/coverage.lcov" || success=false
+#upload_file "debug_parallel_test_coverage" "debug parallel test" "${ARTIFACTS_DIR}/coverage/debug_parallel_test/coverage.lcov" || success=false
 
 if [ "$success" = false ]; then
   exit 1

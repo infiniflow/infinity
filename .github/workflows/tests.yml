@@ -43,11 +43,6 @@ jobs:
       - name: Backup code
         if: ${{ !cancelled() && !failure() && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci')) }}
         run: |
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${PR_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}"
-          
-          ./scripts/upload_codecov.sh
-
           export ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${PR_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}"
 
