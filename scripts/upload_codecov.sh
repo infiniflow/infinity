@@ -1,5 +1,7 @@
 #!/bin/bash   
 
+echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}"
+
 upload_file() {
   local name="$1"
   local flag="$2"

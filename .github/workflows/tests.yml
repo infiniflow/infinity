@@ -45,11 +45,13 @@ jobs:
         run: |
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${PR_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}"
+          
+          ./scripts/upload_codecov.sh
 
           export ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${PR_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}"
 
-          ./scripts/upload_codecov2.sh
+          ./scripts/upload_codecov.sh
 
           if [[ ${{ github.event_name }} != 'pull_request' ]]; then
             HEAD=$(git rev-parse HEAD)
