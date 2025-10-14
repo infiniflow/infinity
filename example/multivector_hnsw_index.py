@@ -18,12 +18,18 @@ creating hnsw index on multivector column, and searching data with both brute fo
 '''
 
 import infinity
+import argparse
 import sys
 import numpy as np
 import polars as pl
 from polars.testing import assert_frame_equal as pl_assert_frame_equal
 
 try:
+
+    parser = argparse.ArgumentParser(description="Benchmark Infinity")
+    parser.add_argument('--crabitq', action='store_true', default=False)
+    args = parser.parse_args()
+
     # Use infinity_embedded module to open a local directory
     # infinity_instance = infinity.connect("/var/infinity")
 
@@ -71,7 +77,7 @@ try:
     # Convert list of tuples to dictionary format for Polars DataFrame
     topK_res = pl.DataFrame({"c1": [item[0] for item in topK_maxsims], "SIMILARITY": [item[1] for item in topK_maxsims]})
     # Cast SIMILARITY column to float32
-    topK_res = topK_res.with_columns(pl.col("SIMILARITY").cast(pl.Float32))
+    topK_res = topK_res.with_columns([pl.col("c1").cast(pl.Int32), pl.col("SIMILARITY").cast(pl.Float32)])
 
     # Drop my_table if it already exists
     db_instance.drop_table("my_table", infinity.common.ConflictType.Ignore)
@@ -109,6 +115,8 @@ try:
                                                              "ef_construction": "200",
                                                              "metric": "ip"
                                                          }), infinity.common.ConflictType.Error)
+    if args.crabitq:
+        table_instance.optimize("index1", {"compress_to_rabitq": "true"})
 
     # Search with hnsw index
     hnsw_res, extra_result = table_instance.output(["c1", "SIMILARITY()"]).match_dense(
