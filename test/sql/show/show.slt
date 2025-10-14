@@ -185,6 +185,21 @@ statement ok
 SHOW MEMORY ALLOCATION;
 
 statement ok
+SHOW CHECKPOINT
+
+statement ok
+SHOW COMPACT
+
+statement ok
+SHOW OPTIMIZE
+
+statement ok
+SHOW IMPORT
+
+statement ok
+SHOW CLEAN
+
+statement ok
 CHECK SYSTEM;
 
 statement ok

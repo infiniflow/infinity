@@ -58,11 +58,7 @@ public:
 
     std::tuple<std::vector<SegmentID> *, Status> GetSegmentIndexIDs1();
 
-    Status SetSegmentIDs(const std::vector<SegmentID> &segment_ids);
-
     bool HasSegmentIndexID(SegmentID segment_id);
-
-    Status AddSegmentID(SegmentID segment_id);
 
     Status AddSegmentIndexID1(SegmentID segment_id, NewTxn *new_txn);
 
@@ -70,17 +66,12 @@ public:
 
     std::tuple<std::shared_ptr<TableIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
-private:
-    Status GetSegmentUpdateTS(std::shared_ptr<SegmentUpdateTS> &segment_update_ts);
-
 public:
     Status InitSet1(const std::shared_ptr<IndexBase> &index_base, NewCatalog *new_catalog);
 
     Status UninitSet1(UsageFlag usage_flag);
 
 private:
-    Status LoadSegmentIDs();
-
     std::string GetTableIndexTag(const std::string &tag) const;
 
 public:

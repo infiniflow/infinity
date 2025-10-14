@@ -50,12 +50,7 @@ public:
     RowID GetBeginRowID();
     size_t GetRowCount();
 
-    BaseMemIndex *GetBaseMemIndex(const MemIndexID &mem_index_id);
     const BaseMemIndex *GetBaseMemIndex() const;
-    void SetBaseMemIndexInfo(const std::string &db_name, const std::string &table_name, const std::string &index_name, const SegmentID &segment_id);
-
-    void SetEMVBMemIndexInfo(const std::string &db_name, const std::string &table_name, const std::string &index_name, const SegmentID &segment_id);
-    EMVBIndexInMem *GetEMVBMemIndex(const MemIndexID &mem_index_id);
 
     std::shared_ptr<HnswIndexInMem> GetHnswIndex();
     void SetHnswIndex(std::shared_ptr<HnswIndexInMem> hnsw_index);

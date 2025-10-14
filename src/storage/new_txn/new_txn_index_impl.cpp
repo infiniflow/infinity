@@ -1556,7 +1556,6 @@ Status NewTxn::OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
         for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
             size_t block_row_cnt = 0;
-            // std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
             std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
             if (!status.ok()) {
                 return status;
@@ -1580,7 +1579,6 @@ Status NewTxn::OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
         for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
             size_t block_row_cnt = 0;
-            // std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
             std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
             if (!status.ok()) {
                 return status;
@@ -1911,7 +1909,6 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta,
             BlockID block_id = block_ids[i];
             BlockMeta block_meta(block_id, segment_meta);
             size_t block_row_cnt = 0;
-            // std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
             std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
             if (!status.ok() || block_row_cnt == block_offset) {
                 return status;
