@@ -77,7 +77,7 @@ try:
     # Convert list of tuples to dictionary format for Polars DataFrame
     topK_res = pl.DataFrame({"c1": [item[0] for item in topK_maxsims], "SIMILARITY": [item[1] for item in topK_maxsims]})
     # Cast SIMILARITY column to float32
-    topK_res = topK_res.with_columns(pl.col("SIMILARITY").cast(pl.Float32))
+    topK_res = topK_res.with_columns([pl.col("c1").cast(pl.Int32), pl.col("SIMILARITY").cast(pl.Float32)])
 
     # Drop my_table if it already exists
     db_instance.drop_table("my_table", infinity.common.ConflictType.Ignore)
