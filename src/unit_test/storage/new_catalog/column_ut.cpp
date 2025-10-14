@@ -139,7 +139,6 @@ TEST_P(TestTxnColumn, test_add_columns) {
         BlockMeta block_meta(block_id, segment_meta);
 
         size_t row_count = 0;
-        // std::tie(row_count, status) = block_meta.GetRowCnt();
         std::tie(row_count, status) = block_meta.GetRowCnt1();
 
         EXPECT_TRUE(status.ok());

@@ -53,21 +53,16 @@ public:
 
     Status AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn);
 
-    Status SetNoMemIndex();
-
     Status InitSet1();
 
     Status RestoreSet(const ChunkID &next_chunk_id);
 
     Status LoadSet();
 
-    Status UninitSet(UsageFlag usage_flag);
-
     Status UninitSet1(UsageFlag usage_flag);
 
     std::shared_ptr<MemIndex> GetMemIndex(bool for_update = false);
     std::shared_ptr<MemIndex> PopMemIndex();
-    bool HasMemIndex();
 
     std::shared_ptr<std::string> GetSegmentIndexDir() const;
 

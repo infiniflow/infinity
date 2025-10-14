@@ -166,12 +166,6 @@ public:
                                                                const std::string &table_id,
                                                                SegmentID segment_id,
                                                                BlockID block_id /*, ColumnID column_id*/);
-    static std::string CatalogTableSegmentBlockColumnTagKey(const std::string &db_id,
-                                                            const std::string &table_id,
-                                                            SegmentID segment_id,
-                                                            BlockID block_id,
-                                                            ColumnID column_id,
-                                                            const std::string &tag_name);
     //    static std::string MetaTableColumnKey(const std::string &key, const std::string& db_name, TxnTimeStamp ts);
     //    static std::string MetaSegmentKey(const std::string &key, const std::string& db_name, TxnTimeStamp ts);
     //    static std::string MetaSegmentBlockKey(const std::string &key, const std::string& db_name, TxnTimeStamp ts);
