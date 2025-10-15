@@ -57,7 +57,12 @@ jobs:
                 # Calculate the hash of the current workspace content
                 HEAD_SHA=$(git rev-parse HEAD^{tree})
                 if [[ ${HEAD_SHA} == ${PR_SHA} ]]; then
-                  echo "Cancel myself since the workspace content hash is the same with PR #${PR_NUMBER} merged. See ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${PR_RUN_ID} for details."
+                  echo "The workspace content hash is the same with PR #${PR_NUMBER} merged. See ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${PR_RUN_ID} for details."
+                  echo "Upload coverage report of PR #${PR_NUMBER}"
+                  export ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${PR_RUN_ID}
+                  echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}"
+                  ./scripts/upload_codecov.sh
+                  echo "Cancel myself"
                   gh run cancel ${GITHUB_RUN_ID}
                   while true; do
                     status=$(gh run view ${GITHUB_RUN_ID} --json status -q .status)
@@ -219,17 +224,6 @@ jobs:
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
           mkdir -p ${ARTIFACTS_DIR}/coverage/debug_unit_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_unit_test
 
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        env:
-          CODECOV_TIMEOUT: 60
-          CODECOV_MAX_ATTEMPTS: 5
-        with:
-          files: coverage.lcov
-          flags: debug unit test
-          name: debug_unit_test_coverage
-          token: ${{ secrets.CODECOV_TOKEN }}
-
       - name: Remove test container
         if: always()
         run: |
@@ -299,17 +293,6 @@ jobs:
           head -10 coverage.lcov
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
           mkdir -p ${ARTIFACTS_DIR}/coverage/debug_sqllogical_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_sqllogical_test
-
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        env:
-          CODECOV_TIMEOUT: 60
-          CODECOV_MAX_ATTEMPTS: 5
-        with:
-          files: coverage.lcov
-          flags: debug sqllogical test
-          name: debug_sqllogical_test_coverage
-          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Remove test container
         if: always()
@@ -420,17 +403,6 @@ jobs:
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
           mkdir -p ${ARTIFACTS_DIR}/coverage/debug_pysdk_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_pysdk_test
 
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        env:
-          CODECOV_TIMEOUT: 60
-          CODECOV_MAX_ATTEMPTS: 5
-        with:
-          files: coverage.lcov
-          flags: debug pysdk test
-          name: debug_pysdk_test_coverage
-          token: ${{ secrets.CODECOV_TOKEN }}
-
       - name: Remove test container
         if: always()
         run: |
@@ -499,17 +471,6 @@ jobs:
           head -10 coverage.lcov
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
           mkdir -p ${ARTIFACTS_DIR}/coverage/debug_http_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_http_test
-
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        env:
-          CODECOV_TIMEOUT: 60
-          CODECOV_MAX_ATTEMPTS: 5
-        with:
-          files: coverage.lcov
-          flags: debug http test
-          name: debug_http_test_coverage
-          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Remove test container
         if: always()
@@ -581,16 +542,37 @@ jobs:
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
           mkdir -p ${ARTIFACTS_DIR}/coverage/debug_parallel_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_parallel_test
 
+      - name: Remove test container
+        if: always()
+        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+
+  debug_upload_codecov:
+    name: debug_upload_codecov
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
+    runs-on: [ "self-hosted", "infinity-test" ]
+    needs: [debug_unit_test, debug_sqllogical_test, debug_pysdk_test, debug_http_test,debug_pysdk_parallel_test]
+    steps:
+      - name: Prepare code and artifacts
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/infinity | tar -xf -
+
+      - name: Start test container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        env:
-          CODECOV_TIMEOUT: 60
-          CODECOV_MAX_ATTEMPTS: 5
-        with:
-          files: coverage.lcov
-          flags: debug parallel test
-          name: debug_parallel_test_coverage
-          token: ${{ secrets.CODECOV_TOKEN }}
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          ./scripts/upload_codecov.sh
 
       - name: Remove test container
         if: always()

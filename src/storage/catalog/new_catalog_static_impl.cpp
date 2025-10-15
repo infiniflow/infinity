@@ -653,30 +653,6 @@ NewCatalog::AddNewSegmentWithID(TableMeta &table_meta, TxnTimeStamp commit_ts, s
     return segment_meta->InitSet();
 }
 
-Status NewCatalog::LoadFlushedSegment1(TableMeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
-    Status status;
-
-    SegmentID segment_id = 0;
-    std::tie(segment_id, status) = table_meta.AddSegmentID1(checkpoint_ts);
-    if (!status.ok()) {
-        return status;
-    }
-
-    SegmentMeta segment_meta(segment_id, table_meta);
-    status = segment_meta.InitSet();
-    if (!status.ok()) {
-        return status;
-    }
-    for (const WalBlockInfo &block_info : segment_info.block_infos_) {
-        status = NewCatalog::LoadFlushedBlock1(segment_meta, block_info, checkpoint_ts);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-
-    return Status::OK();
-}
-
 Status NewCatalog::LoadFlushedSegment2(TableMeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
     Status status = table_meta.AddSegmentWithID(checkpoint_ts, segment_info.segment_id_);
     if (!status.ok()) {
@@ -924,13 +900,7 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
         }
     }
     for (const auto &column_def : *column_defs_ptr) {
-        //    const auto &[chunk_idx, chunk_offset] = block_info.outline_infos_[column_def->id()];
         ColumnMeta column_meta(column_def->id(), block_meta);
-        //    status = column_meta.SetChunkOffset(chunk_offset);
-        //    if (!status.ok()) {
-        //        return status;
-        //    }
-
         status = column_meta.LoadSet();
         if (!status.ok()) {
             return status;

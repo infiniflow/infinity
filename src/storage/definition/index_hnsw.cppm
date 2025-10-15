@@ -28,6 +28,7 @@ namespace infinity {
 export enum class HnswEncodeType {
     kPlain,
     kLVQ,
+    kRabitq,
     kInvalid,
 };
 

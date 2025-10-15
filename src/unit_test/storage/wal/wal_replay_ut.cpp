@@ -489,7 +489,6 @@ TEST_P(WalReplayTest, wal_replay_append) {
                 Value v3 = Value::MakeDouble(0.1);
 
                 size_t block_row_count = 0;
-                // std::tie(row_count, status) = block_meta.GetRowCnt();
                 std::tie(block_row_count, status) = block_meta.GetRowCnt1();
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(block_row_count, row_count);
@@ -706,7 +705,6 @@ TEST_P(WalReplayTest, wal_replay_import) {
                     Value v3 = Value::MakeDouble(0.1);
 
                     size_t block_row_count = 0;
-                    // std::tie(row_count, status) = block_meta.GetRowCnt();
                     std::tie(block_row_count, status) = block_meta.GetRowCnt1();
                     EXPECT_TRUE(status.ok());
                     EXPECT_EQ(block_row_count, row_count);

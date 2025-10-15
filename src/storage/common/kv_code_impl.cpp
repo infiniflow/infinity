@@ -240,14 +240,6 @@ std::string KeyEncode::CatalogTableSegmentBlockColumnKeyPrefix(const std::string
                                                           ColumnID column_id*/) {
     return fmt::format("catalog|blk_col|{}|{}|{}|{}|", db_id, table_id, segment_id, block_id);
 }
-std::string KeyEncode::CatalogTableSegmentBlockColumnTagKey(const std::string &db_id,
-                                                            const std::string &table_id,
-                                                            SegmentID segment_id,
-                                                            BlockID block_id,
-                                                            ColumnID column_id,
-                                                            const std::string &tag_name) {
-    return fmt::format("blk_col|{}|{}|{}|{}|{}|{}", db_id, table_id, segment_id, block_id, column_id, tag_name);
-}
 
 std::string KeyEncode::DatabaseKey(const std::string &db_name, TxnTimeStamp ts) { return fmt::format("db|{}|{}", db_name, ts); }
 std::string KeyEncode::DatabasePrefix(const std::string &db_name) { return fmt::format("db|{}|", db_name); }

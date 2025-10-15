@@ -310,17 +310,6 @@ std::shared_ptr<MetaKey> MetaParse(const std::string &key, const std::string &va
         return table_meta_key;
     }
 
-    if (fields[0] == "catalog" && fields[1] == "tbl_name") {
-        const std::string &db_id_str = fields[2];
-        const std::string &table_name_str = fields[3];
-        const std::string &commit_ts_str = fields[4];
-        const std::string &table_id_str = value;
-
-        auto table_name_meta_key = std::make_shared<TableNameMetaKey>(db_id_str, table_id_str, table_name_str);
-        table_name_meta_key->commit_ts_ = std::stoull(commit_ts_str);
-        return table_name_meta_key;
-    }
-
     if (fields[0] == "catalog" && fields[1] == "seg") {
         const std::string &db_id_str = fields[2];
         const std::string &table_id_str = fields[3];

@@ -78,6 +78,11 @@ export U8DistanceFuncType Get_HNSW_U8IP_16_ptr();
 export U8DistanceFuncType Get_HNSW_U8IP_32_ptr();
 export U8DistanceFuncType Get_HNSW_U8IP_64_ptr();
 export U8CosDistanceFuncType Get_HNSW_U8Cos_ptr();
+// Rabitq U8
+export U8DistanceFuncType Get_Rabitq_U8IP_ptr();
+export U8DistanceFuncType Get_Rabitq_U8IP_16_ptr();
+export U8DistanceFuncType Get_Rabitq_U8IP_32_ptr();
+export U8DistanceFuncType Get_Rabitq_U8IP_64_ptr();
 // MaxSim IP
 export MaxSimF32BitIPFuncType GetMaxSimF32BitIPFuncPtr();
 export MaxSimI32BitIPFuncType GetMaxSimI32BitIPFuncPtr();

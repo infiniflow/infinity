@@ -53,10 +53,6 @@ public:
     std::unique_ptr<NewTxn> BeginReplayTxn(const std::shared_ptr<WalEntry> &replay_entries);
     std::unique_ptr<NewTxn> BeginRecoveryTxn();
 
-    NewTxn *GetTxn(TransactionID txn_id) const;
-
-    TxnState GetTxnState(TransactionID txn_id) const;
-
     inline void Lock() { locker_.lock(); }
 
     inline void UnLock() { locker_.unlock(); }

@@ -22,7 +22,7 @@ import traceback
 
 import infinity
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
-from infinity.common import LOCAL_HOST, LOCAL_INFINITY_PATH
+from infinity.common import LOCAL_HOST
 
 
 def fvecs_read_all(filename):
@@ -111,12 +111,8 @@ def trace_unhandled_exceptions(func):
 
 
 @trace_unhandled_exceptions
-def work(queries, topk, metric_type, column_name, data_type, ef: int, remote: bool, table_name="sift_benchmark"):
-    infinity_obj = None
-    if remote:
-        infinity_obj = infinity.connect(LOCAL_HOST)
-    else:
-        infinity_obj = infinity.connect(LOCAL_INFINITY_PATH)
+def work(queries, topk, metric_type, column_name, data_type, ef: int, table_name="sift_benchmark"):
+    infinity_obj = infinity.connect(LOCAL_HOST)
     table = infinity_obj.get_database("default_db").get_table(table_name)
     for query in queries:
         # print(len(query))
@@ -140,7 +136,7 @@ def fvecs_read(filename):
                 break
 
 
-def process_pool(threads, rounds, query_path, ef: int, remote: bool, table_name):
+def process_pool(threads, rounds, query_path, ef: int, table_name):
     if not os.path.exists(query_path):
         print(f"File: {query_path} doesn't exist")
         raise Exception(f"File: {query_path} doesn't exist")
@@ -157,7 +153,7 @@ def process_pool(threads, rounds, query_path, ef: int, remote: bool, table_name)
         p = multiprocessing.Pool(threads)
         start = time.time()
         for idx in range(threads):
-            p.apply_async(work, args=(queries[idx], 100, "l2", "col1", "float", ef, remote, table_name))
+            p.apply_async(work, args=(queries[idx], 100, "l2", "col1", "float", ef, table_name))
         p.close()
         p.join()
         end = time.time()
@@ -172,19 +168,14 @@ def process_pool(threads, rounds, query_path, ef: int, remote: bool, table_name)
     print(f"ef: {ef}, Avg total dur: {dur_sum:.2f} s, Avg QPS: {(total_queries_count / dur_sum):.2f}")
 
 
-def one_thread(rounds, query_path, ground_truth_path, ef: int, remote: bool, table_name):
+def one_thread(rounds, query_path, ground_truth_path, ef: int, table_name):
     if not os.path.exists(query_path):
         print(f"File: {query_path} doesn't exist")
         raise Exception(f"File: {query_path} doesn't exist")
 
     queries = fvecs_read_all(query_path)
 
-    infinity_obj = None
-    if remote:
-        infinity_obj = infinity.connect(LOCAL_HOST)
-    else:
-        infinity_obj = infinity.connect(LOCAL_INFINITY_PATH)
-
+    infinity_obj = infinity.connect(LOCAL_HOST)
     table = infinity_obj.get_database("default_db").get_table(table_name)
     query_builder = InfinityThriftQueryBuilder(table)
     query_builder.output(["_row_id"])
@@ -235,7 +226,7 @@ def one_thread(rounds, query_path, ground_truth_path, ef: int, remote: bool, tab
     infinity_obj.disconnect()
 
 
-def benchmark(threads, rounds, data_set, ef: int, remote: bool, path):
+def benchmark(threads, rounds, data_set, ef: int, path):
     if not os.path.exists(path):
         print(f"Path: {path} doesn't exist")
         raise Exception(f"Path: {path} doesn't exist")
@@ -245,7 +236,7 @@ def benchmark(threads, rounds, data_set, ef: int, remote: bool, path):
         if threads > 1:
             print(f"Multi-threads: {threads}")
             print(f"Rounds: {rounds}")
-            process_pool(threads, rounds, query_path, ef, remote, f"sift_benchmark")
+            process_pool(threads, rounds, query_path, ef, f"sift_benchmark")
 
         else:
             print(f"Single-thread")
@@ -262,42 +253,43 @@ def benchmark(threads, rounds, data_set, ef: int, remote: bool, path):
         else:
             print(f"Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, query_path, ground_truth_path, ef, remote, f"sift_benchmark")
+            one_thread(rounds, query_path, ground_truth_path, ef, f"sift_benchmark")
+    elif data_set == "sift_10k":
+        query_path = path + "/sift10k_query.fvecs"
+        ground_truth_path = path + "/sift10k_groundtruth.ivecs"
+        if threads > 1:
+            print(f"Multi-threads: {threads}")
+            print(f"Rounds: {rounds}")
+            process_pool(threads, rounds, query_path, ef, f"sift_benchmark")
+
+        else:
+            print(f"Single-thread")
+            print(f"Rounds: {rounds}")
+            one_thread(rounds, query_path, ground_truth_path, ef, f"sift_benchmark")
     elif data_set == "gist_1m":
         query_path = path + "/gist_query.fvecs"
         ground_truth_path = path + "/gist_groundtruth.ivecs"
         if threads > 1:
             print(f"Multi-threads: {threads}")
             print(f"Rounds: {rounds}")
-            process_pool(threads, rounds, query_path, ef, remote, f"gist_benchmark")
+            process_pool(threads, rounds, query_path, ef, f"gist_benchmark")
 
         else:
             print(f"Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, query_path, ground_truth_path, ef, remote, f"gist_benchmark")
+            one_thread(rounds, query_path, ground_truth_path, ef, f"gist_benchmark")
     elif data_set == "msmarco_1m":
         query_path = path + "/msmarco_query.fvecs"
         ground_truth_path = path + "/msmarco_groundtruth.ivecs"
         if threads > 1:
             print(f"Multi-threads: {threads}")
             print(f"Rounds: {rounds}")
-            process_pool(threads, rounds, query_path, ef, remote, f"msmarco_benchmark")
+            process_pool(threads, rounds, query_path, ef, f"msmarco_benchmark")
 
         else:
             print(f"Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, query_path, ground_truth_path, ef, remote, f"msmarco_benchmark")
-
-
-def str2bool(value):
-    if isinstance(value, bool):
-        return value
-    if value.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif value.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("Boolean value expected")
+            one_thread(rounds, query_path, ground_truth_path, ef, f"msmarco_benchmark")
 
 
 if __name__ == '__main__':
@@ -309,11 +301,10 @@ if __name__ == '__main__':
     parser.add_argument("-r", "--rounds", type=int, default=5, dest="rounds")
     parser.add_argument("-d", "--data", type=str, default='sift_1m', dest="data_set")  # sift_1m, gist_1m, msmarco_1m, sift_10k
     parser.add_argument("--ef", type=int, default=200, dest="ef")
-    parser.add_argument("-R", "--remote", type=str2bool, default=True, dest="remote")
 
     data_dir = current_path + "/test/data/benchmark/" + parser.parse_args().data_set
     print(f"Data Dir: {data_dir}")
 
     args = parser.parse_args()
 
-    benchmark(args.threads, args.rounds, args.data_set, args.ef, args.remote, path=data_dir)
+    benchmark(args.threads, args.rounds, args.data_set, args.ef, path=data_dir)

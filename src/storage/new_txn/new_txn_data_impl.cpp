@@ -101,17 +101,6 @@ struct NewTxnCompactState {
             block_meta_.reset();
         }
 
-        // BlockID block_id = 0;
-        // {
-        //     std::tie(block_id, status) = new_segment_meta_->GetNextBlockID();
-        //     if (!status.ok()) {
-        //         return status;
-        //     }
-        //     status = new_segment_meta_->SetNextBlockID(block_id + 1);
-        //     if (!status.ok()) {
-        //         return status;
-        //     }
-        // }
         status = NewCatalog::AddNewBlock1(*new_segment_meta_, commit_ts_, block_meta_);
         if (!status.ok()) {
             return status;
@@ -495,8 +484,6 @@ Status NewTxn::Append(const std::string &db_name, const std::string &table_name,
 Status NewTxn::Append(const TableInfo &table_info, const std::shared_ptr<DataBlock> &input_block) {
     return Append(*table_info.db_name_, *table_info.table_name_, input_block);
 }
-
-Status NewTxn::ReplayAppend(WalCmdAppendV2 *append_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
 
 Status NewTxn::AppendInner(const std::string &db_name,
                            const std::string &table_name,
@@ -985,10 +972,6 @@ NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t appen
     if (VarBufferManager *var_buffer_mgr = dest_vec.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
         //     Ensure buffer obj is loaded.
         size_t _ = var_buffer_mgr->TotalSize();
-        //     Status status = column_meta.SetChunkOffset(chunk_size);
-        //     if (!status.ok()) {
-        //         return status;
-        //     }
     }
     return Status::OK();
 }
@@ -1240,7 +1223,6 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
                                      const std::vector<std::shared_ptr<ColumnDef>> &column_defs,
                                      const std::vector<u32> &column_idx_list,
                                      const std::vector<Value> &default_values) {
-    // auto [block_row_count, status] = block_meta.GetRowCnt();
     auto [block_row_count, status] = block_meta.GetRowCnt1();
     if (!status.ok()) {
         return status;
@@ -1282,19 +1264,16 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
         }
         buffer_obj->SetDataSize(data_size);
 
+        // XXX
         buffer_obj->Save();
         if (outline_buffer_obj) {
             outline_buffer_obj->Save();
         }
 
-        // if (auto *var_buffer_mgr = column_vector.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
-        //     //     Ensure buffer obj is loaded.
-        //     size_t _ = var_buffer_mgr->TotalSize();
-        //     //     Status status = column_meta.SetChunkOffset(chunk_size);
-        //     //     if (!status.ok()) {
-        //     //         return status;
-        //     //     }
-        // }
+        if (VarBufferManager *var_buffer_mgr = column_vector.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
+            //     Ensure buffer obj is loaded.
+            size_t _ = var_buffer_mgr->TotalSize();
+        }
         LOG_TRACE(
             fmt::format("NewTxn::AddColumnsDataInBlock: column name {}, column id {}, column_idx {}, default value {}, segment {}, block {}, rows {}",
                         column_defs[i]->name(),
@@ -1832,10 +1811,6 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
             if (!status.ok()) {
                 return status;
             }
-            //  status = table_index_meta.SetSegmentIDs(new_segment_ids);
-            //  if (!status.ok()) {
-            //      return status;
-            //  }
         }
     }
 

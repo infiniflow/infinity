@@ -116,6 +116,49 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
                 return nullptr;
             }
         }
+        case HnswEncodeType::kRabitq: {
+            if constexpr (!std::is_same_v<DataType, f32>) {
+                return nullptr;
+            } else if (index_hnsw->build_type_ == HnswBuildType::kLSG) {
+                switch (index_hnsw->metric_type_) {
+                    case MetricType::kMetricL2: {
+                        using HnswIndex = KnnHnsw<RabitqL2VecStoreType<DataType, true>, SegmentOffset, OwnMem>;
+                        return std::unique_ptr<HnswIndex>();
+                    }
+                    case MetricType::kMetricInnerProduct: {
+                        using HnswIndex = KnnHnsw<RabitqIPVecStoreType<DataType, true>, SegmentOffset, OwnMem>;
+                        return std::unique_ptr<HnswIndex>();
+                    }
+                    case MetricType::kMetricCosine: {
+                        using HnswIndex = KnnHnsw<RabitqCosVecStoreType<DataType, true>, SegmentOffset, OwnMem>;
+                        return std::unique_ptr<HnswIndex>();
+                    }
+                    default: {
+                        return nullptr;
+                    }
+                }
+            } else if (index_hnsw->build_type_ == HnswBuildType::kPlain) {
+                switch (index_hnsw->metric_type_) {
+                    case MetricType::kMetricL2: {
+                        using HnswIndex = KnnHnsw<RabitqL2VecStoreType<DataType>, SegmentOffset, OwnMem>;
+                        return std::unique_ptr<HnswIndex>();
+                    }
+                    case MetricType::kMetricInnerProduct: {
+                        using HnswIndex = KnnHnsw<RabitqIPVecStoreType<DataType>, SegmentOffset, OwnMem>;
+                        return std::unique_ptr<HnswIndex>();
+                    }
+                    case MetricType::kMetricCosine: {
+                        using HnswIndex = KnnHnsw<RabitqCosVecStoreType<DataType>, SegmentOffset, OwnMem>;
+                        return std::unique_ptr<HnswIndex>();
+                    }
+                    default: {
+                        return nullptr;
+                    }
+                }
+            } else {
+                return nullptr;
+            }
+        }
         default: {
             return nullptr;
         }
@@ -483,6 +526,29 @@ void HnswHandler::CompressToLVQ() {
                         UnrecoverableError("Invalid index type.");
                     } else {
                         hnsw_ = std::move(*index).CompressToLVQ();
+                    }
+                } else {
+                    UnrecoverableError("Invalid index type.");
+                }
+            }
+        },
+        hnsw_);
+}
+
+void HnswHandler::CompressToRabitq() {
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                UnrecoverableError("Invalid index type.");
+            } else {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    using HnswIndexDataType = IndexT::DataType;
+                    if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
+                        UnrecoverableError("Invalid index type.");
+                    } else {
+                        hnsw_ = std::move(*index).CompressToRabitq();
                     }
                 } else {
                     UnrecoverableError("Invalid index type.");
