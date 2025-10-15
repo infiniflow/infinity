@@ -309,7 +309,7 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
             ++output_block_row_id;
         }
         output_block_ptr->Finalize();
-        output_to_data_block_helper.OutputToDataBlock(query_context->storage()->buffer_manager(),
+        output_to_data_block_helper.OutputToDataBlock(query_context->storage()->fileworker_manager(),
                                                       base_table_ref_->block_index_.get(),
                                                       output_data_blocks);
     }

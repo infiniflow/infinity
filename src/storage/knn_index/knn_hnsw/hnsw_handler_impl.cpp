@@ -7,8 +7,7 @@ module;
 module infinity_core:hnsw_handler.impl;
 
 import :hnsw_handler;
-import :buffer_manager;
-import :buffer_handle;
+import :fileworker_manager;
 import :block_column_iter;
 import :memindex_tracer;
 import :default_values;
@@ -620,17 +619,16 @@ void HnswIndexInMem::InsertVecs(SegmentOffset block_offset,
     IncreaseMemoryUsageBase(mem_usage);
 }
 
-void HnswIndexInMem::Dump(BufferObj *buffer_obj, size_t *dump_size_ptr) {
+void HnswIndexInMem::Dump(FileWorker *buffer_obj, size_t *dump_size_ptr) {
     if (dump_size_ptr != nullptr) {
         size_t dump_size = hnsw_handler_->MemUsage();
         *dump_size_ptr = dump_size;
     }
 
-    BufferHandle handle = buffer_obj->Load();
-    auto *data_ptr = static_cast<HnswHandlerPtr *>(handle.GetDataMut());
+    auto *data_ptr = static_cast<HnswHandlerPtr *>(buffer_obj->GetData());
     *data_ptr = hnsw_handler_;
     own_memory_ = false;
-    chunk_handle_ = std::move(handle);
+    chunk_obj_ = std::move(buffer_obj);
 }
 
 size_t

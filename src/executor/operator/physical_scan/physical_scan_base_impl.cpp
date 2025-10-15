@@ -144,7 +144,7 @@ void PhysicalScanBase::SetOutput(const std::vector<char *> &raw_result_dists_lis
         }
     }
     output_block_ptr->Finalize();
-    output_to_data_block_helper.OutputToDataBlock(query_context->storage()->buffer_manager(), block_index, operator_state->data_block_array_);
+    output_to_data_block_helper.OutputToDataBlock(query_context->storage()->fileworker_manager(), block_index, operator_state->data_block_array_);
     ResultCacheManager *cache_mgr = query_context->storage()->result_cache_manager();
     if (cache_result_ && cache_mgr != nullptr) {
         AddCache(query_context, cache_mgr, operator_state->data_block_array_);

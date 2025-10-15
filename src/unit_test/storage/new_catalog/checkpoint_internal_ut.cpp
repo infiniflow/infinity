@@ -43,8 +43,6 @@ import :value;
 import :kv_code;
 import :kv_store;
 import :new_txn;
-import :buffer_obj;
-import :buffer_handle;
 import :secondary_index_in_mem;
 import :secondary_index_data;
 import :segment_meta;
@@ -541,7 +539,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint2) {
         EXPECT_TRUE(status.ok());
     }
 
-    [[maybe_unused]] auto *buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
+    [[maybe_unused]] auto *fileworker_mgr = infinity::InfinityContext::instance().storage()->fileworker_manager();
 
     checkpoint();
     RestartTxnMgr();

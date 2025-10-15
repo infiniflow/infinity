@@ -18,7 +18,6 @@ import :infinity_context;
 import :logger;
 import :base_memindex;
 import :memindex_tracer;
-import :buffer_handle;
 import :config;
 import :chunk_index_meta;
 
@@ -31,9 +30,7 @@ import column_def;
 
 namespace infinity {
 
-class BufferManager;
 struct ColumnVector;
-class BufferObj;
 class LocalFileHandle;
 
 using AbstractHnsw = std::variant<std::unique_ptr<KnnHnsw<PlainCosVecStoreType<float>, SegmentOffset>>,
@@ -339,7 +336,7 @@ public:
         IncreaseMemoryUsageBase(mem_usage);
     }
 
-    void Dump(BufferObj *buffer_obj, size_t *dump_size_ptr = nullptr);
+    void Dump(FileWorker *buffer_obj, size_t *dump_size_ptr = nullptr);
 
 public:
     // LSG setting
@@ -376,7 +373,7 @@ private:
     size_t row_count_ = 0;
     HnswHandlerPtr hnsw_handler_;
     bool own_memory_{};
-    BufferHandle chunk_handle_{};
+    FileWorker *chunk_obj_{};
 };
 
 } // namespace infinity

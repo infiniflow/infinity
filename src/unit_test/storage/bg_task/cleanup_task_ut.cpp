@@ -25,7 +25,7 @@ import :storage;
 import :table_def;
 import :column_vector;
 import :value;
-import :buffer_manager;
+import :fileworker_manager;
 import :physical_import;
 import :status;
 import :bg_task;

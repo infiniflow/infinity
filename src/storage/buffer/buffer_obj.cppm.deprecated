@@ -15,12 +15,10 @@
 export module infinity_core:buffer_obj;
 
 import :file_worker;
-import :buffer_handle;
 import :file_worker_type;
 
 namespace infinity {
 
-export class BufferManager;
 export class VarBuffer;
 class KVInstance;
 class Status;
@@ -31,21 +29,21 @@ export struct BufferObjectInfo {
     size_t object_size_{};
 };
 
-export class BufferObj {
+export class FileWorker {
 public:
     // called by BufferMgr::Get or BufferMgr::Allocate
-    explicit BufferObj(BufferManager *buffer_mgr, std::unique_ptr<FileWorker> file_worker, u32 id);
+    explicit FileWorker(FileWorkerManager *fileworker_mgr, std::unique_ptr<FileWorker> file_worker, u32 id);
 
-    // virtual ~BufferObj();
+    // virtual ~FileWorker();
 
-    // BufferObj(const BufferObj &) = delete;
-    // BufferObj &operator=(const BufferObj &) = delete;
+    // FileWorker(const FileWorker &) = delete;
+    // FileWorker &operator=(const FileWorker &) = delete;
 
     void UpdateFileWorkerInfo(std::unique_ptr<FileWorker> file_worker);
 
 public:
     // called by ObjectHandle when load first time for that ObjectHandle
-    BufferHandle Load();
+    FileWorker *Load();
 
     // called when checkpoint. or in "IMPORT" operator.
     // template <typename SaveType>
@@ -66,8 +64,6 @@ public:
     FileWorker *file_worker() { return file_worker_.get(); }
 
 private:
-    // Friend to encapsulate `Unload` interface and to increase `rc_`.
-    friend class BufferHandle;
 
     // called when BufferHandle needs mutable pointer.
     void *GetMutPointer();
@@ -85,7 +81,7 @@ public:
 protected:
     mutable std::mutex w_locker_{};
 
-    BufferManager *buffer_mgr_;
+    FileWorkerManager *buffer_mgr_;
 
     std::unique_ptr<FileWorker> file_worker_;
 

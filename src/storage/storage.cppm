@@ -17,7 +17,7 @@ export module infinity_core:storage;
 import :wal_manager;
 import :log_file;
 import :status;
-import :buffer_manager;
+import :fileworker_manager;
 import :config;
 
 namespace infinity {
@@ -52,7 +52,7 @@ public:
 
     [[nodiscard]] inline NewCatalog *new_catalog() noexcept { return new_catalog_.get(); }
 
-    [[nodiscard]] inline BufferManager *buffer_manager() noexcept { return buffer_mgr_.get(); }
+    [[nodiscard]] inline FileWorkerManager *fileworker_manager() noexcept { return buffer_mgr_.get(); }
 
     [[nodiscard]] inline BGMemIndexTracer *memindex_tracer() noexcept { return memory_index_tracer_.get(); }
 
@@ -118,7 +118,7 @@ private:
     std::unique_ptr<ObjectStorageProcess> object_storage_processor_{};
     std::unique_ptr<PersistenceManager> persistence_manager_{};
     std::unique_ptr<ResultCacheManager> result_cache_manager_{};
-    std::unique_ptr<BufferManager> buffer_mgr_{};
+    std::unique_ptr<FileWorkerManager> buffer_mgr_{};
     std::unique_ptr<NewCatalog> new_catalog_{};
     std::unique_ptr<BGMemIndexTracer> memory_index_tracer_{};
     std::unique_ptr<NewTxnManager> new_txn_mgr_{};

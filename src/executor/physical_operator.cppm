@@ -17,9 +17,11 @@ export module infinity_core:physical_operator;
 import :physical_operator_type;
 import :base_table_ref;
 import :infinity_type;
-import global_resource_usage;
+import :fileworker_manager;
+
 import std;
 
+import global_resource_usage;
 import data_type;
 
 namespace infinity {
@@ -134,7 +136,6 @@ struct OutputJobInfo {
     friend auto operator<=>(const OutputJobInfo &, const OutputJobInfo &) = default;
 };
 
-class BufferManager;
 struct BlockIndex;
 struct DataBlock;
 export struct OutputToDataBlockHelper {
@@ -149,7 +150,7 @@ export struct OutputToDataBlockHelper {
         output_job_infos.emplace_back(segment_id, block_id, column_id, block_offset, output_block_id, output_column_id, output_row_id);
     }
     void
-    OutputToDataBlock(BufferManager *buffer_mgr, const BlockIndex *block_index, const std::vector<std::unique_ptr<DataBlock>> &output_data_blocks);
+    OutputToDataBlock(FileWorkerManager *fileworker_mgr, const BlockIndex *block_index, const std::vector<std::unique_ptr<DataBlock>> &output_data_blocks);
 };
 
 } // namespace infinity

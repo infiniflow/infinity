@@ -42,8 +42,6 @@ import :value;
 import :kv_code;
 import :kv_store;
 import :new_txn;
-import :buffer_obj;
-import :buffer_handle;
 import :secondary_index_in_mem;
 import :secondary_index_data;
 import :segment_meta;
@@ -494,7 +492,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(segment_id, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 

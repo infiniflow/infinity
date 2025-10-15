@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:new_txn;
 
 import :txn_state;
@@ -25,6 +23,7 @@ import :snapshot_info;
 import :column_vector;
 import :fast_rough_filter;
 import :txn_context;
+import :fileworker_manager;
 
 import std;
 
@@ -61,8 +60,6 @@ struct WalCmdCleanup;
 struct WalCmdCreateTableSnapshot;
 struct WalCmdRestoreTableSnapshot;
 struct WalCmdRestoreDatabaseSnapshot;
-
-class BufferObj;
 
 class ColumnMeta;
 class BlockMeta;
@@ -101,7 +98,6 @@ struct RestoreTableTxnStore;
 struct RestoreDatabaseTxnStore;
 struct UpdateTxnStore;
 struct CreateTableSnapshotTxnStore;
-class BufferManager;
 class IndexBase;
 struct DataBlock;
 class TableDef;
@@ -355,7 +351,7 @@ public:
     Status Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint);
 
     // Getter
-    [[nodiscard]] BufferManager *buffer_mgr() const { return buffer_mgr_; }
+    [[nodiscard]] FileWorkerManager *fileworker_mgr() const { return fileworker_mgr_; }
 
     [[nodiscard]] TransactionID TxnID() const;
 
@@ -537,7 +533,7 @@ private:
                             SegmentMeta &segment_meta,
                             RowID base_rowid,
                             u32 row_cnt,
-                            BufferObj *buffer_obj);
+                            FileWorker *buffer_obj);
 
     Status OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, const std::vector<std::unique_ptr<InitParameter>> &params);
 
@@ -689,7 +685,7 @@ public:
 private:
     // Reference to external class
     NewTxnManager *txn_mgr_{};
-    BufferManager *buffer_mgr_{}; // This BufferManager ptr Only for replaying wal
+    FileWorkerManager *fileworker_mgr_{}; // This FileWorkerManager ptr Only for replaying wal
     NewCatalog *new_catalog_{};
 
     // Used to store the local data in this transaction

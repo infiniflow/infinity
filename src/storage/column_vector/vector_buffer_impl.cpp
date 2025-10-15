@@ -15,9 +15,7 @@
 module infinity_core:vector_buffer.impl;
 
 import :vector_buffer;
-import :buffer_obj;
-import :buffer_manager;
-import :buffer_handle;
+import :fileworker_manager;
 import :infinity_exception;
 import :default_values;
 
@@ -47,7 +45,7 @@ std::shared_ptr<VectorBuffer> VectorBuffer::Make(const size_t data_type_size, co
 }
 
 std::shared_ptr<VectorBuffer>
-VectorBuffer::Make(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, size_t data_type_size, size_t capacity, VectorBufferType buffer_type) {
+VectorBuffer::Make(FileWorker *buffer_obj, FileWorker *outline_buffer_obj, size_t data_type_size, size_t capacity, VectorBufferType buffer_type) {
     std::shared_ptr<VectorBuffer> buffer_ptr = std::make_shared<VectorBuffer>();
     buffer_ptr->buffer_type_ = buffer_type;
     switch (buffer_type) {
@@ -92,7 +90,7 @@ void VectorBuffer::Initialize(size_t type_size, size_t capacity) {
     capacity_ = capacity;
 }
 
-void VectorBuffer::InitializeCompactBit(BufferObj *buffer_obj, size_t capacity) {
+void VectorBuffer::InitializeCompactBit(FileWorker *buffer_obj, size_t capacity) {
     if (initialized_) {
         UnrecoverableError("std::vector buffer is already initialized.");
     }
@@ -103,13 +101,13 @@ void VectorBuffer::InitializeCompactBit(BufferObj *buffer_obj, size_t capacity) 
     // if (buffer_obj->GetBufferSize() != data_size) {
     //     UnrecoverableError("Buffer object size is not equal to data size.");
     // }
-    ptr_ = buffer_obj->Load();
+    // ptr_ = buffer_obj->Load();
     initialized_ = true;
     data_size_ = data_size;
     capacity_ = capacity;
 }
 
-void VectorBuffer::Initialize(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, size_t type_size, size_t capacity) {
+void VectorBuffer::Initialize(FileWorker *buffer_obj, FileWorker *outline_buffer_obj, size_t type_size, size_t capacity) {
     if (initialized_) {
         UnrecoverableError("std::vector buffer is already initialized.");
     }
@@ -120,7 +118,7 @@ void VectorBuffer::Initialize(BufferObj *buffer_obj, BufferObj *outline_buffer_o
     // if (buffer_obj->GetBufferSize() != data_size) {
     //     UnrecoverableError("Buffer object size is not equal to data size.");
     // }
-    ptr_ = buffer_obj->Load();
+    // ptr_ = buffer_obj->Load();
     if (buffer_type_ == VectorBufferType::kVarBuffer) {
         var_buffer_mgr_ = std::make_unique<VarBufferManager>(outline_buffer_obj);
     }
@@ -129,7 +127,7 @@ void VectorBuffer::Initialize(BufferObj *buffer_obj, BufferObj *outline_buffer_o
     capacity_ = capacity;
 }
 
-void VectorBuffer::SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj) {
+void VectorBuffer::SetToCatalog(FileWorker *buffer_obj, FileWorker *outline_buffer_obj) {
     if (!std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
         UnrecoverableError("Cannot convert to new catalog");
     }
@@ -137,7 +135,7 @@ void VectorBuffer::SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer
     void *src_ptr = std::get<std::unique_ptr<char[]>>(ptr_).release();
     buffer_obj->SetData(src_ptr);
 
-    ptr_ = buffer_obj->Load();
+    // ptr_ = buffer_obj->Load();
     if (buffer_type_ == VectorBufferType::kVarBuffer) {
         var_buffer_mgr_->SetToCatalog(outline_buffer_obj);
     }

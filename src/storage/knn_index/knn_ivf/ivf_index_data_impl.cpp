@@ -22,7 +22,7 @@ import :ivf_index_data;
 import :index_ivf;
 import :ivf_index_storage;
 import :index_base;
-import :buffer_manager;
+import :fileworker_manager;
 import :infinity_exception;
 import :status;
 import :default_values;

@@ -15,19 +15,18 @@
 export module infinity_core:emvb_index_in_mem;
 
 import :roaring_bitmap;
+import :file_worker;
 
 import column_def;
 import internal_types;
 
 namespace infinity {
 
-class BufferManager;
 // class ColumnDef;
 class IndexBase;
 class EMVBIndex;
 struct BlockIndex;
 class ColumnVector;
-class BufferObj;
 class KVInstance;
 struct ChunkIndexMetaInfo;
 class MetaCache;
@@ -80,7 +79,7 @@ public:
 
     void Insert(const ColumnVector &col, u32 row_offset, u32 row_count, KVInstance &kv_instance, TxnTimeStamp begin_ts, MetaCache *meta_cache);
 
-    void Dump(BufferObj *buffer_obj);
+    void Dump(FileWorker *fileworker);
 
     // return id: offset in the segment
     std::variant<std::pair<u32, u32>, EMVBInMemQueryResultType> SearchWithBitmask(const f32 *query_ptr,

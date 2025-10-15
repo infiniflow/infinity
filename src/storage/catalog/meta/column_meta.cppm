@@ -24,7 +24,6 @@ namespace infinity {
 
 class BlockMeta;
 class KVInstance;
-class BufferObj;
 
 export class ColumnMeta {
 public:
@@ -46,7 +45,7 @@ public:
 
     Status UninitSet(const ColumnDef *column_def, UsageFlag usage_flag);
 
-    Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer);
+    Status GetColumnBuffer(FileWorker *&column_buffer, FileWorker *&outline_buffer);
 
     std::tuple<size_t, Status> GetColumnSize(size_t row_cnt, const std::shared_ptr<ColumnDef> &col_def) const;
 
@@ -57,7 +56,7 @@ public:
     Status RestoreFromSnapshot(ColumnID column_id);
 
 private:
-    Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer, const ColumnDef *column_def);
+    Status GetColumnBuffer(FileWorker *&column_buffer, FileWorker *&outline_buffer, const ColumnDef *column_def);
 
     Status LoadChunkOffset();
 
@@ -70,8 +69,8 @@ private:
 
     std::optional<size_t> chunk_offset_;
 
-    BufferObj *column_buffer_ = nullptr;
-    BufferObj *outline_buffer_ = nullptr;
+    FileWorker *column_buffer_ = nullptr;
+    FileWorker *outline_buffer_ = nullptr;
 };
 
 } // namespace infinity

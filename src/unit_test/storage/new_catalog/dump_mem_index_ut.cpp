@@ -28,8 +28,6 @@ import :value;
 import :kv_code;
 import :kv_store;
 import :new_txn;
-import :buffer_obj;
-import :buffer_handle;
 import :secondary_index_in_mem;
 import :secondary_index_data;
 import :segment_meta;
@@ -237,7 +235,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -287,7 +285,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -775,7 +773,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -825,7 +823,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -1391,7 +1389,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -1441,7 +1439,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -2024,7 +2022,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -2074,7 +2072,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -2617,7 +2615,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -2667,7 +2665,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -3165,7 +3163,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -3215,7 +3213,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -3448,7 +3446,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -3498,7 +3496,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -4001,7 +3999,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -4051,7 +4049,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -4102,7 +4100,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -4152,7 +4150,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -4752,7 +4750,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -4802,7 +4800,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -4847,7 +4845,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -5358,7 +5356,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -5953,7 +5951,7 @@ TEST_P(TestTxnDumpMemIndex, SLOW_dump_and_dump) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -6003,7 +6001,7 @@ TEST_P(TestTxnDumpMemIndex, SLOW_dump_and_dump) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 

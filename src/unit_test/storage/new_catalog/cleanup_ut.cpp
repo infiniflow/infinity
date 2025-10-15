@@ -40,7 +40,6 @@ import :mem_index;
 import :table_index_meta;
 import :segment_index_meta;
 import :chunk_index_meta;
-import :buffer_obj;
 import :secondary_index_in_mem;
 
 import third_party;
@@ -638,7 +637,7 @@ TEST_P(TestTxnCleanup, cleanup_and_optimize_index) {
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
             }
 
-            BufferObj *buffer_obj = nullptr;
+            FileWorker *buffer_obj = nullptr;
             status = chunk_index_meta.GetIndexBuffer(buffer_obj);
             EXPECT_TRUE(status.ok());
 
@@ -897,7 +896,7 @@ TEST_P(TestTxnCleanup, cleanup_and_dump_index) {
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(2, 0));
             }
 
-            BufferObj *buffer_obj = nullptr;
+            FileWorker *buffer_obj = nullptr;
             status = chunk_index_meta.GetIndexBuffer(buffer_obj);
             EXPECT_TRUE(status.ok());
 

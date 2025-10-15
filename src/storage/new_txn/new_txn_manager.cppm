@@ -14,7 +14,7 @@
 
 export module infinity_core:new_txn_manager;
 
-import :buffer_manager;
+import :fileworker_manager;
 import :txn_state;
 import :default_values;
 import :status;
@@ -57,7 +57,7 @@ public:
 
     inline void UnLock() { locker_.unlock(); }
 
-    BufferManager *GetBufferMgr() const { return buffer_mgr_; }
+    FileWorkerManager *GetFileWorkerMgr() const { return fileworker_mgr_; }
 
     TxnTimeStamp GetReadCommitTS(NewTxn *txn);
 
@@ -164,7 +164,7 @@ public:
 private:
     mutable std::mutex locker_{};
     Storage *storage_{};
-    BufferManager *buffer_mgr_{};
+    FileWorkerManager *fileworker_mgr_{};
     WalManager *wal_mgr_{};
 
     std::unordered_map<TransactionID, std::shared_ptr<NewTxn>> txn_map_{};

@@ -42,8 +42,6 @@ import :value;
 import :kv_code;
 import :kv_store;
 import :new_txn;
-import :buffer_obj;
-import :buffer_handle;
 import :secondary_index_in_mem;
 import :secondary_index_data;
 import :segment_meta;
@@ -206,7 +204,7 @@ TEST_P(TestTxnIndexInternal, test_index0) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -265,7 +263,7 @@ TEST_P(TestTxnIndexInternal, test_index0) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -526,7 +524,7 @@ TEST_P(TestTxnIndexInternal, SLOW_test_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -626,7 +624,7 @@ TEST_P(TestTxnIndexInternal, SLOW_test_index) {
         // int32_t begin_val = 2;
         // int32_t end_val = 3;
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -808,7 +806,7 @@ TEST_P(TestTxnIndexInternal, test_populate_index0) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -1049,7 +1047,7 @@ TEST_P(TestTxnIndexInternal, SLOW_test_populate_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 

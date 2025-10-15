@@ -18,7 +18,7 @@ import :new_txn;
 import :new_catalog;
 import :infinity_exception;
 import :new_txn_manager;
-import :buffer_manager;
+import :fileworker_manager;
 import :wal_entry;
 import :logger;
 import :data_block;
@@ -44,7 +44,6 @@ import :snapshot_info;
 import :kv_store;
 import :random;
 import :kv_code;
-import :buffer_obj;
 import :data_file_worker;
 import :version_file_worker;
 import :block_version;
@@ -61,7 +60,6 @@ import :meta_key;
 import :txn_allocator_task;
 import :meta_type;
 import :base_txn_store;
-import :buffer_handle;
 import :virtual_store;
 import :txn_context;
 import :kv_utility;
@@ -90,8 +88,8 @@ NewTxn::NewTxn(NewTxnManager *txn_manager,
                std::unique_ptr<KVInstance> kv_instance,
                std::shared_ptr<std::string> txn_text,
                TransactionType txn_type)
-    : txn_mgr_(txn_manager), buffer_mgr_(txn_mgr_->GetBufferMgr()), wal_entry_(std::make_shared<WalEntry>()), kv_instance_(std::move(kv_instance)),
-      txn_text_(std::move(txn_text)) {
+    : txn_mgr_(txn_manager), fileworker_mgr_(txn_mgr_->GetFileWorkerMgr()), wal_entry_(std::make_shared<WalEntry>()),
+      kv_instance_(std::move(kv_instance)), txn_text_(std::move(txn_text)) {
     new_catalog_ = InfinityContext::instance().storage()->new_catalog();
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("NewTxn");
@@ -4595,8 +4593,8 @@ Status NewTxn::Cleanup() {
 
     if (metas.empty()) {
         LOG_TRACE("Cleanup: No data need to clean. Try to remove all empty directories...");
-        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-        auto data_dir_str = buffer_mgr->GetFullDataDir();
+        FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+        auto data_dir_str = fileworker_mgr->GetFullDataDir();
         auto data_dir = static_cast<std::filesystem::path>(*data_dir_str);
         // Delete empty dir
         VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
@@ -4619,7 +4617,7 @@ Status NewTxn::ReplayCleanup(WalCmdCleanup *cleanup_cmd, TxnTimeStamp commit_ts,
 Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) {
     KVInstance *kv_instance = kv_instance_.get();
     TxnTimeStamp begin_ts = BeginTS();
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     SystemCache *system_cache = this->txn_mgr()->GetSystemCachePtr();
     MetaCache *meta_cache = this->txn_mgr_->storage()->meta_cache();
     for (auto &meta : metas) {
@@ -4793,9 +4791,9 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
         }
     }
 
-    Status status = buffer_mgr->RemoveClean(kv_instance_.get());
+    Status status = fileworker_mgr->RemoveClean(kv_instance_.get());
 
-    auto data_dir_str = buffer_mgr->GetFullDataDir();
+    auto data_dir_str = fileworker_mgr->GetFullDataDir();
     auto data_dir = static_cast<std::filesystem::path>(*data_dir_str);
     // Delete empty dir
     VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);

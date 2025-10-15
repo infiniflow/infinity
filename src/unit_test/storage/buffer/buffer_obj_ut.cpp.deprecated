@@ -22,9 +22,7 @@ import :ut.base_test;
 import :infinity;
 import :infinity_exception;
 import :logger;
-import :buffer_manager;
-import :buffer_handle;
-import :buffer_obj;
+import :fileworker_manager;
 import :data_file_worker;
 import :infinity_context;
 import :storage;
@@ -75,7 +73,7 @@ class BufferObjTest : public BaseTest {
     void TearDown() override { BaseTest::TearDown(); }
 
 public:
-    void SaveBufferObj(BufferObj *buffer_obj) { buffer_obj->Save(); };
+    void SaveBufferObj(FileWorker *buffer_obj) { buffer_obj->Save(); };
 
     void WaitCleanup(Storage *storage) {
         auto cleanup_task = std::make_shared<CleanupTask>();
@@ -119,19 +117,19 @@ TEST_F(BufferObjTest, DISABLED_XXX_test1) {
 
     auto *storage = InfinityContext::instance().storage();
     auto *persistence_manager = storage->persistence_manager();
-    BufferManager buffer_manager(memory_limit, base_dir, temp_dir, persistence_manager);
+    FileWorkerManager buffer_manager(memory_limit, base_dir, temp_dir, persistence_manager);
 
     size_t test_size1 = 1024;
     auto file_dir1 = std::make_shared<std::string>("dir1");
     auto test_fname1 = std::make_shared<std::string>("test1");
     auto file_worker1 = std::make_unique<DataFileWorker>(base_dir, temp_dir, file_dir1, test_fname1, test_size1, persistence_manager);
-    auto buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1));
+    auto buf1 = buffer_manager.EmplaceFileWorker(std::move(file_worker1));
 
     size_t test_size2 = 1024;
     auto file_dir2 = std::make_shared<std::string>("dir2");
     auto test_fname2 = std::make_shared<std::string>("test2");
     auto file_worker2 = std::make_unique<DataFileWorker>(base_dir, temp_dir, file_dir2, test_fname2, test_size2, persistence_manager);
-    auto buf2 = buffer_manager.AllocateBufferObject(std::move(file_worker2));
+    auto buf2 = buffer_manager.EmplaceFileWorker(std::move(file_worker2));
 
     /// kEphemeral
     // kNew, kEphemeral
@@ -473,7 +471,7 @@ TEST_F(BufferObjTest, DISABLED_XXX_test_big_with_gc_and_cleanup) {
     EXPECT_EQ(storage->buffer_manager()->memory_limit(), (u64)512 * 1024);
 
     auto *txn_mgr = storage->new_txn_manager();
-    //    BufferManager *buffer_mgr = storage->buffer_manager();
+    //    FileWorkerManager *fileworker_mgr = storage->buffer_manager();
 
     auto db_name = std::make_shared<std::string>("default_db");
     auto table_name = std::make_shared<std::string>("table1");

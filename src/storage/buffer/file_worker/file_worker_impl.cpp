@@ -130,7 +130,25 @@ void FileWorker::MoveFile() {
     }
 }
 
-void FileWorker::SetData(void *data) { data_ = data; }
+void FileWorker::Load() {
+    // std::unique_lock<std::mutex> locker(w_locker_); // lockl?
+    std::string path1 = std::filesystem::path(*data_dir_) / *file_dir_ / *file_name_;
+    std::string path2 = std::filesystem::path(*temp_dir_) / *file_dir_ / *file_name_;
+    if (VirtualStore::Exists(path2)) {
+        Read(true);
+    } else {
+        if (persistence_manager_ && persistence_manager_->GetObjCache(path1).obj_addr_.Valid()) {
+            Read(false);
+        } else if (VirtualStore::Exists(path1)) {
+            Read(false);
+        }
+    }
+}
+
+void FileWorker::SetData(void *data) {
+    data_ = data;
+    [[maybe_unused]] auto foo = Write();
+}
 
 void FileWorker::SetDataSize(size_t size) { UnrecoverableError("Not implemented"); }
 

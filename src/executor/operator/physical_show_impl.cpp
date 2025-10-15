@@ -38,7 +38,7 @@ import :options;
 import :status;
 import :virtual_store;
 import :utility;
-import :buffer_manager;
+import :fileworker_manager;
 import :session_manager;
 import :variables;
 import :default_values;
@@ -49,7 +49,6 @@ import :background_process;
 import :compaction_process;
 import :bg_task;
 import :bg_task_type;
-import :buffer_obj;
 import :file_worker_type;
 import :system_info;
 import :wal_entry;
@@ -842,10 +841,6 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowStmtType::kConfig: {
             ExecuteShowConfig(query_context, show_operator_state);
-            break;
-        }
-        case ShowStmtType::kBuffer: {
-            ExecuteShowBuffer(query_context, show_operator_state);
             break;
         }
         case ShowStmtType::kMemIndex: {
@@ -2303,12 +2298,12 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
             // If block files are not found, try to get the buffer object from buffer manager.
             if (check_buffer_obj) {
                 block_size = 0;
-                BufferObj *buffer_obj = nullptr;
-                BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+                FileWorker *buffer_obj = nullptr;
+                FileWorkerManager *buffer_manager = query_context->storage()->fileworker_manager();
 
                 for (const std::string &path : paths) {
                     std::string filepath = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), path);
-                    buffer_obj = buffer_manager->GetBufferObject(filepath);
+                    buffer_obj = buffer_manager->GetFileWorker(filepath);
                     if (buffer_obj != nullptr) {
                         // auto file_size = buffer_obj->GetBufferSize();
                         // block_size += file_size;
@@ -3949,9 +3944,9 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 varchar_type,
             };
 
-            BufferManager *buffer_manager = query_context->storage()->buffer_manager();
-            u64 total_request_count = buffer_manager->TotalRequestCount();
-            u64 cache_miss_count = buffer_manager->CacheMissCount();
+            // FileWorkerManager *buffer_manager = query_context->storage()->fileworker_manager();
+            u64 total_request_count = 0;
+            u64 cache_miss_count = 0;
 
             output_block_ptr->Init(output_column_types);
             Value value = Value::MakeVarchar(fmt::format("{}/{}", cache_miss_count, total_request_count));
@@ -4034,7 +4029,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         //
         //     output_block_ptr->Init(output_column_types);
         //
-        //     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+        //     FileWorkerManager *buffer_manager = query_context->storage()->buffer_manager();
         //     u64 memory_limit = buffer_manager->memory_limit();
         //     u64 memory_usage = buffer_manager->memory_usage();
         //     Value value = Value::MakeVarchar(fmt::format("{}/{}", Utility::FormatByteSize(memory_usage), Utility::FormatByteSize(memory_limit)));
@@ -4098,7 +4093,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             output_block_ptr->Init(output_column_types);
 
-            BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+            FileWorkerManager *buffer_manager = query_context->storage()->fileworker_manager();
             Value value = Value::MakeBigInt(buffer_manager->BufferedObjectCount());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
@@ -4119,7 +4114,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         //
         //     output_block_ptr->Init(output_column_types);
         //
-        //     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+        //     FileWorkerManager *buffer_manager = query_context->storage()->buffer_manager();
         //     std::vector<size_t> size_list = buffer_manager->WaitingGCObjectCount();
         //     size_t total_size = std::accumulate(size_list.begin(), size_list.end(), 0);
         //     Value value = Value::MakeBigInt(total_size);
@@ -4557,9 +4552,9 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 break;
             }
             case GlobalVariable::kMemoryCacheMiss: {
-                BufferManager *buffer_manager = query_context->storage()->buffer_manager();
-                u64 total_request_count = buffer_manager->TotalRequestCount();
-                u64 cache_miss_count = buffer_manager->CacheMissCount();
+                // FileWorkerManager *buffer_manager = query_context->storage()->fileworker_manager();
+                u64 total_request_count = 0;
+                u64 cache_miss_count = 0;
                 {
                     // option name
                     Value value = Value::MakeVarchar(var_name);
@@ -4654,7 +4649,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
             //     }
             //     {
             //         // option value
-            //         BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+            //         FileWorkerManager *buffer_manager = query_context->storage()->buffer_manager();
             //         u64 memory_limit = buffer_manager->memory_limit();
             //         u64 memory_usage = buffer_manager->memory_usage();
             //         Value value =
@@ -4722,7 +4717,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option value
-                    BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+                    FileWorkerManager *buffer_manager = query_context->storage()->fileworker_manager();
                     Value value = Value::MakeVarchar(std::to_string(buffer_manager->BufferedObjectCount()));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
@@ -4744,7 +4739,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
             //     }
             //     {
             //         // option value
-            //         BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+            //         FileWorkerManager *buffer_manager = query_context->storage()->buffer_manager();
             //         std::vector<size_t> size_list = buffer_manager->WaitingGCObjectCount();
             //         size_t total_size = std::accumulate(size_list.begin(), size_list.end(), 0);
             //         Value value = Value::MakeVarchar(std::to_string(total_size));
@@ -5239,54 +5234,6 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
-}
-
-void PhysicalShow::ExecuteShowBuffer(QueryContext *query_context, ShowOperatorState *operator_state) {
-    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    output_block_ptr->Init(*output_types_);
-    size_t row_count = 0;
-
-    BufferManager *buffer_manager = query_context->storage()->buffer_manager();
-    std::vector<BufferObjectInfo> buffer_object_info_array = buffer_manager->GetBufferObjectsInfo();
-    for (const auto &buffer_object_info : buffer_object_info_array) {
-
-        if (output_block_ptr.get() == nullptr) {
-            output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(*output_types_);
-        }
-
-        {
-            // path
-            Value value = Value::MakeVarchar(buffer_object_info.object_path_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-        }
-        {
-            // size
-            i64 buffer_object_size = static_cast<i64>(buffer_object_info.object_size_);
-            Value value = Value::MakeBigInt(buffer_object_size);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
-        }
-        {
-            // type
-            Value value = Value::MakeVarchar(FileWorkerType2Str(buffer_object_info.file_type_));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
-        }
-
-        ++row_count;
-        if (row_count == output_block_ptr->capacity()) {
-            output_block_ptr->Finalize();
-            operator_state->output_.emplace_back(std::move(output_block_ptr));
-            output_block_ptr = nullptr;
-            row_count = 0;
-        }
-    }
-
-    output_block_ptr->Finalize();
-    operator_state->output_.emplace_back(std::move(output_block_ptr));
-    return;
 }
 
 void PhysicalShow::ExecuteShowMemIndex(QueryContext *query_context, ShowOperatorState *operator_state) {

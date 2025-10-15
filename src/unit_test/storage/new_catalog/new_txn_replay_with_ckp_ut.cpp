@@ -50,8 +50,6 @@ import :index_emvb;
 import :index_bmp;
 import :defer_op;
 import :mem_index;
-import :buffer_obj;
-import :buffer_handle;
 import :logger;
 import :kv_store;
 

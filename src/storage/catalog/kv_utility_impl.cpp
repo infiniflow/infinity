@@ -22,10 +22,8 @@ import :utility;
 import :logger;
 import :new_catalog;
 import :infinity_context;
-import :buffer_handle;
-import :buffer_obj;
 import :block_version;
-import :buffer_manager;
+import :fileworker_manager;
 import :infinity_exception;
 import :config;
 
@@ -183,7 +181,7 @@ size_t GetBlockRowCount(KVInstance *kv_instance,
         UnrecoverableError("Failed to get block lock");
     }
 
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     std::string version_filepath = fmt::format("{}/db_{}/tbl_{}/seg_{}/blk_{}/{}",
                                                InfinityContext::instance().config()->DataDir(),
                                                db_id_str,
@@ -191,12 +189,11 @@ size_t GetBlockRowCount(KVInstance *kv_instance,
                                                segment_id,
                                                block_id,
                                                BlockVersion::PATH);
-    BufferObj *version_buffer = buffer_mgr->GetBufferObject(version_filepath);
+    FileWorker *version_buffer = fileworker_mgr->GetFileWorker(version_filepath);
     if (version_buffer == nullptr) {
         UnrecoverableError(fmt::format("Get version buffer failed: {}", version_filepath));
     }
 
-    BufferHandle buffer_handle = version_buffer->Load();
     // version_buffer->ToMmap();
 
     // auto file_worker = version_buffer->file_worker();
@@ -207,7 +204,7 @@ size_t GetBlockRowCount(KVInstance *kv_instance,
 
     // const auto *block_version = reinterpret_cast<const BlockVersion *>(file_worker->GetMmapData());
 
-    const auto *block_version = reinterpret_cast<const BlockVersion *>(buffer_handle.GetData());
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer->GetData());
 
     size_t row_cnt = 0;
     {

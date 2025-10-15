@@ -14,12 +14,9 @@
 
 export module infinity_core:var_buffer;
 
-import :buffer_obj;
-import :buffer_handle;
+import :file_worker;
 
 namespace infinity {
-
-class BufferManager;
 
 export class VarBuffer {
     friend class VarFileWorker;
@@ -27,25 +24,25 @@ export class VarBuffer {
 public:
     VarBuffer() = default;
 
-    VarBuffer(BufferObj *buffer_obj) : buffer_size_prefix_sum_({0}), buffer_obj_(buffer_obj) {}
+    VarBuffer(FileWorker *fileworker) : buffer_size_prefix_sum_({0}), fileworker_(fileworker) {}
 
     // this is called by VarFileWorker
-    VarBuffer(BufferObj *buffer_obj, std::unique_ptr<char[]> buffer, size_t size) : buffer_size_prefix_sum_({0, size}), buffer_obj_(buffer_obj) {
+    VarBuffer(FileWorker *fileworker, std::unique_ptr<char[]> buffer, size_t size) : buffer_size_prefix_sum_({0, size}), fileworker_(fileworker) {
         std::get<std::vector<std::unique_ptr<char[]>>>(buffers_).push_back(std::move(buffer));
     }
 
-    VarBuffer(BufferObj *buffer_obj, const char *buffer, size_t size) : buffer_size_prefix_sum_({0, size}), buffer_obj_(buffer_obj) {
+    VarBuffer(FileWorker *fileworker, const char *buffer, size_t size) : buffer_size_prefix_sum_({0, size}), fileworker_(fileworker) {
         buffers_ = buffer;
     }
 
     VarBuffer(VarBuffer &&other)
-        : buffers_(std::move(other.buffers_)), buffer_size_prefix_sum_(std::move(other.buffer_size_prefix_sum_)), buffer_obj_(other.buffer_obj_) {}
+        : buffers_(std::move(other.buffers_)), buffer_size_prefix_sum_(std::move(other.buffer_size_prefix_sum_)), fileworker_(other.fileworker_) {}
 
     VarBuffer &operator=(VarBuffer &&other) {
         if (this != &other) {
             buffers_ = std::move(other.buffers_);
             buffer_size_prefix_sum_ = std::move(other.buffer_size_prefix_sum_);
-            buffer_obj_ = other.buffer_obj_;
+            fileworker_ = other.fileworker_;
         }
         return *this;
     }
@@ -70,14 +67,14 @@ public:
 private:
     mutable std::shared_mutex mtx_;
 
-    BufferObj *buffer_obj_ = nullptr;
+    FileWorker *fileworker_ = nullptr;
 };
 
 export class VarBufferManager {
 public:
     VarBufferManager() : type_(BufferType::kBuffer), mem_buffer_(nullptr) {}
 
-    VarBufferManager(BufferObj *outline_buffer_obj);
+    VarBufferManager(FileWorker *var_fileworker);
 
     size_t Append(std::unique_ptr<char[]> buffer, size_t size, bool *free_success = nullptr);
 
@@ -91,12 +88,10 @@ public:
 
     size_t TotalSize();
 
-    void SetToCatalog(BufferObj *outline_buffer_obj);
+    void SetToCatalog(FileWorker *var_fileworker);
 
 private:
-    VarBuffer *GetInnerMutNoLock();
-
-    const VarBuffer *GetInnerNoLock();
+    VarBuffer *GetInnerNoLock();
 
     enum class BufferType {
         kBuffer,
@@ -104,8 +99,8 @@ private:
     } type_;
 
     std::unique_ptr<VarBuffer> mem_buffer_;
-    std::optional<BufferHandle> buffer_handle_;
-    BufferObj *outline_buffer_obj_ = nullptr;
+    FileWorker *fileworker_{};
+    FileWorker *var_fileworker_{};
 
     mutable std::mutex mutex_;
 };

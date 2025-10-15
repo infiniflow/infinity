@@ -46,6 +46,16 @@ public:
 
     void Read(bool is_temp);
 
+    void Load();
+
+    std::string GetFilename() {
+        return "Dummy";
+    }
+
+    void PickForCleanup() {
+
+    }
+
     void MoveFile();
 
     virtual void AllocateInMemory() = 0;
@@ -54,7 +64,12 @@ public:
 
     virtual FileWorkerType Type() const = 0;
 
-    void *GetData() const { return data_; }
+    void *GetData() {
+        if (!mmap_true_) {
+            Load();
+        }
+        return data_;
+    }
 
     void SetData(void *data);
 

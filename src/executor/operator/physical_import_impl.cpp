@@ -30,7 +30,6 @@ import :expression_state;
 import :data_block;
 import :logger;
 import :defer_op;
-import :buffer_handle;
 import :data_file_worker;
 import :infinity_exception;
 import :zsv;
@@ -134,8 +133,8 @@ public:
         }
         txn_->WriteDataBlockToFile(db_name_, table_name_, std::move(data_block_), block_idx, &object_paths);
 
-        // BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-        // buffer_mgr->RemoveBufferObjects(object_paths);
+        // FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->buffer_manager();
+        // fileworker_mgr->RemoveBufferObjects(object_paths);
     }
 
 private:

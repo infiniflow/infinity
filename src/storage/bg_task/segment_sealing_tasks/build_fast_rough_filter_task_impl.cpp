@@ -19,7 +19,7 @@ module infinity_core:build_fast_rough_filter_task.impl;
 import :build_fast_rough_filter_task;
 import :infinity_exception;
 import :logger;
-import :buffer_manager;
+import :fileworker_manager;
 import :column_vector;
 import :value;
 import :block_column_iter;

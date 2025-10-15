@@ -18,10 +18,8 @@ module;
 
 module infinity_core:buffer_obj.impl;
 
-import :buffer_obj;
 import :file_worker;
-import :buffer_handle;
-import :buffer_manager;
+import :fileworker_manager;
 import :infinity_exception;
 import :logger;
 import :file_worker_type;
@@ -37,20 +35,20 @@ import global_resource_usage;
 
 namespace infinity {
 
-BufferObj::BufferObj(BufferManager *buffer_mgr, std::unique_ptr<FileWorker> file_worker, u32 id)
-    : buffer_mgr_(buffer_mgr), file_worker_(std::move(file_worker)), id_(id) {
+FileWorker::FileWorker(FileWorkerManager *fileworker_mgr, std::unique_ptr<FileWorker> file_worker, u32 id)
+    : buffer_mgr_(fileworker_mgr), file_worker_(std::move(file_worker)), id_(id) {
 // #ifdef INFINITY_DEBUG
-//     GlobalResourceUsage::IncrObjectCount("BufferObj");
+//     GlobalResourceUsage::IncrObjectCount("FileWorker");
 // #endif
 }
 
-// BufferObj::~BufferObj() {
+// FileWorker::~FileWorker() {
 // #ifdef INFINITY_DEBUG
-//     GlobalResourceUsage::DecrObjectCount("BufferObj");
+//     GlobalResourceUsage::DecrObjectCount("FileWorker");
 // #endif
 // }
 
-void BufferObj::UpdateFileWorkerInfo(std::unique_ptr<FileWorker> new_file_worker) {
+void FileWorker::UpdateFileWorkerInfo(std::unique_ptr<FileWorker> new_file_worker) {
     switch (file_worker_->Type()) {
         case FileWorkerType::kVarFile: {
             assert(new_file_worker->Type() == FileWorkerType::kVarFile);
@@ -65,7 +63,7 @@ void BufferObj::UpdateFileWorkerInfo(std::unique_ptr<FileWorker> new_file_worker
     }
 }
 
-BufferHandle BufferObj::Load() {
+FileWorker *FileWorker::Load() {
     std::unique_lock<std::mutex> locker(w_locker_);
     // auto path1 = file_worker_->GetFilePath();
     auto data_dir = file_worker_->data_dir_;
@@ -83,11 +81,10 @@ BufferHandle BufferObj::Load() {
             file_worker_->Read(false);
         }
     }
-    void *data = file_worker_->GetData();
-    return BufferHandle(this, data);
+    return this;
 }
 
-bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
+bool FileWorker::Save(const FileWorkerSaveCtx &ctx) {
     std::unique_lock<std::mutex> locker(w_locker_);
     // auto data_dir = file_worker_->data_dir_;
     auto temp_dir = file_worker_->temp_dir_;
@@ -97,30 +94,30 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
     return file_worker_->Write(ctx);
 }
 
-void BufferObj::PickForCleanup() {
+void FileWorker::PickForCleanup() {
     std::unique_lock<std::mutex> locker(w_locker_);
-    buffer_mgr_->AddToCleanList(this, false /*do_free*/);
+    buffer_mgr_->AddToCleanList(this);
 }
 
-Status BufferObj::CleanupFile() const { return file_worker_->CleanupFile(); }
+Status FileWorker::CleanupFile() const { return file_worker_->CleanupFile(); }
 
-void BufferObj::CleanupTempFile() const {
+void FileWorker::CleanupTempFile() const {
     std::unique_lock<std::mutex> locker(w_locker_);
     file_worker_->CleanupTempFile();
 }
 
-void *BufferObj::GetMutPointer() {
+void *FileWorker::GetMutPointer() {
     std::unique_lock<std::mutex> locker(w_locker_);
     return file_worker_->GetData();
 }
 
-void BufferObj::SetData(void *data) {
+void FileWorker::SetData(void *data) {
     std::unique_lock<std::mutex> locker(w_locker_);
     file_worker_->SetData(data);
     [[maybe_unused]] auto foo = file_worker_->Write();
 }
 
-void BufferObj::SetDataSize(size_t size) {
+void FileWorker::SetDataSize(size_t size) {
     std::unique_lock<std::mutex> locker(w_locker_);
     file_worker_->SetDataSize(size);
 }

@@ -26,7 +26,7 @@ import third_party;
 import :infinity_context;
 import :block_version;
 import :virtual_store;
-import :buffer_manager;
+import :fileworker_manager;
 import :version_file_worker;
 import :column_vector;
 import :persistence_manager;
@@ -75,7 +75,7 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
     auto version_file_name = std::make_shared<std::string>("block_version_test");
 
     {
-        BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir, nullptr);
+        FileWorkerManager fileworker_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir, nullptr);
 
         auto file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(std::string(GetFullDataDir())),
                                                                std::make_shared<std::string>(std::string(GetFullTmpDir())),
@@ -83,11 +83,10 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
                                                                version_file_name,
                                                                8192,
                                                                nullptr);
-        auto *buffer_obj = buffer_mgr.AllocateBufferObject(std::move(file_worker));
+        fileworker_mgr.EmplaceFileWorker(std::move(file_worker));
 
         {
-            auto block_version_handle = buffer_obj->Load();
-            auto *block_version = static_cast<BlockVersion *>(block_version_handle.GetDataMut());
+            auto *block_version = static_cast<BlockVersion *>(file_worker->GetData());
 
             block_version->Append(10, 3);
             block_version->Append(20, 6);
@@ -95,11 +94,12 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
             block_version->Delete(5, 40);
         }
         {
-            buffer_obj->Save(VersionFileWorkerSaveCtx(15));
+            [[maybe_unused]] bool foo{};
+            file_worker->Write(foo, VersionFileWorkerSaveCtx(15));
         }
     }
     {
-        BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir, nullptr);
+        FileWorkerManager fileworker_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir, nullptr);
 
         auto file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(std::string(GetFullDataDir())),
                                                                std::make_shared<std::string>(std::string(GetFullTmpDir())),
@@ -107,28 +107,26 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
                                                                version_file_name,
                                                                8192,
                                                                nullptr);
-        auto *buffer_obj = buffer_mgr.GetBufferObject(std::move(file_worker));
-
         {
             BlockVersion block_version1(8192);
             block_version1.Append(10, 3);
 
-            auto block_version_handle = buffer_obj->Load();
             {
-                const auto *block_version = static_cast<const BlockVersion *>(block_version_handle.GetData());
+                const auto *block_version = static_cast<const BlockVersion *>(file_worker->GetData());
                 ASSERT_EQ(block_version1, *block_version);
             }
-            auto *block_version = static_cast<BlockVersion *>(block_version_handle.GetDataMut());
+            auto *block_version = static_cast<BlockVersion *>(file_worker->GetData());
             block_version->Append(20, 6);
             block_version->Delete(2, 30);
             block_version->Delete(5, 40);
         }
         {
-            buffer_obj->Save(VersionFileWorkerSaveCtx(35));
+            [[maybe_unused]] bool foo{};
+            file_worker->Write(foo, VersionFileWorkerSaveCtx(35));
         }
     }
     {
-        BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir, nullptr);
+        FileWorkerManager fileworker_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir, nullptr);
 
         auto file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(std::string(GetFullDataDir())),
                                                                std::make_shared<std::string>(std::string(GetFullTmpDir())),
@@ -136,16 +134,13 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
                                                                version_file_name,
                                                                8192,
                                                                nullptr);
-        auto *buffer_obj = buffer_mgr.GetBufferObject(std::move(file_worker));
-
         {
             BlockVersion block_version1(8192);
             block_version1.Append(10, 3);
             block_version1.Append(20, 6);
             block_version1.Delete(2, 30);
 
-            auto block_version_handle = buffer_obj->Load();
-            const auto *block_version = static_cast<const BlockVersion *>(block_version_handle.GetData());
+            const auto *block_version = static_cast<const BlockVersion *>(file_worker->GetData());
             ASSERT_EQ(block_version1, *block_version);
         }
     }

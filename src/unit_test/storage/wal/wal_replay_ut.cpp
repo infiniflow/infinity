@@ -24,7 +24,7 @@ import :infinity_context;
 import :table_def;
 import :data_block;
 import :value;
-import :buffer_manager;
+import :fileworker_manager;
 import :wal_entry;
 import :infinity_exception;
 import :status;
@@ -839,7 +839,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
 
         txn_mgr->PrintAllKeyValue();
 
-        infinity::InfinityContext::instance().UnInit(); // At this point, all kv-pairs in buffer_map are cleared.
+        infinity::InfinityContext::instance().UnInit(); // At this point, all kv-pairs in fileworker_map are cleared.
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
 #endif
@@ -1011,7 +1011,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         NewTxnManager *txn_mgr = storage->new_txn_manager();
-        // BufferManager *buffer_manager = storage->buffer_manager();
+        // FileWorkerManager *buffer_manager = storage->buffer_manager();
 
         // CREATE TABLE test_hnsw (col1 embedding(float,128));
         {

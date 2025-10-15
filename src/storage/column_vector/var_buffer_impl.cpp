@@ -16,7 +16,7 @@ module infinity_core:var_buffer.impl;
 
 import :var_buffer;
 import :infinity_exception;
-import :buffer_manager;
+import :fileworker_manager;
 import :var_file_worker;
 import :infinity_context;
 
@@ -61,7 +61,7 @@ const char *VarBuffer::Get(size_t offset, size_t size) const {
     // find the last index i such that buffer_size_prefix_sum_[i] <= offset
     auto it = std::upper_bound(buffer_size_prefix_sum_.begin(), buffer_size_prefix_sum_.end(), offset);
     // auto it = std::lower_bound(buffer_size_prefix_sum_.begin(), buffer_size_prefix_sum_.end(), offset);
-    // [[maybe_unused]] auto buffer_map = infinity::InfinityContext::instance().storage()->buffer_manager()->buffer_map();
+    // [[maybe_unused]] auto fileworker_map = infinity::InfinityContext::instance().storage()->buffer_manager()->fileworker_map();
     // if (it == buffer_size_prefix_sum_.end()) {
     //     std::string error_msg = fmt::format("offset {} is out of range {}", offset, buffer_size_prefix_sum_.back());
     //     UnrecoverableError(error_msg);
@@ -114,13 +114,13 @@ size_t VarBuffer::TotalSize() const {
 
 size_t VarBufferManager::Append(std::unique_ptr<char[]> data, size_t size, bool *free_success) {
     std::unique_lock<std::mutex> lock(mutex_);
-    auto *buffer = GetInnerMutNoLock();
+    auto *buffer = GetInnerNoLock();
     size_t offset = buffer->Append(std::move(data), size, free_success);
     return offset;
 }
 
-VarBufferManager::VarBufferManager(BufferObj *outline_buffer_obj)
-    : type_(BufferType::kNewCatalog), buffer_handle_(std::nullopt), outline_buffer_obj_(outline_buffer_obj) {}
+VarBufferManager::VarBufferManager(FileWorker *var_fileworker)
+    : type_(BufferType::kNewCatalog), fileworker_(nullptr), var_fileworker_(var_fileworker) {}
 
 size_t VarBufferManager::Append(const char *data, size_t size, bool *free_success) {
     auto buffer = std::make_unique<char[]>(size);
@@ -128,22 +128,20 @@ size_t VarBufferManager::Append(const char *data, size_t size, bool *free_succes
     return Append(std::move(buffer), size, free_success);
 }
 
-void VarBufferManager::SetToCatalog(BufferObj *outline_buffer_obj) {
+void VarBufferManager::SetToCatalog(FileWorker *var_fileworker) {
     std::unique_lock<std::mutex> lock(mutex_);
     if (type_ != BufferType::kBuffer) {
         UnrecoverableError("Cannot convert to new catalog");
     }
     type_ = BufferType::kNewCatalog;
-    outline_buffer_obj_ = outline_buffer_obj;
+    var_fileworker_ = var_fileworker;
     if (!mem_buffer_) {
         mem_buffer_ = std::make_unique<VarBuffer>();
     }
-    outline_buffer_obj_->SetData(mem_buffer_.release());
-
-    buffer_handle_ = outline_buffer_obj_->Load();
+    var_fileworker_->SetData(mem_buffer_.release());
 }
 
-VarBuffer *VarBufferManager::GetInnerMutNoLock() {
+VarBuffer *VarBufferManager::GetInnerNoLock() {
     switch (type_) {
         case BufferType::kBuffer: {
             if (mem_buffer_.get() == nullptr) {
@@ -152,23 +150,7 @@ VarBuffer *VarBufferManager::GetInnerMutNoLock() {
             return mem_buffer_.get();
         }
         case BufferType::kNewCatalog: {
-            buffer_handle_ = outline_buffer_obj_->Load();
-            return static_cast<VarBuffer *>(buffer_handle_->GetDataMut());
-        }
-    }
-}
-
-const VarBuffer *VarBufferManager::GetInnerNoLock() {
-    switch (type_) {
-        case BufferType::kBuffer: {
-            if (mem_buffer_.get() == nullptr) {
-                mem_buffer_ = std::make_unique<VarBuffer>();
-            }
-            return mem_buffer_.get();
-        }
-        case BufferType::kNewCatalog: {
-            buffer_handle_ = outline_buffer_obj_->Load();
-            return static_cast<const VarBuffer *>(buffer_handle_->GetData());
+            return static_cast<VarBuffer *>(var_fileworker_->GetData());
         }
     }
 }

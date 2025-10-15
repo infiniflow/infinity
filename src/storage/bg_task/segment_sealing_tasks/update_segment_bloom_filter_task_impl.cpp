@@ -19,7 +19,7 @@ module infinity_core:update_segment_bloom_filter_task.impl;
 import :update_segment_bloom_filter_task;
 import :bg_task;
 import :background_process;
-import :buffer_manager;
+import :fileworker_manager;
 import :infinity_exception;
 import :logger;
 import :build_fast_rough_filter_task;
@@ -56,12 +56,12 @@ void UpdateSegmentBloomFilterTask::ExecuteInner() {
     // // begin txn
     // // need a txn to keep segment from being deleted
     // update_bloom_filter_txn->Begin();
-    // auto *buffer_mgr = update_bloom_filter_txn->buffer_mgr();
+    // auto *fileworker_mgr = update_bloom_filter_txn->fileworker_mgr();
     // auto begin_ts = update_bloom_filter_txn->BeginTS();
     // LOG_TRACE(fmt::format("SetSegmentStatusSealedTask: BeginTS: {} begin task for segment: {}", begin_ts, segment->segment_id()));
     // // build filter
     // // TODO: check segment visibility?
-    // BuildFastRoughFilterTask::ExecuteUpdateSegmentBloomFilter(segment, buffer_mgr, begin_ts);
+    // BuildFastRoughFilterTask::ExecuteUpdateSegmentBloomFilter(segment, fileworker_mgr, begin_ts);
     // // serialize filter
     // std::string segment_filter_binary_data = segment->GetFastRoughFilter()->SerializeToString();
     // std::vector<std::pair<BlockID, std::string>> block_filter_binary_data = segment->GetBlockFilterBinaryDataVector();

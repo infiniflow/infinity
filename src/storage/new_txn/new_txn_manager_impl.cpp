@@ -20,7 +20,7 @@ import :txn_state;
 import :wal_entry;
 import :infinity_exception;
 import :logger;
-import :buffer_manager;
+import :fileworker_manager;
 import :default_values;
 import :wal_manager;
 import :defer_op;
@@ -44,7 +44,7 @@ import global_resource_usage;
 namespace infinity {
 
 NewTxnManager::NewTxnManager(Storage *storage, KVStore *kv_store, TxnTimeStamp start_ts)
-    : storage_(storage), buffer_mgr_(storage->buffer_manager()), wal_mgr_(storage->wal_manager()), kv_store_(kv_store), current_ts_(start_ts),
+    : storage_(storage), fileworker_mgr_(storage->fileworker_manager()), wal_mgr_(storage->wal_manager()), kv_store_(kv_store), current_ts_(start_ts),
       prepare_commit_ts_(start_ts), is_running_(false) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("NewTxnManager");

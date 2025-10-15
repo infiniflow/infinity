@@ -29,7 +29,7 @@ import :value_expression;
 import :logical_node;
 import :virtual_store;
 import :wal_entry;
-import :buffer_manager;
+import :fileworker_manager;
 import :new_catalog;
 import :memory_indexer;
 import :config;

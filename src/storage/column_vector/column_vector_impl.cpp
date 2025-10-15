@@ -26,7 +26,7 @@ import :roaring_bitmap;
 import :vector_buffer;
 import :logger;
 import :value;
-import :buffer_manager;
+import :fileworker_manager;
 import :status;
 import :base_expression;
 import :value_expression;
@@ -247,8 +247,8 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, size_t capacity) {
     }
 }
 
-void ColumnVector::Initialize(BufferObj *buffer_obj,
-                              BufferObj *outline_buffer_obj,
+void ColumnVector::Initialize(FileWorker *buffer_obj,
+                              FileWorker *outline_buffer_obj,
                               size_t current_row_count,
                               ColumnVectorMode vector_tipe,
                               ColumnVectorType vector_type,
@@ -279,7 +279,7 @@ void ColumnVector::Initialize(BufferObj *buffer_obj,
     tail_index_.store(current_row_count);
 }
 
-void ColumnVector::SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, ColumnVectorMode vector_tipe) {
+void ColumnVector::SetToCatalog(FileWorker *buffer_obj, FileWorker *outline_buffer_obj, ColumnVectorMode vector_tipe) {
     if (buffer_.get() == nullptr) {
         UnrecoverableError("Column vector is not initialized.");
     }

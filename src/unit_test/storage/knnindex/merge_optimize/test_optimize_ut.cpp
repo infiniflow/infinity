@@ -30,7 +30,7 @@ import :index_secondary;
 import :infinity_exception;
 import :bg_task;
 import :wal_manager;
-import :buffer_manager;
+import :fileworker_manager;
 import :background_process;
 import :txn_state;
 import :new_txn_manager;
@@ -47,7 +47,6 @@ import :mem_index;
 import :status;
 import :new_txn;
 import :hnsw_handler;
-import :buffer_obj;
 import :storage;
 
 import compilation_config;
@@ -220,7 +219,7 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 

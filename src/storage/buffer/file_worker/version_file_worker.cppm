@@ -16,7 +16,6 @@ export module infinity_core:version_file_worker;
 
 import :file_worker;
 import :file_worker_type;
-import :buffer_obj;
 import :persistence_manager;
 
 namespace infinity {
@@ -45,7 +44,6 @@ public:
 
     FileWorkerType Type() const override { return FileWorkerType::kVersionDataFile; }
 
-protected:
     bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
     void Read(size_t file_size, bool from_spill) override;

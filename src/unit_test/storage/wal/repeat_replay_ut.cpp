@@ -34,7 +34,7 @@ import :column_vector;
 import :table_def;
 import :data_block;
 import :value;
-import :buffer_manager;
+import :fileworker_manager;
 import :physical_import;
 import :txn_state;
 import :new_txn;
@@ -243,7 +243,7 @@ TEST_P(RepeatReplayTest, import) {
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
     size_t block_row_cnt = 8192;
-    auto TestImport = [&](NewTxnManager *new_txn_mgr, BufferManager *buffer_mgr) {
+    auto TestImport = [&](NewTxnManager *new_txn_mgr, FileWorkerManager *fileworker_mgr) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import table"), TransactionType::kImport);
         auto make_input_block = [&](const Value &v1, const Value &v2) {
             auto input_block = std::make_shared<DataBlock>();
@@ -294,7 +294,7 @@ TEST_P(RepeatReplayTest, import) {
         Storage *storage = InfinityContext::instance().storage();
 
         NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-        BufferManager *buffer_mgr = storage->buffer_manager();
+        FileWorkerManager *fileworker_mgr = storage->fileworker_manager();
         {
             NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
             auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
@@ -313,7 +313,7 @@ TEST_P(RepeatReplayTest, import) {
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
-        TestImport(new_txn_mgr, buffer_mgr);
+        TestImport(new_txn_mgr, fileworker_mgr);
         CheckTable(new_txn_mgr, 1);
         infinity::InfinityContext::instance().UnInit();
     }
@@ -323,9 +323,9 @@ TEST_P(RepeatReplayTest, import) {
         Storage *storage = InfinityContext::instance().storage();
         NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-        BufferManager *buffer_mgr = storage->buffer_manager();
+        FileWorkerManager *fileworker_mgr = storage->fileworker_manager();
         CheckTable(new_txn_mgr, 1);
-        TestImport(new_txn_mgr, buffer_mgr);
+        TestImport(new_txn_mgr, fileworker_mgr);
         CheckTable(new_txn_mgr, 2);
         infinity::InfinityContext::instance().UnInit();
     }
@@ -335,7 +335,7 @@ TEST_P(RepeatReplayTest, import) {
         Storage *storage = InfinityContext::instance().storage();
 
         NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-        BufferManager *buffer_mgr = storage->buffer_manager();
+        FileWorkerManager *fileworker_mgr = storage->fileworker_manager();
         CheckTable(new_txn_mgr, 2);
         {
             //  manually add checkpoint
@@ -349,7 +349,7 @@ TEST_P(RepeatReplayTest, import) {
             status = new_txn_mgr->CommitTxn(txn, ckp_commit_ts.get());
             EXPECT_TRUE(status.ok());
         }
-        TestImport(new_txn_mgr, buffer_mgr);
+        TestImport(new_txn_mgr, fileworker_mgr);
         CheckTable(new_txn_mgr, 3);
         infinity::InfinityContext::instance().UnInit();
     }

@@ -25,10 +25,9 @@ import :knn_scan_data;
 import :knn_filter;
 import :infinity_exception;
 import :column_expression;
-import :buffer_manager;
+import :fileworker_manager;
 import :merge_knn;
 import :knn_result_handler;
-import :buffer_obj;
 import :data_block;
 import :index_hnsw;
 import :status;
@@ -645,13 +644,12 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                     auto [chunk_ids_ptr, mem_index] = get_chunks();
                     for (ChunkID chunk_id : *chunk_ids_ptr) {
                         ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
-                        BufferObj *index_buffer = nullptr;
+                        FileWorker *index_buffer{};
                         status = chunk_index_meta.GetIndexBuffer(index_buffer);
                         if (!status.ok()) {
                             UnrecoverableError(status.message());
                         }
-                        auto index_handle = index_buffer->Load();
-                        const auto *ivf_chunk = static_cast<const IVFIndexInChunk *>(index_handle.GetData());
+                        const auto *ivf_chunk = static_cast<const IVFIndexInChunk *>(index_buffer->GetData());
                         ivf_result_handler->Search(ivf_chunk);
                     }
                     if (mem_index) {
@@ -952,13 +950,12 @@ void ExecuteHnswSearch(QueryContext *query_context,
     auto [chunk_ids_ptr, mem_index] = get_chunks();
     for (ChunkID chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
-        BufferObj *index_buffer = nullptr;
+        FileWorker *index_buffer{};
         status = chunk_index_meta.GetIndexBuffer(index_buffer);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        auto index_handle = index_buffer->Load();
-        const auto *hnsw_handler = reinterpret_cast<const HnswHandlerPtr *>(index_handle.GetData());
+        const auto *hnsw_handler = reinterpret_cast<const HnswHandlerPtr *>(index_buffer->GetData());
         hnsw_search(*hnsw_handler, false);
     }
     if (mem_index) {

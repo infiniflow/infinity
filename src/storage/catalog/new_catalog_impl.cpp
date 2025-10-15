@@ -42,7 +42,7 @@ import :config;
 import :virtual_store;
 import :logger;
 import :utility;
-import :buffer_manager;
+import :fileworker_manager;
 import :infinity_context;
 import :fast_rough_filter;
 import :persistence_manager;

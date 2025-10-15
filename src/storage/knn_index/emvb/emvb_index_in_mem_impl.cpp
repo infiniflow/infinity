@@ -17,12 +17,11 @@ module infinity_core:emvb_index_in_mem.impl;
 import :emvb_index_in_mem;
 import :roaring_bitmap;
 import :default_values;
-import :buffer_manager;
+import :fileworker_manager;
 import :block_column_iter;
 import :infinity_exception;
 import :emvb_index;
 import :index_emvb;
-import :buffer_handle;
 import :index_base;
 import :emvb_product_quantization;
 import :column_vector;
@@ -30,7 +29,6 @@ import :block_index;
 import :table_meta;
 import :segment_meta;
 import :new_txn;
-import :buffer_obj;
 import :kv_store;
 import :chunk_index_meta;
 
@@ -102,15 +100,14 @@ void EMVBIndexInMem::Insert(const ColumnVector &column_vector,
     }
 }
 
-void EMVBIndexInMem::Dump(BufferObj *buffer_obj) {
+void EMVBIndexInMem::Dump(FileWorker *fileworker) {
     std::unique_lock lock(rw_mutex_);
     if (!is_built_.test(std::memory_order_acquire)) {
         UnrecoverableError("EMVBIndexInMem Dump: index not built yet!");
     }
     is_built_.clear(std::memory_order_release);
 
-    BufferHandle handle = buffer_obj->Load();
-    auto data_ptr = static_cast<EMVBIndex *>(handle.GetDataMut());
+    auto data_ptr = static_cast<EMVBIndex *>(fileworker->GetData());
     *data_ptr = std::move(*emvb_index_); // call move in lock
     emvb_index_.reset();
 }

@@ -42,8 +42,6 @@ import :value;
 import :kv_code;
 import :kv_store;
 import :new_txn;
-import :buffer_obj;
-import :buffer_handle;
 import :secondary_index_in_mem;
 import :secondary_index_data;
 import :segment_meta;
@@ -690,8 +688,8 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
         std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
     auto CheckTable = [&](std::vector<ColumnID> column_idxes) {
         auto check_column = [&](ColumnMeta &column_meta) {
-            BufferObj *column_buffer = nullptr;
-            BufferObj *outline_buffer = nullptr;
+            FileWorker *column_buffer = nullptr;
+            FileWorker *outline_buffer = nullptr;
             Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(column_buffer, nullptr);
@@ -747,8 +745,8 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
 
     auto CheckTable1 = [&](std::vector<ColumnID> column_idxes) {
         auto check_column = [&](ColumnMeta &column_meta) {
-            BufferObj *column_buffer = nullptr;
-            BufferObj *outline_buffer = nullptr;
+            FileWorker *column_buffer = nullptr;
+            FileWorker *outline_buffer = nullptr;
             Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(column_buffer, nullptr);
@@ -961,8 +959,8 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
 TEST_P(TestTxnCompact, compact_and_drop_columns) {
     auto CheckTable = [&](const std::vector<ColumnID> &column_idxes, const std::vector<SegmentID> &segment_ids) {
         auto check_column = [&](ColumnMeta &column_meta) {
-            BufferObj *column_buffer = nullptr;
-            BufferObj *outline_buffer = nullptr;
+            FileWorker *column_buffer = nullptr;
+            FileWorker *outline_buffer = nullptr;
             Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(column_buffer, nullptr);

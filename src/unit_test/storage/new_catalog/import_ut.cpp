@@ -34,7 +34,6 @@ import :data_block;
 import :column_vector;
 import :value;
 import :new_txn;
-import :buffer_obj;
 import :segment_meta;
 import :block_meta;
 import :column_meta;
@@ -63,7 +62,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 TEST_P(TestTxnImport, test_import1) {
 
     using namespace infinity;
-    [[maybe_unused]] auto buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
+    [[maybe_unused]] auto fileworker_mgr = infinity::InfinityContext::instance().storage()->fileworker_manager();
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
@@ -162,7 +161,7 @@ TEST_P(TestTxnImport, test_import1) {
                 Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
                 auto some = col.GetValueByIndex(0);
-                [[maybe_unused]] auto buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
+                [[maybe_unused]] auto fileworker_mgr = infinity::InfinityContext::instance().storage()->fileworker_manager();
                 EXPECT_EQ(some, Value::MakeInt(1));
                 EXPECT_EQ(col.GetValueByIndex(1), Value::MakeInt(2));
                 EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeInt(1));
@@ -317,7 +316,7 @@ TEST_P(TestTxnImport, test_import_with_index) {
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(segment_id, 0));
             }
 
-            BufferObj *buffer_obj = nullptr;
+            FileWorker *buffer_obj = nullptr;
             status = chunk_index_meta.GetIndexBuffer(buffer_obj);
             EXPECT_TRUE(status.ok());
         };
@@ -548,7 +547,7 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(segment_id, 0));
             }
 
-            BufferObj *buffer_obj = nullptr;
+            FileWorker *buffer_obj = nullptr;
             status = chunk_index_meta.GetIndexBuffer(buffer_obj);
             EXPECT_TRUE(status.ok());
         };
@@ -768,7 +767,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
             size_t column_idx = 0;
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
-            [[maybe_unused]] auto buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
+            [[maybe_unused]] auto fileworker_mgr = infinity::InfinityContext::instance().storage()->fileworker_manager();
             Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
