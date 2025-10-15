@@ -37,18 +37,7 @@ BufferManager::BufferManager(u64 memory_limit,
                              std::shared_ptr<std::string> data_dir,
                              std::shared_ptr<std::string> temp_dir,
                              PersistenceManager *persistence_manager)
-    : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), persistence_manager_(persistence_manager),
-      current_memory_size_(0) {
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount("BufferManager");
-#endif
-}
-
-BufferManager::~BufferManager() {
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::DecrObjectCount("BufferManager");
-#endif
-}
+    : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), persistence_manager_(persistence_manager) {}
 
 void BufferManager::Start() {
     if (!VirtualStore::Exists(*data_dir_)) {
@@ -178,7 +167,7 @@ std::vector<BufferObjectInfo> BufferManager::GetBufferObjectsInfo() {
             buffer_object_info.object_path_ = buffer_pair.first;
             BufferObj *buffer_object_ptr = buffer_pair.second.get();
             buffer_object_info.file_type_ = buffer_object_ptr->file_worker()->Type();
-            buffer_object_info.object_size_ = buffer_object_ptr->GetBufferSize();
+            // buffer_object_info.object_size_ = buffer_object_ptr->buffer_size_;
             result.emplace_back(buffer_object_info);
         }
     }
@@ -186,33 +175,8 @@ std::vector<BufferObjectInfo> BufferManager::GetBufferObjectsInfo() {
 }
 
 void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool do_free) {
-    {
-        std::unique_lock lock(clean_locker_);
-        clean_list_.emplace_back(buffer_obj);
-    }
-    if (do_free) {
-        size_t buffer_size = buffer_obj->GetBufferSize();
-        [[maybe_unused]] auto memory_size = current_memory_size_.fetch_sub(buffer_size);
-        if (memory_size < buffer_size) {
-            std::string err_msg = fmt::format("BufferManager::AddToCleanList: memory_size < buffer_size: {} < {}", memory_size, buffer_size);
-            LOG_WARN(err_msg);
-            current_memory_size_ = 0;
-            // UnrecoverableError(err_msg);
-        }
-    }
-}
-
-void BufferManager::FreeUnloadBuffer(BufferObj *buffer_obj) {
-    size_t buffer_size = buffer_obj->GetBufferSize();
-    [[maybe_unused]] auto memory_size = current_memory_size_.fetch_sub(buffer_size);
-    if (memory_size < buffer_size) {
-        current_memory_size_ = 0;
-        const std::string error_msg = fmt::format("BufferManager::FreeUnloadBuffer: memory_size < buffer_size: {} < {}, current_memory_size: {}",
-                                                  memory_size,
-                                                  buffer_size,
-                                                  current_memory_size_.load());
-        LOG_WARN(error_msg);
-    }
+    std::unique_lock lock(clean_locker_);
+    clean_list_.emplace_back(buffer_obj);
 }
 
 void BufferManager::AddTemp(BufferObj *buffer_obj) {

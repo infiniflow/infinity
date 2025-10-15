@@ -96,7 +96,7 @@ void HnswFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-bool HnswFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool HnswFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (!data_) {
         UnrecoverableError("WriteToFileImpl: Data is not allocated.");
     }
@@ -106,9 +106,7 @@ bool HnswFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSave
     return true;
 }
 
-bool HnswFileWorker::CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) { return true; }
-
-void HnswFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
+void HnswFileWorker::Read(size_t file_size, bool from_spill) {
     // if (data_ != nullptr) {
     //     UnrecoverableError("Data is already allocated.");
     // }
@@ -120,26 +118,6 @@ void HnswFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     {
         (*hnsw_handler)->LoadFromPtr(*file_handle_, file_size);
     }
-}
-
-bool HnswFileWorker::ReadFromMmapImpl(const void *ptr, size_t size) {
-    if (mmap_data_ != nullptr) {
-        UnrecoverableError("Mmap data is already allocated.");
-    }
-    mmap_data_ = reinterpret_cast<u8 *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_, false).release()));
-    auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(mmap_data_);
-    (*hnsw_handler)->LoadFromPtr(static_cast<const char *>(ptr), size);
-    return true;
-}
-
-void HnswFileWorker::FreeFromMmapImpl() {
-    if (mmap_data_ == nullptr) {
-        UnrecoverableError("Mmap data is not allocated.");
-    }
-    auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(mmap_data_);
-    delete *hnsw_handler;
-    delete hnsw_handler;
-    mmap_data_ = nullptr;
 }
 
 } // namespace infinity

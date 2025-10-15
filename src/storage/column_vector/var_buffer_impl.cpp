@@ -60,14 +60,16 @@ const char *VarBuffer::Get(size_t offset, size_t size) const {
     std::shared_lock lock(mtx_);
     // find the last index i such that buffer_size_prefix_sum_[i] <= offset
     auto it = std::upper_bound(buffer_size_prefix_sum_.begin(), buffer_size_prefix_sum_.end(), offset);
-    if (it == buffer_size_prefix_sum_.end()) {
-        std::string error_msg = fmt::format("offset {} is out of range {}", offset, buffer_size_prefix_sum_.back());
-        UnrecoverableError(error_msg);
-    }
-    if (it == buffer_size_prefix_sum_.begin()) {
-        std::string error_msg = fmt::format("prefix_sum[0] should be 0, but got {}", *it);
-        UnrecoverableError(error_msg);
-    }
+    // auto it = std::lower_bound(buffer_size_prefix_sum_.begin(), buffer_size_prefix_sum_.end(), offset);
+    // [[maybe_unused]] auto buffer_map = infinity::InfinityContext::instance().storage()->buffer_manager()->buffer_map();
+    // if (it == buffer_size_prefix_sum_.end()) {
+    //     std::string error_msg = fmt::format("offset {} is out of range {}", offset, buffer_size_prefix_sum_.back());
+    //     UnrecoverableError(error_msg);
+    // }
+    // if (it == buffer_size_prefix_sum_.begin()) {
+    //     std::string error_msg = fmt::format("prefix_sum[0] should be 0, but got {}", *it);
+    //     UnrecoverableError(error_msg);
+    // }
     size_t i = std::distance(buffer_size_prefix_sum_.begin(), it) - 1;
     size_t offset_in_buffer = offset - buffer_size_prefix_sum_[i];
     if (offset_in_buffer + size > buffer_size_prefix_sum_[i + 1]) {
@@ -150,9 +152,7 @@ VarBuffer *VarBufferManager::GetInnerMutNoLock() {
             return mem_buffer_.get();
         }
         case BufferType::kNewCatalog: {
-            if (!buffer_handle_.has_value()) {
-                buffer_handle_ = outline_buffer_obj_->Load();
-            }
+            buffer_handle_ = outline_buffer_obj_->Load();
             return static_cast<VarBuffer *>(buffer_handle_->GetDataMut());
         }
     }
@@ -167,9 +167,7 @@ const VarBuffer *VarBufferManager::GetInnerNoLock() {
             return mem_buffer_.get();
         }
         case BufferType::kNewCatalog: {
-            if (!buffer_handle_.has_value()) {
-                buffer_handle_ = outline_buffer_obj_->Load();
-            }
+            buffer_handle_ = outline_buffer_obj_->Load();
             return static_cast<const VarBuffer *>(buffer_handle_->GetData());
         }
     }

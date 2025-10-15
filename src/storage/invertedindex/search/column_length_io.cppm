@@ -37,7 +37,7 @@ public:
     ~FullTextColumnLengthReader();
 
     inline u32 GetColumnLength(RowID row_id) {
-        if (row_id >= current_chunk_base_rowid_ && row_id < current_chunk_base_rowid_ + current_chunk_row_count_) [[likely]] {
+        if (row_id >= current_chunk_base_rowid_ && row_id < current_chunk_base_rowid_ + current_chunk_row_count_) {
             assert(column_lengths_ != nullptr);
             return column_lengths_[row_id - current_chunk_base_rowid_];
         }

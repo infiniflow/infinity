@@ -49,18 +49,11 @@ FileWorker::FileWorker(std::shared_ptr<std::string> data_dir,
     if (std::filesystem::path(*file_dir_).is_absolute()) {
         UnrecoverableError(fmt::format("File directory {} is an absolute path.", *file_dir_));
     }
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount("FileWorker");
-#endif
 }
 
-FileWorker::~FileWorker() {
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::DecrObjectCount("FileWorker");
-#endif
-}
+FileWorker::~FileWorker() {}
 
-bool FileWorker::WriteToTemp(const FileWorkerSaveCtx &ctx) {
+bool FileWorker::Write(const FileWorkerSaveCtx &ctx) {
     if (data_ == nullptr) {
         UnrecoverableError("No data will be written.");
     }
@@ -79,19 +72,20 @@ bool FileWorker::WriteToTemp(const FileWorkerSaveCtx &ctx) {
 
     bool prepare_success = false;
 
-    bool all_save = WriteToTempImpl(prepare_success, ctx);
+    bool all_save = Write(prepare_success, ctx);
     if (prepare_success) {
         file_handle_->Sync();
     }
     return all_save;
 }
 
-void FileWorker::ReadFromFile([[maybe_unused]] bool is_temp) {
+void FileWorker::Read([[maybe_unused]] bool is_temp) {
     auto [defer_fn, read_path] = GetFilePathInner(is_temp);
     bool use_object_cache = !is_temp && persistence_manager_ != nullptr;
     size_t file_size = 0;
     auto [file_handle, status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
     if (!status.ok()) {
+        return;
         UnrecoverableError(fmt::format("Read path: {}, error: {}", read_path, status.message()));
     }
     if (use_object_cache) {
@@ -102,7 +96,7 @@ void FileWorker::ReadFromFile([[maybe_unused]] bool is_temp) {
     }
     file_handle_ = std::move(file_handle);
     DeferFn defer_fn2([&]() { file_handle_ = nullptr; });
-    ReadFromFileImpl(file_size, is_temp);
+    Read(file_size, is_temp);
 }
 
 void FileWorker::MoveFile() {
@@ -207,52 +201,5 @@ void FileWorker::CleanupTempFile() const {
         UnrecoverableError(fmt::format("Cleanup: File {} not found for deletion", path));
     }
 }
-
-void FileWorker::Mmap() {
-    if (mmap_addr_ != nullptr || mmap_data_ != nullptr) {
-        this->Munmap();
-    }
-    auto [defer_fn, read_path] = GetFilePathInner(false);
-    bool use_object_cache = persistence_manager_ != nullptr;
-    if (use_object_cache) {
-        int ret = VirtualStore::MmapFilePart(read_path, obj_addr_.part_offset_, obj_addr_.part_size_, mmap_addr_);
-        if (ret < 0) {
-            UnrecoverableError(fmt::format("Mmap file {} failed. {}", read_path, strerror(errno)));
-        }
-        this->ReadFromMmapImpl(mmap_addr_, obj_addr_.part_size_);
-    } else {
-        size_t file_size = VirtualStore::GetFileSize(read_path);
-        int ret = VirtualStore::MmapFile(read_path, mmap_addr_, file_size);
-        if (ret < 0) {
-            UnrecoverableError(fmt::format("Mmap file {} failed. {}", read_path, strerror(errno)));
-        }
-        this->ReadFromMmapImpl(mmap_addr_, file_size);
-    }
-}
-
-void FileWorker::Munmap() {
-    if (mmap_addr_ == nullptr) {
-        return;
-    }
-    this->FreeFromMmapImpl();
-    auto [defer_fn, read_path] = GetFilePathInner(false);
-    bool use_object_cache = persistence_manager_ != nullptr;
-    if (use_object_cache) {
-        VirtualStore::MunmapFilePart(mmap_addr_, obj_addr_.part_offset_, obj_addr_.part_size_);
-    } else {
-        VirtualStore::MunmapFile(read_path);
-    }
-    mmap_addr_ = nullptr;
-    mmap_data_ = nullptr;
-}
-
-bool FileWorker::ReadFromMmapImpl([[maybe_unused]] const void *ptr, [[maybe_unused]] size_t size) {
-    auto path = fmt::format("{}/{}/{}", *data_dir_, *file_dir_, *file_name_);
-    mmap_data_ = (u8 *)std::malloc(size * sizeof(u8));
-    std::memcpy(mmap_data_, mmap_addr_, size * sizeof(u8));
-    return false;
-}
-
-void FileWorker::FreeFromMmapImpl() { UnrecoverableError("Not implemented"); }
 
 } // namespace infinity

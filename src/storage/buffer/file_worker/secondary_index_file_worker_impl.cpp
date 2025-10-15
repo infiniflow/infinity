@@ -59,7 +59,7 @@ void SecondaryIndexFileWorker::FreeInMemory() {
     }
 }
 
-bool SecondaryIndexFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool SecondaryIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (data_) [[likely]] {
         auto index = static_cast<SecondaryIndexData *>(data_);
         index->SaveIndexInner(*file_handle_);
@@ -71,16 +71,14 @@ bool SecondaryIndexFileWorker::WriteToTempImpl(bool &prepare_success, const File
     return true;
 }
 
-bool SecondaryIndexFileWorker::CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) { return true; }
-
-void SecondaryIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
+void SecondaryIndexFileWorker::Read(size_t file_size, bool from_spill) {
     // if (!data_) [[likely]] {
         auto index = GetSecondaryIndexData(column_def_->type(), row_count_, false);
         index->ReadIndexInner(*file_handle_);
         data_ = static_cast<void *>(index);
-        LOG_TRACE("Finished ReadFromFileImpl().");
+        LOG_TRACE("Finished Read().");
     // } else {
-    //     UnrecoverableError("ReadFromFileImpl: data_ is not nullptr");
+    //     UnrecoverableError("Read: data_ is not nullptr");
     // }
 }
 

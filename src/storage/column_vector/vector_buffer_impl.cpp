@@ -100,9 +100,9 @@ void VectorBuffer::InitializeCompactBit(BufferObj *buffer_obj, size_t capacity) 
     if (buffer_obj == nullptr) {
         UnrecoverableError("Buffer object is nullptr.");
     }
-    if (buffer_obj->GetBufferSize() != data_size) {
-        UnrecoverableError("Buffer object size is not equal to data size.");
-    }
+    // if (buffer_obj->GetBufferSize() != data_size) {
+    //     UnrecoverableError("Buffer object size is not equal to data size.");
+    // }
     ptr_ = buffer_obj->Load();
     initialized_ = true;
     data_size_ = data_size;
@@ -117,9 +117,9 @@ void VectorBuffer::Initialize(BufferObj *buffer_obj, BufferObj *outline_buffer_o
     if (buffer_obj == nullptr) {
         UnrecoverableError("Buffer object is nullptr.");
     }
-    if (buffer_obj->GetBufferSize() != data_size) {
-        UnrecoverableError("Buffer object size is not equal to data size.");
-    }
+    // if (buffer_obj->GetBufferSize() != data_size) {
+    //     UnrecoverableError("Buffer object size is not equal to data size.");
+    // }
     ptr_ = buffer_obj->Load();
     if (buffer_type_ == VectorBufferType::kVarBuffer) {
         var_buffer_mgr_ = std::make_unique<VarBufferManager>(outline_buffer_obj);

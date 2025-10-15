@@ -81,16 +81,14 @@ void EMVBIndexFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-bool EMVBIndexFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool EMVBIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     auto *index = static_cast<EMVBIndex *>(data_);
     index->SaveIndexInner(*file_handle_);
     prepare_success = true;
     return true;
 }
 
-bool EMVBIndexFileWorker::CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) { return true; }
-
-void EMVBIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
+void EMVBIndexFileWorker::Read(size_t file_size, bool from_spill) {
     // if (data_) {
     //     UnrecoverableError("Data is already allocated.");
     // }

@@ -63,11 +63,12 @@ public:
 
     size_t TotalSize() const;
 
+    std::variant<std::vector<std::unique_ptr<char[]>>, const char *> buffers_;
+
+    std::vector<size_t> buffer_size_prefix_sum_ = {0};
+
 private:
     mutable std::shared_mutex mtx_;
-
-    std::variant<std::vector<std::unique_ptr<char[]>>, const char *> buffers_;
-    std::vector<size_t> buffer_size_prefix_sum_ = {0};
 
     BufferObj *buffer_obj_ = nullptr;
 };

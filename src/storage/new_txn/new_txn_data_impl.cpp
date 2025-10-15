@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <ranges>
+
 module infinity_core:new_txn_data.impl;
 
 import :new_txn;
@@ -355,31 +359,26 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
         }
     }
 
-    auto &buffer_map = buffer_mgr_->buffer_map();
+    // auto &buffer_map = buffer_mgr_->buffer_map();
 
-    std::vector<std::pair<std::string, std::shared_ptr<BufferObj>>> buffers;
+    // std::unordered_map<std::string, std::shared_ptr<BufferObj>> new_map;
+    //
+    // for (auto const& [path, buffer_obj] : buffer_map) {
+    //     if (path.find("tmp/import") == std::string::npos) {
+    //         new_map.emplace(path, buffer_obj);   // keep unchanged entries
+    //         continue;
+    //     }
+    //
+    //     auto v  = infinity::Partition(path, '/');
+    //     auto vv = infinity::Partition(v[7], '_');
+    //     auto seg = fmt::format("{}_{}", vv[0], stoull(vv[1]) + segment_ids[0]);
+    //     auto path1 = fmt::format("/{}/{}/data/{}/{}/{}/{}/{}", v[1], v[2], v[5], v[6], seg, v[8], v[9]);
+    //
+    //     new_map.emplace(path1, buffer_obj);
+    // }
+    //
+    // buffer_map.swap(new_map);
 
-    for (auto [path, buffer_obj] : buffer_map) {
-        if (path.find("tmp/import") != std::string::npos) {
-            buffers.push_back(std::make_pair(path, buffer_obj));
-        }
-    }
-
-    for (auto [path, buffer_obj] : buffers) {
-        auto v = infinity::Partition(path, '/');
-        auto vv = infinity::Partition(v[7], '_');
-        auto seg = fmt::format("{}_{}", vv[0], stoull(vv[1]) + segment_ids[0]);
-        path = fmt::format("/{}/{}/data/{}/{}/{}/{}/{}", v[1], v[2], v[5], v[6], seg, v[8], v[9]);
-        auto data_dir = "/var/infinity/data";
-        auto file_dir = fmt::format("{}/{}/{}/{}", v[5], v[6], seg, v[8]);
-        buffer_obj->file_worker()->data_dir_ = std::make_shared<std::string>(data_dir);
-        buffer_obj->file_worker()->file_dir_ = std::make_shared<std::string>(file_dir);
-        buffer_map[path] = buffer_obj;
-    }
-
-    for (const auto &[path, buffer_obj] : buffers) {
-        buffer_map.erase(path);
-    }
 
     return Status::OK();
 }
@@ -1390,62 +1389,69 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const CheckpointOption &op
                 continue;
             }
 
-            bool flush_version = false;
-            bool flush_column = false;
-            {
-                // TODO: Refactor min_ts_ and max_ts_ to per-column-ts
-                std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
-                if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
-                    flush_version = true;
-                }
-                if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
-                    flush_column = true;
-                }
+            // bool flush_version = false;
+            // bool flush_column = false;
+            // {
+            //     // TODO: Refactor min_ts_ and max_ts_ to per-column-ts
+            //     std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
+            //     if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
+            //         flush_version = true;
+            //     }
+            //     if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
+            //         flush_column = true;
+            //     }
+            // }
+            // if (flush_version) {
+            //     status = FlushVersionFile(block_meta, option.checkpoint_ts_);
+            //     if (!status.ok()) {
+            //         return status;
+            //     }
+            // }
+            // if (flush_column) {
+            //     status = FlushColumnFiles(block_meta, option.checkpoint_ts_);
+            //     if (!status.ok()) {
+            //         return status;
+            //     }
+            //     bool to_mmap = false;
+            //     // status = TryToMmap(block_meta, option.checkpoint_ts_, &to_mmap);
+            //     // if (!status.ok()) {
+            //     //     return status;
+            //     // }
+            //     if (to_mmap) {
+            //         LOG_INFO(fmt::format("Block {} to mmap, checkpoint ts: {}", block_meta.block_id(), option.checkpoint_ts_));
+            //     }
+            // }
+            auto buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
+            auto buffer_map = buffer_mgr->buffer_map();
+            for (auto &buffer_obj : buffer_map | std::views::values) {
+                buffer_obj->file_worker()->MoveFile();
             }
-            if (flush_version) {
-                status = FlushVersionFile(block_meta, option.checkpoint_ts_);
-                if (!status.ok()) {
-                    return status;
-                }
-            }
-            if (flush_column) {
-                status = FlushColumnFiles(block_meta, option.checkpoint_ts_);
-                if (!status.ok()) {
-                    return status;
-                }
-                bool to_mmap = false;
-                // status = TryToMmap(block_meta, option.checkpoint_ts_, &to_mmap);
-                // if (!status.ok()) {
-                //     return status;
-                // }
-                if (to_mmap) {
-                    LOG_INFO(fmt::format("Block {} to mmap, checkpoint ts: {}", block_meta.block_id(), option.checkpoint_ts_));
-                }
-            }
-            LOG_TRACE(fmt::format("NewTxn::CheckpointTable segment_id {}, block_id {}, flush_column {}, flush_version {}, option.checkpoint_ts_ {}, "
-                                  "block min_ts {}, block "
-                                  "max_ts {}, block checkpoint_ts {}",
-                                  segment_id,
-                                  block_id,
-                                  flush_column,
-                                  flush_version,
-                                  option.checkpoint_ts_,
-                                  block_lock->min_ts_,
-                                  block_lock->max_ts_,
-                                  block_lock->checkpoint_ts_));
-            if (!flush_column or !flush_version) {
-                continue;
-            } else {
-                auto flush_data_entry = std::make_shared<FlushDataEntry>(table_meta.db_id_str(), table_meta.table_id_str(), segment_id, block_id);
-                if (flush_column && flush_version) {
-                    flush_data_entry->to_flush_ = "data and version";
-                } else if (flush_column) {
-                    flush_data_entry->to_flush_ = "data";
-                } else {
-                    flush_data_entry->to_flush_ = "version";
-                }
-                ckp_txn_store->entries_.emplace_back(flush_data_entry);
-            }
+
+            // LOG_TRACE(fmt::format("NewTxn::CheckpointTable segment_id {}, block_id {}, flush_column {}, flush_version {}, option.checkpoint_ts_ {},
+            // "
+            //                       "block min_ts {}, block "
+            //                       "max_ts {}, block checkpoint_ts {}",
+            //                       segment_id,
+            //                       block_id,
+            //                       flush_column,
+            //                       flush_version,
+            //                       option.checkpoint_ts_,
+            //                       block_lock->min_ts_,
+            //                       block_lock->max_ts_,
+            //                       block_lock->checkpoint_ts_));
+            // if (!flush_column or !flush_version) {
+            //     continue;
+            // } else {
+            //     auto flush_data_entry = std::make_shared<FlushDataEntry>(table_meta.db_id_str(), table_meta.table_id_str(), segment_id, block_id);
+            //     if (flush_column && flush_version) {
+            //         flush_data_entry->to_flush_ = "data and version";
+            //     } else if (flush_column) {
+            //         flush_data_entry->to_flush_ = "data";
+            //     } else {
+            //         flush_data_entry->to_flush_ = "version";
+            //     }
+            //     ckp_txn_store->entries_.emplace_back(flush_data_entry);
+            // }
         }
     }
 

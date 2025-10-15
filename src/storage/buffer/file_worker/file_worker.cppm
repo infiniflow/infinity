@@ -42,17 +42,15 @@ public:
     virtual ~FileWorker();
 
 public:
-    [[nodiscard]] bool WriteToTemp(const FileWorkerSaveCtx &ctx = {});
+    [[nodiscard]] bool Write(const FileWorkerSaveCtx &ctx = {});
 
-    void ReadFromFile(bool is_temp);
+    void Read(bool is_temp);
 
     void MoveFile();
 
     virtual void AllocateInMemory() = 0;
 
     virtual void FreeInMemory() = 0;
-
-    virtual size_t GetMemoryCost() const = 0;
 
     virtual FileWorkerType Type() const = 0;
 
@@ -72,11 +70,9 @@ public:
     void CleanupTempFile() const;
 
 protected:
-    virtual bool WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
+    virtual bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
 
-    virtual bool CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
-
-    virtual void ReadFromFileImpl(size_t file_size, bool from_spill) = 0;
+    virtual void Read(size_t file_size, bool from_spill) = 0;
 
     [[nodiscard]] std::string ChooseFileDir(bool is_temp) const;
 
@@ -95,23 +91,6 @@ public:
 protected:
     void *data_{};
     std::unique_ptr<LocalFileHandle> file_handle_{nullptr};
-
-public:
-    // void *GetMmapData() const { return mmap_data_; }
-    [[nodiscard]] void *GetMmapData() const { return mmap_data_; }
-
-    void Mmap();
-
-    void Munmap();
-
-protected:
-    virtual bool ReadFromMmapImpl([[maybe_unused]] const void *ptr, [[maybe_unused]] size_t size);
-
-    virtual void FreeFromMmapImpl();
-
-protected:
-    u8 *mmap_addr_{nullptr};
-    u8 *mmap_data_{nullptr};
 
 };
 } // namespace infinity

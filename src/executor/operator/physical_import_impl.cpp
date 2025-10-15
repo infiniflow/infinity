@@ -134,8 +134,8 @@ public:
         }
         txn_->WriteDataBlockToFile(db_name_, table_name_, std::move(data_block_), block_idx, &object_paths);
 
-        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-        buffer_mgr->RemoveBufferObjects(object_paths);
+        // BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+        // buffer_mgr->RemoveBufferObjects(object_paths);
     }
 
 private:

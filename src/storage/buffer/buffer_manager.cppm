@@ -36,8 +36,6 @@ public:
                            std::shared_ptr<std::string> temp_dir,
                            PersistenceManager *persistence_manager);
 
-    ~BufferManager();
-
 public:
     void Start();
     void Stop();
@@ -57,8 +55,6 @@ public:
     std::shared_ptr<std::string> GetFullDataDir() const { return data_dir_; }
 
     std::shared_ptr<std::string> GetTempDir() const { return temp_dir_; }
-
-    u64 memory_usage() { return current_memory_size_; }
 
     size_t BufferedObjectCount();
 
@@ -80,8 +76,6 @@ private:
 
     void AddToCleanList(BufferObj *buffer_obj, bool do_free);
 
-    void FreeUnloadBuffer(BufferObj *buffer_obj);
-
     void AddTemp(BufferObj *buffer_obj);
 
     void RemoveTemp(BufferObj *buffer_obj);
@@ -94,7 +88,6 @@ private:
     std::shared_ptr<std::string> data_dir_;
     std::shared_ptr<std::string> temp_dir_;
     PersistenceManager *persistence_manager_;
-    std::atomic<u64> current_memory_size_{};
 
     std::mutex w_locker_{};
     std::unordered_map<std::string, std::shared_ptr<BufferObj>> buffer_map_{};

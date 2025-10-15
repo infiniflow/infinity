@@ -50,7 +50,7 @@ struct Varchar {
 
     bool operator<(const Varchar &other) const = delete;
 
-    [[nodiscard]] inline bool IsInlined() const { return length_ <= VARCHAR_INLINE_LENGTH; }
+    [[nodiscard]] bool IsInlined() const { return length_ <= VARCHAR_INLINE_LENGTH; }
 
     uint64_t length_ : 24 = 0;
     union {

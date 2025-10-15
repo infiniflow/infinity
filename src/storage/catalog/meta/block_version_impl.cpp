@@ -112,7 +112,9 @@ i64 BlockVersion::GetRowCount() const {
 
 bool BlockVersion::SaveToFile(void *&mmap_true, size_t &mmap_true_size, TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
     // if (mmap_true) {
-    //     return true;
+    //     munmap(mmap_true, mmap_true_size);
+    //     mmap_true = nullptr;
+    //     // return true;
     // }
     bool is_modified = false;
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);

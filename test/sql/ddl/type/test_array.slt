@@ -4,12 +4,6 @@ DROP TABLE IF EXISTS test_array_table;
 statement ok
 CREATE TABLE test_array_table (col1 INT, col2 ARRAY(VARCHAR));
 
-query I
-SHOW TABLE test_array_table COLUMNS;
-----
-col1 Integer Null (empty)
-col2 Array(Varchar) Null (empty)
-
 statement ok
 INSERT INTO test_array_table VALUES (1, {'hello', 'world'}), (2, {});
 

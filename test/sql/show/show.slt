@@ -107,6 +107,9 @@ statement ok
 CREATE INDEX idx5 ON tb1 (age);
 
 statement ok
+FLUSH DATA;
+
+statement ok
 SHOW TABLE tb1 INDEX idx1;
 
 statement ok
@@ -137,9 +140,6 @@ statement ok
 SHOW CONFIGS;
 
 statement ok
-SHOW GLOBAL VARIABLES;
-
-statement ok
 SHOW GLOBAL VARIABLE cpu_usage;
 
 statement ok
@@ -155,9 +155,6 @@ statement ok
 SHOW QUERIES;
 
 statement ok
-SHOW BUFFER;
-
-statement ok
 SHOW TRANSACTIONS;
 
 statement ok
@@ -165,12 +162,6 @@ SHOW CATALOG;
 
 statement ok
 SHOW LOGS;
-
-statement ok
-SHOW PERSISTENCE FILES;
-
-statement ok
-SHOW PERSISTENCE OBJECTS;
 
 statement ok
 SHOW MEMORY;

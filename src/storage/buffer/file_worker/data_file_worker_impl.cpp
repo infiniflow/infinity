@@ -76,16 +76,17 @@ void DataFileWorker::FreeInMemory() {
 }
 
 // FIXME: to_spill
-bool DataFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool DataFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     // File structure:
     // - header: magic number
     // - header: buffer size
     // - data buffer
     // - footer: checksum
 
-    // if (mmap_true_) {
-    //     return true;
-    // }
+    if (mmap_true_) {
+        munmap(mmap_true_, mmap_true_size_);
+        mmap_true_ = nullptr;
+    }
 
     mmap_true_size_ = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
     auto fd = file_handle_->fd();
@@ -120,9 +121,7 @@ bool DataFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSave
     return true;
 }
 
-bool DataFileWorker::CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) { return true; }
-
-void DataFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
+void DataFileWorker::Read(size_t file_size, bool from_spill) {
     if (!mmap_true_) {
         if (file_size < sizeof(u64) * 3) {
             Status status = Status::DataIOError(fmt::format("Incorrect file length {}.", file_size));
@@ -157,6 +156,7 @@ void DataFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
         }
 
         // file body
+        FreeInMemory();
         data_ = static_cast<void *>(new char[buffer_size_]);
         auto [nbytes3, status3] = file_handle_->Read(data_, buffer_size_);
         if (nbytes3 != buffer_size_) {
@@ -171,63 +171,13 @@ void DataFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
             Status status = Status::DataIOError(fmt::format("Incorrect file checksum length: {}.", nbytes4));
             RecoverableError(status);
         }
-
-    } else {
-        if (file_size < sizeof(u64) * 3) {
-            Status status = Status::DataIOError(fmt::format("Incorrect file length {}.", file_size));
-            RecoverableError(status);
-        }
-
-        size_t offset{};
-
-        // file header: magic number, buffer_size
-        u64 magic_number{0};
-        std::memcpy(&magic_number, (char *)mmap_true_ + offset, sizeof(magic_number));
-        offset += sizeof(magic_number);
-        if (magic_number != 0x00dd3344) {
-            Status status = Status::DataIOError(fmt::format("Read magic error, {} != 0x00dd3344.", magic_number));
-            RecoverableError(status);
-        }
-
-        u64 buffer_size_{};
-        std::memcpy(&buffer_size_, (char *)mmap_true_ + offset, sizeof(buffer_size_));
-        offset += sizeof(buffer_size_);
-
-        if (file_size != buffer_size_ + 3 * sizeof(u64)) {
-            Status status = Status::DataIOError(fmt::format("File size: {} isn't matched with {}.", file_size, buffer_size_ + 3 * sizeof(u64)));
-            RecoverableError(status);
-        }
-
-        // file body
-        data_ = static_cast<void *>(new char[buffer_size_]);
-        std::memcpy(data_, (char *)mmap_true_ + offset, buffer_size_);
-        offset += buffer_size_;
-
-        // file footer: checksum
-        u64 checksum{0};
-        std::memcpy(&checksum, (char *)mmap_true_ + offset, sizeof(checksum));
+        //
+        auto fd = file_handle_->fd();
+        mmap_true_size_ = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
+        // std::memcpy((char *)mmap_true_, data_, mmap_true_size_);
+        mmap_true_ = mmap(nullptr, mmap_true_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
     }
 }
-
-bool DataFileWorker::ReadFromMmapImpl(const void *p, size_t file_size) {
-    const char *ptr = static_cast<const char *>(p);
-    u64 magic_number = ReadBufAdv<u64>(ptr);
-    if (magic_number != 0x00dd3344) {
-        Status status = Status::DataIOError(fmt::format("Read magic error: {} != 0x00dd3344.", magic_number));
-        RecoverableError(status);
-    }
-    u64 buffer_size = ReadBufAdv<u64>(ptr);
-    if (file_size != buffer_size + 3 * sizeof(u64)) {
-        Status status = Status::DataIOError(fmt::format("File size: {} isn't matched with {}.", file_size, buffer_size + 3 * sizeof(u64)));
-        RecoverableError(status);
-    }
-    mmap_data_ = const_cast<u8 *>(reinterpret_cast<const u8 *>(ptr));
-    ptr += buffer_size;
-    [[maybe_unused]] u64 checksum = ReadBufAdv<u64>(ptr);
-    return true;
-}
-
-void DataFileWorker::FreeFromMmapImpl() {}
 
 void DataFileWorker::SetDataSize(size_t size) {
     if (data_ == nullptr) {

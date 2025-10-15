@@ -2310,8 +2310,8 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
                     std::string filepath = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), path);
                     buffer_obj = buffer_manager->GetBufferObject(filepath);
                     if (buffer_obj != nullptr) {
-                        auto file_size = buffer_obj->GetBufferSize();
-                        block_size += file_size;
+                        // auto file_size = buffer_obj->GetBufferSize();
+                        // block_size += file_size;
                     } else {
                         RecoverableError(status);
                     }

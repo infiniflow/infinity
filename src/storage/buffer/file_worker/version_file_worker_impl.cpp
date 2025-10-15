@@ -38,43 +38,30 @@ VersionFileWorker::VersionFileWorker(std::shared_ptr<std::string> data_dir,
                                      PersistenceManager *persistence_manager)
     : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), capacity_(capacity) {
     VersionFileWorker::AllocateInMemory();
+    // ReadFromFile(true);
 }
 
 VersionFileWorker::~VersionFileWorker() {
-    // if (data_ != nullptr) {
-    //     FreeInMemory();
-    //     data_ = nullptr;
-    // }
     VersionFileWorker::FreeInMemory();
+    munmap(mmap_true_, mmap_true_size_);
+    mmap_true_ = nullptr;
 }
 
 void VersionFileWorker::AllocateInMemory() {
-    // if (data_ != nullptr) {
-    //     UnrecoverableError("Data is already allocated.");
-    // }
-    // if (capacity_ == 0) {
-    //     UnrecoverableError("Capacity is 0.");
-    // }
     auto *data = new BlockVersion(capacity_);
     data_ = static_cast<void *>(data);
 }
 
 void VersionFileWorker::FreeInMemory() {
-    // if (data_ == nullptr) {
-    //     UnrecoverableError("Data is already freed.");
-    // }
     auto *data = static_cast<BlockVersion *>(data_);
     delete data;
     data_ = nullptr;
 }
 
-// FIXME
-size_t VersionFileWorker::GetMemoryCost() const { return capacity_ * sizeof(TxnTimeStamp); }
-
-bool VersionFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &base_ctx) {
+bool VersionFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &base_ctx) {
     if (mmap_true_) {
-        // return true;
         munmap(mmap_true_, mmap_true_size_);
+        mmap_true_size_ = mmap_true_size_;
     }
 
     if (data_ == nullptr) {
@@ -93,9 +80,7 @@ bool VersionFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerS
     return false;
 }
 
-bool VersionFileWorker::CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) { return true; }
-
-void VersionFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
+void VersionFileWorker::Read(size_t file_size, bool from_spill) {
     // if (data_ != nullptr) {
     //     UnrecoverableError("Data is already allocated.");
     // }

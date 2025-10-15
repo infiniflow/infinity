@@ -47,18 +47,10 @@ public:
 
     FileWorkerType Type() const override { return FileWorkerType::kHNSWIndexFile; }
 
-    size_t GetMemoryCost() const override { return index_size_; }
-
 protected:
-    bool WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    bool CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
-
-    void ReadFromFileImpl(size_t file_size, bool from_spill) override;
-
-    bool ReadFromMmapImpl(const void *ptr, size_t size) override;
-
-    void FreeFromMmapImpl() override;
+    void Read(size_t file_size, bool from_spill) override;
 
 private:
     size_t index_size_{};

@@ -91,7 +91,7 @@ void BMPIndexFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-bool BMPIndexFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool BMPIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (!data_) {
         UnrecoverableError("Data is not allocated.");
     }
@@ -105,9 +105,7 @@ bool BMPIndexFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorker
     return true;
 }
 
-bool BMPIndexFileWorker::CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) { return true; }
-
-void BMPIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
+void BMPIndexFileWorker::Read(size_t file_size, bool from_spill) {
     // if (data_ != nullptr) {
     //     UnrecoverableError("Data is already allocated.");
     // }
@@ -118,26 +116,6 @@ void BMPIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     // } else {
         (*bmp_handler)->LoadFromPtr(*file_handle_, file_size);
     // }
-}
-
-bool BMPIndexFileWorker::ReadFromMmapImpl(const void *ptr, size_t size) {
-    if (mmap_data_ != nullptr) {
-        UnrecoverableError("Data is already allocated.");
-    }
-    mmap_data_ = reinterpret_cast<u8 *>(new BMPHandlerPtr(BMPHandler::Make(index_base_.get(), column_def_.get(), false).release()));
-    auto *bmp_handler = reinterpret_cast<BMPHandlerPtr *>(mmap_data_);
-    (*bmp_handler)->LoadFromPtr(static_cast<const char *>(ptr), size);
-    return true;
-}
-
-void BMPIndexFileWorker::FreeFromMmapImpl() {
-    if (mmap_data_ == nullptr) {
-        return;
-    }
-    auto *bmp_handler = reinterpret_cast<BMPHandlerPtr *>(mmap_data_);
-    delete *bmp_handler;
-    delete bmp_handler;
-    mmap_data_ = nullptr;
 }
 
 } // namespace infinity

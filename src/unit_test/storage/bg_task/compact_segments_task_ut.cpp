@@ -71,7 +71,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          CompactTaskTest,
                          ::testing::Values(BaseTestParamStr::NEW_BG_ON_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_BG_ON_CONFIG_PATH));
 
-TEST_P(CompactTaskTest, DISABLED_SLOW_bg_compact) {
+TEST_P(CompactTaskTest, SLOW_bg_compact) {
     auto *storage = infinity::InfinityContext::instance().storage();
     auto *txn_mgr = storage->new_txn_manager();
 

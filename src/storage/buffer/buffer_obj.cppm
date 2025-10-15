@@ -36,10 +36,10 @@ public:
     // called by BufferMgr::Get or BufferMgr::Allocate
     explicit BufferObj(BufferManager *buffer_mgr, std::unique_ptr<FileWorker> file_worker, u32 id);
 
-    virtual ~BufferObj();
+    // virtual ~BufferObj();
 
-    BufferObj(const BufferObj &) = delete;
-    BufferObj &operator=(const BufferObj &) = delete;
+    // BufferObj(const BufferObj &) = delete;
+    // BufferObj &operator=(const BufferObj &) = delete;
 
     void UpdateFileWorkerInfo(std::unique_ptr<FileWorker> file_worker);
 
@@ -57,7 +57,7 @@ public:
 
     void CleanupTempFile() const;
 
-    size_t GetBufferSize() const { return file_worker_->GetMemoryCost(); }
+    // size_t GetBufferSize() const { return file_worker_->buffer_size_; }
 
     std::string GetFilename() const { return file_worker_->GetFilePath(); }
 

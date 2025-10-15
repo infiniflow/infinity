@@ -29,6 +29,7 @@ import :var_file_worker;
 import :kv_store;
 import :status;
 import :virtual_store;
+import :var_buffer;
 
 import third_party;
 
@@ -38,16 +39,16 @@ namespace infinity {
 
 BufferObj::BufferObj(BufferManager *buffer_mgr, std::unique_ptr<FileWorker> file_worker, u32 id)
     : buffer_mgr_(buffer_mgr), file_worker_(std::move(file_worker)), id_(id) {
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount("BufferObj");
-#endif
+// #ifdef INFINITY_DEBUG
+//     GlobalResourceUsage::IncrObjectCount("BufferObj");
+// #endif
 }
 
-BufferObj::~BufferObj() {
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::DecrObjectCount("BufferObj");
-#endif
-}
+// BufferObj::~BufferObj() {
+// #ifdef INFINITY_DEBUG
+//     GlobalResourceUsage::DecrObjectCount("BufferObj");
+// #endif
+// }
 
 void BufferObj::UpdateFileWorkerInfo(std::unique_ptr<FileWorker> new_file_worker) {
     switch (file_worker_->Type()) {
@@ -73,16 +74,13 @@ BufferHandle BufferObj::Load() {
     auto file_name = file_worker_->file_name_;
     std::string path1 = std::filesystem::path(*data_dir) / *file_dir / *file_name;
     std::string path2 = std::filesystem::path(*temp_dir) / *file_dir / *file_name;
-    // if (file_worker_->mmap_true_) {
-    //     file_worker_->ReadFromFile(true);
-    // }
     if (VirtualStore::Exists(path2)) {
-        file_worker_->ReadFromFile(true);
+        file_worker_->Read(true);
     } else {
         if (file_worker_->persistence_manager_ && file_worker_->persistence_manager_->GetObjCache(path1).obj_addr_.Valid()) {
-            file_worker_->ReadFromFile(false);
+            file_worker_->Read(false);
         } else if (VirtualStore::Exists(path1)) {
-            file_worker_->ReadFromFile(false);
+            file_worker_->Read(false);
         }
     }
     void *data = file_worker_->GetData();
@@ -96,7 +94,7 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
     auto file_dir = file_worker_->file_dir_;
     auto file_name = file_worker_->file_name_;
     std::string path2 = std::filesystem::path(*temp_dir) / *file_dir / *file_name;
-    return file_worker_->WriteToTemp(ctx);
+    return file_worker_->Write(ctx);
 }
 
 void BufferObj::PickForCleanup() {
@@ -119,7 +117,7 @@ void *BufferObj::GetMutPointer() {
 void BufferObj::SetData(void *data) {
     std::unique_lock<std::mutex> locker(w_locker_);
     file_worker_->SetData(data);
-    [[maybe_unused]] auto foo = file_worker_->WriteToTemp();
+    [[maybe_unused]] auto foo = file_worker_->Write();
 }
 
 void BufferObj::SetDataSize(size_t size) {

@@ -54,7 +54,7 @@ void IVFIndexFileWorker::FreeInMemory() {
     // }
 }
 
-bool IVFIndexFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool IVFIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (data_) {
         auto index = static_cast<IVFIndexInChunk *>(data_);
         index->SaveIndexInner(*file_handle_);
@@ -66,17 +66,15 @@ bool IVFIndexFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorker
     return true;
 }
 
-bool IVFIndexFileWorker::CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) { return true; }
-
-void IVFIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
+void IVFIndexFileWorker::Read(size_t file_size, bool from_spill) {
     // if (!data_) {
         auto index = IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get());
         index->ReadIndexInner(*file_handle_);
         data_ = static_cast<void *>(index);
-        LOG_TRACE("Finished ReadFromFileImpl().");
+        LOG_TRACE("Finished Read().");
     // }
 // else {
-//         UnrecoverableError("ReadFromFileImpl: data_ is not nullptr");
+//         UnrecoverableError("Read: data_ is not nullptr");
 //     }
 }
 

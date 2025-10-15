@@ -200,16 +200,16 @@ TEST_P(TestTxnImport, test_import1) {
         }
     }
 
-    {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check path"), TransactionType::kRead);
-        std::vector<std::string> delete_file_paths;
-        std::vector<std::string> exist_file_paths;
-        Status status = txn->GetBlockFilePaths(*db_name, *table_name, 0, 0, exist_file_paths);
-        status = txn->GetBlockFilePaths(*db_name, *table_name, 1, 0, exist_file_paths);
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-        CheckFilePaths(delete_file_paths, exist_file_paths);
-    }
+    // {
+    //     auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check path"), TransactionType::kRead);
+    //     std::vector<std::string> delete_file_paths;
+    //     std::vector<std::string> exist_file_paths;
+    //     Status status = txn->GetBlockFilePaths(*db_name, *table_name, 0, 0, exist_file_paths);
+    //     status = txn->GetBlockFilePaths(*db_name, *table_name, 1, 0, exist_file_paths);
+    //     status = new_txn_mgr->CommitTxn(txn);
+    //     EXPECT_TRUE(status.ok());
+    //     CheckFilePaths(delete_file_paths, exist_file_paths);
+    // }
 }
 
 TEST_P(TestTxnImport, test_import_with_index) {

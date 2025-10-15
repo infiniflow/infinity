@@ -40,52 +40,26 @@ VarFileWorker::VarFileWorker(std::shared_ptr<std::string> data_dir,
     : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager),
       buffer_size_(buffer_size) {
     VarFileWorker::AllocateInMemory();
-    // [[maybe_unused]] bool foo = WriteToFile(false, {});
-    // ReadFromFile(true);
 }
 
 VarFileWorker::~VarFileWorker() {
-    // if (data_ != nullptr) {
-    //     FreeInMemory();
-    //     data_ = nullptr;
-    // }
-
     VarFileWorker::FreeInMemory();
-
-    // if (mmap_data_ != nullptr) {
-    //     auto *var_buffer = reinterpret_cast<VarBuffer *>(mmap_data_);
-    //     delete var_buffer;
-    //     mmap_data_ = nullptr;
-    // }
+    munmap(mmap_true_, mmap_true_size_);
 }
 
 void VarFileWorker::AllocateInMemory() {
-    // if (data_ != nullptr) {
-    //     UnrecoverableError("Data is already allocated.");
-    // }
     auto *buffer = new VarBuffer(buffer_obj_);
     data_ = static_cast<void *>(buffer);
 }
 
 void VarFileWorker::FreeInMemory() {
-    // if (data_ == nullptr) {
-    //     UnrecoverableError("Data is already freed.");
-    // }
     auto *buffer = static_cast<VarBuffer *>(data_);
-    buffer_size_ = buffer->TotalSize();
+    // buffer_size_ = buffer->TotalSize();
     delete buffer;
     data_ = nullptr;
 }
 
-size_t VarFileWorker::GetMemoryCost() const {
-    if (data_ == nullptr) {
-        return buffer_size_;
-    }
-    auto *buffer = static_cast<VarBuffer *>(data_);
-    return buffer->TotalSize();
-}
-
-bool VarFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool VarFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (mmap_true_) {
         // return true;
         munmap(mmap_true_, mmap_true_size_);
@@ -111,13 +85,9 @@ bool VarFileWorker::WriteToTempImpl(bool &prepare_success, const FileWorkerSaveC
     return true;
 }
 
-bool VarFileWorker::CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) { return true; }
-
-void VarFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
-    // if (data_ != nullptr) {
-    //     UnrecoverableError("Data is not allocated.");
-    // }
+void VarFileWorker::Read(size_t file_size, bool from_spill) {
     if (!mmap_true_) {
+        std::println("fuck the branch: read VarFile: {}", *data_dir_);
         if (file_size < buffer_size_) {
             UnrecoverableError(fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_));
         } else {
@@ -132,41 +102,15 @@ void VarFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
         if (nbytes != buffer_size_) {
             UnrecoverableError(fmt::format("Read {} bytes from file failed, only {} bytes read.", buffer_size_, nbytes));
         }
+        FreeInMemory();
         auto *var_buffer = new VarBuffer(buffer_obj_, std::move(buffer), buffer_size_);
         data_ = static_cast<void *>(var_buffer);
-    } else {
-        if (file_size < buffer_size_) {
-            UnrecoverableError(fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_));
-        } else {
-            buffer_size_ = file_size;
-        }
 
-        size_t offset{};
-        auto buffer = std::make_unique<char[]>(buffer_size_);
-        std::memcpy(buffer.get(), (char *)mmap_true_ + offset, buffer_size_);
-        auto *var_buffer = new VarBuffer(buffer_obj_, std::move(buffer), buffer_size_);
-        data_ = static_cast<void *>(var_buffer);
-    }
-}
+        auto fd = file_handle_->fd();
 
-bool VarFileWorker::ReadFromMmapImpl(const void *ptr, size_t file_size) {
-    if (file_size < buffer_size_) {
-        UnrecoverableError(fmt::format("File size {} is smaller than buffer size {}.", file_size, buffer_size_));
-    } else {
-        buffer_size_ = file_size;
+        mmap_true_size_ = buffer_size_;
+        mmap_true_ = mmap(nullptr, mmap_true_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
     }
-    auto *var_buffer = new VarBuffer(buffer_obj_, static_cast<const char *>(ptr), buffer_size_);
-    mmap_data_ = reinterpret_cast<u8 *>(var_buffer);
-    return true;
-}
-
-void VarFileWorker::FreeFromMmapImpl() {
-    if (mmap_data_ == nullptr) {
-        UnrecoverableError("Data is already freed.");
-    }
-    auto *var_buffer = reinterpret_cast<VarBuffer *>(mmap_data_);
-    delete var_buffer;
-    mmap_data_ = nullptr;
 }
 
 } // namespace infinity

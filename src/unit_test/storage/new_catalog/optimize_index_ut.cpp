@@ -684,7 +684,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_index) {
     }
 }
 
-TEST_P(TestTxnOptimizeIndex, DISABLED_SLOW_optimize_index_and_optimize_index) {
+TEST_P(TestTxnOptimizeIndex, SLOW_optimize_index_and_optimize_index) {
     auto CheckTable = [&] {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
 
@@ -819,7 +819,7 @@ TEST_P(TestTxnOptimizeIndex, DISABLED_SLOW_optimize_index_and_optimize_index) {
     }
 }
 
-TEST_P(TestTxnOptimizeIndex, DISABLED_SLOW_optimize_index_and_dump_index) {
+TEST_P(TestTxnOptimizeIndex, SLOW_optimize_index_and_dump_index) {
     auto PrepareForOptimizeAndDumpIndex = [&] {
         PrepareForOptimizeIndex();
         {

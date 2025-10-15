@@ -39,8 +39,6 @@ public:
 
     void FreeInMemory() override;
 
-    size_t GetMemoryCost() const override;
-
     size_t GetBufferSize() const { return buffer_size_; }
 
     void SetBufferSize(size_t buffer_size) { buffer_size_ = buffer_size; }
@@ -48,15 +46,9 @@ public:
     FileWorkerType Type() const override { return FileWorkerType::kVarFile; }
 
 protected:
-    bool WriteToTempImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    bool CopyToMmapImpl(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
-
-    void ReadFromFileImpl(size_t file_size, bool from_spill) override;
-
-    bool ReadFromMmapImpl(const void *ptr, size_t size) override;
-
-    void FreeFromMmapImpl() override;
+    void Read(size_t file_size, bool from_spill) override;
 
 private:
     size_t buffer_size_ = 0;
