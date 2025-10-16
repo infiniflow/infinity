@@ -1415,10 +1415,11 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const CheckpointOption &op
             //     }
             // }
             auto fileworker_mgr = infinity::InfinityContext::instance().storage()->fileworker_manager();
-            auto fileworker_map = fileworker_mgr->fileworker_map();
-            for (auto &fileworker: fileworker_map | std::views::values) {
-                fileworker->MoveFile();
+            auto &fileworker_map = fileworker_mgr->fileworker_map();
+            for (const auto &ptr : fileworker_map | std::views::values) {
+                ptr->MoveFile();
             }
+
 
             // LOG_TRACE(fmt::format("NewTxn::CheckpointTable segment_id {}, block_id {}, flush_column {}, flush_version {}, option.checkpoint_ts_ {},
             // "
@@ -2021,17 +2022,14 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
                                                              std::make_shared<std::string>(import_tmp_path_),
                                                              block_dir,
                                                              col_filename,
-                                                             total_data_size,
-                                                             fileworker_mgr->persistence_manager());
+                                                             total_data_size);
 
         if (object_paths != nullptr) {
             std::string file_path1 = file_worker1->GetFilePath();
             object_paths->push_back(file_path1);
         }
 
-        // buffer_obj = fileworker_mgr->EmplaceFileWorker(std::move(file_worker1));
-        fileworker_mgr->EmplaceFileWorkerTemp(std::move(file_worker1));
-        buffer_obj = file_worker1.get();
+        buffer_obj = fileworker_mgr->EmplaceFileWorkerTemp(std::move(file_worker1));
 
         VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
         if (buffer_type == VectorBufferType::kVarBuffer) {
@@ -2040,15 +2038,14 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
                                                                 std::make_shared<std::string>(import_tmp_path_),
                                                                 block_dir,
                                                                 outline_filename,
-                                                                0,
-                                                                fileworker_mgr->persistence_manager());
+                                                                0);
 
             if (object_paths != nullptr) {
                 std::string file_path2 = file_worker2->GetFilePath();
                 object_paths->push_back(file_path2);
             }
-            fileworker_mgr->EmplaceFileWorkerTemp(std::move(file_worker2));
             outline_buffer_obj = file_worker2.get();
+            fileworker_mgr->EmplaceFileWorkerTemp(std::move(file_worker2));
         }
 
         size_t data_size = 0;

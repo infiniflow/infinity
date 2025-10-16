@@ -43,9 +43,7 @@ public:
 
     Status GetBlockLock(std::shared_ptr<BlockLock> &block_lock);
 
-    Status InitSet();
-
-    Status LoadSet(TxnTimeStamp checkpoint_ts);
+    Status InitOrLoadSet(TxnTimeStamp checkpoint_ts = 0);
 
     Status RestoreSet();
 

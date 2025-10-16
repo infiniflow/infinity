@@ -143,7 +143,7 @@ Status NewCatalog::InitCatalog(MetaCache *meta_cache, KVInstance *kv_instance, T
                 return status;
             }
         }
-        return block_meta.LoadSet(checkpoint_ts);
+        return block_meta.InitOrLoadSet(checkpoint_ts);
     };
     auto InitSegment = [&](SegmentMeta &segment_meta) {
         auto [block_ids, blocks_status] = segment_meta.GetBlockIDs1();
@@ -734,7 +734,7 @@ Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_t
         return status;
     }
     block_meta.emplace(block_id, segment_meta);
-    status = block_meta->InitSet();
+    status = block_meta->InitOrLoadSet();
     if (!status.ok()) {
         return status;
     }
@@ -765,7 +765,7 @@ Status NewCatalog::LoadImportedOrCompactedSegment(TableMeta &table_meta, const W
         SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
         std::optional<BlockMeta> block_meta;
         block_meta.emplace(block_id, segment_meta);
-        Status status = block_meta->LoadSet(commit_ts);
+        Status status = block_meta->InitOrLoadSet(commit_ts);
         if (!status.ok()) {
             return status;
         }
@@ -827,7 +827,7 @@ Status NewCatalog::AddNewBlockWithID(SegmentMeta &segment_meta, TxnTimeStamp com
         return status;
     }
     block_meta.emplace(block_id, segment_meta);
-    status = block_meta->InitSet();
+    status = block_meta->InitOrLoadSet();
     if (!status.ok()) {
         return status;
     }
@@ -886,7 +886,7 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
     }
 
     BlockMeta block_meta(block_id, segment_meta);
-    status = block_meta.LoadSet(checkpoint_ts);
+    status = block_meta.InitOrLoadSet(checkpoint_ts);
     if (!status.ok()) {
         return status;
     }

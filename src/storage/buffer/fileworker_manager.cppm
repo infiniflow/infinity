@@ -28,10 +28,7 @@ class Status;
 
 export class FileWorkerManager {
 public:
-    explicit FileWorkerManager(u64 memory_limit,
-                               std::shared_ptr<std::string> data_dir,
-                               std::shared_ptr<std::string> temp_dir,
-                               PersistenceManager *persistence_manager);
+    explicit FileWorkerManager(std::shared_ptr<std::string> data_dir, std::shared_ptr<std::string> temp_dir);
 
 public:
     void Start();
@@ -40,9 +37,9 @@ public:
     auto &fileworker_map() { return fileworker_map_; }
 
     // Create a new BufferHandle, or in replay process. (read data block from wal)
-    void EmplaceFileWorker(std::unique_ptr<FileWorker> file_worker);
+    FileWorker *EmplaceFileWorker(std::unique_ptr<FileWorker> file_worker);
 
-    void EmplaceFileWorkerTemp(std::unique_ptr<FileWorker> file_worker);
+    FileWorker *EmplaceFileWorkerTemp(std::unique_ptr<FileWorker> file_worker);
 
     // Get an existing BufferHandle from memory or disk.
     // FileWorker *GetFileWorker(std::unique_ptr<FileWorker> file_worker, bool restart = false);
@@ -72,7 +69,7 @@ private:
     PersistenceManager *persistence_manager_;
 
     std::mutex w_locker_{};
-    std::unordered_map<std::string, std::shared_ptr<FileWorker>> fileworker_map_;
+    std::unordered_map<std::string, std::unique_ptr<FileWorker>> fileworker_map_;
     std::atomic<u32> buffer_id_{};
 
     std::mutex gc_locker_{};

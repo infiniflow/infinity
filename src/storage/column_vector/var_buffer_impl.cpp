@@ -25,7 +25,7 @@ import third_party;
 
 namespace infinity {
 
-size_t VarBuffer::Append(std::unique_ptr<char[]> buffer, size_t size, bool *free_success_p) {
+size_t VarBuffer::Append(std::unique_ptr<char[]> buffer, size_t size) {
     if (std::holds_alternative<const char *>(buffers_)) {
         UnrecoverableError("Cannot append to a const buffer");
     }
@@ -35,17 +35,13 @@ size_t VarBuffer::Append(std::unique_ptr<char[]> buffer, size_t size, bool *free
     size_t offset = buffer_size_prefix_sum_.back();
     buffer_size_prefix_sum_.push_back(offset + size);
 
-    bool free_success = true;
-    if (free_success_p != nullptr) {
-        *free_success_p = free_success;
-    }
     return offset;
 }
 
-size_t VarBuffer::Append(const char *data, size_t size, bool *free_success) {
+size_t VarBuffer::Append(const char *data, size_t size) {
     auto buffer = std::make_unique<char[]>(size);
     std::memcpy(buffer.get(), data, size);
-    return Append(std::move(buffer), size, free_success);
+    return Append(std::move(buffer), size);
 }
 
 const char *VarBuffer::Get(size_t offset, size_t size) const {
@@ -60,21 +56,18 @@ const char *VarBuffer::Get(size_t offset, size_t size) const {
     std::shared_lock lock(mtx_);
     // find the last index i such that buffer_size_prefix_sum_[i] <= offset
     auto it = std::upper_bound(buffer_size_prefix_sum_.begin(), buffer_size_prefix_sum_.end(), offset);
-    // auto it = std::lower_bound(buffer_size_prefix_sum_.begin(), buffer_size_prefix_sum_.end(), offset);
-    // [[maybe_unused]] auto fileworker_map = infinity::InfinityContext::instance().storage()->buffer_manager()->fileworker_map();
-    // if (it == buffer_size_prefix_sum_.end()) {
-    //     std::string error_msg = fmt::format("offset {} is out of range {}", offset, buffer_size_prefix_sum_.back());
-    //     UnrecoverableError(error_msg);
-    // }
-    // if (it == buffer_size_prefix_sum_.begin()) {
-    //     std::string error_msg = fmt::format("prefix_sum[0] should be 0, but got {}", *it);
-    //     UnrecoverableError(error_msg);
-    // }
+    if (it == buffer_size_prefix_sum_.end()) {
+        UnrecoverableError(fmt::format("offset {} is out of range {}", offset, buffer_size_prefix_sum_.back()));
+    }
+    if (it == buffer_size_prefix_sum_.begin()) {
+        UnrecoverableError(fmt::format("prefix_sum[0] should be 0, but got {}", *it));
+    }
     size_t i = std::distance(buffer_size_prefix_sum_.begin(), it) - 1;
     size_t offset_in_buffer = offset - buffer_size_prefix_sum_[i];
     if (offset_in_buffer + size > buffer_size_prefix_sum_[i + 1]) {
         std::string error_msg =
-            fmt::format("offset {} and size {} is out of range [{}, {})", offset, size, buffer_size_prefix_sum_[i], buffer_size_prefix_sum_[i + 1]);
+            fmt::format("offset {} and size {} is out of range [{}, {})", offset, size, buffer_size_prefix_sum_[i], buffer_size_prefix_sum_[i +
+            1]);
         UnrecoverableError(error_msg);
     }
     return buffers[i].get() + offset_in_buffer;
@@ -112,20 +105,20 @@ size_t VarBuffer::TotalSize() const {
     return buffer_size_prefix_sum_.back();
 }
 
-size_t VarBufferManager::Append(std::unique_ptr<char[]> data, size_t size, bool *free_success) {
+size_t VarBufferManager::Append(std::unique_ptr<char[]> data, size_t size) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto *buffer = GetInnerNoLock();
-    size_t offset = buffer->Append(std::move(data), size, free_success);
+    size_t offset = buffer->Append(std::move(data), size);
     return offset;
 }
 
 VarBufferManager::VarBufferManager(FileWorker *var_fileworker)
     : type_(BufferType::kNewCatalog), fileworker_(nullptr), var_fileworker_(var_fileworker) {}
 
-size_t VarBufferManager::Append(const char *data, size_t size, bool *free_success) {
+size_t VarBufferManager::Append(const char *data, size_t size) {
     auto buffer = std::make_unique<char[]>(size);
     std::memcpy(buffer.get(), data, size);
-    return Append(std::move(buffer), size, free_success);
+    return Append(std::move(buffer), size);
 }
 
 void VarBufferManager::SetToCatalog(FileWorker *var_fileworker) {

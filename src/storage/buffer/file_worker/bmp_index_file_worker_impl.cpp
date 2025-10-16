@@ -40,15 +40,13 @@ BMPIndexFileWorker::BMPIndexFileWorker(std::shared_ptr<std::string> data_dir,
                                        std::shared_ptr<std::string> file_name,
                                        std::shared_ptr<IndexBase> index_base,
                                        std::shared_ptr<ColumnDef> column_def,
-                                       PersistenceManager *persistence_manager,
                                        size_t index_size)
     : IndexFileWorker(std::move(data_dir),
                       std::move(temp_dir),
                       std::move(file_dir),
                       std::move(file_name),
                       std::move(index_base),
-                      std::move(column_def),
-                      persistence_manager) {
+                      std::move(column_def)) {
     if (index_size == 0) {
         std::string index_path = GetFilePath();
         auto [file_handle, status] = VirtualStore::Open(index_path, FileAccessMode::kRead);
@@ -99,7 +97,7 @@ bool BMPIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &c
     // if (to_spill) {
     //     (*bmp_handler)->Save(*file_handle_);
     // } else {
-        (*bmp_handler)->SaveToPtr(*file_handle_);
+    (*bmp_handler)->SaveToPtr(*file_handle_);
     // }
     prepare_success = true;
     return true;
@@ -114,7 +112,7 @@ void BMPIndexFileWorker::Read(size_t file_size, bool from_spill) {
     // if (from_spill) {
     //     (*bmp_handler)->Load(*file_handle_);
     // } else {
-        (*bmp_handler)->LoadFromPtr(*file_handle_, file_size);
+    (*bmp_handler)->LoadFromPtr(*file_handle_, file_size);
     // }
 }
 

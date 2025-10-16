@@ -35,9 +35,8 @@ VarFileWorker::VarFileWorker(std::shared_ptr<std::string> data_dir,
                              std::shared_ptr<std::string> temp_dir,
                              std::shared_ptr<std::string> file_dir,
                              std::shared_ptr<std::string> file_name,
-                             size_t buffer_size,
-                             PersistenceManager *persistence_manager)
-    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager) {
+                             size_t buffer_size)
+    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name)) {
     VarFileWorker::AllocateInMemory();
 }
 

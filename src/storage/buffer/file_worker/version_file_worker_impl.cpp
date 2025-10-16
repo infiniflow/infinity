@@ -25,6 +25,7 @@ import :block_version;
 import :infinity_exception;
 import :logger;
 import :persistence_manager;
+import :infinity_context;
 
 import third_party;
 
@@ -34,9 +35,8 @@ VersionFileWorker::VersionFileWorker(std::shared_ptr<std::string> data_dir,
                                      std::shared_ptr<std::string> temp_dir,
                                      std::shared_ptr<std::string> file_dir,
                                      std::shared_ptr<std::string> file_name,
-                                     size_t capacity,
-                                     PersistenceManager *persistence_manager)
-    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), capacity_(capacity) {
+                                     size_t capacity)
+    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name)), capacity_(capacity) {
     VersionFileWorker::AllocateInMemory();
     // ReadFromFile(true);
 }

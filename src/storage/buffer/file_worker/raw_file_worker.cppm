@@ -30,8 +30,7 @@ public:
                            std::shared_ptr<std::string> temp_dir,
                            std::shared_ptr<std::string> file_dir,
                            std::shared_ptr<std::string> file_name,
-                           u32 file_size,
-                           PersistenceManager *persistence_manager);
+                           u32 file_size);
 
     virtual ~RawFileWorker() override;
 

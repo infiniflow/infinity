@@ -35,8 +35,7 @@ public:
     explicit FileWorker(std::shared_ptr<std::string> data_dir,
                         std::shared_ptr<std::string> temp_dir,
                         std::shared_ptr<std::string> file_dir,
-                        std::shared_ptr<std::string> file_name,
-                        PersistenceManager *persistence_manager);
+                        std::shared_ptr<std::string> file_name);
 
     // No destruct here
     virtual ~FileWorker();
@@ -48,13 +47,9 @@ public:
 
     void Load();
 
-    std::string GetFilename() {
-        return "Dummy";
-    }
+    std::string GetFilename() { return "Dummy"; }
 
-    void PickForCleanup() {
-
-    }
+    void PickForCleanup() {}
 
     void MoveFile();
 
@@ -100,12 +95,11 @@ public:
     const std::shared_ptr<std::string> file_name_;
     PersistenceManager *persistence_manager_{};
     ObjAddr obj_addr_;
-    void *mmap_true_{};
+    void *mmap_true_{nullptr};
     size_t mmap_true_size_{};
 
 protected:
     void *data_{};
     std::unique_ptr<LocalFileHandle> file_handle_{nullptr};
-
 };
 } // namespace infinity

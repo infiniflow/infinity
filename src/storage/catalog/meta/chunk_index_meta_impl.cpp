@@ -139,10 +139,8 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
                                                                std::move(secondary_index_file_name),
                                                                index_base,
                                                                column_def,
-                                                               chunk_info.row_cnt_,
-                                                               fileworker_mgr->persistence_manager());
-                fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
-                index_buffer_ = index_file_worker.get();
+                                                               chunk_info.row_cnt_);
+                index_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
                 break;
             }
             case IndexType::kFullText: {
@@ -152,9 +150,8 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
                                                     std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
                                                     index_dir,
                                                     std::move(column_length_file_name),
-                                                    chunk_info.row_cnt_ * sizeof(u32),
-                                                    fileworker_mgr->persistence_manager());
-                index_buffer_ = index_file_worker.get();
+                                                    chunk_info.row_cnt_ * sizeof(u32));
+                index_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
                 break;
             }
             case IndexType::kIVF: {
@@ -165,10 +162,8 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
                                                          index_dir,
                                                          std::move(ivf_index_file_name),
                                                          index_base,
-                                                         column_def,
-                                                         fileworker_mgr->persistence_manager());
-                fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
-                index_buffer_ = index_file_worker.get();
+                                                         column_def);
+                index_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
                 break;
             }
             case IndexType::kHnsw: {
@@ -180,41 +175,35 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
                                                      std::move(hnsw_index_file_name),
                                                      index_base,
                                                      column_def,
-                                                     fileworker_mgr->persistence_manager(),
                                                      chunk_info.index_size_);
-                fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
-                index_buffer_ = index_file_worker.get();
+                index_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
                 break;
             }
             case IndexType::kBMP: {
                 auto bmp_index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
-                auto file_worker =
+                auto index_file_worker =
                     std::make_unique<BMPIndexFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
                                                          std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
                                                          index_dir,
                                                          std::move(bmp_index_file_name),
                                                          index_base,
                                                          column_def,
-                                                         fileworker_mgr->persistence_manager(),
                                                          chunk_info.index_size_);
-                fileworker_mgr->EmplaceFileWorker(std::move(file_worker));
-                index_buffer_ = file_worker.get();
+                index_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
                 break;
             }
             case IndexType::kEMVB: {
                 auto emvb_index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
                 const auto segment_start_offset = chunk_info.base_row_id_.segment_offset_;
-                auto file_worker =
+                auto index_file_worker =
                     std::make_unique<EMVBIndexFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
                                                           std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
                                                           index_dir,
                                                           std::move(emvb_index_file_name),
                                                           index_base,
                                                           column_def,
-                                                          segment_start_offset,
-                                                          fileworker_mgr->persistence_manager());
-                fileworker_mgr->EmplaceFileWorker(std::move(file_worker));
-                index_buffer_ = file_worker.get();
+                                                          segment_start_offset);
+                index_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
                 break;
             }
             case IndexType::kDiskAnn: {
@@ -234,7 +223,7 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
 }
 
 Status ChunkIndexMeta::LoadSet() {
-    FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+    // FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     TableIndexMeta &table_index_meta = segment_index_meta_.table_index_meta();
 
     ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
@@ -256,7 +245,7 @@ Status ChunkIndexMeta::LoadSet() {
         return status;
     }
     std::shared_ptr<std::string> index_dir = segment_index_meta_.GetSegmentIndexDir();
-
+    FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
             auto secondary_index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
@@ -267,9 +256,8 @@ Status ChunkIndexMeta::LoadSet() {
                                                            std::move(secondary_index_file_name),
                                                            index_base,
                                                            column_def,
-                                                           row_count,
-                                                           fileworker_mgr->persistence_manager());
-            index_buffer_ = index_file_worker.get();
+                                                           row_count);
+            index_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
             break;
         }
         case IndexType::kFullText: {
@@ -278,9 +266,8 @@ Status ChunkIndexMeta::LoadSet() {
                                                                      std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
                                                                      index_dir,
                                                                      std::move(column_length_file_name),
-                                                                     row_count * sizeof(u32),
-                                                                     fileworker_mgr->persistence_manager());
-            index_buffer_ = index_file_worker.get();
+                                                                     row_count * sizeof(u32));
+            index_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
             break;
         }
         case IndexType::kIVF: {
@@ -291,9 +278,8 @@ Status ChunkIndexMeta::LoadSet() {
                                                      index_dir,
                                                      std::move(ivf_index_file_name),
                                                      index_base,
-                                                     column_def,
-                                                     fileworker_mgr->persistence_manager());
-            index_buffer_ = index_file_worker.get();
+                                                     column_def);
+            index_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
             break;
         }
         case IndexType::kHnsw: {
@@ -304,36 +290,35 @@ Status ChunkIndexMeta::LoadSet() {
                                                                       std::move(hnsw_index_file_name),
                                                                       index_base,
                                                                       column_def,
-                                                                      fileworker_mgr->persistence_manager(),
                                                                       index_size);
-            index_buffer_ = index_file_worker.get();
+            index_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
             break;
         }
         case IndexType::kBMP: {
             auto bmp_index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
-            auto file_worker = std::make_unique<BMPIndexFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
-                                                                    std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                                                                    index_dir,
-                                                                    std::move(bmp_index_file_name),
-                                                                    index_base,
-                                                                    column_def,
-                                                                    fileworker_mgr->persistence_manager(),
-                                                                    index_size);
-            index_buffer_ = file_worker.get();
+            auto index_file_worker =
+                std::make_unique<BMPIndexFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
+                                                     std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                                                     index_dir,
+                                                     std::move(bmp_index_file_name),
+                                                     index_base,
+                                                     column_def,
+                                                     index_size);
+            index_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
             break;
         }
         case IndexType::kEMVB: {
             auto emvb_index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
             const auto segment_start_offset = base_row_id.segment_offset_;
-            auto file_worker = std::make_unique<EMVBIndexFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
-                                                                     std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                                                                     index_dir,
-                                                                     std::move(emvb_index_file_name),
-                                                                     index_base,
-                                                                     column_def,
-                                                                     segment_start_offset,
-                                                                     fileworker_mgr->persistence_manager());
-            index_buffer_ = file_worker.get();
+            auto index_file_worker =
+                std::make_unique<EMVBIndexFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
+                                                      std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                                                      index_dir,
+                                                      std::move(emvb_index_file_name),
+                                                      index_base,
+                                                      column_def,
+                                                      segment_start_offset);
+            index_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
             break;
         }
         default: {
@@ -380,8 +365,7 @@ Status ChunkIndexMeta::RestoreSet() {
                                                            std::move(secondary_index_file_name),
                                                            index_base,
                                                            column_def,
-                                                           row_count,
-                                                           fileworker_mgr->persistence_manager());
+                                                           row_count);
             break;
         }
         case IndexType::kFullText: {
@@ -390,8 +374,7 @@ Status ChunkIndexMeta::RestoreSet() {
                                                                 std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
                                                                 index_dir,
                                                                 std::move(column_length_file_name),
-                                                                row_count * sizeof(u32),
-                                                                fileworker_mgr->persistence_manager());
+                                                                row_count * sizeof(u32));
             break;
         }
         case IndexType::kIVF: {
@@ -401,8 +384,7 @@ Status ChunkIndexMeta::RestoreSet() {
                                                                      index_dir,
                                                                      std::move(ivf_index_file_name),
                                                                      index_base,
-                                                                     column_def,
-                                                                     fileworker_mgr->persistence_manager());
+                                                                     column_def);
             break;
         }
         case IndexType::kHnsw: {
@@ -413,7 +395,6 @@ Status ChunkIndexMeta::RestoreSet() {
                                                                  std::move(hnsw_index_file_name),
                                                                  index_base,
                                                                  column_def,
-                                                                 fileworker_mgr->persistence_manager(),
                                                                  index_size);
             break;
         }
@@ -425,7 +406,6 @@ Status ChunkIndexMeta::RestoreSet() {
                                                                      std::move(bmp_index_file_name),
                                                                      index_base,
                                                                      column_def,
-                                                                     fileworker_mgr->persistence_manager(),
                                                                      index_size);
             break;
         }
@@ -438,8 +418,7 @@ Status ChunkIndexMeta::RestoreSet() {
                                                                       std::move(emvb_index_file_name),
                                                                       index_base,
                                                                       column_def,
-                                                                      segment_start_offset,
-                                                                      fileworker_mgr->persistence_manager());
+                                                                      segment_start_offset);
 
             break;
         }

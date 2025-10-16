@@ -32,8 +32,7 @@ public:
                                std::shared_ptr<std::string> temp_dir,
                                std::shared_ptr<std::string> file_dir,
                                std::shared_ptr<std::string> file_name,
-                               size_t capacity,
-                               PersistenceManager *persistence_manager);
+                               size_t capacity);
 
     virtual ~VersionFileWorker() override;
 

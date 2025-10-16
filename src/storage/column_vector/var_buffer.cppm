@@ -48,9 +48,9 @@ public:
     }
 
 public:
-    size_t Append(std::unique_ptr<char[]> buffer, size_t size, bool *free_success = nullptr);
+    size_t Append(std::unique_ptr<char[]> buffer, size_t size);
 
-    size_t Append(const char *data, size_t size, bool *free_success = nullptr);
+    size_t Append(const char *data, size_t size);
 
     const char *Get(size_t offset, size_t size) const;
 
@@ -76,9 +76,9 @@ public:
 
     VarBufferManager(FileWorker *var_fileworker);
 
-    size_t Append(std::unique_ptr<char[]> buffer, size_t size, bool *free_success = nullptr);
+    size_t Append(std::unique_ptr<char[]> buffer, size_t size);
 
-    size_t Append(const char *data, size_t size, bool *free_success = nullptr);
+    size_t Append(const char *data, size_t size);
 
     const char *Get(size_t offset, size_t size);
 

@@ -26,8 +26,7 @@ public:
                            std::shared_ptr<std::string> temp_dir,
                            std::shared_ptr<std::string> file_dir,
                            std::shared_ptr<std::string> file_name,
-                           size_t buffer_size,
-                           PersistenceManager *persistence_manager);
+                           size_t buffer_size);
 
     virtual ~VarFileWorker() override;
 

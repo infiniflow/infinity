@@ -34,15 +34,13 @@ public:
                                  std::shared_ptr<std::string> file_name,
                                  std::shared_ptr<IndexBase> index_base,
                                  std::shared_ptr<ColumnDef> column_def,
-                                 const u32 start_segment_offset,
-                                 PersistenceManager *persistence_manager)
+                                 const u32 start_segment_offset)
         : IndexFileWorker(std::move(data_dir),
                           std::move(temp_dir),
                           std::move(file_dir),
                           std::move(file_name),
                           std::move(index_base),
-                          std::move(column_def),
-                          persistence_manager),
+                          std::move(column_def)),
           start_segment_offset_(start_segment_offset) {
         AllocateInMemory();
     }

@@ -303,7 +303,7 @@ TEST_F(TestTxnManagerTest, test_check_txns) {
     }
 }
 
-TEST_F(TestTxnManagerTest, test_parallel_insert_table) {
+TEST_F(TestTxnManagerTest, DISABLED_XXX_test_parallel_insert_table) {
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     // Create db

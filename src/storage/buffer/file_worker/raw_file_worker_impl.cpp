@@ -35,9 +35,8 @@ RawFileWorker::RawFileWorker(std::shared_ptr<std::string> data_dir,
                              std::shared_ptr<std::string> temp_dir,
                              std::shared_ptr<std::string> file_dir,
                              std::shared_ptr<std::string> file_name,
-                             u32 file_size,
-                             PersistenceManager *persistence_manager)
-    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), buffer_size_(file_size) {
+                             u32 file_size)
+    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name)), buffer_size_(file_size) {
     RawFileWorker::AllocateInMemory();
 }
 
@@ -47,9 +46,7 @@ RawFileWorker::~RawFileWorker() {
     mmap_true_ = nullptr;
 }
 
-void RawFileWorker::AllocateInMemory() {
-    data_ = static_cast<void *>(new char[buffer_size_]);
-}
+void RawFileWorker::AllocateInMemory() { data_ = static_cast<void *>(new char[buffer_size_]); }
 
 void RawFileWorker::FreeInMemory() {
     delete[] static_cast<char *>(data_);

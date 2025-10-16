@@ -102,6 +102,7 @@ void VectorBuffer::InitializeCompactBit(FileWorker *buffer_obj, size_t capacity)
     //     UnrecoverableError("Buffer object size is not equal to data size.");
     // }
     // ptr_ = buffer_obj->Load();
+    ptr_ = buffer_obj;
     initialized_ = true;
     data_size_ = data_size;
     capacity_ = capacity;
@@ -119,6 +120,7 @@ void VectorBuffer::Initialize(FileWorker *buffer_obj, FileWorker *outline_buffer
     //     UnrecoverableError("Buffer object size is not equal to data size.");
     // }
     // ptr_ = buffer_obj->Load();
+    ptr_ = buffer_obj;
     if (buffer_type_ == VectorBufferType::kVarBuffer) {
         var_buffer_mgr_ = std::make_unique<VarBufferManager>(outline_buffer_obj);
     }
@@ -136,6 +138,7 @@ void VectorBuffer::SetToCatalog(FileWorker *buffer_obj, FileWorker *outline_buff
     buffer_obj->SetData(src_ptr);
 
     // ptr_ = buffer_obj->Load();
+    ptr_ = buffer_obj;
     if (buffer_type_ == VectorBufferType::kVarBuffer) {
         var_buffer_mgr_->SetToCatalog(outline_buffer_obj);
     }

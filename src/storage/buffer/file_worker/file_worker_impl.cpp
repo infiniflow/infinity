@@ -42,11 +42,11 @@ namespace infinity {
 FileWorker::FileWorker(std::shared_ptr<std::string> data_dir,
                        std::shared_ptr<std::string> temp_dir,
                        std::shared_ptr<std::string> file_dir,
-                       std::shared_ptr<std::string> file_name,
-                       PersistenceManager *persistence_manager)
-    : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), file_dir_(std::move(file_dir)), file_name_(std::move(file_name)),
-      persistence_manager_(persistence_manager) {
+                       std::shared_ptr<std::string> file_name)
+    : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), file_dir_(std::move(file_dir)), file_name_(std::move(file_name)) {
+    mmap_true_ = nullptr;
     if (std::filesystem::path(*file_dir_).is_absolute()) {
+        persistence_manager_ = InfinityContext::instance().storage()->persistence_manager();
         UnrecoverableError(fmt::format("File directory {} is an absolute path.", *file_dir_));
     }
 }

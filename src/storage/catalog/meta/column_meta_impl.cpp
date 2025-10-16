@@ -64,13 +64,8 @@ Status ColumnMeta::InitSet(const std::shared_ptr<ColumnDef> &col_def) {
                                                             std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
                                                             block_dir_ptr,
                                                             filename,
-                                                            total_data_size,
-                                                            fileworker_mgr->persistence_manager());
-        column_buffer_ = file_worker.get();
-        fileworker_mgr->EmplaceFileWorker(std::move(file_worker));
-        if (!column_buffer_) {
-            return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", file_worker->GetFilePath()));
-        }
+                                                            total_data_size);
+        column_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(file_worker));
     }
     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
     if (buffer_type == VectorBufferType::kVarBuffer) {
@@ -79,13 +74,8 @@ Status ColumnMeta::InitSet(const std::shared_ptr<ColumnDef> &col_def) {
                                                                    std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
                                                                    block_dir_ptr,
                                                                    filename,
-                                                                   0, /*buffer_size*/
-                                                                   fileworker_mgr->persistence_manager());
-        fileworker_mgr->EmplaceFileWorker(std::move(outline_file_worker));
-        outline_buffer_ = outline_file_worker.get();
-        if (!outline_buffer_) {
-            return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", outline_file_worker->GetFilePath()));
-        }
+                                                                   0 /*buffer_size*/);
+        outline_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(outline_file_worker));
     }
     return Status::OK();
 }
@@ -116,12 +106,8 @@ Status ColumnMeta::LoadSet() {
                                                             std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
                                                             block_dir_ptr,
                                                             filename,
-                                                            total_data_size,
-                                                            fileworker_mgr->persistence_manager());
-        column_buffer_ = file_worker.get();
-        if (!column_buffer_) {
-            return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", file_worker->GetFilePath()));
-        }
+                                                            total_data_size);
+        column_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(file_worker));
     }
     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
     if (buffer_type == VectorBufferType::kVarBuffer) {
@@ -133,12 +119,8 @@ Status ColumnMeta::LoadSet() {
                                                                    std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
                                                                    block_dir_ptr,
                                                                    filename,
-                                                                   chunk_offset,
-                                                                   fileworker_mgr->persistence_manager());
-        outline_buffer_ = outline_file_worker.get();
-        if (!outline_buffer_) {
-            return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", outline_file_worker->GetFilePath()));
-        }
+                                                                   chunk_offset);
+        outline_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(outline_file_worker));
     }
     return Status::OK();
 }
@@ -160,8 +142,7 @@ Status ColumnMeta::RestoreSet(const ColumnDef *column_def) {
                                                             std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
                                                             block_dir_ptr,
                                                             filename,
-                                                            total_data_size,
-                                                            fileworker_mgr->persistence_manager());
+                                                            total_data_size);
         auto *buffer_obj = fileworker_mgr->GetFileWorker(file_worker->GetFilePath());
         if (buffer_obj == nullptr) {
             column_buffer_ = file_worker.get();
@@ -180,8 +161,7 @@ Status ColumnMeta::RestoreSet(const ColumnDef *column_def) {
                                                                    std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
                                                                    block_dir_ptr,
                                                                    filename,
-                                                                   0, /*buffer_size*/
-                                                                   fileworker_mgr->persistence_manager());
+                                                                   0 /*buffer_size*/);
         auto *buffer_obj = fileworker_mgr->GetFileWorker(outline_file_worker->GetFilePath());
         if (buffer_obj == nullptr) {
             outline_buffer_ = outline_file_worker.get();

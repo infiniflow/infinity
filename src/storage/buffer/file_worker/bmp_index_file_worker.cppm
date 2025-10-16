@@ -35,7 +35,6 @@ public:
                                 std::shared_ptr<std::string> file_name,
                                 std::shared_ptr<IndexBase> index_base,
                                 std::shared_ptr<ColumnDef> column_def,
-                                PersistenceManager *persistence_manager,
                                 size_t index_size = 0);
 
     ~BMPIndexFileWorker() override;

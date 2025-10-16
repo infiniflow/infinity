@@ -35,15 +35,13 @@ public:
                                       std::shared_ptr<std::string> file_name,
                                       std::shared_ptr<IndexBase> index_base,
                                       std::shared_ptr<ColumnDef> column_def,
-                                      u32 row_count,
-                                      PersistenceManager *persistence_manager)
+                                      u32 row_count)
         : IndexFileWorker(std::move(data_dir),
                           std::move(temp_dir),
                           std::move(file_dir),
                           std::move(file_name),
                           std::move(index_base),
-                          std::move(column_def),
-                          persistence_manager),
+                          std::move(column_def)),
           row_count_(row_count) {
         AllocateInMemory();
     }

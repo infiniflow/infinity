@@ -32,15 +32,13 @@ public:
                                 std::shared_ptr<std::string> file_dir,
                                 std::shared_ptr<std::string> file_name,
                                 std::shared_ptr<IndexBase> index_base,
-                                std::shared_ptr<ColumnDef> column_def,
-                                PersistenceManager *persistence_manager)
+                                std::shared_ptr<ColumnDef> column_def)
         : IndexFileWorker(std::move(data_dir),
                           std::move(temp_dir),
                           std::move(file_dir),
                           std::move(file_name),
                           std::move(index_base),
-                          std::move(column_def),
-                          persistence_manager) {
+                          std::move(column_def)) {
         IVFIndexFileWorker::AllocateInMemory();
     }
 

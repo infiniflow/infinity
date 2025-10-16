@@ -43,15 +43,13 @@ HnswFileWorker::HnswFileWorker(std::shared_ptr<std::string> data_dir,
                                std::shared_ptr<std::string> file_name,
                                std::shared_ptr<IndexBase> index_base,
                                std::shared_ptr<ColumnDef> column_def,
-                               PersistenceManager *persistence_manager,
                                size_t index_size)
     : IndexFileWorker(std::move(data_dir),
                       std::move(temp_dir),
                       std::move(file_dir),
                       std::move(file_name),
                       std::move(index_base),
-                      std::move(column_def),
-                      persistence_manager) {
+                      std::move(column_def)) {
     if (index_size == 0) {
 
         std::string index_path = GetFilePath();

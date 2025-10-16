@@ -24,6 +24,7 @@ import :persistence_manager;
 import :virtual_store;
 import :kv_store;
 import :status;
+import :infinity_context;
 
 import std.compat;
 import third_party;
@@ -32,11 +33,10 @@ import global_resource_usage;
 
 namespace infinity {
 
-FileWorkerManager::FileWorkerManager(u64 memory_limit,
-                                     std::shared_ptr<std::string> data_dir,
-                                     std::shared_ptr<std::string> temp_dir,
-                                     PersistenceManager *persistence_manager)
-    : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), persistence_manager_(persistence_manager) {}
+FileWorkerManager::FileWorkerManager(std::shared_ptr<std::string> data_dir, std::shared_ptr<std::string> temp_dir)
+    : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)) {
+    persistence_manager_ = InfinityContext::instance().storage()->persistence_manager();
+}
 
 void FileWorkerManager::Start() {
     if (!VirtualStore::Exists(*data_dir_)) {
@@ -46,51 +46,32 @@ void FileWorkerManager::Start() {
 
 void FileWorkerManager::Stop() {
     RemoveClean(nullptr);
-    LOG_INFO("Buffer manager is stopped.");
+    LOG_INFO("FileWorker manager is stopped.");
 }
 
-void FileWorkerManager::EmplaceFileWorker(std::unique_ptr<FileWorker> file_worker) {
+FileWorker *FileWorkerManager::EmplaceFileWorker(std::unique_ptr<FileWorker> file_worker) {
     std::string file_path = file_worker->GetFilePath();
     std::unique_lock lock(w_locker_);
     if (auto iter = fileworker_map_.find(file_path); iter != fileworker_map_.end()) {
-        UnrecoverableError(fmt::format("FileWorkerManager::Allocate: file {} already exists.", file_path.c_str()));
+        return iter->second.get();
     }
-    fileworker_map_.emplace(file_path, std::move(file_worker));
+    auto [iter, _] = fileworker_map_.emplace(file_path, std::move(file_worker));
+    return iter->second.get();
 }
 
-void FileWorkerManager::EmplaceFileWorkerTemp(std::unique_ptr<FileWorker> file_worker) {
+FileWorker *FileWorkerManager::EmplaceFileWorkerTemp(std::unique_ptr<FileWorker> file_worker) {
     std::string file_path = file_worker->GetFilePathTmp();
     std::unique_lock lock(w_locker_);
     if (auto iter = fileworker_map_.find(file_path); iter != fileworker_map_.end()) {
-        UnrecoverableError(fmt::format("FileWorkerManager::Allocate: file {} already exists.", file_path.c_str()));
+        return iter->second.get();
     }
-    fileworker_map_.emplace(file_path, std::move(file_worker));
+    auto [iter, _] = fileworker_map_.emplace(file_path, std::move(file_worker));
+    return iter->second.get();
 }
-
-// FileWorker *FileWorkerManager::GetFileWorker(std::unique_ptr<FileWorker> file_worker, bool restart) {
-//     std::string file_path = file_worker->GetFilePath();
-//
-//     std::unique_lock lock(w_locker_);
-//     if (auto iter1 = fileworker_map_.find(file_path); iter1 != fileworker_map_.end()) {
-//         auto *file_worker2 = iter1->second.get();
-//         if (restart) {
-//             buffer_obj->UpdateFileWorkerInfo(std::move(file_worker2));
-//         }
-//         return buffer_obj;
-//     }
-//
-//     auto buffer_obj = MakeBufferObj(std::move(file_worker));
-//
-//     FileWorker *res = buffer_obj.get();
-//     fileworker_map_.emplace(std::move(file_path), std::move(buffer_obj));
-//
-//     return res;
-// }
 
 FileWorker *FileWorkerManager::GetFileWorker(const std::string &file_path) {
     std::unique_lock lock(w_locker_);
     if (auto iter = fileworker_map_.find(file_path); iter != fileworker_map_.end()) {
-        // iter->second->Load();
         return iter->second.get();
     }
     LOG_TRACE(fmt::format("FileWorkerManager::GetFileWorker: file {} not found.", file_path));
@@ -138,23 +119,6 @@ Status FileWorkerManager::RemoveClean(KVInstance *kv_instance) {
     }
     return Status::OK();
 }
-
-// std::vector<BufferObjectInfo> FileWorkerManager::GetBufferObjectsInfo() {
-//     std::vector<BufferObjectInfo> result;
-//     {
-//         std::unique_lock lock(w_locker_);
-//         result.reserve(fileworker_map_.size());
-//         for (const auto &buffer_pair : fileworker_map_) {
-//             BufferObjectInfo buffer_object_info;
-//             buffer_object_info.object_path_ = buffer_pair.first;
-//             FileWorker *fileworker_ptr = buffer_pair.second.get();
-//             buffer_object_info.file_type_ = fileworker_ptr->Type();
-//             // buffer_object_info.object_size_ = buffer_object_ptr->buffer_size_;
-//             result.emplace_back(buffer_object_info);
-//         }
-//     }
-//     return result;
-// }
 
 void FileWorkerManager::AddToCleanList(FileWorker *fileworker) {
     std::unique_lock lock(clean_locker_);
