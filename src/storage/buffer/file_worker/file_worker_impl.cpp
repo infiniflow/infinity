@@ -63,6 +63,9 @@ bool FileWorker::Write(const FileWorkerSaveCtx &ctx) {
         VirtualStore::MakeDirectory(write_dir);
     }
     std::string write_path = fmt::format("{}/{}", write_dir, *file_name_);
+    if (write_path.find("/var/infinity/data/") != std::string::npos) {
+        std::println("asdasdasdasdasdasdasdasdasdasd");
+    }
 
     auto [file_handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
     if (!status.ok()) {
@@ -131,7 +134,7 @@ void FileWorker::MoveFile() {
 }
 
 void FileWorker::Load() {
-    // std::unique_lock<std::mutex> locker(w_locker_); // lockl?
+    std::unique_lock<std::mutex> locker(l_); // lockl?
     std::string path1 = std::filesystem::path(*data_dir_) / *file_dir_ / *file_name_;
     std::string path2 = std::filesystem::path(*temp_dir_) / *file_dir_ / *file_name_;
     if (VirtualStore::Exists(path2)) {

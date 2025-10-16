@@ -80,6 +80,9 @@ void RawFileWorker::Read(size_t file_size, bool from_spill) {
         FreeInMemory();
         data_ = static_cast<void *>(new char[buffer_size_]);
         auto fd = file_handle_->fd();
+        if (file_handle_ == nullptr) {
+            std::println("kkkkkkkk");
+        }
         auto [nbytes, status1] = file_handle_->Read(data_, buffer_size_);
 
         mmap_true_size_ = buffer_size_;

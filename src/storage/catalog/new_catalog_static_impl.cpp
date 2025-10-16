@@ -1200,7 +1200,6 @@ Status NewCatalog::GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begi
         return status;
     }
 
-    version_buffer->Load();
     std::shared_ptr<BlockLock> block_lock;
     {
         status = block_meta.GetBlockLock(block_lock);

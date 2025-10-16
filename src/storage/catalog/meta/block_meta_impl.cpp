@@ -176,11 +176,11 @@ std::tuple<FileWorker *, Status> BlockMeta::GetVersionBuffer() {
 
         // Get block directory without acquiring lock again (avoid recursive lock)
         if (block_dir_ == nullptr) {
-            TableMeta &table_meta = segment_meta_.table_meta();
+            auto &table_meta = segment_meta_.table_meta();
             block_dir_ = std::make_shared<std::string>(
                 fmt::format("db_{}/tbl_{}/seg_{}/blk_{}", table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_));
         }
-        std::string version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ + "/" + std::string(BlockVersion::PATH);
+        auto version_filepath = fmt::format("{}/{}/{}", InfinityContext::instance().config()->DataDir(), *block_dir_, BlockVersion::PATH);
         version_buffer_ = fileworker_mgr->GetFileWorker(version_filepath);
         if (version_buffer_ == nullptr) {
             auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();

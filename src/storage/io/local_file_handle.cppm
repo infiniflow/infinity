@@ -25,11 +25,7 @@ export enum class FileAccessMode { kWrite, kRead, kMmapRead, kInvalid };
 
 export class LocalFileHandle {
 public:
-    LocalFileHandle(i32 fd, const std::string &path, FileAccessMode file_access_mode) : fd_(fd), path_(path), access_mode_(file_access_mode) {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount("LocalFileHandle");
-#endif
-    }
+    LocalFileHandle(i32 fd, const std::string &path, FileAccessMode file_access_mode) : fd_(fd), path_(path), access_mode_(file_access_mode) {}
     ~LocalFileHandle();
 
     Status Append(const void *buffer, u64 nbytes);

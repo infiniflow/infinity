@@ -84,7 +84,6 @@ bool VarFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
 
 void VarFileWorker::Read(size_t file_size, bool from_spill) {
     if (!mmap_true_) {
-        std::println("fuck the branch: read VarFile: {}", *data_dir_);
         // if (file_size < buffer_size_) {
         //     UnrecoverableError(fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_));
         // } else {

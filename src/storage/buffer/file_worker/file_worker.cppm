@@ -89,6 +89,7 @@ protected:
     std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> GetFilePathInner(bool spill);
 
 public:
+    std::mutex l_;
     std::shared_ptr<std::string> data_dir_;
     const std::shared_ptr<std::string> temp_dir_;
     std::shared_ptr<std::string> file_dir_;
