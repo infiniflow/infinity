@@ -31,12 +31,7 @@ import third_party;
 
 namespace infinity {
 
-RawFileWorker::RawFileWorker(std::shared_ptr<std::string> data_dir,
-                             std::shared_ptr<std::string> temp_dir,
-                             std::shared_ptr<std::string> file_dir,
-                             std::shared_ptr<std::string> file_name,
-                             u32 file_size)
-    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name)), buffer_size_(file_size) {
+RawFileWorker::RawFileWorker(std::shared_ptr<std::string> file_path, u32 file_size) : FileWorker(std::move(file_path)), buffer_size_(file_size) {
     RawFileWorker::AllocateInMemory();
 }
 
@@ -74,15 +69,12 @@ bool RawFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     return true;
 }
 
-void RawFileWorker::Read(size_t file_size, bool from_spill) {
+void RawFileWorker::Read(size_t file_size) {
     if (!mmap_true_) {
         buffer_size_ = file_handle_->FileSize();
         FreeInMemory();
         data_ = static_cast<void *>(new char[buffer_size_]);
         auto fd = file_handle_->fd();
-        if (file_handle_ == nullptr) {
-            std::println("kkkkkkkk");
-        }
         auto [nbytes, status1] = file_handle_->Read(data_, buffer_size_);
 
         mmap_true_size_ = buffer_size_;

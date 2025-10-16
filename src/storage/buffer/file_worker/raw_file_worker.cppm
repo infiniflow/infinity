@@ -26,11 +26,7 @@ namespace infinity {
 // - The file size is consistant since creation.
 export class RawFileWorker : public FileWorker {
 public:
-    explicit RawFileWorker(std::shared_ptr<std::string> data_dir,
-                           std::shared_ptr<std::string> temp_dir,
-                           std::shared_ptr<std::string> file_dir,
-                           std::shared_ptr<std::string> file_name,
-                           u32 file_size);
+    explicit RawFileWorker(std::shared_ptr<std::string> file_path, u32 file_size);
 
     virtual ~RawFileWorker() override;
 
@@ -44,7 +40,7 @@ public:
 protected:
     bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void Read(size_t file_size, bool from_spill) override;
+    void Read(size_t file_size) override;
 
 private:
     size_t buffer_size_;

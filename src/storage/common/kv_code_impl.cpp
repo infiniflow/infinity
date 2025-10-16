@@ -317,7 +317,7 @@ std::string KeyEncode::PMObjectPrefix() { return "pm|object|"; }
 
 std::string KeyEncode::PMObjectStatPrefix() { return "pm|object_stat|"; }
 
-std::string KeyEncode::PMObjectKey(const std::string &key) { return fmt::format("pm|object|{}", key); }
+std::string KeyEncode::PMObjectKey(std::string_view key) { return fmt::format("pm|object|{}", key); }
 
 std::string KeyEncode::PMObjectStatKey(const std::string &key) { return fmt::format("pm|object_stat|{}", key); }
 

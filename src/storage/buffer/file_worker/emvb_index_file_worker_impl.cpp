@@ -88,7 +88,7 @@ bool EMVBIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &
     return true;
 }
 
-void EMVBIndexFileWorker::Read(size_t file_size, bool from_spill) {
+void EMVBIndexFileWorker::Read(size_t file_size) {
     // if (data_) {
     //     UnrecoverableError("Data is already allocated.");
     // }

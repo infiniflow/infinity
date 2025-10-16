@@ -151,10 +151,14 @@ std::unique_ptr<StreamReader> VirtualStore::OpenStreamReader(const std::string &
 }
 
 // For local disk filesystem, such as temp file, disk cache and WAL
-bool VirtualStore::Exists(const std::string &path) {
+bool VirtualStore::Exists(std::string_view path, bool is_v2) {
+    auto persistence_manager = InfinityContext::instance().storage()->persistence_manager();
+    if (is_v2 && persistence_manager) {
+        return persistence_manager->GetObjCache(path).obj_addr_.Valid();
+    }
     std::error_code error_code;
-    fs::path p{path};
-    bool is_exists = std::filesystem::exists(p, error_code);
+    // fs::path p{path};
+    bool is_exists = std::filesystem::exists(path, error_code);
     if (error_code.value() == 0) {
         return is_exists;
     } else {
@@ -168,12 +172,11 @@ Status VirtualStore::DeleteFile(const std::string &file_name) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", file_name));
     }
     std::error_code error_code;
-    fs::path p{file_name};
-    if (!Exists(p)) {
+    if (!Exists(file_name)) {
         LOG_WARN(fmt::format("The {} to be deleted does not exists ", file_name));
         return Status::OK();
     }
-    bool is_deleted = std::filesystem::remove(p, error_code);
+    bool is_deleted = std::filesystem::remove(file_name, error_code);
     if (error_code.value() != 0) {
         UnrecoverableError(fmt::format("Delete file {} exception: {}", file_name, strerror(errno)));
     }

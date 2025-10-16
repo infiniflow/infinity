@@ -31,12 +31,8 @@ import third_party;
 
 namespace infinity {
 
-VersionFileWorker::VersionFileWorker(std::shared_ptr<std::string> data_dir,
-                                     std::shared_ptr<std::string> temp_dir,
-                                     std::shared_ptr<std::string> file_dir,
-                                     std::shared_ptr<std::string> file_name,
-                                     size_t capacity)
-    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name)), capacity_(capacity) {
+VersionFileWorker::VersionFileWorker(std::shared_ptr<std::string> file_path, size_t capacity)
+    : FileWorker(std::move(file_path)), capacity_(capacity) {
     VersionFileWorker::AllocateInMemory();
     // ReadFromFile(true);
 }
@@ -80,7 +76,7 @@ bool VersionFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ba
     return false;
 }
 
-void VersionFileWorker::Read(size_t file_size, bool from_spill) {
+void VersionFileWorker::Read(size_t file_size) {
     // if (data_ != nullptr) {
     //     UnrecoverableError("Data is already allocated.");
     // }

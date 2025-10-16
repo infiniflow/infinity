@@ -29,10 +29,7 @@ namespace infinity {
 
 export class BMPIndexFileWorker final : public IndexFileWorker {
 public:
-    explicit BMPIndexFileWorker(std::shared_ptr<std::string> data_dir,
-                                std::shared_ptr<std::string> temp_dir,
-                                std::shared_ptr<std::string> file_dir,
-                                std::shared_ptr<std::string> file_name,
+    explicit BMPIndexFileWorker(std::shared_ptr<std::string> file_path,
                                 std::shared_ptr<IndexBase> index_base,
                                 std::shared_ptr<ColumnDef> column_def,
                                 size_t index_size = 0);
@@ -49,7 +46,7 @@ public:
 protected:
     bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void Read(size_t file_size, bool from_spill) override;
+    void Read(size_t file_size) override;
 
 private:
     size_t index_size_{};

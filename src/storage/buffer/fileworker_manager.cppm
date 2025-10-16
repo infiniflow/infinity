@@ -41,9 +41,6 @@ public:
 
     FileWorker *EmplaceFileWorkerTemp(std::unique_ptr<FileWorker> file_worker);
 
-    // Get an existing BufferHandle from memory or disk.
-    // FileWorker *GetFileWorker(std::unique_ptr<FileWorker> file_worker, bool restart = false);
-
     FileWorker *GetFileWorker(const std::string &file_path);
 
     std::shared_ptr<std::string> GetFullDataDir() const { return data_dir_; }
@@ -56,9 +53,7 @@ public:
 
     void RemoveBufferObjects(const std::vector<std::string> &object_paths);
 
-    // std::vector<BufferObjectInfo> GetBufferObjectsInfo();
-
-    inline PersistenceManager *persistence_manager() const { return persistence_manager_; }
+    // inline PersistenceManager *persistence_manager() const { return persistence_manager_; }
 
 private:
     void AddToCleanList(FileWorker *fileworker);
@@ -72,9 +67,9 @@ private:
     std::unordered_map<std::string, std::unique_ptr<FileWorker>> fileworker_map_;
     std::atomic<u32> buffer_id_{};
 
-    std::mutex gc_locker_{};
+    std::mutex gc_locker_;
 
-    std::mutex clean_locker_{};
+    std::mutex clean_locker_;
     std::vector<FileWorker *> clean_list_{};
 
     std::mutex temp_locker_{};

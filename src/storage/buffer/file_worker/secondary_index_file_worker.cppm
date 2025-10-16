@@ -29,20 +29,11 @@ namespace infinity {
 // pgm index
 export class SecondaryIndexFileWorker final : public IndexFileWorker {
 public:
-    explicit SecondaryIndexFileWorker(std::shared_ptr<std::string> data_dir,
-                                      std::shared_ptr<std::string> temp_dir,
-                                      std::shared_ptr<std::string> file_dir,
-                                      std::shared_ptr<std::string> file_name,
+    explicit SecondaryIndexFileWorker(std::shared_ptr<std::string> file_path,
                                       std::shared_ptr<IndexBase> index_base,
                                       std::shared_ptr<ColumnDef> column_def,
                                       u32 row_count)
-        : IndexFileWorker(std::move(data_dir),
-                          std::move(temp_dir),
-                          std::move(file_dir),
-                          std::move(file_name),
-                          std::move(index_base),
-                          std::move(column_def)),
-          row_count_(row_count) {
+        : IndexFileWorker(std::move(file_path), std::move(index_base), std::move(column_def)), row_count_(row_count) {
         AllocateInMemory();
     }
 
@@ -57,7 +48,7 @@ public:
 protected:
     bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void Read(size_t file_size, bool from_spill) override;
+    void Read(size_t file_size) override;
 
     const u32 row_count_{};
 };

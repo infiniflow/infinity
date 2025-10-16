@@ -71,7 +71,7 @@ bool SecondaryIndexFileWorker::Write(bool &prepare_success, const FileWorkerSave
     return true;
 }
 
-void SecondaryIndexFileWorker::Read(size_t file_size, bool from_spill) {
+void SecondaryIndexFileWorker::Read(size_t file_size) {
     // if (!data_) [[likely]] {
         auto index = GetSecondaryIndexData(column_def_->type(), row_count_, false);
         index->ReadIndexInner(*file_handle_);

@@ -53,28 +53,24 @@ Status ColumnMeta::InitSet(const std::shared_ptr<ColumnDef> &col_def) {
     std::shared_ptr<std::string> block_dir_ptr = block_meta_.GetBlockDir();
     FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     {
-        auto filename = std::make_shared<std::string>(fmt::format("{}.col", column_id));
+        auto filename = fmt::format("{}.col", column_id);
         size_t total_data_size = 0;
         if (col_def->type()->type() == LogicalType::kBoolean) {
             total_data_size = (block_meta_.block_capacity() + 7) / 8;
         } else {
             total_data_size = block_meta_.block_capacity() * col_def->type()->Size();
         }
-        auto file_worker = std::make_unique<DataFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
-                                                            std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                                                            block_dir_ptr,
-                                                            filename,
-                                                            total_data_size);
+        auto file_path =
+            std::make_shared<std::string>(fmt::format("{}/{}/{}", InfinityContext::instance().config()->TempDir(), *block_dir_ptr, filename));
+        auto file_worker = std::make_unique<DataFileWorker>(file_path, total_data_size);
         column_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(file_worker));
     }
     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
     if (buffer_type == VectorBufferType::kVarBuffer) {
-        auto filename = std::make_shared<std::string>(fmt::format("col_{}_out", column_id));
-        auto outline_file_worker = std::make_unique<VarFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
-                                                                   std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                                                                   block_dir_ptr,
-                                                                   filename,
-                                                                   0 /*buffer_size*/);
+        auto filename = fmt::format("col_{}_out", column_id);
+        auto file_path =
+            std::make_shared<std::string>(fmt::format("{}/{}/{}", InfinityContext::instance().config()->TempDir(), *block_dir_ptr, filename));
+        auto outline_file_worker = std::make_unique<VarFileWorker>(file_path, 0 /*buffer_size*/);
         outline_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(outline_file_worker));
     }
     return Status::OK();
@@ -95,31 +91,26 @@ Status ColumnMeta::LoadSet() {
     auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     std::shared_ptr<std::string> block_dir_ptr = block_meta_.GetBlockDir();
     {
-        auto filename = std::make_shared<std::string>(fmt::format("{}.col", col_def->id()));
+        auto filename = fmt::format("{}.col", col_def->id());
         size_t total_data_size = 0;
         if (col_def->type()->type() == LogicalType::kBoolean) {
             total_data_size = (block_meta_.block_capacity() + 7) / 8;
         } else {
             total_data_size = block_meta_.block_capacity() * col_def->type()->Size();
         }
-        auto file_worker = std::make_unique<DataFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
-                                                            std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                                                            block_dir_ptr,
-                                                            filename,
-                                                            total_data_size);
+        auto file_path =
+            std::make_shared<std::string>(fmt::format("{}/{}/{}", InfinityContext::instance().config()->TempDir(), *block_dir_ptr, filename));
+        auto file_worker = std::make_unique<DataFileWorker>(file_path, total_data_size);
         column_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(file_worker));
     }
     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
     if (buffer_type == VectorBufferType::kVarBuffer) {
-        auto filename = std::make_shared<std::string>(fmt::format("col_{}_out", col_def->id()));
+        auto filename = fmt::format("col_{}_out", col_def->id());
 
         size_t chunk_offset = 0;
-
-        auto outline_file_worker = std::make_unique<VarFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
-                                                                   std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                                                                   block_dir_ptr,
-                                                                   filename,
-                                                                   chunk_offset);
+        auto file_path =
+            std::make_shared<std::string>(fmt::format("{}/{}/{}", InfinityContext::instance().config()->TempDir(), *block_dir_ptr, filename));
+        auto outline_file_worker = std::make_unique<VarFileWorker>(file_path, chunk_offset);
         outline_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(outline_file_worker));
     }
     return Status::OK();
@@ -131,18 +122,16 @@ Status ColumnMeta::RestoreSet(const ColumnDef *column_def) {
     auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     std::shared_ptr<std::string> block_dir_ptr = block_meta_.GetBlockDir();
     {
-        auto filename = std::make_shared<std::string>(fmt::format("{}.col", column_def->id()));
+        auto filename = fmt::format("{}.col", column_def->id());
         size_t total_data_size = 0;
         if (column_def->type()->type() == LogicalType::kBoolean) {
             total_data_size = (block_meta_.block_capacity() + 7) / 8;
         } else {
             total_data_size = block_meta_.block_capacity() * column_def->type()->Size();
         }
-        auto file_worker = std::make_unique<DataFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
-                                                            std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                                                            block_dir_ptr,
-                                                            filename,
-                                                            total_data_size);
+        auto file_path =
+            std::make_shared<std::string>(fmt::format("{}/{}/{}", InfinityContext::instance().config()->TempDir(), *block_dir_ptr, filename));
+        auto file_worker = std::make_unique<DataFileWorker>(file_path, total_data_size);
         auto *buffer_obj = fileworker_mgr->GetFileWorker(file_worker->GetFilePath());
         if (buffer_obj == nullptr) {
             column_buffer_ = file_worker.get();
@@ -153,15 +142,13 @@ Status ColumnMeta::RestoreSet(const ColumnDef *column_def) {
     }
     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*column_def->type());
     if (buffer_type == VectorBufferType::kVarBuffer) {
-        auto filename = std::make_shared<std::string>(fmt::format("col_{}_out", column_def->id()));
+        auto filename = fmt::format("col_{}_out", column_def->id());
 
         // check if 0 is the right buffer size
         // follow loadset
-        auto outline_file_worker = std::make_unique<VarFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
-                                                                   std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                                                                   block_dir_ptr,
-                                                                   filename,
-                                                                   0 /*buffer_size*/);
+        auto file_path =
+            std::make_shared<std::string>(fmt::format("{}/{}/{}", InfinityContext::instance().config()->TempDir(), *block_dir_ptr, filename));
+        auto outline_file_worker = std::make_unique<VarFileWorker>(file_path, 0 /*buffer_size*/);
         auto *buffer_obj = fileworker_mgr->GetFileWorker(outline_file_worker->GetFilePath());
         if (buffer_obj == nullptr) {
             outline_buffer_ = outline_file_worker.get();

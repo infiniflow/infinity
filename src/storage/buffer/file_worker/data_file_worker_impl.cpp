@@ -33,12 +33,8 @@ import serialize;
 
 namespace infinity {
 
-DataFileWorker::DataFileWorker(std::shared_ptr<std::string> data_dir,
-                               std::shared_ptr<std::string> temp_dir,
-                               std::shared_ptr<std::string> file_dir,
-                               std::shared_ptr<std::string> file_name,
-                               size_t buffer_size)
-    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name)), buffer_size_(buffer_size) {
+DataFileWorker::DataFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_size)
+    : FileWorker(std::move(file_path)), buffer_size_(buffer_size) {
     DataFileWorker::AllocateInMemory();
     // [[maybe_unused]] bool foo = WriteToFile(false, {});
     // ReadFromFile(true);
@@ -119,7 +115,7 @@ bool DataFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) 
     return true;
 }
 
-void DataFileWorker::Read(size_t file_size, bool from_spill) {
+void DataFileWorker::Read(size_t file_size) {
     if (!mmap_true_) {
         if (file_size < sizeof(u64) * 3) {
             Status status = Status::DataIOError(fmt::format("Incorrect file length {}.", file_size));

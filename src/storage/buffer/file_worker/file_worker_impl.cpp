@@ -39,16 +39,9 @@ import global_resource_usage;
 
 namespace infinity {
 
-FileWorker::FileWorker(std::shared_ptr<std::string> data_dir,
-                       std::shared_ptr<std::string> temp_dir,
-                       std::shared_ptr<std::string> file_dir,
-                       std::shared_ptr<std::string> file_name)
-    : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), file_dir_(std::move(file_dir)), file_name_(std::move(file_name)) {
+FileWorker::FileWorker(std::shared_ptr<std::string> file_path) : file_path_(std::move(file_path)) {
     mmap_true_ = nullptr;
-    if (std::filesystem::path(*file_dir_).is_absolute()) {
-        persistence_manager_ = InfinityContext::instance().storage()->persistence_manager();
-        UnrecoverableError(fmt::format("File directory {} is an absolute path.", *file_dir_));
-    }
+    persistence_manager_ = InfinityContext::instance().storage()->persistence_manager();
 }
 
 FileWorker::~FileWorker() {}
@@ -58,16 +51,7 @@ bool FileWorker::Write(const FileWorkerSaveCtx &ctx) {
         UnrecoverableError("No data will be written.");
     }
 
-    std::string write_dir = ChooseFileDir(true /* is_temp */);
-    if (!VirtualStore::Exists(write_dir)) {
-        VirtualStore::MakeDirectory(write_dir);
-    }
-    std::string write_path = fmt::format("{}/{}", write_dir, *file_name_);
-    if (write_path.find("/var/infinity/data/") != std::string::npos) {
-        std::println("asdasdasdasdasdasdasdasdasdasd");
-    }
-
-    auto [file_handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
+    auto [file_handle, status] = VirtualStore::Open(*file_path_, FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -82,14 +66,13 @@ bool FileWorker::Write(const FileWorkerSaveCtx &ctx) {
     return all_save;
 }
 
-void FileWorker::Read([[maybe_unused]] bool is_temp) {
-    auto [defer_fn, read_path] = GetFilePathInner(is_temp);
-    bool use_object_cache = !is_temp && persistence_manager_ != nullptr;
+void FileWorker::Read() {
+    auto read_path = *file_path_;
+    bool use_object_cache = persistence_manager_ != nullptr;
     size_t file_size = 0;
     auto [file_handle, status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
     if (!status.ok()) {
         return;
-        UnrecoverableError(fmt::format("Read path: {}, error: {}", read_path, status.message()));
     }
     if (use_object_cache) {
         file_handle->Seek(obj_addr_.part_offset_);
@@ -99,34 +82,26 @@ void FileWorker::Read([[maybe_unused]] bool is_temp) {
     }
     file_handle_ = std::move(file_handle);
     DeferFn defer_fn2([&]() { file_handle_ = nullptr; });
-    Read(file_size, is_temp);
+    Read(file_size);
 }
 
 void FileWorker::MoveFile() {
-    std::string src_path = fmt::format("/var/infinity/tmp/{}/{}", *file_dir_, *file_name_);
     std::string dest_dir = ChooseFileDir(false);
     std::string dest_path = fmt::format("{}/{}", dest_dir, *file_name_);
     if (persistence_manager_ == nullptr) {
-        if (!VirtualStore::Exists(src_path)) {
+        if (!VirtualStore::Exists(*file_path_)) {
             return;
-            // Status status = Status::FileNotFound(src_path);
-            // RecoverableError(status);
         }
         if (!VirtualStore::Exists(dest_dir)) {
             VirtualStore::MakeDirectory(dest_dir);
         }
-        // if (fs.Exists(dest_path)) {
-        //     UnrecoverableError(fmt::format("File {} was already been created before.", dest_path));
-        // }
-        VirtualStore::Rename(src_path, dest_path);
+        VirtualStore::Rename(*file_path_, dest_path);
     } else {
         PersistResultHandler handler(persistence_manager_);
-        if (!VirtualStore::Exists(src_path)) {
+        if (!VirtualStore::Exists(*file_path_)) {
             return;
-            // Status status = Status::FileNotFound(src_path);
-            // RecoverableError(status);
         }
-        PersistWriteResult persist_result = persistence_manager_->Persist(dest_path, src_path);
+        PersistWriteResult persist_result = persistence_manager_->Persist(dest_path, *file_path_);
         handler.HandleWriteResult(persist_result);
 
         obj_addr_ = persist_result.obj_addr_;
@@ -135,16 +110,8 @@ void FileWorker::MoveFile() {
 
 void FileWorker::Load() {
     std::unique_lock<std::mutex> locker(l_); // lockl?
-    std::string path1 = std::filesystem::path(*data_dir_) / *file_dir_ / *file_name_;
-    std::string path2 = std::filesystem::path(*temp_dir_) / *file_dir_ / *file_name_;
-    if (VirtualStore::Exists(path2)) {
+    if (VirtualStore::Exists(*file_path_)) {
         Read(true);
-    } else {
-        if (persistence_manager_ && persistence_manager_->GetObjCache(path1).obj_addr_.Valid()) {
-            Read(false);
-        } else if (VirtualStore::Exists(path1)) {
-            Read(false);
-        }
     }
 }
 

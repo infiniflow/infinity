@@ -109,13 +109,13 @@ PersistenceManager::~PersistenceManager() {
 #endif
 }
 
-PersistWriteResult PersistenceManager::Persist(const std::string &file_path, const std::string &tmp_file_path, bool try_compose) {
-     PersistWriteResult result;
+PersistWriteResult PersistenceManager::Persist(std::string_view file_path, std::string_view tmp_file_path, bool try_compose) {
+    PersistWriteResult result;
 
     std::error_code ec;
     fs::path src_fp = tmp_file_path;
 
-    std::string local_path = RemovePrefix(file_path);
+    auto local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
         UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
     }
@@ -293,10 +293,10 @@ void PersistenceManager::CurrentObjFinalizeNoLock(std::vector<std::string> &pers
     }
 }
 
-PersistReadResult PersistenceManager::GetObjCache(const std::string &file_path) {
+PersistReadResult PersistenceManager::GetObjCache(std::string_view file_path) {
     PersistReadResult result;
 
-    std::string local_path = RemovePrefix(file_path);
+    std::string_view local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
         // UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
         return result;
@@ -354,10 +354,10 @@ std::tuple<size_t, Status> PersistenceManager::GetDirectorySize(const std::strin
     return {total_size, Status::OK()};
 }
 
-std::tuple<size_t, Status> PersistenceManager::GetFileSize(const std::string &file_path) {
+std::tuple<size_t, Status> PersistenceManager::GetFileSize(std::string_view file_path) {
     PersistReadResult result;
 
-    std::string local_path = RemovePrefix(file_path);
+    auto local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
         UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
     }
@@ -373,8 +373,8 @@ std::tuple<size_t, Status> PersistenceManager::GetFileSize(const std::string &fi
     return {obj_addr.part_size_, Status::OK()};
 }
 
-ObjAddr PersistenceManager::GetObjCacheWithoutCnt(const std::string &local_path) {
-    std::string lock_path = RemovePrefix(local_path);
+ObjAddr PersistenceManager::GetObjCacheWithoutCnt(std::string_view local_path) {
+    auto lock_path = RemovePrefix(local_path);
     if (lock_path.empty()) {
         UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
     }
@@ -391,9 +391,9 @@ ObjAddr PersistenceManager::GetObjCacheWithoutCnt(const std::string &local_path)
     return obj_addr;
 }
 
-PersistWriteResult PersistenceManager::PutObjCache(const std::string &file_path) {
+PersistWriteResult PersistenceManager::PutObjCache(std::string_view file_path) {
     PersistWriteResult result;
-    std::string local_path = RemovePrefix(file_path);
+    auto local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
         UnrecoverableError(fmt::format("Failed to find file path of {}", file_path));
     }
@@ -431,7 +431,7 @@ std::string PersistenceManager::ObjCreate() { return UUID().to_string(); }
 
 int PersistenceManager::CurrentObjRoomNoLock() { return int(object_size_limit_) - int(current_object_size_); }
 
-void PersistenceManager::CurrentObjAppendNoLock(const std::string &tmp_file_path, size_t file_size) {
+void PersistenceManager::CurrentObjAppendNoLock(std::string_view tmp_file_path, size_t file_size) {
     fs::path src_fp = tmp_file_path;
     fs::path dst_fp = fs::path(workspace_) / current_object_key_;
 
@@ -589,7 +589,7 @@ void PersistenceManager::SaveObjStat(const std::string &obj_key, const std::shar
     object_stats_->PutNoCount(obj_key, obj_stat);
 }
 
-void PersistenceManager::AddObjAddrToKVStore(const std::string &path, const ObjAddr &obj_addr) {
+void PersistenceManager::AddObjAddrToKVStore(std::string_view path, const ObjAddr &obj_addr) {
     std::string key = KeyEncode::PMObjectKey(RemovePrefix(path));
     std::string value = obj_addr.Serialize().dump();
     Status status = kv_store_->Put(key, value, false);
@@ -598,21 +598,20 @@ void PersistenceManager::AddObjAddrToKVStore(const std::string &path, const ObjA
     }
 }
 
-std::string PersistenceManager::RemovePrefix(const std::string &path) {
+std::string_view PersistenceManager::RemovePrefix(std::string_view path) {
     if (path.starts_with(local_data_dir_)) {
         return path.substr(local_data_dir_.length());
     }
     if (!path.starts_with("/")) {
         return path;
     }
-    // return "";
     return path;
 }
 
-PersistWriteResult PersistenceManager::Cleanup(const std::string &file_path) {
+PersistWriteResult PersistenceManager::Cleanup(std::string_view file_path) {
     PersistWriteResult result;
 
-    std::string local_path = RemovePrefix(file_path);
+    auto local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
         // UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
         return result;

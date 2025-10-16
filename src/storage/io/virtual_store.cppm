@@ -54,7 +54,7 @@ public:
     static std::tuple<std::unique_ptr<LocalFileHandle>, Status> Open(const std::string &path, FileAccessMode access_mode);
     static std::unique_ptr<StreamReader> OpenStreamReader(const std::string &path);
     static bool IsRegularFile(const std::string &path);
-    static bool Exists(const std::string &path);
+    static bool Exists(std::string_view path, bool is_v2 = false);
     static Status DeleteFile(const std::string &path);
     static Status DeleteFileBG(const std::string &path);
     static Status MakeDirectory(const std::string &path);

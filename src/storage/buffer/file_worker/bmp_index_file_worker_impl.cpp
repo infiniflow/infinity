@@ -34,19 +34,11 @@ import internal_types;
 
 namespace infinity {
 
-BMPIndexFileWorker::BMPIndexFileWorker(std::shared_ptr<std::string> data_dir,
-                                       std::shared_ptr<std::string> temp_dir,
-                                       std::shared_ptr<std::string> file_dir,
-                                       std::shared_ptr<std::string> file_name,
+BMPIndexFileWorker::BMPIndexFileWorker(std::shared_ptr<std::string> file_path,
                                        std::shared_ptr<IndexBase> index_base,
                                        std::shared_ptr<ColumnDef> column_def,
                                        size_t index_size)
-    : IndexFileWorker(std::move(data_dir),
-                      std::move(temp_dir),
-                      std::move(file_dir),
-                      std::move(file_name),
-                      std::move(index_base),
-                      std::move(column_def)) {
+    : IndexFileWorker(std::move(file_path), std::move(index_base), std::move(column_def)) {
     if (index_size == 0) {
         std::string index_path = GetFilePath();
         auto [file_handle, status] = VirtualStore::Open(index_path, FileAccessMode::kRead);
@@ -103,7 +95,7 @@ bool BMPIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &c
     return true;
 }
 
-void BMPIndexFileWorker::Read(size_t file_size, bool from_spill) {
+void BMPIndexFileWorker::Read(size_t file_size) {
     // if (data_ != nullptr) {
     //     UnrecoverableError("Data is already allocated.");
     // }

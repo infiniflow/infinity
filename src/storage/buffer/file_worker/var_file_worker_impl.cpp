@@ -31,12 +31,7 @@ import third_party;
 
 namespace infinity {
 
-VarFileWorker::VarFileWorker(std::shared_ptr<std::string> data_dir,
-                             std::shared_ptr<std::string> temp_dir,
-                             std::shared_ptr<std::string> file_dir,
-                             std::shared_ptr<std::string> file_name,
-                             size_t buffer_size)
-    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name)) {
+VarFileWorker::VarFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_size) : FileWorker(std::move(file_path)) {
     VarFileWorker::AllocateInMemory();
 }
 
@@ -82,12 +77,12 @@ bool VarFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     return true;
 }
 
-void VarFileWorker::Read(size_t file_size, bool from_spill) {
+void VarFileWorker::Read(size_t file_size) {
     if (!mmap_true_) {
         // if (file_size < buffer_size_) {
         //     UnrecoverableError(fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_));
         // } else {
-            size_t buffer_size = file_size;
+        size_t buffer_size = file_size;
         // }
 
         auto buffer = std::make_unique<char[]>(buffer_size);

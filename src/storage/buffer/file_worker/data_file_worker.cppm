@@ -22,11 +22,7 @@ namespace infinity {
 
 export class DataFileWorker : public FileWorker {
 public:
-    explicit DataFileWorker(std::shared_ptr<std::string> data_dir,
-                            std::shared_ptr<std::string> temp_dir,
-                            std::shared_ptr<std::string> file_dir,
-                            std::shared_ptr<std::string> file_name,
-                            size_t buffer_sizer);
+    explicit DataFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_sizer);
 
     virtual ~DataFileWorker() override;
 
@@ -40,7 +36,7 @@ public:
 protected:
     bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void Read(size_t file_size, bool from_spill) override;
+    void Read(size_t file_size) override;
 
     void SetDataSize(size_t size) override;
 

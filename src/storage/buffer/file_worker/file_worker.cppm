@@ -32,10 +32,7 @@ export struct FileWorkerSaveCtx {};
 export class FileWorker {
 public:
     // spill_dir_ is not init here
-    explicit FileWorker(std::shared_ptr<std::string> data_dir,
-                        std::shared_ptr<std::string> temp_dir,
-                        std::shared_ptr<std::string> file_dir,
-                        std::shared_ptr<std::string> file_name);
+    explicit FileWorker(std::shared_ptr<std::string> file_path);
 
     // No destruct here
     virtual ~FileWorker();
@@ -43,11 +40,9 @@ public:
 public:
     [[nodiscard]] bool Write(const FileWorkerSaveCtx &ctx = {});
 
-    void Read(bool is_temp);
+    void Read();
 
     void Load();
-
-    std::string GetFilename() { return "Dummy"; }
 
     void PickForCleanup() {}
 
@@ -82,7 +77,7 @@ public:
 protected:
     virtual bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
 
-    virtual void Read(size_t file_size, bool from_spill) = 0;
+    virtual void Read(size_t file_size) = 0;
 
     [[nodiscard]] std::string ChooseFileDir(bool is_temp) const;
 
@@ -90,13 +85,10 @@ protected:
 
 public:
     std::mutex l_;
-    std::shared_ptr<std::string> data_dir_;
-    const std::shared_ptr<std::string> temp_dir_;
-    std::shared_ptr<std::string> file_dir_;
-    const std::shared_ptr<std::string> file_name_;
+    std::shared_ptr<std::string> file_path_;
     PersistenceManager *persistence_manager_{};
     ObjAddr obj_addr_;
-    void *mmap_true_{nullptr};
+    void *mmap_true_{};
     size_t mmap_true_size_{};
 
 protected:

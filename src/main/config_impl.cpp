@@ -129,7 +129,7 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
     } else {
         LOG_INFO("No config file is given, use default configs.");
     }
-    if (config_path.get() == nullptr || config_path->empty() || !VirtualStore::Exists(std::filesystem::absolute(*config_path))) {
+    if (config_path.get() == nullptr || config_path->empty() || !VirtualStore::Exists(*config_path)) {
         if (config_path.get() == nullptr || config_path->empty()) {
             fmt::print("No config file is given, use default configs.\n");
         } else {

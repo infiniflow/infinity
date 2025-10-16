@@ -109,7 +109,7 @@ Status FileWorkerManager::RemoveClean(KVInstance *kv_instance) {
     {
         std::unique_lock lock(w_locker_);
         for (auto *fileworker : clean_list) {
-            auto file_path = fileworker->GetFilename();
+            auto file_path = *(fileworker->file_path_);
             [[maybe_unused]] size_t remove_n = fileworker_map_.erase(file_path);
             // if (remove_n != 1) {
             //     UnrecoverableError(fmt::format("FileWorkerManager::RemoveClean: file {} not found.", file_path.c_str()));

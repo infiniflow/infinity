@@ -48,52 +48,6 @@ FileWorker::FileWorker(FileWorkerManager *fileworker_mgr, std::unique_ptr<FileWo
 // #endif
 // }
 
-void FileWorker::UpdateFileWorkerInfo(std::unique_ptr<FileWorker> new_file_worker) {
-    switch (file_worker_->Type()) {
-        case FileWorkerType::kVarFile: {
-            assert(new_file_worker->Type() == FileWorkerType::kVarFile);
-            auto *var_file_worker = static_cast<VarFileWorker *>(file_worker_.get());
-            auto *new_var_file_worker = static_cast<VarFileWorker *>(new_file_worker.get());
-            var_file_worker->SetBufferSize(new_var_file_worker->GetBufferSize());
-            break;
-        }
-        default: {
-            break;
-        }
-    }
-}
-
-FileWorker *FileWorker::Load() {
-    std::unique_lock<std::mutex> locker(w_locker_);
-    // auto path1 = file_worker_->GetFilePath();
-    auto data_dir = file_worker_->data_dir_;
-    auto temp_dir = file_worker_->temp_dir_;
-    auto file_dir = file_worker_->file_dir_;
-    auto file_name = file_worker_->file_name_;
-    std::string path1 = std::filesystem::path(*data_dir) / *file_dir / *file_name;
-    std::string path2 = std::filesystem::path(*temp_dir) / *file_dir / *file_name;
-    if (VirtualStore::Exists(path2)) {
-        file_worker_->Read(true);
-    } else {
-        if (file_worker_->persistence_manager_ && file_worker_->persistence_manager_->GetObjCache(path1).obj_addr_.Valid()) {
-            file_worker_->Read(false);
-        } else if (VirtualStore::Exists(path1)) {
-            file_worker_->Read(false);
-        }
-    }
-    return this;
-}
-
-bool FileWorker::Save(const FileWorkerSaveCtx &ctx) {
-    std::unique_lock<std::mutex> locker(w_locker_);
-    // auto data_dir = file_worker_->data_dir_;
-    auto temp_dir = file_worker_->temp_dir_;
-    auto file_dir = file_worker_->file_dir_;
-    auto file_name = file_worker_->file_name_;
-    std::string path2 = std::filesystem::path(*temp_dir) / *file_dir / *file_name;
-    return file_worker_->Write(ctx);
-}
-
 void FileWorker::PickForCleanup() {
     std::unique_lock<std::mutex> locker(w_locker_);
     buffer_mgr_->AddToCleanList(this);
