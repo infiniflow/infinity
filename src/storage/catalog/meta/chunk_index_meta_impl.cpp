@@ -212,10 +212,6 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
                 index_buffer_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
                 break;
             }
-            case IndexType::kDiskAnn: {
-                LOG_WARN("Not implemented");
-                break;
-            }
             default: {
                 UnrecoverableError("Not implemented yet");
             }

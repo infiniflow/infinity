@@ -148,24 +148,6 @@ export {
     constexpr u32 EMVB_N_DOC_OUT_SECOND_STAGE_FACTOR = 20;
     constexpr f32 EMVB_THRESHOLD_FINAL = 0.0f;
 
-    // default diskann parameter
-    constexpr size_t DISKANN_R = 16;
-    constexpr size_t DISKANN_L = 200;
-    constexpr size_t DISKANN_NUM_PQ_CHUNKS = 4;
-    constexpr size_t DISKANN_NUM_PARTS = 1;
-    constexpr size_t DISKANN_MAX_PQ_CHUNKS = 100;
-    constexpr size_t DISKANN_TRAINING_SET_SIZE = 100000;       // sample rate = data_size/TRAINING_SET_SIZE
-    constexpr f64 DISKANN_SPACE_FOR_CACHED_NODES_IN_GB = 0.25; // cache vector memory in GB
-    constexpr f64 DISKANN_THRESHOLD_FOR_CACHING_IN_GB = 1.0;   //
-    constexpr u32 DISKANN_NUM_NODES_TO_CACHE = 250000;         // cache node num
-    constexpr u32 DISKANN_WARMUP_L = 20;
-    constexpr u32 DISKANN_NUM_KMEANS_REPS = 12;        // max iterations of lloyds kmeans
-    constexpr u32 DISKANN_NUM_CENTERS = 256;           // number of centers for pq chunk
-    constexpr f32 DISKANN_GRAPH_SLACK_FACTOR = 1.3f;   // In-mem index reserve factor
-    constexpr size_t DISKANN_MAX_GRAPH_DEGREE = 512;   // SSD index max degree
-    constexpr size_t DISKANN_SECTOR_LEN = 4096u;       // SSD index sector size
-    constexpr size_t DISKANN_MAX_N_SECTOR_READS = 128; // SSD index max sector reads
-
     // default hnsw parameter
     constexpr size_t HNSW_M = 16;
     constexpr size_t HNSW_EF_CONSTRUCTION = 200;

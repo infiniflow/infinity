@@ -222,8 +222,7 @@ struct IndexType {
     FullText = 2,
     BMP = 3,
     Secondary = 4,
-    EMVB = 5,
-    DiskAnn = 6
+    EMVB = 5
   };
 };
 

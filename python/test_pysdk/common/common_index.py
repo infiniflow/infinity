@@ -13,7 +13,6 @@ class IndexType(Enum):
     Secondary = 4
     EMVB = 5
     BMP = 6
-    DiskAnn = 7
 
     def to_ttype(self):
         from infinity.common import InfinityException
@@ -30,8 +29,6 @@ class IndexType(Enum):
                 return ttypes.IndexType.EMVB
             case IndexType.BMP:
                 return ttypes.IndexType.BMP
-            case IndexType.DiskAnn:
-                return ttypes.IndexType.DiskAnn
             case _:
                 raise InfinityException(ErrorCode.INVALID_INDEX_TYPE, "Unknown index type")
 
@@ -51,8 +48,6 @@ class IndexType(Enum):
                 return LocalIndexType.kEMVB
             case IndexType.BMP:
                 return LocalIndexType.kBMP
-            case IndexType.DiskAnn:
-                return LocalIndexType.kDiskAnn
             case _:
                 raise InfinityException(ErrorCode.INVALID_INDEX_TYPE, "Unknown index type")
 

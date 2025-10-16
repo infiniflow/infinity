@@ -234,8 +234,6 @@ public:
 
     static Status MemIndexRecover(NewTxn *txn);
 
-    static Status MemIndexCommit(NewTxn *txn);
-
     static Status GetAllMemIndexes(NewTxn *txn, std::vector<std::shared_ptr<MemIndex>> &mem_indexes, std::vector<MemIndexID> &mem_index_ids);
 
     static Status AddNewDB(NewTxn *txn,
@@ -286,9 +284,6 @@ public:
 
     static Status
     AddNewBlockColumn(BlockMeta &block_meta, size_t column_idx, const std::shared_ptr<ColumnDef> &column_def, std::optional<ColumnMeta> &column_meta);
-
-    static Status
-    AddNewBlockColumnForTransform(BlockMeta &block_meta, size_t column_idx, std::optional<ColumnMeta> &column_meta, TxnTimeStamp commit_ts);
 
     static Status CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag);
 

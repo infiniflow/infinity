@@ -51,14 +51,6 @@ import column_def;
 
 namespace infinity {
 
-WalManager::WalManager(Storage *storage, std::string wal_dir, u64 wal_size_threshold, FlushOptionType flush_option)
-    : cfg_wal_size_threshold_(wal_size_threshold), wal_dir_(wal_dir), wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), storage_(storage),
-      running_(false), flush_option_(flush_option), last_ckp_wal_size_(0), checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS) {
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount("WalManager");
-#endif
-}
-
 WalManager::WalManager(Storage *storage, std::string wal_dir, std::string data_dir, u64 wal_size_threshold, FlushOptionType flush_option)
     : cfg_wal_size_threshold_(wal_size_threshold), wal_dir_(wal_dir), wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), data_path_(data_dir),
       storage_(storage), running_(false), flush_option_(flush_option), last_ckp_wal_size_(0), checkpoint_in_progress_(false),

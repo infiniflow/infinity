@@ -934,7 +934,7 @@ static const yytype_int16 yyrline[] =
     3959,  3965,  3971,  3977,  3983,  3989,  4000,  4004,  4009,  4041,
     4051,  4056,  4061,  4066,  4072,  4076,  4077,  4079,  4080,  4082,
     4083,  4095,  4103,  4107,  4110,  4114,  4117,  4121,  4125,  4130,
-    4136,  4146,  4156,  4164,  4175,  4207
+    4136,  4146,  4156,  4164,  4175,  4205
 };
 #endif
 
@@ -9739,8 +9739,6 @@ Return4:
         index_type = infinity::IndexType::kIVF;
     } else if (strcmp((yyvsp[-1].str_value), "emvb") == 0) {
         index_type = infinity::IndexType::kEMVB;
-    } else if(strcmp((yyvsp[-1].str_value), "diskann") == 0){
-        index_type = infinity::IndexType::kDiskAnn;
     } else {
         free((yyvsp[-1].str_value));
         free((yyvsp[-4].str_value));
@@ -9758,11 +9756,11 @@ Return4:
     (yyval.index_info_t)->index_param_list_ = (yyvsp[0].with_index_param_list_t);
     free((yyvsp[-4].str_value));
 }
-#line 9762 "parser.cpp"
+#line 9760 "parser.cpp"
     break;
 
   case 565: /* index_info: '(' IDENTIFIER ')'  */
-#line 4207 "parser.y"
+#line 4205 "parser.y"
                      {
     (yyval.index_info_t) = new infinity::IndexInfo();
     (yyval.index_info_t)->index_type_ = infinity::IndexType::kSecondary;
@@ -9770,11 +9768,11 @@ Return4:
     (yyval.index_info_t)->column_name_ = (yyvsp[-1].str_value);
     free((yyvsp[-1].str_value));
 }
-#line 9774 "parser.cpp"
+#line 9772 "parser.cpp"
     break;
 
 
-#line 9778 "parser.cpp"
+#line 9776 "parser.cpp"
 
       default: break;
     }
@@ -10003,7 +10001,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 4215 "parser.y"
+#line 4213 "parser.y"
 
 
 void

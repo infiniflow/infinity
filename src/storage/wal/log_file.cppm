@@ -38,9 +38,6 @@ public:
     static std::string WalFilename(TxnTimeStamp max_commit_ts);
 
     static std::string TempWalFilename();
-
-    // max_commit_ts is the largest commit ts before the latest checkpoint
-    static void RecycleWalFile(TxnTimeStamp max_commit_ts, const std::string &wal_dir);
 };
 
 } // namespace infinity

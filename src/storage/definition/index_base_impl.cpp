@@ -17,7 +17,6 @@ module infinity_core:index_base.impl;
 import :index_base;
 import :index_ivf;
 import :index_hnsw;
-import :index_diskann;
 import :index_full_text;
 import :index_secondary;
 import :index_emvb;
@@ -143,17 +142,6 @@ std::shared_ptr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes
                                               lsg_config);
             break;
         }
-        case IndexType::kDiskAnn: {
-            MetricType metric_type = ReadBufAdv<MetricType>(ptr);
-            DiskAnnEncodeType encode_type = ReadBufAdv<DiskAnnEncodeType>(ptr);
-            size_t R = ReadBufAdv<size_t>(ptr);
-            size_t L = ReadBufAdv<size_t>(ptr);
-            size_t num_pq_chunks = ReadBufAdv<size_t>(ptr);
-            size_t num_parts = ReadBufAdv<size_t>(ptr);
-            res = std::make_shared<
-                IndexDiskAnn>(index_name, index_comment, file_name, column_names, metric_type, encode_type, R, L, num_pq_chunks, num_parts);
-            break;
-        }
         case IndexType::kFullText: {
             std::string analyzer = ReadBufAdv<std::string>(ptr);
             u8 flag = ReadBufAdv<u8>(ptr);
@@ -268,25 +256,6 @@ std::shared_ptr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str
                                               ef_construction,
                                               block_size,
                                               lsg_config);
-            break;
-        }
-        case IndexType::kDiskAnn: {
-            size_t R = doc["R"].get<size_t>();
-            size_t L = doc["L"].get<size_t>();
-            size_t num_pq_chunks = doc["num_pq_chunks"].get<size_t>();
-            size_t num_parts = doc["num_parts"].get<size_t>();
-            MetricType metric_type = StringToMetricType(doc["metric_type"].get<std::string>());
-            DiskAnnEncodeType encode_type = StringToDiskAnnEncodeType(doc["encode_type"].get<std::string>());
-            res = std::make_shared<IndexDiskAnn>(index_name,
-                                                 index_comment,
-                                                 file_name,
-                                                 std::move(column_names),
-                                                 metric_type,
-                                                 encode_type,
-                                                 R,
-                                                 L,
-                                                 num_pq_chunks,
-                                                 num_parts);
             break;
         }
         case IndexType::kFullText: {

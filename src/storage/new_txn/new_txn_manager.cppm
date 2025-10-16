@@ -63,7 +63,7 @@ public:
 
     TxnTimeStamp GetWriteCommitTS(std::shared_ptr<NewTxn> txn);
 
-    TxnTimeStamp GetCurrentTS();
+    // TxnTimeStamp GetCurrentTS();
 
     // std::optional<std::string> CheckTxnConflict(NewTxn *txn);
 
