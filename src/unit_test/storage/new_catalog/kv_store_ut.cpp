@@ -468,7 +468,6 @@ TEST_F(TestTxnKVStoreTest, kv_store6) {
         status = kv_instance1->Put("loop", "value5");
         EXPECT_TRUE(status.ok());
 
-        //        auto iter2 = kv_instance1->GetIterator("key2", "key4");
         auto iter2 = kv_instance1->GetIterator();
 
         std::string prefix = "";

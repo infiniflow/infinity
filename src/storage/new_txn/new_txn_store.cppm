@@ -47,8 +47,6 @@ public:
 
     Status Delete(const std::vector<RowID> &row_ids);
 
-    void GetAccessState(const std::vector<RowID> &row_ids, AccessState &access_state);
-
     DeleteState &delete_state() const { return *delete_state_; }
     DeleteState &undo_delete_state();
 

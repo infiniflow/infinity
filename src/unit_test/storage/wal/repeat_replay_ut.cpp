@@ -143,7 +143,6 @@ TEST_P(RepeatReplayTest, append) {
             Value v2 = Value::MakeVarchar("v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2");
 
             size_t row_count = 0;
-            // std::tie(row_count, status) = block_meta.GetRowCnt();
             std::tie(row_count, status) = block_meta.GetRowCnt1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(row_count, row_cnt);

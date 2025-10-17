@@ -450,7 +450,6 @@ FullText,
 BMP,
 Secondary,
 EMVB,
-DiskAnn,
 }
 
 struct IndexInfo {

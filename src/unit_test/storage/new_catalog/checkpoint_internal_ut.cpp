@@ -165,7 +165,6 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint0) {
             Value v2 = Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz");
 
             size_t row_count = 0;
-            // std::tie(row_count, status) = block_meta.GetRowCnt();
             std::tie(row_count, status) = block_meta.GetRowCnt1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(row_count, block_row_cnt);

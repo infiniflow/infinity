@@ -272,6 +272,10 @@ TEST_P(TestTxnIndexInternal, test_index0) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
+
+    auto new_catalog = InfinityContext::instance().storage()->new_catalog();
+    new_catalog->GetAllMemIndexInfo();
+
     dump_index(*index_name1);
 
     append_a_block();
@@ -641,6 +645,10 @@ TEST_P(TestTxnIndexInternal, DISABLED_SLOW_test_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
+
+    auto new_catalog = InfinityContext::instance().storage()->new_catalog();
+    new_catalog->GetAllMemIndexInfo();
+
     dump_index(*index_name1);
     dump_index(*index_name2);
     dump_index(*index_name3);

@@ -54,10 +54,6 @@ std::string ToString(BGTaskType type) {
             return "Cleanup";
             break;
         }
-        case BGTaskType::kUpdateSegmentBloomFilterData: {
-            return "UpdateSegmentBloomFilterData";
-            break;
-        }
         case BGTaskType::kDumpMemIndex: {
             return "DumpMemIndex";
             break;

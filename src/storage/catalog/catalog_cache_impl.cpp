@@ -152,159 +152,6 @@ void TableCache::CommitAppendNolock(const std::shared_ptr<AppendPrepareInfo> &ap
     return;
 }
 
-bool TableCache::AllPrepareAreCommittedNolock() const {
-    return prepare_segment_id_ == commit_segment_id_ && prepare_segment_offset_ == commit_segment_offset_;
-}
-
-RowID TableCache::GetCommitPosition() const { return RowID(commit_segment_id_, commit_segment_offset_); }
-
-// Import segments
-std::shared_ptr<ImportPrepareInfo> TableCache::PrepareImportSegmentsNolock(u64 segment_count, TransactionID txn_id) {
-    std::shared_ptr<ImportPrepareInfo> import_prepare_info = std::make_shared<ImportPrepareInfo>();
-    // Get the prepared segment id and insert into the import prepare info
-    for (size_t i = 0; i < segment_count; ++i) {
-        SegmentID segment_id = next_segment_id_;
-        import_prepare_info->segment_ids_.emplace_back(segment_id);
-        ++next_segment_id_;
-    }
-
-    std::vector<SegmentID> &segments = import_prepare_info->segment_ids_;
-
-    // Create index prepare info
-    for (const auto &index_pair : index_cache_map_) {
-        auto index_cache = index_pair.second;
-        CreateIndexPrepareInfo index_prepare_info;
-        index_prepare_info.index_id_ = index_cache->index_id_;
-        index_prepare_info.index_name_ = index_cache->index_name_;
-        index_prepare_info.segment_index_prepare_infos_.reserve(segment_count);
-        for (const SegmentID segment_id : segments) {
-            SegmentIndexPrepareInfo segment_index_prepare_info;
-            segment_index_prepare_info.segment_id_ = segment_id;
-            segment_index_prepare_info.chunk_id_ = 0; // chunk id should be zero
-            // segment_index_prepare_info.row_count_ = 0; // row count should be given in prepare commit phase
-            index_prepare_info.segment_index_prepare_infos_.emplace_back(segment_index_prepare_info);
-        }
-        import_prepare_info->indexes_.emplace_back(index_prepare_info);
-    }
-
-    import_prepare_info_map_.emplace(txn_id, import_prepare_info);
-    return import_prepare_info;
-}
-
-void TableCache::CommitImportSegmentsNolock(const std::shared_ptr<ImportPrepareInfo> &import_prepare_info, TransactionID txn_id) {
-    auto iter = import_prepare_info_map_.find(txn_id);
-    if (iter == import_prepare_info_map_.end()) {
-        UnrecoverableError(fmt::format("Transaction id: {} not found in import prepare info map", txn_id));
-    }
-    import_prepare_info_map_.erase(iter);
-
-    // Commit the segments
-    size_t segment_count = import_prepare_info->segment_ids_.size();
-    for (size_t idx = 0; idx < segment_count; ++idx) {
-        SegmentID segment_id = import_prepare_info->segment_ids_[idx];
-        u64 row_count = import_prepare_info->row_counts_[idx];
-
-        auto iter = segment_cache_map_.find(segment_id);
-        if (iter != segment_cache_map_.end()) {
-            UnrecoverableError(fmt::format("Segment id: {} already exists in segment cache map", segment_id));
-        }
-        std::shared_ptr<SegmentCache> segment_cache = std::make_shared<SegmentCache>(segment_id, row_count);
-        segment_cache->sealed_ = true;
-        segment_cache_map_.emplace(segment_id, segment_cache);
-    }
-
-    // Commit segment index
-    for (const auto &index_prepare_info : import_prepare_info->indexes_) {
-        auto index_iter = index_cache_map_.find(index_prepare_info.index_id_);
-        if (index_iter == index_cache_map_.end()) {
-            UnrecoverableError(fmt::format("Index id: {} not found in index cache map", index_prepare_info.index_id_));
-        }
-        TableIndexCache *index_cache = index_iter->second.get();
-        for (const auto &segment_index_prepare_info : index_prepare_info.segment_index_prepare_infos_) {
-            SegmentID segment_id = segment_index_prepare_info.segment_id_;
-            auto segment_iter = index_cache->segment_index_cache_map_.find(segment_id);
-            if (segment_iter != index_cache->segment_index_cache_map_.end()) {
-                UnrecoverableError(fmt::format("Segment id: {} already exists in segment cache map", segment_id));
-            }
-            auto segment_index_cache = std::make_shared<SegmentIndexCache>(segment_id);
-            segment_index_cache->next_chunk_id_ = segment_index_prepare_info.chunk_id_ + 1;
-            index_cache->segment_index_cache_map_.emplace(segment_id, segment_index_cache);
-            //            std::pair<RowID, u64> range = {RowID(segment_id, 0), segment_index_prepare_info.row_count_};
-            //            segment_index_cache->chunk_row_ranges_.emplace(segment_index_prepare_info.chunk_id_, range);
-        }
-    }
-    return;
-}
-
-// Compact segments
-std::shared_ptr<CompactPrepareInfo> TableCache::PrepareCompactSegmentsNolock(const std::vector<SegmentID> &segment_ids, TransactionID txn_id) {
-    std::shared_ptr<CompactPrepareInfo> compact_prepare_info = std::make_shared<CompactPrepareInfo>();
-    // Get the prepared segment id and insert into the import prepare info
-    compact_prepare_info->new_segment_id_ = next_segment_id_;
-    ++next_segment_id_;
-
-    compact_prepare_info->old_segment_ids_ = segment_ids;
-
-    // Create index prepare info
-    for (const auto &index_pair : index_cache_map_) {
-        auto index_cache = index_pair.second;
-        CreateIndexPrepareInfo index_prepare_info;
-        index_prepare_info.index_id_ = index_cache->index_id_;
-        index_prepare_info.index_name_ = index_cache->index_name_;
-        index_prepare_info.segment_index_prepare_infos_.reserve(1);
-
-        SegmentIndexPrepareInfo segment_index_prepare_info;
-        segment_index_prepare_info.segment_id_ = compact_prepare_info->new_segment_id_;
-        segment_index_prepare_info.chunk_id_ = 0; // chunk id should be zero
-        // segment_index_prepare_info.row_count_ = 0; // row count should be given in prepare commit phase
-        index_prepare_info.segment_index_prepare_infos_.emplace_back(segment_index_prepare_info);
-        compact_prepare_info->indexes_.emplace_back(index_prepare_info);
-    }
-
-    compact_prepare_info_map_.emplace(txn_id, compact_prepare_info);
-    return nullptr;
-}
-
-void TableCache::CommitCompactSegmentsNolock(const std::shared_ptr<CompactPrepareInfo> &compact_prepare_info, TransactionID txn_id) {
-
-    auto iter = compact_prepare_info_map_.find(txn_id);
-    if (iter == compact_prepare_info_map_.end()) {
-        UnrecoverableError(fmt::format("Transaction id: {} not found in import prepare info map", txn_id));
-    }
-    compact_prepare_info_map_.erase(iter);
-
-    // Commit the segment
-    SegmentID new_segment_id = compact_prepare_info->new_segment_id_;
-    u64 row_count = compact_prepare_info->new_segment_row_count_;
-
-    std::shared_ptr<SegmentCache> segment_cache = std::make_shared<SegmentCache>(new_segment_id, row_count);
-    segment_cache->sealed_ = true;
-    segment_cache_map_.emplace(new_segment_id, segment_cache);
-
-    // Commit segment index
-    for (const auto &index_prepare_info : compact_prepare_info->indexes_) {
-        auto index_iter = index_cache_map_.find(index_prepare_info.index_id_);
-        if (index_iter == index_cache_map_.end()) {
-            UnrecoverableError(fmt::format("Index id: {} not found in index cache map", index_prepare_info.index_id_));
-        }
-        TableIndexCache *index_cache = index_iter->second.get();
-        for (const auto &segment_index_prepare_info : index_prepare_info.segment_index_prepare_infos_) {
-            SegmentID segment_id = segment_index_prepare_info.segment_id_;
-            auto segment_iter = index_cache->segment_index_cache_map_.find(segment_id);
-            if (segment_iter != index_cache->segment_index_cache_map_.end()) {
-                UnrecoverableError(fmt::format("Segment id: {} already exists in segment cache map", segment_id));
-            }
-            auto segment_index_cache = std::make_shared<SegmentIndexCache>(segment_id);
-            segment_index_cache->next_chunk_id_ = segment_index_prepare_info.chunk_id_ + 1;
-            index_cache->segment_index_cache_map_.emplace(segment_id, segment_index_cache);
-            //            std::pair<RowID, u64> range = {RowID(segment_id, 0), segment_index_prepare_info.row_count_};
-            //            segment_index_cache->chunk_row_ranges_.emplace(segment_index_prepare_info.chunk_id_, range);
-        }
-    }
-
-    return;
-}
-
 std::vector<SegmentID> TableCache::ApplySegmentIDsNolock(u64 segment_count) {
     std::vector<SegmentID> segment_ids;
     segment_ids.reserve(segment_count);
@@ -315,20 +162,6 @@ std::vector<SegmentID> TableCache::ApplySegmentIDsNolock(u64 segment_count) {
     }
 
     return segment_ids;
-}
-
-ChunkID TableCache::ApplyChunkIDNolock(u64 index_id, SegmentID segment_id) {
-    auto index_iter = index_cache_map_.find(index_id);
-    if (index_iter == index_cache_map_.end()) {
-        UnrecoverableError(fmt::format("Index id: {} not found in index cache map", index_id));
-    }
-    TableIndexCache *index_cache = index_iter->second.get();
-    auto segment_index_iter = index_cache->segment_index_cache_map_.find(segment_id);
-    if (segment_index_iter == index_cache->segment_index_cache_map_.end()) {
-        UnrecoverableError(fmt::format("Segment id: {} not found in segment index cache map", segment_id));
-    }
-    SegmentIndexCache *segment_index_cache = segment_index_iter->second.get();
-    return segment_index_cache->next_chunk_id_++;
 }
 
 void TableCache::AddTableIndexCacheNolock(const std::shared_ptr<TableIndexCache> &table_index_cache) {
@@ -436,55 +269,16 @@ void SystemCache::DropIndexCache(u64 db_id, u64 table_id, u64 index_id) {
     table_cache->DropTableIndexCacheNolock(index_id);
 }
 
-std::shared_ptr<ImportPrepareInfo> SystemCache::PrepareImportSegments(u64 db_id, u64 table_id, u64 segment_count, TransactionID txn_id) {
-    std::unique_lock lock(cache_mtx_);
-    TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
-    return table_cache->PrepareImportSegmentsNolock(segment_count, txn_id);
-}
-
-void SystemCache::CommitImportSegments(u64 db_id, u64 table_id, const std::shared_ptr<ImportPrepareInfo> &import_prepare_info, TransactionID txn_id) {
-    std::unique_lock lock(cache_mtx_);
-    TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
-    table_cache->CommitImportSegmentsNolock(import_prepare_info, txn_id);
-}
-
-std::shared_ptr<CompactPrepareInfo>
-SystemCache::PrepareCompactSegments(u64 db_id, u64 table_id, const std::vector<SegmentID> &segment_ids, TransactionID txn_id) {
-    std::unique_lock lock(cache_mtx_);
-    TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
-    return table_cache->PrepareCompactSegmentsNolock(segment_ids, txn_id);
-}
-
-void SystemCache::CommitCompactSegments(u64 db_id,
-                                        u64 table_id,
-                                        const std::shared_ptr<CompactPrepareInfo> &compact_prepare_info,
-                                        TransactionID txn_id) {
-    std::unique_lock lock(cache_mtx_);
-    TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
-    return table_cache->CommitCompactSegmentsNolock(compact_prepare_info, txn_id);
-}
-
 std::vector<SegmentID> SystemCache::ApplySegmentIDs(u64 db_id, u64 table_id, u64 segment_count) {
     std::unique_lock lock(cache_mtx_);
     TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
     return table_cache->ApplySegmentIDsNolock(segment_count);
 }
 
-ChunkID SystemCache::ApplyChunkID(u64 db_id, u64 table_id, u64 index_id, SegmentID segment_id) {
-    std::unique_lock lock(cache_mtx_);
-    TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
-    return table_cache->ApplyChunkIDNolock(index_id, segment_id);
-}
-
 std::shared_ptr<AppendPrepareInfo> SystemCache::PrepareAppend(u64 db_id, u64 table_id, size_t row_count, TransactionID txn_id) {
     std::unique_lock lock(cache_mtx_);
     TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
     return table_cache->PrepareAppendNolock(row_count, txn_id);
-}
-void SystemCache::CommitAppend(u64 db_id, u64 table_id, const std::shared_ptr<AppendPrepareInfo> &append_info, TransactionID txn_id) {
-    std::unique_lock lock(cache_mtx_);
-    TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
-    table_cache->CommitAppendNolock(append_info, txn_id);
 }
 
 Status SystemCache::AddDbCacheNolock(const std::shared_ptr<DbCache> &db_cache) {

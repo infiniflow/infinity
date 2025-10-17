@@ -30,10 +30,6 @@ struct FastPForWrapper {
 
     const u32 *Decompress(const u32 *src, u32 count, u32 *dest, size_t &outsize) const;
 
-    static void ApplyDelta(u32 *src, size_t count);
-
-    static void RevertDelta(u32 *src, size_t count);
-
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

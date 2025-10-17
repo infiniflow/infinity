@@ -217,8 +217,8 @@ std::tuple<BufferObj *, Status> BlockMeta::GetVersionBuffer() {
         std::string version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ + "/" + std::string(BlockVersion::PATH);
         version_buffer_ = buffer_mgr->GetBufferObject(version_filepath);
         if (version_buffer_ == nullptr) {
-            // auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-            // new_txn_mgr->PrintAllDroppedKeys();
+            auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+            new_txn_mgr->PrintAllDroppedKeys();
             return {nullptr, Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath))};
         }
     }
@@ -242,24 +242,6 @@ std::shared_ptr<std::string> BlockMeta::GetBlockDir() {
     }
 
     return block_dir_;
-}
-
-// TODO: Need to fix this function: no data stored in kv_instance_ this way
-// usually use column_def to get column_id
-std::tuple<std::vector<ColumnID> *, Status> BlockMeta::GetBlockColumnIDs1() {
-    if (!column_ids1_) {
-        column_ids1_ = infinity::GetTableSegmentBlockColumns(&kv_instance_,
-                                                             segment_meta_.table_meta().db_id_str(),
-                                                             segment_meta_.table_meta().table_id_str(),
-                                                             segment_meta_.segment_id(),
-                                                             block_id_,
-                                                             begin_ts_);
-    }
-    // auto new_txn_mgr = InfinityContext::instance().storage()-> new_txn_manager();
-
-    // new_txn_mgr->PrintAllKeyValue();
-
-    return {&*column_ids1_, Status::OK()};
 }
 
 std::string BlockMeta::GetBlockTag(const std::string &tag) const {

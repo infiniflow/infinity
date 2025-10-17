@@ -125,31 +125,6 @@ std::vector<BlockID> GetTableSegmentBlocks(KVInstance *kv_instance,
     return block_ids;
 }
 
-std::vector<ColumnID> GetTableSegmentBlockColumns(KVInstance *kv_instance,
-                                                  const std::string &db_id_str,
-                                                  const std::string &table_id_str,
-                                                  SegmentID segment_id,
-                                                  BlockID block_id,
-                                                  TxnTimeStamp begin_ts) {
-    std::vector<ColumnID> column_ids;
-    std::string block_column_id_prefix = KeyEncode::CatalogTableSegmentBlockColumnKeyPrefix(db_id_str, table_id_str, segment_id, block_id);
-    auto iter = kv_instance->GetIterator();
-    iter->Seek(block_column_id_prefix);
-    while (iter->Valid() && iter->Key().starts_with(block_column_id_prefix)) {
-        TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-        if (commit_ts > begin_ts) {
-            LOG_DEBUG(fmt::format("SKIP BLOCK COLUMN: {} {} {}", iter->Key().ToString(), commit_ts, begin_ts));
-            iter->Next();
-            continue;
-        }
-        ColumnID column_id = std::stoull(iter->Key().ToString().substr(block_column_id_prefix.size()));
-        column_ids.push_back(column_id);
-        iter->Next();
-    }
-    std::sort(column_ids.begin(), column_ids.end());
-    return column_ids;
-}
-
 std::shared_ptr<IndexBase> GetTableIndexDef(KVInstance *kv_instance,
                                             const std::string &db_id_str,
                                             const std::string &table_id_str,

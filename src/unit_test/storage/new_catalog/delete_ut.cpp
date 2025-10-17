@@ -169,6 +169,7 @@ TEST_P(TestTxnDelete, test_delete) {
             EXPECT_FALSE(has_next);
         }
 
+        txn->PrintVersionInBlock(block_meta, std::vector<BlockOffset>{1, 3}, true);
         txn->PrintVersionInBlock(block_meta, std::vector<BlockOffset>{1, 3}, false);
 
         status = new_txn_mgr->CommitTxn(txn);

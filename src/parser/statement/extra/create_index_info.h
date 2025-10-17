@@ -32,7 +32,6 @@ enum class IndexType {
     kSecondary,
     kEMVB,
     kInvalid,
-    kDiskAnn,
 };
 
 struct IndexInfo {

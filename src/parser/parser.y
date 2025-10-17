@@ -4185,8 +4185,6 @@ index_info : '(' IDENTIFIER ')' USING IDENTIFIER with_index_param_list {
         index_type = infinity::IndexType::kIVF;
     } else if (strcmp($5, "emvb") == 0) {
         index_type = infinity::IndexType::kEMVB;
-    } else if(strcmp($5, "diskann") == 0){
-        index_type = infinity::IndexType::kDiskAnn;
     } else {
         free($5);
         free($2);

@@ -185,6 +185,7 @@ std::string CreateIndexTxnStore::ToString() const {
                        index_id_str_);
 }
 
+// It is not used as wal_entry_ is populated via PopulateIndex() for "create index"
 std::shared_ptr<WalEntry> CreateIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     std::shared_ptr<WalEntry> wal_entry = std::make_shared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
@@ -299,7 +300,7 @@ std::string AppendTxnStore::ToString() const {
                        row_ranges_.size());
 }
 
-size_t AppendTxnStore::RowCount() const { return input_block_->row_count(); }
+// size_t AppendTxnStore::RowCount() const { return input_block_->row_count(); }
 
 std::shared_ptr<WalEntry> AppendTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     std::shared_ptr<WalEntry> wal_entry = std::make_shared<WalEntry>();
@@ -346,11 +347,11 @@ std::shared_ptr<WalEntry> ImportTxnStore::ToWalEntry(TxnTimeStamp commit_ts) con
     return wal_entry;
 }
 
-size_t ImportTxnStore::SegmentCount() const {
-    size_t segment_count =
-        row_count_ % DEFAULT_SEGMENT_CAPACITY == 0 ? row_count_ / DEFAULT_SEGMENT_CAPACITY : row_count_ / DEFAULT_SEGMENT_CAPACITY + 1;
-    return segment_count;
-}
+// size_t ImportTxnStore::SegmentCount() const {
+//     size_t segment_count =
+//         row_count_ % DEFAULT_SEGMENT_CAPACITY == 0 ? row_count_ / DEFAULT_SEGMENT_CAPACITY : row_count_ / DEFAULT_SEGMENT_CAPACITY + 1;
+//     return segment_count;
+// }
 
 std::string DumpMemIndexTxnStore::ToString() const {
     return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, index: {}, index_id: {}",

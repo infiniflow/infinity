@@ -175,7 +175,6 @@ private:
 public:
     std::shared_ptr<MemIndex> GetMemIndex(const std::string &mem_index_key, bool for_update);
     std::shared_ptr<MemIndex> PopMemIndex(const std::string &mem_index_key);
-    bool HasMemIndex(const std::string &mem_index_key);
     Status DropMemIndexByMemIndexKey(const std::string &mem_index_key);
     std::vector<std::pair<std::string, std::string>> GetAllMemIndexInfo();
 
@@ -192,12 +191,6 @@ private:
     std::shared_mutex ft_index_cache_mtx_{};
     std::unordered_map<std::string, std::shared_ptr<TableIndexReaderCache>> ft_index_cache_map_{};
 
-public:
-    Status AddSegmentUpdateTS(std::string segment_update_ts_key, std::shared_ptr<SegmentUpdateTS> segment_update_ts);
-    Status GetSegmentUpdateTS(const std::string &segment_update_ts_key, std::shared_ptr<SegmentUpdateTS> &segment_update_ts);
-    void DropSegmentUpdateTSByKey(const std::string &segment_update_ts_key);
-
-private:
     std::shared_mutex segment_update_ts_mtx_{};
     std::unordered_map<std::string, std::shared_ptr<SegmentUpdateTS>> segment_update_ts_map_{};
 
@@ -241,8 +234,6 @@ public:
 
     static Status MemIndexRecover(NewTxn *txn);
 
-    static Status MemIndexCommit(NewTxn *txn);
-
     static Status GetAllMemIndexes(NewTxn *txn, std::vector<std::shared_ptr<MemIndex>> &mem_indexes, std::vector<MemIndexID> &mem_index_ids);
 
     static Status AddNewDB(NewTxn *txn,
@@ -273,8 +264,6 @@ public:
 
     static Status AddNewSegmentWithID(TableMeta &table_meta, TxnTimeStamp commit_ts, std::optional<SegmentMeta> &segment_meta, SegmentID segment_id);
 
-    static Status LoadFlushedSegment1(TableMeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts);
-
     static Status LoadFlushedSegment2(TableMeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts);
 
     static Status CleanSegment(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
@@ -295,9 +284,6 @@ public:
 
     static Status
     AddNewBlockColumn(BlockMeta &block_meta, size_t column_idx, const std::shared_ptr<ColumnDef> &column_def, std::optional<ColumnMeta> &column_meta);
-
-    static Status
-    AddNewBlockColumnForTransform(BlockMeta &block_meta, size_t column_idx, std::optional<ColumnMeta> &column_meta, TxnTimeStamp commit_ts);
 
     static Status CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag);
 

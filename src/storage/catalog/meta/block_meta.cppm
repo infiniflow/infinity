@@ -54,7 +54,6 @@ public:
 
     Status UninitSet(UsageFlag usage_flag);
 
-    // std::tuple<size_t, Status> GetRowCnt();
     TxnTimeStamp GetCreateTimestampFromKV() const;
 
     std::tuple<size_t, Status> GetRowCnt1();
@@ -66,10 +65,6 @@ public:
     std::tuple<std::shared_ptr<BlockInfo>, Status> GetBlockInfo();
 
     std::tuple<std::shared_ptr<BlockColumnInfo>, Status> GetBlockColumnInfo(ColumnID column_id);
-
-    // std::pair<ColumnID, Status> AddBlockColumnID1(TxnTimeStamp commit_ts);
-    //
-    std::tuple<std::vector<ColumnID> *, Status> GetBlockColumnIDs1();
 
     std::string GetBlockTag(const std::string &tag) const;
 
@@ -89,7 +84,6 @@ private:
     KVInstance &kv_instance_;
     SegmentMeta &segment_meta_;
     BlockID block_id_;
-    std::optional<std::vector<ColumnID>> column_ids1_; // stored in columndefs in kv
 
     std::shared_ptr<std::string> block_dir_;
     std::optional<size_t> row_cnt_; // stored in the block version file

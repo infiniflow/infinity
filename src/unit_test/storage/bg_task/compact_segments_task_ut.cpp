@@ -71,7 +71,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          CompactTaskTest,
                          ::testing::Values(BaseTestParamStr::NEW_BG_ON_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_BG_ON_CONFIG_PATH));
 
-TEST_P(CompactTaskTest, DISABLED_SLOW_bg_compact) {
+TEST_P(CompactTaskTest, bg_compact) {
     auto *storage = infinity::InfinityContext::instance().storage();
     auto *txn_mgr = storage->new_txn_manager();
 
@@ -90,32 +90,29 @@ TEST_P(CompactTaskTest, DISABLED_SLOW_bg_compact) {
         status = txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    std::vector<size_t> segment_sizes{1, 10, 100};
+    std::vector<size_t> segment_sizes{1, 10};
     size_t segment_count = std::accumulate(segment_sizes.begin(), segment_sizes.end(), 0);
     this->AddSegments(txn_mgr, *table_name, segment_sizes);
 
     i64 compact_interval = InfinityContext::instance().storage()->config()->CompactInterval();
     LOG_INFO(fmt::format("compact_interval: {} seconds", compact_interval));
     size_t last_seg_count = segment_count;
-    i64 loop = 0;
-    while (loop < 5) {
-        loop++;
-        // Wait for the compact task to run
-        LOG_INFO("Wait for compact task to run");
-        sleep(compact_interval + 1);
 
-        // Check if the segment count has been reduced
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
-        std::shared_ptr<DBMeta> db_meta;
-        std::shared_ptr<TableMeta> table_meta;
-        TxnTimeStamp create_timestamp;
-        auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
-        EXPECT_TRUE(status.ok());
+    // Wait for the compact task to run
+    LOG_INFO("Wait for compact task to run");
+    sleep(compact_interval + 1);
 
-        std::vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
-        EXPECT_TRUE(status.ok());
-        EXPECT_LT(segment_ids_ptr->size(), last_seg_count);
-        last_seg_count = segment_ids_ptr->size();
-    }
+    // Check if the segment count has been reduced
+    auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
+    std::shared_ptr<DBMeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta;
+    TxnTimeStamp create_timestamp;
+    auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
+    EXPECT_TRUE(status.ok());
+
+    std::vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+    EXPECT_TRUE(status.ok());
+    EXPECT_LT(segment_ids_ptr->size(), last_seg_count);
+    last_seg_count = segment_ids_ptr->size();
 }

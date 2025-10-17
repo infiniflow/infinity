@@ -43,43 +43,6 @@ SegmentMeta::SegmentMeta(SegmentID segment_id, TableMeta &table_meta)
     : begin_ts_(table_meta.begin_ts()), commit_ts_(table_meta.commit_ts()), kv_instance_(*table_meta.kv_instance()), table_meta_(table_meta),
       segment_id_(segment_id) {}
 
-// Status SegmentMeta::SetBlockIDs(const std::vector<BlockID> &block_ids) {
-//     block_ids_ = std::make_shared<std::vector<BlockID>>(block_ids);
-//     std::string block_ids_key = GetSegmentTag("block_ids");
-//     std::string block_ids_str = nlohmann::json(block_ids).dump();
-//     Status status = kv_instance_.Put(block_ids_key, block_ids_str);
-//     if (!status.ok()) {
-//         return status;
-//     }
-//     return Status::OK();
-// }
-
-// Status SegmentMeta::AddBlockID(BlockID block_id) {
-//     if (!block_ids_) {
-//         Status status = LoadBlockIDs();
-//         if (!status.ok()) {
-//             return status;
-//         }
-//     }
-//     block_ids_->push_back(block_id);
-//     Status status = SetBlockIDs(*block_ids_);
-//     if (!status.ok()) {
-//         return status;
-//     }
-//     return Status::OK();
-// }
-
-Status SegmentMeta::SetNextBlockID(BlockID next_block_id) {
-    next_block_id_ = next_block_id;
-    std::string next_block_id_key = GetSegmentTag(std::string(NEXT_BLOCK_ID));
-    std::string next_block_id_str = fmt::format("{}", next_block_id);
-    Status status = kv_instance_.Put(next_block_id_key, next_block_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
-
 Status SegmentMeta::SetFirstDeleteTS(TxnTimeStamp first_delete_ts) {
     std::string first_delete_ts_key = GetSegmentTag("first_delete_ts");
     std::string first_delete_ts_str = fmt::format("{}", first_delete_ts);
@@ -92,18 +55,6 @@ Status SegmentMeta::SetFirstDeleteTS(TxnTimeStamp first_delete_ts) {
 }
 
 Status SegmentMeta::InitSet() {
-    // {
-    //     Status status = SetBlockIDs(std::vector<BlockID>());
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    // }
-    {
-        Status status = SetNextBlockID(0);
-        if (!status.ok()) {
-            return status;
-        }
-    }
     {
         Status status = SetFirstDeleteTS(UNCOMMIT_TS);
         if (!status.ok()) {
@@ -116,15 +67,6 @@ Status SegmentMeta::InitSet() {
 // called when restore segment from snapshot with segment meta
 // restore segment meta from snapshot with segment meta
 Status SegmentMeta::RestoreSet() {
-
-    {
-        Status status;
-        status = SetNextBlockID(next_block_id_.value_or(0));
-        if (!status.ok()) {
-            return status;
-        }
-    }
-
     {
         Status status = SetFirstDeleteTS(first_delete_ts_.value_or(UNCOMMIT_TS));
         if (!status.ok()) {
@@ -138,13 +80,6 @@ Status SegmentMeta::RestoreSet() {
 Status SegmentMeta::UninitSet(UsageFlag usage_flag) { return UninitSet(usage_flag, begin_ts_); }
 
 Status SegmentMeta::UninitSet(UsageFlag usage_flag, TxnTimeStamp begin_ts) {
-    // {
-    //     std::string block_ids_key = GetSegmentTag("block_ids");
-    //     Status status = kv_instance_.Delete(block_ids_key);
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    // }
     {
         std::string block_id_prefix = KeyEncode::CatalogTableSegmentBlockKeyPrefix(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_);
         auto iter = kv_instance_.GetIterator();
@@ -173,20 +108,6 @@ Status SegmentMeta::UninitSet(UsageFlag usage_flag, TxnTimeStamp begin_ts) {
         block_ids1_.reset();
     }
     {
-        std::string next_block_id_key = GetSegmentTag(std::string(NEXT_BLOCK_ID));
-        Status status = kv_instance_.Delete(next_block_id_key);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    // {
-    //     std::string row_cnt_key = GetSegmentTag("row_cnt");
-    //     Status status = kv_instance_.Delete(row_cnt_key);
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    // }
-    {
         std::string first_delete_ts_key = GetSegmentTag("first_delete_ts");
         Status status = kv_instance_.Delete(first_delete_ts_key);
         if (!status.ok()) {
@@ -204,45 +125,6 @@ Status SegmentMeta::UninitSet(UsageFlag usage_flag, TxnTimeStamp begin_ts) {
     }
     return Status::OK();
 }
-
-// Status SegmentMeta::LoadBlockIDs() {
-//     std::string block_ids_key = GetSegmentTag("block_ids");
-//     std::string block_ids_str;
-//     Status status = kv_instance_.Get(block_ids_key, block_ids_str);
-//     if (!status.ok()) {
-//         return status;
-//     }
-//     block_ids_ = std::make_shared<std::vector<BlockID>>(nlohmann::json::parse(block_ids_str).get<std::vector<BlockID>>());
-//     return Status::OK();
-// }
-
-Status SegmentMeta::LoadBlockIDs1() {
-    block_ids1_ =
-        infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts_);
-    return Status::OK();
-}
-
-Status SegmentMeta::LoadNextBlockID() {
-    std::string next_block_id_key = GetSegmentTag(std::string(NEXT_BLOCK_ID));
-    std::string next_block_id_str;
-    Status status = kv_instance_.Get(next_block_id_key, next_block_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-    next_block_id_ = std::stoull(next_block_id_str);
-    return Status::OK();
-}
-
-// Status SegmentMeta::LoadRowCnt() {
-//     std::string row_cnt_key = GetSegmentTag("row_cnt");
-//     std::string row_cnt_str;
-//     Status status = kv_instance_.Get(row_cnt_key, row_cnt_str);
-//     if (!status.ok()) {
-//         return status;
-//     }
-//     row_cnt_ = std::stoull(row_cnt_str);
-//     return Status::OK();
-// }
 
 Status SegmentMeta::LoadFirstDeleteTS() {
     if (first_delete_ts_.has_value()) {
@@ -292,68 +174,7 @@ TxnTimeStamp SegmentMeta::GetCreateTimestampFromKV() const {
     return std::stoull(create_ts_str);
 }
 
-Status SegmentMeta::Init() {
-    // {
-    //     table_meta_.AddSegmentID(segment_id_);
-    // }
-    {
-        std::string latest_block_id_key = GetSegmentTag(std::string(NEXT_BLOCK_ID));
-        std::string latest_block_id_str;
-        Status status = kv_instance_.Get(latest_block_id_key, latest_block_id_str);
-        if (!status.ok()) {
-            if (status.code() != ErrorCode::kNotFound) {
-                return status;
-            }
-            status = kv_instance_.Put(latest_block_id_key, "0");
-            if (!status.ok()) {
-                return status;
-            }
-        }
-    }
-    // {
-    //     std::string block_ids_key = GetSegmentTag("block_ids");
-    //     std::string block_ids_str = nlohmann::json::array().dump();
-    //     Status status = kv_instance_.Put(block_ids_key, block_ids_str);
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    // }
-    {
-
-        std::string row_cnt_key = GetSegmentTag("row_cnt");
-        std::string row_cnt_str;
-        Status status = kv_instance_.Get(row_cnt_key, row_cnt_str);
-        if (!status.ok()) {
-            if (status.code() != ErrorCode::kNotFound) {
-                return status;
-            }
-            status = kv_instance_.Put(row_cnt_key, "0");
-            if (!status.ok()) {
-                return status;
-            }
-        }
-    }
-    return Status::OK();
-}
-
-// Status SegmentMeta::AddBlockID(BlockID block_id) {
-//     if (block_ids_ == nullptr) {
-//         Status status = LoadBlockIDs();
-//         if (!status.ok()) {
-//             return status;
-//         }
-//     }
-
-//     block_ids_->push_back(block_id);
-//     std::string block_ids_key = GetSegmentTag("block_ids");
-//     std::string block_ids_str = nlohmann::json(*block_ids_).dump();
-//     Status status = kv_instance_.Put(block_ids_key, block_ids_str);
-//     if (!status.ok()) {
-//         LOG_ERROR(fmt::format("Fail to add block_id: {} to key: {}", block_id, block_ids_key));
-//         return status;
-//     }
-//     return Status::OK();
-// }
+Status SegmentMeta::Init() { return Status::OK(); }
 
 Status SegmentMeta::AddBlockWithID(TxnTimeStamp commit_ts, BlockID block_id) {
     Status status;
@@ -410,16 +231,6 @@ std::tuple<std::shared_ptr<std::string>, Status> SegmentMeta::GetSegmentDir() {
     return {std::make_shared<std::string>(seg_dir), Status::OK()};
 }
 
-// std::tuple<std::shared_ptr<std::vector<BlockID>>, Status> SegmentMeta::GetBlockIDs() {
-//     if (block_ids_ == nullptr) {
-//         Status status = LoadBlockIDs();
-//         if (!status.ok()) {
-//             return {nullptr, status};
-//         }
-//     }
-//     return {std::make_shared<std::vector<BlockID>>(*block_ids_), Status::OK()};
-// }
-
 std::tuple<std::vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1() {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!block_ids1_) {
@@ -436,16 +247,6 @@ std::tuple<std::vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1(TxnTimeStam
     }
     return {&*block_ids1_, Status::OK()};
 }
-
-// std::tuple<size_t, Status> SegmentMeta::GetRowCnt() {
-//     if (!row_cnt_) {
-//         Status status = LoadRowCnt();
-//         if (!status.ok()) {
-//             return {0, status};
-//         }
-//     }
-//     return {row_cnt_.value(), Status::OK()};
-// }
 
 std::tuple<size_t, Status> SegmentMeta::GetRowCnt1() {
     std::lock_guard<std::mutex> lock(mtx_);
@@ -478,16 +279,6 @@ std::tuple<size_t, Status> SegmentMeta::GetRowCnt1() {
     row_cnt_ = row_cnt;
     return {row_cnt, Status::OK()};
 #endif
-}
-
-std::tuple<BlockID, Status> SegmentMeta::GetNextBlockID() {
-    if (!next_block_id_) {
-        Status status = LoadNextBlockID();
-        if (!status.ok()) {
-            return {INVALID_BLOCK_ID, status};
-        }
-    }
-    return {*next_block_id_, Status::OK()};
 }
 
 Status SegmentMeta::GetFirstDeleteTS(TxnTimeStamp &first_delete_ts) {

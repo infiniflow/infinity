@@ -16,7 +16,6 @@ module infinity_core:background_process.impl;
 
 import :background_process;
 import :bg_task;
-import :update_segment_bloom_filter_task;
 import :logger;
 import :blocking_queue;
 import :infinity_exception;
@@ -65,6 +64,7 @@ void BGTaskProcessor::Process() {
         task_queue_.DequeueBulk(tasks);
 
         for (const auto &bg_task : tasks) {
+            LOG_TRACE(fmt::format("Process background task, BGTaskType: {}", ToString(bg_task->type_)));
             switch (bg_task->type_) {
                 case BGTaskType::kStopProcessor: {
                     LOG_INFO("Stop the background processor");
@@ -134,23 +134,6 @@ void BGTaskProcessor::Process() {
                             new_txn_mgr->AddTaskInfo(bg_task_info);
                         }
                         LOG_DEBUG("Cleanup task in background done");
-                    }
-                    break;
-                }
-                case BGTaskType::kUpdateSegmentBloomFilterData: {
-                    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
-                    if (storage_mode == StorageMode::kUnInitialized) {
-                        UnrecoverableError("Uninitialized storage mode");
-                    }
-                    if (storage_mode == StorageMode::kWritable or storage_mode == StorageMode::kReadable) {
-                        LOG_DEBUG("Update segment bloom filter");
-                        auto *task = static_cast<UpdateSegmentBloomFilterTask *>(bg_task.get());
-                        {
-                            std::unique_lock<std::mutex> locker(task_mutex_);
-                            task_text_ = task->ToString();
-                        }
-                        task->Execute();
-                        LOG_DEBUG("Update segment bloom filter done");
                     }
                     break;
                 }

@@ -67,7 +67,6 @@ private:
         if (block_id != last_block_id_) {
             last_block_id_ = block_id;
             BlockMeta block_meta(block_id, segment_meta_);
-            // auto [row_cnt, status] = block_meta.GetRowCnt();
             auto [row_cnt, status] = block_meta.GetRowCnt1();
             if (!status.ok()) {
                 UnrecoverableError("Get row count failed");

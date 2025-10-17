@@ -55,11 +55,8 @@ Status DBMeta::InitSet(const std::string *comment) {
     }
 
     // Create next table id;
-    std::string next_table_id_key = GetDBTag(NEXT_TABLE_ID.data());
-    Status status = kv_instance_->Put(next_table_id_key, "0");
-    if (!status.ok()) {
-        return status;
-    }
+    std::string table_id_str{"0"};
+    SetNextTableID(table_id_str);
 
     return Status::OK();
 }
@@ -247,7 +244,7 @@ std::tuple<std::string, Status> DBMeta::GetNextTableID() {
     u64 next_table_id = std::stoull(next_table_id_str);
     ++next_table_id;
     std::string new_next_table_id_str = std::to_string(next_table_id);
-    status = kv_instance_->Put(next_table_id_key, new_next_table_id_str);
+    status = SetNextTableID(new_next_table_id_str);
     if (!status.ok()) {
         return {"", status};
     }
