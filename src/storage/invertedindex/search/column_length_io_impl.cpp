@@ -17,8 +17,6 @@ module infinity_core:column_length_io.impl;
 import :column_length_io;
 import :column_index_reader;
 import :memory_indexer;
-import :buffer_obj;
-import :buffer_handle;
 
 import std;
 
@@ -39,7 +37,7 @@ FullTextColumnLengthReader::~FullTextColumnLengthReader() = default;
 
 u32 FullTextColumnLengthReader::SeekFile(RowID row_id) {
     // determine the chunk index which contains row_id
-    current_chunk_buffer_handle_.~BufferHandle();
+    // current_chunk_buffer_handle_.~BufferHandle();
     size_t left = 0;
     size_t right = chunk_index_meta_infos_.size();
     size_t current_chunk = std::numeric_limits<size_t>::max();
@@ -59,8 +57,8 @@ u32 FullTextColumnLengthReader::SeekFile(RowID row_id) {
     }
 
     // Load the column-length file of the chunk index
-    current_chunk_buffer_handle_ = chunk_index_meta_infos_[current_chunk].index_buffer_->Load();
-    column_lengths_ = (const u32 *)current_chunk_buffer_handle_.GetData();
+    current_chunk_buffer_obj_ = chunk_index_meta_infos_[current_chunk].index_buffer_;
+    column_lengths_ = (const u32 *)current_chunk_buffer_obj_->GetData();
     current_chunk_base_rowid_ = chunk_index_meta_infos_[current_chunk].base_rowid_;
     current_chunk_row_count_ = chunk_index_meta_infos_[current_chunk].row_cnt_;
     return column_lengths_[row_id - current_chunk_base_rowid_];

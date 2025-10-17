@@ -49,9 +49,7 @@ public:
     Status Put(const std::string &key, const std::string &value);
     Status Delete(const std::string &key);
     Status Get(const std::string &key, std::string &value);
-    Status GetForUpdate(const std::string &key, std::string &value);
     std::unique_ptr<KVIterator> GetIterator();
-    std::unique_ptr<KVIterator> GetIterator(const char *lower_bound_key, const char *upper_bound_key);
     std::vector<std::pair<std::string, std::string>> GetAllKeyValue();
     std::string ToString() const;
 

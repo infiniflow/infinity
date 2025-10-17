@@ -25,7 +25,6 @@ namespace infinity {
 extern template class EMVBSharedVec<u32>;
 class EMVBProductQuantizer;
 class LocalFileHandle;
-class BufferManager;
 struct BlockIndex;
 class NewTxn;
 class SegmentMeta;

@@ -45,7 +45,6 @@ import :index_secondary;
 import :index_full_text;
 import :mem_index;
 import :index_base;
-import :buffer_obj;
 import :secondary_index_in_mem;
 import :memory_indexer;
 

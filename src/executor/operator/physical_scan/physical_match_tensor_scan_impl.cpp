@@ -42,8 +42,7 @@ import :emvb_index;
 import :knn_filter;
 import :global_block_id;
 import :block_index;
-import :buffer_manager;
-import :buffer_handle;
+import :fileworker_manager;
 import :match_tensor_scan_function_data;
 import :mlas_matrix_multiply;
 import :physical_fusion;
@@ -52,7 +51,6 @@ import :logical_match_tensor_scan;
 import :simd_functions;
 import :knn_expression;
 import :result_cache_manager;
-import :buffer_obj;
 import :table_meta;
 import :table_index_meta;
 import :segment_index_meta;
@@ -427,13 +425,12 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             // 2. chunk index
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-                BufferObj *index_buffer = nullptr;
+                FileWorker *index_buffer{};
                 Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }
-                BufferHandle index_handle = index_buffer->Load();
-                const auto *emvb_index = static_cast<const EMVBIndex *>(index_handle.GetData());
+                const auto *emvb_index = static_cast<const EMVBIndex *>(index_buffer->GetData());
 
                 const auto [result_num, score_ptr, row_id_ptr] =
                     emvb_index->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
@@ -939,24 +936,24 @@ void CalculateScoreOnColumnVector(ColumnVector &column_vector,
 
 struct RerankerParameterPack {
     std::vector<MatchTensorRerankDoc> &rerank_docs_;
-    BufferManager *buffer_mgr_;
+    FileWorkerManager *buffer_mgr_;
     const DataType *column_data_type_;
     const ColumnID column_id_;
     const BlockIndex *block_index_;
     const MatchTensorExpression &match_tensor_expr_;
     RerankerParameterPack(std::vector<MatchTensorRerankDoc> &rerank_docs,
-                          BufferManager *buffer_mgr,
+                          FileWorkerManager *fileworker_mgr,
                           const DataType *column_data_type,
                           const ColumnID column_id,
                           const BlockIndex *block_index,
                           const MatchTensorExpression &match_tensor_expr)
-        : rerank_docs_(rerank_docs), buffer_mgr_(buffer_mgr), column_data_type_(column_data_type), column_id_(column_id), block_index_(block_index),
+        : rerank_docs_(rerank_docs), buffer_mgr_(fileworker_mgr), column_data_type_(column_data_type), column_id_(column_id), block_index_(block_index),
           match_tensor_expr_(match_tensor_expr) {}
 };
 
 template <typename CalcutateScoreOfRowOp>
 void GetRerankerScore(std::vector<MatchTensorRerankDoc> &rerank_docs,
-                      BufferManager *buffer_mgr,
+                      FileWorkerManager *fileworker_mgr,
                       const ColumnID column_id,
                       const BlockIndex *block_index,
                       const char *query_tensor_ptr,
@@ -1024,7 +1021,7 @@ struct ExecuteMatchTensorRerankerTypes {
 };
 
 void CalculateFusionMatchTensorRerankerScores(std::vector<MatchTensorRerankDoc> &rerank_docs,
-                                              BufferManager *buffer_mgr,
+                                              FileWorkerManager *fileworker_mgr,
                                               const DataType *column_data_type,
                                               const ColumnID column_id,
                                               const BlockIndex *block_index,
@@ -1032,7 +1029,7 @@ void CalculateFusionMatchTensorRerankerScores(std::vector<MatchTensorRerankDoc> 
     const auto column_elem_type = static_cast<const EmbeddingInfo *>(column_data_type->type_info().get())->Type();
     const auto [new_search_ptr, new_search_expr] = GetMatchTensorExprForCalculation(src_match_tensor_expr, column_elem_type);
     const auto *match_tensor_expr_ptr = new_search_expr ? new_search_expr.get() : &src_match_tensor_expr;
-    RerankerParameterPack parameter_pack(rerank_docs, buffer_mgr, column_data_type, column_id, block_index, *match_tensor_expr_ptr);
+    RerankerParameterPack parameter_pack(rerank_docs, fileworker_mgr, column_data_type, column_id, block_index, *match_tensor_expr_ptr);
     const auto query_elem_type = parameter_pack.match_tensor_expr_.embedding_data_type_;
     ElemTypeDispatch<ExecuteMatchTensorRerankerTypes, TypeList<>>(parameter_pack, column_elem_type, query_elem_type);
 }

@@ -152,13 +152,6 @@ WalSegmentInfo::WalSegmentInfo(SegmentMeta &segment_meta, TxnTimeStamp begin_ts)
     for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, segment_meta);
         block_infos_.emplace_back(block_meta);
-
-        // size_t block_row_cnt = 0;
-        // std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
-        // if (!status.ok()) {
-        //     UnrecoverableError(status.message());
-        // }
-        // row_count += block_row_cnt;
     }
 
     // row_count_ = row_count;

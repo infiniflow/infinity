@@ -43,8 +43,6 @@ import :value;
 import :kv_code;
 import :kv_store;
 import :new_txn;
-import :buffer_obj;
-import :buffer_handle;
 import :secondary_index_data;
 import :segment_meta;
 import :block_meta;
@@ -84,7 +82,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnReplayIndex,
                          ::testing::Values(TestTxnReplayIndex::NEW_CONFIG_PATH, TestTxnReplayIndex::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_replay_append_with_index) {
+TEST_P(TestTxnReplayIndex, SLOW_test_replay_append_with_index) {
     using namespace infinity;
 
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
@@ -410,7 +408,7 @@ TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_replay_append_with_index) {
         // int32_t begin_val = 2;
         // int32_t end_val = 3;
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
@@ -463,7 +461,7 @@ TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_replay_append_with_index) {
     });
 }
 
-TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_populate_index) {
+TEST_P(TestTxnReplayIndex, SLOW_test_populate_index) {
     using namespace infinity;
 
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
@@ -683,7 +681,7 @@ TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_populate_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
         status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 

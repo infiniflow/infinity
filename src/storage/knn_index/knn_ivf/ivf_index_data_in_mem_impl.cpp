@@ -16,7 +16,7 @@ module infinity_core:ivf_index_data_in_mem.impl;
 
 import :ivf_index_data_in_mem;
 import :ivf_index_storage;
-import :buffer_manager;
+import :fileworker_manager;
 import :index_base;
 import :index_ivf;
 import :infinity_exception;
@@ -26,13 +26,11 @@ import :kmeans_partition;
 import :search_top_1;
 import :column_vector;
 import :ivf_index_data;
-import :buffer_handle;
 import :knn_scan_data;
 import :ivf_index_util_func;
 import :base_memindex;
 import :memindex_tracer;
 import :infinity_context;
-import :buffer_obj;
 
 import std;
 import third_party;
@@ -218,7 +216,7 @@ public:
         IncreaseMemoryUsageBase(mem2 > mem1 ? mem2 - mem1 : 0);
     }
 
-    void Dump(BufferObj *buffer_obj, size_t *p_dump_size) override {
+    void Dump(FileWorker *buffer_obj, size_t *p_dump_size) override {
         std::unique_lock lock(rw_mutex_);
         size_t dump_size = MemoryUsed();
         if (!have_ivf_index_.test(std::memory_order_acquire)) {
@@ -227,13 +225,12 @@ public:
         if (p_dump_size != nullptr) {
             *p_dump_size = dump_size;
         }
-        BufferHandle handle = buffer_obj->Load();
-        auto *data_ptr = static_cast<IVFIndexInChunk *>(handle.GetDataMut());
+        auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_obj->GetData());
         data_ptr->GetMemData(std::move(*ivf_index_storage_));
         delete ivf_index_storage_;
         ivf_index_storage_ = data_ptr->GetIVFIndexStoragePtr();
         own_ivf_index_storage_ = false;
-        dump_handle_ = std::move(handle);
+        dump_obj_ = std::move(buffer_obj);
     }
 
     void SearchIndexInMem(const KnnDistanceBase1 *knn_distance,

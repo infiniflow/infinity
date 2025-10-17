@@ -23,10 +23,9 @@ import :segment_meta;
 import :table_meta;
 import :new_catalog;
 import :infinity_context;
-import :buffer_manager;
+import :fileworker_manager;
 import :block_version;
 import :version_file_worker;
-import :buffer_handle;
 import :meta_info;
 import :column_meta;
 import :fast_rough_filter;
@@ -69,75 +68,39 @@ TxnTimeStamp BlockMeta::GetCreateTimestampFromKV() const {
     return std::stoull(create_ts_str);
 }
 
-Status BlockMeta::InitSet() {
+Status BlockMeta::InitOrLoadSet(TxnTimeStamp checkpoint_ts) {
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     {
         std::string block_lock_key = GetBlockTag("lock");
-        Status status = new_catalog->AddBlockLock(std::move(block_lock_key));
+        Status status;
+        if (checkpoint_ts == 0) {
+            status = new_catalog->AddBlockLock(std::move(block_lock_key));
+        } else {
+            status = new_catalog->AddBlockLock(std::move(block_lock_key), checkpoint_ts);
+        }
         if (!status.ok()) {
             return status;
         }
     }
-    std::shared_ptr<std::string> block_dir_ptr = this->GetBlockDir();
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-    {
-        auto version_file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
-                                                                       std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                                                                       block_dir_ptr,
-                                                                       BlockVersion::FileName(),
-                                                                       this->block_capacity(),
-                                                                       buffer_mgr->persistence_manager());
-        version_buffer_ = buffer_mgr->AllocateBufferObject(std::move(version_file_worker));
-        if (!version_buffer_) {
-            return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
-        }
-        version_buffer_->AddObjRc();
-    }
-    return Status::OK();
-}
-
-Status BlockMeta::LoadSet(TxnTimeStamp checkpoint_ts) {
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    {
-        std::string block_lock_key = GetBlockTag("lock");
-        Status status = new_catalog->AddBlockLock(std::move(block_lock_key), checkpoint_ts);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    auto *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-    std::shared_ptr<std::string> block_dir_ptr = this->GetBlockDir();
-    auto version_file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
-                                                                   std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                                                                   block_dir_ptr,
-                                                                   BlockVersion::FileName(),
-                                                                   this->block_capacity(),
-                                                                   buffer_mgr->persistence_manager());
-    version_buffer_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
-    if (!version_buffer_) {
-        return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
-    }
-    version_buffer_->AddObjRc();
-
+    auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+    std::shared_ptr<std::string> block_dir_ptr = GetBlockDir();
+    auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
+    auto version_file_worker = std::make_unique<VersionFileWorker>(rel_file_path, block_capacity());
+    version_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(version_file_worker));
     return Status::OK();
 }
 
 Status BlockMeta::RestoreSet() {
-    auto *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-    std::shared_ptr<std::string> block_dir_ptr = this->GetBlockDir();
-    auto version_file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
-                                                                   std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                                                                   block_dir_ptr,
-                                                                   BlockVersion::FileName(),
-                                                                   this->block_capacity(),
-                                                                   buffer_mgr->persistence_manager());
-    auto *buffer_obj = buffer_mgr->GetBufferObject(version_file_worker->GetFilePath());
+    auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+    std::shared_ptr<std::string> block_dir_ptr = GetBlockDir();
+    auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
+    auto version_file_worker = std::make_unique<VersionFileWorker>(rel_file_path, block_capacity());
+    auto *buffer_obj = fileworker_mgr->GetFileWorker(version_file_worker->GetFilePath());
     if (buffer_obj == nullptr) {
-        version_buffer_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
+        version_buffer_ = version_file_worker.get();
         if (!version_buffer_) {
             return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
         }
-        version_buffer_->AddObjRc();
     }
     return Status::OK();
 }
@@ -150,23 +113,17 @@ Status BlockMeta::RestoreSetFromSnapshot() {
 
         Status status = new_catalog->AddBlockLock(std::move(block_lock_key));
     }
-    auto *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-    std::shared_ptr<std::string> block_dir_ptr = this->GetBlockDir();
-    auto version_file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
-                                                                   std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                                                                   block_dir_ptr,
-                                                                   BlockVersion::FileName(),
-                                                                   this->block_capacity(),
-                                                                   buffer_mgr->persistence_manager());
+    // auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+    std::shared_ptr<std::string> block_dir_ptr = GetBlockDir();
+    auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
+    auto version_file_worker = std::make_unique<VersionFileWorker>(rel_file_path, block_capacity());
 
-    version_buffer_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
+    version_buffer_ = version_file_worker.get();
     if (!version_buffer_) {
         return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
     }
-    version_buffer_->AddObjRc();
 
-    BufferHandle buffer_handle = version_buffer_->Load();
-    auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+    auto *block_version = reinterpret_cast<BlockVersion *>(version_buffer_->GetData());
     block_version->RestoreFromSnapshot(commit_ts_);
 
     return Status::OK();
@@ -203,22 +160,22 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
     return Status::OK();
 }
 
-std::tuple<BufferObj *, Status> BlockMeta::GetVersionBuffer() {
+std::tuple<FileWorker *, Status> BlockMeta::GetVersionBuffer() {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!version_buffer_) {
-        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+        FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
 
         // Get block directory without acquiring lock again (avoid recursive lock)
         if (block_dir_ == nullptr) {
-            TableMeta &table_meta = segment_meta_.table_meta();
+            auto &table_meta = segment_meta_.table_meta();
             block_dir_ = std::make_shared<std::string>(
                 fmt::format("db_{}/tbl_{}/seg_{}/blk_{}", table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_));
         }
-        std::string version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ + "/" + std::string(BlockVersion::PATH);
-        version_buffer_ = buffer_mgr->GetBufferObject(version_filepath);
+        auto version_filepath = fmt::format("{}/{}", *block_dir_, BlockVersion::PATH);
+        version_buffer_ = fileworker_mgr->GetFileWorker(version_filepath);
         if (version_buffer_ == nullptr) {
-            // auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-            // new_txn_mgr->PrintAllDroppedKeys();
+            auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+            new_txn_mgr->PrintAllDroppedKeys();
             return {nullptr, Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath))};
         }
     }
@@ -242,24 +199,6 @@ std::shared_ptr<std::string> BlockMeta::GetBlockDir() {
     }
 
     return block_dir_;
-}
-
-// TODO: Need to fix this function: no data stored in kv_instance_ this way
-// usually use column_def to get column_id
-std::tuple<std::vector<ColumnID> *, Status> BlockMeta::GetBlockColumnIDs1() {
-    if (!column_ids1_) {
-        column_ids1_ = infinity::GetTableSegmentBlockColumns(&kv_instance_,
-                                                             segment_meta_.table_meta().db_id_str(),
-                                                             segment_meta_.table_meta().table_id_str(),
-                                                             segment_meta_.segment_id(),
-                                                             block_id_,
-                                                             begin_ts_);
-    }
-    // auto new_txn_mgr = InfinityContext::instance().storage()-> new_txn_manager();
-
-    // new_txn_mgr->PrintAllKeyValue();
-
-    return {&*column_ids1_, Status::OK()};
 }
 
 std::string BlockMeta::GetBlockTag(const std::string &tag) const {
@@ -295,14 +234,13 @@ std::tuple<size_t, Status> BlockMeta::GetRowCnt1() {
     if (!status.ok()) {
         return {0, status};
     }
-    BufferObj *version_buffer;
+    FileWorker *version_buffer;
     std::tie(version_buffer, status) = this->GetVersionBuffer();
     if (!status.ok()) {
         return {0, status};
     }
 
-    BufferHandle buffer_handle = version_buffer->Load();
-    const auto *block_version = reinterpret_cast<const BlockVersion *>(buffer_handle.GetData());
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer->GetData());
 
     size_t row_cnt = 0;
     {

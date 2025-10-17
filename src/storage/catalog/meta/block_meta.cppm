@@ -25,7 +25,6 @@ namespace infinity {
 class KVInstance;
 class SegmentMeta;
 // struct BlockLock;
-class BufferObj;
 class FastRoughFilter;
 
 export class BlockMeta {
@@ -44,9 +43,7 @@ public:
 
     Status GetBlockLock(std::shared_ptr<BlockLock> &block_lock);
 
-    Status InitSet();
-
-    Status LoadSet(TxnTimeStamp checkpoint_ts);
+    Status InitOrLoadSet(TxnTimeStamp checkpoint_ts = 0);
 
     Status RestoreSet();
 
@@ -54,22 +51,17 @@ public:
 
     Status UninitSet(UsageFlag usage_flag);
 
-    // std::tuple<size_t, Status> GetRowCnt();
     TxnTimeStamp GetCreateTimestampFromKV() const;
 
     std::tuple<size_t, Status> GetRowCnt1();
 
-    std::tuple<BufferObj *, Status> GetVersionBuffer();
+    std::tuple<FileWorker *, Status> GetVersionBuffer();
 
     std::vector<std::string> FilePaths();
 
     std::tuple<std::shared_ptr<BlockInfo>, Status> GetBlockInfo();
 
     std::tuple<std::shared_ptr<BlockColumnInfo>, Status> GetBlockColumnInfo(ColumnID column_id);
-
-    // std::pair<ColumnID, Status> AddBlockColumnID1(TxnTimeStamp commit_ts);
-    //
-    std::tuple<std::vector<ColumnID> *, Status> GetBlockColumnIDs1();
 
     std::string GetBlockTag(const std::string &tag) const;
 
@@ -89,12 +81,11 @@ private:
     KVInstance &kv_instance_;
     SegmentMeta &segment_meta_;
     BlockID block_id_;
-    std::optional<std::vector<ColumnID>> column_ids1_; // stored in columndefs in kv
 
     std::shared_ptr<std::string> block_dir_;
     std::optional<size_t> row_cnt_; // stored in the block version file
 
-    BufferObj *version_buffer_ = nullptr;
+    FileWorker *version_buffer_ = nullptr;
     std::shared_ptr<FastRoughFilter> fast_rough_filter_;
 };
 

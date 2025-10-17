@@ -23,12 +23,10 @@ import :infinity_context;
 import :infinity_exception;
 import :default_values;
 import :logger;
-import :buffer_obj;
 import :storage;
 import :config;
-import :buffer_manager;
+import :fileworker_manager;
 import :block_version;
-import :buffer_handle;
 import :new_catalog;
 import :status;
 import :kv_code;
@@ -729,7 +727,7 @@ size_t MetaTableObject::GetCurrentSegmentRowCount(Storage *storage_ptr) const {
     }
     TableMetaKey *table_meta_key = static_cast<TableMetaKey *>(meta_key_.get());
     BlockID current_block_id = segment_object->GetCurrentBlockID();
-    BufferManager *buffer_mgr_ptr = storage_ptr->buffer_manager();
+    auto *buffer_mgr_ptr = storage_ptr->fileworker_manager();
     Config *config_ptr = storage_ptr->config();
     std::string version_filepath = fmt::format("{}/db_{}/tbl_{}/seg_{}/blk_{}/{}",
                                                config_ptr->DataDir(),
@@ -738,12 +736,11 @@ size_t MetaTableObject::GetCurrentSegmentRowCount(Storage *storage_ptr) const {
                                                unsealed_segment_id,
                                                current_block_id,
                                                BlockVersion::PATH);
-    BufferObj *version_buffer = buffer_mgr_ptr->GetBufferObject(version_filepath);
+    auto *version_buffer = buffer_mgr_ptr->GetFileWorker(version_filepath);
     if (version_buffer == nullptr) {
         UnrecoverableError(fmt::format("Can't get version from: {}", version_filepath));
     }
-    BufferHandle buffer_handle = version_buffer->Load();
-    const auto *block_version = reinterpret_cast<const BlockVersion *>(buffer_handle.GetData());
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer->GetData());
     size_t row_cnt = 0;
     {
         std::shared_ptr<BlockLock> block_lock{};
@@ -1097,7 +1094,7 @@ bool MetaTree::CheckData(const std::string &path) {
 
 std::unordered_set<std::string> MetaTree::GetDataVfsPathSet() {
     std::unordered_set<std::string> data_path_set;
-    const auto *pm = InfinityContext::instance().storage()->buffer_manager()->persistence_manager();
+    const auto *pm = InfinityContext::instance().storage()->fileworker_manager()->persistence_manager();
     for (auto files = pm->GetAllFiles(); const auto &path : files | std::views::keys) {
         data_path_set.emplace(path);
     }
@@ -1118,7 +1115,7 @@ std::unordered_set<std::string> MetaTree::GetDataVfsOffPathSet() {
 }
 
 std::vector<std::string> MetaTree::CheckMetaDataMapping(CheckStmtType tag, std::optional<std::string> db_table_str) {
-    const auto *pm = InfinityContext::instance().storage()->buffer_manager()->persistence_manager();
+    const auto *pm = InfinityContext::instance().storage()->fileworker_manager()->persistence_manager();
     auto data_path_set = pm != nullptr ? this->GetDataVfsPathSet() : this->GetDataVfsOffPathSet();
 
     std::vector<std::string> data_mismatch_entry;

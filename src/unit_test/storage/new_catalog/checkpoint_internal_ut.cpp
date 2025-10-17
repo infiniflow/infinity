@@ -43,8 +43,6 @@ import :value;
 import :kv_code;
 import :kv_store;
 import :new_txn;
-import :buffer_obj;
-import :buffer_handle;
 import :secondary_index_in_mem;
 import :secondary_index_data;
 import :segment_meta;
@@ -211,7 +209,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint0) {
     check_table();
 }
 
-TEST_P(TestTxnCheckpointInternalTest, DISABLED_SLOW_test_checkpoint1) {
+TEST_P(TestTxnCheckpointInternalTest, SLOW_test_checkpoint1) {
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -495,8 +493,9 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint2) {
         EXPECT_TRUE(status.ok());
     }
 
-    for (auto i = 0; i < 1; i++)
+    for (auto i = 0; i < 1; i++) {
         append();
+    }
 
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop column"), TransactionType::kDropColumn);
@@ -533,20 +532,20 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint2) {
                                                         std::set<ConstraintType>(),
                                                         "",
                                                         default_value1);
-        std::vector<std::shared_ptr<ColumnDef>> columns;
-        columns.emplace_back(column_def11);
-        columns.emplace_back(column_def22);
+        std::vector columns{column_def11, column_def22};
         Status status = txn->AddColumns(*db_name, *table_name, columns);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
 
+    [[maybe_unused]] auto *fileworker_mgr = infinity::InfinityContext::instance().storage()->fileworker_manager();
+
     checkpoint();
     RestartTxnMgr();
 }
 
-TEST_P(TestTxnCheckpointInternalTest, DISABLED_SLOW_test_checkpoint3) {
+TEST_P(TestTxnCheckpointInternalTest, SLOW_test_checkpoint3) {
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(999, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(9999, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -693,7 +692,7 @@ TEST_P(TestTxnCheckpointInternalTest, DISABLED_SLOW_test_checkpoint3) {
     checkpoint();
 }
 
-TEST_P(TestTxnCheckpointInternalTest, DISABLED_SLOW_test_checkpoint4) {
+TEST_P(TestTxnCheckpointInternalTest, SLOW_test_checkpoint4) {
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());

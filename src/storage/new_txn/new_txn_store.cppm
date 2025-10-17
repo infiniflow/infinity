@@ -30,7 +30,6 @@ namespace infinity {
 export class NewTxn;
 class BGTaskProcessor;
 struct DataBlock;
-class BufferManager;
 
 class KVInstance;
 struct WalSegmentInfo;
@@ -46,8 +45,6 @@ public:
     ~NewTxnTableStore1();
 
     Status Delete(const std::vector<RowID> &row_ids);
-
-    void GetAccessState(const std::vector<RowID> &row_ids, AccessState &access_state);
 
     DeleteState &delete_state() const { return *delete_state_; }
     DeleteState &undo_delete_state();

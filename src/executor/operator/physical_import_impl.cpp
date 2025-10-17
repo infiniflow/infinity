@@ -30,7 +30,6 @@ import :expression_state;
 import :data_block;
 import :logger;
 import :defer_op;
-import :buffer_handle;
 import :data_file_worker;
 import :infinity_exception;
 import :zsv;
@@ -133,14 +132,6 @@ public:
             UnrecoverableError("Txn is nullptr");
         }
         txn_->WriteDataBlockToFile(db_name_, table_name_, std::move(data_block_), block_idx, &object_paths);
-
-        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-        for (auto &object_path : object_paths) {
-            auto buf_obj = buffer_mgr->GetBufferObject(object_path);
-            buffer_mgr->RemoveFromGCQueue(buf_obj);
-            buf_obj->Free();
-        }
-        buffer_mgr->RemoveBufferObjects(object_paths);
     }
 
 private:

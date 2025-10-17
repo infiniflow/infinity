@@ -29,16 +29,18 @@ import third_party;
 namespace infinity {
 
 SecondaryIndexFileWorker::~SecondaryIndexFileWorker() {
-    if (data_ != nullptr) {
-        FreeInMemory();
-        data_ = nullptr;
-    }
+    // if (data_ != nullptr) {
+    //     FreeInMemory();
+    //     data_ = nullptr;
+    // }
+    FreeInMemory();
 }
 
 void SecondaryIndexFileWorker::AllocateInMemory() {
-    if (data_) [[unlikely]] {
-        UnrecoverableError("AllocateInMemory: Already allocated.");
-    } else if (auto &data_type = column_def_->type(); data_type->CanBuildSecondaryIndex()) [[likely]] {
+    // if (data_) [[unlikely]] {
+    //     UnrecoverableError("AllocateInMemory: Already allocated.");
+    // } else
+    if (auto &data_type = column_def_->type(); data_type->CanBuildSecondaryIndex()) [[likely]] {
         data_ = static_cast<void *>(GetSecondaryIndexData(data_type, row_count_, true));
         LOG_TRACE("Finished AllocateInMemory().");
     } else {
@@ -57,7 +59,7 @@ void SecondaryIndexFileWorker::FreeInMemory() {
     }
 }
 
-bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool SecondaryIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (data_) [[likely]] {
         auto index = static_cast<SecondaryIndexData *>(data_);
         index->SaveIndexInner(*file_handle_);
@@ -69,15 +71,15 @@ bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_succ
     return true;
 }
 
-void SecondaryIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
-    if (!data_) [[likely]] {
+void SecondaryIndexFileWorker::Read(size_t file_size) {
+    // if (!data_) [[likely]] {
         auto index = GetSecondaryIndexData(column_def_->type(), row_count_, false);
         index->ReadIndexInner(*file_handle_);
         data_ = static_cast<void *>(index);
-        LOG_TRACE("Finished ReadFromFileImpl().");
-    } else {
-        UnrecoverableError("ReadFromFileImpl: data_ is not nullptr");
-    }
+        LOG_TRACE("Finished Read().");
+    // } else {
+    //     UnrecoverableError("Read: data_ is not nullptr");
+    // }
 }
 
 } // namespace infinity

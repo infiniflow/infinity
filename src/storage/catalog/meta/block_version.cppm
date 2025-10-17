@@ -22,8 +22,6 @@ namespace infinity {
 struct ColumnVector;
 
 struct CreateField {
-    //    CreateField(TxnTimeStamp create_ts, i32 row_count) : create_ts_(create_ts), row_count_(row_count) {}
-
     TxnTimeStamp create_ts_{};
     i64 row_count_{};
 
@@ -50,12 +48,10 @@ export struct BlockVersion {
     i32 GetRowCount(TxnTimeStamp begin_ts) const;
     i64 GetRowCount() const;
 
-    std::tuple<i32, Status> GetRowCountForUpdate(TxnTimeStamp begin_ts) const;
-
-    bool SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
+    bool SaveToFile(void *&mmap_true, size_t &mmap_true_size, TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
 
     void SpillToFile(LocalFileHandle *file_handle) const;
-    static std::unique_ptr<BlockVersion> LoadFromFile(LocalFileHandle *file_handle);
+    static std::unique_ptr<BlockVersion> LoadFromFile(void *&mmap_true, LocalFileHandle *file_handle);
 
     void GetCreateTS(size_t offset, size_t size, ColumnVector &res) const;
 

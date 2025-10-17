@@ -50,8 +50,6 @@ import :index_emvb;
 import :index_bmp;
 import :defer_op;
 import :mem_index;
-import :buffer_obj;
-import :buffer_handle;
 import :logger;
 
 import column_def;
@@ -1189,7 +1187,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_dump_index) {
                 EXPECT_EQ(chunk_info->row_cnt_, block_row_cnt);
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(0, chunk_id * block_row_cnt));
 
-                BufferObj *buffer_obj = nullptr;
+                FileWorker *buffer_obj = nullptr;
                 status = chunk_index_meta.GetIndexBuffer(buffer_obj);
                 EXPECT_TRUE(status.ok());
             }
@@ -1335,7 +1333,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_optimize_index) {
             EXPECT_EQ(chunk_info->row_cnt_, block_row_cnt * 2);
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
 
-            BufferObj *buffer_obj = nullptr;
+            FileWorker *buffer_obj = nullptr;
             status = chunk_index_meta.GetIndexBuffer(buffer_obj);
             EXPECT_TRUE(status.ok());
         }

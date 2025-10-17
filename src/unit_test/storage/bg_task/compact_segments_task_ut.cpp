@@ -22,7 +22,7 @@ import :ut.base_test;
 import :storage;
 import :infinity_context;
 import :status;
-import :buffer_manager;
+import :fileworker_manager;
 import :column_vector;
 import :table_def;
 import :value;
@@ -71,7 +71,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          CompactTaskTest,
                          ::testing::Values(BaseTestParamStr::NEW_BG_ON_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_BG_ON_CONFIG_PATH));
 
-TEST_P(CompactTaskTest, bg_compact) {
+TEST_P(CompactTaskTest, SLOW_bg_compact) {
     auto *storage = infinity::InfinityContext::instance().storage();
     auto *txn_mgr = storage->new_txn_manager();
 

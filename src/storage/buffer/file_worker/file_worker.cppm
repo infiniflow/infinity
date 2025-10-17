@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:file_worker;
 
 import :file_worker_type;
@@ -25,7 +23,6 @@ import third_party;
 
 namespace infinity {
 
-class KVInstance;
 class LocalFileHandle;
 class Status;
 
@@ -33,20 +30,19 @@ export struct FileWorkerSaveCtx {};
 
 export class FileWorker {
 public:
-    // spill_dir_ is not init here
-    explicit FileWorker(std::shared_ptr<std::string> data_dir,
-                        std::shared_ptr<std::string> temp_dir,
-                        std::shared_ptr<std::string> file_dir,
-                        std::shared_ptr<std::string> file_name,
-                        PersistenceManager *persistence_manager);
+    explicit FileWorker(std::shared_ptr<std::string> file_path);
 
     // No destruct here
     virtual ~FileWorker();
 
 public:
-    [[nodiscard]] bool WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx = {});
+    [[nodiscard]] bool Write(const FileWorkerSaveCtx &ctx = {});
 
-    void ReadFromFile(bool from_spill);
+    void Read();
+
+    void Load();
+
+    void PickForCleanup() {}
 
     void MoveFile();
 
@@ -54,11 +50,14 @@ public:
 
     virtual void FreeInMemory() = 0;
 
-    virtual size_t GetMemoryCost() const = 0;
-
     virtual FileWorkerType Type() const = 0;
 
-    void *GetData() const { return data_; }
+    void *GetData() {
+        if (!mmap_) {
+            Load();
+        }
+        return data_;
+    }
 
     void SetData(void *data);
 
@@ -67,47 +66,27 @@ public:
     // Get an absolute file path. As key of a buffer handle.
     std::string GetFilePath() const;
 
+    std::string GetFilePathTemp() const;
+
     Status CleanupFile() const;
 
-    void CleanupTempFile() const;
-
 protected:
-    virtual bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
+    virtual bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
 
-    virtual void ReadFromFileImpl(size_t file_size, bool from_spill) = 0;
+    virtual void Read(size_t file_size) = 0;
 
-    std::string ChooseFileDir(bool spill) const;
-
-    std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> GetFilePathInner(bool spill);
+    // std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> GetFilePathInner(bool spill);
 
 public:
-    const std::shared_ptr<std::string> data_dir_{};
-    const std::shared_ptr<std::string> temp_dir_{};
-    const std::shared_ptr<std::string> file_dir_{};
-    const std::shared_ptr<std::string> file_name_{};
+    std::mutex l_;
+    std::shared_ptr<std::string> rel_file_path_;
     PersistenceManager *persistence_manager_{};
-    ObjAddr obj_addr_{};
+    ObjAddr obj_addr_;
+    void *mmap_{};
+    size_t mmap_size_{};
 
 protected:
-    void *data_{nullptr};
-    std::unique_ptr<LocalFileHandle> file_handle_{nullptr};
-
-public:
-    void *GetMmapData() const { return mmap_data_; }
-
-    void Mmap();
-
-    void Munmap();
-
-    void MmapNotNeed();
-
-protected:
-    virtual bool ReadFromMmapImpl([[maybe_unused]] const void *ptr, [[maybe_unused]] size_t size);
-
-    virtual void FreeFromMmapImpl();
-
-protected:
-    u8 *mmap_addr_{nullptr};
-    u8 *mmap_data_{nullptr};
+    void *data_{};
+    std::unique_ptr<LocalFileHandle> file_handle_;
 };
 } // namespace infinity

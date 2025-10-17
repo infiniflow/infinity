@@ -128,32 +128,6 @@ bool TableIndexMeta::HasSegmentIndexID(SegmentID segment_id) {
     return true;
 }
 
-Status TableIndexMeta::SetSegmentIDs(const std::vector<SegmentID> &segment_ids) {
-    std::string segment_ids_key = GetTableIndexTag("segment_ids");
-    std::string segment_ids_str = nlohmann::json(segment_ids).dump();
-    Status status = kv_instance_.Put(segment_ids_key, segment_ids_str);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
-
-Status TableIndexMeta::AddSegmentID(SegmentID segment_id) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    if (!segment_ids_) {
-        Status status = LoadSegmentIDs();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    segment_ids_->push_back(segment_id);
-    Status status = SetSegmentIDs(*segment_ids_);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
-
 Status TableIndexMeta::AddSegmentIndexID1(SegmentID segment_id, NewTxn *new_txn) {
 
     std::string segment_id_key = KeyEncode::CatalogIdxSegmentKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, segment_id);
@@ -192,32 +166,9 @@ Status TableIndexMeta::RemoveSegmentIndexIDs(const std::vector<SegmentID> &segme
     return Status::OK();
 }
 
-Status TableIndexMeta::GetSegmentUpdateTS(std::shared_ptr<SegmentUpdateTS> &segment_update_ts) {
-    if (segment_update_ts_) {
-        segment_update_ts = segment_update_ts_;
-        return Status::OK();
-    }
-    std::string segment_update_ts_key = GetTableIndexTag("segment_update_ts");
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    Status status = new_catalog->GetSegmentUpdateTS(segment_update_ts_key, segment_update_ts);
-    if (!status.ok()) {
-        return status;
-    }
-    segment_update_ts_ = segment_update_ts;
-    return Status::OK();
-}
-
 Status TableIndexMeta::InitSet1(const std::shared_ptr<IndexBase> &index_base, NewCatalog *new_catalog) {
     {
         Status status = SetIndexBase(index_base);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    if (index_base->index_type_ == IndexType::kFullText) {
-        std::string segment_update_ts_key = GetTableIndexTag("segment_update_ts");
-        auto segment_update_ts = std::make_shared<SegmentUpdateTS>();
-        Status status = new_catalog->AddSegmentUpdateTS(segment_update_ts_key, segment_update_ts);
         if (!status.ok()) {
             return status;
         }
@@ -239,10 +190,6 @@ Status TableIndexMeta::UninitSet1(UsageFlag usage_flag) {
             if (!status.ok() && status.code() != ErrorCode::kCatalogError) {
                 return status;
             }
-
-            NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-            std::string segment_update_ts_key = GetTableIndexTag("segment_update_ts");
-            new_catalog->DropSegmentUpdateTSByKey(segment_update_ts_key);
         }
     }
 
@@ -262,21 +209,6 @@ Status TableIndexMeta::UninitSet1(UsageFlag usage_flag) {
         return status;
     }
 
-    return Status::OK();
-}
-
-Status TableIndexMeta::LoadSegmentIDs() {
-    std::string segment_ids_key = GetTableIndexTag("segment_ids");
-    std::string segment_ids_str;
-    Status status = kv_instance_.Get(segment_ids_key, segment_ids_str);
-    if (!status.ok()) {
-        return status;
-    }
-    simdjson::padded_string json_pad(segment_ids_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(json_pad);
-    std::vector<SegmentID> segment_ids = doc.get<std::vector<SegmentID>>();
-    segment_ids_ = segment_ids;
     return Status::OK();
 }
 

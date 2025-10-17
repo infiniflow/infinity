@@ -14,7 +14,6 @@
 
 export module infinity_core:vector_buffer;
 
-import :buffer_handle;
 import :var_buffer;
 import :sparse_util;
 
@@ -24,9 +23,6 @@ import data_type;
 import global_resource_usage;
 
 namespace infinity {
-
-class BufferManager;
-class BufferObj;
 
 export enum class VectorBufferType {
     kInvalid,
@@ -41,30 +37,22 @@ public:
     static std::shared_ptr<VectorBuffer> Make(size_t data_type_size, size_t capacity, VectorBufferType buffer_type);
 
     static std::shared_ptr<VectorBuffer>
-    Make(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, size_t data_type_size, size_t capacity, VectorBufferType buffer_type);
+    Make(FileWorker *fileworker, FileWorker *var_fileworker, size_t data_type_size, size_t capacity, VectorBufferType buffer_type);
 
 public:
-    explicit VectorBuffer() {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount("VectorBuffer");
-#endif
-    }
+    explicit VectorBuffer() {}
 
-    ~VectorBuffer() {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::DecrObjectCount("VectorBuffer");
-#endif
-    }
+    ~VectorBuffer() {}
 
     void Initialize(size_t type_size, size_t capacity);
 
     void InitializeCompactBit(size_t capacity);
 
-    void InitializeCompactBit(BufferObj *buffer_obj, size_t capacity);
+    void InitializeCompactBit(FileWorker *fileworker, size_t capacity);
 
-    void Initialize(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, size_t type_size, size_t capacity);
+    void Initialize(FileWorker *fileworker, FileWorker *var_fileworker, size_t type_size, size_t capacity);
 
-    void SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj);
+    void SetToCatalog(FileWorker *fileworker, FileWorker *var_fileworker);
 
     void ResetToInit(VectorBufferType type);
 
@@ -74,7 +62,7 @@ public:
         if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
             return std::get<std::unique_ptr<char[]>>(ptr_).get();
         } else {
-            return static_cast<char *>(std::get<BufferHandle>(ptr_).GetDataMut());
+            return static_cast<char *>(std::get<FileWorker *>(ptr_)->GetData());
         }
     }
 
@@ -82,7 +70,7 @@ public:
         if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
             return std::get<std::unique_ptr<char[]>>(ptr_).get();
         } else {
-            return static_cast<const char *>(std::get<BufferHandle>(ptr_).GetData());
+            return static_cast<const char *>(std::get<FileWorker *>(ptr_)->GetData());
         }
     }
 
@@ -101,7 +89,7 @@ public:
 private:
     bool initialized_{false};
 
-    std::variant<std::unique_ptr<char[]>, BufferHandle> ptr_;
+    std::variant<std::unique_ptr<char[]>, FileWorker *> ptr_;
 
     size_t data_size_{0};
     size_t capacity_{0};

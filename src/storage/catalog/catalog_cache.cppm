@@ -25,50 +25,6 @@ namespace infinity {
 
 class IndexBase;
 
-export struct SegmentIndexPrepareInfo {
-    SegmentID segment_id_{};
-    ChunkID chunk_id_{};
-    size_t row_count_{};
-};
-
-export struct DumpMemIndexPrepareInfo {
-    SegmentID segment_id_{};
-    ChunkID chunk_id_{};
-    SegmentOffset start_offset_{};
-    size_t row_count_{};
-    u64 index_id_;
-};
-
-export struct CreateIndexPrepareInfo {
-    u64 index_id_{};
-    std::string index_name_{};
-    std::vector<SegmentIndexPrepareInfo> segment_index_prepare_infos_;
-};
-
-export struct ImportPrepareInfo {
-    std::vector<SegmentID> segment_ids_;
-    std::vector<u64> row_counts_; // assigned by import operation in prepare commit phase. row count of each imported segment.
-    std::vector<CreateIndexPrepareInfo> indexes_;
-};
-
-export struct CompactPrepareInfo {
-    SegmentID new_segment_id_{};
-    u64 new_segment_row_count_{};
-    std::vector<SegmentID> old_segment_ids_{};
-    std::vector<CreateIndexPrepareInfo> indexes_{};
-};
-
-export struct OptimizeSegmentIndexPrepareInfo {
-    SegmentID new_segment_id_;
-    std::vector<ChunkID> old_chunk_ids_;
-    ChunkID new_chunk_id_;
-};
-
-export struct OptimizePrepareInfo {
-    u64 index_id_{};
-    std::vector<OptimizeSegmentIndexPrepareInfo> segment_index_prepare_infos_;
-};
-
 export struct AppendPrepareInfo {
     TransactionID transaction_id_;
     std::vector<std::pair<RowID, u64>> ranges_;
@@ -128,23 +84,12 @@ public:
 
     std::shared_ptr<AppendPrepareInfo> PrepareAppendNolock(size_t row_count, TransactionID txn_id);
     void CommitAppendNolock(const std::shared_ptr<AppendPrepareInfo> &append_info, TransactionID txn_id);
-    bool AllPrepareAreCommittedNolock() const;
-    RowID GetCommitPosition() const;
     SegmentID prepare_segment_id_{0};
     SegmentOffset prepare_segment_offset_{0};
     SegmentID commit_segment_id_{0};
     SegmentOffset commit_segment_offset_{0};
 
-    // Import segments
-    std::shared_ptr<ImportPrepareInfo> PrepareImportSegmentsNolock(u64 segment_count, TransactionID txn_id);
-    void CommitImportSegmentsNolock(const std::shared_ptr<ImportPrepareInfo> &import_prepare_info, TransactionID txn_id);
-
-    // Compact segments
-    std::shared_ptr<CompactPrepareInfo> PrepareCompactSegmentsNolock(const std::vector<SegmentID> &segment_ids, TransactionID txn_id);
-    void CommitCompactSegmentsNolock(const std::shared_ptr<CompactPrepareInfo> &compact_prepare_info, TransactionID txn_id);
-
     std::vector<SegmentID> ApplySegmentIDsNolock(u64 segment_count);
-    ChunkID ApplyChunkIDNolock(u64 index_id, SegmentID segment_id);
 
     void AddTableIndexCacheNolock(const std::shared_ptr<TableIndexCache> &table_index_cache);
     void DropTableIndexCacheNolock(u64 index_id);
@@ -165,16 +110,12 @@ public:
 
     std::map<SegmentID, std::shared_ptr<SegmentCache>> segment_cache_map_{}; // segment_id -> segment_cache
 
-    std::map<SegmentID, std::shared_ptr<SegmentCache>> sealed_segment_cache_map_{}; // segment_id -> segment_cache
     std::shared_ptr<SegmentCache> unsealed_segment_cache_{};
     std::deque<std::shared_ptr<AppendPrepareInfo>> uncommitted_append_infos_{};
 
     // Used by dump index / create index, index_id -> table_index_cache
     std::map<u64, std::shared_ptr<TableIndexCache>> index_cache_map_{}; // index_id -> table_index_cache
     std::map<std::string, u64> index_name_map_{};                       // index_name -> index_id
-
-    std::map<TransactionID, std::shared_ptr<ImportPrepareInfo>> import_prepare_info_map_{};   // txn_id -> import_prepare_info
-    std::map<TransactionID, std::shared_ptr<CompactPrepareInfo>> compact_prepare_info_map_{}; // txn_id -> import_prepare_info
 };
 
 export struct DbCache {
@@ -215,21 +156,10 @@ public:
     // Drop index
     void DropIndexCache(u64 db_id, u64 table_id, u64 index_id);
 
-    // Import segments
-    std::shared_ptr<ImportPrepareInfo> PrepareImportSegments(u64 db_id, u64 table_id, u64 segment_count, TransactionID txn_id);
-    void CommitImportSegments(u64 db_id, u64 table_id, const std::shared_ptr<ImportPrepareInfo> &import_prepare_info, TransactionID txn_id);
-
-    // Compact segments
-    std::shared_ptr<CompactPrepareInfo>
-    PrepareCompactSegments(u64 db_id, u64 table_id, const std::vector<SegmentID> &segment_ids, TransactionID txn_id);
-    void CommitCompactSegments(u64 db_id, u64 table_id, const std::shared_ptr<CompactPrepareInfo> &compact_prepare_info, TransactionID txn_id);
-
     std::vector<SegmentID> ApplySegmentIDs(u64 db_id, u64 table_id, u64 segment_count);
-    ChunkID ApplyChunkID(u64 db_id, u64 table_id, u64 index_id, SegmentID segment_id);
 
     // Append and update
     std::shared_ptr<AppendPrepareInfo> PrepareAppend(u64 db_id, u64 table_id, size_t row_count, TransactionID txn_id);
-    void CommitAppend(u64 db_id, u64 table_id, const std::shared_ptr<AppendPrepareInfo> &append_info, TransactionID txn_id);
 
     nlohmann::json ToJson() const;
 

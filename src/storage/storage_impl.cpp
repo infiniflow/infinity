@@ -16,7 +16,7 @@ module infinity_core:storage.impl;
 
 import :storage;
 import :config;
-import :buffer_manager;
+import :fileworker_manager;
 import :default_values;
 import :wal_manager;
 import :new_catalog;
@@ -198,11 +198,8 @@ Status Storage::AdminToReader() {
         buffer_mgr_->Stop();
         buffer_mgr_.reset();
     }
-    buffer_mgr_ = std::make_unique<BufferManager>(config_ptr_->BufferManagerSize(),
-                                                  std::make_shared<std::string>(config_ptr_->DataDir()),
-                                                  std::make_shared<std::string>(config_ptr_->TempDir()),
-                                                  persistence_manager_.get(),
-                                                  config_ptr_->LRUNum());
+    buffer_mgr_ = std::make_unique<FileWorkerManager>(std::make_shared<std::string>(config_ptr_->DataDir()),
+                                                      std::make_shared<std::string>(config_ptr_->TempDir()));
     buffer_mgr_->Start();
 
     meta_cache_ = std::make_unique<MetaCache>(DEFAULT_META_CACHE_SIZE);
@@ -246,11 +243,8 @@ Status Storage::AdminToWriter() {
         buffer_mgr_->Stop();
         buffer_mgr_.reset();
     }
-    buffer_mgr_ = std::make_unique<BufferManager>(config_ptr_->BufferManagerSize(),
-                                                  std::make_shared<std::string>(config_ptr_->DataDir()),
-                                                  std::make_shared<std::string>(config_ptr_->TempDir()),
-                                                  persistence_manager_.get(),
-                                                  config_ptr_->LRUNum());
+    buffer_mgr_ = std::make_unique<FileWorkerManager>(std::make_shared<std::string>(config_ptr_->DataDir()),
+                                                      std::make_shared<std::string>(config_ptr_->TempDir()));
     buffer_mgr_->Start();
 
     meta_cache_ = std::make_unique<MetaCache>(DEFAULT_META_CACHE_SIZE);

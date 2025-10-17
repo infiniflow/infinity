@@ -60,16 +60,16 @@ namespace infinity {
 // } // namespace
 
 void NewTxnGetVisibleRangeState::Init(std::shared_ptr<BlockLock> block_lock,
-                                      BufferHandle version_buffer_handle,
+                                      FileWorker *version_buffer_obj,
                                       TxnTimeStamp begin_ts,
                                       TxnTimeStamp commit_ts) {
     block_lock_ = std::move(block_lock);
-    version_buffer_handle_ = std::move(version_buffer_handle);
+    version_buffer_obj_ = std::move(version_buffer_obj);
     begin_ts_ = begin_ts;
     commit_ts_ = commit_ts;
     {
         std::shared_lock<std::shared_mutex> lock(block_lock_->mtx_);
-        const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer_handle_.GetData());
+        const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer_obj_->GetData());
         block_offset_end_ = block_version->GetRowCount(begin_ts_);
     }
 }
@@ -79,7 +79,7 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, std::pair<
         return false;
     }
 
-    const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer_handle_.GetData());
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer_obj_->GetData());
 
     if (block_offset_begin == block_offset_end_) {
         auto [offset, commit_cnt] = block_version->GetCommitRowCount(commit_ts_);
@@ -143,7 +143,7 @@ Status NewCatalog::InitCatalog(MetaCache *meta_cache, KVInstance *kv_instance, T
                 return status;
             }
         }
-        return block_meta.LoadSet(checkpoint_ts);
+        return block_meta.InitOrLoadSet(checkpoint_ts);
     };
     auto InitSegment = [&](SegmentMeta &segment_meta) {
         auto [block_ids, blocks_status] = segment_meta.GetBlockIDs1();
@@ -653,30 +653,6 @@ NewCatalog::AddNewSegmentWithID(TableMeta &table_meta, TxnTimeStamp commit_ts, s
     return segment_meta->InitSet();
 }
 
-Status NewCatalog::LoadFlushedSegment1(TableMeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
-    Status status;
-
-    SegmentID segment_id = 0;
-    std::tie(segment_id, status) = table_meta.AddSegmentID1(checkpoint_ts);
-    if (!status.ok()) {
-        return status;
-    }
-
-    SegmentMeta segment_meta(segment_id, table_meta);
-    status = segment_meta.InitSet();
-    if (!status.ok()) {
-        return status;
-    }
-    for (const WalBlockInfo &block_info : segment_info.block_infos_) {
-        status = NewCatalog::LoadFlushedBlock1(segment_meta, block_info, checkpoint_ts);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-
-    return Status::OK();
-}
-
 Status NewCatalog::LoadFlushedSegment2(TableMeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
     Status status = table_meta.AddSegmentWithID(checkpoint_ts, segment_info.segment_id_);
     if (!status.ok()) {
@@ -758,7 +734,7 @@ Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_t
         return status;
     }
     block_meta.emplace(block_id, segment_meta);
-    status = block_meta->InitSet();
+    status = block_meta->InitOrLoadSet();
     if (!status.ok()) {
         return status;
     }
@@ -774,6 +750,7 @@ Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_t
     for (size_t column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
         std::shared_ptr<ColumnDef> &col_def = column_defs_ptr->at(column_idx);
         ColumnMeta column_meta(column_idx, *block_meta);
+        [[maybe_unused]] FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
         status = column_meta.InitSet(col_def);
         if (!status.ok()) {
             return status;
@@ -788,7 +765,7 @@ Status NewCatalog::LoadImportedOrCompactedSegment(TableMeta &table_meta, const W
         SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
         std::optional<BlockMeta> block_meta;
         block_meta.emplace(block_id, segment_meta);
-        Status status = block_meta->LoadSet(commit_ts);
+        Status status = block_meta->InitOrLoadSet(commit_ts);
         if (!status.ok()) {
             return status;
         }
@@ -850,7 +827,7 @@ Status NewCatalog::AddNewBlockWithID(SegmentMeta &segment_meta, TxnTimeStamp com
         return status;
     }
     block_meta.emplace(block_id, segment_meta);
-    status = block_meta->InitSet();
+    status = block_meta->InitOrLoadSet();
     if (!status.ok()) {
         return status;
     }
@@ -909,7 +886,7 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
     }
 
     BlockMeta block_meta(block_id, segment_meta);
-    status = block_meta.LoadSet(checkpoint_ts);
+    status = block_meta.InitOrLoadSet(checkpoint_ts);
     if (!status.ok()) {
         return status;
     }
@@ -923,13 +900,7 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
         }
     }
     for (const auto &column_def : *column_defs_ptr) {
-        //    const auto &[chunk_idx, chunk_offset] = block_info.outline_infos_[column_def->id()];
         ColumnMeta column_meta(column_def->id(), block_meta);
-        //    status = column_meta.SetChunkOffset(chunk_offset);
-        //    if (!status.ok()) {
-        //        return status;
-        //    }
-
         status = column_meta.LoadSet();
         if (!status.ok()) {
             return status;
@@ -1210,14 +1181,15 @@ Status NewCatalog::GetColumnVector(ColumnMeta &column_meta,
                                    ColumnVector &column_vector) {
     std::shared_ptr<DataType> column_type = col_def->type();
 
-    BufferObj *buffer_obj = nullptr;
-    BufferObj *outline_buffer_obj = nullptr;
+    FileWorker *buffer_obj = nullptr;
+    FileWorker *outline_buffer_obj = nullptr;
     Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
     if (!status.ok()) {
         return status;
     }
 
     column_vector = ColumnVector(column_type);
+    // buffer_obj->file_worker()->ReadFromFile(true);
     column_vector.Initialize(buffer_obj, outline_buffer_obj, row_count, tipe);
     return Status::OK();
 }
@@ -1228,7 +1200,6 @@ Status NewCatalog::GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begi
         return status;
     }
 
-    BufferHandle buffer_handle = version_buffer->Load();
     std::shared_ptr<BlockLock> block_lock;
     {
         status = block_meta.GetBlockLock(block_lock);
@@ -1236,7 +1207,7 @@ Status NewCatalog::GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begi
             return status;
         }
     }
-    state.Init(std::move(block_lock), std::move(buffer_handle), begin_ts, commit_ts);
+    state.Init(std::move(block_lock), std::move(version_buffer), begin_ts, commit_ts);
     return Status::OK();
 }
 
@@ -1254,8 +1225,7 @@ Status NewCatalog::GetCreateTSVector(BlockMeta &block_meta, size_t offset, size_
         return status;
     }
 
-    BufferHandle buffer_handle = version_buffer->Load();
-    const auto *block_version = reinterpret_cast<const BlockVersion *>(buffer_handle.GetData());
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer->GetData());
     {
         std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
         block_version->GetCreateTS(offset, size, column_vector);
@@ -1277,8 +1247,7 @@ Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, size_t offset, size_
         return status;
     }
 
-    BufferHandle buffer_handle = version_buffer->Load();
-    const auto *block_version = reinterpret_cast<const BlockVersion *>(buffer_handle.GetData());
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer->GetData());
     {
         std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
         block_version->GetDeleteTS(offset, size, column_vector);

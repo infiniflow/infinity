@@ -57,20 +57,6 @@ Status NewTxnTableStore1::Delete(const std::vector<RowID> &row_ids) {
     return Status::OK();
 }
 
-void NewTxnTableStore1::GetAccessState(const std::vector<RowID> &row_ids, AccessState &access_state) {
-    std::unordered_map<SegmentID, std::unordered_map<BlockID, std::vector<BlockOffset>>> &row_hash_table = access_state.rows_;
-    for (auto row_id : row_ids) {
-        BlockID block_id = row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
-        BlockOffset block_offset = row_id.segment_offset_ % DEFAULT_BLOCK_CAPACITY;
-        auto &seg_map = row_hash_table[row_id.segment_id_];
-        auto &block_vec = seg_map[block_id];
-        block_vec.emplace_back(block_offset);
-        if (block_vec.size() > DEFAULT_BLOCK_CAPACITY) {
-            UnrecoverableError("Delete row exceed block capacity");
-        }
-    }
-}
-
 DeleteState &NewTxnTableStore1::undo_delete_state() {
     if (!undo_delete_state_) {
 

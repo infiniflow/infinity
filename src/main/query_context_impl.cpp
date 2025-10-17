@@ -261,13 +261,13 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
         StopProfile(QueryPhase::kExecution);
         //        LOG_WARN(fmt::format("Before commit cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kCommit);
-        this->CommitTxn();
+        CommitTxn();
         StopProfile(QueryPhase::kCommit);
 
     } catch (RecoverableException &e) {
 
         // If txn has been rollbacked, do not rollback again here.
-        NewTxn *new_txn = this->GetNewTxn();
+        NewTxn *new_txn = GetNewTxn();
         if (new_txn != nullptr) {
             StopProfile();
             StartProfile(QueryPhase::kRollback);

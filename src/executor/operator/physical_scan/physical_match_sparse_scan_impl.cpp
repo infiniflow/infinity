@@ -37,13 +37,11 @@ import :knn_result_handler;
 import :match_sparse_scan_function_data;
 import :global_block_id;
 import :bmp_index_file_worker;
-import :buffer_handle;
 import :sparse_util;
 import :bmp_util;
 import :knn_filter;
 import :bmp_handler;
 import :status;
-import :buffer_obj;
 import :table_meta;
 import :table_index_meta;
 import :segment_index_meta;
@@ -521,13 +519,12 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
             }
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
-                BufferObj *index_buffer = nullptr;
+                FileWorker *index_buffer{};
                 status = chunk_index_meta.GetIndexBuffer(index_buffer);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }
-                BufferHandle index_handle = index_buffer->Load();
-                const auto *bmp_handler = reinterpret_cast<const BMPHandlerPtr *>(index_handle.GetData());
+                const auto *bmp_handler = reinterpret_cast<const BMPHandlerPtr *>(index_buffer->GetData());
                 bmp_search(*bmp_handler, 0, false, filter);
             }
             if (auto mem_index = segment_index_meta->GetMemIndex()) {

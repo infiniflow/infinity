@@ -26,7 +26,7 @@ import :roaring_bitmap;
 import :vector_buffer;
 import :logger;
 import :value;
-import :buffer_manager;
+import :fileworker_manager;
 import :status;
 import :base_expression;
 import :value_expression;
@@ -98,6 +98,21 @@ ColumnVector &ColumnVector::operator=(ColumnVector &&right) noexcept {
         vector_type_ = right.vector_type_;
         data_type_ = std::move(right.data_type_);
         data_ptr_ = std::exchange(right.data_ptr_, nullptr);
+        capacity_ = right.capacity_;
+        tail_index_.store(right.tail_index_.load());
+    }
+    return *this;
+}
+
+ColumnVector &ColumnVector::operator=(const ColumnVector &right) noexcept {
+    if (this != &right) {
+        data_type_size_ = right.data_type_size_;
+        buffer_ = right.buffer_;
+        nulls_ptr_ = right.nulls_ptr_;
+        initialized = right.initialized;
+        vector_type_ = right.vector_type_;
+        data_type_ = right.data_type_;
+        data_ptr_ = right.data_ptr_;
         capacity_ = right.capacity_;
         tail_index_.store(right.tail_index_.load());
     }
@@ -232,8 +247,8 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, size_t capacity) {
     }
 }
 
-void ColumnVector::Initialize(BufferObj *buffer_obj,
-                              BufferObj *outline_buffer_obj,
+void ColumnVector::Initialize(FileWorker *buffer_obj,
+                              FileWorker *outline_buffer_obj,
                               size_t current_row_count,
                               ColumnVectorMode vector_tipe,
                               ColumnVectorType vector_type,
@@ -264,7 +279,7 @@ void ColumnVector::Initialize(BufferObj *buffer_obj,
     tail_index_.store(current_row_count);
 }
 
-void ColumnVector::SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, ColumnVectorMode vector_tipe) {
+void ColumnVector::SetToCatalog(FileWorker *buffer_obj, FileWorker *outline_buffer_obj, ColumnVectorMode vector_tipe) {
     if (buffer_.get() == nullptr) {
         UnrecoverableError("Column vector is not initialized.");
     }

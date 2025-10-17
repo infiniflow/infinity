@@ -21,6 +21,7 @@ import :index_defines;
 import :logger;
 import :status;
 import :default_values;
+import :file_worker;
 
 import third_party;
 
@@ -31,16 +32,15 @@ export class TermDocIterator;
 class NewTxn;
 class MemoryIndexer;
 class TableIndexMeta;
-class BufferObj;
 struct SegmentIndexFtInfo;
 
 struct ColumnReaderChunkInfo {
-    BufferObj *index_buffer_ = nullptr;
+    FileWorker *index_buffer_{};
     RowID base_rowid_{};
     size_t row_cnt_{};
     size_t term_cnt_{};
-    SegmentID segment_id_ = 0;
-    ChunkID chunk_id_ = 0;
+    SegmentID segment_id_{};
+    ChunkID chunk_id_{};
 };
 
 export class ColumnIndexReader {

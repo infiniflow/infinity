@@ -20,7 +20,7 @@ import :txn_state;
 import :wal_entry;
 import :infinity_exception;
 import :logger;
-import :buffer_manager;
+import :fileworker_manager;
 import :default_values;
 import :wal_manager;
 import :defer_op;
@@ -44,7 +44,7 @@ import global_resource_usage;
 namespace infinity {
 
 NewTxnManager::NewTxnManager(Storage *storage, KVStore *kv_store, TxnTimeStamp start_ts)
-    : storage_(storage), buffer_mgr_(storage->buffer_manager()), wal_mgr_(storage->wal_manager()), kv_store_(kv_store), current_ts_(start_ts),
+    : storage_(storage), fileworker_mgr_(storage->fileworker_manager()), wal_mgr_(storage->wal_manager()), kv_store_(kv_store), current_ts_(start_ts),
       prepare_commit_ts_(start_ts), is_running_(false) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("NewTxnManager");
@@ -183,22 +183,6 @@ std::unique_ptr<NewTxn> NewTxnManager::BeginRecoveryTxn() {
     // Create txn instance
     std::unique_ptr<NewTxn> recovery_txn = NewTxn::NewRecoveryTxn(this, begin_ts, commit_ts);
     return recovery_txn;
-}
-
-NewTxn *NewTxnManager::GetTxn(TransactionID txn_id) const {
-    std::lock_guard guard(locker_);
-    NewTxn *res = txn_map_.at(txn_id).get();
-    return res;
-}
-
-TxnState NewTxnManager::GetTxnState(TransactionID txn_id) const {
-    std::lock_guard guard(locker_);
-    auto iter = txn_map_.find(txn_id);
-    if (iter == txn_map_.end()) {
-        return TxnState::kCommitted;
-    }
-    NewTxn *txn = iter->second.get();
-    return txn->GetTxnState();
 }
 
 // Prepare to commit ReadTxn
