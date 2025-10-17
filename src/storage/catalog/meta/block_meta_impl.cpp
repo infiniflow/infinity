@@ -84,9 +84,8 @@ Status BlockMeta::InitOrLoadSet(TxnTimeStamp checkpoint_ts) {
     }
     auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     std::shared_ptr<std::string> block_dir_ptr = GetBlockDir();
-    auto file_path =
-        std::make_shared<std::string>(fmt::format("{}/{}/{}", InfinityContext::instance().config()->TempDir(), *block_dir_ptr, BlockVersion::PATH));
-    auto version_file_worker = std::make_unique<VersionFileWorker>(file_path, block_capacity());
+    auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
+    auto version_file_worker = std::make_unique<VersionFileWorker>(rel_file_path, block_capacity());
     version_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(version_file_worker));
     return Status::OK();
 }
@@ -94,9 +93,8 @@ Status BlockMeta::InitOrLoadSet(TxnTimeStamp checkpoint_ts) {
 Status BlockMeta::RestoreSet() {
     auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     std::shared_ptr<std::string> block_dir_ptr = GetBlockDir();
-    auto file_path =
-        std::make_shared<std::string>(fmt::format("{}/{}/{}", InfinityContext::instance().config()->TempDir(), *block_dir_ptr, BlockVersion::PATH));
-    auto version_file_worker = std::make_unique<VersionFileWorker>(file_path, block_capacity());
+    auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
+    auto version_file_worker = std::make_unique<VersionFileWorker>(rel_file_path, block_capacity());
     auto *buffer_obj = fileworker_mgr->GetFileWorker(version_file_worker->GetFilePath());
     if (buffer_obj == nullptr) {
         version_buffer_ = version_file_worker.get();
@@ -117,9 +115,8 @@ Status BlockMeta::RestoreSetFromSnapshot() {
     }
     // auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     std::shared_ptr<std::string> block_dir_ptr = GetBlockDir();
-    auto file_path =
-        std::make_shared<std::string>(fmt::format("{}/{}/{}", InfinityContext::instance().config()->TempDir(), *block_dir_ptr, BlockVersion::PATH));
-    auto version_file_worker = std::make_unique<VersionFileWorker>(file_path, block_capacity());
+    auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
+    auto version_file_worker = std::make_unique<VersionFileWorker>(rel_file_path, block_capacity());
 
     version_buffer_ = version_file_worker.get();
     if (!version_buffer_) {
@@ -174,7 +171,7 @@ std::tuple<FileWorker *, Status> BlockMeta::GetVersionBuffer() {
             block_dir_ = std::make_shared<std::string>(
                 fmt::format("db_{}/tbl_{}/seg_{}/blk_{}", table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_));
         }
-        auto version_filepath = fmt::format("{}/{}/{}", InfinityContext::instance().config()->DataDir(), *block_dir_, BlockVersion::PATH);
+        auto version_filepath = fmt::format("{}/{}", *block_dir_, BlockVersion::PATH);
         version_buffer_ = fileworker_mgr->GetFileWorker(version_filepath);
         if (version_buffer_ == nullptr) {
             auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();

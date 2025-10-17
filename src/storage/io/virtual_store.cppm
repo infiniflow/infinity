@@ -57,17 +57,17 @@ public:
     static bool Exists(std::string_view path, bool is_v2 = false);
     static Status DeleteFile(const std::string &path);
     static Status DeleteFileBG(const std::string &path);
-    static Status MakeDirectory(const std::string &path);
+    static Status MakeDirectory(std::string_view path);
     static Status RemoveDirectory(const std::string &path);
     static Status CleanupDirectory(const std::string &path);
     static void RecursiveCleanupAllEmptyDir(const std::string &path);
     static Status Rename(const std::string &old_path, const std::string &new_path);
     static Status Truncate(const std::string &file_name, size_t new_length);
     static Status Merge(const std::string &dst_file, const std::string &src_file);
-    static Status Copy(const std::string &dst_file, const std::string &src_file);
+    static Status Copy(std::string_view dst_file, std::string_view src_file);
     static std::tuple<std::vector<std::shared_ptr<std::filesystem::directory_entry>>, Status> ListDirectory(const std::string &path);
     static size_t GetFileSize(const std::string &path);
-    static std::string GetParentPath(const std::string &path);
+    static std::string GetParentPath(std::string_view path);
     static size_t GetDirectorySize(const std::string &path);
     static std::string ConcatenatePath(const std::string &dir_path, const std::string &file_path);
 

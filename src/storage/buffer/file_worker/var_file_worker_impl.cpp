@@ -37,7 +37,7 @@ VarFileWorker::VarFileWorker(std::shared_ptr<std::string> file_path, size_t buff
 
 VarFileWorker::~VarFileWorker() {
     VarFileWorker::FreeInMemory();
-    munmap(mmap_true_, mmap_true_size_);
+    munmap(mmap_, mmap_size_);
 }
 
 void VarFileWorker::AllocateInMemory() {
@@ -53,32 +53,32 @@ void VarFileWorker::FreeInMemory() {
 }
 
 bool VarFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-    if (mmap_true_) {
+    if (mmap_) {
         // return true;
-        munmap(mmap_true_, mmap_true_size_);
+        munmap(mmap_, mmap_size_);
     }
     if (data_ == nullptr) {
         UnrecoverableError("Data is not allocated.");
     }
     const auto *buffer = static_cast<const VarBuffer *>(data_);
-    mmap_true_size_ = buffer->TotalSize();
-    auto buffer_data = std::make_unique<char[]>(mmap_true_size_);
+    mmap_size_ = buffer->TotalSize();
+    auto buffer_data = std::make_unique<char[]>(mmap_size_);
     char *ptr = buffer_data.get();
     buffer->Write(ptr);
 
     auto fd = file_handle_->fd();
-    ftruncate(fd, mmap_true_size_);
+    ftruncate(fd, mmap_size_);
 
-    mmap_true_ = mmap(nullptr, mmap_true_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    mmap_ = mmap(nullptr, mmap_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
-    std::memcpy(mmap_true_, buffer_data.get(), mmap_true_size_);
+    std::memcpy(mmap_, buffer_data.get(), mmap_size_);
 
     prepare_success = true;
     return true;
 }
 
 void VarFileWorker::Read(size_t file_size) {
-    if (!mmap_true_) {
+    if (!mmap_) {
         // if (file_size < buffer_size_) {
         //     UnrecoverableError(fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_));
         // } else {
@@ -100,8 +100,8 @@ void VarFileWorker::Read(size_t file_size) {
 
         auto fd = file_handle_->fd();
 
-        mmap_true_size_ = buffer_size;
-        mmap_true_ = mmap(nullptr, mmap_true_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+        mmap_size_ = buffer_size;
+        mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
     }
 }
 

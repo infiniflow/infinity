@@ -4791,7 +4791,7 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
         }
     }
 
-    Status status = fileworker_mgr->RemoveClean(kv_instance_.get());
+    Status status = fileworker_mgr->RemoveCleanList(kv_instance_.get());
 
     auto data_dir_str = fileworker_mgr->GetFullDataDir();
     auto data_dir = static_cast<std::filesystem::path>(*data_dir_str);

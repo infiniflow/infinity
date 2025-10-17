@@ -37,8 +37,8 @@ RawFileWorker::RawFileWorker(std::shared_ptr<std::string> file_path, u32 file_si
 
 RawFileWorker::~RawFileWorker() {
     RawFileWorker::FreeInMemory();
-    munmap(mmap_true_, mmap_true_size_);
-    mmap_true_ = nullptr;
+    munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
 void RawFileWorker::AllocateInMemory() { data_ = static_cast<void *>(new char[buffer_size_]); }
@@ -50,19 +50,19 @@ void RawFileWorker::FreeInMemory() {
 
 bool RawFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     assert(data_ != nullptr && buffer_size_ > 0);
-    if (mmap_true_) {
-        munmap(mmap_true_, mmap_true_size_);
-        mmap_true_ = nullptr;
+    if (mmap_) {
+        munmap(mmap_, mmap_size_);
+        mmap_ = nullptr;
     }
 
-    mmap_true_size_ = buffer_size_;
+    mmap_size_ = buffer_size_;
     auto fd = file_handle_->fd();
-    ftruncate(fd, mmap_true_size_);
-    mmap_true_ = mmap(nullptr, mmap_true_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+    ftruncate(fd, mmap_size_);
+    mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
 
     size_t offset{};
 
-    std::memcpy((char *)mmap_true_ + offset, data_, buffer_size_);
+    std::memcpy((char *)mmap_ + offset, data_, buffer_size_);
     offset += buffer_size_;
     // auto status = file_handle_->Append(data_, buffer_size_);
     prepare_success = true; // Not run defer_fn
@@ -70,15 +70,15 @@ bool RawFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
 }
 
 void RawFileWorker::Read(size_t file_size) {
-    if (!mmap_true_) {
+    if (!mmap_) {
         buffer_size_ = file_handle_->FileSize();
         FreeInMemory();
         data_ = static_cast<void *>(new char[buffer_size_]);
         auto fd = file_handle_->fd();
         auto [nbytes, status1] = file_handle_->Read(data_, buffer_size_);
 
-        mmap_true_size_ = buffer_size_;
-        mmap_true_ = mmap(nullptr, mmap_true_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+        mmap_size_ = buffer_size_;
+        mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
     }
 }
 

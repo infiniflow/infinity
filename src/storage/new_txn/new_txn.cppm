@@ -678,7 +678,7 @@ public:
                                 const std::string &table_name,
                                 std::shared_ptr<DataBlock> input_block,
                                 const u64 &input_block_idx,
-                                std::vector<std::string> *object_paths = nullptr);
+                                std::vector<std::string> *file_worker_paths = nullptr);
 
     Status PrintVersionInBlock(BlockMeta &block_meta, const std::vector<BlockOffset> &block_offsets, bool ignore_invisible);
 

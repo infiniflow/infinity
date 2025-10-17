@@ -39,8 +39,8 @@ import global_resource_usage;
 
 namespace infinity {
 
-FileWorker::FileWorker(std::shared_ptr<std::string> file_path) : file_path_(std::move(file_path)) {
-    mmap_true_ = nullptr;
+FileWorker::FileWorker(std::shared_ptr<std::string> rel_file_path) : rel_file_path_(std::move(rel_file_path)) {
+    mmap_ = nullptr;
     persistence_manager_ = InfinityContext::instance().storage()->persistence_manager();
 }
 
@@ -51,7 +51,7 @@ bool FileWorker::Write(const FileWorkerSaveCtx &ctx) {
         UnrecoverableError("No data will be written.");
     }
 
-    auto [file_handle, status] = VirtualStore::Open(*file_path_, FileAccessMode::kWrite);
+    auto [file_handle, status] = VirtualStore::Open(GetFilePathTemp(), FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -67,14 +67,13 @@ bool FileWorker::Write(const FileWorkerSaveCtx &ctx) {
 }
 
 void FileWorker::Read() {
-    auto read_path = *file_path_;
-    bool use_object_cache = persistence_manager_ != nullptr;
     size_t file_size = 0;
-    auto [file_handle, status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
+    auto [file_handle, status] = VirtualStore::Open(GetFilePathTemp(), FileAccessMode::kRead);
     if (!status.ok()) {
+        // convert to GetFilePath
         return;
     }
-    if (use_object_cache) {
+    if (persistence_manager_) {
         file_handle->Seek(obj_addr_.part_offset_);
         file_size = obj_addr_.part_size_;
     } else {
@@ -86,22 +85,22 @@ void FileWorker::Read() {
 }
 
 void FileWorker::MoveFile() {
-    std::string dest_dir = ChooseFileDir(false);
-    std::string dest_path = fmt::format("{}/{}", dest_dir, *file_name_);
+    auto temp_path = GetFilePathTemp();
+    auto data_path = GetFilePath();
     if (persistence_manager_ == nullptr) {
-        if (!VirtualStore::Exists(*file_path_)) {
+        if (!VirtualStore::Exists(temp_path)) {
             return;
         }
-        if (!VirtualStore::Exists(dest_dir)) {
-            VirtualStore::MakeDirectory(dest_dir);
+        if (!VirtualStore::Exists(data_path)) {
+            VirtualStore::MakeDirectory(data_path);
         }
-        VirtualStore::Rename(*file_path_, dest_path);
+        VirtualStore::Copy(temp_path, data_path); // sys call, may need copy
     } else {
         PersistResultHandler handler(persistence_manager_);
-        if (!VirtualStore::Exists(*file_path_)) {
+        if (!VirtualStore::Exists(temp_path)) {
             return;
         }
-        PersistWriteResult persist_result = persistence_manager_->Persist(dest_path, *file_path_);
+        PersistWriteResult persist_result = persistence_manager_->Persist(data_path, temp_path);
         handler.HandleWriteResult(persist_result);
 
         obj_addr_ = persist_result.obj_addr_;
@@ -110,8 +109,8 @@ void FileWorker::MoveFile() {
 
 void FileWorker::Load() {
     std::unique_lock<std::mutex> locker(l_); // lockl?
-    if (VirtualStore::Exists(*file_path_)) {
-        Read(true);
+    if (VirtualStore::Exists(GetFilePathTemp()) || VirtualStore::Exists(GetFilePath())) {
+        Read();
     }
 }
 
@@ -123,71 +122,33 @@ void FileWorker::SetData(void *data) {
 void FileWorker::SetDataSize(size_t size) { UnrecoverableError("Not implemented"); }
 
 // Get absolute file path. As key of buffer handle.
-std::string FileWorker::GetFilePath() const { return std::filesystem::path(*data_dir_) / *file_dir_ / *file_name_; }
+std::string FileWorker::GetFilePath() const { return fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *rel_file_path_); }
 
-std::string FileWorker::GetFilePathTmp() const { return std::filesystem::path(*temp_dir_) / *file_dir_ / *file_name_; }
-
-std::string FileWorker::ChooseFileDir(bool is_temp) const {
-    return is_temp ? std::filesystem::path(*temp_dir_) / *file_dir_ : std::filesystem::path(*data_dir_) / *file_dir_;
-}
-
-std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> FileWorker::GetFilePathInner(bool from_spill) {
-    bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
-    std::optional<DeferFn<std::function<void()>>> defer_fn;
-    std::string read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
-    if (use_object_cache) {
-        PersistReadResult result = persistence_manager_->GetObjCache(read_path);
-        defer_fn.emplace(([=, this]() {
-            if (use_object_cache && obj_addr_.Valid()) {
-                std::string read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
-                PersistWriteResult res = persistence_manager_->PutObjCache(read_path);
-                PersistResultHandler handler = PersistResultHandler(persistence_manager_);
-                handler.HandleWriteResult(res);
-            }
-        }));
-        PersistResultHandler handler = PersistResultHandler(persistence_manager_);
-        obj_addr_ = handler.HandleReadResult(result);
-        if (!obj_addr_.Valid()) {
-            UnrecoverableError(fmt::format("Failed to find object for local path {}", read_path));
-        }
-        read_path = persistence_manager_->GetObjPath(obj_addr_.obj_key_);
-    }
-    return {std::move(defer_fn), read_path};
-}
+std::string FileWorker::GetFilePathTemp() const { return fmt::format("{}/{}", InfinityContext::instance().config()->TempDir(), *rel_file_path_); }
 
 Status FileWorker::CleanupFile() const {
     if (persistence_manager_ != nullptr) {
-        PersistResultHandler handler(persistence_manager_);
-        std::string path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
-        PersistWriteResult result = persistence_manager_->Cleanup(path);
-        if (!result.obj_addr_.Valid()) {
+        PersistResultHandler handler{persistence_manager_};
+        auto result_temp = persistence_manager_->Cleanup(GetFilePathTemp());
+        if (!result_temp.obj_addr_.Valid()) {
             return Status::OK();
         }
-        handler.HandleWriteResult(result); // Delete files
+        auto result_data = persistence_manager_->Cleanup(GetFilePath());
+        if (!result_data.obj_addr_.Valid()) {
+            return Status::OK();
+        }
+        // Delete files
+        handler.HandleWriteResult(result_temp);
+        handler.HandleWriteResult(result_data);
         return Status::OK();
     }
 
-    std::string path_str = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
-
-    Status status;
-
-    status = VirtualStore::DeleteFile(path_str);
-
-    path_str = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
-
-    status = VirtualStore::DeleteFile(path_str);
-
-    return Status::OK();
-}
-
-void FileWorker::CleanupTempFile() const {
-    std::string path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
-    if (VirtualStore::Exists(path)) {
-        LOG_TRACE(fmt::format("Clean temp file: {}", path));
-        VirtualStore::DeleteFile(path);
-    } else {
-        UnrecoverableError(fmt::format("Cleanup: File {} not found for deletion", path));
+    auto status = VirtualStore::DeleteFile(GetFilePathTemp());
+    if (!status.ok()) {
+        return status;
     }
+    status = VirtualStore::DeleteFile(GetFilePath());
+    return status;
 }
 
 } // namespace infinity

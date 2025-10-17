@@ -23,7 +23,6 @@ import third_party;
 
 namespace infinity {
 
-class KVInstance;
 class LocalFileHandle;
 class Status;
 
@@ -31,7 +30,6 @@ export struct FileWorkerSaveCtx {};
 
 export class FileWorker {
 public:
-    // spill_dir_ is not init here
     explicit FileWorker(std::shared_ptr<std::string> file_path);
 
     // No destruct here
@@ -55,7 +53,7 @@ public:
     virtual FileWorkerType Type() const = 0;
 
     void *GetData() {
-        if (!mmap_true_) {
+        if (!mmap_) {
             Load();
         }
         return data_;
@@ -68,31 +66,27 @@ public:
     // Get an absolute file path. As key of a buffer handle.
     std::string GetFilePath() const;
 
-    std::string GetFilePathTmp() const;
+    std::string GetFilePathTemp() const;
 
     Status CleanupFile() const;
-
-    void CleanupTempFile() const;
 
 protected:
     virtual bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
 
     virtual void Read(size_t file_size) = 0;
 
-    [[nodiscard]] std::string ChooseFileDir(bool is_temp) const;
-
-    std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> GetFilePathInner(bool spill);
+    // std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> GetFilePathInner(bool spill);
 
 public:
     std::mutex l_;
-    std::shared_ptr<std::string> file_path_;
+    std::shared_ptr<std::string> rel_file_path_;
     PersistenceManager *persistence_manager_{};
     ObjAddr obj_addr_;
-    void *mmap_true_{};
-    size_t mmap_true_size_{};
+    void *mmap_{};
+    size_t mmap_size_{};
 
 protected:
     void *data_{};
-    std::unique_ptr<LocalFileHandle> file_handle_{nullptr};
+    std::unique_ptr<LocalFileHandle> file_handle_;
 };
 } // namespace infinity

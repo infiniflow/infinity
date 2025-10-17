@@ -39,8 +39,8 @@ VersionFileWorker::VersionFileWorker(std::shared_ptr<std::string> file_path, siz
 
 VersionFileWorker::~VersionFileWorker() {
     VersionFileWorker::FreeInMemory();
-    munmap(mmap_true_, mmap_true_size_);
-    mmap_true_ = nullptr;
+    munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
 void VersionFileWorker::AllocateInMemory() {
@@ -55,9 +55,9 @@ void VersionFileWorker::FreeInMemory() {
 }
 
 bool VersionFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &base_ctx) {
-    if (mmap_true_) {
-        munmap(mmap_true_, mmap_true_size_);
-        mmap_true_size_ = mmap_true_size_;
+    if (mmap_) {
+        munmap(mmap_, mmap_size_);
+        mmap_size_ = mmap_size_;
     }
 
     if (data_ == nullptr) {
@@ -67,7 +67,7 @@ bool VersionFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ba
 
     const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
     TxnTimeStamp ckp_ts = ctx.checkpoint_ts_;
-    bool is_full = data->SaveToFile(mmap_true_, mmap_true_size_, ckp_ts, *file_handle_);
+    bool is_full = data->SaveToFile(mmap_, mmap_size_, ckp_ts, *file_handle_);
     if (is_full) {
         LOG_TRACE(fmt::format("Version file is full: {}", GetFilePath()));
         // if the version file is full, return true to spill to file
@@ -80,7 +80,7 @@ void VersionFileWorker::Read(size_t file_size) {
     // if (data_ != nullptr) {
     //     UnrecoverableError("Data is already allocated.");
     // }
-    auto *data = BlockVersion::LoadFromFile(mmap_true_, file_handle_.get()).release();
+    auto *data = BlockVersion::LoadFromFile(mmap_, file_handle_.get()).release();
     data_ = static_cast<void *>(data);
 }
 

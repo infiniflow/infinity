@@ -49,11 +49,9 @@ public:
 
     size_t BufferedObjectCount();
 
-    Status RemoveClean(KVInstance *kv_instance);
+    Status RemoveCleanList(KVInstance *kv_instance);
 
-    void RemoveBufferObjects(const std::vector<std::string> &object_paths);
-
-    // inline PersistenceManager *persistence_manager() const { return persistence_manager_; }
+    inline PersistenceManager *persistence_manager() const { return persistence_manager_; }
 
 private:
     void AddToCleanList(FileWorker *fileworker);
@@ -61,20 +59,13 @@ private:
 private:
     std::shared_ptr<std::string> data_dir_;
     std::shared_ptr<std::string> temp_dir_;
-    PersistenceManager *persistence_manager_;
+    PersistenceManager *persistence_manager_{};
 
-    std::mutex w_locker_{};
+    std::mutex w_locker_;
     std::unordered_map<std::string, std::unique_ptr<FileWorker>> fileworker_map_;
-    std::atomic<u32> buffer_id_{};
-
-    std::mutex gc_locker_;
 
     std::mutex clean_locker_;
     std::vector<FileWorker *> clean_list_{};
-
-    std::mutex temp_locker_{};
-    std::unordered_set<FileWorker *> temp_set_;
-    std::unordered_set<FileWorker *> clean_temp_set_;
 };
 
 } // namespace infinity

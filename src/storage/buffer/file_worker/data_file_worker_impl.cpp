@@ -15,7 +15,6 @@
 module;
 
 #include <sys/mman.h>
-#include <unistd.h>
 
 module infinity_core:data_file_worker.impl;
 
@@ -25,6 +24,7 @@ import :status;
 import :logger;
 import :persistence_manager;
 import :local_file_handle;
+import :virtual_store;
 
 import std;
 import third_party;
@@ -77,37 +77,37 @@ bool DataFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) 
     // - data buffer
     // - footer: checksum
 
-    if (mmap_true_) {
-        munmap(mmap_true_, mmap_true_size_);
-        mmap_true_ = nullptr;
+    if (mmap_) {
+        munmap(mmap_, mmap_size_);
+        mmap_ = nullptr;
     }
 
-    mmap_true_size_ = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
+    mmap_size_ = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
     auto fd = file_handle_->fd();
-    ftruncate(fd, mmap_true_size_);
-    mmap_true_ = mmap(nullptr, mmap_true_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+    VirtualStore::Truncate(GetFilePathTemp(), mmap_size_);
+    mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
     size_t offset{};
 
     u64 magic_number = 0x00dd3344;
-    std::memcpy((char *)mmap_true_ + offset, &magic_number, sizeof(u64));
+    std::memcpy((char *)mmap_ + offset, &magic_number, sizeof(u64));
     offset += sizeof(u64);
 
-    std::memcpy((char *)mmap_true_ + offset, &buffer_size_, sizeof(buffer_size_));
+    std::memcpy((char *)mmap_ + offset, &buffer_size_, sizeof(buffer_size_));
     offset += sizeof(buffer_size_);
 
     size_t data_size = data_size_.load();
-    std::memcpy((char *)mmap_true_ + offset, data_, data_size);
+    std::memcpy((char *)mmap_ + offset, data_, data_size);
     offset += data_size;
 
     size_t unused_size = buffer_size_ - data_size;
     if (unused_size > 0) {
         std::string str(unused_size, '\0');
-        std::memcpy((char *)mmap_true_ + offset, str.c_str(), unused_size);
+        std::memcpy((char *)mmap_ + offset, str.c_str(), unused_size);
         offset += unused_size;
     }
 
     u64 checksum{};
-    std::memcpy((char *)mmap_true_ + offset, &checksum, sizeof(checksum));
+    std::memcpy((char *)mmap_ + offset, &checksum, sizeof(checksum));
     offset += sizeof(u64);
 
     prepare_success = true; // Not run defer_fn
@@ -116,12 +116,11 @@ bool DataFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) 
 }
 
 void DataFileWorker::Read(size_t file_size) {
-    if (!mmap_true_) {
+    if (!mmap_) {
         if (file_size < sizeof(u64) * 3) {
             Status status = Status::DataIOError(fmt::format("Incorrect file length {}.", file_size));
             RecoverableError(status);
         }
-
         // file header: magic number, buffer_size
         u64 magic_number{0};
         auto [nbytes1, status1] = file_handle_->Read(&magic_number, sizeof(magic_number));
@@ -129,12 +128,10 @@ void DataFileWorker::Read(size_t file_size) {
             RecoverableError(status1);
         }
         if (nbytes1 != sizeof(magic_number)) {
-            Status status = Status::DataIOError(fmt::format("Read magic number which length isn't {}.", nbytes1));
-            RecoverableError(status);
+            RecoverableError(Status::DataIOError(fmt::format("Read magic number which length isn't {}.", nbytes1)));
         }
         if (magic_number != 0x00dd3344) {
-            Status status = Status::DataIOError(fmt::format("Read magic error, {} != 0x00dd3344.", magic_number));
-            RecoverableError(status);
+            RecoverableError(Status::DataIOError(fmt::format("Read magic error, {} != 0x00dd3344.", magic_number)));
         }
 
         u64 buffer_size_{};
@@ -167,9 +164,9 @@ void DataFileWorker::Read(size_t file_size) {
         }
         //
         auto fd = file_handle_->fd();
-        mmap_true_size_ = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
+        mmap_size_ = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
         // std::memcpy((char *)mmap_true_, data_, mmap_true_size_);
-        mmap_true_ = mmap(nullptr, mmap_true_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+        mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
     }
 }
 

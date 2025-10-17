@@ -152,9 +152,10 @@ std::unique_ptr<StreamReader> VirtualStore::OpenStreamReader(const std::string &
 
 // For local disk filesystem, such as temp file, disk cache and WAL
 bool VirtualStore::Exists(std::string_view path, bool is_v2) {
-    auto persistence_manager = InfinityContext::instance().storage()->persistence_manager();
-    if (is_v2 && persistence_manager) {
-        return persistence_manager->GetObjCache(path).obj_addr_.Valid();
+    if (is_v2) {
+        if (auto persistence_manager = InfinityContext::instance().storage()->persistence_manager()) {
+            return persistence_manager->GetObjCache(path).obj_addr_.Valid();
+        }
     }
     std::error_code error_code;
     // fs::path p{path};
@@ -208,7 +209,7 @@ Status VirtualStore::DeleteFileBG(const std::string &path) {
     return Status::OK();
 }
 
-Status VirtualStore::MakeDirectory(const std::string &path) {
+Status VirtualStore::MakeDirectory(std::string_view path) {
     if (VirtualStore::Exists(path)) {
         if (std::filesystem::is_directory(path)) {
             return Status::OK();
@@ -347,7 +348,7 @@ Status VirtualStore::Merge(const std::string &dst_path, const std::string &src_p
     return Status::OK();
 }
 
-Status VirtualStore::Copy(const std::string &dst_path, const std::string &src_path) {
+Status VirtualStore::Copy(std::string_view dst_path, std::string_view src_path) {
     if (!std::filesystem::path(dst_path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", dst_path));
     }
@@ -355,7 +356,7 @@ Status VirtualStore::Copy(const std::string &dst_path, const std::string &src_pa
         UnrecoverableError(fmt::format("{} isn't absolute path.", src_path));
     }
 
-    std::string dst_dir = GetParentPath(dst_path);
+    auto dst_dir = GetParentPath(dst_path);
     if (!VirtualStore::Exists(dst_dir)) {
         VirtualStore::MakeDirectory(dst_dir);
     }
@@ -390,7 +391,7 @@ size_t VirtualStore::GetFileSize(const std::string &path) {
     return std::filesystem::file_size(path);
 }
 
-std::string VirtualStore::GetParentPath(const std::string &path) { return fs::path(path).parent_path().string(); }
+std::string VirtualStore::GetParentPath(std::string_view path) { return fs::path(path).parent_path().string(); }
 
 size_t VirtualStore::GetDirectorySize(const std::string &path) {
     if (!std::filesystem::path(path).is_absolute()) {

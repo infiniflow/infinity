@@ -110,7 +110,7 @@ i64 BlockVersion::GetRowCount() const {
     return row_count;
 }
 
-bool BlockVersion::SaveToFile(void *&mmap_true, size_t &mmap_true_size, TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
+bool BlockVersion::SaveToFile(void *&mmap_p, size_t &mmap_size, TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
     // if (mmap_true) {
     //     munmap(mmap_true, mmap_true_size);
     //     mmap_true = nullptr;
@@ -126,23 +126,23 @@ bool BlockVersion::SaveToFile(void *&mmap_true, size_t &mmap_true_size, TxnTimeS
 
     BlockOffset capacity = deleted_.size();
     auto fd = file_handle.fd();
-    mmap_true_size = sizeof(create_size) + sizeof(capacity) + (2 * create_size + capacity) * sizeof(TxnTimeStamp);
-    ftruncate(fd, mmap_true_size);
+    mmap_size = sizeof(create_size) + sizeof(capacity) + (2 * create_size + capacity) * sizeof(TxnTimeStamp);
+    ftruncate(fd, mmap_size);
     size_t offset{};
-    mmap_true = mmap(nullptr, mmap_true_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    mmap_p = mmap(nullptr, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
-    std::memcpy((char *)mmap_true + offset, &create_size, sizeof(create_size));
+    std::memcpy((char *)mmap_p + offset, &create_size, sizeof(create_size));
     offset += sizeof(create_size);
 
     for (size_t j = 0; j < create_size; ++j) {
-        std::memcpy((char *)mmap_true + offset, &created_[j].create_ts_, sizeof(TxnTimeStamp));
+        std::memcpy((char *)mmap_p + offset, &created_[j].create_ts_, sizeof(TxnTimeStamp));
         offset += sizeof(TxnTimeStamp);
 
-        std::memcpy((char *)mmap_true + offset, &created_[j].row_count_, sizeof(TxnTimeStamp));
+        std::memcpy((char *)mmap_p + offset, &created_[j].row_count_, sizeof(TxnTimeStamp));
         offset += sizeof(TxnTimeStamp);
     }
 
-    std::memcpy((char *)mmap_true + offset, &capacity, sizeof(capacity));
+    std::memcpy((char *)mmap_p + offset, &capacity, sizeof(capacity));
     offset += sizeof(capacity);
 
     TxnTimeStamp dump_ts = 0;
@@ -150,11 +150,11 @@ bool BlockVersion::SaveToFile(void *&mmap_true, size_t &mmap_true_size, TxnTimeS
     for (const auto &ts : deleted_) {
         if (ts <= checkpoint_ts) {
             ++deleted_row_count;
-            std::memcpy((char *)mmap_true + offset, &ts, sizeof(ts));
+            std::memcpy((char *)mmap_p + offset, &ts, sizeof(ts));
             offset += sizeof(ts);
         } else {
             is_modified = true;
-            std::memcpy((char *)mmap_true + offset, &dump_ts, sizeof(dump_ts));
+            std::memcpy((char *)mmap_p + offset, &dump_ts, sizeof(dump_ts));
             offset += sizeof(dump_ts);
         }
     }

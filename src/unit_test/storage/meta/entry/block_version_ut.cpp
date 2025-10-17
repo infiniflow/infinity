@@ -75,12 +75,8 @@ TEST_P(BlockVersionTest, DISABLED_XXX_SaveAndLoad2) {
     auto version_file_name = std::make_shared<std::string>("block_version_test");
 
     {
-
-        auto file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(std::string(GetFullDataDir())),
-                                                               std::make_shared<std::string>(std::string(GetFullTmpDir())),
-                                                               block_dir,
-                                                               version_file_name,
-                                                               8192);
+        auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir, *version_file_name));
+        auto file_worker = std::make_unique<VersionFileWorker>(rel_file_path, 8192);
 
         {
             auto *block_version = static_cast<BlockVersion *>(file_worker->GetData());
@@ -96,12 +92,8 @@ TEST_P(BlockVersionTest, DISABLED_XXX_SaveAndLoad2) {
         }
     }
     {
-
-        auto file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(std::string(GetFullDataDir())),
-                                                               std::make_shared<std::string>(std::string(GetFullTmpDir())),
-                                                               block_dir,
-                                                               version_file_name,
-                                                               8192);
+        auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir, *version_file_name));
+        auto file_worker = std::make_unique<VersionFileWorker>(rel_file_path, 8192);
         {
             BlockVersion block_version1(8192);
             block_version1.Append(10, 3);
@@ -121,13 +113,8 @@ TEST_P(BlockVersionTest, DISABLED_XXX_SaveAndLoad2) {
         }
     }
     {
-        // FileWorkerManager fileworker_mgr(data_dir, temp_dir, nullptr);
-
-        auto file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(std::string(GetFullDataDir())),
-                                                               std::make_shared<std::string>(std::string(GetFullTmpDir())),
-                                                               block_dir,
-                                                               version_file_name,
-                                                               8192);
+        auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir, *version_file_name));
+        auto file_worker = std::make_unique<VersionFileWorker>(rel_file_path, 8192);
         {
             BlockVersion block_version1(8192);
             block_version1.Append(10, 3);
