@@ -605,8 +605,8 @@ Status NewTxn::ReplayDropTable(WalCmdDropTableV2 *drop_table_cmd, TxnTimeStamp c
 }
 
 Status NewTxn::RenameTable(const std::string &db_name, const std::string &old_table_name, const std::string &new_table_name) {
-    this->CheckTxnStatus();
-    this->CheckTxn(db_name);
+    CheckTxnStatus();
+    CheckTxn(db_name);
 
     std::shared_ptr<DBMeta> db_meta;
     TxnTimeStamp db_create_ts;
@@ -4716,7 +4716,7 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
                 SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
                 ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
-                Status status = NewCatalog::CleanBlockColumn(column_meta, column_meta_key->column_def_.get(), UsageFlag::kOther);
+                Status status = NewCatalog::CleanBlockColumn(column_meta, column_meta_key->column_def_, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }

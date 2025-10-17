@@ -691,7 +691,7 @@ SegmentID MetaTableObject::GetNextSegmentID() const {
 SegmentID MetaTableObject::GetUnsealedSegmentID() const {
     auto meta_iter = tag_map_.find("unsealed_segment_id");
     if (meta_iter == tag_map_.end()) {
-        SegmentID next_segment_id = this->GetNextSegmentID();
+        SegmentID next_segment_id = GetNextSegmentID();
         std::string error_msg =
             fmt::format("Can't find 'unsealed_segment_id' in table: {}, use next segment id: {}", meta_key_->ToString(), next_segment_id);
         LOG_WARN(error_msg);
@@ -713,7 +713,7 @@ size_t MetaTableObject::GetCurrentSegmentRowCount(Storage *storage_ptr) const {
     if (segment_map_.empty()) {
         return 0;
     }
-    SegmentID unsealed_segment_id = this->GetUnsealedSegmentID();
+    SegmentID unsealed_segment_id = GetUnsealedSegmentID();
     auto seg_iter = segment_map_.find(unsealed_segment_id);
     if (seg_iter == segment_map_.end()) {
         std::string error_msg = fmt::format("Can't find unsealed segment id: {}, table: {}", unsealed_segment_id, meta_key_->ToString());
@@ -727,20 +727,18 @@ size_t MetaTableObject::GetCurrentSegmentRowCount(Storage *storage_ptr) const {
     }
     TableMetaKey *table_meta_key = static_cast<TableMetaKey *>(meta_key_.get());
     BlockID current_block_id = segment_object->GetCurrentBlockID();
-    auto *buffer_mgr_ptr = storage_ptr->fileworker_manager();
-    Config *config_ptr = storage_ptr->config();
-    std::string version_filepath = fmt::format("{}/db_{}/tbl_{}/seg_{}/blk_{}/{}",
-                                               config_ptr->DataDir(),
-                                               table_meta_key->db_id_str_,
-                                               table_meta_key->table_id_str_,
-                                               unsealed_segment_id,
-                                               current_block_id,
-                                               BlockVersion::PATH);
-    auto *version_buffer = buffer_mgr_ptr->GetFileWorker(version_filepath);
-    if (version_buffer == nullptr) {
-        UnrecoverableError(fmt::format("Can't get version from: {}", version_filepath));
+    auto *file_worker_mgr = storage_ptr->fileworker_manager();
+    auto rel_version_path = fmt::format("db_{}/tbl_{}/seg_{}/blk_{}/{}",
+                                             table_meta_key->db_id_str_,
+                                             table_meta_key->table_id_str_,
+                                             unsealed_segment_id,
+                                             current_block_id,
+                                             BlockVersion::PATH);
+    auto *version_file_worker = file_worker_mgr->GetFileWorker(rel_version_path);
+    if (version_file_worker == nullptr) {
+        UnrecoverableError(fmt::format("Can't get version from: {}", rel_version_path));
     }
-    const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer->GetData());
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(version_file_worker->GetData());
     size_t row_cnt = 0;
     {
         std::shared_ptr<BlockLock> block_lock{};
@@ -771,9 +769,9 @@ std::shared_ptr<TableCache> MetaTableObject::RestoreTableCache(Storage *storage_
     try {
         db_id = std::stoull(table_key->db_id_str_);
         table_id = std::stoull(table_key->table_id_str_);
-        unsealed_segment_id = this->GetUnsealedSegmentID();
-        unsealed_segment_offset = this->GetCurrentSegmentRowCount(storage_ptr);
-        next_segment_id = this->GetNextSegmentID();
+        unsealed_segment_id = GetUnsealedSegmentID();
+        unsealed_segment_offset = GetCurrentSegmentRowCount(storage_ptr);
+        next_segment_id = GetNextSegmentID();
     } catch (const std::exception &e) {
         UnrecoverableError(fmt::format("DB id or table id is invalid: {}, cause: {}", table_key->ToString(), e.what()));
     }
@@ -1116,7 +1114,7 @@ std::unordered_set<std::string> MetaTree::GetDataVfsOffPathSet() {
 
 std::vector<std::string> MetaTree::CheckMetaDataMapping(CheckStmtType tag, std::optional<std::string> db_table_str) {
     const auto *pm = InfinityContext::instance().storage()->fileworker_manager()->persistence_manager();
-    auto data_path_set = pm != nullptr ? this->GetDataVfsPathSet() : this->GetDataVfsOffPathSet();
+    auto data_path_set = pm != nullptr ? GetDataVfsPathSet() : GetDataVfsOffPathSet();
 
     std::vector<std::string> data_mismatch_entry;
 

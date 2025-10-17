@@ -100,7 +100,7 @@ public:
 
     std::tuple<std::shared_ptr<SegmentSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
-    Status RestoreSet();
+    // Status RestoreSet();
 
     Status RestoreFromSnapshot(const WalSegmentInfoV2 &segment_info, bool is_link_files = false);
 

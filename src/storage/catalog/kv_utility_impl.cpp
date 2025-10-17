@@ -182,16 +182,15 @@ size_t GetBlockRowCount(KVInstance *kv_instance,
     }
 
     FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
-    std::string version_filepath = fmt::format("{}/db_{}/tbl_{}/seg_{}/blk_{}/{}",
-                                               InfinityContext::instance().config()->DataDir(),
+    auto rel_version_filepath = fmt::format("db_{}/tbl_{}/seg_{}/blk_{}/{}",
                                                db_id_str,
                                                table_id_str,
                                                segment_id,
                                                block_id,
                                                BlockVersion::PATH);
-    FileWorker *version_buffer = fileworker_mgr->GetFileWorker(version_filepath);
+    FileWorker *version_buffer = fileworker_mgr->GetFileWorker(rel_version_filepath);
     if (version_buffer == nullptr) {
-        UnrecoverableError(fmt::format("Get version buffer failed: {}", version_filepath));
+        UnrecoverableError(fmt::format("Get version buffer failed: {}", rel_version_filepath));
     }
 
     const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer->GetData());

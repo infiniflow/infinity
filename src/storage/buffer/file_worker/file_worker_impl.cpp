@@ -68,19 +68,36 @@ bool FileWorker::Write(const FileWorkerSaveCtx &ctx) {
 
 void FileWorker::Read() {
     size_t file_size = 0;
-    auto [file_handle, status] = VirtualStore::Open(GetFilePathTemp(), FileAccessMode::kRead);
+
+    auto temp_path = GetFilePathTemp();
+    auto data_path = GetFilePath();
+    bool flag{};
+    std::string file_path;
+    if (VirtualStore::Exists(temp_path)) { // branchless
+        file_path = temp_path;
+        flag = true;
+    } else if (VirtualStore::Exists(data_path)) {
+        file_path = data_path;
+        flag = false;
+    }
+    auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kRead);
     if (!status.ok()) {
-        // convert to GetFilePath
+        // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
         return;
     }
-    if (persistence_manager_) {
-        file_handle->Seek(obj_addr_.part_offset_);
-        file_size = obj_addr_.part_size_;
-    } else {
+
+    if (flag) {
         file_size = file_handle->FileSize();
+    } else {
+        if (persistence_manager_) {
+            file_handle->Seek(obj_addr_.part_offset_);
+            file_size = obj_addr_.part_size_;
+        } else {
+            file_size = file_handle->FileSize();
+        }
     }
+
     file_handle_ = std::move(file_handle);
-    DeferFn defer_fn2([&]() { file_handle_ = nullptr; });
     Read(file_size);
 }
 
@@ -107,11 +124,9 @@ void FileWorker::MoveFile() {
     }
 }
 
-void FileWorker::Load() {
-    std::unique_lock<std::mutex> locker(l_); // lockl?
-    if (VirtualStore::Exists(GetFilePathTemp()) || VirtualStore::Exists(GetFilePath())) {
-        Read();
-    }
+void *FileWorker::GetData() {
+    Read();
+    return data_;
 }
 
 void FileWorker::SetData(void *data) {

@@ -48,31 +48,21 @@ void FileWorkerManager::Stop() {
 }
 
 FileWorker *FileWorkerManager::EmplaceFileWorker(std::unique_ptr<FileWorker> file_worker) {
-    std::string file_path = file_worker->GetFilePath();
     std::unique_lock lock(w_locker_);
-    if (auto iter = fileworker_map_.find(file_path); iter != fileworker_map_.end()) {
+    auto rel_file_path = file_worker->rel_file_path_;
+    if (auto iter = fileworker_map_.find(*rel_file_path); iter != fileworker_map_.end()) {
         return iter->second.get();
     }
-    auto [iter, _] = fileworker_map_.emplace(file_path, std::move(file_worker));
+    auto [iter, _] = fileworker_map_.emplace(*rel_file_path, std::move(file_worker));
     return iter->second.get();
 }
 
-FileWorker *FileWorkerManager::EmplaceFileWorkerTemp(std::unique_ptr<FileWorker> file_worker) {
-    std::string file_path = file_worker->GetFilePathTemp();
+FileWorker *FileWorkerManager::GetFileWorker(const std::string &rel_file_path) {
     std::unique_lock lock(w_locker_);
-    if (auto iter = fileworker_map_.find(file_path); iter != fileworker_map_.end()) {
+    if (auto iter = fileworker_map_.find(rel_file_path); iter != fileworker_map_.end()) {
         return iter->second.get();
     }
-    auto [iter, _] = fileworker_map_.emplace(file_path, std::move(file_worker));
-    return iter->second.get();
-}
-
-FileWorker *FileWorkerManager::GetFileWorker(const std::string &file_path) {
-    std::unique_lock lock(w_locker_);
-    if (auto iter = fileworker_map_.find(file_path); iter != fileworker_map_.end()) {
-        return iter->second.get();
-    }
-    LOG_TRACE(fmt::format("FileWorkerManager::GetFileWorker: file {} not found.", file_path));
+    LOG_TRACE(fmt::format("FileWorkerManager::GetFileWorker: file {} not found.", rel_file_path));
     return nullptr;
 }
 

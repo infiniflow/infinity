@@ -914,19 +914,17 @@ Status NewCatalog::CleanBlock(BlockMeta &block_meta, UsageFlag usage_flag) {
                           block_meta.segment_meta().table_meta().table_id_str(),
                           block_meta.segment_meta().segment_id(),
                           block_meta.block_id()));
-    block_meta.RestoreSet();
-    Status status;
-    std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs_ptr;
+    block_meta.InitOrLoadSet();
 
-    TableMeta &table_meta = block_meta.segment_meta().table_meta();
-    std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
+    auto &table_meta = block_meta.segment_meta().table_meta();
+    auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
     if (!status.ok()) {
         return status;
     }
 
     for (const auto &column_def : *column_defs_ptr) {
         ColumnMeta column_meta(column_def->id(), block_meta);
-        status = NewCatalog::CleanBlockColumn(column_meta, column_def.get(), usage_flag);
+        status = NewCatalog::CleanBlockColumn(column_meta, column_def, usage_flag);
         if (!status.ok()) {
             return status;
         }
@@ -973,16 +971,14 @@ NewCatalog::AddNewBlockColumnForTransform(BlockMeta &block_meta, size_t column_i
     return Status::OK();
 }
 
-Status NewCatalog::CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag) {
+Status NewCatalog::CleanBlockColumn(ColumnMeta &column_meta, const std::shared_ptr<ColumnDef> &column_def, UsageFlag usage_flag) {
     LOG_TRACE(fmt::format("CleanBlockColumn: cleaning table id: {}, segment_id: {}, block_id: {}, column_id: {}",
                           column_meta.block_meta().segment_meta().table_meta().table_id_str(),
                           column_meta.block_meta().segment_meta().segment_id(),
                           column_meta.block_meta().block_id(),
                           column_def->id()));
-    column_meta.RestoreSet(column_def);
-    Status status;
-
-    status = column_meta.UninitSet(column_def, usage_flag);
+    column_meta.InitSet(column_def);
+    auto status = column_meta.UninitSet(column_def, usage_flag);
     if (!status.ok()) {
         return status;
     }
@@ -1019,7 +1015,7 @@ Status NewCatalog::RestoreNewSegmentIndex1(TableIndexMeta &table_index_meta,
     }
 
     segment_index_meta.emplace(segment_id, table_index_meta);
-    status = segment_index_meta->RestoreSet(next_chunk_id);
+    status = segment_index_meta->InitSet(next_chunk_id);
     if (!status.ok()) {
         return status;
     }
@@ -1033,8 +1029,8 @@ Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, Usage
                           segment_index_meta.table_index_meta().index_id_str()));
     if (usage_flag != UsageFlag::kTransform) {
         // Invalidate the fulltext index cache for this segment
-        TableMeta &table_meta = segment_index_meta.table_index_meta().table_meta();
-        Status status = table_meta.InvalidateFtIndexCache();
+        auto &table_meta = segment_index_meta.table_index_meta().table_meta();
+        auto status = table_meta.InvalidateFtIndexCache();
         if (!status.ok()) {
             return status;
         }
@@ -1044,7 +1040,7 @@ Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, Usage
     if (!status.ok()) {
         return status;
     }
-    for (ChunkID chunk_id : *chunk_ids_ptr) {
+    for (auto chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
         status = NewCatalog::CleanChunkIndex(chunk_index_meta, usage_flag);
         if (!status.ok()) {
@@ -1164,10 +1160,8 @@ Status NewCatalog::CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UsageFlag u
                           chunk_index_meta.segment_index_meta().segment_id(),
                           chunk_index_meta.segment_index_meta().table_index_meta().index_id_str(),
                           chunk_index_meta.chunk_id()));
-    chunk_index_meta.RestoreSet();
-    Status status;
-
-    status = chunk_index_meta.UninitSet(usage_flag);
+    chunk_index_meta.LoadSet();
+    auto status = chunk_index_meta.UninitSet(usage_flag);
     if (!status.ok()) {
         return status;
     }

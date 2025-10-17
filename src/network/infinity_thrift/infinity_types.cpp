@@ -1352,7 +1352,7 @@ uint32_t ArrayType::read(::apache::thrift::protocol::TProtocol* iprot) {
     {
       case 1:
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          if (!this->element_data_type) { 
+          if (!this->element_data_type) {
             this->element_data_type = ::std::shared_ptr<DataType>(new DataType);
           }
           xfer += this->element_data_type->read(iprot);
@@ -1384,7 +1384,7 @@ uint32_t ArrayType::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
   xfer += oprot->writeFieldBegin("element_data_type", ::apache::thrift::protocol::T_STRUCT, 1);
   if (this->element_data_type) {
-    xfer += this->element_data_type->write(oprot); 
+    xfer += this->element_data_type->write(oprot);
   } else {oprot->writeStructBegin("DataType"); 
     oprot->writeStructEnd();
     oprot->writeFieldStop();
@@ -1862,7 +1862,7 @@ uint32_t ParsedExprType::read(::apache::thrift::protocol::TProtocol* iprot) {
     {
       case 1:
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          if (!this->constant_expr) { 
+          if (!this->constant_expr) {
             this->constant_expr = ::std::shared_ptr<ConstantExpr>(new ConstantExpr);
           }
           xfer += this->constant_expr->read(iprot);
@@ -1888,7 +1888,7 @@ uint32_t ParsedExprType::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 2:
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          if (!this->column_expr) { 
+          if (!this->column_expr) {
             this->column_expr = ::std::shared_ptr<ColumnExpr>(new ColumnExpr);
           }
           xfer += this->column_expr->read(iprot);
@@ -1903,7 +1903,7 @@ uint32_t ParsedExprType::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 3:
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          if (!this->function_expr) { 
+          if (!this->function_expr) {
             this->function_expr = ::std::shared_ptr<FunctionExpr>(new FunctionExpr);
           }
           xfer += this->function_expr->read(iprot);
@@ -1918,7 +1918,7 @@ uint32_t ParsedExprType::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 4:
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          if (!this->between_expr) { 
+          if (!this->between_expr) {
             this->between_expr = ::std::shared_ptr<BetweenExpr>(new BetweenExpr);
           }
           xfer += this->between_expr->read(iprot);
@@ -1934,7 +1934,7 @@ uint32_t ParsedExprType::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 5:
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          if (!this->knn_expr) { 
+          if (!this->knn_expr) {
             this->knn_expr = ::std::shared_ptr<KnnExpr>(new KnnExpr);
           }
           xfer += this->knn_expr->read(iprot);
@@ -1955,7 +1955,7 @@ uint32_t ParsedExprType::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 6:
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          if (!this->match_sparse_expr) { 
+          if (!this->match_sparse_expr) {
             this->match_sparse_expr = ::std::shared_ptr<MatchSparseExpr>(new MatchSparseExpr);
           }
           xfer += this->match_sparse_expr->read(iprot);
@@ -1974,7 +1974,7 @@ uint32_t ParsedExprType::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 7:
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          if (!this->match_tensor_expr) { 
+          if (!this->match_tensor_expr) {
             this->match_tensor_expr = ::std::shared_ptr<MatchTensorExpr>(new MatchTensorExpr);
           }
           xfer += this->match_tensor_expr->read(iprot);
@@ -1993,7 +1993,7 @@ uint32_t ParsedExprType::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 8:
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          if (!this->match_expr) { 
+          if (!this->match_expr) {
             this->match_expr = ::std::shared_ptr<MatchExpr>(new MatchExpr);
           }
           xfer += this->match_expr->read(iprot);
@@ -2010,7 +2010,7 @@ uint32_t ParsedExprType::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 9:
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          if (!this->fusion_expr) { 
+          if (!this->fusion_expr) {
             this->fusion_expr = ::std::shared_ptr<FusionExpr>(new FusionExpr);
           }
           xfer += this->fusion_expr->read(iprot);
@@ -2026,7 +2026,7 @@ uint32_t ParsedExprType::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 10:
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          if (!this->search_expr) { 
+          if (!this->search_expr) {
             this->search_expr = ::std::shared_ptr<SearchExpr>(new SearchExpr);
           }
           xfer += this->search_expr->read(iprot);
@@ -2041,7 +2041,7 @@ uint32_t ParsedExprType::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 11:
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          if (!this->in_expr) { 
+          if (!this->in_expr) {
             this->in_expr = ::std::shared_ptr<InExpr>(new InExpr);
           }
           xfer += this->in_expr->read(iprot);
@@ -2075,7 +2075,7 @@ uint32_t ParsedExprType::write(::apache::thrift::protocol::TProtocol* oprot) con
   if (this->__isset.constant_expr) {
     xfer += oprot->writeFieldBegin("constant_expr", ::apache::thrift::protocol::T_STRUCT, 1);
     if (this->constant_expr) {
-      xfer += this->constant_expr->write(oprot); 
+      xfer += this->constant_expr->write(oprot);
     } else {oprot->writeStructBegin("ConstantExpr"); 
       oprot->writeStructEnd();
       oprot->writeFieldStop();
@@ -2085,7 +2085,7 @@ uint32_t ParsedExprType::write(::apache::thrift::protocol::TProtocol* oprot) con
   if (this->__isset.column_expr) {
     xfer += oprot->writeFieldBegin("column_expr", ::apache::thrift::protocol::T_STRUCT, 2);
     if (this->column_expr) {
-      xfer += this->column_expr->write(oprot); 
+      xfer += this->column_expr->write(oprot);
     } else {oprot->writeStructBegin("ColumnExpr"); 
       oprot->writeStructEnd();
       oprot->writeFieldStop();
@@ -2095,7 +2095,7 @@ uint32_t ParsedExprType::write(::apache::thrift::protocol::TProtocol* oprot) con
   if (this->__isset.function_expr) {
     xfer += oprot->writeFieldBegin("function_expr", ::apache::thrift::protocol::T_STRUCT, 3);
     if (this->function_expr) {
-      xfer += this->function_expr->write(oprot); 
+      xfer += this->function_expr->write(oprot);
     } else {oprot->writeStructBegin("FunctionExpr"); 
       oprot->writeStructEnd();
       oprot->writeFieldStop();
@@ -2105,7 +2105,7 @@ uint32_t ParsedExprType::write(::apache::thrift::protocol::TProtocol* oprot) con
   if (this->__isset.between_expr) {
     xfer += oprot->writeFieldBegin("between_expr", ::apache::thrift::protocol::T_STRUCT, 4);
     if (this->between_expr) {
-      xfer += this->between_expr->write(oprot); 
+      xfer += this->between_expr->write(oprot);
     } else {oprot->writeStructBegin("BetweenExpr"); 
       oprot->writeStructEnd();
       oprot->writeFieldStop();
@@ -2115,7 +2115,7 @@ uint32_t ParsedExprType::write(::apache::thrift::protocol::TProtocol* oprot) con
   if (this->__isset.knn_expr) {
     xfer += oprot->writeFieldBegin("knn_expr", ::apache::thrift::protocol::T_STRUCT, 5);
     if (this->knn_expr) {
-      xfer += this->knn_expr->write(oprot); 
+      xfer += this->knn_expr->write(oprot);
     } else {oprot->writeStructBegin("KnnExpr"); 
       oprot->writeStructEnd();
       oprot->writeFieldStop();
@@ -2125,7 +2125,7 @@ uint32_t ParsedExprType::write(::apache::thrift::protocol::TProtocol* oprot) con
   if (this->__isset.match_sparse_expr) {
     xfer += oprot->writeFieldBegin("match_sparse_expr", ::apache::thrift::protocol::T_STRUCT, 6);
     if (this->match_sparse_expr) {
-      xfer += this->match_sparse_expr->write(oprot); 
+      xfer += this->match_sparse_expr->write(oprot);
     } else {oprot->writeStructBegin("MatchSparseExpr"); 
       oprot->writeStructEnd();
       oprot->writeFieldStop();
@@ -2135,7 +2135,7 @@ uint32_t ParsedExprType::write(::apache::thrift::protocol::TProtocol* oprot) con
   if (this->__isset.match_tensor_expr) {
     xfer += oprot->writeFieldBegin("match_tensor_expr", ::apache::thrift::protocol::T_STRUCT, 7);
     if (this->match_tensor_expr) {
-      xfer += this->match_tensor_expr->write(oprot); 
+      xfer += this->match_tensor_expr->write(oprot);
     } else {oprot->writeStructBegin("MatchTensorExpr"); 
       oprot->writeStructEnd();
       oprot->writeFieldStop();
@@ -2145,7 +2145,7 @@ uint32_t ParsedExprType::write(::apache::thrift::protocol::TProtocol* oprot) con
   if (this->__isset.match_expr) {
     xfer += oprot->writeFieldBegin("match_expr", ::apache::thrift::protocol::T_STRUCT, 8);
     if (this->match_expr) {
-      xfer += this->match_expr->write(oprot); 
+      xfer += this->match_expr->write(oprot);
     } else {oprot->writeStructBegin("MatchExpr"); 
       oprot->writeStructEnd();
       oprot->writeFieldStop();
@@ -2155,7 +2155,7 @@ uint32_t ParsedExprType::write(::apache::thrift::protocol::TProtocol* oprot) con
   if (this->__isset.fusion_expr) {
     xfer += oprot->writeFieldBegin("fusion_expr", ::apache::thrift::protocol::T_STRUCT, 9);
     if (this->fusion_expr) {
-      xfer += this->fusion_expr->write(oprot); 
+      xfer += this->fusion_expr->write(oprot);
     } else {oprot->writeStructBegin("FusionExpr"); 
       oprot->writeStructEnd();
       oprot->writeFieldStop();
@@ -2165,7 +2165,7 @@ uint32_t ParsedExprType::write(::apache::thrift::protocol::TProtocol* oprot) con
   if (this->__isset.search_expr) {
     xfer += oprot->writeFieldBegin("search_expr", ::apache::thrift::protocol::T_STRUCT, 10);
     if (this->search_expr) {
-      xfer += this->search_expr->write(oprot); 
+      xfer += this->search_expr->write(oprot);
     } else {oprot->writeStructBegin("SearchExpr"); 
       oprot->writeStructEnd();
       oprot->writeFieldStop();
@@ -2175,7 +2175,7 @@ uint32_t ParsedExprType::write(::apache::thrift::protocol::TProtocol* oprot) con
   if (this->__isset.in_expr) {
     xfer += oprot->writeFieldBegin("in_expr", ::apache::thrift::protocol::T_STRUCT, 11);
     if (this->in_expr) {
-      xfer += this->in_expr->write(oprot); 
+      xfer += this->in_expr->write(oprot);
     } else {oprot->writeStructBegin("InExpr"); 
       oprot->writeStructEnd();
       oprot->writeFieldStop();
@@ -5058,7 +5058,7 @@ uint32_t GenericMatchExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
     {
       case 1:
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          if (!this->match_vector_expr) { 
+          if (!this->match_vector_expr) {
             this->match_vector_expr = ::std::shared_ptr<KnnExpr>(new KnnExpr);
           }
           xfer += this->match_vector_expr->read(iprot);
@@ -5079,7 +5079,7 @@ uint32_t GenericMatchExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 2:
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          if (!this->match_sparse_expr) { 
+          if (!this->match_sparse_expr) {
             this->match_sparse_expr = ::std::shared_ptr<MatchSparseExpr>(new MatchSparseExpr);
           }
           xfer += this->match_sparse_expr->read(iprot);
@@ -5098,7 +5098,7 @@ uint32_t GenericMatchExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 3:
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          if (!this->match_tensor_expr) { 
+          if (!this->match_tensor_expr) {
             this->match_tensor_expr = ::std::shared_ptr<MatchTensorExpr>(new MatchTensorExpr);
           }
           xfer += this->match_tensor_expr->read(iprot);
@@ -5117,7 +5117,7 @@ uint32_t GenericMatchExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 4:
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          if (!this->match_text_expr) { 
+          if (!this->match_text_expr) {
             this->match_text_expr = ::std::shared_ptr<MatchExpr>(new MatchExpr);
           }
           xfer += this->match_text_expr->read(iprot);
@@ -5152,7 +5152,7 @@ uint32_t GenericMatchExpr::write(::apache::thrift::protocol::TProtocol* oprot) c
   if (this->__isset.match_vector_expr) {
     xfer += oprot->writeFieldBegin("match_vector_expr", ::apache::thrift::protocol::T_STRUCT, 1);
     if (this->match_vector_expr) {
-      xfer += this->match_vector_expr->write(oprot); 
+      xfer += this->match_vector_expr->write(oprot);
     } else {oprot->writeStructBegin("KnnExpr"); 
       oprot->writeStructEnd();
       oprot->writeFieldStop();
@@ -5162,7 +5162,7 @@ uint32_t GenericMatchExpr::write(::apache::thrift::protocol::TProtocol* oprot) c
   if (this->__isset.match_sparse_expr) {
     xfer += oprot->writeFieldBegin("match_sparse_expr", ::apache::thrift::protocol::T_STRUCT, 2);
     if (this->match_sparse_expr) {
-      xfer += this->match_sparse_expr->write(oprot); 
+      xfer += this->match_sparse_expr->write(oprot);
     } else {oprot->writeStructBegin("MatchSparseExpr"); 
       oprot->writeStructEnd();
       oprot->writeFieldStop();
@@ -5172,7 +5172,7 @@ uint32_t GenericMatchExpr::write(::apache::thrift::protocol::TProtocol* oprot) c
   if (this->__isset.match_tensor_expr) {
     xfer += oprot->writeFieldBegin("match_tensor_expr", ::apache::thrift::protocol::T_STRUCT, 3);
     if (this->match_tensor_expr) {
-      xfer += this->match_tensor_expr->write(oprot); 
+      xfer += this->match_tensor_expr->write(oprot);
     } else {oprot->writeStructBegin("MatchTensorExpr"); 
       oprot->writeStructEnd();
       oprot->writeFieldStop();
@@ -5182,7 +5182,7 @@ uint32_t GenericMatchExpr::write(::apache::thrift::protocol::TProtocol* oprot) c
   if (this->__isset.match_text_expr) {
     xfer += oprot->writeFieldBegin("match_text_expr", ::apache::thrift::protocol::T_STRUCT, 4);
     if (this->match_text_expr) {
-      xfer += this->match_text_expr->write(oprot); 
+      xfer += this->match_text_expr->write(oprot);
     } else {oprot->writeStructBegin("MatchExpr"); 
       oprot->writeStructEnd();
       oprot->writeFieldStop();

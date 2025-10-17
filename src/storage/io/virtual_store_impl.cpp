@@ -124,6 +124,8 @@ std::tuple<std::unique_ptr<LocalFileHandle>, Status> VirtualStore::Open(const st
             break;
         }
         case FileAccessMode::kWrite: {
+            auto ps = fs::path(path).parent_path().string();
+            VirtualStore::MakeDirectory(ps);
             fd = open(path.c_str(), O_RDWR | O_CREAT, 0666);
             break;
         }

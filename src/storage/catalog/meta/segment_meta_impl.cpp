@@ -66,16 +66,16 @@ Status SegmentMeta::InitSet() {
 
 // called when restore segment from snapshot with segment meta
 // restore segment meta from snapshot with segment meta
-Status SegmentMeta::RestoreSet() {
-    {
-        Status status = SetFirstDeleteTS(first_delete_ts_.value_or(UNCOMMIT_TS));
-        if (!status.ok()) {
-            return status;
-        }
-    }
-
-    return Status::OK();
-}
+// Status SegmentMeta::RestoreSet() {
+//     {
+//         Status status = SetFirstDeleteTS(first_delete_ts_.value_or(UNCOMMIT_TS));
+//         if (!status.ok()) {
+//             return status;
+//         }
+//     }
+//
+//     return Status::OK();
+// }
 
 Status SegmentMeta::UninitSet(UsageFlag usage_flag) { return UninitSet(usage_flag, begin_ts_); }
 
@@ -418,7 +418,8 @@ std::tuple<std::shared_ptr<SegmentSnapshotInfo>, Status> SegmentMeta::MapMetaToS
 
 Status SegmentMeta::RestoreFromSnapshot(const WalSegmentInfoV2 &segment_info, bool is_link_files) {
     if (!is_link_files) {
-        Status status = RestoreSet();
+        // Status status = RestoreSet();
+        Status status = InitSet();
         if (!status.ok()) {
             return status;
         }

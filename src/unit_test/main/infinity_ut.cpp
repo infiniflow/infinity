@@ -207,7 +207,7 @@ TEST_F(InfinityTest, test1) {
         col2->names_.emplace_back(col2_name);
         output_columns->emplace_back(col2);
 
-        SearchExpr *search_expr = nullptr;
+        SearchExpr *search_expr{};
 
         result =
             infinity
