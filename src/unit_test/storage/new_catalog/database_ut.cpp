@@ -371,6 +371,66 @@ TEST_P(TestTxnDatabase, db_test3) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
+TEST_P(TestTxnDatabase, createdb_wrong_conflicttype) {
+    using namespace infinity;
+
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
+        Status status = txn1->CreateDatabase("db1", ConflictType::kReplace, std::make_shared<std::string>());
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn1);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
+        Status status = txn1->CreateDatabase("db1", ConflictType::kInvalid, std::make_shared<std::string>());
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn1);
+        EXPECT_TRUE(status.ok());
+    }
+}
+
+TEST_P(TestTxnDatabase, dropdb_wrong_conflicttype) {
+    using namespace infinity;
+
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
+        Status status = txn1->CreateDatabase("db1", ConflictType::kError, std::make_shared<std::string>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
+        Status status = txn1->DropDatabase("db1", ConflictType::kReplace);
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn1);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
+        Status status = txn1->DropDatabase("db1", ConflictType::kInvalid);
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn1);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
+        Status status = txn1->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+    }
+}
+
 TEST_P(TestTxnDatabase, dropdb_dropdb_test) {
     using namespace infinity;
 
