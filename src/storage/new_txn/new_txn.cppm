@@ -312,7 +312,6 @@ private:
     Status ReplayCreateIndex(WalCmdCreateIndexV2 *create_index_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayDumpIndex(WalCmdDumpIndexV2 *dump_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayDropIndex(WalCmdDropIndexV2 *drop_index_cmd, TxnTimeStamp commit_ts, i64 txn_id);
-    Status ReplayAppend(WalCmdAppendV2 *append_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayDelete(WalCmdDeleteV2 *delete_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_ts, i64 txn_id);
@@ -555,8 +554,6 @@ private:
 
 public:
     Status RecoverMemIndex(TableIndexMeta &table_index_meta);
-
-    Status CommitMemIndex(TableIndexMeta &table_index_meta);
 
     Status GetFullTextIndexReader(const std::string &db_name, const std::string &table_name, std::shared_ptr<IndexReader> &index_reader);
 

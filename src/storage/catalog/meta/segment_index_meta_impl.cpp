@@ -300,12 +300,6 @@ std::shared_ptr<MemIndex> SegmentIndexMeta::PopMemIndex() {
     return new_catalog->PopMemIndex(mem_index_key);
 }
 
-bool SegmentIndexMeta::HasMemIndex() {
-    std::string mem_index_key = GetSegmentIndexTag("mem_index");
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    return new_catalog->HasMemIndex(mem_index_key);
-}
-
 Status SegmentIndexMeta::LoadChunkIDs1() {
     chunk_ids_ = std::vector<ChunkID>();
     std::vector<ChunkID> &chunk_ids = *chunk_ids_;

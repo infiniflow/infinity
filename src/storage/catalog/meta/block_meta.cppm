@@ -67,10 +67,6 @@ public:
 
     std::tuple<std::shared_ptr<BlockColumnInfo>, Status> GetBlockColumnInfo(ColumnID column_id);
 
-    // std::pair<ColumnID, Status> AddBlockColumnID1(TxnTimeStamp commit_ts);
-    //
-    std::tuple<std::vector<ColumnID> *, Status> GetBlockColumnIDs1();
-
     std::string GetBlockTag(const std::string &tag) const;
 
     Status GetFastRoughFilter(std::shared_ptr<FastRoughFilter> &fast_rough_filter);

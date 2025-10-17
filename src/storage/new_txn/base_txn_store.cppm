@@ -314,7 +314,7 @@ export struct AppendTxnStore final : public BaseTxnStore {
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 
     void ClearData() final;
-    size_t RowCount() const;
+    // size_t RowCount() const;
 };
 
 export struct ImportTxnStore final : public BaseTxnStore {
@@ -343,7 +343,7 @@ export struct ImportTxnStore final : public BaseTxnStore {
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 
-    size_t SegmentCount() const;
+    // size_t SegmentCount() const;
 };
 
 export struct DumpMemIndexTxnStore final : public BaseTxnStore {

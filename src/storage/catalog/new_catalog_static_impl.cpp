@@ -340,69 +340,6 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn) {
     return Status::OK();
 }
 
-Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
-    Status status;
-    std::vector<std::string> *db_id_strs_ptr;
-    std::vector<std::string> *db_names_ptr = nullptr;
-    CatalogMeta catalog_meta(new_txn);
-    status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
-    if (!status.ok()) {
-        return status;
-    }
-    auto IndexCommitTable = [&](TableMeta &table_meta) {
-        std::vector<std::string> *index_id_strs_ptr = nullptr;
-        std::vector<std::string> *index_name_strs_ptr = nullptr;
-        status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
-        if (!status.ok()) {
-            return status;
-        }
-        size_t index_count = index_id_strs_ptr->size();
-        for (size_t idx = 0; idx < index_count; ++idx) {
-            const std::string &index_id_str = index_id_strs_ptr->at(idx);
-            const std::string &index_name_str = index_name_strs_ptr->at(idx);
-
-            TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
-            status = new_txn->CommitMemIndex(table_index_meta);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        return Status::OK();
-    };
-    auto IndexCommitDB = [&](DBMeta &db_meta) {
-        std::vector<std::string> *table_id_strs_ptr = nullptr;
-        std::vector<std::string> *table_names_ptr = nullptr;
-        status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
-        if (!status.ok()) {
-            return status;
-        }
-
-        size_t table_count = table_id_strs_ptr->size();
-        for (size_t idx = 0; idx < table_count; ++idx) {
-            const std::string &table_id_str = table_id_strs_ptr->at(idx);
-            const std::string &table_name = table_names_ptr->at(idx);
-            TableMeta table_meta(db_meta.db_id_str(), table_id_str, table_name, new_txn);
-            status = IndexCommitTable(table_meta);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        return Status::OK();
-    };
-
-    size_t db_count = db_id_strs_ptr->size();
-    for (size_t idx = 0; idx < db_count; ++idx) {
-        const std::string &db_id_str = db_id_strs_ptr->at(idx);
-        const std::string &db_name = db_names_ptr->at(idx);
-        DBMeta db_meta(db_id_str, db_name, new_txn);
-        status = IndexCommitDB(db_meta);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    return Status::OK();
-}
-
 Status NewCatalog::GetAllMemIndexes(NewTxn *txn, std::vector<std::shared_ptr<MemIndex>> &mem_indexes, std::vector<MemIndexID> &mem_index_ids) {
     auto TraverseTableIndex =
         [&](TableIndexMeta &table_index_meta, const std::string &db_name, const std::string &table_name, const std::string &index_name) {
@@ -653,30 +590,6 @@ NewCatalog::AddNewSegmentWithID(TableMeta &table_meta, TxnTimeStamp commit_ts, s
     return segment_meta->InitSet();
 }
 
-Status NewCatalog::LoadFlushedSegment1(TableMeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
-    Status status;
-
-    SegmentID segment_id = 0;
-    std::tie(segment_id, status) = table_meta.AddSegmentID1(checkpoint_ts);
-    if (!status.ok()) {
-        return status;
-    }
-
-    SegmentMeta segment_meta(segment_id, table_meta);
-    status = segment_meta.InitSet();
-    if (!status.ok()) {
-        return status;
-    }
-    for (const WalBlockInfo &block_info : segment_info.block_infos_) {
-        status = NewCatalog::LoadFlushedBlock1(segment_meta, block_info, checkpoint_ts);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-
-    return Status::OK();
-}
-
 Status NewCatalog::LoadFlushedSegment2(TableMeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
     Status status = table_meta.AddSegmentWithID(checkpoint_ts, segment_info.segment_id_);
     if (!status.ok()) {
@@ -874,29 +787,6 @@ Status NewCatalog::AddNewBlockWithID(SegmentMeta &segment_meta, TxnTimeStamp com
     return Status::OK();
 }
 
-Status NewCatalog::AddNewBlockForTransform(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, std::optional<BlockMeta> &block_meta) {
-    Status status;
-
-    BlockID block_id;
-    std::tie(block_id, status) = segment_meta.AddBlockID1(commit_ts);
-    if (!status.ok()) {
-        return status;
-    }
-    block_meta.emplace(block_id, segment_meta);
-    // status = block_meta->InitSet();
-    // if (!status.ok()) {
-    //     return status;
-    // }
-    return Status::OK();
-}
-//
-// Status NewCatalog::AddNewTableIndexForTransform(TableMeta &table_meta, TxnTimeStamp commit_ts, std::optional<TableIndexMeta> &table_index_meta) {
-//     Status status;
-//     BlockID block_id;
-//     std::tie(block_id, status) = table_meta.AddBlockID1(commit_ts);
-//     return Status::OK();
-// }
-
 Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockInfo &block_info, TxnTimeStamp checkpoint_ts) {
     Status status;
     BlockID block_id = 0;
@@ -923,12 +813,7 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
         }
     }
     for (const auto &column_def : *column_defs_ptr) {
-        //    const auto &[chunk_idx, chunk_offset] = block_info.outline_infos_[column_def->id()];
         ColumnMeta column_meta(column_def->id(), block_meta);
-        //    status = column_meta.SetChunkOffset(chunk_offset);
-        //    if (!status.ok()) {
-        //        return status;
-        //    }
 
         status = column_meta.LoadSet();
         if (!status.ok()) {
@@ -976,29 +861,6 @@ Status NewCatalog::AddNewBlockColumn(BlockMeta &block_meta,
             return status;
         }
     }
-    return Status::OK();
-}
-
-Status
-NewCatalog::AddNewBlockColumnForTransform(BlockMeta &block_meta, size_t column_idx, std::optional<ColumnMeta> &column_meta, TxnTimeStamp commit_ts) {
-    auto &kv_instance = block_meta.kv_instance();
-    column_meta.emplace(column_idx, block_meta);
-    auto &segment_meta = block_meta.segment_meta();
-    auto &table_meta = segment_meta.table_meta();
-    std::string block_id_key = KeyEncode::CatalogTableSegmentBlockColumnKey(table_meta.db_id_str(),
-                                                                            table_meta.table_id_str(),
-                                                                            segment_meta.segment_id(),
-                                                                            block_meta.block_id(),
-                                                                            column_idx,
-                                                                            commit_ts);
-    std::string commit_ts_str = fmt::format("{}", commit_ts);
-    Status status = kv_instance.Put(block_id_key, commit_ts_str);
-    // {
-    //     Status status = column_meta->InitSet();
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    // }
     return Status::OK();
 }
 

@@ -67,7 +67,6 @@ public:
 
     std::shared_ptr<MemIndex> GetMemIndex(bool for_update = false);
     std::shared_ptr<MemIndex> PopMemIndex();
-    bool HasMemIndex();
 
     std::shared_ptr<std::string> GetSegmentIndexDir() const;
 

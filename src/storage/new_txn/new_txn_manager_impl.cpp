@@ -185,22 +185,6 @@ std::unique_ptr<NewTxn> NewTxnManager::BeginRecoveryTxn() {
     return recovery_txn;
 }
 
-NewTxn *NewTxnManager::GetTxn(TransactionID txn_id) const {
-    std::lock_guard guard(locker_);
-    NewTxn *res = txn_map_.at(txn_id).get();
-    return res;
-}
-
-TxnState NewTxnManager::GetTxnState(TransactionID txn_id) const {
-    std::lock_guard guard(locker_);
-    auto iter = txn_map_.find(txn_id);
-    if (iter == txn_map_.end()) {
-        return TxnState::kCommitted;
-    }
-    NewTxn *txn = iter->second.get();
-    return txn->GetTxnState();
-}
-
 // Prepare to commit ReadTxn
 TxnTimeStamp NewTxnManager::GetReadCommitTS(NewTxn *txn) {
     std::lock_guard guard(locker_);
@@ -209,10 +193,10 @@ TxnTimeStamp NewTxnManager::GetReadCommitTS(NewTxn *txn) {
     return commit_ts;
 }
 
-TxnTimeStamp NewTxnManager::GetCurrentTS() {
-    std::lock_guard guard(locker_);
-    return current_ts_;
-}
+// TxnTimeStamp NewTxnManager::GetCurrentTS() {
+//     std::lock_guard guard(locker_);
+//     return current_ts_;
+// }
 
 // Prepare to commit WriteTxn
 TxnTimeStamp NewTxnManager::GetWriteCommitTS(std::shared_ptr<NewTxn> txn) {
