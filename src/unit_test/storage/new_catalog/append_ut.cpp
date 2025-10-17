@@ -508,6 +508,101 @@ TEST_P(TestTxnAppend, test_append2) {
     }
 }
 
+TEST_P(TestTxnAppend, test_append_mismatch) {
+    using namespace infinity;
+
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+        Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    auto input_block = std::make_shared<DataBlock>();
+    {
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            col1->AppendValue(Value::MakeInt(1));
+            col1->AppendValue(Value::MakeInt(2));
+            input_block->InsertVector(col1, 0);
+        }
+        {
+            auto col2 = ColumnVector::Make(column_def2->type());
+            col2->Initialize();
+            col2->AppendValue(Value::MakeVarchar("abc"));
+            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            input_block->InsertVector(col2, 1);
+        }
+        input_block->Finalize();
+    }
+
+    auto input_block2 = std::make_shared<DataBlock>();
+    {
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            col1->AppendValue(Value::MakeInt(1));
+            col1->AppendValue(Value::MakeInt(2));
+            input_block2->InsertVector(col1, 0);
+        }
+        input_block2->Finalize();
+    }
+
+    auto input_block3 = std::make_shared<DataBlock>();
+    {
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            col1->AppendValue(Value::MakeInt(1));
+            col1->AppendValue(Value::MakeInt(2));
+            input_block3->InsertVector(col1, 0);
+        }
+        {
+            auto col2 = ColumnVector::Make(column_def1->type());
+            col2->Initialize();
+            col2->AppendValue(Value::MakeInt(1));
+            col2->AppendValue(Value::MakeInt(2));
+            input_block3->InsertVector(col2, 1);
+        }
+        input_block->Finalize();
+    }
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
+        Status status = txn->Append(*db_name, *table_name, input_block2);
+        EXPECT_FALSE(status.ok()); // ColumnCountMismatch
+        status = new_txn_mgr->RollBackTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append again"), TransactionType::kAppend);
+        Status status = txn->Append(*db_name, *table_name, input_block3);
+        EXPECT_FALSE(status.ok()); // DataTypeMismatch
+        status = new_txn_mgr->RollBackTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+}
+
 TEST_P(TestTxnAppend, test_append_drop_db) {
     using namespace infinity;
 

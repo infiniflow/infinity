@@ -252,6 +252,7 @@ TEST_P(TestTxnReplayAlter, test_rename) {
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
     auto new_table_name = std::make_shared<std::string>("tb2");
+    auto new_table_name2 = std::make_shared<std::string>("tb3");
 
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
@@ -267,7 +268,25 @@ TEST_P(TestTxnReplayAlter, test_rename) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-    };
+    }
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
+        Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    new_txn_mgr->PrintAllKeyValue();
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("rename"), TransactionType::kRenameTable);
+        Status status = txn->RenameTable(*db_name, *new_table_name, *new_table_name2);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
 
     RestartTxnMgr();
 
@@ -276,7 +295,7 @@ TEST_P(TestTxnReplayAlter, test_rename) {
         std::shared_ptr<DBMeta> db_meta;
         std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
-        Status status = txn->GetTableMeta(*db_name, *new_table_name, db_meta, table_meta, create_timestamp);
+        Status status = txn->GetTableMeta(*db_name, *new_table_name2, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
     }
 }

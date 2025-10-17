@@ -54,7 +54,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          CleanupTaskTest,
                          ::testing::Values(BaseTestParamStr::NEW_BG_ON_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_BG_ON_CONFIG_PATH));
 
-TEST_P(CleanupTaskTest, DISABLED_SLOW_test_delete_db_simple) {
+TEST_P(CleanupTaskTest, test_delete_db_simple) {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto *wal_manager = infinity::InfinityContext::instance().storage()->wal_manager();
     i64 cleanup_interval = InfinityContext::instance().storage()->config()->CleanupInterval();

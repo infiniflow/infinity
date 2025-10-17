@@ -101,6 +101,8 @@ TEST_P(TestTxnTable, table_test1) {
     }
 
     new_txn_mgr->PrintAllKeyValue();
+    new_txn_mgr->PrintAllDroppedKeys();
+    PrintTransactionHistory();
 }
 
 TEST_P(TestTxnTable, table_test2) {
@@ -155,6 +157,102 @@ TEST_P(TestTxnTable, table_test2) {
 
     new_txn_mgr->PrintAllKeyValue();
 }
+TEST_P(TestTxnTable, createtable_wrong_conflicttype) {
+    using namespace infinity;
+
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
+
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kIgnore, std::make_shared<std::string>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+        Status status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kReplace);
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+        Status status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kInvalid);
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
+        Status status = txn5->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+    }
+}
+
+TEST_P(TestTxnTable, droptable_wrong_conflicttype) {
+    using namespace infinity;
+
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
+
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kIgnore, std::make_shared<std::string>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+        Status status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
+        Status status = txn4->DropTable(*db_name, *table_name, ConflictType::kReplace);
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
+        Status status = txn4->DropTable(*db_name, *table_name, ConflictType::kInvalid);
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
+        Status status = txn5->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+    }
+}
 
 TEST_P(TestTxnTable, createtable_createtable) {
     using namespace infinity;
@@ -195,7 +293,7 @@ TEST_P(TestTxnTable, createtable_createtable) {
         EXPECT_TRUE(status.ok());
 
         // drop database
-        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kDropDB);
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
         status = txn5->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
