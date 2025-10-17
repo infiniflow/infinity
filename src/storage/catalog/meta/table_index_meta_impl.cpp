@@ -128,32 +128,6 @@ bool TableIndexMeta::HasSegmentIndexID(SegmentID segment_id) {
     return true;
 }
 
-Status TableIndexMeta::SetSegmentIDs(const std::vector<SegmentID> &segment_ids) {
-    std::string segment_ids_key = GetTableIndexTag("segment_ids");
-    std::string segment_ids_str = nlohmann::json(segment_ids).dump();
-    Status status = kv_instance_.Put(segment_ids_key, segment_ids_str);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
-
-Status TableIndexMeta::AddSegmentID(SegmentID segment_id) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    if (!segment_ids_) {
-        Status status = LoadSegmentIDs();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    segment_ids_->push_back(segment_id);
-    Status status = SetSegmentIDs(*segment_ids_);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
-
 Status TableIndexMeta::AddSegmentIndexID1(SegmentID segment_id, NewTxn *new_txn) {
 
     std::string segment_id_key = KeyEncode::CatalogIdxSegmentKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, segment_id);
@@ -265,26 +239,9 @@ Status TableIndexMeta::UninitSet1(UsageFlag usage_flag) {
     return Status::OK();
 }
 
-Status TableIndexMeta::LoadSegmentIDs() {
-    std::string segment_ids_key = GetTableIndexTag("segment_ids");
-    std::string segment_ids_str;
-    Status status = kv_instance_.Get(segment_ids_key, segment_ids_str);
-    if (!status.ok()) {
-        return status;
-    }
-    simdjson::padded_string json_pad(segment_ids_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(json_pad);
-    std::vector<SegmentID> segment_ids = doc.get<std::vector<SegmentID>>();
-    segment_ids_ = segment_ids;
-    return Status::OK();
-}
-
 std::string TableIndexMeta::GetTableIndexTag(const std::string &tag) const {
     return KeyEncode::CatalogIndexTagKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, tag);
 }
-
-std::string TableIndexMeta::FtIndexCacheTag() const { return GetTableIndexTag("ft_cache"); }
 
 Status TableIndexMeta::GetTableIndexInfo(TableIndexInfo &table_index_info) {
     Status status;

@@ -25,7 +25,6 @@ namespace infinity {
 class BlockMeta;
 class KVInstance;
 class BufferObj;
-// class ColumnDef;
 
 export class ColumnMeta {
 public:
@@ -39,10 +38,6 @@ public:
 
     std::shared_ptr<ColumnDef> get_column_def() const;
 
-    Status GetChunkOffset(size_t &chunk_offset);
-
-    Status SetChunkOffset(size_t chunk_offset);
-
     Status InitSet(const std::shared_ptr<ColumnDef> &col_def);
 
     Status LoadSet();
@@ -52,8 +47,6 @@ public:
     Status UninitSet(const ColumnDef *column_def, UsageFlag usage_flag);
 
     Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer);
-
-    std::tuple<std::shared_ptr<ColumnDef>, Status> GetColumnDef() const;
 
     std::tuple<size_t, Status> GetColumnSize(size_t row_cnt, const std::shared_ptr<ColumnDef> &col_def) const;
 
@@ -66,18 +59,12 @@ public:
 private:
     Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer, const ColumnDef *column_def);
 
-    Status LoadChunkOffset();
-
     Status LoadColumnBuffer(const ColumnDef *col_def);
-
-    std::string GetColumnTag(const std::string &tag) const;
 
 private:
     KVInstance &kv_instance_;
     BlockMeta &block_meta_;
     size_t column_idx_;
-
-    std::optional<size_t> chunk_offset_;
 
     BufferObj *column_buffer_ = nullptr;
     BufferObj *outline_buffer_ = nullptr;

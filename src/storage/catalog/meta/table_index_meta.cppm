@@ -58,11 +58,7 @@ public:
 
     std::tuple<std::vector<SegmentID> *, Status> GetSegmentIndexIDs1();
 
-    Status SetSegmentIDs(const std::vector<SegmentID> &segment_ids);
-
     bool HasSegmentIndexID(SegmentID segment_id);
-
-    Status AddSegmentID(SegmentID segment_id);
 
     Status AddSegmentIndexID1(SegmentID segment_id, NewTxn *new_txn);
 
@@ -79,13 +75,9 @@ public:
     Status UninitSet1(UsageFlag usage_flag);
 
 private:
-    Status LoadSegmentIDs();
-
     std::string GetTableIndexTag(const std::string &tag) const;
 
 public:
-    std::string FtIndexCacheTag() const;
-
     // Methods for secondary index cardinality
     Status SetSecondaryIndexCardinality(SecondaryIndexCardinality cardinality);
 

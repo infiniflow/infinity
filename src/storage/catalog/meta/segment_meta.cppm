@@ -23,7 +23,6 @@ import :wal_entry;
 namespace infinity {
 
 class KVInstance;
-// class ColumnDef;
 class TableMeta;
 export struct SegmentInfo;
 class FastRoughFilter;
@@ -68,10 +67,6 @@ public:
 
     size_t segment_capacity() const { return DEFAULT_SEGMENT_CAPACITY; }
 
-    // Status SetBlockIDs(const std::vector<BlockID> &block_ids);
-
-    Status SetNextBlockID(BlockID next_block_id);
-
     Status SetFirstDeleteTS(TxnTimeStamp first_delete_ts);
 
     Status InitSet();
@@ -89,14 +84,11 @@ public:
     Status CommitBlock(BlockID block_id, TxnTimeStamp commit_ts);
 
     std::tuple<std::shared_ptr<std::string>, Status> GetSegmentDir();
-    // std::tuple<std::shared_ptr<std::vector<BlockID>>, Status> GetBlockIDs();
 
     std::tuple<std::vector<BlockID> *, Status> GetBlockIDs1();
     std::tuple<std::vector<BlockID> *, Status> GetBlockIDs1(TxnTimeStamp commit_ts);
 
-    // std::tuple<size_t, Status> GetRowCnt();
     std::tuple<size_t, Status> GetRowCnt1();
-    std::tuple<BlockID, Status> GetNextBlockID();
 
     Status GetFirstDeleteTS(TxnTimeStamp &first_delete_ts);
 
@@ -113,15 +105,7 @@ public:
     Status RestoreFromSnapshot(const WalSegmentInfoV2 &segment_info, bool is_link_files = false);
 
 private:
-    // Status LoadBlockIDs();
-
-    Status LoadBlockIDs1();
-
-    Status LoadNextBlockID();
-
     Status LoadFirstDeleteTS();
-
-    // Status LoadRowCnt();
 
     std::string GetSegmentTag(const std::string &tag) const;
 
@@ -132,10 +116,6 @@ private:
     TableMeta &table_meta_;
     SegmentID segment_id_;
     std::optional<std::string> segment_dir_; // TODO: check if it is no longer in use
-
-    // std::shared_ptr<std::vector<BlockID>> block_ids_;
-    std::optional<BlockID> next_block_id_;
-    // std::optional<size_t> row_cnt_;
 
     std::optional<std::vector<BlockID>> block_ids1_;
     std::optional<size_t> row_cnt_;
