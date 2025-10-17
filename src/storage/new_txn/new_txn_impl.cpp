@@ -1641,14 +1641,14 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
         return status;
     }
 
-    LOG_DEBUG(fmt::format("checkpoint ts {}, got {} DBs.", checkpoint_ts, db_id_strs_ptr->size()));
-
     // Put the data into local txn store
     if (base_txn_store_ != nullptr) {
         return Status::UnexpectedError("txn store is not null");
     }
     base_txn_store_ = std::make_shared<CheckpointTxnStore>(checkpoint_ts, auto_checkpoint);
     auto *txn_store = static_cast<CheckpointTxnStore *>(base_txn_store_.get());
+
+    LOG_DEBUG(fmt::format("{}, got {} DBs.", txn_store->ToString(), db_id_strs_ptr->size()));
 
     size_t db_count = db_id_strs_ptr->size();
     for (size_t idx = 0; idx < db_count; ++idx) {
@@ -1675,8 +1675,6 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
 
     return Status::OK();
 }
-
-Status NewTxn::ReplayCheckpoint(WalCmdCheckpointV2 *optimize_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
 
 Status NewTxn::CheckpointDB(DBMeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store) {
     std::vector<std::string> *table_id_strs_ptr;
@@ -2387,24 +2385,6 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
     }
     return Status::OK();
 }
-
-//
-// Status NewTxn::PrepareCommitCreateDB() {
-//    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-//
-//    CreateDBTxnStore *txn_store = static_cast<CreateDBTxnStore *>(base_txn_store_.get());
-//    std::string db_id_str = std::to_string(txn_store->db_id_);
-//    std::shared_ptr<DBMeta> db_meta;
-//    Status status = NewCatalog::AddNewDB(kv_instance_.get(), db_id_str, commit_ts, txn_store->db_name_,
-//    txn_store->comment_ptr_.get(), db_meta); if (!status.ok()) {
-//        UnrecoverableError(status.message());
-//    }
-//
-//    std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdCreateDatabaseV2>(txn_store->db_name_, db_id_str,
-//    *txn_store->comment_ptr_); wal_entry_->cmds_.push_back(wal_command);
-//    txn_context_ptr_->AddOperation(std::make_shared<std::string>(wal_command->ToString()));
-//    return Status::OK();
-//}
 
 Status NewTxn::PrepareCommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
@@ -4562,6 +4542,7 @@ Status NewTxn::Cleanup() {
     base_txn_store_ = std::make_shared<CleanupTxnStore>();
     CleanupTxnStore *txn_store = static_cast<CleanupTxnStore *>(base_txn_store_.get());
     txn_store->timestamp_ = begin_ts;
+    LOG_TRACE(txn_store->ToString());
 
     TxnTimeStamp last_cleanup_ts = new_catalog_->GetLastCleanupTS();
     TxnTimeStamp oldest_txn_begin_ts = txn_mgr_->GetOldestAliveTS();
@@ -4613,8 +4594,6 @@ Status NewTxn::Cleanup() {
 
     return Status::OK();
 }
-
-Status NewTxn::ReplayCleanup(WalCmdCleanup *cleanup_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
 
 Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) {
     KVInstance *kv_instance = kv_instance_.get();

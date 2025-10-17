@@ -159,14 +159,6 @@ std::shared_ptr<MemIndex> NewCatalog::PopMemIndex(const std::string &mem_index_k
     return nullptr;
 }
 
-bool NewCatalog::HasMemIndex(const std::string &mem_index_key) {
-    std::unique_lock<std::shared_mutex> lck(mem_index_mtx_);
-    if (auto iter = mem_index_map_.find(mem_index_key); iter != mem_index_map_.end()) {
-        return true;
-    }
-    return false;
-}
-
 Status NewCatalog::DropMemIndexByMemIndexKey(const std::string &mem_index_key) {
     bool delete_success = false;
     {

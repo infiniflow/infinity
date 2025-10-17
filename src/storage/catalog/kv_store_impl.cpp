@@ -99,34 +99,34 @@ Status KVInstance::Get(const std::string &key, std::string &value) {
     return Status::OK();
 }
 
-Status KVInstance::GetForUpdate(const std::string &key, std::string &value) {
-    rocksdb::Status s = transaction_->GetForUpdate(read_options_, key, &value);
-    if (!s.ok()) {
-        switch (s.code()) {
-            case rocksdb::Status::Code::kNotFound: {
-                return Status::NotFound(fmt::format("Key not found: {}", key));
-            }
-            default: {
-                std::string msg = fmt::format("rocksdb::Transaction::GetForUpdate key: {}", key);
-                LOG_DEBUG(msg);
-                return Status::RocksDBError(std::move(s), key);
-            }
-        }
-    }
-    return Status::OK();
-}
+// Status KVInstance::GetForUpdate(const std::string &key, std::string &value) {
+//     rocksdb::Status s = transaction_->GetForUpdate(read_options_, key, &value);
+//     if (!s.ok()) {
+//         switch (s.code()) {
+//             case rocksdb::Status::Code::kNotFound: {
+//                 return Status::NotFound(fmt::format("Key not found: {}", key));
+//             }
+//             default: {
+//                 std::string msg = fmt::format("rocksdb::Transaction::GetForUpdate key: {}", key);
+//                 LOG_DEBUG(msg);
+//                 return Status::RocksDBError(std::move(s), key);
+//             }
+//         }
+//     }
+//     return Status::OK();
+// }
 
 std::unique_ptr<KVIterator> KVInstance::GetIterator() { return std::make_unique<KVIterator>(transaction_->GetIterator(read_options_)); }
 
-std::unique_ptr<KVIterator> KVInstance::GetIterator(const char *lower_bound_key, const char *upper_bound_key) {
-    if (lower_bound_key != nullptr) {
-        read_options_.iterate_lower_bound = new rocksdb::Slice(lower_bound_key);
-    }
-    if (upper_bound_key != nullptr) {
-        read_options_.iterate_upper_bound = new rocksdb::Slice(upper_bound_key);
-    }
-    return std::make_unique<KVIterator>(transaction_->GetIterator(read_options_));
-}
+// std::unique_ptr<KVIterator> KVInstance::GetIterator(const char *lower_bound_key, const char *upper_bound_key) {
+//     if (lower_bound_key != nullptr) {
+//         read_options_.iterate_lower_bound = new rocksdb::Slice(lower_bound_key);
+//     }
+//     if (upper_bound_key != nullptr) {
+//         read_options_.iterate_upper_bound = new rocksdb::Slice(upper_bound_key);
+//     }
+//     return std::make_unique<KVIterator>(transaction_->GetIterator(read_options_));
+// }
 
 std::vector<std::pair<std::string, std::string>> KVInstance::GetAllKeyValue() {
     std::vector<std::pair<std::string, std::string>> result;
