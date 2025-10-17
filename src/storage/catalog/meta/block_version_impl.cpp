@@ -105,16 +105,6 @@ i64 BlockVersion::GetRowCount() const {
     return row_count;
 }
 
-std::tuple<i32, Status> BlockVersion::GetRowCountForUpdate(TxnTimeStamp begin_ts) const {
-    // check read-write conflict
-    std::shared_lock<std::shared_mutex> lock(rw_mutex_);
-    if (!created_.empty() && created_.back().create_ts_ >= begin_ts) {
-        return {0, Status::TxnConflict(0, fmt::format("Append conflict, begin_ts: {}, last_create_ts: {}", begin_ts, created_.back().create_ts_))};
-    }
-    i32 row_count = created_.empty() ? 0 : created_.back().row_count_;
-    return {row_count, Status::OK()};
-}
-
 bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
     bool is_modified = false;
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);

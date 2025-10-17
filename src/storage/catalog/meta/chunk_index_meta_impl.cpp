@@ -53,18 +53,6 @@ std::string IndexFileName(ChunkID chunk_id) { return fmt::format("chunk_{}.idx",
 
 } // namespace
 
-nlohmann::json ChunkIndexMetaInfo::Serialize() {
-    nlohmann::json json_res;
-    ToJson(json_res);
-    return json_res;
-}
-
-std::shared_ptr<ChunkIndexMetaInfo> ChunkIndexMetaInfo::Deserialize(const nlohmann::json &chunk_index_json) {
-    auto chunk_index_meta_info = std::make_shared<ChunkIndexMetaInfo>();
-    chunk_index_meta_info->FromJson(chunk_index_json.dump());
-    return chunk_index_meta_info;
-}
-
 void ChunkIndexMetaInfo::ToJson(nlohmann::json &json) const {
     json["base_name"] = base_name_;
     json["base_row_id"] = base_row_id_.ToUint64();

@@ -229,29 +229,6 @@ Status TableMeta::RemoveSegmentIDs1(const std::vector<SegmentID> &segment_ids) {
     return Status::OK();
 }
 
-std::pair<SegmentID, Status> TableMeta::AddSegmentID1(TxnTimeStamp commit_ts) {
-    Status status;
-
-    SegmentID segment_id = 0;
-    {
-        std::vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = GetSegmentIDs1();
-        if (!status.ok()) {
-            return {0, status};
-        }
-        segment_id = segment_ids_ptr->empty() ? 0 : segment_ids_ptr->back() + 1;
-        segment_ids1_->push_back(segment_id);
-    }
-
-    std::string segment_id_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
-    std::string commit_ts_str = fmt::format("{}", commit_ts);
-    status = kv_instance_->Put(segment_id_key, commit_ts_str);
-    if (!status.ok()) {
-        return {0, status};
-    }
-    return {segment_id, Status::OK()};
-}
-
 Status TableMeta::AddSegmentWithID(TxnTimeStamp commit_ts, SegmentID segment_id) {
     const std::string segment_id_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
     const std::string commit_ts_str = fmt::format("{}", commit_ts);

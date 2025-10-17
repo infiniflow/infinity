@@ -146,19 +146,6 @@ TEST_P(TestTxnTableMeta, table_meta) {
     }
 
     {
-        TxnTimeStamp commit_ts = 1;
-
-        SegmentID segment_id = 0;
-        std::tie(segment_id, status) = table_meta.AddSegmentID1(commit_ts);
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(segment_id, 1);
-
-        std::tie(segment_id, status) = table_meta.AddSegmentID1(commit_ts);
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(segment_id, 2);
-    }
-
-    {
         auto dir_ptr = table_meta.GetTableDir();
         EXPECT_STREQ(dir_ptr->c_str(), "0");
     }
