@@ -16,13 +16,13 @@ module;
 
 #include "unit_test/gtest_expand.h"
 
-module infinity_core:ut.dump_index_task;
+module infinity_core:ut.dump_index_task_2;
 
 import :ut.base_test;
 import :storage;
 import :infinity_context;
 import :status;
-import :fileworker_manager;
+import :buffer_manager;
 import :column_vector;
 import :table_def;
 import :value;
@@ -53,13 +53,13 @@ import data_type;
 
 using namespace infinity;
 
-class DumpMemIndexTaskTest : public BaseTestParamStr {};
+class DumpMemIndexTaskTest2 : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         DumpMemIndexTaskTest,
-                         ::testing::Values(BaseTestParamStr::NEW_BG_ON_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_BG_ON_CONFIG_PATH));
+                         DumpMemIndexTaskTest2,
+                         ::testing::Values(BaseTestParamStr::NEW_BG_ON_CONFIG_PATH2, BaseTestParamStr::NEW_VFS_OFF_BG_ON_CONFIG_PATH2));
 
-TEST_P(DumpMemIndexTaskTest, SLOW_row_cnt_exceed_memindex_capacity) {
+TEST_P(DumpMemIndexTaskTest2, row_cnt_exceed_memory_quota) {
     auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     auto db_name = std::make_shared<std::string>("db1");
@@ -101,11 +101,13 @@ TEST_P(DumpMemIndexTaskTest, SLOW_row_cnt_exceed_memindex_capacity) {
         EXPECT_TRUE(status.ok());
     };
 
-    // Mem index capacity is set to 8192 rows in toml
-    i64 mem_index_capacity = InfinityContext::instance().storage()->config()->MemIndexCapacity();
-    LOG_INFO(fmt::format("mem_index_capacity: {}", mem_index_capacity));
+    // Mem index memory quota is set to 1K in the toml
+    i64 memindex_memory_quota = InfinityContext::instance().storage()->config()->MemIndexMemoryQuota();
+    LOG_INFO(fmt::format("memindex_memory_quota: {}", memindex_memory_quota));
 
-    // Append 8192 rows to exceed the mem index capacity
+    // Append 8192 * 2 rows to exceed the mem index memory quota
+
+    append();
     append();
 
     // Wait for the mem index dump in background to finish
@@ -147,14 +149,14 @@ TEST_P(DumpMemIndexTaskTest, SLOW_row_cnt_exceed_memindex_capacity) {
             status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_info_ptr->base_row_id_, RowID(segment_id, 0));
-            EXPECT_EQ(chunk_info_ptr->row_cnt_, 8192);
+            EXPECT_EQ(chunk_info_ptr->row_cnt_, 8192 * 2);
         }
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
 
-    // Second time: append 8192 rows to exceed the mem index capacity
+    // Second time: append 8192 rows to exceed the mem index memory quota
     append();
 
     // Wait for the mem index dump in background to finish
@@ -195,7 +197,7 @@ TEST_P(DumpMemIndexTaskTest, SLOW_row_cnt_exceed_memindex_capacity) {
             ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
             status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(chunk_info_ptr->base_row_id_, RowID(segment_id, 8192));
+            EXPECT_EQ(chunk_info_ptr->base_row_id_, RowID(segment_id, 8192 * 2));
             EXPECT_EQ(chunk_info_ptr->row_cnt_, 8192);
         }
 

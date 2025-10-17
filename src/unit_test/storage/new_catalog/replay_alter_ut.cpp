@@ -278,7 +278,6 @@ TEST_P(TestTxnReplayAlter, test_rename) {
         EXPECT_TRUE(status.ok());
     }
 
-    LOG_INFO("Abc");
     new_txn_mgr->PrintAllKeyValue();
 
     {
