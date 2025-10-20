@@ -39,7 +39,6 @@ import :status;
 import :mem_index;
 import :kv_store;
 import :new_catalog;
-import :buffer_handle;
 
 import std;
 import third_party;
@@ -94,7 +93,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeta &table_index_me
                                                                                                               flag);
             segment_readers_.push_back(std::move(segment_reader));
 
-            BufferObj *index_buffer = nullptr;
+            FileWorker *index_buffer = nullptr;
             status = chunk_index_meta.GetIndexBuffer(index_buffer);
             if (!status.ok()) {
                 return status;

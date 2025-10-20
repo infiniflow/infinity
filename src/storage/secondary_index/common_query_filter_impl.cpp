@@ -28,7 +28,7 @@ import :filter_value_type_classification;
 import :physical_index_scan;
 import :filter_expression_push_down;
 import :data_block;
-import :buffer_manager;
+import :fileworker_manager;
 import :expression_evaluator;
 import :default_values;
 import :column_vector;

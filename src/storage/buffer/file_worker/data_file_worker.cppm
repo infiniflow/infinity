@@ -22,12 +22,7 @@ namespace infinity {
 
 export class DataFileWorker : public FileWorker {
 public:
-    explicit DataFileWorker(std::shared_ptr<std::string> data_dir,
-                            std::shared_ptr<std::string> temp_dir,
-                            std::shared_ptr<std::string> file_dir,
-                            std::shared_ptr<std::string> file_name,
-                            size_t buffer_size,
-                            PersistenceManager *persistence_manager);
+    explicit DataFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_sizer);
 
     virtual ~DataFileWorker() override;
 
@@ -36,18 +31,12 @@ public:
 
     void FreeInMemory() override;
 
-    size_t GetMemoryCost() const override { return buffer_size_; }
-
     FileWorkerType Type() const override { return FileWorkerType::kDataFile; }
 
 protected:
-    bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void ReadFromFileImpl(size_t file_size, bool from_spill) override;
-
-    bool ReadFromMmapImpl(const void *ptr, size_t size) override;
-
-    void FreeFromMmapImpl() override;
+    void Read(size_t file_size, bool other) override;
 
     void SetDataSize(size_t size) override;
 

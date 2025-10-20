@@ -53,7 +53,7 @@ void FileReader::ReFill() {
     else
         buffer_length_ = buffer_size_;
 #ifndef NDEBUG
-    auto current_offset = lseek(file_handle_->FileDescriptor(), 0, SEEK_CUR);
+    auto current_offset = lseek(file_handle_->fd(), 0, SEEK_CUR);
     assert(buffer_start_ == static_cast<size_t>(current_offset));
 #endif
     auto [tmp_read_size, status] = file_handle_->Read(data_.get(), buffer_length_);

@@ -15,6 +15,8 @@
 module;
 
 #include <cassert>
+#include <sys/mman.h>
+#include <unistd.h>
 
 module infinity_core:raw_file_worker.impl;
 
@@ -29,59 +31,54 @@ import third_party;
 
 namespace infinity {
 
-RawFileWorker::RawFileWorker(std::shared_ptr<std::string> data_dir,
-                             std::shared_ptr<std::string> temp_dir,
-                             std::shared_ptr<std::string> file_dir,
-                             std::shared_ptr<std::string> file_name,
-                             u32 file_size,
-                             PersistenceManager *persistence_manager)
-    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), buffer_size_(file_size) {}
+RawFileWorker::RawFileWorker(std::shared_ptr<std::string> file_path, u32 file_size) : FileWorker(std::move(file_path)), buffer_size_(file_size) {
+    RawFileWorker::AllocateInMemory();
+}
 
 RawFileWorker::~RawFileWorker() {
-    if (data_ != nullptr) {
-        FreeInMemory();
-        data_ = nullptr;
-    }
+    RawFileWorker::FreeInMemory();
+    munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
-void RawFileWorker::AllocateInMemory() {
-    if (data_ != nullptr) {
-        UnrecoverableError("Data is already allocated.");
-    }
-    if (buffer_size_ == 0) {
-        UnrecoverableError("Buffer size is 0.");
-    }
-    data_ = static_cast<void *>(new char[buffer_size_]);
-}
+void RawFileWorker::AllocateInMemory() { data_ = static_cast<void *>(new char[buffer_size_]); }
 
 void RawFileWorker::FreeInMemory() {
-    if (data_ == nullptr) {
-        UnrecoverableError("Data is already freed.");
-    }
     delete[] static_cast<char *>(data_);
     data_ = nullptr;
 }
 
-bool RawFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool RawFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     assert(data_ != nullptr && buffer_size_ > 0);
-    auto status = file_handle_->Append(data_, buffer_size_);
-    if (!status.ok()) {
-        RecoverableError(status);
+    if (mmap_) {
+        munmap(mmap_, mmap_size_);
+        mmap_ = nullptr;
     }
+
+    mmap_size_ = buffer_size_;
+    auto fd = file_handle_->fd();
+    ftruncate(fd, mmap_size_);
+    mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+
+    size_t offset{};
+
+    std::memcpy((char *)mmap_ + offset, data_, buffer_size_);
+    offset += buffer_size_;
+    // auto status = file_handle_->Append(data_, buffer_size_);
     prepare_success = true; // Not run defer_fn
     return true;
 }
 
-void RawFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
-    buffer_size_ = file_handle_->FileSize();
-    data_ = static_cast<void *>(new char[buffer_size_]);
-    auto [nbytes, status1] = file_handle_->Read(data_, buffer_size_);
-    if (!status1.ok()) {
-        RecoverableError(status1);
-    }
-    if (nbytes != buffer_size_) {
-        Status status = Status::DataIOError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes));
-        RecoverableError(status);
+void RawFileWorker::Read(size_t file_size, bool other) {
+    if (!mmap_) {
+        buffer_size_ = file_handle_->FileSize();
+        FreeInMemory();
+        data_ = static_cast<void *>(new char[buffer_size_]);
+        auto fd = file_handle_->fd();
+        auto [nbytes, status1] = file_handle_->Read(data_, buffer_size_);
+
+        mmap_size_ = buffer_size_;
+        mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
     }
 }
 

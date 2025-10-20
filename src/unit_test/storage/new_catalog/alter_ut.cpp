@@ -34,7 +34,6 @@ import :data_block;
 import :column_vector;
 import :value;
 import :new_txn;
-import :buffer_obj;
 import :segment_meta;
 import :block_meta;
 import :column_meta;

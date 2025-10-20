@@ -16,7 +16,6 @@ export module infinity_core:ivf_index_data_in_mem;
 
 import :index_ivf;
 import :ivf_index_storage;
-import :buffer_handle;
 import :base_memindex;
 import :memindex_tracer;
 import :chunk_index_meta;
@@ -27,11 +26,9 @@ import internal_types;
 
 namespace infinity {
 
-class BufferManager;
 class IndexBase;
 class KnnDistanceBase1;
 export struct ColumnVector;
-class BufferObj;
 
 export class IVFIndexInMem : public BaseMemIndex {
 protected:
@@ -42,7 +39,7 @@ protected:
     u32 input_embedding_count_ = 0;
     IVF_Index_Storage *ivf_index_storage_ = nullptr;
     bool own_ivf_index_storage_ = true;
-    BufferHandle dump_handle_{};
+    FileWorker * dump_obj_{};
 
     const IndexIVFOption &ivf_option() const { return ivf_index_storage_->ivf_option(); }
     u32 embedding_dimension() const { return ivf_index_storage_->embedding_dimension(); }
@@ -61,7 +58,7 @@ public:
     virtual u32 GetRowCount() const = 0;
 
     virtual void InsertBlockData(const SegmentOffset block_offset, const ColumnVector &col, BlockOffset row_offset, BlockOffset row_cnt) = 0;
-    virtual void Dump(BufferObj *buffer_obj, size_t *p_dump_size = nullptr) = 0;
+    virtual void Dump(FileWorker *buffer_obj, size_t *p_dump_size = nullptr) = 0;
     void SearchIndex(const KnnDistanceBase1 *knn_distance,
                      const void *query_ptr,
                      EmbeddingDataType query_element_type,

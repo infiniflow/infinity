@@ -66,9 +66,6 @@ public:
 
     std::tuple<std::shared_ptr<TableIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
-private:
-    Status GetSegmentUpdateTS(std::shared_ptr<SegmentUpdateTS> &segment_update_ts);
-
 public:
     Status InitSet1(const std::shared_ptr<IndexBase> &index_base, NewCatalog *new_catalog);
 

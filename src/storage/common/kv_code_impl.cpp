@@ -240,14 +240,6 @@ std::string KeyEncode::CatalogTableSegmentBlockColumnKeyPrefix(const std::string
                                                           ColumnID column_id*/) {
     return fmt::format("catalog|blk_col|{}|{}|{}|{}|", db_id, table_id, segment_id, block_id);
 }
-std::string KeyEncode::CatalogTableSegmentBlockColumnTagKey(const std::string &db_id,
-                                                            const std::string &table_id,
-                                                            SegmentID segment_id,
-                                                            BlockID block_id,
-                                                            ColumnID column_id,
-                                                            const std::string &tag_name) {
-    return fmt::format("blk_col|{}|{}|{}|{}|{}|{}", db_id, table_id, segment_id, block_id, column_id, tag_name);
-}
 
 std::string KeyEncode::DatabaseKey(const std::string &db_name, TxnTimeStamp ts) { return fmt::format("db|{}|{}", db_name, ts); }
 std::string KeyEncode::DatabasePrefix(const std::string &db_name) { return fmt::format("db|{}|", db_name); }
@@ -325,7 +317,7 @@ std::string KeyEncode::PMObjectPrefix() { return "pm|object|"; }
 
 std::string KeyEncode::PMObjectStatPrefix() { return "pm|object_stat|"; }
 
-std::string KeyEncode::PMObjectKey(const std::string &key) { return fmt::format("pm|object|{}", key); }
+std::string KeyEncode::PMObjectKey(std::string_view key) { return fmt::format("pm|object|{}", key); }
 
 std::string KeyEncode::PMObjectStatKey(const std::string &key) { return fmt::format("pm|object_stat|{}", key); }
 

@@ -37,7 +37,7 @@ import :default_values;
 import :infinity_exception;
 import :value;
 import :logger;
-import :buffer_manager;
+import :fileworker_manager;
 import :meta_info;
 import :block_index;
 import :mlas_matrix_multiply;
@@ -349,7 +349,7 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
             }
         }
     }
-    BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
+    FileWorkerManager *fileworker_mgr = query_context->storage()->fileworker_manager();
     std::vector<MatchTensorRerankDoc> rerank_docs;
     // 1. prepare query target rows
     for (std::unordered_set<u64> row_id_set; const auto &[input_data_block_id, input_blocks] : input_data_blocks) {
@@ -379,7 +379,7 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
         return lhs.row_id_ < rhs.row_id_;
     });
     // 3. calculate score
-    CalculateFusionMatchTensorRerankerScores(rerank_docs, buffer_mgr, column_data_type, column_id, block_index, *fusion_expr_->match_tensor_expr_);
+    CalculateFusionMatchTensorRerankerScores(rerank_docs, fileworker_mgr, column_data_type, column_id, block_index, *fusion_expr_->match_tensor_expr_);
     // 4. sort by score
     std::sort(rerank_docs.begin(), rerank_docs.end(), [](const MatchTensorRerankDoc &lhs, const MatchTensorRerankDoc &rhs) noexcept {
         return lhs.score_ > rhs.score_;

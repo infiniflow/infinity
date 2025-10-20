@@ -42,7 +42,7 @@ import :config;
 import :virtual_store;
 import :logger;
 import :utility;
-import :buffer_manager;
+import :fileworker_manager;
 import :infinity_context;
 import :fast_rough_filter;
 import :persistence_manager;
@@ -240,38 +240,6 @@ Status NewCatalog::DropFtIndexCacheByFtIndexCacheKey(const std::string &ft_index
         return Status::CatalogError(fmt::format("FtIndexCache key: {} not found", ft_index_cache_key));
     }
     return Status::OK();
-}
-
-Status NewCatalog::AddSegmentUpdateTS(std::string segment_update_ts_key, std::shared_ptr<SegmentUpdateTS> segment_update_ts) {
-    bool insert_success = false;
-    std::unordered_map<std::string, std::shared_ptr<SegmentUpdateTS>>::iterator iter;
-    {
-        std::unique_lock lock(segment_update_ts_mtx_);
-        std::tie(iter, insert_success) = segment_update_ts_map_.emplace(std::move(segment_update_ts_key), std::move(segment_update_ts));
-    }
-    if (!insert_success) {
-        return Status::CatalogError(fmt::format("SegmentUpdateTS key: {} already exists", iter->first));
-    }
-    return Status::OK();
-}
-
-Status NewCatalog::GetSegmentUpdateTS(const std::string &segment_update_ts_key, std::shared_ptr<SegmentUpdateTS> &segment_update_ts) {
-    segment_update_ts = nullptr;
-    {
-        std::shared_lock<std::shared_mutex> lck(segment_update_ts_mtx_);
-        if (auto iter = segment_update_ts_map_.find(segment_update_ts_key); iter != segment_update_ts_map_.end()) {
-            segment_update_ts = iter->second;
-        }
-    }
-    if (segment_update_ts == nullptr) {
-        return Status::CatalogError(fmt::format("Get SegmentUpdateTS key: {} not found", segment_update_ts_key));
-    }
-    return Status::OK();
-}
-
-void NewCatalog::DropSegmentUpdateTSByKey(const std::string &segment_update_ts_key) {
-    std::unique_lock lock(segment_update_ts_mtx_);
-    segment_update_ts_map_.erase(segment_update_ts_key);
 }
 
 Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts,

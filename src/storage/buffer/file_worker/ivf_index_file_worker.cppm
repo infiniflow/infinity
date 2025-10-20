@@ -19,6 +19,7 @@ import :file_worker;
 import :index_base;
 import :file_worker_type;
 import :persistence_manager;
+import :ivf_index_data;
 
 import column_def;
 
@@ -26,20 +27,10 @@ namespace infinity {
 
 export class IVFIndexFileWorker final : public IndexFileWorker {
 public:
-    explicit IVFIndexFileWorker(std::shared_ptr<std::string> data_dir,
-                                std::shared_ptr<std::string> temp_dir,
-                                std::shared_ptr<std::string> file_dir,
-                                std::shared_ptr<std::string> file_name,
-                                std::shared_ptr<IndexBase> index_base,
-                                std::shared_ptr<ColumnDef> column_def,
-                                PersistenceManager *persistence_manager)
-        : IndexFileWorker(std::move(data_dir),
-                          std::move(temp_dir),
-                          std::move(file_dir),
-                          std::move(file_name),
-                          std::move(index_base),
-                          std::move(column_def),
-                          persistence_manager) {}
+    explicit IVFIndexFileWorker(std::shared_ptr<std::string> file_path, std::shared_ptr<IndexBase> index_base, std::shared_ptr<ColumnDef> column_def)
+        : IndexFileWorker(std::move(file_path), std::move(index_base), std::move(column_def)) {
+        IVFIndexFileWorker::AllocateInMemory();
+    }
 
     ~IVFIndexFileWorker() override;
 
@@ -50,9 +41,9 @@ public:
     FileWorkerType Type() const override { return FileWorkerType::kIVFIndexFile; }
 
 protected:
-    bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void ReadFromFileImpl(size_t file_size, bool from_spill) override;
+    void Read(size_t file_size, bool other) override;
 };
 
 } // namespace infinity

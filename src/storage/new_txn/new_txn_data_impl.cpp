@@ -12,20 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <ranges>
+
 module infinity_core:new_txn_data.impl;
 
 import :new_txn;
 import :new_txn_manager;
 import :kv_store;
 import :default_values;
-import :buffer_obj;
 import :infinity_exception;
 import :infinity_context;
 import :data_file_worker;
 import :var_file_worker;
 import :version_file_worker;
 import :block_version;
-import :buffer_handle;
 import :vector_buffer;
 import :logger;
 import :var_buffer;
@@ -60,6 +62,7 @@ import :emvb_index_in_mem;
 import :txn_context;
 import :persist_result_handler;
 import :virtual_store;
+import :utility;
 
 import std;
 import third_party;
@@ -125,8 +128,8 @@ struct NewTxnCompactState {
             segment_row_cnt_ += cur_block_row_cnt_;
             for (ColumnID i = 0; i < column_cnt_; ++i) {
                 ColumnMeta column_meta(i, *block_meta_);
-                BufferObj *buffer_obj = nullptr;
-                BufferObj *outline_buffer_obj = nullptr;
+                FileWorker *buffer_obj = nullptr;
+                FileWorker *outline_buffer_obj = nullptr;
 
                 Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
                 if (!status.ok()) {
@@ -139,9 +142,9 @@ struct NewTxnCompactState {
                 }
                 buffer_obj->SetDataSize(data_size);
 
-                buffer_obj->Save();
+                [[maybe_unused]] auto foo = buffer_obj->Write();
                 if (outline_buffer_obj) {
-                    outline_buffer_obj->Save();
+                    [[maybe_unused]] auto foo = outline_buffer_obj->Write();
                 }
             }
         }
@@ -172,7 +175,8 @@ struct NewTxnCompactState {
 
 Status NewTxn::Import(const std::string &db_name, const std::string &table_name, const std::vector<std::shared_ptr<DataBlock>> &input_blocks) {
     Status status;
-    std::vector<size_t> block_row_cnts{};
+    [[maybe_unused]] auto fileworker_mgr = infinity::InfinityContext::instance().storage()->fileworker_manager();
+    std::vector<size_t> block_row_cnts;
 
     for (size_t i = 0; i < input_blocks.size(); ++i) {
         std::vector<std::shared_ptr<DataType>> column_types;
@@ -189,7 +193,7 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
 
 Status NewTxn::Import(const std::string &db_name, const std::string &table_name, const std::vector<size_t> &block_row_cnts) {
     this->CheckTxn(db_name);
-
+    [[maybe_unused]] auto fileworker_mgr = infinity::InfinityContext::instance().storage()->fileworker_manager();
     Status status;
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     std::string import_tmp_dir = "import" + std::to_string(TxnID());
@@ -262,6 +266,8 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
         std::optional<BlockMeta> block_meta;
         size_t segment_idx = input_block_idx / DEFAULT_BLOCK_PER_SEGMENT;
         size_t block_idx = input_block_idx % DEFAULT_BLOCK_PER_SEGMENT;
+        // put to kv and construct a true fileworker
+        // we dont need to construct a new fileworker
         status = NewCatalog::AddNewBlock1(*segment_metas[segment_idx], fake_commit_ts, block_meta);
         if (!status.ok()) {
             return status;
@@ -271,7 +277,7 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
         std::string old_block_dir = fmt::format("db_{}/tbl_{}/seg_{}/blk_{}", db_meta->db_id_str(), table_meta.table_id(), segment_idx, block_idx);
         std::string old_block_path = InfinityContext::instance().config()->TempDir() + "/" + import_tmp_dir + "/" + old_block_dir;
         std::string new_block_dir = *block_meta->GetBlockDir();
-        std::string new_block_path = InfinityContext::instance().config()->DataDir() + "/" + new_block_dir;
+        std::string new_block_path = InfinityContext::instance().config()->TempDir() + "/" + new_block_dir;
 
         std::vector<std::string> import_file_paths{};
         for (const auto &entry : std::filesystem::directory_iterator(old_block_path)) {
@@ -279,31 +285,9 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
             import_file_paths.emplace_back(new_block_path + "/" + file_name);
         }
 
-        PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-        if (pm != nullptr) {
-            PersistResultHandler handler(pm);
-            for (const auto &entry : std::filesystem::directory_iterator(old_block_path)) {
-                std::string file_name = entry.path().filename().string();
-                std::string src_path = old_block_path + "/" + file_name;
-                std::string dest_path = new_block_path + "/" + file_name;
-
-                PersistWriteResult persist_result = pm->Persist(dest_path, src_path);
-                handler.HandleWriteResult(persist_result);
-                import_txn_store->import_file_names_.emplace_back(new_block_dir + "/" + file_name);
-            }
-        } else {
-            Status rename_status = VirtualStore::Rename(old_block_path, new_block_path);
-            if (!rename_status.ok()) {
-                return rename_status;
-            }
-        }
-
-        // Change type and status of buffer object of the import data files
-        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-        for (auto &import_file : import_file_paths) {
-            if (import_file.ends_with(".col") || import_file.ends_with("_out")) {
-                buffer_mgr->ChangeBufferObjectState(import_file);
-            }
+        auto rename_status = VirtualStore::Rename(old_block_path, new_block_path);
+        if (!rename_status.ok()) {
+            return rename_status;
         }
 
         block_row_cnts_in_seg[segment_idx].push_back(block_row_cnts[input_block_idx]);
@@ -372,6 +356,26 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
             }
         }
     }
+
+    // auto &fileworker_map = buffer_mgr_->fileworker_map();
+
+    // std::unordered_map<std::string, std::shared_ptr<FileWorker>> new_map;
+    //
+    // for (auto const& [path, buffer_obj] : fileworker_map) {
+    //     if (path.find("tmp/import") == std::string::npos) {
+    //         new_map.emplace(path, buffer_obj);   // keep unchanged entries
+    //         continue;
+    //     }
+    //
+    //     auto v  = infinity::Partition(path, '/');
+    //     auto vv = infinity::Partition(v[7], '_');
+    //     auto seg = fmt::format("{}_{}", vv[0], stoull(vv[1]) + segment_ids[0]);
+    //     auto path1 = fmt::format("/{}/{}/data/{}/{}/{}/{}/{}", v[1], v[2], v[5], v[6], seg, v[8], v[9]);
+    //
+    //     new_map.emplace(path1, buffer_obj);
+    // }
+    //
+    // fileworker_map.swap(new_map);
 
     return Status::OK();
 }
@@ -896,8 +900,8 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
             return status;
         }
     }
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     {
+        TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
 
         block_lock->min_ts_ = std::min(block_lock->min_ts_, commit_ts);
@@ -907,16 +911,18 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
         for (size_t column_idx = 0; column_idx < input_block->column_count(); ++column_idx) {
             const ColumnVector &column_vector = *input_block->column_vectors[column_idx];
             ColumnMeta column_meta(column_idx, block_meta);
-            status = this->AppendInColumn(column_meta, block_offset, append_rows, column_vector, input_offset);
+            status = AppendInColumn(column_meta, block_offset, append_rows, column_vector, input_offset);
             if (!status.ok()) {
                 return status;
             }
         }
 
         // append in version file.
-        BufferHandle buffer_handle = version_buffer->Load();
-        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+        BlockVersion *block_version{};
+        version_buffer->Read(block_version);
         block_version->Append(commit_ts, block_offset + append_rows);
+        VersionFileWorkerSaveCtx version_file_worker_save_ctx{commit_ts};
+        [[maybe_unused]] auto foo = version_buffer->Write(version_file_worker_save_ctx);
     }
     return Status::OK();
 }
@@ -933,9 +939,9 @@ NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t appen
     }
     dest_vec.AppendWith(column_vector, source_offset, append_rows);
 
-    BufferObj *buffer_obj = nullptr;
-    BufferObj *outline_buffer_obj = nullptr;
-    Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
+    FileWorker *file_worker{};
+    FileWorker *var_file_worker{};
+    Status status = column_meta.GetColumnBuffer(file_worker, var_file_worker);
     if (!status.ok()) {
         return status;
     }
@@ -944,7 +950,11 @@ NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t appen
     if (!status2.ok()) {
         return status;
     }
-    buffer_obj->SetDataSize(data_size);
+    file_worker->SetDataSize(data_size);
+    [[maybe_unused]] auto foo = file_worker->Write();
+    if (var_file_worker != nullptr) {
+        [[maybe_unused]] auto foo1 = var_file_worker->Write();
+    }
 
     if (VarBufferManager *var_buffer_mgr = dest_vec.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
         //     Ensure buffer obj is loaded.
@@ -956,14 +966,14 @@ NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t appen
 Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffset> &block_offsets, std::vector<BlockOffset> &undo_block_offsets) {
     std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
     Status status;
-    BufferObj *version_buffer = nullptr;
+    FileWorker *version_buffer = nullptr;
     std::tie(version_buffer, status) = block_meta.GetVersionBuffer();
     if (!status.ok()) {
         return status;
     }
 
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     {
+        TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
         std::shared_ptr<BlockLock> block_lock;
         status = block_meta.GetBlockLock(block_lock);
         if (!status.ok()) {
@@ -972,8 +982,8 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
 
         // delete in version file
-        BufferHandle buffer_handle = version_buffer->Load();
-        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+        BlockVersion *block_version{};
+        version_buffer->Read(block_version);
         undo_block_offsets.reserve(block_offsets.size());
         for (BlockOffset block_offset : block_offsets) {
             status = block_version->Delete(block_offset, commit_ts);
@@ -983,17 +993,19 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
             undo_block_offsets.push_back(block_offset);
         }
         block_lock->max_ts_ = std::max(block_lock->max_ts_, commit_ts); // FIXME: remove max_ts, undo delete should not revert max_ts
+        VersionFileWorkerSaveCtx version_file_worker_save_ctx{commit_ts};
+        [[maybe_unused]] auto foo = version_buffer->Write(version_file_worker_save_ctx);
     }
     return Status::OK();
 }
 
 Status NewTxn::RollbackDeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffset> &block_offsets) {
     std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
-    BufferObj *version_buffer = nullptr;
+    FileWorker *version_buffer = nullptr;
     {
         std::string version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + std::string(BlockVersion::PATH);
-        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-        version_buffer = buffer_mgr->GetBufferObject(version_filepath);
+        FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+        version_buffer = fileworker_mgr->GetFileWorker(version_filepath);
         if (version_buffer == nullptr) {
             return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
         }
@@ -1008,8 +1020,8 @@ Status NewTxn::RollbackDeleteInBlock(BlockMeta &block_meta, const std::vector<Bl
         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
 
         // delete in version file
-        BufferHandle buffer_handle = version_buffer->Load();
-        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+        BlockVersion *block_version{};
+        version_buffer->Read(block_version);
         for (BlockOffset block_offset : block_offsets) {
             block_version->RollbackDelete(block_offset);
         }
@@ -1020,7 +1032,7 @@ Status NewTxn::RollbackDeleteInBlock(BlockMeta &block_meta, const std::vector<Bl
 Status NewTxn::PrintVersionInBlock(BlockMeta &block_meta, const std::vector<BlockOffset> &block_offsets, bool ignore_invisible) {
     std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
     Status status;
-    BufferObj *version_buffer = nullptr;
+    FileWorker *version_buffer = nullptr;
     std::tie(version_buffer, status) = block_meta.GetVersionBuffer();
     if (!status.ok()) {
         return status;
@@ -1036,8 +1048,8 @@ Status NewTxn::PrintVersionInBlock(BlockMeta &block_meta, const std::vector<Bloc
         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
 
         // delete in version file
-        BufferHandle buffer_handle = version_buffer->Load();
-        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+        BlockVersion *block_version{};
+        version_buffer->Read(block_version);
         for (BlockOffset block_offset : block_offsets) {
             status = block_version->Print(begin_ts, block_offset, ignore_invisible);
             if (!status.ok()) {
@@ -1226,8 +1238,8 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
             column_vector.AppendValue(default_value);
         }
 
-        BufferObj *buffer_obj = nullptr;
-        BufferObj *outline_buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
+        FileWorker *outline_buffer_obj = nullptr;
         status = column_meta->GetColumnBuffer(buffer_obj, outline_buffer_obj);
         if (!status.ok()) {
             return status;
@@ -1238,6 +1250,12 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
             return status;
         }
         buffer_obj->SetDataSize(data_size);
+
+        // XXX
+        [[maybe_unused]] auto foo = buffer_obj->Write();
+        if (outline_buffer_obj) {
+            [[maybe_unused]] auto foo = outline_buffer_obj->Write();
+        }
 
         if (VarBufferManager *var_buffer_mgr = column_vector.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
             //     Ensure buffer obj is loaded.
@@ -1359,62 +1377,69 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const CheckpointOption &op
                 continue;
             }
 
-            bool flush_version = false;
-            bool flush_column = false;
-            {
-                // TODO: Refactor min_ts_ and max_ts_ to per-column-ts
-                std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
-                if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
-                    flush_version = true;
-                }
-                if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
-                    flush_column = true;
-                }
+            // bool flush_version = false;
+            // bool flush_column = false;
+            // {
+            //     // TODO: Refactor min_ts_ and max_ts_ to per-column-ts
+            //     std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
+            //     if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
+            //         flush_version = true;
+            //     }
+            //     if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
+            //         flush_column = true;
+            //     }
+            // }
+            // if (flush_version) {
+            //     status = FlushVersionFile(block_meta, option.checkpoint_ts_);
+            //     if (!status.ok()) {
+            //         return status;
+            //     }
+            // }
+            // if (flush_column) {
+            //     status = FlushColumnFiles(block_meta, option.checkpoint_ts_);
+            //     if (!status.ok()) {
+            //         return status;
+            //     }
+            //     bool to_mmap = false;
+            //     // status = TryToMmap(block_meta, option.checkpoint_ts_, &to_mmap);
+            //     // if (!status.ok()) {
+            //     //     return status;
+            //     // }
+            //     if (to_mmap) {
+            //         LOG_INFO(fmt::format("Block {} to mmap, checkpoint ts: {}", block_meta.block_id(), option.checkpoint_ts_));
+            //     }
+            // }
+            auto fileworker_mgr = infinity::InfinityContext::instance().storage()->fileworker_manager();
+            auto &fileworker_map = fileworker_mgr->fileworker_map();
+            for (const auto &ptr : fileworker_map | std::views::values) {
+                ptr->MoveFile();
             }
-            if (flush_version) {
-                status = FlushVersionFile(block_meta, option.checkpoint_ts_);
-                if (!status.ok()) {
-                    return status;
-                }
-            }
-            if (flush_column) {
-                status = FlushColumnFiles(block_meta, option.checkpoint_ts_);
-                if (!status.ok()) {
-                    return status;
-                }
-                bool to_mmap = false;
-                status = TryToMmap(block_meta, option.checkpoint_ts_, &to_mmap);
-                if (!status.ok()) {
-                    return status;
-                }
-                if (to_mmap) {
-                    LOG_INFO(fmt::format("Block {} to mmap, checkpoint ts: {}", block_meta.block_id(), option.checkpoint_ts_));
-                }
-            }
-            LOG_TRACE(fmt::format("NewTxn::CheckpointTable segment_id {}, block_id {}, flush_column {}, flush_version {}, option.checkpoint_ts_ {}, "
-                                  "block min_ts {}, block "
-                                  "max_ts {}, block checkpoint_ts {}",
-                                  segment_id,
-                                  block_id,
-                                  flush_column,
-                                  flush_version,
-                                  option.checkpoint_ts_,
-                                  block_lock->min_ts_,
-                                  block_lock->max_ts_,
-                                  block_lock->checkpoint_ts_));
-            if (!flush_column or !flush_version) {
-                continue;
-            } else {
-                auto flush_data_entry = std::make_shared<FlushDataEntry>(table_meta.db_id_str(), table_meta.table_id_str(), segment_id, block_id);
-                if (flush_column && flush_version) {
-                    flush_data_entry->to_flush_ = "data and version";
-                } else if (flush_column) {
-                    flush_data_entry->to_flush_ = "data";
-                } else {
-                    flush_data_entry->to_flush_ = "version";
-                }
-                ckp_txn_store->entries_.emplace_back(flush_data_entry);
-            }
+
+            // LOG_TRACE(fmt::format("NewTxn::CheckpointTable segment_id {}, block_id {}, flush_column {}, flush_version {}, option.checkpoint_ts_ {},
+            // "
+            //                       "block min_ts {}, block "
+            //                       "max_ts {}, block checkpoint_ts {}",
+            //                       segment_id,
+            //                       block_id,
+            //                       flush_column,
+            //                       flush_version,
+            //                       option.checkpoint_ts_,
+            //                       block_lock->min_ts_,
+            //                       block_lock->max_ts_,
+            //                       block_lock->checkpoint_ts_));
+            // if (!flush_column or !flush_version) {
+            //     continue;
+            // } else {
+            //     auto flush_data_entry = std::make_shared<FlushDataEntry>(table_meta.db_id_str(), table_meta.table_id_str(), segment_id, block_id);
+            //     if (flush_column && flush_version) {
+            //         flush_data_entry->to_flush_ = "data and version";
+            //     } else if (flush_column) {
+            //         flush_data_entry->to_flush_ = "data";
+            //     } else {
+            //         flush_data_entry->to_flush_ = "version";
+            //     }
+            //     ckp_txn_store->entries_.emplace_back(flush_data_entry);
+            // }
         }
     }
 
@@ -1524,8 +1549,8 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
             }
         }
         for (size_t i = 0; i < index_id_strs->size(); ++i) {
-            const std::string &index_id_str = (*index_id_strs)[i];
-            const std::string &index_name_str = (*index_name_strs)[i];
+            const auto &index_id_str = (*index_id_strs)[i];
+            const auto &index_name_str = (*index_name_strs)[i];
             table_index_metas.push_back(std::make_shared<TableIndexMeta>(index_id_str, index_name_str, table_meta));
         }
     }
@@ -1591,12 +1616,12 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
         }
         LOG_DEBUG(fmt::format("CommitBottomAppend block {}, existing row cnt {}, new row cnt {}", block_id, block_row_cnt, range.second));
 
-        status = this->AppendInBlock(*block_meta, block_offset, range.second, append_cmd->block_.get(), copied_row_cnt);
+        status = AppendInBlock(*block_meta, block_offset, range.second, append_cmd->block_.get(), copied_row_cnt);
         if (!status.ok()) {
             return status;
         }
         for (auto &table_index_meta : table_index_metas) {
-            status = this->AppendIndex(*table_index_meta, range);
+            status = AppendIndex(*table_index_meta, range);
             if (!status.ok()) {
                 return status;
             }
@@ -1609,7 +1634,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
 
             for (size_t i = 0; i < table_index_metas.size(); ++i) {
                 const std::string &index_name = (*index_name_strs)[i];
-                std::shared_ptr<DumpMemIndexTask> dump_index_task = std::make_shared<DumpMemIndexTask>(db_name, table_name, index_name, segment_id);
+                auto dump_index_task = std::make_shared<DumpMemIndexTask>(db_name, table_name, index_name, segment_id);
                 // Trigger dump index processor to dump mem index for new sealed segment
                 auto *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
                 dump_index_processor->Submit(dump_index_task);
@@ -1838,8 +1863,8 @@ Status NewTxn::AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segm
         if (!status.ok()) {
             return status;
         }
-        BufferHandle buffer_handle = version_buffer->Load();
-        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+        BlockVersion *block_version{};
+        version_buffer->Read(block_version);
 
         block_version->Append(save_ts, block_info.row_count_);
     }
@@ -1857,11 +1882,11 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
         if (!status.ok()) {
             return status;
         }
-        BufferHandle buffer_handle = version_buffer->Load();
-        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+        BlockVersion *block_version{};
+        version_buffer->Read(block_version);
 
         block_version->CommitAppend(save_ts, commit_ts);
-        version_buffer->Save(VersionFileWorkerSaveCtx(commit_ts));
+        [[maybe_unused]] auto foo = version_buffer->Write(VersionFileWorkerSaveCtx(commit_ts));
 
         std::shared_ptr<BlockLock> block_lock;
         status = block_meta.GetBlockLock(block_lock);
@@ -1881,18 +1906,20 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
 
 Status NewTxn::FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts) {
     std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
 
-    BufferObj *version_buffer = nullptr;
+    // just rename it, dont need to get
+    FileWorker *version_buffer = nullptr;
     {
         std::string version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + std::string(BlockVersion::PATH);
-        version_buffer = buffer_mgr->GetBufferObject(version_filepath);
+        version_buffer = fileworker_mgr->GetFileWorker(version_filepath);
         if (version_buffer == nullptr) {
             return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
         }
     }
-
-    version_buffer->Save(VersionFileWorkerSaveCtx(save_ts));
+    // Move the file from temp to data
+    version_buffer->MoveFile();
+    // version_buffer->Save(VersionFileWorkerSaveCtx(save_ts));
     return Status::OK();
 }
 
@@ -1907,52 +1934,19 @@ Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
     LOG_TRACE("NewTxn::FlushColumnFiles begin");
     for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
         ColumnMeta column_meta(column_idx, block_meta);
-        BufferObj *buffer_obj = nullptr;
-        BufferObj *outline_buffer_obj = nullptr;
+        FileWorker *buffer_obj = nullptr;
+        FileWorker *outline_buffer_obj = nullptr;
 
         status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
         if (!status.ok()) {
             return status;
         }
-        buffer_obj->Save();
+        buffer_obj->MoveFile();
         if (outline_buffer_obj) {
-            outline_buffer_obj->Save();
+            outline_buffer_obj->MoveFile();
         }
     }
     LOG_TRACE("NewTxn::FlushColumnFiles end");
-    return Status::OK();
-}
-
-Status NewTxn::TryToMmap(BlockMeta &block_meta, TxnTimeStamp save_ts, bool *to_mmap_ptr) {
-    auto [row_cnt, status] = block_meta.GetRowCnt1();
-    if (!status.ok()) {
-        return status;
-    }
-    bool to_mmap = row_cnt >= block_meta.block_capacity();
-    if (to_mmap_ptr) {
-        *to_mmap_ptr = to_mmap;
-    }
-    if (to_mmap) {
-        std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs;
-        std::tie(column_defs, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
-        if (!status.ok()) {
-            return status;
-        }
-        for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
-            ColumnMeta column_meta(column_idx, block_meta);
-            BufferObj *buffer_obj = nullptr;
-            BufferObj *outline_buffer_obj = nullptr;
-
-            status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
-            if (!status.ok()) {
-                return status;
-            }
-            buffer_obj->ToMmap();
-            if (outline_buffer_obj) {
-                outline_buffer_obj->ToMmap();
-            }
-        }
-    }
     return Status::OK();
 }
 
@@ -1960,12 +1954,9 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
                                     const std::string &table_name,
                                     std::shared_ptr<DataBlock> input_block,
                                     const u64 &input_block_idx,
-                                    std::vector<std::string> *object_paths) {
+                                    std::vector<std::string> *file_worker_paths) {
     Status status;
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-
-    std::string import_tmp_dir = fmt::format("import{}", TxnID());
-    std::string import_tmp_path_ = InfinityContext::instance().config()->TempDir() + "/" + import_tmp_dir;
+    FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
 
     if (!input_block->Finalized()) {
         UnrecoverableError("Attempt to import unfinalized data block");
@@ -2001,10 +1992,10 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
         std::shared_ptr<ColumnVector> col = input_block->column_vectors[i];
         auto col_def = table_info->column_defs_[i];
 
-        BufferObj *buffer_obj = nullptr;
-        BufferObj *outline_buffer_obj = nullptr;
+        FileWorker *file_worker{};
+        FileWorker *var_file_worker{};
         ColumnID column_id = col_def->id();
-        std::shared_ptr<std::string> col_filename = std::make_shared<std::string>(fmt::format("{}.col", column_id));
+        auto file_name = fmt::format("{}.col", column_id);
 
         size_t total_data_size = 0;
         if (col_def->type()->type() == LogicalType::kBoolean) {
@@ -2013,40 +2004,28 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
             total_data_size = DEFAULT_BLOCK_CAPACITY * col_def->type()->Size();
         }
 
-        std::shared_ptr<std::string> block_dir = std::make_shared<std::string>(
-            fmt::format("db_{}/tbl_{}/seg_{}/blk_{}", table_info->db_id_, table_info->table_id_, segment_idx, block_idx));
-        auto file_worker1 = std::make_unique<DataFileWorker>(std::make_shared<std::string>(import_tmp_path_),
-                                                             std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                                                             block_dir,
-                                                             col_filename,
-                                                             total_data_size,
-                                                             buffer_mgr->persistence_manager());
+        auto block_dir =
+            fmt::format("import{}/db_{}/tbl_{}/seg_{}/blk_{}", TxnID(), table_info->db_id_, table_info->table_id_, segment_idx, block_idx);
+        auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", block_dir, std::move(file_name)));
+        auto file_worker1 = std::make_unique<DataFileWorker>(rel_file_path, total_data_size);
 
-        if (object_paths != nullptr) {
-            std::string file_path1 = file_worker1->GetFilePath();
-            object_paths->push_back(file_path1);
+        if (file_worker_paths != nullptr) {
+            file_worker_paths->push_back(*rel_file_path);
         }
 
-        buffer_obj = buffer_mgr->AllocateBufferObject(std::move(file_worker1));
+        file_worker = fileworker_mgr->EmplaceFileWorker(std::move(file_worker1));
 
         VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
         if (buffer_type == VectorBufferType::kVarBuffer) {
-            std::shared_ptr<std::string> outline_filename = std::make_shared<std::string>(fmt::format("col_{}_out", column_id));
-            auto file_worker2 = std::make_unique<VarFileWorker>(std::make_shared<std::string>(import_tmp_path_),
-                                                                std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                                                                block_dir,
-                                                                outline_filename,
-                                                                0,
-                                                                buffer_mgr->persistence_manager());
+            auto outline_file_name = fmt::format("col_{}_out", column_id);
+            auto outline_rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", block_dir, std::move(outline_file_name)));
+            auto file_worker2 = std::make_unique<VarFileWorker>(outline_rel_file_path, 0);
 
-            if (object_paths != nullptr) {
-                std::string file_path2 = file_worker2->GetFilePath();
-                object_paths->push_back(file_path2);
+            if (file_worker_paths != nullptr) {
+                file_worker_paths->push_back(*outline_rel_file_path);
             }
-            outline_buffer_obj = buffer_mgr->AllocateBufferObject(std::move(file_worker2));
+            var_file_worker = fileworker_mgr->EmplaceFileWorker(std::move(file_worker2));
         }
-
-        col->SetToCatalog(buffer_obj, outline_buffer_obj, ColumnVectorMode::kReadWrite);
 
         size_t data_size = 0;
         if (col_def->type()->type() == LogicalType::kBoolean) {
@@ -2054,11 +2033,13 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
         } else {
             data_size = row_cnt * col_def->type()->Size();
         }
-        buffer_obj->SetDataSize(data_size);
+        file_worker->SetDataSize(data_size);
 
-        buffer_obj->Save();
-        if (outline_buffer_obj) {
-            outline_buffer_obj->Save();
+        col->SetToCatalog(file_worker, var_file_worker, ColumnVectorMode::kReadWrite);
+
+        [[maybe_unused]] auto foo = file_worker->Write();
+        if (var_file_worker) {
+            [[maybe_unused]] auto foo = var_file_worker->Write();
         }
     }
 

@@ -38,9 +38,6 @@ import global_resource_usage;
 
 namespace infinity {
 
-class BufferManager;
-class BufferObj;
-
 export enum class ColumnVectorMode : i8 {
     kReadWrite,
     kReadOnly,
@@ -67,18 +64,18 @@ public:
     static std::shared_ptr<ColumnVector> Make(std::shared_ptr<DataType> data_type);
 
 public:
-    size_t data_type_size_{0};
+    size_t data_type_size_{};
 
     // this buffer is holding the data
-    std::shared_ptr<VectorBuffer> buffer_{nullptr};
+    std::shared_ptr<VectorBuffer> buffer_;
 
     // A bitmap to indicate the null information
     // true: row is not null
     // false: row is null
     // initial state: all true
-    std::shared_ptr<Bitmask> nulls_ptr_{nullptr};
+    std::shared_ptr<Bitmask> nulls_ptr_;
 
-    bool initialized{false};
+    bool initialized_{};
 
 private:
     ColumnVectorType vector_type_{ColumnVectorType::kInvalid};
@@ -86,11 +83,11 @@ private:
     std::shared_ptr<DataType> data_type_{};
 
     // Only a pointer to the real data in vector buffer
-    char *data_ptr_{nullptr};
+    char *data_ptr_{};
 
-    size_t capacity_{0};
+    size_t capacity_{};
 
-    std::atomic<size_t> tail_index_{0};
+    std::atomic_size_t tail_index_{};
 
 public:
     ColumnVector();
@@ -105,6 +102,8 @@ public:
     ColumnVector(ColumnVector &&right) noexcept;
 
     ColumnVector &operator=(ColumnVector &&right) noexcept;
+
+    ColumnVector &operator=(const ColumnVector &right) noexcept;
 
     ~ColumnVector();
 
@@ -124,14 +123,14 @@ private:
 public:
     void Initialize(ColumnVectorType vector_type = ColumnVectorType::kFlat, size_t capacity = DEFAULT_VECTOR_SIZE);
 
-    void Initialize(BufferObj *buffer_obj,
-                    BufferObj *outline_buffer_obj,
+    void Initialize(FileWorker *fileworker,
+                    FileWorker *var_fileworker,
                     size_t current_row_count,
                     ColumnVectorMode vector_tipe = ColumnVectorMode::kReadWrite,
                     ColumnVectorType vector_type = ColumnVectorType::kFlat,
                     size_t capacity = DEFAULT_VECTOR_SIZE);
 
-    void SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, ColumnVectorMode vector_tipe);
+    void SetToCatalog(FileWorker *buffer_obj, FileWorker *outline_buffer_obj, ColumnVectorMode vector_tipe);
 
     void Initialize(const ColumnVector &other, const Selection &input_select);
 
