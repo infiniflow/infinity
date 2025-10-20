@@ -66,7 +66,7 @@ bool IVFIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &c
     return true;
 }
 
-void IVFIndexFileWorker::Read(size_t file_size) {
+void IVFIndexFileWorker::Read(size_t file_size, bool other) {
     // if (!data_) {
         auto index = IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get());
         index->ReadIndexInner(*file_handle_);

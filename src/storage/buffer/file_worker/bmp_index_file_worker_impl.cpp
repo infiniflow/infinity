@@ -95,7 +95,7 @@ bool BMPIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &c
     return true;
 }
 
-void BMPIndexFileWorker::Read(size_t file_size) {
+void BMPIndexFileWorker::Read(size_t file_size, bool other) {
     // if (data_ != nullptr) {
     //     UnrecoverableError("Data is already allocated.");
     // }

@@ -69,7 +69,7 @@ bool RawFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     return true;
 }
 
-void RawFileWorker::Read(size_t file_size) {
+void RawFileWorker::Read(size_t file_size, bool other) {
     if (!mmap_) {
         buffer_size_ = file_handle_->FileSize();
         FreeInMemory();

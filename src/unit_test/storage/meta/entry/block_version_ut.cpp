@@ -67,65 +67,66 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 //     }
 // }
 
-TEST_P(BlockVersionTest, DISABLED_XXX_SaveAndLoad2) {
-    auto data_dir = std::make_shared<std::string>(std::string(GetFullDataDir()) + "/block_version_test");
-    auto temp_dir = std::make_shared<std::string>(std::string(GetFullTmpDir()) + "/temp/block_version_test");
-    auto persistence_dir = std::make_shared<std::string>(std::string(GetFullTmpDir()) + "/persistence/block_version_test");
-    auto block_dir = std::make_shared<std::string>("block_version_test/block");
-    auto version_file_name = std::make_shared<std::string>("block_version_test");
-
-    {
-        auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir, *version_file_name));
-        auto file_worker = std::make_unique<VersionFileWorker>(rel_file_path, 8192);
-
-        {
-            auto *block_version = static_cast<BlockVersion *>(file_worker->GetData());
-
-            block_version->Append(10, 3);
-            block_version->Append(20, 6);
-            block_version->Delete(2, 30);
-            block_version->Delete(5, 40);
-        }
-        {
-            [[maybe_unused]] bool foo{};
-            file_worker->Write(foo, VersionFileWorkerSaveCtx(15));
-        }
-    }
-    {
-        auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir, *version_file_name));
-        auto file_worker = std::make_unique<VersionFileWorker>(rel_file_path, 8192);
-        {
-            BlockVersion block_version1(8192);
-            block_version1.Append(10, 3);
-
-            {
-                const auto *block_version = static_cast<const BlockVersion *>(file_worker->GetData());
-                ASSERT_EQ(block_version1, *block_version);
-            }
-            auto *block_version = static_cast<BlockVersion *>(file_worker->GetData());
-            block_version->Append(20, 6);
-            block_version->Delete(2, 30);
-            block_version->Delete(5, 40);
-        }
-        {
-            [[maybe_unused]] bool foo{};
-            file_worker->Write(foo, VersionFileWorkerSaveCtx(35));
-        }
-    }
-    {
-        auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir, *version_file_name));
-        auto file_worker = std::make_unique<VersionFileWorker>(rel_file_path, 8192);
-        {
-            BlockVersion block_version1(8192);
-            block_version1.Append(10, 3);
-            block_version1.Append(20, 6);
-            block_version1.Delete(2, 30);
-
-            const auto *block_version = static_cast<const BlockVersion *>(file_worker->GetData());
-            ASSERT_EQ(block_version1, *block_version);
-        }
-    }
-}
+// TEST_P(BlockVersionTest, DISABLED_XXX_SaveAndLoad2) {
+//     auto data_dir = std::make_shared<std::string>(std::string(GetFullDataDir()) + "/block_version_test");
+//     auto temp_dir = std::make_shared<std::string>(std::string(GetFullTmpDir()) + "/temp/block_version_test");
+//     auto persistence_dir = std::make_shared<std::string>(std::string(GetFullTmpDir()) + "/persistence/block_version_test");
+//     auto block_dir = std::make_shared<std::string>("block_version_test/block");
+//     auto version_file_name = std::make_shared<std::string>("block_version_test");
+//
+//     {
+//         auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir, *version_file_name));
+//         auto file_worker = std::make_unique<VersionFileWorker>(rel_file_path, 8192);
+//
+//         {
+//             BlockVersion *block_version{};
+//             file_worker->Read(block_version);
+//
+//             block_version->Append(10, 3);
+//             block_version->Append(20, 6);
+//             block_version->Delete(2, 30);
+//             block_version->Delete(5, 40);
+//         }
+//         {
+//             [[maybe_unused]] bool foo{};
+//             file_worker->Write(foo, VersionFileWorkerSaveCtx(15));
+//         }
+//     }
+//     {
+//         auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir, *version_file_name));
+//         auto file_worker = std::make_unique<VersionFileWorker>(rel_file_path, 8192);
+//         {
+//             BlockVersion block_version1(8192);
+//             block_version1.Append(10, 3);
+//
+//             {
+//                 const auto *block_version = static_cast<const BlockVersion *>(file_worker->GetData());
+//                 ASSERT_EQ(block_version1, *block_version);
+//             }
+//             auto *block_version = static_cast<BlockVersion *>(file_worker->GetData());
+//             block_version->Append(20, 6);
+//             block_version->Delete(2, 30);
+//             block_version->Delete(5, 40);
+//         }
+//         {
+//             [[maybe_unused]] bool foo{};
+//             file_worker->Write(foo, VersionFileWorkerSaveCtx(35));
+//         }
+//     }
+//     {
+//         auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir, *version_file_name));
+//         auto file_worker = std::make_unique<VersionFileWorker>(rel_file_path, 8192);
+//         {
+//             BlockVersion block_version1(8192);
+//             block_version1.Append(10, 3);
+//             block_version1.Append(20, 6);
+//             block_version1.Delete(2, 30);
+//
+//             const auto *block_version = static_cast<const BlockVersion *>(file_worker->GetData());
+//             ASSERT_EQ(block_version1, *block_version);
+//         }
+//     }
+// }
 
 TEST_P(BlockVersionTest, DISABLED_DEPRECATED_delete_test) {
     BlockVersion block_version(8192);

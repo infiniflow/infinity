@@ -46,9 +46,9 @@ BlockMeta::BlockMeta(BlockID block_id, SegmentMeta &segment_meta)
       block_id_(block_id) {}
 
 Status BlockMeta::GetBlockLock(std::shared_ptr<BlockLock> &block_lock) {
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    std::string block_lock_key = GetBlockTag("lock");
-    Status status = new_catalog->GetBlockLock(block_lock_key, block_lock);
+    auto *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    auto block_lock_key = GetBlockTag("lock");
+    auto status = new_catalog->GetBlockLock(block_lock_key, block_lock);
     if (!status.ok()) {
         return status;
     }
@@ -108,7 +108,8 @@ Status BlockMeta::RestoreSetFromSnapshot() {
         return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
     }
 
-    auto *block_version = reinterpret_cast<BlockVersion *>(version_file_worker_->GetData());
+    BlockVersion *block_version{};
+    version_file_worker_->Read(block_version);
     block_version->RestoreFromSnapshot(commit_ts_);
 
     return Status::OK();
@@ -148,7 +149,7 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
 std::tuple<FileWorker *, Status> BlockMeta::GetVersionBuffer() {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!version_file_worker_) {
-        FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+        auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
 
         // Get block directory without acquiring lock again (avoid recursive lock)
         if (block_dir_ == nullptr) {

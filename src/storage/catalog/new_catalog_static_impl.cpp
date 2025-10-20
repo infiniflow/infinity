@@ -69,7 +69,8 @@ void NewTxnGetVisibleRangeState::Init(std::shared_ptr<BlockLock> block_lock,
     commit_ts_ = commit_ts;
     {
         std::shared_lock<std::shared_mutex> lock(block_lock_->mtx_);
-        const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer_obj_->GetData());
+        const BlockVersion *block_version{};
+        version_buffer_obj_->Read(block_version);
         block_offset_end_ = block_version->GetRowCount(begin_ts_);
     }
 }
@@ -79,7 +80,8 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, std::pair<
         return false;
     }
 
-    const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer_obj_->GetData());
+    const BlockVersion *block_version{};
+    version_buffer_obj_->Read(block_version);
 
     if (block_offset_begin == block_offset_end_) {
         auto [offset, commit_cnt] = block_version->GetCommitRowCount(commit_ts_);
@@ -1219,7 +1221,8 @@ Status NewCatalog::GetCreateTSVector(BlockMeta &block_meta, size_t offset, size_
         return status;
     }
 
-    const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer->GetData());
+    const BlockVersion *block_version{};
+    version_buffer->Read(block_version);
     {
         std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
         block_version->GetCreateTS(offset, size, column_vector);
@@ -1241,7 +1244,8 @@ Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, size_t offset, size_
         return status;
     }
 
-    const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer->GetData());
+    const BlockVersion * block_version{};
+    version_buffer->Read(block_version);
     {
         std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
         block_version->GetDeleteTS(offset, size, column_vector);

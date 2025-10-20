@@ -430,7 +430,8 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }
-                const auto *emvb_index = static_cast<const EMVBIndex *>(index_buffer->GetData());
+                const EMVBIndex *emvb_index{};
+                index_buffer->Read(emvb_index);
 
                 const auto [result_num, score_ptr, row_id_ptr] =
                     emvb_index->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
@@ -947,8 +948,8 @@ struct RerankerParameterPack {
                           const ColumnID column_id,
                           const BlockIndex *block_index,
                           const MatchTensorExpression &match_tensor_expr)
-        : rerank_docs_(rerank_docs), buffer_mgr_(fileworker_mgr), column_data_type_(column_data_type), column_id_(column_id), block_index_(block_index),
-          match_tensor_expr_(match_tensor_expr) {}
+        : rerank_docs_(rerank_docs), buffer_mgr_(fileworker_mgr), column_data_type_(column_data_type), column_id_(column_id),
+          block_index_(block_index), match_tensor_expr_(match_tensor_expr) {}
 };
 
 template <typename CalcutateScoreOfRowOp>

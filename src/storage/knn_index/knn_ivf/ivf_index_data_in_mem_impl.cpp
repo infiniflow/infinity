@@ -216,7 +216,7 @@ public:
         IncreaseMemoryUsageBase(mem2 > mem1 ? mem2 - mem1 : 0);
     }
 
-    void Dump(FileWorker *buffer_obj, size_t *p_dump_size) override {
+    void Dump(FileWorker *file_worker, size_t *p_dump_size) override {
         std::unique_lock lock(rw_mutex_);
         size_t dump_size = MemoryUsed();
         if (!have_ivf_index_.test(std::memory_order_acquire)) {
@@ -225,12 +225,13 @@ public:
         if (p_dump_size != nullptr) {
             *p_dump_size = dump_size;
         }
-        auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_obj->GetData());
+        IVFIndexInChunk *data_ptr{};
+        file_worker->Read(data_ptr);
         data_ptr->GetMemData(std::move(*ivf_index_storage_));
         delete ivf_index_storage_;
         ivf_index_storage_ = data_ptr->GetIVFIndexStoragePtr();
         own_ivf_index_storage_ = false;
-        dump_obj_ = std::move(buffer_obj);
+        dump_obj_ = std::move(file_worker);
     }
 
     void SearchIndexInMem(const KnnDistanceBase1 *knn_distance,

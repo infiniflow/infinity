@@ -425,7 +425,8 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                 old_buffers.emplace_back(row_cnts[i], buffer_obj);
             }
 
-            auto *data_ptr = static_cast<SecondaryIndexData *>(buffer_obj->GetData());
+            SecondaryIndexData *data_ptr{};
+            buffer_obj->Read(data_ptr);
             data_ptr->InsertMergeData(old_buffers);
             break;
         }
@@ -444,7 +445,8 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                 column_def = std::move(col_def);
             }
 
-            auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_obj->GetData());
+            IVFIndexInChunk *data_ptr{};
+            buffer_obj->Read(data_ptr);
             data_ptr->BuildIVFIndex(segment_meta, row_cnt, column_def);
             break;
         }
@@ -476,7 +478,8 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                 column_def = std::move(col_def);
             }
 
-            auto *data_ptr = static_cast<EMVBIndex *>(buffer_obj->GetData());
+            EMVBIndex *data_ptr{};
+            buffer_obj->Read(data_ptr);
             data_ptr->BuildEMVBIndex(base_rowid, row_cnt, segment_meta, column_def);
             break;
         }
@@ -1383,8 +1386,8 @@ Status NewTxn::PopulateIvfIndexInner(std::shared_ptr<IndexBase> index_base,
         }
     }
     {
-        // FileWorker *buffer_obj2 = buffer_obj->Load();
-        auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_obj->GetData());
+        IVFIndexInChunk *data_ptr{};
+        buffer_obj->Read(data_ptr);
         data_ptr->BuildIVFIndex(segment_meta, row_count, column_def);
     }
     [[maybe_unused]] auto foo = buffer_obj->Write();
@@ -1412,9 +1415,9 @@ Status NewTxn::PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
         return status;
     }
     new_chunk_ids.push_back(chunk_id);
-    std::optional<ChunkIndexMeta> chunk_index_meta;
-    FileWorker *buffer_obj = nullptr;
+    FileWorker *buffer_obj{};
     {
+        std::optional<ChunkIndexMeta> chunk_index_meta;
         Status status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
                                                       this,
                                                       chunk_id,
@@ -1430,7 +1433,8 @@ Status NewTxn::PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
         }
     }
     {
-        auto *data_ptr = static_cast<EMVBIndex *>(buffer_obj->GetData());
+        EMVBIndex *data_ptr{};
+        buffer_obj->Read(data_ptr);
         data_ptr->BuildEMVBIndex(base_row_id, row_count, segment_meta, column_def);
     }
     [[maybe_unused]] auto foo = buffer_obj->Write();
@@ -1620,7 +1624,9 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
                 if (!status.ok()) {
                     return status;
                 }
-                BMPHandlerPtr bmp_handler = *static_cast<BMPHandlerPtr *>(index_buffer->GetData());
+
+                BMPHandlerPtr bmp_handler{};
+                index_buffer->Read(bmp_handler);
                 bmp_handler->Optimize(options);
             }
             std::shared_ptr<BMPIndexInMem> bmp_index = mem_index->GetBMPIndex();
@@ -1643,7 +1649,8 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
                 if (!status.ok()) {
                     return status;
                 }
-                HnswHandlerPtr hnsw_handler = *static_cast<HnswHandlerPtr *>(index_buffer->GetData());
+                HnswHandlerPtr hnsw_handler{};
+                index_buffer->Read(hnsw_handler);
                 if (params->compress_to_lvq) {
                     hnsw_handler->CompressToLVQ();
                 } else if (params->compress_to_rabitq) {

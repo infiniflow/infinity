@@ -625,7 +625,8 @@ void HnswIndexInMem::Dump(FileWorker *buffer_obj, size_t *dump_size_ptr) {
         *dump_size_ptr = dump_size;
     }
 
-    auto *data_ptr = static_cast<HnswHandlerPtr *>(buffer_obj->GetData());
+    HnswHandlerPtr *data_ptr{};
+    buffer_obj->Read(data_ptr);
     *data_ptr = hnsw_handler_;
     own_memory_ = false;
     chunk_obj_ = std::move(buffer_obj);

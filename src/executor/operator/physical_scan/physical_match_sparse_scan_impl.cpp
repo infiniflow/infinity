@@ -524,7 +524,8 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }
-                const auto *bmp_handler = reinterpret_cast<const BMPHandlerPtr *>(index_buffer->GetData());
+                const BMPHandlerPtr *bmp_handler{};
+                index_buffer->Read(bmp_handler);
                 bmp_search(*bmp_handler, 0, false, filter);
             }
             if (auto mem_index = segment_index_meta->GetMemIndex()) {

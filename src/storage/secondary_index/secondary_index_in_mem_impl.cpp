@@ -70,9 +70,9 @@ public:
         IncreaseMemoryUsageBase(inserted_rows * MemoryCostOfEachRow());
     }
 
-    void Dump(FileWorker *buffer_obj) const override {
-        // buffer_obj->file_worker()->ReadFromFile(false);
-        auto data_ptr = static_cast<SecondaryIndexData *>(buffer_obj->GetData());
+    void Dump(FileWorker *file_worker) const override {
+        SecondaryIndexData *data_ptr{};
+        file_worker->Read(data_ptr);
 
         std::multimap<KeyType, u32> temp_map;
         const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);

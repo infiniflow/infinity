@@ -172,8 +172,8 @@ size_t GetBlockRowCount(KVInstance *kv_instance,
                         TxnTimeStamp begin_ts,
                         TxnTimeStamp commit_ts) {
 
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    std::string block_lock_key = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "lock");
+    auto *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    auto block_lock_key = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "lock");
 
     std::shared_ptr<BlockLock> block_lock;
     Status status = new_catalog->GetBlockLock(block_lock_key, block_lock);
@@ -181,19 +181,15 @@ size_t GetBlockRowCount(KVInstance *kv_instance,
         UnrecoverableError("Failed to get block lock");
     }
 
-    FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
-    auto rel_version_filepath = fmt::format("db_{}/tbl_{}/seg_{}/blk_{}/{}",
-                                               db_id_str,
-                                               table_id_str,
-                                               segment_id,
-                                               block_id,
-                                               BlockVersion::PATH);
-    FileWorker *version_buffer = fileworker_mgr->GetFileWorker(rel_version_filepath);
+    auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+    auto rel_version_filepath = fmt::format("db_{}/tbl_{}/seg_{}/blk_{}/{}", db_id_str, table_id_str, segment_id, block_id, BlockVersion::PATH);
+    auto *version_buffer = fileworker_mgr->GetFileWorker(rel_version_filepath);
     if (version_buffer == nullptr) {
         UnrecoverableError(fmt::format("Get version buffer failed: {}", rel_version_filepath));
     }
 
-    const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer->GetData());
+    const BlockVersion *block_version{};
+    version_buffer->Read(block_version);
 
     size_t row_cnt = 0;
     {

@@ -51,7 +51,9 @@ public:
         if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
             return std::get<std::unique_ptr<char[]>>(ptr_).get();
         } else {
-            return static_cast<const char *>(std::get<FileWorker *>(ptr_)->GetData());
+            void *data{};
+            std::get<FileWorker *>(ptr_)->Read(data);
+            return static_cast<const char *>(data);
         }
     }
 
@@ -59,7 +61,9 @@ public:
         if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
             return std::get<std::unique_ptr<char[]>>(ptr_).get();
         } else {
-            return static_cast<char *>(std::get<FileWorker *>(ptr_)->GetData());
+            void *data{};
+            std::get<FileWorker *>(ptr_)->Read(data);
+            return static_cast<char *>(data);
         }
     }
 

@@ -41,7 +41,7 @@ public:
 
     bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void Read(size_t file_size) override;
+    void Read(size_t file_size, bool other) override;
 
 private:
     size_t capacity_{};

@@ -649,7 +649,8 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                         if (!status.ok()) {
                             UnrecoverableError(status.message());
                         }
-                        const auto *ivf_chunk = static_cast<const IVFIndexInChunk *>(index_buffer->GetData());
+                        const IVFIndexInChunk *ivf_chunk{};
+                        index_buffer->Read(ivf_chunk);
                         ivf_result_handler->Search(ivf_chunk);
                     }
                     if (mem_index) {
@@ -950,16 +951,17 @@ void ExecuteHnswSearch(QueryContext *query_context,
     auto [chunk_ids_ptr, mem_index] = get_chunks();
     for (ChunkID chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
-        FileWorker *index_buffer{};
-        status = chunk_index_meta.GetIndexBuffer(index_buffer);
+        FileWorker *index_file_worker{};
+        status = chunk_index_meta.GetIndexBuffer(index_file_worker);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        const auto *hnsw_handler = reinterpret_cast<const HnswHandlerPtr *>(index_buffer->GetData());
+        const HnswHandlerPtr *hnsw_handler{};
+        index_file_worker->Read(hnsw_handler);
         hnsw_search(*hnsw_handler, false);
     }
     if (mem_index) {
-        std::shared_ptr<HnswIndexInMem> memory_hnsw_index = mem_index->GetHnswIndex();
+        auto memory_hnsw_index = mem_index->GetHnswIndex();
         if (memory_hnsw_index) {
             const HnswHandlerPtr hnsw_handler = memory_hnsw_index->get();
             hnsw_search(hnsw_handler, true);

@@ -302,9 +302,9 @@ PersistReadResult PersistenceManager::GetObjCache(std::string_view file_path) {
         return result;
     }
 
-    std::string pm_fp_key = KeyEncode::PMObjectKey(local_path);
+    auto pm_fp_key = KeyEncode::PMObjectKey(local_path);
     std::string value;
-    Status status = kv_store_->Get(pm_fp_key, value);
+    auto status = kv_store_->Get(pm_fp_key, value);
     if (!status.ok()) {
         LOG_WARN(fmt::format("GetObjCache Failed to find object for local path {}: {}", local_path, status.message()));
         // LOG_TRACE(fmt::format("All key-value pairs in kv_store: \n{}", kv_store_->ToString()));
@@ -325,9 +325,9 @@ PersistReadResult PersistenceManager::GetObjCache(std::string_view file_path) {
         object_stats_->Get(obj_addr.obj_key_);
         LOG_TRACE(fmt::format("GetObjCache current object {} ref count {}", obj_addr.obj_key_, current_object_ref_count_));
     } else {
-        std::shared_ptr<ObjStat> obj_stat = object_stats_->Get(obj_addr.obj_key_);
+        auto obj_stat = object_stats_->Get(obj_addr.obj_key_);
         LOG_TRACE(fmt::format("GetObjCache object {}, file_path: {}, ref count {}", obj_addr.obj_key_, file_path, obj_stat->ref_count_));
-        std::string read_path = GetObjPath(result.obj_addr_.obj_key_);
+        auto read_path = GetObjPath(result.obj_addr_.obj_key_);
         if (!VirtualStore::Exists(read_path)) {
             auto expect = ObjCached::kCached;
             obj_stat->cached_.compare_exchange_strong(expect, ObjCached::kNotCached);

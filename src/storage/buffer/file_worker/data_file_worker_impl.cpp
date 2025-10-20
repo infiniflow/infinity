@@ -115,7 +115,7 @@ bool DataFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) 
     return true;
 }
 
-void DataFileWorker::Read(size_t file_size) {
+void DataFileWorker::Read(size_t file_size, bool other) {
     if (!mmap_) {
         if (file_size < sizeof(u64) * 3) {
             RecoverableError(Status::DataIOError(fmt::format("Incorrect file length {}.", file_size)));

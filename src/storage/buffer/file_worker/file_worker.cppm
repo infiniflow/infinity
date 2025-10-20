@@ -17,6 +17,7 @@ export module infinity_core:file_worker;
 import :file_worker_type;
 import :persistence_manager;
 import :defer_op;
+import :virtual_store;
 
 import std.compat;
 import third_party;
@@ -38,7 +39,69 @@ public:
 public:
     [[nodiscard]] bool Write(const FileWorkerSaveCtx &ctx = {});
 
-    void Read(void *data);
+    template <typename T>
+    void Read(T *&data) {
+        size_t file_size = 0;
+
+        auto temp_path = GetFilePathTemp();
+        auto data_path = GetFilePath();
+        bool flag{};
+        std::string file_path;
+        if (VirtualStore::Exists(temp_path)) { // branchless
+            file_path = temp_path;
+            flag = true;
+        } else if (VirtualStore::Exists(data_path, true)) {
+            file_path = data_path;
+            flag = false;
+        }
+        if (flag) {
+            auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kRead);
+            if (!status.ok()) {
+                // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+                data = static_cast<T *>(data_);
+                return;
+            }
+
+            if (flag) {
+                file_size = file_handle->FileSize();
+            } else {
+                if (persistence_manager_) {
+                    file_handle->Seek(obj_addr_.part_offset_);
+                    file_size = obj_addr_.part_size_;
+                } else {
+                    file_size = file_handle->FileSize();
+                }
+            }
+
+            file_handle_ = std::move(file_handle);
+            Read(file_size, true);
+            data = static_cast<T *>(data_);
+        } else {
+            if (file_path.empty()) {
+                data = static_cast<T *>(data_);
+                return;
+            }
+            auto result = persistence_manager_->GetObjCache(file_path);
+            obj_addr_ = result.obj_addr_;
+            auto true_file_path = fmt::format("/var/infinity/persistence/{}", obj_addr_.obj_key_);
+            auto [file_handle, status] = VirtualStore::Open(true_file_path, FileAccessMode::kRead);
+            if (!status.ok()) {
+                // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+                data = static_cast<T *>(data_);
+                return;
+            }
+            if (persistence_manager_) {
+                file_handle->Seek(obj_addr_.part_offset_);
+                file_size = obj_addr_.part_size_;
+            } else {
+                file_size = file_handle->FileSize();
+            }
+
+            file_handle_ = std::move(file_handle);
+            Read(file_size, true);
+            data = static_cast<T *>(data_);
+        }
+    }
 
     void PickForCleanup() {}
 
@@ -49,8 +112,6 @@ public:
     virtual void FreeInMemory() = 0;
 
     virtual FileWorkerType Type() const = 0;
-
-    void *GetData();
 
     void SetData(void *data);
 
@@ -66,7 +127,7 @@ public:
 protected:
     virtual bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
 
-    virtual void Read(size_t file_size) = 0;
+    virtual void Read(size_t file_size, bool other) = 0;
 
 public:
     std::mutex l_;

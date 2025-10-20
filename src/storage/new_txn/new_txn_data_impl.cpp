@@ -918,7 +918,8 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
         }
 
         // append in version file.
-        auto *block_version = reinterpret_cast<BlockVersion *>(version_buffer->GetData());
+        BlockVersion *block_version{};
+        version_buffer->Read(block_version);
         block_version->Append(commit_ts, block_offset + append_rows);
         VersionFileWorkerSaveCtx version_file_worker_save_ctx{commit_ts};
         [[maybe_unused]] auto foo = version_buffer->Write(version_file_worker_save_ctx);
@@ -981,7 +982,8 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
 
         // delete in version file
-        auto *block_version = reinterpret_cast<BlockVersion *>(version_buffer->GetData());
+        BlockVersion *block_version{};
+        version_buffer->Read(block_version);
         undo_block_offsets.reserve(block_offsets.size());
         for (BlockOffset block_offset : block_offsets) {
             status = block_version->Delete(block_offset, commit_ts);
@@ -1018,7 +1020,8 @@ Status NewTxn::RollbackDeleteInBlock(BlockMeta &block_meta, const std::vector<Bl
         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
 
         // delete in version file
-        auto *block_version = reinterpret_cast<BlockVersion *>(version_buffer->GetData());
+        BlockVersion *block_version{};
+        version_buffer->Read(block_version);
         for (BlockOffset block_offset : block_offsets) {
             block_version->RollbackDelete(block_offset);
         }
@@ -1045,7 +1048,8 @@ Status NewTxn::PrintVersionInBlock(BlockMeta &block_meta, const std::vector<Bloc
         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
 
         // delete in version file
-        auto *block_version = reinterpret_cast<BlockVersion *>(version_buffer->GetData());
+        BlockVersion *block_version{};
+        version_buffer->Read(block_version);
         for (BlockOffset block_offset : block_offsets) {
             status = block_version->Print(begin_ts, block_offset, ignore_invisible);
             if (!status.ok()) {
@@ -1859,7 +1863,8 @@ Status NewTxn::AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segm
         if (!status.ok()) {
             return status;
         }
-        auto *block_version = reinterpret_cast<BlockVersion *>(version_buffer->GetData());
+        BlockVersion *block_version{};
+        version_buffer->Read(block_version);
 
         block_version->Append(save_ts, block_info.row_count_);
     }
@@ -1877,7 +1882,8 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
         if (!status.ok()) {
             return status;
         }
-        auto *block_version = reinterpret_cast<BlockVersion *>(version_buffer->GetData());
+        BlockVersion *block_version{};
+        version_buffer->Read(block_version);
 
         block_version->CommitAppend(save_ts, commit_ts);
         [[maybe_unused]] auto foo = version_buffer->Write(VersionFileWorkerSaveCtx(commit_ts));

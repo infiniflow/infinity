@@ -77,7 +77,7 @@ bool VarFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     return true;
 }
 
-void VarFileWorker::Read(size_t file_size) {
+void VarFileWorker::Read(size_t file_size, bool other) {
     if (!mmap_) {
         // if (file_size < buffer_size_) {
         //     UnrecoverableError(fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_));

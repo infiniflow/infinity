@@ -143,7 +143,9 @@ VarBuffer *VarBufferManager::GetInnerNoLock() {
             return mem_buffer_.get();
         }
         case BufferType::kNewCatalog: {
-            return static_cast<VarBuffer *>(var_fileworker_->GetData());
+            VarBuffer* var_buffer{};
+            var_fileworker_->Read(var_buffer);
+            return var_buffer;
         }
     }
 }

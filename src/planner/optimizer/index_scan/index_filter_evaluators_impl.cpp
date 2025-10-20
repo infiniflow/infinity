@@ -644,7 +644,8 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
             // High cardinality: use traditional approach
             const u32 begin_pos = begin_pos_;
             const u32 end_pos = end_pos_;
-            const auto index = static_cast<const SecondaryIndexDataBase<CardinalityTag> *>(index_buffer_->GetData());
+            const SecondaryIndexDataBase<CardinalityTag> *index{};
+            index_buffer_->Read(index);
             const auto [key_ptr, offset_ptr] = index->GetKeyOffsetPointer();
             // output result
             for (u32 i = begin_pos; i < end_pos; ++i) {
@@ -653,7 +654,8 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
         } else {
             // Low cardinality: use RoaringBitmap approach
             const auto [begin_val, end_val] = current_range_;
-            const auto index = static_cast<const SecondaryIndexDataBase<CardinalityTag> *>(index_buffer_->GetData());
+            const SecondaryIndexDataBase<CardinalityTag> *index{};
+            index_buffer_->Read(index);
 
             // Get unique keys count and pointer through base class interface
             u32 unique_key_count = index->GetUniqueKeyCount();
@@ -694,10 +696,9 @@ struct TrunkReaderT<ColumnValueType, HighCardinalityTag> final : TrunkReader<Col
         : segment_row_count_(segment_row_count), index_(index) {}
 
     u32 GetResultCnt(const std::pair<KeyType, KeyType> interval_range) override {
-        // FileWorker *index_obj{};
-        const SecondaryIndexDataBase<HighCardinalityTag> *index = nullptr;
+        const SecondaryIndexDataBase<HighCardinalityTag> *index{};
         if (index_buffer_) {
-            index = static_cast<const SecondaryIndexDataBase<HighCardinalityTag> *>(index_buffer_->GetData());
+            index_buffer_->Read(index);
         } else {
             index = index_;
         }
@@ -780,7 +781,8 @@ struct TrunkReaderT<ColumnValueType, HighCardinalityTag> final : TrunkReader<Col
     void OutPut(Bitmask &selected_rows) override {
         const u32 begin_pos = begin_pos_;
         const u32 end_pos = end_pos_;
-        const auto index = static_cast<const SecondaryIndexDataBase<HighCardinalityTag> *>(index_buffer_->GetData());
+        const SecondaryIndexDataBase<HighCardinalityTag> * index{};
+        index_buffer_->Read(index);
         const auto [key_ptr, offset_ptr] = index->GetKeyOffsetPointer();
         // output result
         for (u32 i = begin_pos; i < end_pos; ++i) {

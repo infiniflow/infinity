@@ -96,7 +96,7 @@ bool HnswFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) 
     return true;
 }
 
-void HnswFileWorker::Read(size_t file_size) {
+void HnswFileWorker::Read(size_t file_size, bool other) {
     // if (data_ != nullptr) {
     //     UnrecoverableError("Data is already allocated.");
     // }

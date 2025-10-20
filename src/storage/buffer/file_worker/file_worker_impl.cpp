@@ -66,41 +66,42 @@ bool FileWorker::Write(const FileWorkerSaveCtx &ctx) {
     return all_save;
 }
 
-void FileWorker::Read(void *&data) {
-    size_t file_size = 0;
-
-    auto temp_path = GetFilePathTemp();
-    auto data_path = GetFilePath();
-    bool flag{};
-    std::string file_path;
-    if (VirtualStore::Exists(temp_path)) { // branchless
-        file_path = temp_path;
-        flag = true;
-    } else if (VirtualStore::Exists(data_path, true)) {
-        file_path = data_path;
-        flag = false;
-    }
-    auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kRead);
-    if (!status.ok()) {
-        // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
-        return;
-    }
-
-    if (flag) {
-        file_size = file_handle->FileSize();
-    } else {
-        if (persistence_manager_) {
-            file_handle->Seek(obj_addr_.part_offset_);
-            file_size = obj_addr_.part_size_;
-        } else {
-            file_size = file_handle->FileSize();
-        }
-    }
-
-    file_handle_ = std::move(file_handle);
-    Read(file_size);
-    data = data_;
-}
+// template<typename T>
+// void FileWorker::Read(T *&data) {
+//     size_t file_size = 0;
+//
+//     auto temp_path = GetFilePathTemp();
+//     auto data_path = GetFilePath();
+//     bool flag{};
+//     std::string file_path;
+//     if (VirtualStore::Exists(temp_path)) { // branchless
+//         file_path = temp_path;
+//         flag = true;
+//     } else if (VirtualStore::Exists(data_path, true)) {
+//         file_path = data_path;
+//         flag = false;
+//     }
+//     auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kRead);
+//     if (!status.ok()) {
+//         // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+//         return;
+//     }
+//
+//     if (flag) {
+//         file_size = file_handle->FileSize();
+//     } else {
+//         if (persistence_manager_) {
+//             file_handle->Seek(obj_addr_.part_offset_);
+//             file_size = obj_addr_.part_size_;
+//         } else {
+//             file_size = file_handle->FileSize();
+//         }
+//     }
+//
+//     file_handle_ = std::move(file_handle);
+//     Read(file_size);
+//     data = data_;
+// }
 
 void FileWorker::MoveFile() {
     auto temp_path = GetFilePathTemp();
@@ -123,11 +124,6 @@ void FileWorker::MoveFile() {
 
         obj_addr_ = persist_result.obj_addr_;
     }
-}
-
-void *FileWorker::GetData() {
-    Read();
-    return data_;
 }
 
 void FileWorker::SetData(void *data) {

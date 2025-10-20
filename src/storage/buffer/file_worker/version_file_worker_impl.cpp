@@ -76,7 +76,7 @@ bool VersionFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ba
     return false;
 }
 
-void VersionFileWorker::Read(size_t file_size) {
+void VersionFileWorker::Read(size_t file_size, bool other) {
     // if (data_ != nullptr) {
     //     UnrecoverableError("Data is already allocated.");
     // }
