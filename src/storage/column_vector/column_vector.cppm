@@ -64,18 +64,18 @@ public:
     static std::shared_ptr<ColumnVector> Make(std::shared_ptr<DataType> data_type);
 
 public:
-    size_t data_type_size_{0};
+    size_t data_type_size_{};
 
     // this buffer is holding the data
-    std::shared_ptr<VectorBuffer> buffer_{nullptr};
+    std::shared_ptr<VectorBuffer> buffer_;
 
     // A bitmap to indicate the null information
     // true: row is not null
     // false: row is null
     // initial state: all true
-    std::shared_ptr<Bitmask> nulls_ptr_{nullptr};
+    std::shared_ptr<Bitmask> nulls_ptr_;
 
-    bool initialized{false};
+    bool initialized_{};
 
 private:
     ColumnVectorType vector_type_{ColumnVectorType::kInvalid};
@@ -83,11 +83,11 @@ private:
     std::shared_ptr<DataType> data_type_{};
 
     // Only a pointer to the real data in vector buffer
-    char *data_ptr_{nullptr};
+    char *data_ptr_{};
 
-    size_t capacity_{0};
+    size_t capacity_{};
 
-    std::atomic<size_t> tail_index_{0};
+    std::atomic_size_t tail_index_{};
 
 public:
     ColumnVector();

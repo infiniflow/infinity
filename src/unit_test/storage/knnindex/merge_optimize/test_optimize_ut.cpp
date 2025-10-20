@@ -90,8 +90,8 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                                            (std::string(test_data_path()) + "/config/test_optimize_vfs_off.toml").c_str()));
 
 TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
-    Storage *storage = InfinityContext::instance().storage();
-    NewTxnManager *txn_mgr = storage->new_txn_manager();
+    auto *storage = InfinityContext::instance().storage();
+    auto *txn_mgr = storage->new_txn_manager();
 
     auto db_name = std::make_shared<std::string>("default_db");
 

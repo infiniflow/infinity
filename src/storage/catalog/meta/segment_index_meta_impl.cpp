@@ -156,7 +156,11 @@ Status SegmentIndexMeta::InitSet1() {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::RestoreSet(const ChunkID &next_chunk_id) { return SetNextChunkID(next_chunk_id); }
+Status SegmentIndexMeta::InitSet(const ChunkID &next_chunk_id) { // replace for RestoreSet
+    return SetNextChunkID(next_chunk_id);
+}
+
+// Status SegmentIndexMeta::RestoreSet(const ChunkID &next_chunk_id) { return SetNextChunkID(next_chunk_id); }
 
 Status SegmentIndexMeta::LoadSet() {
     {
@@ -171,8 +175,8 @@ Status SegmentIndexMeta::LoadSet() {
 Status SegmentIndexMeta::UninitSet1(UsageFlag usage_flag) {
     {
         // Remove all chunk ids
-        TableMeta &table_meta = table_index_meta_.table_meta();
-        std::string chunk_id_prefix =
+        auto &table_meta = table_index_meta_.table_meta();
+        auto chunk_id_prefix =
             KeyEncode::CatalogIdxChunkPrefix(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_);
         auto iter = kv_instance_.GetIterator();
         iter->Seek(chunk_id_prefix);
@@ -184,8 +188,8 @@ Status SegmentIndexMeta::UninitSet1(UsageFlag usage_flag) {
     }
     {
         // Remove next chunk id
-        std::string next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
-        Status status = kv_instance_.Delete(next_chunk_id_key);
+        auto next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
+        auto status = kv_instance_.Delete(next_chunk_id_key);
         if (!status.ok()) {
             return status;
         }
@@ -193,23 +197,23 @@ Status SegmentIndexMeta::UninitSet1(UsageFlag usage_flag) {
     }
     if (usage_flag == UsageFlag::kOther) {
         // Clear mem index
-        std::shared_ptr<MemIndex> mem_index = GetMemIndex();
+        auto mem_index = GetMemIndex();
         if (mem_index != nullptr) {
             mem_index->ClearMemIndex();
         }
 
         // Remove mem index
-        std::string mem_index_key = GetSegmentIndexTag("mem_index");
-        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-        Status status = new_catalog->DropMemIndexByMemIndexKey(mem_index_key);
+        auto mem_index_key = GetSegmentIndexTag("mem_index");
+        auto *new_catalog = InfinityContext::instance().storage()->new_catalog();
+        auto status = new_catalog->DropMemIndexByMemIndexKey(mem_index_key);
         if (!status.ok()) {
             return status;
         }
     }
     {
         // Remove ft_info tag
-        std::string ft_info_key = GetSegmentIndexTag("ft_info");
-        Status status = kv_instance_.Delete(ft_info_key);
+        auto ft_info_key = GetSegmentIndexTag("ft_info");
+        auto status = kv_instance_.Delete(ft_info_key);
         if (!status.ok()) {
             return status;
         }
@@ -219,30 +223,30 @@ Status SegmentIndexMeta::UninitSet1(UsageFlag usage_flag) {
 }
 
 std::shared_ptr<MemIndex> SegmentIndexMeta::GetMemIndex(bool for_update) {
-    std::string mem_index_key = GetSegmentIndexTag("mem_index");
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    auto mem_index_key = GetSegmentIndexTag("mem_index");
+    auto *new_catalog = InfinityContext::instance().storage()->new_catalog();
     return new_catalog->GetMemIndex(mem_index_key, for_update);
 }
 
 std::shared_ptr<MemIndex> SegmentIndexMeta::PopMemIndex() {
-    std::string mem_index_key = GetSegmentIndexTag("mem_index");
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    auto mem_index_key = GetSegmentIndexTag("mem_index");
+    auto *new_catalog = InfinityContext::instance().storage()->new_catalog();
     return new_catalog->PopMemIndex(mem_index_key);
 }
 
 Status SegmentIndexMeta::LoadChunkIDs1() {
     chunk_ids_ = std::vector<ChunkID>();
-    std::vector<ChunkID> &chunk_ids = *chunk_ids_;
-    TxnTimeStamp begin_ts = table_index_meta_.table_meta().begin_ts();
-    TxnTimeStamp commit_ts = table_index_meta_.table_meta().commit_ts();
+    auto &chunk_ids = *chunk_ids_;
+    auto begin_ts = table_index_meta_.table_meta().begin_ts();
+    auto commit_ts = table_index_meta_.table_meta().commit_ts();
 
-    TableMeta &table_meta = table_index_meta_.table_meta();
-    std::string chunk_id_prefix =
+    auto &table_meta = table_index_meta_.table_meta();
+    auto chunk_id_prefix =
         KeyEncode::CatalogIdxChunkPrefix(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_);
     auto iter = kv_instance_.GetIterator();
     iter->Seek(chunk_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(chunk_id_prefix)) {
-        std::string key = iter->Key().ToString();
+        auto key = iter->Key().ToString();
         auto [chunk_id, is_chunk_id] = ExtractU64FromStringSuffix(key, chunk_id_prefix.size());
         if (is_chunk_id) {
             TxnTimeStamp chunk_commit_ts = std::stoull(iter->Value().ToString());
@@ -261,9 +265,9 @@ Status SegmentIndexMeta::LoadChunkIDs1() {
 }
 
 Status SegmentIndexMeta::LoadNextChunkID() {
-    std::string next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
+    auto next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
     std::string next_chunk_id_str;
-    Status status = kv_instance_.Get(next_chunk_id_key, next_chunk_id_str);
+    auto status = kv_instance_.Get(next_chunk_id_key, next_chunk_id_str);
     if (!status.ok()) {
         return status;
     }
@@ -272,12 +276,12 @@ Status SegmentIndexMeta::LoadNextChunkID() {
 }
 
 std::string SegmentIndexMeta::GetSegmentIndexTag(const std::string &tag) {
-    const TableMeta &table_meta = table_index_meta_.table_meta();
+    const auto &table_meta = table_index_meta_.table_meta();
     return KeyEncode::CatalogIdxSegmentTagKey(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_, tag);
 }
 
 std::shared_ptr<std::string> SegmentIndexMeta::GetSegmentIndexDir() const {
-    std::shared_ptr<std::string> table_index_dir = table_index_meta_.GetTableIndexDir();
+    auto table_index_dir = table_index_meta_.GetTableIndexDir();
     if (!table_index_dir) {
         return nullptr;
     }
@@ -285,14 +289,12 @@ std::shared_ptr<std::string> SegmentIndexMeta::GetSegmentIndexDir() const {
 }
 
 std::shared_ptr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo() {
-    std::shared_ptr<IndexBase> index_def;
-    Status status;
-    std::tie(index_def, status) = table_index_meta_.GetIndexBase();
+    auto [index_def, status] = table_index_meta_.GetIndexBase();
     if (!status.ok()) {
         return nullptr;
     }
     if (!chunk_ids_) {
-        Status status = LoadChunkIDs1();
+        auto status = LoadChunkIDs1();
         if (!status.ok()) {
             return nullptr;
         }
@@ -308,7 +310,7 @@ std::shared_ptr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo() {
         segment_index_files.insert(segment_index_files.end(), chunk_index_files.begin(), chunk_index_files.end());
     }
 
-    std::shared_ptr<SegmentIndexInfo> segment_index_info = std::make_shared<SegmentIndexInfo>();
+    auto segment_index_info = std::make_shared<SegmentIndexInfo>();
     segment_index_info->segment_id_ = segment_id_;
     segment_index_info->index_type_ = index_def->index_type_;
     segment_index_info->index_dir_ = GetSegmentIndexDir();
@@ -318,7 +320,7 @@ std::shared_ptr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo() {
 }
 
 std::tuple<std::shared_ptr<SegmentIndexSnapshotInfo>, Status> SegmentIndexMeta::MapMetaToSnapShotInfo() {
-    std::shared_ptr<SegmentIndexSnapshotInfo> segment_index_snapshot_info = std::make_shared<SegmentIndexSnapshotInfo>();
+    auto segment_index_snapshot_info = std::make_shared<SegmentIndexSnapshotInfo>();
     segment_index_snapshot_info->segment_id_ = segment_id_;
     auto [chunk_ids, status] = GetChunkIDs1();
     if (!status.ok()) {

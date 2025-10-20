@@ -47,27 +47,26 @@ std::shared_ptr<ColumnDef> ColumnMeta::get_column_def() const {
 }
 
 Status ColumnMeta::InitSet(const std::shared_ptr<ColumnDef> &col_def) {
-    Status status;
-    ColumnID column_id = col_def->id();
+    auto column_id = col_def->id();
 
-    std::shared_ptr<std::string> block_dir_ptr = block_meta_.GetBlockDir();
-    FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+    auto block_dir = block_meta_.GetBlockDir();
+    auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     {
-        auto filename = fmt::format("{}.col", column_id);
+        auto file_name = fmt::format("{}.col", column_id);
         size_t total_data_size = 0;
         if (col_def->type()->type() == LogicalType::kBoolean) {
             total_data_size = (block_meta_.block_capacity() + 7) / 8;
         } else {
             total_data_size = block_meta_.block_capacity() * col_def->type()->Size();
         }
-        auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, filename));
+        auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir, file_name));
         auto file_worker = std::make_unique<DataFileWorker>(rel_file_path, total_data_size);
         column_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(file_worker));
     }
-    VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
+    auto buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
     if (buffer_type == VectorBufferType::kVarBuffer) {
-        auto filename = fmt::format("col_{}_out", column_id);
-        auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, filename));
+        auto file_name = fmt::format("col_{}_out", column_id);
+        auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir, file_name));
         auto outline_file_worker = std::make_unique<VarFileWorker>(rel_file_path, 0 /*buffer_size*/);
         outline_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(outline_file_worker));
     }
@@ -75,11 +74,9 @@ Status ColumnMeta::InitSet(const std::shared_ptr<ColumnDef> &col_def) {
 }
 
 Status ColumnMeta::LoadSet() {
-    Status status;
     std::shared_ptr<ColumnDef> col_def;
     {
-        std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs_ptr;
-        std::tie(column_defs_ptr, status) = block_meta_.segment_meta().table_meta().GetColumnDefs();
+        auto [column_defs_ptr, status] = block_meta_.segment_meta().table_meta().GetColumnDefs();
         if (!status.ok()) {
             return status;
         }
@@ -100,7 +97,7 @@ Status ColumnMeta::LoadSet() {
         auto file_worker = std::make_unique<DataFileWorker>(rel_file_path, total_data_size);
         column_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(file_worker));
     }
-    VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
+    auto buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
     if (buffer_type == VectorBufferType::kVarBuffer) {
         auto filename = fmt::format("col_{}_out", col_def->id());
 
@@ -108,48 +105,6 @@ Status ColumnMeta::LoadSet() {
         auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, filename));
         auto outline_file_worker = std::make_unique<VarFileWorker>(rel_file_path, chunk_offset);
         outline_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(outline_file_worker));
-    }
-    return Status::OK();
-}
-
-Status ColumnMeta::RestoreSet(const ColumnDef *column_def) {
-    Status status;
-
-    auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
-    std::shared_ptr<std::string> block_dir_ptr = block_meta_.GetBlockDir();
-    {
-        auto filename = fmt::format("{}.col", column_def->id());
-        size_t total_data_size = 0;
-        if (column_def->type()->type() == LogicalType::kBoolean) {
-            total_data_size = (block_meta_.block_capacity() + 7) / 8;
-        } else {
-            total_data_size = block_meta_.block_capacity() * column_def->type()->Size();
-        }
-        auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, filename));
-        auto file_worker = std::make_unique<DataFileWorker>(rel_file_path, total_data_size);
-        auto *buffer_obj = fileworker_mgr->GetFileWorker(file_worker->GetFilePath());
-        if (buffer_obj == nullptr) {
-            column_buffer_ = file_worker.get();
-            if (!column_buffer_) {
-                return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", file_worker->GetFilePath()));
-            }
-        }
-    }
-    VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*column_def->type());
-    if (buffer_type == VectorBufferType::kVarBuffer) {
-        auto filename = fmt::format("col_{}_out", column_def->id());
-
-        // check if 0 is the right buffer size
-        // follow loadset
-        auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, filename));
-        auto outline_file_worker = std::make_unique<VarFileWorker>(rel_file_path, 0 /*buffer_size*/);
-        auto *buffer_obj = fileworker_mgr->GetFileWorker(outline_file_worker->GetFilePath());
-        if (buffer_obj == nullptr) {
-            outline_buffer_ = outline_file_worker.get();
-            if (!outline_buffer_) {
-                return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", outline_file_worker->GetFilePath()));
-            }
-        }
     }
     return Status::OK();
 }
@@ -163,16 +118,16 @@ Status ColumnMeta::FilePaths(std::vector<std::string> &paths) {
     if (!status.ok()) {
         return status;
     }
-    ColumnDef *col_def = (*column_defs_ptr)[column_idx_].get();
-    ColumnID column_id = col_def->id();
+    auto *col_def = (*column_defs_ptr)[column_idx_].get();
+    auto column_id = col_def->id();
 
-    std::string col_filename = std::to_string(column_id) + ".col";
+    auto col_filename = fmt::format("{}.col", column_id);
     paths.push_back(*block_meta_.GetBlockDir() + "/" + col_filename);
 
     {
-        VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
+        auto buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
         if (buffer_type == VectorBufferType::kVarBuffer) {
-            std::string outline_filename = fmt::format("col_{}_out", column_id);
+            auto outline_filename = fmt::format("col_{}_out", column_id);
             paths.push_back(*block_meta_.GetBlockDir() + "/" + outline_filename);
         }
     }
@@ -180,9 +135,9 @@ Status ColumnMeta::FilePaths(std::vector<std::string> &paths) {
     return Status::OK();
 }
 
-Status ColumnMeta::GetColumnBuffer(FileWorker *&column_buffer, FileWorker *&outline_buffer, const ColumnDef *column_def) {
+Status ColumnMeta::GetColumnBuffer(FileWorker *&column_buffer, FileWorker *&outline_buffer, const std::shared_ptr<ColumnDef> &column_def) {
     if (!column_buffer_) {
-        Status status = LoadColumnBuffer(column_def);
+        auto status = LoadColumnBuffer(column_def);
         if (!status.ok()) {
             return status;
         }
@@ -203,11 +158,10 @@ std::tuple<size_t, Status> ColumnMeta::GetColumnSize(size_t row_cnt, const std::
     return {total_data_size, Status::OK()};
 }
 
-Status ColumnMeta::UninitSet(const ColumnDef *column_def, UsageFlag usage_flag) {
-    Status status;
+Status ColumnMeta::UninitSet(const std::shared_ptr<ColumnDef> &column_def, UsageFlag usage_flag) {
 
     if (usage_flag == UsageFlag::kOther) {
-        status = this->GetColumnBuffer(column_buffer_, outline_buffer_, column_def);
+        auto status = GetColumnBuffer(column_buffer_, outline_buffer_, column_def);
         if (!status.ok()) {
             return status;
         }
@@ -220,40 +174,40 @@ Status ColumnMeta::UninitSet(const ColumnDef *column_def, UsageFlag usage_flag) 
     return Status::OK();
 }
 
-Status ColumnMeta::LoadColumnBuffer(const ColumnDef *col_def) {
-    std::shared_ptr<std::string> block_dir_ptr = block_meta_.GetBlockDir();
-    if (!col_def) {
+Status ColumnMeta::LoadColumnBuffer(std::shared_ptr<ColumnDef> column_def) {
+    auto block_dir = block_meta_.GetBlockDir();
+    if (!column_def) {
         auto [column_defs_ptr, status] = block_meta_.segment_meta().table_meta().GetColumnDefs();
         if (!status.ok()) {
             return status;
         }
-        col_def = (*column_defs_ptr)[column_idx_].get();
+        column_def = (*column_defs_ptr)[column_idx_];
     }
-    ColumnID column_id = col_def->id();
+    ColumnID column_id = column_def->id();
 
     FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     {
-        std::string col_filename = std::to_string(column_id) + ".col";
-        std::string col_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + col_filename;
-        column_buffer_ = fileworker_mgr->GetFileWorker(col_filepath);
+        auto col_file_name = fmt::format("{}.col", column_id);
+        auto col_file_path = fmt::format("{}/{}", *block_dir, col_file_name);
+        column_buffer_ = fileworker_mgr->GetFileWorker(col_file_path);
         if (column_buffer_ == nullptr) {
-            return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", col_filepath));
+            return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", col_file_path));
         }
     }
-    VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
+    VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*column_def->type());
     if (buffer_type == VectorBufferType::kVarBuffer) {
-        std::string outline_filename = fmt::format("col_{}_out", column_id);
-        std::string outline_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + outline_filename;
-        outline_buffer_ = fileworker_mgr->GetFileWorker(outline_filepath);
+        auto outline_file_name = fmt::format("col_{}_out", column_id);
+        auto outline_file_path = fmt::format("{}/{}", *block_dir, outline_file_name);
+        outline_buffer_ = fileworker_mgr->GetFileWorker(outline_file_path);
         if (outline_buffer_ == nullptr) {
-            return Status::BufferManagerError(fmt::format("Get outline buffer object failed: {}", outline_filepath));
+            return Status::BufferManagerError(fmt::format("Get outline buffer object failed: {}", outline_file_path));
         }
     }
     return Status::OK();
 }
 
 std::tuple<std::shared_ptr<BlockColumnSnapshotInfo>, Status> ColumnMeta::MapMetaToSnapShotInfo() {
-    std::shared_ptr<BlockColumnSnapshotInfo> block_column_snapshot_info = std::make_shared<BlockColumnSnapshotInfo>();
+    auto block_column_snapshot_info = std::make_shared<BlockColumnSnapshotInfo>();
     block_column_snapshot_info->column_id_ = column_idx_;
     std::vector<std::string> column_file_paths;
     auto status = FilePaths(column_file_paths);
@@ -265,8 +219,8 @@ std::tuple<std::shared_ptr<BlockColumnSnapshotInfo>, Status> ColumnMeta::MapMeta
     std::vector<std::shared_ptr<OutlineSnapshotInfo>> outline_snapshots;
     // start at the second column file path
     for (size_t i = 1; i < column_file_paths.size(); ++i) {
-        const std::string &outline_filename = column_file_paths[i];
-        std::shared_ptr<OutlineSnapshotInfo> outline_snapshot_info = std::make_shared<OutlineSnapshotInfo>();
+        const auto &outline_filename = column_file_paths[i];
+        auto outline_snapshot_info = std::make_shared<OutlineSnapshotInfo>();
         outline_snapshot_info->filepath_ = outline_filename;
         outline_snapshots.push_back(outline_snapshot_info);
     }
@@ -275,15 +229,12 @@ std::tuple<std::shared_ptr<BlockColumnSnapshotInfo>, Status> ColumnMeta::MapMeta
 }
 
 Status ColumnMeta::RestoreFromSnapshot(ColumnID column_id) {
-    // TODO: figure out whether we are still using chunkoffset
-    Status status;
-    std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs;
-    std::tie(column_defs, status) = block_meta_.segment_meta().table_meta().GetColumnDefs();
+    auto [column_defs, status] = block_meta_.segment_meta().table_meta().GetColumnDefs();
     if (!status.ok()) {
         return status;
     }
-    const ColumnDef *col_def = (*column_defs)[column_id].get();
-    status = RestoreSet(col_def);
+    auto col_def = (*column_defs)[column_id];
+    status = InitSet(col_def);
     if (!status.ok()) {
         return status;
     }

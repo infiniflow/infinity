@@ -59,8 +59,6 @@ public:
 
     Status LoadSet();
 
-    Status RestoreSet();
-
     Status RestoreSetFromSnapshot(const ChunkIndexMetaInfo &chunk_info);
 
     Status UninitSet(UsageFlag usage_flag);

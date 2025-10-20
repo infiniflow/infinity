@@ -1903,7 +1903,7 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta,
 
 Status NewTxn::RecoverMemIndex(TableIndexMeta &table_index_meta) {
     Status status;
-    TableMeta &table_meta = table_index_meta.table_meta();
+    auto &table_meta = table_index_meta.table_meta();
 
     std::vector<SegmentID> *segment_ids_ptr = nullptr;
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
@@ -1942,8 +1942,8 @@ Status NewTxn::RecoverMemIndex(TableIndexMeta &table_index_meta) {
     }
     std::ostringstream oss;
     oss << "[";
-    for (const auto &range : append_ranges) {
-        oss << fmt::format("({}, {}), ", range.first.ToUint64(), range.second);
+    for (const auto &[first, second] : append_ranges) {
+        oss << fmt::format("({}, {}), ", first.ToUint64(), second);
     }
     oss << "]";
     LOG_INFO(fmt::format("NewTxn::RecoverMemIndex db {} table {} index {} append_ranges {}: {}",
@@ -1953,7 +1953,7 @@ Status NewTxn::RecoverMemIndex(TableIndexMeta &table_index_meta) {
                          append_ranges.size(),
                          oss.str()));
     for (const auto &range : append_ranges) {
-        status = this->AppendIndex(table_index_meta, range);
+        status = AppendIndex(table_index_meta, range);
         if (!status.ok()) {
             return status;
         }
@@ -1962,10 +1962,8 @@ Status NewTxn::RecoverMemIndex(TableIndexMeta &table_index_meta) {
 }
 
 Status NewTxn::CommitMemIndex(TableIndexMeta &table_index_meta) {
-    Status status;
 
-    std::shared_ptr<IndexBase> index_base;
-    std::tie(index_base, status) = table_index_meta.GetIndexBase();
+    auto [index_base, status] = table_index_meta.GetIndexBase();
     if (!status.ok()) {
         return status;
     }
@@ -2098,9 +2096,7 @@ Status NewTxn::PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
 
     TableMeta table_meta(db_id_str, table_id_str, table_name, this);
     TableIndexMeta table_index_meta(index_id_str, index_name, table_meta);
-    std::shared_ptr<IndexBase> index_base;
-    Status status;
-    std::tie(index_base, status) = table_index_meta.GetIndexBase();
+    auto [index_base, status] = table_index_meta.GetIndexBase();
     if (!status.ok()) {
         return status;
     }

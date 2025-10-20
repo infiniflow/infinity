@@ -101,7 +101,7 @@ Status ChunkIndexMeta::GetIndexBuffer(FileWorker *&index_buffer) {
 Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
     chunk_info_ = chunk_info;
     {
-        std::string chunk_info_key = GetChunkIndexTag("chunk_info");
+        auto chunk_info_key = GetChunkIndexTag("chunk_info");
         nlohmann::json chunk_info_json;
         chunk_info_->ToJson(chunk_info_json);
         auto status = kv_instance_.Put(chunk_info_key, chunk_info_json.dump());
@@ -110,7 +110,7 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
         }
     }
 
-    TableIndexMeta &table_index_meta = segment_index_meta_.table_index_meta();
+    auto &table_index_meta = segment_index_meta_.table_index_meta();
 
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
@@ -126,9 +126,9 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
         column_def = std::move(col_def);
     }
 
-    std::shared_ptr<std::string> index_dir = segment_index_meta_.GetSegmentIndexDir();
     {
-        FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+        auto index_dir = segment_index_meta_.GetSegmentIndexDir();
+        auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
         switch (index_base->index_type_) {
             case IndexType::kSecondary: {
                 auto index_file_name = IndexFileName(chunk_id_);
@@ -191,17 +191,17 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
 
 Status ChunkIndexMeta::LoadSet() {
     // FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
-    TableIndexMeta &table_index_meta = segment_index_meta_.table_index_meta();
+    auto &table_index_meta = segment_index_meta_.table_index_meta();
 
-    ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-    Status status = this->GetChunkInfo(chunk_info_ptr);
+    ChunkIndexMetaInfo *chunk_info_ptr{};
+    auto status = GetChunkInfo(chunk_info_ptr);
     if (!status.ok()) {
         return status;
     }
-    RowID base_row_id = chunk_info_ptr->base_row_id_;
-    size_t row_count = chunk_info_ptr->row_cnt_;
-    const std::string &base_name = chunk_info_ptr->base_name_;
-    size_t index_size = chunk_info_ptr->index_size_;
+    auto base_row_id = chunk_info_ptr->base_row_id_;
+    auto row_count = chunk_info_ptr->row_cnt_;
+    const auto &base_name = chunk_info_ptr->base_name_;
+    auto index_size = chunk_info_ptr->index_size_;
 
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
@@ -211,8 +211,8 @@ Status ChunkIndexMeta::LoadSet() {
     if (!col_status.ok()) {
         return status;
     }
-    std::shared_ptr<std::string> index_dir = segment_index_meta_.GetSegmentIndexDir();
-    FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+    auto index_dir = segment_index_meta_.GetSegmentIndexDir();
+    auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
             auto index_file_name = IndexFileName(chunk_id_);
@@ -267,84 +267,6 @@ Status ChunkIndexMeta::LoadSet() {
     return Status::OK();
 }
 
-Status ChunkIndexMeta::RestoreSet() {
-    FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
-    TableIndexMeta &table_index_meta = segment_index_meta_.table_index_meta();
-
-    ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-    Status status = this->GetChunkInfo(chunk_info_ptr);
-    if (!status.ok()) {
-        return status;
-    }
-    RowID base_row_id = chunk_info_ptr->base_row_id_;
-    size_t row_count = chunk_info_ptr->row_cnt_;
-    const std::string &base_name = chunk_info_ptr->base_name_;
-    size_t index_size = chunk_info_ptr->index_size_;
-
-    auto [index_base, index_status] = table_index_meta.GetIndexBase();
-    if (!index_status.ok()) {
-        return index_status;
-    }
-    auto [column_def, col_status] = table_index_meta.GetColumnDef();
-    if (!col_status.ok()) {
-        return status;
-    }
-    std::shared_ptr<std::string> index_dir = segment_index_meta_.GetSegmentIndexDir();
-    std::unique_ptr<FileWorker> index_file_worker;
-    switch (index_base->index_type_) {
-        case IndexType::kSecondary: {
-            auto index_file_name = IndexFileName(chunk_id_);
-            auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
-            index_file_worker = std::make_unique<SecondaryIndexFileWorker>(rel_file_path, index_base, column_def, row_count);
-            break;
-        }
-        case IndexType::kFullText: {
-            auto column_length_file_name = base_name + LENGTH_SUFFIX;
-            auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(column_length_file_name)));
-            index_file_worker = std::make_unique<RawFileWorker>(rel_file_path, row_count * sizeof(u32));
-            break;
-        }
-        case IndexType::kIVF: {
-            auto index_file_name = IndexFileName(chunk_id_);
-            auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
-            index_file_worker = std::make_unique<IVFIndexFileWorker>(rel_file_path, index_base, column_def);
-            break;
-        }
-        case IndexType::kHnsw: {
-            auto index_file_name = IndexFileName(chunk_id_);
-            auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
-            index_file_worker = std::make_unique<HnswFileWorker>(rel_file_path, index_base, column_def, index_size);
-            break;
-        }
-        case IndexType::kBMP: {
-            auto index_file_name = IndexFileName(chunk_id_);
-            auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
-            index_file_worker = std::make_unique<BMPIndexFileWorker>(rel_file_path, index_base, column_def, index_size);
-            break;
-        }
-        case IndexType::kEMVB: {
-            auto index_file_name = IndexFileName(chunk_id_);
-            auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
-            const auto segment_start_offset = base_row_id.segment_offset_;
-            index_file_worker = std::make_unique<EMVBIndexFileWorker>(rel_file_path, index_base, column_def, segment_start_offset);
-
-            break;
-        }
-        default: {
-            UnrecoverableError("Not implemented yet");
-        }
-    }
-    auto *buffer_obj = fileworker_mgr->GetFileWorker(index_file_worker->GetFilePath());
-    if (buffer_obj == nullptr) {
-        index_buffer_ = index_file_worker.get();
-    }
-    if (index_buffer_ == nullptr) {
-        return Status::BufferManagerError("GetFileWorker failed");
-    }
-
-    return Status::OK();
-}
-
 Status ChunkIndexMeta::RestoreSetFromSnapshot(const ChunkIndexMetaInfo &chunk_info) {
     chunk_info_ = chunk_info;
     {
@@ -373,7 +295,7 @@ Status ChunkIndexMeta::RestoreSetFromSnapshot(const ChunkIndexMetaInfo &chunk_in
         column_def = std::move(col_def);
     }
 
-    Status status = RestoreSet();
+    auto status = LoadSet();
     if (!status.ok()) {
         return status;
     }
@@ -501,8 +423,8 @@ Status ChunkIndexMeta::LoadChunkInfo() {
 Status ChunkIndexMeta::LoadIndexBuffer() {
     TableIndexMeta &table_index_meta = segment_index_meta_.table_index_meta();
 
-    std::string index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), segment_index_meta_.GetSegmentIndexDir()->c_str());
-    FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+    auto index_dir = *segment_index_meta_.GetSegmentIndexDir();
+    auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
 
     auto [index_def, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {

@@ -86,22 +86,7 @@ Status BlockMeta::InitOrLoadSet(TxnTimeStamp checkpoint_ts) {
     std::shared_ptr<std::string> block_dir_ptr = GetBlockDir();
     auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
     auto version_file_worker = std::make_unique<VersionFileWorker>(rel_file_path, block_capacity());
-    version_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(version_file_worker));
-    return Status::OK();
-}
-
-Status BlockMeta::RestoreSet() {
-    auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
-    std::shared_ptr<std::string> block_dir_ptr = GetBlockDir();
-    auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
-    auto version_file_worker = std::make_unique<VersionFileWorker>(rel_file_path, block_capacity());
-    auto *buffer_obj = fileworker_mgr->GetFileWorker(version_file_worker->GetFilePath());
-    if (buffer_obj == nullptr) {
-        version_buffer_ = version_file_worker.get();
-        if (!version_buffer_) {
-            return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
-        }
-    }
+    version_file_worker_ = fileworker_mgr->EmplaceFileWorker(std::move(version_file_worker));
     return Status::OK();
 }
 
@@ -118,12 +103,12 @@ Status BlockMeta::RestoreSetFromSnapshot() {
     auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
     auto version_file_worker = std::make_unique<VersionFileWorker>(rel_file_path, block_capacity());
 
-    version_buffer_ = version_file_worker.get();
-    if (!version_buffer_) {
+    version_file_worker_ = version_file_worker.get();
+    if (!version_file_worker_) {
         return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
     }
 
-    auto *block_version = reinterpret_cast<BlockVersion *>(version_buffer_->GetData());
+    auto *block_version = reinterpret_cast<BlockVersion *>(version_file_worker_->GetData());
     block_version->RestoreFromSnapshot(commit_ts_);
 
     return Status::OK();
@@ -151,7 +136,7 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
     }
 
     if (usage_flag == UsageFlag::kOther) {
-        auto [version_buffer, status] = this->GetVersionBuffer();
+        auto [version_buffer, status] = GetVersionBuffer();
         if (!status.ok()) {
             return status;
         }
@@ -162,7 +147,7 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
 
 std::tuple<FileWorker *, Status> BlockMeta::GetVersionBuffer() {
     std::lock_guard<std::mutex> lock(mtx_);
-    if (!version_buffer_) {
+    if (!version_file_worker_) {
         FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
 
         // Get block directory without acquiring lock again (avoid recursive lock)
@@ -172,14 +157,12 @@ std::tuple<FileWorker *, Status> BlockMeta::GetVersionBuffer() {
                 fmt::format("db_{}/tbl_{}/seg_{}/blk_{}", table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_));
         }
         auto version_filepath = fmt::format("{}/{}", *block_dir_, BlockVersion::PATH);
-        version_buffer_ = fileworker_mgr->GetFileWorker(version_filepath);
-        if (version_buffer_ == nullptr) {
-            auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-            new_txn_mgr->PrintAllDroppedKeys();
+        version_file_worker_ = fileworker_mgr->GetFileWorker(version_filepath);
+        if (version_file_worker_ == nullptr) {
             return {nullptr, Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath))};
         }
     }
-    return {version_buffer_, Status::OK()};
+    return {version_file_worker_, Status::OK()};
 }
 
 std::vector<std::string> BlockMeta::FilePaths() {

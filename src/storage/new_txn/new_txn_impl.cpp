@@ -605,8 +605,8 @@ Status NewTxn::ReplayDropTable(WalCmdDropTableV2 *drop_table_cmd, TxnTimeStamp c
 }
 
 Status NewTxn::RenameTable(const std::string &db_name, const std::string &old_table_name, const std::string &new_table_name) {
-    this->CheckTxnStatus();
-    this->CheckTxn(db_name);
+    CheckTxnStatus();
+    CheckTxn(db_name);
 
     std::shared_ptr<DBMeta> db_meta;
     TxnTimeStamp db_create_ts;
@@ -1653,13 +1653,13 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
         const std::string &db_id_str = db_id_strs_ptr->at(idx);
         const std::string &db_name = db_names_ptr->at(idx);
         DBMeta db_meta(db_id_str, db_name, this);
-        status = this->CheckpointDB(db_meta, option, txn_store);
+        status = CheckpointDB(db_meta, option, txn_store);
         if (!status.ok()) {
             return status;
         }
     }
 
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    auto *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
         PersistResultHandler handler(pm);
         PersistWriteResult result = pm->CurrentObjFinalize(true);
@@ -2250,10 +2250,8 @@ Status NewTxn::GetTableMeta(const std::string &db_name,
                             std::shared_ptr<TableMeta> &table_meta,
                             TxnTimeStamp &create_table_ts,
                             std::string *table_key_ptr) {
-
-    Status status;
     TxnTimeStamp db_create_ts;
-    status = this->GetDBMeta(db_name, db_meta, db_create_ts);
+    auto status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -4716,7 +4714,7 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
                 SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
                 ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
-                Status status = NewCatalog::CleanBlockColumn(column_meta, column_meta_key->column_def_.get(), UsageFlag::kOther);
+                Status status = NewCatalog::CleanBlockColumn(column_meta, column_meta_key->column_def_, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }

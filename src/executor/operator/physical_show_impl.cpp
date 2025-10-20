@@ -2298,13 +2298,12 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
             // If block files are not found, try to get the buffer object from buffer manager.
             if (check_buffer_obj) {
                 block_size = 0;
-                FileWorker *buffer_obj = nullptr;
-                FileWorkerManager *buffer_manager = query_context->storage()->fileworker_manager();
+                FileWorker *file_worker{};
+                auto *buffer_manager = query_context->storage()->fileworker_manager();
 
-                for (const std::string &path : paths) {
-                    std::string filepath = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), path);
-                    buffer_obj = buffer_manager->GetFileWorker(filepath);
-                    if (buffer_obj != nullptr) {
+                for (const auto &path : paths) {
+                    file_worker = buffer_manager->GetFileWorker(path);
+                    if (file_worker != nullptr) {
                         // auto file_size = buffer_obj->GetBufferSize();
                         // block_size += file_size;
                     } else {

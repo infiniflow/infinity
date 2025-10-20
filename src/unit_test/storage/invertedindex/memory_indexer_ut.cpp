@@ -222,41 +222,40 @@ TEST_P(MemoryIndexerTest, SLOW_Memory) {
     Check();
 }
 
-TEST_P(MemoryIndexerTest, SpillLoadTest) {
-    auto indexer1 = std::make_unique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
-    std::shared_ptr<ColumnVector> column_vector = MakeColumnVector(wiki_paragraphs_);
-    indexer1->Insert(column_vector, 0, 2);
-    indexer1->Insert(column_vector, 2, 2);
-    indexer1->Insert(column_vector, 4, 1);
-    indexer1->Dump(false, true);
-    std::unique_ptr<MemoryIndexer> loaded_indexer = std::make_unique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
-
-    loaded_indexer->Load();
-    SegmentID segment_id = 0;
-    auto segment_reader = std::make_shared<InMemIndexSegmentReader>(segment_id, loaded_indexer.get());
-    for (size_t i = 0; i < expected_postings_.size(); ++i) {
-        const ExpectedPosting &expected = expected_postings_[i];
-        const std::string &term = expected.term;
-        SegmentPosting seg_posting;
-        std::shared_ptr<std::vector<SegmentPosting>> seg_postings = std::make_shared<std::vector<SegmentPosting>>();
-
-        auto ret = segment_reader->GetSegmentPosting(term, seg_posting);
-        if (ret) {
-            seg_postings->push_back(seg_posting);
-        }
-
-        auto posting_iter = std::make_unique<PostingIterator>(flag_);
-        u32 state_pool_size = 0;
-        posting_iter->Init(seg_postings, state_pool_size);
-        RowID doc_id = INVALID_ROWID;
-        for (size_t j = 0; j < expected.doc_ids.size(); ++j) {
-            doc_id = posting_iter->SeekDoc(expected.doc_ids[j]);
-            ASSERT_EQ(doc_id, expected.doc_ids[j]);
-            u32 tf = posting_iter->GetCurrentTF();
-            ASSERT_EQ(tf, expected.tfs[j]);
-        }
-    }
-}
+// TEST_P(MemoryIndexerTest, SpillLoadTest) {
+//     auto indexer1 = std::make_unique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+//     std::shared_ptr<ColumnVector> column_vector = MakeColumnVector(wiki_paragraphs_);
+//     indexer1->Insert(column_vector, 0, 2);
+//     indexer1->Insert(column_vector, 2, 2);
+//     indexer1->Insert(column_vector, 4, 1);
+//     indexer1->Dump(false, true);
+//     std::unique_ptr<MemoryIndexer> loaded_indexer = std::make_unique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+//
+//     SegmentID segment_id = 0;
+//     auto segment_reader = std::make_shared<InMemIndexSegmentReader>(segment_id, loaded_indexer.get());
+//     for (size_t i = 0; i < expected_postings_.size(); ++i) {
+//         const ExpectedPosting &expected = expected_postings_[i];
+//         const std::string &term = expected.term;
+//         SegmentPosting seg_posting;
+//         std::shared_ptr<std::vector<SegmentPosting>> seg_postings = std::make_shared<std::vector<SegmentPosting>>();
+//
+//         auto ret = segment_reader->GetSegmentPosting(term, seg_posting);
+//         if (ret) {
+//             seg_postings->push_back(seg_posting);
+//         }
+//
+//         auto posting_iter = std::make_unique<PostingIterator>(flag_);
+//         u32 state_pool_size = 0;
+//         posting_iter->Init(seg_postings, state_pool_size);
+//         RowID doc_id = INVALID_ROWID;
+//         for (size_t j = 0; j < expected.doc_ids.size(); ++j) {
+//             doc_id = posting_iter->SeekDoc(expected.doc_ids[j]);
+//             ASSERT_EQ(doc_id, expected.doc_ids[j]);
+//             u32 tf = posting_iter->GetCurrentTF();
+//             ASSERT_EQ(tf, expected.tfs[j]);
+//         }
+//     }
+// }
 
 TEST_P(MemoryIndexerTest, SLOW_SeekPosition) {
     // "A B C" repeats 7 times

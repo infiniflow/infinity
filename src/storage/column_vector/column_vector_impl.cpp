@@ -71,7 +71,7 @@ ColumnVector::ColumnVector(std::shared_ptr<DataType> data_type) : vector_type_(C
 
 // used in BatchInvertTask::BatchInvertTask, keep ObjectCount correct
 ColumnVector::ColumnVector(const ColumnVector &right)
-    : data_type_size_(right.data_type_size_), buffer_(right.buffer_), nulls_ptr_(right.nulls_ptr_), initialized(right.initialized),
+    : data_type_size_(right.data_type_size_), buffer_(right.buffer_), nulls_ptr_(right.nulls_ptr_), initialized_(right.initialized_),
       vector_type_(right.vector_type_), data_type_(right.data_type_), data_ptr_(right.data_ptr_), capacity_(right.capacity_),
       tail_index_(right.tail_index_.load()) {
 #ifdef INFINITY_DEBUG
@@ -82,7 +82,7 @@ ColumnVector::ColumnVector(const ColumnVector &right)
 // used in BlockColumnIter, keep ObjectCount correct
 ColumnVector::ColumnVector(ColumnVector &&right) noexcept
     : data_type_size_(right.data_type_size_), buffer_(std::move(right.buffer_)), nulls_ptr_(std::move(right.nulls_ptr_)),
-      initialized(right.initialized), vector_type_(right.vector_type_), data_type_(std::move(right.data_type_)), data_ptr_(right.data_ptr_),
+      initialized_(right.initialized_), vector_type_(right.vector_type_), data_type_(std::move(right.data_type_)), data_ptr_(right.data_ptr_),
       capacity_(right.capacity_), tail_index_(right.tail_index_.load()) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("ColumnVector");
@@ -94,7 +94,7 @@ ColumnVector &ColumnVector::operator=(ColumnVector &&right) noexcept {
         data_type_size_ = right.data_type_size_;
         buffer_ = std::move(right.buffer_);
         nulls_ptr_ = std::move(right.nulls_ptr_);
-        initialized = right.initialized;
+        initialized_ = right.initialized_;
         vector_type_ = right.vector_type_;
         data_type_ = std::move(right.data_type_);
         data_ptr_ = std::exchange(right.data_ptr_, nullptr);
@@ -109,7 +109,7 @@ ColumnVector &ColumnVector::operator=(const ColumnVector &right) noexcept {
         data_type_size_ = right.data_type_size_;
         buffer_ = right.buffer_;
         nulls_ptr_ = right.nulls_ptr_;
-        initialized = right.initialized;
+        initialized_ = right.initialized_;
         vector_type_ = right.vector_type_;
         data_type_ = right.data_type_;
         data_ptr_ = right.data_ptr_;
@@ -137,7 +137,7 @@ std::string ColumnVector::ToString() const {
 void ColumnVector::AppendWith(const ColumnVector &other) { return AppendWith(other, 0, other.Size()); }
 
 void ColumnVector::AppendValue(const Value &value) {
-    if (!initialized) {
+    if (!initialized_) {
         UnrecoverableError("Column vector isn't initialized.");
     }
     if (vector_type_ == ColumnVectorType::kConstant) {
@@ -156,7 +156,7 @@ void ColumnVector::AppendValue(const Value &value) {
 }
 
 void ColumnVector::SetVectorType(ColumnVectorType vector_type) {
-    if (initialized) {
+    if (initialized_) {
         UnrecoverableError("Column vector isn't initialized.");
     }
     if (vector_type == ColumnVectorType::kInvalid) {
@@ -202,10 +202,10 @@ VectorBufferType ColumnVector::GetVectorBufferType(const DataType &data_type) {
 }
 
 VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, size_t capacity) {
-    if (initialized) {
+    if (initialized_) {
         UnrecoverableError("Column vector is already initialized.");
     }
-    initialized = true;
+    initialized_ = true;
     if (data_type_->type() == LogicalType::kInvalid) {
         UnrecoverableError("Attempt to initialize column vector to invalid type.");
     }
@@ -643,7 +643,7 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
 }
 
 void ColumnVector::CopyRow(const ColumnVector &other, size_t dst_idx, size_t src_idx) {
-    if (!initialized) {
+    if (!initialized_) {
         UnrecoverableError("Column vector isn't initialized.");
     }
     if (data_type_->type() == LogicalType::kInvalid) {
@@ -823,7 +823,7 @@ void ColumnVector::CopyRow(const ColumnVector &other, size_t dst_idx, size_t src
 }
 
 std::string ColumnVector::ToString(size_t row_index) const {
-    if (!initialized) {
+    if (!initialized_) {
         UnrecoverableError("Column vector isn't initialized.");
     }
 
@@ -978,18 +978,17 @@ std::string ColumnVector::ToString(size_t row_index) const {
 }
 
 Value ColumnVector::GetValueByIndex(size_t index) const {
-    if (!initialized) {
+    if (!initialized_) {
         UnrecoverableError("Column vector isn't initialized.");
     }
     size_t tail_index = tail_index_.load();
     if (index >= tail_index) {
-        UnrecoverableError(
-            fmt::format("Attempt to access an invalid index of column vector: {}, current tail index: {}", std::to_string(index), tail_index));
+        UnrecoverableError(fmt::format("Attempt to access an invalid index of column vector: {}, current tail index: {}", index, tail_index));
     }
 
     // Not valid, make a same data type with null indicator
-    if (!(this->nulls_ptr_->IsTrue(index))) {
-        return Value::MakeValue(*this->data_type_);
+    if (!(nulls_ptr_->IsTrue(index))) {
+        return Value::MakeValue(*data_type_);
     }
 
     if (data_type_->type() == LogicalType::kBoolean) {
@@ -1138,16 +1137,16 @@ Value ColumnVector::GetArrayValueRecursively(const DataType &data_type, const ch
 }
 
 void ColumnVector::SetValueByIndex(size_t index, const Value &value) {
-    if (!initialized) {
+    if (!initialized_) {
         UnrecoverableError("Column vector isn't initialized.");
     }
     size_t tail_index = tail_index_.load();
     if (index > tail_index || index >= capacity_) {
         UnrecoverableError(
             fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
-                        std::to_string(index),
-                        std::to_string(tail_index),
-                        std::to_string(capacity_)));
+                        index,
+                        tail_index,
+                        capacity_));
     }
 
     // TODO: Check if the value type is same as column vector type
@@ -1375,7 +1374,7 @@ void ColumnVector::Finalize(size_t index) {
 char *ColumnVector::GetRawPtr(size_t index) { return data_ptr_ + index * data_type_->Size(); }
 
 void ColumnVector::SetByRawPtr(size_t index, const char *raw_ptr) {
-    if (!initialized) {
+    if (!initialized_) {
         UnrecoverableError("Column vector isn't initialized.");
     }
     if (index >= capacity_) {
@@ -1540,7 +1539,7 @@ void ColumnVector::SetByRawPtr(size_t index, const char *raw_ptr) {
 }
 
 void ColumnVector::AppendByPtr(const char *value_ptr) {
-    if (!initialized) {
+    if (!initialized_) {
         UnrecoverableError("Column vector isn't initialized.");
     }
     if (vector_type_ == ColumnVectorType::kConstant) {
@@ -2323,7 +2322,7 @@ void ColumnVector::ShallowCopy(const ColumnVector &other) {
     this->vector_type_ = other.vector_type_;
     this->data_ptr_ = other.data_ptr_;
     this->data_type_size_ = other.data_type_size_;
-    this->initialized = other.initialized;
+    this->initialized_ = other.initialized_;
     this->capacity_ = other.capacity_;
     this->tail_index_.store(other.tail_index_.load());
 }
@@ -2365,14 +2364,14 @@ void ColumnVector::Reset() {
     tail_index_.store(0);
 
     // 8. Reset initialized flag
-    initialized = false;
+    initialized_ = false;
 }
 
 bool ColumnVector::operator==(const ColumnVector &other) const {
     // initialized, data_type_, vector_type_, data_ptr_[0..tail_index_ * data_type_size_]
-    if (!this->initialized && !other.initialized)
+    if (!this->initialized_ && !other.initialized_)
         return true;
-    if (!this->initialized || !other.initialized || this->data_type_.get() == nullptr || other.data_type_.get() == nullptr ||
+    if (!this->initialized_ || !other.initialized_ || this->data_type_.get() == nullptr || other.data_type_.get() == nullptr ||
         (*this->data_type_).operator!=(*other.data_type_) || this->data_type_size_ != other.data_type_size_ ||
         this->vector_type_ != other.vector_type_ || this->tail_index_.load() != other.tail_index_.load() || *this->nulls_ptr_ != *other.nulls_ptr_)
         return false;
@@ -2394,7 +2393,7 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
 }
 
 i32 ColumnVector::GetSizeInBytes() const {
-    if (!initialized) {
+    if (!initialized_) {
         UnrecoverableError("Column vector isn't initialized.");
     }
     if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant && vector_type_ != ColumnVectorType::kCompactBit) {
@@ -2413,7 +2412,7 @@ i32 ColumnVector::GetSizeInBytes() const {
 }
 
 void ColumnVector::WriteAdv(char *&ptr) const {
-    if (!initialized) {
+    if (!initialized_) {
         UnrecoverableError("Column vector isn't initialized.");
     }
     if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant && vector_type_ != ColumnVectorType::kCompactBit) {

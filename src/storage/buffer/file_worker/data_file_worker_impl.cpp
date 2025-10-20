@@ -118,8 +118,7 @@ bool DataFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) 
 void DataFileWorker::Read(size_t file_size) {
     if (!mmap_) {
         if (file_size < sizeof(u64) * 3) {
-            Status status = Status::DataIOError(fmt::format("Incorrect file length {}.", file_size));
-            RecoverableError(status);
+            RecoverableError(Status::DataIOError(fmt::format("Incorrect file length {}.", file_size)));
         }
         // file header: magic number, buffer_size
         u64 magic_number{0};

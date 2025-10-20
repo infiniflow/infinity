@@ -75,7 +75,7 @@ TEST_F(ColumnVectorRowTest, flat_row) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         RowID row_id{static_cast<u32>(i), static_cast<u32>(i)};
@@ -99,7 +99,7 @@ TEST_F(ColumnVectorRowTest, flat_row) {
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
-    EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
+    EXPECT_EQ(column_vector.initialized_, clone_column_vector.initialized_);
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
@@ -115,7 +115,7 @@ TEST_F(ColumnVectorRowTest, flat_row) {
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
     //    EXPECT_EQ(column_vector.data_type(), DataType(LogicalType::kInvalid));
     //    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kInvalid);
 
@@ -139,7 +139,7 @@ TEST_F(ColumnVectorRowTest, flat_row) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         RowID row_id{static_cast<u32>(i), static_cast<u32>(i)};
@@ -188,7 +188,7 @@ TEST_F(ColumnVectorRowTest, contant_row) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < 1; ++i) {
         RowID row_id{static_cast<u32>(i), static_cast<u32>(i)};
@@ -214,7 +214,7 @@ TEST_F(ColumnVectorRowTest, contant_row) {
     EXPECT_NE(column_vector.buffer_, nullptr);
 
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -234,7 +234,7 @@ TEST_F(ColumnVectorRowTest, contant_row) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
     for (i64 i = 0; i < 1; ++i) {
         RowID row_id{static_cast<u32>(i), static_cast<u32>(i)};
         Value v = Value::MakeRow(row_id);

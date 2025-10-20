@@ -186,7 +186,7 @@ PersistWriteResult PersistenceManager::Persist(std::string_view file_path, std::
         return result;
     }
     std::lock_guard<std::mutex> lock(mtx_);
-    if (int(src_size) >= CurrentObjRoomNoLock()) {
+    if (static_cast<int>(src_size) >= CurrentObjRoomNoLock()) {
         CurrentObjFinalizeNoLock(result.persist_keys_);
     }
     current_object_size_ = (current_object_size_ + ObjAlignment - 1) & ~(ObjAlignment - 1);

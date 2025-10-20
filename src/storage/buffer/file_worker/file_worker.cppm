@@ -38,9 +38,7 @@ public:
 public:
     [[nodiscard]] bool Write(const FileWorkerSaveCtx &ctx = {});
 
-    void Read();
-
-    void Load();
+    void Read(void *data);
 
     void PickForCleanup() {}
 
@@ -52,21 +50,16 @@ public:
 
     virtual FileWorkerType Type() const = 0;
 
-    void *GetData() {
-        if (!mmap_) {
-            Load();
-        }
-        return data_;
-    }
+    void *GetData();
 
     void SetData(void *data);
 
     virtual void SetDataSize(size_t size);
 
     // Get an absolute file path. As key of a buffer handle.
-    std::string GetFilePath() const;
+    [[nodiscard]] std::string GetFilePath() const;
 
-    std::string GetFilePathTemp() const;
+    [[nodiscard]] std::string GetFilePathTemp() const;
 
     Status CleanupFile() const;
 
@@ -74,8 +67,6 @@ protected:
     virtual bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
 
     virtual void Read(size_t file_size) = 0;
-
-    // std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> GetFilePathInner(bool spill);
 
 public:
     std::mutex l_;

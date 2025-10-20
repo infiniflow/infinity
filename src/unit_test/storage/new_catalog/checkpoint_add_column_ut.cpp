@@ -118,49 +118,49 @@ TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
 
     Status status;
     NewTxn *txn;
-    txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+    txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
     status = txn->CreateTable(*db_name, table_def, ConflictType::kError);
     EXPECT_TRUE(status.ok());
-    status = new_txn_mgr->CommitTxn(txn);
+    status = new_txn_mgr_->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
 
     std::shared_ptr<DataBlock> input_block = make_input_block(std::vector<std::shared_ptr<ColumnDef>>{column_def1, column_def2},
                                                               std::vector<Value>{Value::MakeInt(1), Value::MakeVarchar("abcde")},
                                                               10);
-    txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
+    txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
     status = txn->Append(*db_name, *table_name, input_block);
     EXPECT_TRUE(status.ok());
-    status = new_txn_mgr->CommitTxn(txn);
+    status = new_txn_mgr_->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
 
     std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
     default_varchar->str_value_ = strdup("");
     std::shared_ptr<ColumnDef> column_def3 =
         std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
-    txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
+    txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("add column"), TransactionType::kAddColumn);
     status = txn->AddColumns(*db_name, *table_name, std::vector<std::shared_ptr<ColumnDef>>{column_def3});
     EXPECT_TRUE(status.ok());
-    status = new_txn_mgr->CommitTxn(txn);
+    status = new_txn_mgr_->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
 
-    txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
+    txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
     status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
     EXPECT_TRUE(status.ok());
-    status = new_txn_mgr->CommitTxn(txn);
+    status = new_txn_mgr_->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
 
     input_block = make_input_block(std::vector<std::shared_ptr<ColumnDef>>{column_def1, column_def2, column_def3},
                                    std::vector<Value>{Value::MakeInt(1), Value::MakeVarchar("abcde"), Value::MakeVarchar("abcde")},
                                    10);
-    txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
+    txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
     status = txn->Append(*db_name, *table_name, input_block);
     EXPECT_TRUE(status.ok());
-    status = new_txn_mgr->CommitTxn(txn);
+    status = new_txn_mgr_->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
 
     RestartTxnMgr();
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
 
         // Check table row count is 20
         std::shared_ptr<DBMeta> db_meta;

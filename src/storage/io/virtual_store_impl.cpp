@@ -118,17 +118,19 @@ std::string ToString(StorageType storage_type) {
 
 std::tuple<std::unique_ptr<LocalFileHandle>, Status> VirtualStore::Open(const std::string &path, FileAccessMode access_mode) {
     i32 fd = -1;
+    // auto persistence_manager = InfinityContext::instance().storage()->persistence_manager();
+    // if (persistence_manager) {
+    //
+    // }
     switch (access_mode) {
         case FileAccessMode::kRead: {
             fd = open(path.c_str(), O_RDONLY, 0666);
             break;
         }
         case FileAccessMode::kWrite: {
+            auto ps = fs::path(path).parent_path().string();
+            MakeDirectory(ps);
             fd = open(path.c_str(), O_RDWR | O_CREAT, 0666);
-            break;
-        }
-        case FileAccessMode::kMmapRead: {
-            UnrecoverableError("Unsupported now.");
             break;
         }
         case FileAccessMode::kInvalid: {

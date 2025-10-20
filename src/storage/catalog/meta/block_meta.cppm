@@ -45,8 +45,6 @@ public:
 
     Status InitOrLoadSet(TxnTimeStamp checkpoint_ts = 0);
 
-    Status RestoreSet();
-
     Status RestoreSetFromSnapshot();
 
     Status UninitSet(UsageFlag usage_flag);
@@ -85,7 +83,7 @@ private:
     std::shared_ptr<std::string> block_dir_;
     std::optional<size_t> row_cnt_; // stored in the block version file
 
-    FileWorker *version_buffer_ = nullptr;
+    FileWorker *version_file_worker_ = nullptr;
     std::shared_ptr<FastRoughFilter> fast_rough_filter_;
 };
 

@@ -900,8 +900,8 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
             return status;
         }
     }
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     {
+        TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
 
         block_lock->min_ts_ = std::min(block_lock->min_ts_, commit_ts);
@@ -921,16 +921,7 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
         auto *block_version = reinterpret_cast<BlockVersion *>(version_buffer->GetData());
         block_version->Append(commit_ts, block_offset + append_rows);
         VersionFileWorkerSaveCtx version_file_worker_save_ctx{commit_ts};
-        // [[maybe_unused]] std::unordered_map<std::string, ObjAddr> a = version_buffer->file_worker()->persistence_manager_->GetAllFiles();
-        // fmt::print("aaaaa:\n");
-        // for (auto &[path, obj_addr]: a) {
-        //     fmt::print("path: {}, obj_addr: {}\n", path, obj_addr.obj_key_);
-        // }
         [[maybe_unused]] auto foo = version_buffer->Write(version_file_worker_save_ctx);
-        // [[maybe_unused]] std::unordered_map<std::string, ObjAddr> b = version_buffer->file_worker()->persistence_manager_->GetAllFiles();
-        // for (auto &[path, obj_addr]: b) {
-        //     fmt::print("path: {}, obj_addr: {}\n", path, obj_addr.obj_key_);
-        // }
     }
     return Status::OK();
 }
@@ -961,7 +952,7 @@ NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t appen
     file_worker->SetDataSize(data_size);
     [[maybe_unused]] auto foo = file_worker->Write();
     if (var_file_worker != nullptr) {
-        [[maybe_unused]] auto foo = var_file_worker->Write();
+        [[maybe_unused]] auto foo1 = var_file_worker->Write();
     }
 
     if (VarBufferManager *var_buffer_mgr = dest_vec.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
@@ -980,8 +971,8 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
         return status;
     }
 
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     {
+        TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
         std::shared_ptr<BlockLock> block_lock;
         status = block_meta.GetBlockLock(block_lock);
         if (!status.ok()) {
@@ -1995,8 +1986,8 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
         std::shared_ptr<ColumnVector> col = input_block->column_vectors[i];
         auto col_def = table_info->column_defs_[i];
 
-        FileWorker *buffer_obj = nullptr;
-        FileWorker *outline_buffer_obj = nullptr;
+        FileWorker *file_worker{};
+        FileWorker *var_file_worker{};
         ColumnID column_id = col_def->id();
         auto file_name = fmt::format("{}.col", column_id);
 
@@ -2016,7 +2007,7 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
             file_worker_paths->push_back(*rel_file_path);
         }
 
-        buffer_obj = fileworker_mgr->EmplaceFileWorkerTemp(std::move(file_worker1));
+        file_worker = fileworker_mgr->EmplaceFileWorker(std::move(file_worker1));
 
         VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
         if (buffer_type == VectorBufferType::kVarBuffer) {
@@ -2027,8 +2018,7 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
             if (file_worker_paths != nullptr) {
                 file_worker_paths->push_back(*outline_rel_file_path);
             }
-            outline_buffer_obj = file_worker2.get();
-            fileworker_mgr->EmplaceFileWorkerTemp(std::move(file_worker2));
+            var_file_worker = fileworker_mgr->EmplaceFileWorker(std::move(file_worker2));
         }
 
         size_t data_size = 0;
@@ -2037,13 +2027,13 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
         } else {
             data_size = row_cnt * col_def->type()->Size();
         }
-        buffer_obj->SetDataSize(data_size);
+        file_worker->SetDataSize(data_size);
 
-        col->SetToCatalog(buffer_obj, outline_buffer_obj, ColumnVectorMode::kReadWrite);
+        col->SetToCatalog(file_worker, var_file_worker, ColumnVectorMode::kReadWrite);
 
-        [[maybe_unused]] auto foo = buffer_obj->Write();
-        if (outline_buffer_obj) {
-            [[maybe_unused]] auto foo = outline_buffer_obj->Write();
+        [[maybe_unused]] auto foo = file_worker->Write();
+        if (var_file_worker) {
+            [[maybe_unused]] auto foo = var_file_worker->Write();
         }
     }
 

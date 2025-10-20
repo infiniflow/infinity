@@ -309,7 +309,6 @@ void NewTxnManager::SendToWAL(NewTxn *txn) {
 }
 
 Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
-
     Status status = txn->Commit();
 
     if (commit_ts_ptr != nullptr) {

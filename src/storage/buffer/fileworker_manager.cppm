@@ -39,9 +39,7 @@ public:
     // Create a new BufferHandle, or in replay process. (read data block from wal)
     FileWorker *EmplaceFileWorker(std::unique_ptr<FileWorker> file_worker);
 
-    FileWorker *EmplaceFileWorkerTemp(std::unique_ptr<FileWorker> file_worker);
-
-    FileWorker *GetFileWorker(const std::string &file_path);
+    FileWorker *GetFileWorker(const std::string &rel_file_path);
 
     std::shared_ptr<std::string> GetFullDataDir() const { return data_dir_; }
 

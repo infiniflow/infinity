@@ -1073,7 +1073,7 @@ Status TableMeta::SetBeginTS(TxnTimeStamp begin_ts) {
 }
 
 std::tuple<size_t, Status> TableMeta::GetTableRowCount() {
-    Status status{};
+    Status status;
     size_t row_count{};
     auto [segment_ids, seg_status] = GetSegmentIDs1();
     for (auto &segment_id : *segment_ids) {
