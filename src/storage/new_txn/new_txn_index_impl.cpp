@@ -942,12 +942,12 @@ Status NewTxn::PopulateIndex(const std::string &db_name,
     }
     std::vector<ChunkID> new_chunk_ids;
     if (index_base->index_type_ == IndexType::kIVF) {
-        Status status = this->PopulateIvfIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_ids);
+        Status status = PopulateIvfIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_ids);
         if (!status.ok()) {
             return status;
         }
     } else if (index_base->index_type_ == IndexType::kEMVB) {
-        Status status = this->PopulateEmvbIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_ids);
+        Status status = PopulateEmvbIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_ids);
         if (!status.ok()) {
             return status;
         }
@@ -956,14 +956,14 @@ Status NewTxn::PopulateIndex(const std::string &db_name,
             case IndexType::kSecondary:
             case IndexType::kHnsw:
             case IndexType::kBMP: {
-                Status status = this->PopulateIndexToMem(*segment_index_meta, segment_meta, column_id, segment_row_cnt);
+                Status status = PopulateIndexToMem(*segment_index_meta, segment_meta, column_id, segment_row_cnt);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
             case IndexType::kFullText: {
-                Status status = this->PopulateFtIndexInner(index_base, *segment_index_meta, segment_meta, column_id, segment_row_cnt, new_chunk_ids);
+                Status status = PopulateFtIndexInner(index_base, *segment_index_meta, segment_meta, column_id, segment_row_cnt, new_chunk_ids);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1265,23 +1265,23 @@ Status NewTxn::PopulateFtIndexInner(std::shared_ptr<IndexBase> index_base,
     if (index_base->index_type_ != IndexType::kFullText) {
         UnrecoverableError("Invalid index type");
     }
-    const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
+    const auto *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
     Status status;
-    std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-    std::vector<BlockID> *block_ids_ptr = nullptr;
+    auto mem_index = segment_index_meta.GetMemIndex();
+    std::vector<BlockID> *block_ids_ptr{};
     std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
         return status;
     }
     size_t block_capacity = DEFAULT_BLOCK_CAPACITY;
     i64 mem_index_capacity = InfinityContext::instance().storage()->config()->MemIndexCapacity();
-    std::shared_ptr<std::string> index_dir = segment_index_meta.GetSegmentIndexDir();
-    std::shared_ptr<MemoryIndexer> memory_indexer = nullptr;
-    for (BlockID block_id : *block_ids_ptr) {
+    auto index_dir = segment_index_meta.GetSegmentIndexDir();
+    std::shared_ptr<MemoryIndexer> memory_indexer;
+    for (auto block_id : *block_ids_ptr) {
         if (memory_indexer == nullptr) {
             RowID base_row_id(segment_index_meta.segment_id(), block_id * block_capacity);
-            std::string base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
-            std::string full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
+            auto base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
+            auto full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
             memory_indexer = std::make_shared<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
             LOG_INFO(fmt::format("PopulateFtIndexInner created memory_indexer, base_name: {}", base_name));
         }
@@ -1324,7 +1324,7 @@ Status NewTxn::PopulateFtIndexInner(std::shared_ptr<IndexBase> index_base,
             new_chunk_ids.push_back(new_chunk_id);
 
             std::optional<ChunkIndexMeta> chunk_index_meta;
-            ChunkIndexMetaInfo chunk_index_meta_info = memory_indexer->GetChunkIndexMetaInfo();
+            auto chunk_index_meta_info = memory_indexer->GetChunkIndexMetaInfo();
             status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
                                                    this,
                                                    new_chunk_id,
@@ -1691,23 +1691,23 @@ Status NewTxn::ReplayOptimizeIndeByParams(WalCmdOptimizeV2 *optimize_cmd) {
 Status NewTxn::ReplayOptimize(WalCmdOptimizeV2 *optimize_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
 
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {
-    std::shared_ptr<MemIndex> mem_index = segment_index_meta.PopMemIndex();
+    auto mem_index = segment_index_meta.PopMemIndex();
     if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
         return Status::EmptyMemIndex();
     }
     mem_index->WaitUpdate();
     LOG_TRACE(fmt::format("NewTxn::DumpSegmentMemIndex WaitUpdate mem_index {:p}", (void *)mem_index.get()));
-    TableIndexMeta &table_index_meta = segment_index_meta.table_index_meta();
+    auto &table_index_meta = segment_index_meta.table_index_meta();
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
         return index_status;
     }
 
-    std::shared_ptr<SecondaryIndexInMem> memory_secondary_index = nullptr;
-    std::shared_ptr<IVFIndexInMem> memory_ivf_index = nullptr;
-    std::shared_ptr<HnswIndexInMem> memory_hnsw_index = nullptr;
-    std::shared_ptr<BMPIndexInMem> memory_bmp_index = nullptr;
-    std::shared_ptr<EMVBIndexInMem> memory_emvb_index = nullptr;
+    std::shared_ptr<SecondaryIndexInMem> memory_secondary_index;
+    std::shared_ptr<IVFIndexInMem> memory_ivf_index;
+    std::shared_ptr<HnswIndexInMem> memory_hnsw_index;
+    std::shared_ptr<BMPIndexInMem> memory_bmp_index;
+    std::shared_ptr<EMVBIndexInMem> memory_emvb_index;
 
     // dump mem index only happens in parallel with read, not write, so no lock is needed.
     switch (index_base->index_type_) {
@@ -1719,7 +1719,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
             break;
         }
         case IndexType::kFullText: {
-            std::shared_ptr<MemoryIndexer> memory_indexer = mem_index->GetFulltextIndex();
+           auto memory_indexer = mem_index->GetFulltextIndex();
             if (memory_indexer == nullptr) {
                 return Status::EmptyMemIndex();
             }

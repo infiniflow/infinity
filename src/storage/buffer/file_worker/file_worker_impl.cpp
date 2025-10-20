@@ -42,6 +42,7 @@ namespace infinity {
 FileWorker::FileWorker(std::shared_ptr<std::string> rel_file_path) : rel_file_path_(std::move(rel_file_path)) {
     mmap_ = nullptr;
     persistence_manager_ = InfinityContext::instance().storage()->persistence_manager();
+    file_worker_manager_ = InfinityContext::instance().storage()->fileworker_manager();
 }
 
 FileWorker::~FileWorker() {}
@@ -103,6 +104,11 @@ bool FileWorker::Write(const FileWorkerSaveCtx &ctx) {
 //     data = data_;
 // }
 
+void FileWorker::PickForCleanup() {
+    // // std::unique_lock<std::mutex> locker(l_);
+    file_worker_manager_->AddToCleanList(this);
+}
+
 void FileWorker::MoveFile() {
     auto temp_path = GetFilePathTemp();
     auto data_path = GetFilePath();
@@ -110,10 +116,11 @@ void FileWorker::MoveFile() {
         if (!VirtualStore::Exists(temp_path)) {
             return;
         }
-        if (!VirtualStore::Exists(data_path)) {
-            VirtualStore::MakeDirectory(data_path);
+        auto data_path_parent = VirtualStore::GetParentPath(data_path);
+        if (!VirtualStore::Exists(data_path_parent)) {
+            VirtualStore::MakeDirectory(data_path_parent);
         }
-        VirtualStore::Copy(temp_path, data_path); // sys call, may need copy
+        VirtualStore::Copy(data_path, temp_path); // sys call, may need copy
     } else {
         PersistResultHandler handler(persistence_manager_);
         if (!VirtualStore::Exists(temp_path)) {
@@ -141,24 +148,25 @@ std::string FileWorker::GetFilePathTemp() const { return fmt::format("{}/{}", In
 Status FileWorker::CleanupFile() const {
     if (persistence_manager_ != nullptr) {
         PersistResultHandler handler{persistence_manager_};
-        auto result_temp = persistence_manager_->Cleanup(GetFilePathTemp());
-        if (!result_temp.obj_addr_.Valid()) {
-            return Status::OK();
-        }
+        auto status = VirtualStore::DeleteFile(GetFilePathTemp());
+        // auto result_temp = persistence_manager_->Cleanup(GetFilePathTemp());
+        // if (!result_temp.obj_addr_.Valid()) {
+        //     return Status::OK();
+        // }
         auto result_data = persistence_manager_->Cleanup(GetFilePath());
         if (!result_data.obj_addr_.Valid()) {
             return Status::OK();
         }
         // Delete files
-        handler.HandleWriteResult(result_temp);
+        // handler.HandleWriteResult(result_temp);
         handler.HandleWriteResult(result_data);
         return Status::OK();
     }
 
     auto status = VirtualStore::DeleteFile(GetFilePathTemp());
-    if (!status.ok()) {
-        return status;
-    }
+    // if (!status.ok()) {
+    //     return status;
+    // }
     status = VirtualStore::DeleteFile(GetFilePath());
     return status;
 }

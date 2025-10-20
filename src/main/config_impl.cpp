@@ -410,8 +410,7 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
         }
 
         // Persistence Dir
-        // std::string persistence_dir = DEFAULT_PERSISTENCE_DIR.data();
-        std::string persistence_dir = "";
+        std::string persistence_dir = DEFAULT_PERSISTENCE_DIR.data();
         if (default_config != nullptr) {
             persistence_dir = default_config->default_persistence_dir_;
         }
@@ -437,8 +436,7 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
         }
 
         // Cleanup Interval
-        // i64 cleanup_interval = DEFAULT_CLEANUP_INTERVAL_SEC;
-        i64 cleanup_interval = 0;
+        i64 cleanup_interval = DEFAULT_CLEANUP_INTERVAL_SEC;
         std::unique_ptr<IntegerOption> cleanup_interval_option =
             std::make_unique<IntegerOption>(CLEANUP_INTERVAL_OPTION_NAME, cleanup_interval, MAX_CLEANUP_INTERVAL_SEC, MIN_CLEANUP_INTERVAL_SEC);
         status = global_options_.AddOption(std::move(cleanup_interval_option));
@@ -448,8 +446,7 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
         }
 
         // Compact Interval
-        // i64 compact_interval = DEFAULT_COMPACT_INTERVAL_SEC;
-        i64 compact_interval = 0;
+        i64 compact_interval = DEFAULT_COMPACT_INTERVAL_SEC;
         std::unique_ptr<IntegerOption> compact_interval_option =
             std::make_unique<IntegerOption>(COMPACT_INTERVAL_OPTION_NAME, compact_interval, MAX_COMPACT_INTERVAL_SEC, MIN_COMPACT_INTERVAL_SEC);
         status = global_options_.AddOption(std::move(compact_interval_option));
@@ -459,8 +456,7 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
         }
 
         // Optimize Index Interval
-        // i64 optimize_index_interval = DEFAULT_OPTIMIZE_INTERVAL_SEC;
-        i64 optimize_index_interval = 0;
+        i64 optimize_index_interval = DEFAULT_OPTIMIZE_INTERVAL_SEC;
         std::unique_ptr<IntegerOption> optimize_interval_option = std::make_unique<IntegerOption>(OPTIMIZE_INTERVAL_OPTION_NAME,
                                                                                                   optimize_index_interval,
                                                                                                   MAX_COMPACT_INTERVAL_SEC,
@@ -629,8 +625,7 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
         }
 
         // Checkpoint Interval
-        // i64 checkpoint_interval = DEFAULT_CHECKPOINT_INTERVAL_SEC;
-        i64 checkpoint_interval = 0;
+        i64 checkpoint_interval = DEFAULT_CHECKPOINT_INTERVAL_SEC;
         std::unique_ptr<IntegerOption> checkpoint_interval_option = std::make_unique<IntegerOption>(CHECKPOINT_INTERVAL_OPTION_NAME,
                                                                                                     checkpoint_interval,
                                                                                                     MAX_CHECKPOINT_INTERVAL_SEC,
@@ -1641,8 +1636,7 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
                         }
                         case GlobalOptionIndex::kCleanupInterval: {
                             // Cleanup Interval
-                            // i64 cleanup_interval = DEFAULT_CLEANUP_INTERVAL_SEC;
-                            i64 cleanup_interval = 0;
+                            i64 cleanup_interval = DEFAULT_CLEANUP_INTERVAL_SEC;
                             if (elem.second.is_string()) {
                                 std::string cleanup_interval_str = elem.second.value_or(DEFAULT_CLEANUP_INTERVAL_SEC_STR.data());
                                 auto res = ParseTimeInfo(cleanup_interval_str, cleanup_interval);
@@ -1668,8 +1662,7 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
                         }
                         case GlobalOptionIndex::kCompactInterval: {
                             // Compact Interval
-                            // i64 compact_interval = DEFAULT_COMPACT_INTERVAL_SEC;
-                            i64 compact_interval = 0;
+                            i64 compact_interval = DEFAULT_COMPACT_INTERVAL_SEC;
                             if (elem.second.is_string()) {
                                 std::string compact_interval_str = elem.second.value_or(DEFAULT_COMPACT_INTERVAL_SEC_STR.data());
                                 auto res = ParseTimeInfo(compact_interval_str, compact_interval);
@@ -1695,8 +1688,7 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
                         }
                         case GlobalOptionIndex::kOptimizeIndexInterval: {
                             // Optimize Index Interval
-                            // i64 optimize_index_interval = DEFAULT_OPTIMIZE_INTERVAL_SEC;
-                            i64 optimize_index_interval = 0;
+                            i64 optimize_index_interval = DEFAULT_OPTIMIZE_INTERVAL_SEC;
                             if (elem.second.is_string()) {
                                 std::string optimize_index_interval_str = elem.second.value_or(DEFAULT_OPTIMIZE_INTERVAL_SEC_STR.data());
                                 auto res = ParseTimeInfo(optimize_index_interval_str, optimize_index_interval);
@@ -2390,8 +2382,7 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
                         }
                         case GlobalOptionIndex::kCheckpointInterval: {
                             // Checkpoint Interval
-                            // i64 checkpoint_interval = DEFAULT_CHECKPOINT_INTERVAL_SEC;
-                            i64 checkpoint_interval = 0;
+                            i64 checkpoint_interval = DEFAULT_CHECKPOINT_INTERVAL_SEC;
                             if (elem.second.is_string()) {
                                 std::string checkpoint_interval_str = elem.second.value_or(DEFAULT_CHECKPOINT_INTERVAL_SEC_STR.data());
                                 auto res = ParseTimeInfo(checkpoint_interval_str, checkpoint_interval);

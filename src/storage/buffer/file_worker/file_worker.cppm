@@ -26,6 +26,7 @@ namespace infinity {
 
 class LocalFileHandle;
 class Status;
+export class FileWorkerManager;
 
 export struct FileWorkerSaveCtx {};
 
@@ -81,6 +82,20 @@ public:
                 data = static_cast<T *>(data_);
                 return;
             }
+            if (!persistence_manager_) {
+                auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kRead);
+                if (!status.ok()) {
+                    // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+                    data = static_cast<T *>(data_);
+                    return;
+                }
+                file_size = file_handle->FileSize();
+
+                file_handle_ = std::move(file_handle);
+                Read(file_size, true);
+                data = static_cast<T *>(data_);
+                return;
+            }
             auto result = persistence_manager_->GetObjCache(file_path);
             obj_addr_ = result.obj_addr_;
             auto true_file_path = fmt::format("/var/infinity/persistence/{}", obj_addr_.obj_key_);
@@ -103,7 +118,7 @@ public:
         }
     }
 
-    void PickForCleanup() {}
+    void PickForCleanup();
 
     void MoveFile();
 
@@ -133,6 +148,7 @@ public:
     std::mutex l_;
     std::shared_ptr<std::string> rel_file_path_;
     PersistenceManager *persistence_manager_{};
+    FileWorkerManager *file_worker_manager_;
     ObjAddr obj_addr_;
     void *mmap_{};
     size_t mmap_size_{};

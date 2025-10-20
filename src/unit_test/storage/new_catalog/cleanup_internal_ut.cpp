@@ -523,7 +523,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_index) {
 }
 
 TEST_P(TestTxnCleanupInternal, test_cleanup_compact) {
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
+    auto db_name = std::make_shared<std::string>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");

@@ -51,7 +51,6 @@ public:
 
     inline PersistenceManager *persistence_manager() const { return persistence_manager_; }
 
-private:
     void AddToCleanList(FileWorker *fileworker);
 
 private:

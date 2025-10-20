@@ -343,14 +343,14 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
 
         for (size_t segment_idx = 0; segment_idx < segment_count; ++segment_idx) {
             size_t segment_row_cnt = segment_row_cnts[segment_idx];
-            status = this->PopulateIndex(db_name,
-                                         table_name,
-                                         index_name,
-                                         table_key,
-                                         table_index_meta,
-                                         *segment_metas[segment_idx],
-                                         segment_row_cnt,
-                                         DumpIndexCause::kImport);
+            status = PopulateIndex(db_name,
+                                   table_name,
+                                   index_name,
+                                   table_key,
+                                   table_index_meta,
+                                   *segment_metas[segment_idx],
+                                   segment_row_cnt,
+                                   DumpIndexCause::kImport);
             if (!status.ok()) {
                 return status;
             }

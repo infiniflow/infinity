@@ -26,6 +26,8 @@ import column_def;
 import data_type;
 import logical_type;
 
+namespace fs = std::filesystem;
+
 namespace infinity {
 
 template <typename T>
@@ -108,7 +110,7 @@ template <typename T>
 void BaseTestWithParam<T>::CheckFilePaths(std::vector<std::string> &delete_file_paths, std::vector<std::string> &exist_file_paths) {
     auto *pm = infinity::InfinityContext::instance().persistence_manager();
     if (pm == nullptr) {
-        std::filesystem::path data_dir = this->GetFullDataDir();
+        auto data_dir = static_cast<fs::path>(GetFullDataDir());
         for (auto &file_path : delete_file_paths) {
             file_path = data_dir / file_path;
         }
@@ -116,21 +118,21 @@ void BaseTestWithParam<T>::CheckFilePaths(std::vector<std::string> &delete_file_
             file_path = data_dir / file_path;
         }
         for (const auto &file_path : delete_file_paths) {
-            if (!std::filesystem::path(file_path).is_absolute()) {
+            if (!fs::path(file_path).is_absolute()) {
                 ADD_FAILURE() << "File path is not absolute: " << file_path;
             }
-            EXPECT_FALSE(std::filesystem::exists(file_path));
+            EXPECT_FALSE(fs::exists(file_path));
 
-            auto path = static_cast<std::filesystem::path>(file_path).parent_path();
-            EXPECT_TRUE(!std::filesystem::exists(path) || std::filesystem::is_directory(path) && !std::filesystem::is_empty(path) ||
-                        std::filesystem::is_directory(path) && std::filesystem::is_empty(path) && path == data_dir);
+            auto path = static_cast<fs::path>(file_path).parent_path();
+            EXPECT_TRUE(!fs::exists(path) || fs::is_directory(path) && !fs::is_empty(path) ||
+                        fs::is_directory(path) && fs::is_empty(path) && path == data_dir);
         }
         for (const auto &file_path : exist_file_paths) {
-            if (!std::filesystem::path(file_path).is_absolute()) {
+            if (!fs::path(file_path).is_absolute()) {
                 ADD_FAILURE() << "File path is not absolute: " << file_path;
             }
             fmt::print("{}\n", file_path);
-            EXPECT_TRUE(std::filesystem::exists(file_path));
+            EXPECT_TRUE(fs::exists(file_path));
         }
     } else {
         auto local_path_map = pm->GetAllFiles();

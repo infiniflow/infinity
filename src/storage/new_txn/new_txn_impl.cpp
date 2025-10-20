@@ -4554,14 +4554,14 @@ Status NewTxn::Cleanup() {
     if (base_txn_store_ != nullptr) {
         return Status::UnexpectedError("txn store is not null");
     }
-    TxnTimeStamp begin_ts = BeginTS();
+    auto begin_ts = BeginTS();
     base_txn_store_ = std::make_shared<CleanupTxnStore>();
-    CleanupTxnStore *txn_store = static_cast<CleanupTxnStore *>(base_txn_store_.get());
+    auto *txn_store = static_cast<CleanupTxnStore *>(base_txn_store_.get());
     txn_store->timestamp_ = begin_ts;
 
-    TxnTimeStamp last_cleanup_ts = new_catalog_->GetLastCleanupTS();
-    TxnTimeStamp oldest_txn_begin_ts = txn_mgr_->GetOldestAliveTS();
-    TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
+    auto last_cleanup_ts = new_catalog_->GetLastCleanupTS();
+    auto oldest_txn_begin_ts = txn_mgr_->GetOldestAliveTS();
+    auto last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
 
     if (last_cleanup_ts >= oldest_txn_begin_ts) {
         LOG_TRACE(fmt::format("SKIP cleanup. last_cleanup_ts: {}, oldest_txn_begin_ts: {}", last_cleanup_ts, oldest_txn_begin_ts));
@@ -4569,7 +4569,7 @@ Status NewTxn::Cleanup() {
         return Status::OK();
     }
 
-    KVInstance *kv_instance = kv_instance_.get();
+    auto *kv_instance = kv_instance_.get();
 
     TxnTimeStamp visible_ts = std::min(begin_ts, last_checkpoint_ts);
 

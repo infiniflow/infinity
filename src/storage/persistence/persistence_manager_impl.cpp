@@ -145,10 +145,10 @@ PersistWriteResult PersistenceManager::Persist(std::string_view file_path, std::
     if (src_size == 0) {
         LOG_WARN(fmt::format("Persist empty local path {}", file_path));
         ObjAddr obj_addr(ObjAddr::KeyEmpty, 0, 0);
-        fs::remove(tmp_file_path, ec); // This may cause the issue
-        if (ec) {
-            UnrecoverableError(fmt::format("Failed to remove {}", tmp_file_path));
-        }
+        // fs::remove(tmp_file_path, ec); // This may cause the issue
+        // if (ec) {
+        //     UnrecoverableError(fmt::format("Failed to remove {}", tmp_file_path));
+        // }
         status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump(), false);
         if (!status.ok()) {
             UnrecoverableError(status.message());
@@ -192,10 +192,10 @@ PersistWriteResult PersistenceManager::Persist(std::string_view file_path, std::
     current_object_size_ = (current_object_size_ + ObjAlignment - 1) & ~(ObjAlignment - 1);
     ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
     CurrentObjAppendNoLock(tmp_file_path, src_size);
-    fs::remove(tmp_file_path, ec);
-    if (ec) {
-        UnrecoverableError(fmt::format("Failed to remove {}", tmp_file_path));
-    }
+    // fs::remove(tmp_file_path, ec);
+    // if (ec) {
+    //     UnrecoverableError(fmt::format("Failed to remove {}", tmp_file_path));
+    // }
 
     object_stats_->PutNew(current_object_key_, std::make_shared<ObjStat>(current_object_size_, current_object_parts_, current_object_ref_count_));
     LOG_TRACE(fmt::format("Persist current object {}", current_object_key_));
