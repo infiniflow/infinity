@@ -148,14 +148,13 @@ TEST_P(TestTxnTableMeta, table_meta) {
     {
         TxnTimeStamp commit_ts = 1;
 
-        SegmentID segment_id = 0;
-        std::tie(segment_id, status) = table_meta.AddSegmentID1(commit_ts);
+        SegmentID segment_id = 1;
+        Status status = table_meta.AddSegmentWithID(commit_ts, segment_id);
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(segment_id, 1);
 
-        std::tie(segment_id, status) = table_meta.AddSegmentID1(commit_ts);
+        segment_id = 2;
+        status = table_meta.AddSegmentWithID(commit_ts, segment_id);
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(segment_id, 2);
     }
 
     {

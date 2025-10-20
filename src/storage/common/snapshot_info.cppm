@@ -48,7 +48,6 @@ export struct OutlineSnapshotInfo {
 export struct BlockColumnSnapshotInfo {
     ColumnID column_id_;
     std::string filepath_;
-    u64 last_chunk_offset_;
     std::vector<std::shared_ptr<OutlineSnapshotInfo>> outline_snapshots_;
 
     nlohmann::json Serialize();
