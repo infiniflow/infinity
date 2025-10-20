@@ -146,6 +146,18 @@ TEST_P(TestTxnTableMeta, table_meta) {
     }
 
     {
+        TxnTimeStamp commit_ts = 1;
+
+        SegmentID segment_id = 1;
+        Status status = table_meta.AddSegmentWithID(commit_ts, segment_id);
+        EXPECT_TRUE(status.ok());
+
+        segment_id = 2;
+        status = table_meta.AddSegmentWithID(commit_ts, segment_id);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
         auto dir_ptr = table_meta.GetTableDir();
         EXPECT_STREQ(dir_ptr->c_str(), "0");
     }
