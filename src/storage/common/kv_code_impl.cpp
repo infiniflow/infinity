@@ -24,73 +24,6 @@ import column_def;
 
 namespace infinity {
 
-std::unique_ptr<KeyBase> KeyBase::FromString(const std::string &key_str) {
-    if (key_str.empty()) {
-        UnrecoverableError(fmt::format("Empty key: {}", key_str));
-        return nullptr;
-    }
-
-    auto pos = key_str.find_first_of('|');
-    if (pos == std::string::npos) {
-        UnrecoverableError(fmt::format("Unrecognized key: {}", key_str));
-        return nullptr;
-    }
-
-    std::string key_type_str = key_str.substr(0, pos);
-    if (key_type_str == "db") {
-        auto key_db = std::make_unique<KeyDb>();
-        key_db->db_name_ = key_str.substr(pos + 1);
-        key_db->ts_ = std::stoull(key_db->db_name_.substr(key_db->db_name_.find_first_of('|') + 1));
-        key_db->db_name_ = key_db->db_name_.substr(0, key_db->db_name_.find_first_of('|'));
-        return key_db;
-    } else if (key_type_str == "db_tag") {
-        auto key_db_tag = std::make_unique<KeyDbTag>();
-        key_db_tag->db_id_ = key_str.substr(pos + 1);
-        key_db_tag->tag_name_ = key_db_tag->db_id_.substr(key_db_tag->db_id_.find_first_of('|') + 1);
-        key_db_tag->db_id_ = key_db_tag->db_id_.substr(0, key_db_tag->db_id_.find_first_of('|'));
-        return key_db_tag;
-    } else if (key_type_str == "tbl") {
-        auto key_table = std::make_unique<KeyTable>();
-        key_table->db_id_ = key_str.substr(pos + 1);
-        key_table->table_name_ = key_table->db_id_.substr(key_table->db_id_.find_first_of('|') + 1);
-        key_table->db_id_ = key_table->db_id_.substr(0, key_table->db_id_.find_first_of('|'));
-        key_table->ts_ = std::stoull(key_table->table_name_.substr(key_table->table_name_.find_first_of('|') + 1));
-        key_table->table_name_ = key_table->table_name_.substr(0, key_table->table_name_.find_first_of('|'));
-        return key_table;
-    } else if (key_type_str == "tbl_tag") {
-        auto key_table_tag = std::make_unique<KeyTableTag>();
-        key_table_tag->db_id_ = key_str.substr(pos + 1);
-        key_table_tag->table_id_ = key_table_tag->db_id_.substr(key_table_tag->db_id_.find_first_of('|') + 1);
-        key_table_tag->db_id_ = key_table_tag->db_id_.substr(0, key_table_tag->db_id_.find_first_of('|'));
-        key_table_tag->tag_name_ = key_table_tag->table_id_.substr(key_table_tag->table_id_.find_first_of('|') + 1);
-        key_table_tag->table_id_ = key_table_tag->table_id_.substr(0, key_table_tag->table_id_.find_first_of('|'));
-        return key_table_tag;
-    } else if (key_type_str == "idx") {
-        auto key_index = std::make_unique<KeyIndex>();
-        key_index->db_id_ = key_str.substr(pos + 1);
-        key_index->table_id_ = key_index->db_id_.substr(key_index->db_id_.find_first_of('|') + 1);
-        key_index->db_id_ = key_index->db_id_.substr(0, key_index->db_id_.find_first_of('|'));
-        key_index->index_name_ = key_index->table_id_.substr(key_index->table_id_.find_first_of('|') + 1);
-        key_index->table_id_ = key_index->table_id_.substr(0, key_index->table_id_.find_first_of('|'));
-        key_index->ts_ = std::stoull(key_index->index_name_.substr(key_index->index_name_.find_first_of('|') + 1));
-        key_index->index_name_ = key_index->index_name_.substr(0, key_index->index_name_.find_first_of('|'));
-        return key_index;
-    } else if (key_type_str == "idx_tag") {
-        auto key_index_tag = std::make_unique<KeyIndexTag>();
-        key_index_tag->db_id_ = key_str.substr(pos + 1);
-        key_index_tag->table_id_ = key_index_tag->db_id_.substr(key_index_tag->db_id_.find_first_of('|') + 1);
-        key_index_tag->db_id_ = key_index_tag->db_id_.substr(0, key_index_tag->db_id_.find_first_of('|'));
-        key_index_tag->index_id_ = key_index_tag->table_id_.substr(key_index_tag->table_id_.find_first_of('|') + 1);
-        key_index_tag->table_id_ = key_index_tag->table_id_.substr(0, key_index_tag->table_id_.find_first_of('|'));
-        key_index_tag->tag_name_ = key_index_tag->index_id_.substr(key_index_tag->index_id_.find_first_of('|') + 1);
-        key_index_tag->index_id_ = key_index_tag->index_id_.substr(0, key_index_tag->index_id_.find_first_of('|'));
-        return key_index_tag;
-    } else {
-        UnrecoverableError(fmt::format("Unrecognized key: {}", key_str));
-        return nullptr;
-    }
-}
-
 std::string KeyDb::ToString() const { return fmt::format("db|{}|{}", db_name_, ts_); }
 
 std::string KeyDbTag::ToString() const { return fmt::format("db|{}|{}", db_id_, tag_name_); }
@@ -122,10 +55,6 @@ std::string KeyEncode::CatalogTableTagKey(const std::string &db_id, const std::s
     return fmt::format("tbl|{}|{}|{}", db_id, table_id, tag_name);
 }
 
-std::string KeyEncode::CatalogTableTagPrefix(const std::string &db_id, const std::string &table_id, const std::string &tag_name) {
-    return fmt::format("tbl|{}|{}|{}|", db_id, table_id, tag_name);
-}
-
 std::string KeyEncode::CatalogIndexKey(const std::string &db_id, const std::string &table_id, const std::string &index_name, TxnTimeStamp ts) {
     return fmt::format("catalog|idx|{}|{}|{}|{}", db_id, table_id, index_name, ts);
 }
@@ -139,11 +68,6 @@ std::string KeyEncode::CatalogTableIndexPrefix(const std::string &db_id, const s
 std::string
 KeyEncode::CatalogIndexTagKey(const std::string &db_id, const std::string &table_id, const std::string &index_id, const std::string &tag_name) {
     return fmt::format("idx|{}|{}|{}|{}", db_id, table_id, index_id, tag_name);
-}
-
-std::string
-KeyEncode::CatalogIndexTagKeyPrefix(const std::string &db_id, const std::string &table_id, const std::string &index_id, const std::string &tag_name) {
-    return fmt::format("idx|{}|{}|{}|{}|", db_id, table_id, index_id, tag_name);
 }
 
 std::string
@@ -224,21 +148,6 @@ std::string KeyEncode::CatalogTableSegmentBlockTagKey(const std::string &db_id,
                                                       BlockID block_id,
                                                       const std::string &tag_name) {
     return fmt::format("blk|{}|{}|{}|{}|{}", db_id, table_id, segment_id, block_id, tag_name);
-}
-std::string KeyEncode::CatalogTableSegmentBlockColumnKey(const std::string &db_id,
-                                                         const std::string &table_id,
-                                                         SegmentID segment_id,
-                                                         BlockID block_id,
-                                                         ColumnID column_id,
-                                                         TxnTimeStamp ts) {
-    return fmt::format("catalog|blk_col|{}|{}|{}|{}|{}|{}", db_id, table_id, segment_id, block_id, column_id, ts);
-}
-std::string KeyEncode::CatalogTableSegmentBlockColumnKeyPrefix(const std::string &db_id,
-                                                          const std::string &table_id,
-                                                          SegmentID segment_id,
-                                                          BlockID block_id/*,
-                                                          ColumnID column_id*/) {
-    return fmt::format("catalog|blk_col|{}|{}|{}|{}|", db_id, table_id, segment_id, block_id);
 }
 std::string KeyEncode::CatalogTableSegmentBlockColumnTagKey(const std::string &db_id,
                                                             const std::string &table_id,
@@ -343,16 +252,8 @@ KeyEncode::RenameTableKey(const std::string &db_id_str, const std::string &table
     return fmt::format("drop|tbl_name|{}/{}/{}/{}", db_id_str, table_name, create_ts, table_id_str);
 }
 
-std::string KeyEncode::DropTableKeyPrefix(const std::string &db_id_str, const std::string &table_name) {
-    return fmt::format("drop|tbl|{}/{}/", db_id_str, table_name);
-}
-
 std::string KeyEncode::DropSegmentKey(const std::string &db_id_str, const std::string &table_id_str, SegmentID segment_id) {
     return fmt::format("drop|seg|{}/{}/{}", db_id_str, table_id_str, segment_id);
-}
-
-std::string KeyEncode::DropBlockKey(const std::string &db_id_str, const std::string &table_id_str, SegmentID segment_id, BlockID block_id) {
-    return fmt::format("drop|blk|{}/{}/{}/{}", db_id_str, table_id_str, segment_id, block_id);
 }
 
 std::string

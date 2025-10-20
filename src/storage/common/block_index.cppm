@@ -56,7 +56,7 @@ public:
 
     BlockOffset GetBlockOffset(SegmentID segment_id, BlockID block_id) const;
 
-    bool IsEmpty() const;
+    bool IsEmpty() const { return new_segment_block_index_.empty(); }
 
 public:
     std::vector<std::shared_ptr<TableIndexMeta>> table_index_meta_map_;

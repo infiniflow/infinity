@@ -57,21 +57,21 @@ void ObjAddr::Deserialize(std::string_view obj_str) {
     part_size_ = doc["part_size"].get<size_t>();
 }
 
-size_t ObjAddr::GetSizeInBytes() const { return sizeof(int32_t) + obj_key_.size() + sizeof(size_t) + sizeof(size_t); }
-
-void ObjAddr::WriteBufAdv(char *&buf) const {
-    ::infinity::WriteBufAdv(buf, obj_key_);
-    ::infinity::WriteBufAdv(buf, part_offset_);
-    ::infinity::WriteBufAdv(buf, part_size_);
-}
-
-ObjAddr ObjAddr::ReadBufAdv(const char *&buf) {
-    ObjAddr ret;
-    ret.obj_key_ = ::infinity::ReadBufAdv<std::string>(buf);
-    ret.part_offset_ = ::infinity::ReadBufAdv<size_t>(buf);
-    ret.part_size_ = ::infinity::ReadBufAdv<size_t>(buf);
-    return ret;
-}
+// size_t ObjAddr::GetSizeInBytes() const { return sizeof(int32_t) + obj_key_.size() + sizeof(size_t) + sizeof(size_t); }
+//
+// void ObjAddr::WriteBufAdv(char *&buf) const {
+//     ::infinity::WriteBufAdv(buf, obj_key_);
+//     ::infinity::WriteBufAdv(buf, part_offset_);
+//     ::infinity::WriteBufAdv(buf, part_size_);
+// }
+//
+// ObjAddr ObjAddr::ReadBufAdv(const char *&buf) {
+//     ObjAddr ret;
+//     ret.obj_key_ = ::infinity::ReadBufAdv<std::string>(buf);
+//     ret.part_offset_ = ::infinity::ReadBufAdv<size_t>(buf);
+//     ret.part_size_ = ::infinity::ReadBufAdv<size_t>(buf);
+//     return ret;
+// }
 
 PersistenceManager::PersistenceManager(Storage *storage,
                                        const std::string &workspace,
@@ -336,22 +336,22 @@ PersistReadResult PersistenceManager::GetObjCache(const std::string &file_path) 
     return result;
 }
 
-std::tuple<size_t, Status> PersistenceManager::GetDirectorySize(const std::string &path_str) {
-    size_t total_size = 0;
-
-    if (!VirtualStore::Exists(path_str)) {
-        return {0, Status::IOError(fmt::format("{} doesn't exist.", path_str))};
-    }
-
-    const fs::path path(path_str);
-    for (const auto &entry : fs::recursive_directory_iterator(path)) {
-        if (fs::is_regular_file(entry.status())) {
-            total_size += fs::file_size(entry.path());
-        }
-    }
-
-    return {total_size, Status::OK()};
-}
+// std::tuple<size_t, Status> PersistenceManager::GetDirectorySize(const std::string &path_str) {
+//     size_t total_size = 0;
+//
+//     if (!VirtualStore::Exists(path_str)) {
+//         return {0, Status::IOError(fmt::format("{} doesn't exist.", path_str))};
+//     }
+//
+//     const fs::path path(path_str);
+//     for (const auto &entry : fs::recursive_directory_iterator(path)) {
+//         if (fs::is_regular_file(entry.status())) {
+//             total_size += fs::file_size(entry.path());
+//         }
+//     }
+//
+//     return {total_size, Status::OK()};
+// }
 
 std::tuple<size_t, Status> PersistenceManager::GetFileSize(const std::string &file_path) {
     PersistReadResult result;
@@ -372,23 +372,23 @@ std::tuple<size_t, Status> PersistenceManager::GetFileSize(const std::string &fi
     return {obj_addr.part_size_, Status::OK()};
 }
 
-ObjAddr PersistenceManager::GetObjCacheWithoutCnt(const std::string &local_path) {
-    std::string lock_path = RemovePrefix(local_path);
-    if (lock_path.empty()) {
-        UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
-    }
-
-    std::string pm_fp_key = KeyEncode::PMObjectKey(local_path);
-    std::string value;
-    Status status = kv_store_->Get(pm_fp_key, value);
-    if (!status.ok()) {
-        LOG_WARN(fmt::format("GetFileSize Failed to find object for local path {}: {}", local_path, status.message()));
-        return ObjAddr();
-    }
-    ObjAddr obj_addr;
-    obj_addr.Deserialize(value);
-    return obj_addr;
-}
+// ObjAddr PersistenceManager::GetObjCacheWithoutCnt(const std::string &local_path) {
+//     std::string lock_path = RemovePrefix(local_path);
+//     if (lock_path.empty()) {
+//         UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
+//     }
+//
+//     std::string pm_fp_key = KeyEncode::PMObjectKey(local_path);
+//     std::string value;
+//     Status status = kv_store_->Get(pm_fp_key, value);
+//     if (!status.ok()) {
+//         LOG_WARN(fmt::format("GetFileSize Failed to find object for local path {}: {}", local_path, status.message()));
+//         return ObjAddr();
+//     }
+//     ObjAddr obj_addr;
+//     obj_addr.Deserialize(value);
+//     return obj_addr;
+// }
 
 PersistWriteResult PersistenceManager::PutObjCache(const std::string &file_path) {
     PersistWriteResult result;
@@ -572,30 +572,30 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
     }
 }
 
-ObjStat PersistenceManager::GetObjStatByObjAddr(const ObjAddr &obj_addr) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    std::shared_ptr<ObjStat> obj_stat = object_stats_->GetNoCount(obj_addr.obj_key_);
-    if (obj_stat == nullptr) {
-        return ObjStat();
-    }
-    return *obj_stat;
-}
-
-void PersistenceManager::SaveLocalPath(const std::string &file_path, const ObjAddr &object_addr) { AddObjAddrToKVStore(file_path, object_addr); }
-
-void PersistenceManager::SaveObjStat(const std::string &obj_key, const std::shared_ptr<ObjStat> &obj_stat) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    object_stats_->PutNoCount(obj_key, obj_stat);
-}
-
-void PersistenceManager::AddObjAddrToKVStore(const std::string &path, const ObjAddr &obj_addr) {
-    std::string key = KeyEncode::PMObjectKey(RemovePrefix(path));
-    std::string value = obj_addr.Serialize().dump();
-    Status status = kv_store_->Put(key, value, false);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
-}
+// ObjStat PersistenceManager::GetObjStatByObjAddr(const ObjAddr &obj_addr) {
+//     std::lock_guard<std::mutex> lock(mtx_);
+//     std::shared_ptr<ObjStat> obj_stat = object_stats_->GetNoCount(obj_addr.obj_key_);
+//     if (obj_stat == nullptr) {
+//         return ObjStat();
+//     }
+//     return *obj_stat;
+// }
+//
+// void PersistenceManager::SaveLocalPath(const std::string &file_path, const ObjAddr &object_addr) { AddObjAddrToKVStore(file_path, object_addr); }
+//
+// void PersistenceManager::SaveObjStat(const std::string &obj_key, const std::shared_ptr<ObjStat> &obj_stat) {
+//     std::lock_guard<std::mutex> lock(mtx_);
+//     object_stats_->PutNoCount(obj_key, obj_stat);
+// }
+//
+// void PersistenceManager::AddObjAddrToKVStore(const std::string &path, const ObjAddr &obj_addr) {
+//     std::string key = KeyEncode::PMObjectKey(RemovePrefix(path));
+//     std::string value = obj_addr.Serialize().dump();
+//     Status status = kv_store_->Put(key, value, false);
+//     if (!status.ok()) {
+//         UnrecoverableError(status.message());
+//     }
+// }
 
 std::string PersistenceManager::RemovePrefix(const std::string &path) {
     if (path.starts_with(local_data_dir_)) {

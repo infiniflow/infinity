@@ -37,7 +37,6 @@ enum class KeyType {
 export struct KeyBase {
     KeyBase(KeyType key_type) : key_type_(key_type) {}
     KeyType key_type_{KeyType::kInvalid};
-    static std::unique_ptr<KeyBase> FromString(const std::string &key_str);
 };
 
 export struct KeyDb : public KeyBase {
@@ -108,7 +107,6 @@ public:
     static std::string CatalogDbTablePrefix(const std::string &db_id);
 
     static std::string CatalogTableTagKey(const std::string &db_id, const std::string &table_id, const std::string &tag_name);
-    static std::string CatalogTableTagPrefix(const std::string &db_id, const std::string &table_id, const std::string &tag_name);
 
     static std::string CatalogIndexKey(const std::string &db_id, const std::string &table_id, const std::string &index_name, TxnTimeStamp ts);
     static std::string CatalogIndexPrefix(const std::string &db_id, const std::string &table_id, const std::string &index_name);
@@ -116,8 +114,6 @@ public:
 
     static std::string
     CatalogIndexTagKey(const std::string &db_id, const std::string &table_id, const std::string &index_id, const std::string &tag_name);
-    static std::string
-    CatalogIndexTagKeyPrefix(const std::string &db_id, const std::string &table_id, const std::string &index_id, const std::string &tag_name);
 
     static std::string CatalogIdxSegmentKey(const std::string &db_id, const std::string &table_id, const std::string &index_id, SegmentID segment_id);
     static std::string CatalogIdxSegmentKeyPrefix(const std::string &db_id, const std::string &table_id, const std::string &index_id);
@@ -156,29 +152,12 @@ public:
                                                       SegmentID segment_id,
                                                       BlockID block_id,
                                                       const std::string &tag_name);
-    static std::string CatalogTableSegmentBlockColumnKey(const std::string &db_id,
-                                                         const std::string &table_id,
-                                                         SegmentID segment_id,
-                                                         BlockID block_id,
-                                                         ColumnID column_id,
-                                                         TxnTimeStamp ts);
-    static std::string CatalogTableSegmentBlockColumnKeyPrefix(const std::string &db_id,
-                                                               const std::string &table_id,
-                                                               SegmentID segment_id,
-                                                               BlockID block_id /*, ColumnID column_id*/);
     static std::string CatalogTableSegmentBlockColumnTagKey(const std::string &db_id,
                                                             const std::string &table_id,
                                                             SegmentID segment_id,
                                                             BlockID block_id,
                                                             ColumnID column_id,
                                                             const std::string &tag_name);
-    //    static std::string MetaTableColumnKey(const std::string &key, const std::string& db_name, TxnTimeStamp ts);
-    //    static std::string MetaSegmentKey(const std::string &key, const std::string& db_name, TxnTimeStamp ts);
-    //    static std::string MetaSegmentBlockKey(const std::string &key, const std::string& db_name, TxnTimeStamp ts);
-    //    static std::string MetaSegmentBlockColumnKey(const std::string &key, const std::string& db_name, TxnTimeStamp ts);
-    //    static std::string MetaIndexKey(const std::string &key, const std::string& db_name, TxnTimeStamp ts);
-    //    static std::string MetaIndexSegmentKey(const std::string &key, const std::string& db_name, TxnTimeStamp ts);
-    //    static std::string MetaIndexChunkKey(const std::string &key, const std::string& db_name, TxnTimeStamp ts);
 
     static std::string DatabaseKey(const std::string &db_name, TxnTimeStamp ts);
     static std::string DatabasePrefix(const std::string &db_name);
@@ -239,11 +218,7 @@ public:
     static std::string
     RenameTableKey(const std::string &db_id_str, const std::string &table_name, const std::string &table_id_str, TxnTimeStamp create_ts);
 
-    static std::string DropTableKeyPrefix(const std::string &db_id_str, const std::string &table_name);
-
     static std::string DropSegmentKey(const std::string &db_id_str, const std::string &table_id_str, SegmentID segment_id);
-
-    static std::string DropBlockKey(const std::string &db_id_str, const std::string &table_id_str, SegmentID segment_id, BlockID block_id);
 
     static std::string
     DropTableColumnKey(const std::string &db_id_str, const std::string &table_id_str, const std::string &column_name, TxnTimeStamp create_ts);
