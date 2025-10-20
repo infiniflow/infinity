@@ -44,11 +44,9 @@ export struct ObjAddr {
 
     void Deserialize(std::string_view obj_str);
 
-    size_t GetSizeInBytes() const;
-
-    void WriteBufAdv(char *&buf) const;
-
-    static ObjAddr ReadBufAdv(const char *&buf);
+    // size_t GetSizeInBytes() const;
+    // void WriteBufAdv(char *&buf) const;
+    // static ObjAddr ReadBufAdv(const char *&buf);
     static constexpr std::string KeyEmpty = "KEY_EMPTY";
 };
 
@@ -93,9 +91,8 @@ public:
 
     std::tuple<size_t, Status> GetFileSize(const std::string &file_path);
 
-    std::tuple<size_t, Status> GetDirectorySize(const std::string &path_str);
-
-    ObjAddr GetObjCacheWithoutCnt(const std::string &local_path);
+    // std::tuple<size_t, Status> GetDirectorySize(const std::string &path_str);
+    // ObjAddr GetObjCacheWithoutCnt(const std::string &local_path);
 
     [[nodiscard]] PersistWriteResult PutObjCache(const std::string &file_path);
 
@@ -133,17 +130,16 @@ private:
 
     std::string RemovePrefix(const std::string &path);
 
-    ObjStat GetObjStatByObjAddr(const ObjAddr &obj_addr);
+    // ObjStat GetObjStatByObjAddr(const ObjAddr &obj_addr);
 
     void CheckValid();
 
 public: // for unit test
-    void SaveLocalPath(const std::string &local_path, const ObjAddr &object_addr);
-
+        // void SaveLocalPath(const std::string &local_path, const ObjAddr &object_addr);
 private:
-    void SaveObjStat(const std::string &obj_key, const std::shared_ptr<ObjStat> &obj_stat);
+    // void SaveObjStat(const std::string &obj_key, const std::shared_ptr<ObjStat> &obj_stat);
 
-    void AddObjAddrToKVStore(const std::string &path, const ObjAddr &obj_addr);
+    // void AddObjAddrToKVStore(const std::string &path, const ObjAddr &obj_addr);
 
     Storage *storage_;
     KVStore *kv_store_{nullptr};

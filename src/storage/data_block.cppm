@@ -42,10 +42,6 @@ public:
 
     void Init(const DataBlock *input, const std::shared_ptr<Selection> &input_select);
 
-    void Init(const std::shared_ptr<DataBlock> &input, const std::shared_ptr<Selection> &input_select);
-
-    void Init(const std::shared_ptr<DataBlock> &input, size_t start_idx, size_t end_idx);
-
     static std::shared_ptr<DataBlock> MoveFrom(std::shared_ptr<DataBlock> &input);
 
     void Init(const std::vector<std::shared_ptr<DataType>> &types, size_t capacity = DEFAULT_VECTOR_SIZE);

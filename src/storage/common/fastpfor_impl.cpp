@@ -75,17 +75,17 @@ const u32 *FastPForWrapper<Codec>::Decompress(const u32 *src, u32 count, u32 *de
     return codec.decodeArray(src, count, dest, reinterpret_cast<size_t &>(outsize));
 }
 
-template <FastPForCodec Codec>
-void FastPForWrapper<Codec>::ApplyDelta(u32 *src, size_t count) {
-    using namespace FastPForLib;
-    FastPForLib::Delta::deltaSIMD(src, count);
-}
-
-template <FastPForCodec Codec>
-void FastPForWrapper<Codec>::RevertDelta(u32 *src, size_t count) {
-    using namespace FastPForLib;
-    FastPForLib::Delta::inverseDeltaSIMD(src, count);
-}
+// template <FastPForCodec Codec>
+// void FastPForWrapper<Codec>::ApplyDelta(u32 *src, size_t count) {
+//     using namespace FastPForLib;
+//     FastPForLib::Delta::deltaSIMD(src, count);
+// }
+//
+// template <FastPForCodec Codec>
+// void FastPForWrapper<Codec>::RevertDelta(u32 *src, size_t count) {
+//     using namespace FastPForLib;
+//     FastPForLib::Delta::inverseDeltaSIMD(src, count);
+// }
 
 // template struct FastPForWrapper<FastPForCodec::FastPFor>;
 template struct FastPForWrapper<FastPForCodec::SIMDBitPacking>;

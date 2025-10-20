@@ -30,45 +30,45 @@ import data_type;
 
 namespace infinity {
 
-static std::string TableTypeToString(TableType type) {
-    switch (type) {
-        case TableType::kInvalid: {
-            UnrecoverableError("Unexpected table type: Invalid");
-            break;
-        }
-        case TableType::kDataTable:
-            return "DataTable";
-        case TableType::kIntermediate:
-            return "Intermediate";
-        case TableType::kResult:
-            return "Result";
-        case TableType::kOrderBy:
-            return "OrderBy";
-        case TableType::kGroupBy:
-            return "GroupBy";
-        case TableType::kAggregate:
-            return "Aggregate";
-        case TableType::kCrossProduct:
-            return "CrossProduct";
-    }
-    UnrecoverableError("Unexpected error.");
+// static std::string TableTypeToString(TableType type) {
+//     switch (type) {
+//         case TableType::kInvalid: {
+//             UnrecoverableError("Unexpected table type: Invalid");
+//             break;
+//         }
+//         case TableType::kDataTable:
+//             return "DataTable";
+//         case TableType::kIntermediate:
+//             return "Intermediate";
+//         case TableType::kResult:
+//             return "Result";
+//         case TableType::kOrderBy:
+//             return "OrderBy";
+//         case TableType::kGroupBy:
+//             return "GroupBy";
+//         case TableType::kAggregate:
+//             return "Aggregate";
+//         case TableType::kCrossProduct:
+//             return "CrossProduct";
+//     }
+//     UnrecoverableError("Unexpected error.");
+//
+//     return "";
+// }
 
-    return "";
-}
-
-std::string DataTable::ToString() const {
-    std::stringstream ss;
-    ss << definition_ptr_->ToString();
-    ss << "Table type: " << TableTypeToString(type_) << " Row count: " << row_count_ << std::endl;
-
-    size_t block_count = data_blocks_.size();
-    for (size_t idx = 0; idx < block_count; ++idx) {
-        ss << "Block " << idx << std::endl;
-        ss << data_blocks_[idx]->ToString();
-    }
-
-    return ss.str();
-}
+// std::string DataTable::ToString() const {
+//     std::stringstream ss;
+//     ss << definition_ptr_->ToString();
+//     ss << "Table type: " << TableTypeToString(type_) << " Row count: " << row_count_ << std::endl;
+//
+//     size_t block_count = data_blocks_.size();
+//     for (size_t idx = 0; idx < block_count; ++idx) {
+//         ss << "Block " << idx << std::endl;
+//         ss << data_blocks_[idx]->ToString();
+//     }
+//
+//     return ss.str();
+// }
 
 std::shared_ptr<std::vector<RowID>> DataTable::GetRowIDVector() const {
     size_t block_count = data_blocks_.size();

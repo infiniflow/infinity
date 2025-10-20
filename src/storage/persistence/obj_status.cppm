@@ -81,17 +81,15 @@ export struct ObjStat {
         return *this;
     }
 
-    nlohmann::json Serialize() const;
+    // nlohmann::json Serialize() const;
 
     std::string ToString() const;
 
     void Deserialize(std::string_view str);
 
-    size_t GetSizeInBytes() const;
-
-    void WriteBufAdv(char *&buf) const;
-
-    static ObjStat ReadBufAdv(const char *&buf);
+    // size_t GetSizeInBytes() const;
+    // void WriteBufAdv(char *&buf) const;
+    // static ObjStat ReadBufAdv(const char *&buf);
 
     void CheckValid(const std::string &obj_key, size_t current_object_size) const;
 };
