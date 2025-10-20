@@ -65,8 +65,6 @@ private:
     BlockMeta &block_meta_;
     size_t column_idx_;
 
-    std::optional<size_t> chunk_offset_;
-
     FileWorker *column_buffer_ = nullptr;
     FileWorker *outline_buffer_ = nullptr;
 };

@@ -43,14 +43,7 @@ export enum class WalCommandType : i8 {
     INVALID = 0,
     // -----------------------------
     // Catalog
-    // -----------------------------
-    CREATE_DATABASE = 1,
-    DROP_DATABASE = 2,
-    CREATE_TABLE = 3,
-    DROP_TABLE = 4,
-    ALTER_INFO = 5,
-    CREATE_INDEX = 6,
-    DROP_INDEX = 7,
+    // -----------------------------,
     CREATE_DATABASE_V2 = 8,
     DROP_DATABASE_V2 = 9,
     CREATE_TABLE_V2 = 10,
@@ -62,27 +55,13 @@ export enum class WalCommandType : i8 {
     // -----------------------------
     // Data
     // -----------------------------
-    IMPORT = 20,
-    APPEND = 21,
-    DELETE = 22,
     IMPORT_V2 = 23,
     APPEND_V2 = 24,
     DELETE_V2 = 25,
 
     // -----------------------------
-    // SEGMENT STATUS
-    // -----------------------------
-    SET_SEGMENT_STATUS_SEALED = 31,
-    UPDATE_SEGMENT_BLOOM_FILTER_DATA = 32,
-    SET_SEGMENT_STATUS_SEALED_V2 = 33,
-    UPDATE_SEGMENT_BLOOM_FILTER_DATA_V2 = 34,
-
-    // -----------------------------
     // Alter
     // -----------------------------
-    RENAME_TABLE = 40,
-    ADD_COLUMNS = 41,
-    DROP_COLUMNS = 42,
     RENAME_TABLE_V2 = 43,
     ADD_COLUMNS_V2 = 44,
     DROP_COLUMNS_V2 = 45,
@@ -91,7 +70,6 @@ export enum class WalCommandType : i8 {
     // Flush
     // -----------------------------
     CHECKPOINT = 99,
-    COMPACT = 100,
     CHECKPOINT_V2 = 104,
     COMPACT_V2 = 105,
 
@@ -104,8 +82,6 @@ export enum class WalCommandType : i8 {
     // -----------------------------
     // Other
     // -----------------------------
-    OPTIMIZE = 101,
-    DUMP_INDEX = 102,
     DUMMY = 103,
     OPTIMIZE_V2 = 106,
     DUMP_INDEX_V2 = 107,
@@ -268,27 +244,6 @@ export struct WalCmdDummy final : public WalCmd {
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
-export struct WalCmdCreateDatabase final : public WalCmd {
-    explicit WalCmdCreateDatabase(const std::string &db_name, const std::string &db_dir_tail, const std::string &db_comment)
-        : WalCmd(WalCommandType::CREATE_DATABASE), db_name_(db_name), db_dir_tail_(db_dir_tail), db_comment_(db_comment) {
-        assert(!std::filesystem::path(db_dir_tail_).is_absolute());
-    }
-
-    ~WalCmdCreateDatabase() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    [[nodiscard]] i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    std::string db_name_{};
-    std::string db_dir_tail_{};
-    std::string db_comment_{};
-};
-
 export struct WalCmdCreateDatabaseV2 final : public WalCmd {
     explicit WalCmdCreateDatabaseV2(const std::string &db_name, const std::string &db_id, const std::string &db_comment)
         : WalCmd(WalCommandType::CREATE_DATABASE_V2), db_name_(db_name), db_id_(db_id), db_comment_(db_comment) {}
@@ -306,22 +261,6 @@ export struct WalCmdCreateDatabaseV2 final : public WalCmd {
     std::string db_name_{};
     std::string db_id_{};
     std::string db_comment_{};
-};
-
-export struct WalCmdDropDatabase final : public WalCmd {
-    explicit WalCmdDropDatabase(const std::string &db_name) : WalCmd(WalCommandType::DROP_DATABASE), db_name_(db_name) {}
-
-    ~WalCmdDropDatabase() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    [[nodiscard]] i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    std::string db_name_{};
 };
 
 export struct WalCmdDropDatabaseV2 final : public WalCmd {
@@ -343,25 +282,6 @@ export struct WalCmdDropDatabaseV2 final : public WalCmd {
     TxnTimeStamp create_ts_{};
 };
 
-export struct WalCmdCreateTable final : public WalCmd {
-    WalCmdCreateTable(const std::string &db_name, const std::string &table_dir_tail, const std::shared_ptr<TableDef> &table_def)
-        : WalCmd(WalCommandType::CREATE_TABLE), db_name_(db_name), table_dir_tail_(table_dir_tail), table_def_(table_def) {}
-
-    ~WalCmdCreateTable() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    [[nodiscard]] i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    std::string db_name_{};
-    std::string table_dir_tail_{};
-    std::shared_ptr<TableDef> table_def_{};
-};
-
 export struct WalCmdCreateTableV2 final : public WalCmd {
     WalCmdCreateTableV2(const std::string &db_name, const std::string &db_id, const std::string &table_id, const std::shared_ptr<TableDef> &table_def)
         : WalCmd(WalCommandType::CREATE_TABLE_V2), db_name_(db_name), db_id_(db_id), table_id_(table_id), table_def_(table_def) {}
@@ -380,24 +300,6 @@ export struct WalCmdCreateTableV2 final : public WalCmd {
     std::string db_id_{};
     std::string table_id_{};
     std::shared_ptr<TableDef> table_def_{};
-};
-
-export struct WalCmdDropTable final : public WalCmd {
-    WalCmdDropTable(const std::string &db_name, const std::string &table_name)
-        : WalCmd(WalCommandType::DROP_TABLE), db_name_(db_name), table_name_(table_name) {}
-
-    ~WalCmdDropTable() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    [[nodiscard]] i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    std::string db_name_{};
-    std::string table_name_{};
 };
 
 export struct WalCmdDropTableV2 final : public WalCmd {
@@ -428,36 +330,6 @@ export struct WalCmdDropTableV2 final : public WalCmd {
 
     // Redundant but useful in commit phase.
     std::string table_key_{};
-};
-
-export struct WalCmdCreateIndex final : public WalCmd {
-    WalCmdCreateIndex(const std::string &db_name,
-                      const std::string &table_name,
-                      const std::string &index_dir_tail_,
-                      const std::shared_ptr<IndexBase> &index_base)
-        : WalCmd(WalCommandType::CREATE_INDEX), db_name_(db_name), table_name_(table_name), index_dir_tail_(index_dir_tail_),
-          index_base_(index_base) {
-        assert(!std::filesystem::path(index_dir_tail_).is_absolute());
-    }
-
-    WalCmdCreateIndex(const std::string &db_name, const std::string &table_name, const std::shared_ptr<IndexBase> &index_base)
-        : WalCmd(WalCommandType::CREATE_INDEX), db_name_(db_name), table_name_(table_name), index_base_(index_base) {}
-
-    ~WalCmdCreateIndex() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    [[nodiscard]] i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    std::string db_name_{};
-    std::string table_name_{};
-    std::string index_dir_tail_{};
-    std::shared_ptr<IndexBase> index_base_{};
-    std::vector<WalSegmentIndexInfo> segment_index_infos_;
 };
 
 export struct WalCmdCreateIndexV2 final : public WalCmd {
@@ -513,24 +385,6 @@ export struct WalRestoreIndexV2 final {
     void WriteBufferAdv(char *&buf) const;
 };
 
-export struct WalCmdDropIndex final : public WalCmd {
-    WalCmdDropIndex(const std::string &db_name, const std::string &table_name, const std::string &index_name)
-        : WalCmd(WalCommandType::DROP_INDEX), db_name_(db_name), table_name_(table_name), index_name_(index_name) {}
-    ~WalCmdDropIndex() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    std::string db_name_{};
-    std::string table_name_{};
-    std::string index_name_{};
-};
-
 export struct WalCmdDropIndexV2 final : public WalCmd {
     WalCmdDropIndexV2(const std::string &db_name,
                       const std::string &db_id,
@@ -564,24 +418,6 @@ export struct WalCmdDropIndexV2 final : public WalCmd {
     std::string index_key_{};
 };
 
-export struct WalCmdImport final : public WalCmd {
-    WalCmdImport(const std::string &db_name, const std::string &table_name, const WalSegmentInfo &segment_info)
-        : WalCmd(WalCommandType::IMPORT), db_name_(db_name), table_name_(table_name), segment_info_(segment_info) {}
-    ~WalCmdImport() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    [[nodiscard]] i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    std::string db_name_{};
-    std::string table_name_{};
-    WalSegmentInfo segment_info_;
-};
-
 export struct WalCmdImportV2 final : public WalCmd {
     WalCmdImportV2(const std::string &db_name,
                    const std::string &db_id,
@@ -605,25 +441,6 @@ export struct WalCmdImportV2 final : public WalCmd {
     std::string table_name_{};
     std::string table_id_{};
     WalSegmentInfo segment_info_;
-};
-
-export struct WalCmdAppend final : public WalCmd {
-    WalCmdAppend(const std::string &db_name, const std::string &table_name, const std::shared_ptr<DataBlock> &block)
-        : WalCmd(WalCommandType::APPEND), db_name_(db_name), table_name_(table_name), block_(block) {}
-
-    ~WalCmdAppend() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    [[nodiscard]] i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    std::string db_name_{};
-    std::string table_name_{};
-    std::shared_ptr<DataBlock> block_{};
 };
 
 export struct WalCmdAppendV2 final : public WalCmd {
@@ -654,25 +471,6 @@ export struct WalCmdAppendV2 final : public WalCmd {
     std::shared_ptr<DataBlock> block_{};
 };
 
-export struct WalCmdDelete final : public WalCmd {
-    WalCmdDelete(const std::string &db_name, const std::string &table_name, const std::vector<RowID> &row_ids)
-        : WalCmd(WalCommandType::DELETE), db_name_(db_name), table_name_(table_name), row_ids_(row_ids) {}
-
-    ~WalCmdDelete() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    [[nodiscard]] i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    std::string db_name_{};
-    std::string table_name_{};
-    std::vector<RowID> row_ids_{};
-};
-
 export struct WalCmdDeleteV2 final : public WalCmd {
     WalCmdDeleteV2(const std::string &db_name,
                    const std::string &db_id,
@@ -696,131 +494,6 @@ export struct WalCmdDeleteV2 final : public WalCmd {
     std::string table_name_{};
     std::string table_id_{};
     std::vector<RowID> row_ids_{};
-};
-
-// used when append op turn an old unsealed segment full and sealed
-// will always have necessary minmax filter
-// may have user-defined bloom filter
-export struct WalCmdSetSegmentStatusSealed final : public WalCmd {
-    WalCmdSetSegmentStatusSealed(const std::string &db_name,
-                                 const std::string &table_name,
-                                 SegmentID segment_id,
-                                 const std::string &segment_filter_binary_data,
-                                 const std::vector<std::pair<BlockID, std::string>> &block_filter_binary_data)
-        : WalCmd(WalCommandType::SET_SEGMENT_STATUS_SEALED), db_name_(db_name), table_name_(table_name), segment_id_(segment_id),
-          segment_filter_binary_data_(segment_filter_binary_data), block_filter_binary_data_(block_filter_binary_data) {}
-
-    ~WalCmdSetSegmentStatusSealed() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    static WalCmdSetSegmentStatusSealed ReadBufferAdv(const char *&ptr);
-
-    const std::string db_name_{};
-    const std::string table_name_{};
-    const SegmentID segment_id_{};
-    const std::string segment_filter_binary_data_{};
-    const std::vector<std::pair<BlockID, std::string>> block_filter_binary_data_{};
-};
-
-export struct WalCmdSetSegmentStatusSealedV2 final : public WalCmd {
-    WalCmdSetSegmentStatusSealedV2(const std::string &db_name,
-                                   const std::string &db_id,
-                                   const std::string &table_name,
-                                   const std::string &table_id,
-                                   SegmentID segment_id,
-                                   const std::string &segment_filter_binary_data,
-                                   const std::vector<std::pair<BlockID, std::string>> &block_filter_binary_data)
-        : WalCmd(WalCommandType::SET_SEGMENT_STATUS_SEALED_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
-          segment_id_(segment_id), segment_filter_binary_data_(segment_filter_binary_data), block_filter_binary_data_(block_filter_binary_data) {}
-
-    ~WalCmdSetSegmentStatusSealedV2() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    static WalCmdSetSegmentStatusSealedV2 ReadBufferAdv(const char *&ptr);
-
-    const std::string db_name_{};
-    const std::string db_id_{};
-    const std::string table_name_{};
-    const std::string table_id_{};
-    const SegmentID segment_id_{};
-    const std::string segment_filter_binary_data_{};
-    const std::vector<std::pair<BlockID, std::string>> block_filter_binary_data_{};
-};
-
-// used when user-defined bloom filter need to be updated
-export struct WalCmdUpdateSegmentBloomFilterData final : public WalCmd {
-    WalCmdUpdateSegmentBloomFilterData(const std::string &db_name,
-                                       const std::string &table_name,
-                                       SegmentID &segment_id,
-                                       const std::string &segment_filter_binary_data,
-                                       const std::vector<std::pair<BlockID, std::string>> &block_filter_binary_data)
-        : WalCmd(WalCommandType::UPDATE_SEGMENT_BLOOM_FILTER_DATA), db_name_(db_name), table_name_(table_name), segment_id_(segment_id),
-          segment_filter_binary_data_(segment_filter_binary_data), block_filter_binary_data_(block_filter_binary_data) {}
-
-    ~WalCmdUpdateSegmentBloomFilterData() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    static WalCmdUpdateSegmentBloomFilterData ReadBufferAdv(const char *&ptr);
-
-    const std::string db_name_{};
-    const std::string table_name_{};
-    const SegmentID segment_id_{};
-    const std::string segment_filter_binary_data_{};
-    const std::vector<std::pair<BlockID, std::string>> block_filter_binary_data_{};
-};
-
-// used when user-defined bloom filter need to be updated
-export struct WalCmdUpdateSegmentBloomFilterDataV2 final : public WalCmd {
-    WalCmdUpdateSegmentBloomFilterDataV2(const std::string &db_name,
-                                         const std::string &db_id,
-                                         const std::string &table_name,
-                                         const std::string &table_id,
-                                         SegmentID segment_id,
-                                         const std::string &segment_filter_binary_data,
-                                         const std::vector<std::pair<BlockID, std::string>> &block_filter_binary_data)
-        : WalCmd(WalCommandType::UPDATE_SEGMENT_BLOOM_FILTER_DATA_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
-          segment_id_(segment_id), segment_filter_binary_data_(segment_filter_binary_data), block_filter_binary_data_(block_filter_binary_data) {}
-
-    ~WalCmdUpdateSegmentBloomFilterDataV2() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    static WalCmdUpdateSegmentBloomFilterDataV2 ReadBufferAdv(const char *&ptr);
-
-    const std::string db_name_{};
-    const std::string db_id_{};
-    const std::string table_name_{};
-    const std::string table_id_{};
-    const SegmentID segment_id_{};
-    const std::string segment_filter_binary_data_{};
-    const std::vector<std::pair<BlockID, std::string>> block_filter_binary_data_{};
 };
 
 export struct WalCmdCheckpoint final : public WalCmd {
@@ -860,35 +533,6 @@ export struct WalCmdCheckpointV2 final : public WalCmd {
     i64 max_commit_ts_{};
 };
 
-export struct WalCmdCompact final : public WalCmd {
-    WalCmdCompact(const std::string &db_name,
-                  const std::string &table_name,
-                  const std::vector<WalSegmentInfo> &new_segment_infos,
-                  const std::vector<SegmentID> &deprecated_segment_ids)
-        : WalCmd(WalCommandType::COMPACT), db_name_(db_name), table_name_(table_name), new_segment_infos_(new_segment_infos),
-          deprecated_segment_ids_(deprecated_segment_ids) {}
-
-    ~WalCmdCompact() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    const std::string db_name_{};
-    const std::string table_name_{};
-    std::vector<WalSegmentInfo> new_segment_infos_{};
-    const std::vector<SegmentID> deprecated_segment_ids_{};
-
-    // Used in commit phase
-    std::string db_id_str_;
-    std::string table_id_str_;
-    std::string table_key_;
-};
-
 export struct WalCmdCompactV2 final : public WalCmd {
 
     WalCmdCompactV2(const std::string &db_name,
@@ -923,29 +567,6 @@ export struct WalCmdCompactV2 final : public WalCmd {
     const std::vector<SegmentID> deprecated_segment_ids_{};
 };
 
-export struct WalCmdOptimize final : public WalCmd {
-    WalCmdOptimize(const std::string &db_name,
-                   const std::string &table_name,
-                   const std::string &index_name,
-                   std::vector<std::unique_ptr<InitParameter>> &&params)
-        : WalCmd(WalCommandType::OPTIMIZE), db_name_(db_name), table_name_(table_name), index_name_(index_name), params_(std::move(params)) {}
-
-    ~WalCmdOptimize() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    std::string db_name_{};
-    std::string table_name_{};
-    std::string index_name_{};
-    std::vector<std::unique_ptr<InitParameter>> params_{};
-};
-
 export struct WalCmdOptimizeV2 final : public WalCmd {
     WalCmdOptimizeV2(const std::string &db_name,
                      const std::string &db_id,
@@ -977,37 +598,6 @@ export struct WalCmdOptimizeV2 final : public WalCmd {
 };
 
 export enum class DumpIndexCause { kImport, kCompact, kCreateIndex, kOptimizeIndex, kReplayCreateIndex, kDumpMemIndex, kInvalid };
-
-export struct WalCmdDumpIndex final : public WalCmd {
-    WalCmdDumpIndex(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id)
-        : WalCmd(WalCommandType::DUMP_INDEX), db_name_(db_name), table_name_(table_name), index_name_(index_name), segment_id_(segment_id) {}
-
-    WalCmdDumpIndex(const std::string &db_name,
-                    const std::string &table_name,
-                    const std::string &index_name,
-                    SegmentID segment_id,
-                    const std::vector<WalChunkIndexInfo> &chunk_infos,
-                    const std::vector<ChunkID> &deprecate_ids)
-        : WalCmd(WalCommandType::DUMP_INDEX), db_name_(db_name), table_name_(table_name), index_name_(index_name), segment_id_(segment_id),
-          chunk_infos_(chunk_infos), deprecate_ids_(deprecate_ids) {}
-
-    ~WalCmdDumpIndex() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    std::string db_name_{};
-    std::string table_name_{};
-    std::string index_name_{};
-    SegmentID segment_id_{};
-    std::vector<WalChunkIndexInfo> chunk_infos_{};
-    std::vector<ChunkID> deprecate_ids_{};
-};
 
 export struct WalCmdDumpIndexV2 final : public WalCmd {
     WalCmdDumpIndexV2(const std::string &db_name,
@@ -1060,24 +650,6 @@ export struct WalCmdDumpIndexV2 final : public WalCmd {
     DumpIndexCause dump_cause_{DumpIndexCause::kInvalid};
 };
 
-export struct WalCmdRenameTable : public WalCmd {
-    WalCmdRenameTable(const std::string &db_name, const std::string &table_name, const std::string &new_table_name)
-        : WalCmd(WalCommandType::RENAME_TABLE), db_name_(db_name), table_name_(table_name), new_table_name_(new_table_name) {}
-    ~WalCmdRenameTable() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    std::string db_name_{};
-    std::string table_name_{};
-    std::string new_table_name_{};
-};
-
 export struct WalCmdRenameTableV2 : public WalCmd {
     WalCmdRenameTableV2(const std::string &db_name,
                         const std::string &db_id,
@@ -1105,24 +677,6 @@ export struct WalCmdRenameTableV2 : public WalCmd {
 
     // Redundant but useful in commit phase.
     std::string old_table_key_{};
-};
-
-export struct WalCmdAddColumns : public WalCmd {
-    WalCmdAddColumns(const std::string &db_name, const std::string &table_name, const std::vector<std::shared_ptr<ColumnDef>> &column_defs)
-        : WalCmd(WalCommandType::ADD_COLUMNS), db_name_(db_name), table_name_(table_name), column_defs_(column_defs) {}
-    ~WalCmdAddColumns() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    std::string db_name_{};
-    std::string table_name_{};
-    std::vector<std::shared_ptr<ColumnDef>> column_defs_{};
 };
 
 export struct WalCmdAddColumnsV2 : public WalCmd {
@@ -1156,28 +710,6 @@ export struct WalCmdAddColumnsV2 : public WalCmd {
 
     // Redundant but usefule commit phase.
     std::string table_key_{};
-};
-
-export struct WalCmdDropColumns : public WalCmd {
-    WalCmdDropColumns(const std::string &db_name, const std::string &table_name, const std::vector<std::string> &column_names)
-        : WalCmd(WalCommandType::DROP_COLUMNS), db_name_(db_name), table_name_(table_name), column_names_(column_names) {}
-    ~WalCmdDropColumns() override = default;
-
-    bool operator==(const WalCmd &other) const final;
-    i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    std::string db_name_{};
-    std::string table_name_{};
-    std::string table_key_{};
-    std::vector<std::string> column_names_{};
-
-    // Redudant but useful in commit phase
-    std::vector<ColumnID> column_ids_{};
 };
 
 export struct WalCmdDropColumnsV2 : public WalCmd {

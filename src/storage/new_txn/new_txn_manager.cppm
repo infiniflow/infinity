@@ -63,9 +63,7 @@ public:
 
     TxnTimeStamp GetWriteCommitTS(std::shared_ptr<NewTxn> txn);
 
-    TxnTimeStamp GetCurrentTS();
-
-    // std::optional<std::string> CheckTxnConflict(NewTxn *txn);
+    // TxnTimeStamp GetCurrentTS();
 
     bool CheckConflict1(NewTxn *txn, std::string &conflict_reason, bool &retry_query);
     void SaveOrResetMetaCacheForReadTxn(NewTxn *txn);

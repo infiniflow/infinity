@@ -43,12 +43,6 @@ export std::vector<BlockID> GetTableSegmentBlocks(KVInstance *kv_instance,
                                                   TxnTimeStamp begin_ts,
                                                   TxnTimeStamp commit_ts);
 
-export std::vector<ColumnID> GetTableSegmentBlockColumns(KVInstance *kv_instance,
-                                                         const std::string &db_id_str,
-                                                         const std::string &table_id_str,
-                                                         SegmentID segment_id,
-                                                         BlockID block_id,
-                                                         TxnTimeStamp begin_ts);
 export std::shared_ptr<IndexBase> GetTableIndexDef(KVInstance *kv_instance,
                                                    const std::string &db_id_str,
                                                    const std::string &table_id_str,

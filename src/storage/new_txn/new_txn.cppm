@@ -551,8 +551,6 @@ private:
 public:
     Status RecoverMemIndex(TableIndexMeta &table_index_meta);
 
-    Status CommitMemIndex(TableIndexMeta &table_index_meta);
-
     Status GetFullTextIndexReader(const std::string &db_name, const std::string &table_name, std::shared_ptr<IndexReader> &index_reader);
 
 private:

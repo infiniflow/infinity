@@ -1126,8 +1126,6 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
-
 Status NewTxn::InitSegmentIndex(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta) {
     Status status;
     std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
@@ -1688,8 +1686,6 @@ Status NewTxn::ReplayOptimizeIndeByParams(WalCmdOptimizeV2 *optimize_cmd) {
     return OptimizeIndexByParams(optimize_cmd->db_name_, optimize_cmd->table_name_, optimize_cmd->index_name_, std::move(optimize_cmd->params_));
 }
 
-Status NewTxn::ReplayOptimize(WalCmdOptimizeV2 *optimize_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
-
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {
     std::shared_ptr<MemIndex> mem_index = segment_index_meta.PopMemIndex();
     if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
@@ -1965,37 +1961,6 @@ Status NewTxn::RecoverMemIndex(TableIndexMeta &table_index_meta) {
             return status;
         }
     }
-    return Status::OK();
-}
-
-Status NewTxn::CommitMemIndex(TableIndexMeta &table_index_meta) {
-
-    auto [index_base, status] = table_index_meta.GetIndexBase();
-    if (!status.ok()) {
-        return status;
-    }
-
-    if (index_base->index_type_ != IndexType::kFullText) {
-        return Status::OK();
-    }
-
-    std::vector<SegmentID> *index_segment_ids_ptr = nullptr;
-    std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
-    if (!status.ok()) {
-        return status;
-    }
-    for (SegmentID segment_id : *index_segment_ids_ptr) {
-        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-
-        std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-        if (mem_index) {
-            std::shared_ptr<MemoryIndexer> memory_indexer = mem_index->GetFulltextIndex();
-            if (memory_indexer) {
-                memory_indexer->Commit();
-            }
-        }
-    }
-
     return Status::OK();
 }
 

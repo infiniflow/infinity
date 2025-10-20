@@ -55,8 +55,7 @@ Status DBMeta::InitSet(const std::string *comment) {
     }
 
     // Create next table id;
-    std::string table_id_str{"0"};
-    SetNextTableID(table_id_str);
+    SetNextTableID("0");
 
     return Status::OK();
 }
