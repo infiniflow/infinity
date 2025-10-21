@@ -173,7 +173,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
         bmp_knn_slt_file.write("statement ok\n")
         bmp_knn_slt_file.write(
-            "OPTIMIZE {} ON {} WITH (bp_reorder, topk = {});\n".format(
+            "ALTER {} ON {} WITH (bp_reorder, topk = {});\n".format(
                 index_name, table_name, topk
             )
         )
