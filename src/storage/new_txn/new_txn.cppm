@@ -541,9 +541,7 @@ private:
 
     Status DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id);
 
-    Status CheckpointDB(DBMeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
-
-    Status CheckpointTable(TableMeta &table_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
+    Status CheckpointInner();
 
     Status
     CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, std::vector<std::pair<RowID, u64>> &append_ranges);

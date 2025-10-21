@@ -121,8 +121,12 @@ void FileWorker::MoveFile() {
             VirtualStore::MakeDirectory(data_path_parent);
         }
         VirtualStore::Copy(data_path, temp_path); // sys call, may need copy
-    } else {
+    }
+    else {
         PersistResultHandler handler(persistence_manager_);
+        if (temp_path.find("/var/infinity/tmp/import") != std::string::npos) {
+            return;
+        }
         if (!VirtualStore::Exists(temp_path)) {
             return;
         }

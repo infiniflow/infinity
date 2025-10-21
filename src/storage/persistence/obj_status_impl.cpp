@@ -32,10 +32,10 @@ nlohmann::json ObjStat::Serialize() const {
     obj["obj_size"] = obj_size_;
     obj["parts"] = parts_;
     obj["deleted_ranges"] = nlohmann::json::array();
-    for (auto &range : deleted_ranges_) {
+    for (const auto &[start_, end_] : deleted_ranges_) {
         nlohmann::json range_obj;
-        range_obj["start"] = range.start_;
-        range_obj["end"] = range.end_;
+        range_obj["start"] = start_;
+        range_obj["end"] = end_;
         obj["deleted_ranges"].emplace_back(range_obj);
     }
     return obj;
@@ -46,10 +46,10 @@ std::string ObjStat::ToString() const {
     obj["obj_size"] = obj_size_;
     obj["parts"] = parts_;
     obj["deleted_ranges"] = nlohmann::json::array();
-    for (auto &range : deleted_ranges_) {
+    for (const auto &[start_, end_] : deleted_ranges_) {
         nlohmann::json range_obj;
-        range_obj["start"] = range.start_;
-        range_obj["end"] = range.end_;
+        range_obj["start"] = start_;
+        range_obj["end"] = end_;
         obj["deleted_ranges"].emplace_back(range_obj);
     }
     return obj.dump();
@@ -87,9 +87,9 @@ void ObjStat::WriteBufAdv(char *&buf) const {
     ::infinity::WriteBufAdv(buf, obj_size_);
     ::infinity::WriteBufAdv(buf, parts_);
     ::infinity::WriteBufAdv(buf, deleted_ranges_.size());
-    for (auto &range : deleted_ranges_) {
-        ::infinity::WriteBufAdv(buf, range.start_);
-        ::infinity::WriteBufAdv(buf, range.end_);
+    for (const auto &[start_, end_] : deleted_ranges_) {
+        ::infinity::WriteBufAdv(buf, start_);
+        ::infinity::WriteBufAdv(buf, end_);
     }
 }
 
@@ -99,11 +99,10 @@ ObjStat ObjStat::ReadBufAdv(const char *&buf) {
     ret.parts_ = ::infinity::ReadBufAdv<size_t>(buf);
     ret.ref_count_ = 0;
 
-    size_t start, end;
     size_t len = ::infinity::ReadBufAdv<size_t>(buf);
     for (size_t i = 0; i < len; ++i) {
-        start = ::infinity::ReadBufAdv<size_t>(buf);
-        end = ::infinity::ReadBufAdv<size_t>(buf);
+        size_t start = ::infinity::ReadBufAdv<size_t>(buf);
+        size_t end = ::infinity::ReadBufAdv<size_t>(buf);
         ret.deleted_ranges_.emplace(Range{.start_ = start, .end_ = end});
     }
     return ret;
@@ -116,13 +115,12 @@ void ObjStat::CheckValid(const std::string &obj_key, size_t current_object_size)
         auto it2 = std::next(it1);
         while (it2 != deleted_ranges.end()) {
             if (it1->end_ >= it2->start_) {
-                std::string error_msg = fmt::format("CurrentObjFinalize Object {} deleted ranges intersect: [{}, {}), [{}, {})",
-                                                    obj_key,
-                                                    it1->start_,
-                                                    it1->end_,
-                                                    it2->start_,
-                                                    it2->end_);
-                LOG_ERROR(error_msg);
+                LOG_ERROR(fmt::format("CurrentObjFinalize Object {} deleted ranges intersect: [{}, {}), [{}, {})",
+                                      obj_key,
+                                      it1->start_,
+                                      it1->end_,
+                                      it2->start_,
+                                      it2->end_));
             }
             it1 = it2;
             it2 = std::next(it2);
@@ -130,8 +128,7 @@ void ObjStat::CheckValid(const std::string &obj_key, size_t current_object_size)
     } else if (deleted_ranges.size() == 1) {
         auto it1 = deleted_ranges.begin();
         if (it1->start_ == 0 && it1->end_ == current_object_size) {
-            std::string error_msg = fmt::format("CurrentObjFinalize Object {} is fully deleted", obj_key);
-            LOG_ERROR(error_msg);
+            LOG_ERROR(fmt::format("CurrentObjFinalize Object {} is fully deleted", obj_key));
         }
     }
 }

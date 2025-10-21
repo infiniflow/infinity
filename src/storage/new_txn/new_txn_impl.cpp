@@ -1611,7 +1611,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
 
     Status status;
     TxnTimeStamp checkpoint_ts = txn_context_ptr_->begin_ts_;
-    CheckpointOption option{checkpoint_ts};
+    // CheckpointOption option{checkpoint_ts};
 
     current_ckp_ts_ = checkpoint_ts;
     LOG_INFO(fmt::format("checkpoint ts: {}, txn: {}", current_ckp_ts_, txn_context_ptr_->txn_id_));
@@ -1631,8 +1631,8 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
     }
     DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
 
-    std::vector<std::string> *db_id_strs_ptr;
-    std::vector<std::string> *db_names_ptr;
+    std::vector<std::string> *db_id_strs_ptr{};
+    std::vector<std::string> *db_names_ptr{};
     CatalogMeta catalog_meta(this);
     status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
     if (!status.ok()) {
@@ -1646,17 +1646,11 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
         return Status::UnexpectedError("txn store is not null");
     }
     base_txn_store_ = std::make_shared<CheckpointTxnStore>(checkpoint_ts, auto_checkpoint);
-    auto *txn_store = static_cast<CheckpointTxnStore *>(base_txn_store_.get());
+    // auto *txn_store = static_cast<CheckpointTxnStore *>(base_txn_store_.get());
 
-    size_t db_count = db_id_strs_ptr->size();
-    for (size_t idx = 0; idx < db_count; ++idx) {
-        const std::string &db_id_str = db_id_strs_ptr->at(idx);
-        const std::string &db_name = db_names_ptr->at(idx);
-        DBMeta db_meta(db_id_str, db_name, this);
-        status = CheckpointDB(db_meta, option, txn_store);
-        if (!status.ok()) {
-            return status;
-        }
+    status = CheckpointInner();
+    if (!status.ok()) {
+        return status;
     }
 
     auto *pm = InfinityContext::instance().persistence_manager();
@@ -1675,29 +1669,6 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
 }
 
 Status NewTxn::ReplayCheckpoint(WalCmdCheckpointV2 *optimize_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
-
-Status NewTxn::CheckpointDB(DBMeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store) {
-    std::vector<std::string> *table_id_strs_ptr;
-    std::vector<std::string> *table_names_ptr;
-    Status status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
-    if (!status.ok()) {
-        return status;
-    }
-
-    size_t table_count = table_id_strs_ptr->size();
-    LOG_DEBUG(fmt::format("checkpoint ts {}, db id {}, got {} tables.", option.checkpoint_ts_, db_meta.db_id_str(), table_count));
-    for (size_t idx = 0; idx < table_count; ++idx) {
-        const std::string &table_id_str = table_id_strs_ptr->at(idx);
-        const std::string &table_name = table_names_ptr->at(idx);
-        TableMeta table_meta(db_meta.db_id_str(), table_id_str, table_name, this);
-        status = CheckpointTable(table_meta, option, ckp_txn_store);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-
-    return Status::OK();
-}
 
 void NewTxn::AddMetaKeyForCommit(const std::string &key) { keys_wait_for_commit_.push_back(key); }
 
@@ -5428,9 +5399,8 @@ Status NewTxn::CheckpointForSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
         UnrecoverableError(fmt::format("last checkpoint ts isn't correct: {}", last_ckp_ts));
     }
 
-    Status status;
     TxnTimeStamp checkpoint_ts = txn_context_ptr_->begin_ts_;
-    CheckpointOption option{checkpoint_ts};
+    // CheckpointOption option{checkpoint_ts};
 
     current_ckp_ts_ = checkpoint_ts;
     LOG_INFO(fmt::format("checkpoint ts for snapshot: {}", current_ckp_ts_));
@@ -5449,26 +5419,20 @@ Status NewTxn::CheckpointForSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
     }
     DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
 
-    std::vector<std::string> *db_id_strs_ptr;
-    std::vector<std::string> *db_names_ptr;
+    std::vector<std::string> *db_id_strs_ptr{};
+    std::vector<std::string> *db_names_ptr{};
     CatalogMeta catalog_meta(this);
-    status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
+    auto status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
     if (!status.ok()) {
         return status;
     }
 
-    size_t db_count = db_id_strs_ptr->size();
-    for (size_t idx = 0; idx < db_count; ++idx) {
-        const std::string &db_id_str = db_id_strs_ptr->at(idx);
-        const std::string &db_name = db_names_ptr->at(idx);
-        DBMeta db_meta(db_id_str, db_name, this);
-        status = CheckpointDB(db_meta, option, txn_store);
-        if (!status.ok()) {
-            return status;
-        }
+    status = CheckpointInner();
+    if (!status.ok()) {
+        return status;
     }
 
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    auto *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
         PersistResultHandler handler(pm);
         PersistWriteResult result = pm->CurrentObjFinalize(true);
