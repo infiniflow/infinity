@@ -93,7 +93,6 @@ jobs:
         files: |
           cmake-build-reldeb/infinity-*.deb
           cmake-build-reldeb/infinity-*.rpm
-          cmake-build-reldeb/infinity-*.tar.gz
 
     - name: Purge binary packages
       run: sudo rm -rf cmake-build-reldeb/infinity-*.deb cmake-build-reldeb/infinity-*.rpm cmake-build-reldeb/infinity-*.tar.gz
