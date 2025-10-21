@@ -23,11 +23,9 @@ jobs:
     - name: Ensure workspace ownership
       run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
 
-    # https://github.com/actions/checkout/blob/v3/README.md
+    # https://github.com/actions/checkout/blob/v5/README.md
     - name: Check out code
       uses: actions/checkout@v5
-      with:
-        ssh-key: ${{ secrets.MY_DEPLOY_KEY }}
 
     - name: Prepare release body
       run: |
