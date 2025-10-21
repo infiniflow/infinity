@@ -25,6 +25,7 @@ enum class AlterStatementType : uint8_t {
     kRenameTable,
     kAddColumns,
     kDropColumns,
+    kAlterIndex,
 };
 
 class AlterStatement : public BaseStatement {
@@ -77,6 +78,18 @@ public:
     std::string ToString() const final { return "DropColumnsStatement"; }
 
     std::vector<std::string> column_names_;
+};
+
+class AlterIndexStatement final : public AlterStatement {
+public:
+    AlterIndexStatement(const char *schema_name, const char *table_name) : AlterStatement(schema_name, table_name, AlterStatementType::kAlterIndex) {}
+
+    ~AlterIndexStatement() = default;
+
+    std::string ToString() const final { return "AlterIndexStatement"; }
+
+    std::string index_name_{};
+    std::vector<std::unique_ptr<InitParameter>> opt_params_{};
 };
 
 } // namespace infinity

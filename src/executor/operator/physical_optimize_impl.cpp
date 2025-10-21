@@ -45,18 +45,6 @@ bool PhysicalOptimize::Execute(QueryContext *query_context, OperatorState *opera
         return true;
     }
 
-    if (index_name_.empty()) {
-        OptimizeIndex(query_context, operator_state);
-    } else {
-        OptIndex(query_context, operator_state);
-    }
-
-    operator_state->SetComplete();
-    return true;
-}
-
-void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState *operator_state) {
-    // Get tables from catalog
     LOG_INFO(fmt::format("OptimizeIndex {}.{} begin", db_name_, table_name_));
 
     NewTxn *new_txn = query_context->GetNewTxn();
@@ -65,18 +53,9 @@ void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState 
         operator_state->status_ = status;
         RecoverableError(status);
     }
-}
 
-void PhysicalOptimize::OptIndex(QueryContext *query_context, OperatorState *operator_state) {
-    LOG_INFO(fmt::format("OptimizeIndex {}.{}::{} begin", db_name_, table_name_, index_name_));
-
-    NewTxn *new_txn = query_context->GetNewTxn();
-    new_txn->SetTxnType(TransactionType::kAlterIndex);
-    Status status = new_txn->OptimizeIndexByParams(db_name_, table_name_, index_name_, std::move(opt_params_));
-    if (!status.ok()) {
-        operator_state->status_ = status;
-        RecoverableError(status);
-    }
+    operator_state->SetComplete();
+    return true;
 }
 
 } // namespace infinity
