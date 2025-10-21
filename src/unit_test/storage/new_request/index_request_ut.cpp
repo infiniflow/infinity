@@ -296,7 +296,7 @@ TEST_P(TestIndexRequest, test_optimize_index) {
         EXPECT_TRUE(ok);
     }
     {
-        std::string optimize_index_sql = "optimize idx1 on t1 with(lvq_avg)";
+        std::string optimize_index_sql = "alter idx1 on t1 with(lvq_avg)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(optimize_index_sql);
         bool ok = HandleQueryResult(query_result);
