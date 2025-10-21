@@ -152,6 +152,7 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
             break;
         }
         case SIGSEGV:
+        case SIGILL:
         case SIGABRT: {
             // Print back strace
             const char *signal_name = strsignal(signal_number);
@@ -197,6 +198,7 @@ void RegisterSignal() {
     sigaction(SIGQUIT, &sig_action, nullptr);
     sigaction(SIGTERM, &sig_action, nullptr);
     sigaction(SIGSEGV, &sig_action, nullptr);
+    sigaction(SIGILL, &sig_action, nullptr);
     sigaction(SIGABRT, &sig_action, nullptr);
 }
 
