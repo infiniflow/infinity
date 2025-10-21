@@ -435,7 +435,7 @@ set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/conf/postins
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA "${CMAKE_CURRENT_SOURCE_DIR}/conf/postinst")
 
 # Specify the package generators
-set(CPACK_GENERATOR "RPM;DEB;TGZ")
+set(CPACK_GENERATOR "RPM;DEB")
 
 # Enable CPack debug output
 set(CPACK_PACKAGE_DEBUG True)

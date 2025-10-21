@@ -98,6 +98,14 @@ TEST_P(CleanupTaskTest, test_delete_db_simple) {
             EXPECT_TRUE(status.ok());
         }
 
+        {
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
+            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+
         std::vector<std::string> exist_file_paths;
         {
             auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table 1"), TransactionType::kRead);
