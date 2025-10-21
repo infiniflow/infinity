@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   release:
+    # https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md
     # https://github.com/actions/runner-images/discussions/5734
     # It's not possible to disable avx512 CPU hardware instruction of ubuntu-latest.
     runs-on: [ "self-hosted", "infinity-build" ]
@@ -75,7 +76,7 @@ jobs:
 
     - name: Build release version
       run: |
-        sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCPACK_PACKAGE_VERSION=${{ env.RELEASE_TAG }} -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -DCMAKE_JOB_POOLS:STRING='link=1' -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb --target infinity"
+        sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCPACK_PACKAGE_VERSION=${RELEASE_TAG} -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb --target infinity"
 
     - name: Build RPM and DEB
       run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/cmake-build-reldeb && cpack"
@@ -97,27 +98,11 @@ jobs:
     - name: Purge binary packages
       run: sudo rm -rf cmake-build-reldeb/infinity-*.deb cmake-build-reldeb/infinity-*.rpm cmake-build-reldeb/infinity-*.tar.gz
 
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    # https://github.com/marketplace/actions/docker-login
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: infiniflow
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    # https://github.com/marketplace/actions/build-and-push-docker-images
     - name: Build and push
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        push: true
-        tags: infiniflow/infinity:${{ env.RELEASE_TAG }}
-        file: scripts/Dockerfile_infinity
+      run: |
+        echo ${{ secrets.DOCKERHUB_TOKEN }} | sudo docker login --username infiniflow --password-stdin
+        sudo docker build -t infiniflow/infinity:${RELEASE_TAG} -f scripts/Dockerfile_infinity .
+        sudo docker push infiniflow/infinity:${RELEASE_TAG}
 
     - name: Build infinity-sdk
       if: startsWith(github.ref, 'refs/tags/v')
