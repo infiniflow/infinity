@@ -4554,12 +4554,12 @@ Status NewTxn::Cleanup() {
         return Status::OK();
     }
 
-    KVInstance *kv_instance = kv_instance_.get();
-
-    TxnTimeStamp visible_ts = std::min(begin_ts, last_checkpoint_ts);
-
+    // We will only clean up entities dropped before both the begin timestamp of active transactions and the latest checkpoint,
+    // ensuring the entities are no longer needed.
+    TxnTimeStamp visible_ts = std::min(oldest_txn_begin_ts, last_checkpoint_ts);
     LOG_INFO(fmt::format("Cleaning ts < {} dropped entities...", visible_ts));
 
+    KVInstance *kv_instance = kv_instance_.get();
     std::vector<std::string> dropped_keys;
     std::vector<std::shared_ptr<MetaKey>> metas;
     Status status = new_catalog_->GetCleanedMeta(visible_ts, kv_instance, metas, dropped_keys);
