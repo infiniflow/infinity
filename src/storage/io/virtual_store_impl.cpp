@@ -268,13 +268,8 @@ void VirtualStore::RecursiveCleanupAllEmptyDir(const std::string &path) {
         RecursiveCleanupAllEmptyDir(entry.path());
     }
 
-    for (const auto &entry : std::filesystem::directory_iterator(path)) {
-        auto entry_path = entry.path();
-
-        // Skip removing empty files of fulltext index, because they might be used.
-        if (std::filesystem::is_empty(entry_path) && !entry_path.filename().string().starts_with("ft_")) {
-            std::filesystem::remove(entry_path);
-        }
+    if (std::filesystem::is_empty(path)) {
+        std::filesystem::remove(path);
     }
 }
 
