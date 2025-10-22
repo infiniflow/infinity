@@ -52,11 +52,6 @@ public:
     inline std::shared_ptr<std::vector<std::shared_ptr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
 private:
-    void OptimizeIndex(QueryContext *query_context, OperatorState *operator_state);
-
-    void OptIndex(QueryContext *query_context, OperatorState *operator_state);
-
-private:
     std::string db_name_{};
     std::string table_name_{};
     std::string index_name_{};
