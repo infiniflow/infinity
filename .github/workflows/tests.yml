@@ -191,7 +191,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v $PWD/var_infinity:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Start minio container
         if: ${{ !cancelled() && !failure() }}
@@ -215,6 +215,7 @@ jobs:
         run: |
           echo 'debug unit test log' && tail -n 1000 debug_unit_test*.log
           mkdir -p ${ARTIFACTS_DIR}/debug_unit_test/ && cp debug_unit_test*.log ${ARTIFACTS_DIR}/debug_unit_test/
+          cp var_infinity/wal/wal.log* ${ARTIFACTS_DIR}/debug_unit_test/
 
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
@@ -251,7 +252,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v $PWD/var_infinity:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -276,7 +277,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_sqllogic_test/ && cp debug_sqllogictest*.log ${ARTIFACTS_DIR}/debug_sqllogic_test/
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_sqllogic_test/infinity.log
+          cp var_infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_sqllogic_test/
           echo 'debug sqllogictest log' && tail -n 1000 debug_sqllogictest*.log
 
       - name: Generate LCOV report
@@ -319,7 +320,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v $PWD/var_infinity:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -360,7 +361,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v $PWD/var_infinity:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -385,7 +386,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_pysdk_test && cp debug_pysdk*.log ${ARTIFACTS_DIR}/debug_pysdk_test/
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_pysdk_test/
+          cp var_infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_pysdk_test/
           echo 'debug pysdk log' && tail -n 1000 debug_pysdk*.log
 
       - name: Generate LCOV report
@@ -429,7 +430,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v $PWD/var_infinity:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -454,7 +455,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_http_test && cp debug_http*.log ${ARTIFACTS_DIR}/debug_http_test/
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_http_test/
+          cp var_infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_http_test/
           echo 'debug http log' && tail -n 1000 debug_http*.log
 
       - name: Generate LCOV report
@@ -499,7 +500,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v $PWD/var_infinity:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -524,7 +525,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_parallel_test && cp debug_parallel_stderr.log ${ARTIFACTS_DIR}/debug_parallel_test/
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_parallel_test/
+          cp var_infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_parallel_test/
           echo 'debug parallel log' && tail -n 1000 debug_parallel*.log
 
       - name: Generate LCOV report
@@ -567,7 +568,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v $PWD/var_infinity:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Upload coverage reports to Codecov
         if: ${{ !cancelled() && !failure() }}
@@ -634,7 +635,8 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          mkdir $PWD/var_infinity
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v $PWD/var_infinity:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Start minio container
         if: ${{ !cancelled() && !failure() }}
@@ -658,6 +660,7 @@ jobs:
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_unit_test && cp reldeb_unit_test*.log ${ARTIFACTS_DIR}/reldeb_unit_test/
           echo 'reldeb unit test log' && tail -n 1000 reldeb_unit_test*.log
+          cp var_infinity/wal/wal.log* ${ARTIFACTS_DIR}/reldeb_unit_test/
 
       - name: Remove test container
         if: always()
@@ -686,7 +689,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v $PWD/var_infinity:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -707,7 +710,7 @@ jobs:
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_sqllogic_test && cp reldeb_sqllogic_test*.log ${ARTIFACTS_DIR}/reldeb_sqllogic_test/
           cp reldeb_sqllogic_test* ${ARTIFACTS_DIR}/reldeb_sqllogic_test/
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_sqllogic_test/
+          cp var_infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_sqllogic_test/
           echo 'reldeb sqllogic test log' && tail -n 1000 reldeb_sqllogic_test*.log
 
       - name: Remove test container
@@ -735,7 +738,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v $PWD/var_infinity:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -755,7 +758,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_pysdk_test && cp reldeb_pysdk*.log ${ARTIFACTS_DIR}/reldeb_pysdk_test/
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_pysdk_test/
+          cp var_infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_pysdk_test/
           echo 'reldeb pysdk log' && tail -n 1000 reldeb_pysdk*.log
 
       - name: Remove test container
@@ -783,7 +786,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v $PWD/var_infinity:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -803,7 +806,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_http_test && cp reldeb_http*.log ${ARTIFACTS_DIR}/reldeb_http_test/
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_http_test/
+          cp var_infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_http_test/
           echo 'reldeb http log' && tail -n 1000 reldeb_http*.log
 
       - name: Remove test container
@@ -831,7 +834,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v $PWD/var_infinity:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -851,7 +854,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_pysdk_parallel_test && cp reldeb_pysdk_parallel*.log ${ARTIFACTS_DIR}/reldeb_pysdk_parallel_test/
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_pysdk_parallel_test/
+          cp var_infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_pysdk_parallel_test/
           echo 'reldeb parallel log' && tail -n 1000 reldeb_pysdk_parallel*.log
 
       - name: Remove test container
@@ -879,7 +882,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v $PWD/var_infinity:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -912,7 +915,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_minio_pysdk_test && cp reldeb_minio_pysdk*.log ${ARTIFACTS_DIR}/reldeb_minio_pysdk_test/
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_minio_pysdk_test/
+          cp var_infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_minio_pysdk_test/
           echo 'reldeb minio pysdk log' && tail -n 1000 reldeb_minio_pysdk*.log
 
       - name: Remove test container
@@ -942,7 +945,7 @@ jobs:
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity -v $PWD/var_infinity:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -979,7 +982,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_minio_parallel_test && cp reldeb_minio_parallel*.log ${ARTIFACTS_DIR}/reldeb_minio_parallel_test/
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_minio_parallel_test/
+          cp var_infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_minio_parallel_test/
           echo 'reldeb minio parallel log' && tail -n 1000 reldeb_minio_parallel*.log
 
       - name: Remove test container
