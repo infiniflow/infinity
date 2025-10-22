@@ -4548,18 +4548,21 @@ Status NewTxn::Cleanup() {
     TxnTimeStamp oldest_txn_begin_ts = txn_mgr_->GetOldestAliveTS();
     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
 
-    if (last_cleanup_ts >= oldest_txn_begin_ts) {
-        LOG_TRACE(fmt::format("SKIP cleanup. last_cleanup_ts: {}, oldest_txn_begin_ts: {}", last_cleanup_ts, oldest_txn_begin_ts));
+    // We will only clean up entities dropped before both the begin timestamp of active transactions and the latest checkpoint,
+    // ensuring the entities are no longer needed.
+    TxnTimeStamp visible_ts = std::min(oldest_txn_begin_ts, last_checkpoint_ts);
+    if (last_cleanup_ts < visible_ts) {
+        LOG_INFO(fmt::format("Cleaning ts < {} dropped entities...", visible_ts));
+    } else {
+        LOG_INFO(fmt::format("SKIP cleanup. last_cleanup_ts: {}, oldest_txn_begin_ts: {}, last_checkpoint_ts: {}",
+                             last_cleanup_ts,
+                             oldest_txn_begin_ts,
+                             last_checkpoint_ts));
 
         return Status::OK();
     }
 
     KVInstance *kv_instance = kv_instance_.get();
-
-    TxnTimeStamp visible_ts = std::min(begin_ts, last_checkpoint_ts);
-
-    LOG_INFO(fmt::format("Cleaning ts < {} dropped entities...", visible_ts));
-
     std::vector<std::string> dropped_keys;
     std::vector<std::shared_ptr<MetaKey>> metas;
     Status status = new_catalog_->GetCleanedMeta(visible_ts, kv_instance, metas, dropped_keys);
