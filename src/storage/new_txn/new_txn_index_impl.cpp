@@ -1879,11 +1879,17 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta,
     RowID start_row_id(segment_id, 0);
     for (const ChunkIndexMetaInfo &chunk_index_meta_info : chunk_index_meta_infos) {
         if (chunk_index_meta_info.base_row_id_ != start_row_id) {
-            UnrecoverableError(fmt::format("Chunk index row alignment error: Expected {} but got {}",
+            UnrecoverableError(fmt::format("Chunk index row alignment error: Expected {}.{} but got {}.{}",
+                                           start_row_id.segment_id_,
+                                           start_row_id.segment_offset_,
                                            chunk_index_meta_info.base_row_id_.segment_id_,
-                                           start_row_id.segment_id_));
+                                           chunk_index_meta_info.base_row_id_.segment_offset_));
         }
         start_row_id = chunk_index_meta_info.base_row_id_ + chunk_index_meta_info.row_cnt_;
+        LOG_TRACE(fmt::format("CountMemIndexGapInSegment: Chunk index row id {}.{}, row count {}",
+                              chunk_index_meta_info.base_row_id_.segment_id_,
+                              chunk_index_meta_info.base_row_id_.segment_offset_,
+                              chunk_index_meta_info.row_cnt_));
     }
 
     std::vector<BlockID> *block_ids_ptr = nullptr;
