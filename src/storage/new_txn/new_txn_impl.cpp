@@ -1877,7 +1877,7 @@ Status NewTxn::Commit() {
         TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(this);
         this->SetTxnCommitting(commit_ts);
         this->SetTxnCommitted();
-        if (!meta_cache_items_.empty() || !cache_infos_.empty()) {
+        if (!MetaCacheAndCacheInfoEmpty()) {
             txn_mgr_->SaveOrResetMetaCacheForReadTxn(this);
         }
 
@@ -5469,17 +5469,30 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
     return Status::OK();
 }
 
-void NewTxn::AddMetaCache(const std::shared_ptr<MetaBaseCache> &meta_base_cache) { meta_cache_items_.emplace_back(meta_base_cache); }
+void NewTxn::AddMetaCache(const std::shared_ptr<MetaBaseCache> &meta_base_cache) {
+    std::lock_guard<std::mutex> lock(cache_mtx_);
+    meta_cache_items_.emplace_back(meta_base_cache);
+}
 
-void NewTxn::AddCacheInfo(const std::shared_ptr<CacheInfo> &cache_info) { cache_infos_.emplace_back(cache_info); }
+void NewTxn::AddCacheInfo(const std::shared_ptr<CacheInfo> &cache_info) {
+    std::lock_guard<std::mutex> lock(cache_mtx_);
+    cache_infos_.emplace_back(cache_info);
+}
+
+bool NewTxn::MetaCacheAndCacheInfoEmpty() {
+    std::lock_guard<std::mutex> lock(cache_mtx_);
+    return meta_cache_items_.empty() && cache_infos_.empty();
+}
 
 void NewTxn::ResetMetaCacheAndCacheInfo() {
+    std::lock_guard<std::mutex> lock(cache_mtx_);
     meta_cache_items_.clear();
     cache_infos_.clear();
 }
 
 void NewTxn::SaveMetaCacheAndCacheInfo() {
     MetaCache *meta_cache_ptr = txn_mgr_->storage()->meta_cache();
+    std::lock_guard<std::mutex> lock(cache_mtx_);
     meta_cache_ptr->Put(meta_cache_items_, cache_infos_, this->BeginTS());
 }
 
