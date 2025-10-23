@@ -1598,8 +1598,6 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDelete, test_delete_and_drop_column) {
@@ -2225,8 +2223,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDelete, test_delete_and_rename) {
@@ -2839,8 +2835,6 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDelete, test_delete_and_create_index) {
@@ -3469,8 +3463,6 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDelete, test_delete_and_drop_index) {
@@ -4155,8 +4147,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDelete, test_delete_and_import) {
@@ -4909,8 +4899,6 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDelete, test_delete_and_append) {
@@ -5646,8 +5634,6 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDelete, test_delete_and_delete) {
@@ -6193,8 +6179,6 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDelete, test_delete_and_compact) {
@@ -6607,8 +6591,6 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
 
         DropDB();
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDelete, test_delete_and_optimize_index) {
@@ -7012,6 +6994,4 @@ TEST_P(TestTxnDelete, test_delete_and_optimize_index) {
 
         DropDB();
     }
-
-    RemoveDbDirs();
 }

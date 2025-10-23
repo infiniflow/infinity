@@ -930,8 +930,6 @@ TEST_P(TestTxnUpdate, test_update_and_drop_table) {
 
         DropDatabase(setup);
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnUpdate, test_update_and_drop_index) {
@@ -1081,8 +1079,6 @@ TEST_P(TestTxnUpdate, test_update_and_drop_index) {
 
         DropDatabase(setup);
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnUpdate, test_update_and_dump_index) {
@@ -1198,8 +1194,6 @@ TEST_P(TestTxnUpdate, test_update_and_dump_index) {
 
         DropDatabase(setup);
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
@@ -1431,8 +1425,6 @@ TEST_P(TestTxnUpdate, test_update_and_add_drop_column_conflicts) {
 
         DropDatabase(setup);
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnUpdate, test_update_and_compact_conflicts) {
@@ -1555,7 +1547,6 @@ TEST_P(TestTxnUpdate, test_update_and_compact_conflicts) {
 
         DropDatabase(setup);
     }
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnUpdate, test_update_and_create_index_conflicts) {
@@ -1680,8 +1671,6 @@ TEST_P(TestTxnUpdate, test_update_and_create_index_conflicts) {
 
         DropDatabase(setup);
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnUpdate, test_update_and_delete_conflicts) {
@@ -1841,8 +1830,6 @@ TEST_P(TestTxnUpdate, test_update_and_delete_conflicts) {
 
         DropDatabase(setup);
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnUpdate, test_update_and_delete_no_conflicts) {
@@ -1934,6 +1921,4 @@ TEST_P(TestTxnUpdate, test_update_and_delete_no_conflicts) {
 
         DropDatabase(setup);
     }
-
-    RemoveDbDirs();
 }
