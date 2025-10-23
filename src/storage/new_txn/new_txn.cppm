@@ -674,6 +674,7 @@ public:
 
     void AddMetaCache(const std::shared_ptr<MetaBaseCache> &meta_base_cache);
     void AddCacheInfo(const std::shared_ptr<CacheInfo> &cache_info);
+    bool MetaCacheAndCacheInfoEmpty();
     void ResetMetaCacheAndCacheInfo();
     void SaveMetaCacheAndCacheInfo();
 
@@ -729,9 +730,8 @@ private:
     // Use for commit and rollback
     std::vector<std::unique_ptr<std::binary_semaphore>> semas_{};
 
-    // Meta cache
+    std::mutex cache_mtx_{};
     std::vector<std::shared_ptr<MetaBaseCache>> meta_cache_items_{}; // cache item to store
-
     std::vector<std::shared_ptr<CacheInfo>> cache_infos_{};
 
 private:
