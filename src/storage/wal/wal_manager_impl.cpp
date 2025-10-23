@@ -350,6 +350,23 @@ void WalManager::NewFlush() {
         }
         txn_batch.clear();
 
+        if (!VirtualStore::Exists(wal_path_)) {
+            LOG_ERROR(fmt::format("WAL file: {} does not exist", wal_path_));
+            LOG_ERROR(fmt::format("To list the files in WAL directory: {}", wal_dir_));
+            auto [entries, status] = VirtualStore::ListDirectory(wal_dir_);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+            for (const auto &entry : entries) {
+                const auto &filename = entry->path().string();
+                LOG_ERROR(fmt::format("WAL file: {} ", filename));
+            }
+            if (entries.empty()) {
+                LOG_ERROR(fmt::format("No files in {}", wal_dir_));
+            }
+            UnrecoverableError("WAL files not found");
+        }
+
         // Check if the wal file is too large, swap to a new one.
         try {
             auto file_size = VirtualStore::GetFileSize(wal_path_);
