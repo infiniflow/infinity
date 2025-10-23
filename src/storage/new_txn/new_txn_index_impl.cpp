@@ -387,7 +387,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     }
 
     std::optional<ChunkIndexMeta> chunk_index_meta;
-    FileWorker *buffer_obj = nullptr;
+    FileWorker *index_file_worker = nullptr;
     {
         status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
                                                this,
@@ -401,7 +401,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         if (!status.ok()) {
             return status;
         }
-        status = chunk_index_meta->GetIndexBuffer(buffer_obj);
+        status = chunk_index_meta->GetIndexBuffer(index_file_worker);
         if (!status.ok()) {
             return status;
         }
@@ -414,19 +414,19 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                 ChunkID old_chunk_id = deprecate_ids[i];
                 ChunkIndexMeta old_chunk_meta(old_chunk_id, segment_index_meta);
 
-                FileWorker *buffer_obj = nullptr;
+                FileWorker *index_file_worker{};
                 {
                     // Status status = NewCatalog::GetChunkIndex(old_chunk_meta, buffer_obj);
-                    status = old_chunk_meta.GetIndexBuffer(buffer_obj);
+                    status = old_chunk_meta.GetIndexBuffer(index_file_worker);
                     if (!status.ok()) {
                         return status;
                     }
                 }
-                old_buffers.emplace_back(row_cnts[i], buffer_obj);
+                old_buffers.emplace_back(row_cnts[i], index_file_worker);
             }
 
             SecondaryIndexData *data_ptr{};
-            buffer_obj->Read(data_ptr);
+            index_file_worker->Read(data_ptr);
             data_ptr->InsertMergeData(old_buffers);
             break;
         }
@@ -446,7 +446,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             }
 
             IVFIndexInChunk *data_ptr{};
-            buffer_obj->Read(data_ptr);
+            index_file_worker->Read(data_ptr);
             data_ptr->BuildIVFIndex(segment_meta, row_cnt, column_def);
             break;
         }
@@ -461,7 +461,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                 }
                 column_def = std::move(col_def);
             }
-            status = OptimizeVecIndex(index_base, column_def, segment_meta, base_rowid, row_cnt, buffer_obj);
+            status = OptimizeVecIndex(index_base, column_def, segment_meta, base_rowid, row_cnt, index_file_worker);
             if (!status.ok()) {
                 return status;
             }
@@ -479,7 +479,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             }
 
             EMVBIndex *data_ptr{};
-            buffer_obj->Read(data_ptr);
+            index_file_worker->Read(data_ptr);
             data_ptr->BuildEMVBIndex(base_rowid, row_cnt, segment_meta, column_def);
             break;
         }
@@ -495,7 +495,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         }
     }
 
-    [[maybe_unused]] auto foo = buffer_obj->Write();
+    [[maybe_unused]] auto foo = index_file_worker->Write();
 
     std::vector<WalChunkIndexInfo> chunk_infos;
     chunk_infos.emplace_back(*chunk_index_meta);
@@ -1366,7 +1366,7 @@ Status NewTxn::PopulateIvfIndexInner(std::shared_ptr<IndexBase> index_base,
     }
     new_chunk_ids.push_back(chunk_id);
     std::optional<ChunkIndexMeta> chunk_index_meta;
-    FileWorker *buffer_obj = nullptr;
+    FileWorker *index_file_worker{};
     {
         Status status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
                                                       this,
@@ -1380,17 +1380,17 @@ Status NewTxn::PopulateIvfIndexInner(std::shared_ptr<IndexBase> index_base,
         if (!status.ok()) {
             return status;
         }
-        status = chunk_index_meta->GetIndexBuffer(buffer_obj);
+        status = chunk_index_meta->GetIndexBuffer(index_file_worker);
         if (!status.ok()) {
             return status;
         }
     }
     {
         IVFIndexInChunk *data_ptr{};
-        buffer_obj->Read(data_ptr);
+        index_file_worker->Read(data_ptr);
         data_ptr->BuildIVFIndex(segment_meta, row_count, column_def);
     }
-    [[maybe_unused]] auto foo = buffer_obj->Write();
+    [[maybe_unused]] auto foo = index_file_worker->Write();
     return Status::OK();
 }
 
@@ -1415,7 +1415,7 @@ Status NewTxn::PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
         return status;
     }
     new_chunk_ids.push_back(chunk_id);
-    FileWorker *buffer_obj{};
+    FileWorker *index_file_worker{};
     {
         std::optional<ChunkIndexMeta> chunk_index_meta;
         Status status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
@@ -1427,17 +1427,17 @@ Status NewTxn::PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
                                                       "" /*base_name*/,
                                                       0 /*index_size*/,
                                                       chunk_index_meta);
-        status = chunk_index_meta->GetIndexBuffer(buffer_obj);
+        status = chunk_index_meta->GetIndexBuffer(index_file_worker);
         if (!status.ok()) {
             return status;
         }
     }
     {
         EMVBIndex *data_ptr{};
-        buffer_obj->Read(data_ptr);
+        index_file_worker->Read(data_ptr);
         data_ptr->BuildEMVBIndex(base_row_id, row_count, segment_meta, column_def);
     }
-    [[maybe_unused]] auto foo = buffer_obj->Write();
+    [[maybe_unused]] auto foo = index_file_worker->Write();
     return Status::OK();
 }
 
@@ -1625,9 +1625,9 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
                     return status;
                 }
 
-                BMPHandlerPtr bmp_handler{};
+                BMPHandlerPtr *bmp_handler{};
                 index_buffer->Read(bmp_handler);
-                bmp_handler->Optimize(options);
+                (*bmp_handler)->Optimize(options);
             }
             std::shared_ptr<BMPIndexInMem> bmp_index = mem_index->GetBMPIndex();
             if (bmp_index) {
@@ -1719,7 +1719,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
             break;
         }
         case IndexType::kFullText: {
-           auto memory_indexer = mem_index->GetFulltextIndex();
+            auto memory_indexer = mem_index->GetFulltextIndex();
             if (memory_indexer == nullptr) {
                 return Status::EmptyMemIndex();
             }
@@ -1774,7 +1774,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
     }
 
     std::optional<ChunkIndexMeta> chunk_index_meta;
-    FileWorker *buffer_obj = nullptr;
+    FileWorker *index_file_worker = nullptr;
     {
         Status status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
                                                       this,
@@ -1794,38 +1794,38 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
                                                        segment_index_meta.segment_id(),
                                                        new_chunk_id});
 
-        status = chunk_index_meta->GetIndexBuffer(buffer_obj);
+        status = chunk_index_meta->GetIndexBuffer(index_file_worker);
         if (!status.ok()) {
             return status;
         }
     }
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
-            memory_secondary_index->Dump(buffer_obj);
-            [[maybe_unused]] auto foo = buffer_obj->Write();
+            memory_secondary_index->Dump(index_file_worker);
+            [[maybe_unused]] auto foo = index_file_worker->Write();
             break;
         }
         case IndexType::kFullText: {
             break;
         }
         case IndexType::kIVF: {
-            memory_ivf_index->Dump(buffer_obj);
-            [[maybe_unused]] auto foo = buffer_obj->Write();
+            memory_ivf_index->Dump(index_file_worker);
+            [[maybe_unused]] auto foo = index_file_worker->Write();
             break;
         }
         case IndexType::kHnsw: {
-            memory_hnsw_index->Dump(buffer_obj);
-            [[maybe_unused]] auto foo = buffer_obj->Write();
+            memory_hnsw_index->Dump(index_file_worker);
+            [[maybe_unused]] auto foo = index_file_worker->Write();
             break;
         }
         case IndexType::kBMP: {
-            memory_bmp_index->Dump(buffer_obj);
-            [[maybe_unused]] auto foo = buffer_obj->Write();
+            memory_bmp_index->Dump(index_file_worker);
+            [[maybe_unused]] auto foo = index_file_worker->Write();
             break;
         }
         case IndexType::kEMVB: {
-            memory_emvb_index->Dump(buffer_obj);
-            [[maybe_unused]] auto foo = buffer_obj->Write();
+            memory_emvb_index->Dump(index_file_worker);
+            [[maybe_unused]] auto foo = index_file_worker->Write();
             break;
         }
         default: {

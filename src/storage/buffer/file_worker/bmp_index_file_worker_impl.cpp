@@ -14,6 +14,9 @@
 
 module;
 
+#include <sys/mman.h>
+#include <unistd.h>
+
 module infinity_core:bmp_index_file_worker.impl;
 
 import :bmp_index_file_worker;
@@ -62,12 +65,16 @@ BMPIndexFileWorker::~BMPIndexFileWorker() {
     //     mmap_data_ = nullptr;
     // }
     FreeInMemory();
+
+    munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
 void BMPIndexFileWorker::AllocateInMemory() {
     // if (data_) {
     //     UnrecoverableError("Data is already allocated.");
     // }
+    std::println("fuck the allocate bmp");
     data_ = static_cast<void *>(new BMPHandlerPtr());
 }
 
@@ -82,12 +89,13 @@ void BMPIndexFileWorker::FreeInMemory() {
 }
 
 bool BMPIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+    std::println("W bmp");
     if (!data_) {
         UnrecoverableError("Data is not allocated.");
     }
     auto *bmp_handler = reinterpret_cast<BMPHandlerPtr *>(data_);
     // if (to_spill) {
-    //     (*bmp_handler)->Save(*file_handle_);
+    // (*bmp_handler)->Save(*file_handle_);
     // } else {
     (*bmp_handler)->SaveToPtr(*file_handle_);
     // }
@@ -99,7 +107,9 @@ void BMPIndexFileWorker::Read(size_t file_size, bool other) {
     // if (data_ != nullptr) {
     //     UnrecoverableError("Data is already allocated.");
     // }
-    data_ = static_cast<void *>(new BMPHandlerPtr(BMPHandler::Make(index_base_.get(), column_def_.get()).release()));
+    std::println("R bmp");
+    // FreeInMemory();
+    // data_ = static_cast<void *>(new BMPHandlerPtr(BMPHandler::Make(index_base_.get(), column_def_.get()).release()));
     auto *bmp_handler = reinterpret_cast<BMPHandlerPtr *>(data_);
     // if (from_spill) {
     //     (*bmp_handler)->Load(*file_handle_);

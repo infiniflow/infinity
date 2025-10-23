@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <sys/mman.h>
+#include <unistd.h>
+
 module infinity_core:secondary_index_file_worker.impl;
 
 import :secondary_index_file_worker;
@@ -34,12 +39,15 @@ SecondaryIndexFileWorker::~SecondaryIndexFileWorker() {
     //     data_ = nullptr;
     // }
     FreeInMemory();
+    munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
 void SecondaryIndexFileWorker::AllocateInMemory() {
     // if (data_) [[unlikely]] {
     //     UnrecoverableError("AllocateInMemory: Already allocated.");
     // } else
+    std::println("fuck the allocate secondary");
     if (auto &data_type = column_def_->type(); data_type->CanBuildSecondaryIndex()) [[likely]] {
         data_ = static_cast<void *>(GetSecondaryIndexData(data_type, row_count_, true));
         LOG_TRACE("Finished AllocateInMemory().");
@@ -60,6 +68,7 @@ void SecondaryIndexFileWorker::FreeInMemory() {
 }
 
 bool SecondaryIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+    std::println("W sec");
     if (data_) [[likely]] {
         auto index = static_cast<SecondaryIndexData *>(data_);
         index->SaveIndexInner(*file_handle_);
@@ -72,6 +81,7 @@ bool SecondaryIndexFileWorker::Write(bool &prepare_success, const FileWorkerSave
 }
 
 void SecondaryIndexFileWorker::Read(size_t file_size, bool other) {
+    std::println("R sec");
     // if (!data_) [[likely]] {
         auto index = GetSecondaryIndexData(column_def_->type(), row_count_, false);
         index->ReadIndexInner(*file_handle_);

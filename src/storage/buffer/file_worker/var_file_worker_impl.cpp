@@ -38,10 +38,12 @@ VarFileWorker::VarFileWorker(std::shared_ptr<std::string> file_path, size_t buff
 VarFileWorker::~VarFileWorker() {
     VarFileWorker::FreeInMemory();
     munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
 void VarFileWorker::AllocateInMemory() {
     auto *buffer = new VarBuffer(this);
+    std::println("fuck the allocate var");
     data_ = static_cast<void *>(buffer);
 }
 
@@ -50,9 +52,18 @@ void VarFileWorker::FreeInMemory() {
     // buffer_size_ = buffer->TotalSize();
     delete buffer;
     data_ = nullptr;
+
+    munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
+struct bbb {
+    bbb() { std::println("W var"); }
+    ~bbb() noexcept { std::println("~W var"); }
+};
+
 bool VarFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+    bbb _;
     if (mmap_) {
         // return true;
         munmap(mmap_, mmap_size_);
@@ -70,14 +81,21 @@ bool VarFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     ftruncate(fd, mmap_size_);
 
     mmap_ = mmap(nullptr, mmap_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-
-    std::memcpy(mmap_, buffer_data.get(), mmap_size_);
-
+    if (mmap_ == MAP_FAILED) {
+        std::println("this code");
+        mmap_ = nullptr;
+    } else {
+        std::println("mmap_size: {}", mmap_size_);
+        std::memcpy(mmap_, ptr, mmap_size_);
+    }
+    // close(fd);
     prepare_success = true;
+
     return true;
 }
 
 void VarFileWorker::Read(size_t file_size, bool other) {
+    // std::println("R var");
     if (!mmap_) {
         // if (file_size < buffer_size_) {
         //     UnrecoverableError(fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_));
@@ -99,9 +117,14 @@ void VarFileWorker::Read(size_t file_size, bool other) {
         data_ = static_cast<void *>(var_buffer);
 
         auto fd = file_handle_->fd();
-
+        // close(fd);
         mmap_size_ = buffer_size;
-        mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+        mmap_ = mmap(nullptr, mmap_size_, PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+        if (mmap_ == MAP_FAILED) {
+            std::println("that code: {}", mmap_size_);
+            mmap_ = nullptr;
+        }
+        // close(fd);
     }
 }
 

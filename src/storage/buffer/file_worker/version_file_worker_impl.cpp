@@ -45,19 +45,34 @@ VersionFileWorker::~VersionFileWorker() {
 
 void VersionFileWorker::AllocateInMemory() {
     auto *data = new BlockVersion(capacity_);
+    std::println("fuck the allocate version");
     data_ = static_cast<void *>(data);
 }
 
 void VersionFileWorker::FreeInMemory() {
+    if (data_ == nullptr) {
+        return;
+    }
+    std::println("free the allocate version");
     auto *data = static_cast<BlockVersion *>(data_);
     delete data;
     data_ = nullptr;
+
+    munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
+struct aaa {
+    aaa(const std::string &tmp) : tmp_(tmp) { std::println("W version: {}", tmp_); }
+    ~aaa() noexcept { std::println("~W version: {}", tmp_); }
+    std::string tmp_;
+};
+
 bool VersionFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &base_ctx) {
+    aaa _{*rel_file_path_};
     if (mmap_) {
         munmap(mmap_, mmap_size_);
-        mmap_size_ = mmap_size_;
+        // mmap_size_ = mmap_size_;
     }
 
     if (data_ == nullptr) {
@@ -67,7 +82,10 @@ bool VersionFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ba
 
     const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
     TxnTimeStamp ckp_ts = ctx.checkpoint_ts_;
-    bool is_full = data->SaveToFile(mmap_, mmap_size_, ckp_ts, *file_handle_);
+    // if (mmap_size_ == 0) {
+    //     return true;
+    // }
+    bool is_full = data->SaveToFile(mmap_, mmap_size_, *rel_file_path_, ckp_ts, *file_handle_);
     if (is_full) {
         LOG_TRACE(fmt::format("Version file is full: {}", GetFilePath()));
         // if the version file is full, return true to spill to file
@@ -80,8 +98,19 @@ void VersionFileWorker::Read(size_t file_size, bool other) {
     // if (data_ != nullptr) {
     //     UnrecoverableError("Data is already allocated.");
     // }
-    auto *data = BlockVersion::LoadFromFile(mmap_, file_handle_.get()).release();
-    data_ = static_cast<void *>(data);
+    // FreeInMemory();
+    std::println("R version");
+    // auto *data = static_cast<BlockVersion *>(data_);
+    BlockVersion::LoadFromFile(data_, mmap_size_, mmap_, file_handle_.get());
+    // data_ = static_cast<void *>(data);
+
+    // std::memcpy(data_, data, sizeof(BlockVersion));
+    // std::memcpy(data_, data, sizeof(BlockVersion));
+
+    // auto *nmsl_data = static_cast<BlockVersion *>(data_);
+    // *nmsl_data = std::move(*data);
+    //
+    // delete data;
 }
 
 } // namespace infinity

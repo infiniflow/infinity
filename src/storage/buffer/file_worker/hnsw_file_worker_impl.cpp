@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <sys/mman.h>
+#include <unistd.h>
+
 module infinity_core:hnsw_file_worker.impl;
 
 import :hnsw_file_worker;
@@ -67,12 +72,15 @@ HnswFileWorker::~HnswFileWorker() {
     // }
 
     HnswFileWorker::FreeInMemory();
+    munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
 void HnswFileWorker::AllocateInMemory() {
     // if (data_) {
     //     UnrecoverableError("Data is already allocated.");
     // }
+    std::println("fuck the allocate hnsw");
     data_ = static_cast<void *>(new HnswHandlerPtr());
 }
 
@@ -87,6 +95,7 @@ void HnswFileWorker::FreeInMemory() {
 }
 
 bool HnswFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+    std::println("W hnsw");
     if (!data_) {
         UnrecoverableError("WriteToFileImpl: Data is not allocated.");
     }
@@ -97,6 +106,7 @@ bool HnswFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) 
 }
 
 void HnswFileWorker::Read(size_t file_size, bool other) {
+    std::println("R hnsw");
     // if (data_ != nullptr) {
     //     UnrecoverableError("Data is already allocated.");
     // }

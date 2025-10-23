@@ -41,6 +41,7 @@ FileReader::FileReader(const std::string &path, size_t buffer_size)
     }
 
     file_handle_ = std::move(file_handle);
+    // close(file_handle_->fd());
     file_size_ = file_handle_->FileSize();
 }
 

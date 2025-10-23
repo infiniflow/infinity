@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <sys/mman.h>
+#include <unistd.h>
+
 module infinity_core:ivf_index_file_worker.impl;
 
 import :ivf_index_file_worker;
@@ -33,12 +38,16 @@ IVFIndexFileWorker::~IVFIndexFileWorker() {
     //     data_ = nullptr;
     // }
     FreeInMemory();
+
+    munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
 void IVFIndexFileWorker::AllocateInMemory() {
     // if (data_) [[unlikely]] {
     //     UnrecoverableError("AllocateInMemory: Already allocated.");
     // }
+    std::println("fuck the allocate ivf");
     data_ = static_cast<void *>(IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get()));
 }
 
@@ -55,6 +64,7 @@ void IVFIndexFileWorker::FreeInMemory() {
 }
 
 bool IVFIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+    std::println("W ivf");
     if (data_) {
         auto index = static_cast<IVFIndexInChunk *>(data_);
         index->SaveIndexInner(*file_handle_);
@@ -67,15 +77,16 @@ bool IVFIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &c
 }
 
 void IVFIndexFileWorker::Read(size_t file_size, bool other) {
+    std::println("R ivf");
     // if (!data_) {
-        auto index = IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get());
-        index->ReadIndexInner(*file_handle_);
-        data_ = static_cast<void *>(index);
-        LOG_TRACE("Finished Read().");
+    auto index = IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get());
+    index->ReadIndexInner(*file_handle_);
+    data_ = static_cast<void *>(index);
+    LOG_TRACE("Finished Read().");
     // }
-// else {
-//         UnrecoverableError("Read: data_ is not nullptr");
-//     }
+    // else {
+    //         UnrecoverableError("Read: data_ is not nullptr");
+    //     }
 }
 
 } // namespace infinity

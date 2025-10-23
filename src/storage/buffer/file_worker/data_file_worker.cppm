@@ -41,7 +41,7 @@ protected:
     void SetDataSize(size_t size) override;
 
 private:
-    const size_t buffer_size_;
+    size_t buffer_size_;
     std::atomic<size_t> data_size_{};
 };
 } // namespace infinity

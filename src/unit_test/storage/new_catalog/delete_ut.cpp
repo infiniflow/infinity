@@ -402,7 +402,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
     //                            |----------------------|----------|
     //                           t2                  drop db    commit (success)
     {
-        std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+        auto db_name = std::make_shared<std::string>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
         auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -457,7 +457,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
     //                            |----------------------|----------|
     //                           t2                  drop db    commit (success)
     {
-        std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+        auto db_name = std::make_shared<std::string>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
         auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -514,7 +514,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
     //                            |----------------------|----------|
     //                           t2                  drop db    commit (success)
     {
-        std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+        auto db_name = std::make_shared<std::string>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
         auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -568,7 +568,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
     //         |----------------------|----------|
     //        t2                  drop db    commit (success)
     {
-        std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+        auto db_name = std::make_shared<std::string>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
         auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -622,7 +622,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
@@ -700,7 +700,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
     //                            |----------------------|----------|
     //                           t2                  drop table    commit (success)
     {
-        std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+        auto db_name = std::make_shared<std::string>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
         auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -762,7 +762,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
     //                            |----------------------|----------|
     //                           t2                  drop db    commit (success)
     {
-        std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+        auto db_name = std::make_shared<std::string>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
         auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -826,7 +826,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
     //                            |----------------------|----------|
     //                           t2                  drop table    commit (success)
     {
-        std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+        auto db_name = std::make_shared<std::string>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
         auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -887,7 +887,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
     //         |----------------------|----------|
     //        t2                  drop table    commit (success)
     {
-        std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+        auto db_name = std::make_shared<std::string>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
         auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -946,9 +946,9 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
 
 TEST_P(TestTxnDelete, test_delete_and_add_column) {
     using namespace infinity;
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
@@ -1021,7 +1021,7 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
         }
     };
 
-    std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
+    auto default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
     default_varchar->str_value_ = strdup("");
 
     //    t1      delete      commit (success)
@@ -1029,7 +1029,7 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
     //                            |----------------------|----------|
     //                           t2                  add column    commit (success)
     {
-        std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+        auto db_name = std::make_shared<std::string>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
         auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -1101,7 +1101,7 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
     //                    |----------------------|----------|
     //                    t2                  add column   commit (success)
     {
-        std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+        auto db_name = std::make_shared<std::string>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
         auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -1175,7 +1175,7 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
     //                    |-----------------------|-------------------------|
     //                    t2                  add column          commit (success)
     {
-        std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+        auto db_name = std::make_shared<std::string>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
         auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -1249,7 +1249,7 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
     //                    |-------------|-------------------|
     //                    t2        add column       commit (success)
     {
-        std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+        auto db_name = std::make_shared<std::string>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
         auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -1394,7 +1394,7 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
     //                    |----------------------|----------|
     //                    t2                  add column  commit (success)
     {
-        std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+        auto db_name = std::make_shared<std::string>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
         auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -1464,7 +1464,7 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
     //                    |----------------------|----------|
     //                    t2                  add column   commit (success)
     {
-        std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+        auto db_name = std::make_shared<std::string>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
         auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -1535,7 +1535,7 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
     //                    |----------------------|----------|
     //                    t2                  add column   commit (success)
     {
-        std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+        auto db_name = std::make_shared<std::string>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
         auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -1606,7 +1606,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
@@ -1679,7 +1679,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
         }
     };
 
-    std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
+    auto default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
     default_varchar->str_value_ = strdup("");
 
     //    t1      delete      commit (success)
@@ -1687,7 +1687,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
     //                            |----------------------|----------|
     //                           t2                  drop column    commit (success)
     {
-        std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+        auto db_name = std::make_shared<std::string>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
         auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -1754,7 +1754,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
     //                    |----------------------|----------|
     //                    t2                  drop column   commit (success)
     {
-        std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+        auto db_name = std::make_shared<std::string>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
         auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -6727,20 +6727,20 @@ TEST_P(TestTxnDelete, test_delete_and_optimize_index) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
         TxnTimeStamp begin_ts = txn->BeginTS();
         TxnTimeStamp commit_ts = txn->CommitTS();
-
+    
         std::shared_ptr<DBMeta> db_meta;
         std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
-
+    
         std::vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
         EXPECT_EQ(segment_ids_ptr->size(), 1);
         SegmentMeta segment_meta(segment_ids_ptr->at(0), *table_meta);
-
+    
         NewTxnGetVisibleRangeState state;
         std::vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();

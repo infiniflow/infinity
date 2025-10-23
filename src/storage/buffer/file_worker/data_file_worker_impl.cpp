@@ -49,6 +49,8 @@ DataFileWorker::~DataFileWorker() {
     //     UnrecoverableError("Data is already freed.");
     // }
     DataFileWorker::FreeInMemory();
+    munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
 void DataFileWorker::AllocateInMemory() {
@@ -58,10 +60,12 @@ void DataFileWorker::AllocateInMemory() {
     // if (buffer_size_ == 0) {
     //     UnrecoverableError("Buffer size is 0.");
     // }
+    std::println("fuck the allocate data");
     data_ = static_cast<void *>(new char[buffer_size_]{});
 }
 
 void DataFileWorker::FreeInMemory() {
+    std::println("free the allocate data");
     if (data_ == nullptr) {
         UnrecoverableError("Data is already freed.");
     }
@@ -69,46 +73,60 @@ void DataFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-// FIXME: to_spill
+struct ccc {
+    ccc(const std::string &tmp) : tmp_(tmp) { std::println("W data: {}", tmp_); }
+    ~ccc() noexcept { std::println("~W data: {}", tmp_); }
+    std::string tmp_;
+};
+
 bool DataFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     // File structure:
     // - header: magic number
     // - header: buffer size
     // - data buffer
     // - footer: checksum
-
+    ccc _{*rel_file_path_};
     if (mmap_) {
+        std::println("munmap {} {}", mmap_, *rel_file_path_);
         munmap(mmap_, mmap_size_);
         mmap_ = nullptr;
     }
 
     mmap_size_ = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
-    auto fd = file_handle_->fd();
-    VirtualStore::Truncate(GetFilePathTemp(), mmap_size_);
-    mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
-    size_t offset{};
+    if (mmap_size_ == 0) {
 
-    u64 magic_number = 0x00dd3344;
-    std::memcpy((char *)mmap_ + offset, &magic_number, sizeof(u64));
-    offset += sizeof(u64);
+    } else {
+        auto fd = file_handle_->fd();
+        VirtualStore::Truncate(GetFilePathTemp(), mmap_size_);
+        mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+        if (mmap_ == MAP_FAILED) {
+            std::println("fuck mmap mmap_");
+        }
+        size_t offset{};
 
-    std::memcpy((char *)mmap_ + offset, &buffer_size_, sizeof(buffer_size_));
-    offset += sizeof(buffer_size_);
+        u64 magic_number = 0x00dd3344;
+        std::println("pointer: {} & {} & {}", mmap_, *rel_file_path_, fd);
+        std::memcpy((char *)mmap_ + offset, &magic_number, sizeof(u64));
+        offset += sizeof(u64);
 
-    size_t data_size = data_size_.load();
-    std::memcpy((char *)mmap_ + offset, data_, data_size);
-    offset += data_size;
+        std::memcpy((char *)mmap_ + offset, &buffer_size_, sizeof(buffer_size_));
+        offset += sizeof(buffer_size_);
 
-    size_t unused_size = buffer_size_ - data_size;
-    if (unused_size > 0) {
-        std::string str(unused_size, '\0');
-        std::memcpy((char *)mmap_ + offset, str.c_str(), unused_size);
-        offset += unused_size;
+        size_t data_size = data_size_.load();
+        std::memcpy((char *)mmap_ + offset, data_, data_size);
+        offset += data_size;
+
+        size_t unused_size = buffer_size_ - data_size;
+        if (unused_size > 0) {
+            std::string str(unused_size, '\0');
+            std::memcpy((char *)mmap_ + offset, str.c_str(), unused_size);
+            offset += unused_size;
+        }
+
+        u64 checksum{};
+        std::memcpy((char *)mmap_ + offset, &checksum, sizeof(checksum));
+        offset += sizeof(u64);
     }
-
-    u64 checksum{};
-    std::memcpy((char *)mmap_ + offset, &checksum, sizeof(checksum));
-    offset += sizeof(u64);
 
     prepare_success = true; // Not run defer_fn
     // munmap(mmap_true_, mmap_len);
@@ -116,6 +134,7 @@ bool DataFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) 
 }
 
 void DataFileWorker::Read(size_t file_size, bool other) {
+    std::println("R data");
     if (!mmap_) {
         if (file_size < sizeof(u64) * 3) {
             RecoverableError(Status::DataIOError(fmt::format("Incorrect file length {}.", file_size)));
@@ -133,7 +152,7 @@ void DataFileWorker::Read(size_t file_size, bool other) {
             RecoverableError(Status::DataIOError(fmt::format("Read magic error, {} != 0x00dd3344.", magic_number)));
         }
 
-        u64 buffer_size_{};
+        // u64 buffer_size_{};
         auto [nbytes2, status2] = file_handle_->Read(&buffer_size_, sizeof(buffer_size_));
         if (nbytes2 != sizeof(buffer_size_)) {
             Status status = Status::DataIOError(fmt::format("Unmatched buffer length: {} / {}", nbytes2, buffer_size_));
@@ -165,7 +184,11 @@ void DataFileWorker::Read(size_t file_size, bool other) {
         auto fd = file_handle_->fd();
         mmap_size_ = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
         // std::memcpy((char *)mmap_true_, data_, mmap_true_size_);
-        mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+        mmap_ = mmap(nullptr, mmap_size_, PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+        if (mmap_ == MAP_FAILED) {
+            std::println("that code 2: {}", mmap_size_);
+            mmap_ = nullptr;
+        }
     }
 }
 
