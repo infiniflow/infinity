@@ -199,13 +199,13 @@ void BlockVersion::LoadFromFile(void *&data, size_t &mmap_size, void *&mmap_p, L
         std::memcpy(&block_version->deleted_[i], (char *)mmap_p + offset, sizeof(TxnTimeStamp));
         offset += sizeof(TxnTimeStamp);
     }
-    auto fd = file_handle->fd();
+    // auto fd = file_handle->fd();
     mmap_size = sizeof(create_size) + sizeof(capacity) + (2 * create_size + capacity) * sizeof(TxnTimeStamp);
-    mmap_p = mmap(nullptr, mmap_size, PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
-    if (mmap_p == MAP_FAILED) {
-        std::println("that code: {}", mmap_size);
-        mmap_p = nullptr;
-    }
+    // mmap_p = mmap(nullptr, mmap_size, PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+    // if (mmap_p == MAP_FAILED) {
+    //     std::println("that code: {}", mmap_size);
+    //     mmap_p = nullptr;
+    // }
 }
 
 void BlockVersion::GetCreateTS(size_t offset, size_t size, ColumnVector &res) const {

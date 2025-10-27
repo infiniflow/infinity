@@ -86,8 +86,8 @@ Status FileWorkerManager::RemoveCleanList(KVInstance *kv_instance) {
     }
     {
         std::unique_lock lock(w_locker_);
-        for (auto *fileworker : clean_list) {
-            auto fileworker_key = *(fileworker->rel_file_path_);
+        for (auto *file_worker : clean_list) {
+            auto fileworker_key = *(file_worker->rel_file_path_);
             [[maybe_unused]] size_t remove_n = fileworker_map_.erase(fileworker_key);
             // if (remove_n != 1) {
             //     UnrecoverableError(fmt::format("FileWorkerManager::RemoveClean: file {} not found.", file_path.c_str()));
@@ -98,9 +98,9 @@ Status FileWorkerManager::RemoveCleanList(KVInstance *kv_instance) {
     return Status::OK();
 }
 
-void FileWorkerManager::AddToCleanList(FileWorker *fileworker) {
+void FileWorkerManager::AddToCleanList(FileWorker *file_worker) {
     std::unique_lock lock(clean_locker_);
-    clean_list_.emplace_back(fileworker);
+    clean_list_.emplace_back(file_worker);
 }
 
 } // namespace infinity

@@ -266,8 +266,8 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
         std::optional<BlockMeta> block_meta;
         size_t segment_idx = input_block_idx / DEFAULT_BLOCK_PER_SEGMENT;
         size_t block_idx = input_block_idx % DEFAULT_BLOCK_PER_SEGMENT;
-        // put to kv and construct a true fileworker
-        // we dont need to construct a new fileworker
+        // put to kv and construct a true file_worker
+        // we dont need to construct a new file_worker
         status = NewCatalog::AddNewBlock1(*segment_metas[segment_idx], fake_commit_ts, block_meta);
         if (!status.ok()) {
             return status;
@@ -774,13 +774,13 @@ Status NewTxn::Compact(const std::string &db_name, const std::string &table_name
         TableIndexMeta table_index_meta(index_id_str, index_name, table_meta);
 
         status = PopulateIndex(db_name,
-                                     table_name,
-                                     index_name,
-                                     table_key,
-                                     table_index_meta,
-                                     *compact_state.new_segment_meta_,
-                                     compact_state.segment_row_cnt_,
-                                     DumpIndexCause::kCompact);
+                               table_name,
+                               index_name,
+                               table_key,
+                               table_index_meta,
+                               *compact_state.new_segment_meta_,
+                               compact_state.segment_row_cnt_,
+                               DumpIndexCause::kCompact);
         if (!status.ok()) {
             return status;
         }
@@ -1356,7 +1356,9 @@ Status NewTxn::CheckpointInner() {
     auto fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     auto &fileworker_map = fileworker_mgr->fileworker_map();
     for (const auto &ptr : fileworker_map | std::views::values) {
-        ptr->MoveFile();
+        if (ptr->rel_file_path_->find("import") == std::string::npos) {
+            ptr->MoveFile();
+        }
     }
 
     return Status::OK();

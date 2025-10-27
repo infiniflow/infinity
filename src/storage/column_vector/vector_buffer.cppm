@@ -37,7 +37,7 @@ public:
     static std::shared_ptr<VectorBuffer> Make(size_t data_type_size, size_t capacity, VectorBufferType buffer_type);
 
     static std::shared_ptr<VectorBuffer>
-    Make(FileWorker *fileworker, FileWorker *var_fileworker, size_t data_type_size, size_t capacity, VectorBufferType buffer_type);
+    Make(FileWorker *file_worker, FileWorker *var_file_worker, size_t data_type_size, size_t capacity, VectorBufferType buffer_type);
 
 public:
     explicit VectorBuffer() {}
@@ -48,11 +48,11 @@ public:
 
     void InitializeCompactBit(size_t capacity);
 
-    void InitializeCompactBit(FileWorker *fileworker, size_t capacity);
+    void InitializeCompactBit(FileWorker *file_worker, size_t capacity);
 
-    void Initialize(FileWorker *fileworker, FileWorker *var_fileworker, size_t type_size, size_t capacity);
+    void Initialize(FileWorker *file_worker, FileWorker *var_file_worker, size_t type_size, size_t capacity);
 
-    void SetToCatalog(FileWorker *fileworker, FileWorker *var_fileworker);
+    void SetToCatalog(FileWorker *file_worker, FileWorker *var_file_worker);
 
     void ResetToInit(VectorBufferType type);
 

@@ -76,9 +76,6 @@ const char *VarBuffer::Get(size_t offset, size_t size) const {
 size_t VarBuffer::Write(char *ptr) const {
     if (std::holds_alternative<const char *>(buffers_)) {
         UnrecoverableError("Cannot write to a const buffer");
-        // const auto *buffer = std::get<const char *>(buffers_);
-        // std::memcpy(ptr, buffer, buffer_size_prefix_sum_.back());
-        // return buffer_size_prefix_sum_.back();
     }
     auto &buffers = std::get<std::vector<std::unique_ptr<char[]>>>(buffers_);
     std::shared_lock lock(mtx_);
@@ -112,8 +109,8 @@ size_t VarBufferManager::Append(std::unique_ptr<char[]> data, size_t size) {
     return offset;
 }
 
-VarBufferManager::VarBufferManager(FileWorker *var_fileworker)
-    : type_(BufferType::kNewCatalog), fileworker_(nullptr), var_fileworker_(var_fileworker) {}
+VarBufferManager::VarBufferManager(FileWorker *var_file_worker)
+    : type_(BufferType::kNewCatalog), file_worker_(nullptr), var_fileworker_(var_file_worker) {}
 
 size_t VarBufferManager::Append(const char *data, size_t size) {
     auto buffer = std::make_unique<char[]>(size);
@@ -121,13 +118,13 @@ size_t VarBufferManager::Append(const char *data, size_t size) {
     return Append(std::move(buffer), size);
 }
 
-void VarBufferManager::SetToCatalog(FileWorker *var_fileworker) {
+void VarBufferManager::SetToCatalog(FileWorker *var_file_worker) {
     std::unique_lock<std::mutex> lock(mutex_);
     if (type_ != BufferType::kBuffer) {
         UnrecoverableError("Cannot convert to new catalog");
     }
     type_ = BufferType::kNewCatalog;
-    var_fileworker_ = var_fileworker;
+    var_fileworker_ = var_file_worker;
     if (!mem_buffer_) {
         mem_buffer_ = std::make_unique<VarBuffer>();
     }

@@ -51,7 +51,7 @@ public:
 
     inline PersistenceManager *persistence_manager() const { return persistence_manager_; }
 
-    void AddToCleanList(FileWorker *fileworker);
+    void AddToCleanList(FileWorker *file_worker);
 
 private:
     std::shared_ptr<std::string> data_dir_;

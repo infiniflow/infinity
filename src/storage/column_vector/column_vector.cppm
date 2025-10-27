@@ -123,8 +123,8 @@ private:
 public:
     void Initialize(ColumnVectorType vector_type = ColumnVectorType::kFlat, size_t capacity = DEFAULT_VECTOR_SIZE);
 
-    void Initialize(FileWorker *fileworker,
-                    FileWorker *var_fileworker,
+    void Initialize(FileWorker *file_worker,
+                    FileWorker *var_file_worker,
                     size_t current_row_count,
                     ColumnVectorMode vector_tipe = ColumnVectorMode::kReadWrite,
                     ColumnVectorType vector_type = ColumnVectorType::kFlat,

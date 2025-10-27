@@ -94,7 +94,7 @@ bool HnswFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) 
 void HnswFileWorker::Read(size_t file_size, bool other) {
     data_ = static_cast<void *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_).release()));
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
-    (*hnsw_handler)->LoadFromPtr(*file_handle_, file_size);
+    (*hnsw_handler)->LoadFromPtr(mmap_, mmap_size_, *file_handle_, file_size);
 }
 
 } // namespace infinity

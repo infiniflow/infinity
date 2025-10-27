@@ -530,7 +530,7 @@ public:
         return std::make_unique<This>(M, ef_construction, std::move(data_store), std::move(distance));
     }
 
-    static std::unique_ptr<This> LoadFromPtr(LocalFileHandle &file_handle, size_t size) {
+    static std::unique_ptr<This> LoadFromPtr(void *&mmap_p, size_t &mmap_size, LocalFileHandle &file_handle, size_t size) {
         auto buffer = std::make_unique<char[]>(size);
         file_handle.Read(buffer.get(), size);
         const char *ptr = buffer.get();

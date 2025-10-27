@@ -27,7 +27,7 @@ export constexpr ChunkId INVALID_CHUNK_ID = -1;
 
 export struct VectorHeapChunk {
 public:
-    explicit VectorHeapChunk(FileWorker *fileworker) : ptr_(fileworker) {}
+    explicit VectorHeapChunk(FileWorker *file_worker) : ptr_(file_worker) {}
 
     explicit VectorHeapChunk(u64 capacity) : ptr_(std::make_unique_for_overwrite<char[]>(capacity)) {}
 

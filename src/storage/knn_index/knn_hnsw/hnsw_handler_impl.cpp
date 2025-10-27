@@ -439,7 +439,7 @@ void HnswHandler::Load(LocalFileHandle &file_handle) {
         hnsw_);
 }
 
-void HnswHandler::LoadFromPtr(LocalFileHandle &file_handle, size_t file_size) {
+void HnswHandler::LoadFromPtr(void *&mmap_p, size_t &mmap_size, LocalFileHandle &file_handle, size_t file_size) {
     std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
@@ -448,7 +448,7 @@ void HnswHandler::LoadFromPtr(LocalFileHandle &file_handle, size_t file_size) {
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    index = IndexT::LoadFromPtr(file_handle, file_size);
+                    index = IndexT::LoadFromPtr(mmap_p, mmap_size, file_handle, file_size);
                 } else {
                     UnrecoverableError("Invalid index type.");
                 }

@@ -56,6 +56,7 @@ void VarFileWorker::FreeInMemory() {
 }
 
 bool VarFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+    auto old_mmap_size = mmap_size_;
     if (mmap_) {
         munmap(mmap_, mmap_size_);
     }
@@ -75,8 +76,9 @@ bool VarFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (mmap_ == MAP_FAILED) {
         mmap_ = nullptr;
     } else {
-        std::println("mmap_size: {}", mmap_size_);
-        std::memcpy(mmap_, ptr, mmap_size_);
+        auto diff = mmap_size_ - old_mmap_size;
+        // std::println("mmap_diff: {}", diff);
+        std::memcpy((char *)mmap_ + old_mmap_size, ptr + old_mmap_size, diff);
     }
     prepare_success = true;
 

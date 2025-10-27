@@ -85,6 +85,9 @@ bool VersionFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ba
 }
 
 void VersionFileWorker::Read(size_t file_size, bool other) {
+    if (!data_) {
+        std::println("???????????");
+    }
     BlockVersion::LoadFromFile(data_, mmap_size_, mmap_, file_handle_.get());
 }
 

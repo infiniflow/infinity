@@ -24,25 +24,25 @@ export class VarBuffer {
 public:
     VarBuffer() = default;
 
-    VarBuffer(FileWorker *fileworker) : buffer_size_prefix_sum_({0}), fileworker_(fileworker) {}
+    VarBuffer(FileWorker *file_worker) : buffer_size_prefix_sum_({0}), file_worker_(file_worker) {}
 
     // this is called by VarFileWorker
-    VarBuffer(FileWorker *fileworker, std::unique_ptr<char[]> buffer, size_t size) : buffer_size_prefix_sum_({0, size}), fileworker_(fileworker) {
+    VarBuffer(FileWorker *file_worker, std::unique_ptr<char[]> buffer, size_t size) : buffer_size_prefix_sum_({0, size}), file_worker_(file_worker) {
         std::get<std::vector<std::unique_ptr<char[]>>>(buffers_).push_back(std::move(buffer));
     }
 
-    VarBuffer(FileWorker *fileworker, const char *buffer, size_t size) : buffer_size_prefix_sum_({0, size}), fileworker_(fileworker) {
+    VarBuffer(FileWorker *file_worker, const char *buffer, size_t size) : buffer_size_prefix_sum_({0, size}), file_worker_(file_worker) {
         buffers_ = buffer;
     }
 
     VarBuffer(VarBuffer &&other)
-        : buffers_(std::move(other.buffers_)), buffer_size_prefix_sum_(std::move(other.buffer_size_prefix_sum_)), fileworker_(other.fileworker_) {}
+        : buffers_(std::move(other.buffers_)), buffer_size_prefix_sum_(std::move(other.buffer_size_prefix_sum_)), file_worker_(other.file_worker_) {}
 
     VarBuffer &operator=(VarBuffer &&other) {
         if (this != &other) {
             buffers_ = std::move(other.buffers_);
             buffer_size_prefix_sum_ = std::move(other.buffer_size_prefix_sum_);
-            fileworker_ = other.fileworker_;
+            file_worker_ = other.file_worker_;
         }
         return *this;
     }
@@ -67,14 +67,14 @@ public:
 private:
     mutable std::shared_mutex mtx_;
 
-    FileWorker *fileworker_ = nullptr;
+    FileWorker *file_worker_{};
 };
 
 export class VarBufferManager {
 public:
     VarBufferManager() : type_(BufferType::kBuffer), mem_buffer_(nullptr) {}
 
-    VarBufferManager(FileWorker *var_fileworker);
+    VarBufferManager(FileWorker *var_file_worker);
 
     size_t Append(std::unique_ptr<char[]> buffer, size_t size);
 
@@ -88,7 +88,7 @@ public:
 
     size_t TotalSize();
 
-    void SetToCatalog(FileWorker *var_fileworker);
+    void SetToCatalog(FileWorker *var_file_worker);
 
 private:
     VarBuffer *GetInnerNoLock();
@@ -99,7 +99,7 @@ private:
     } type_;
 
     std::unique_ptr<VarBuffer> mem_buffer_;
-    FileWorker *fileworker_{};
+    FileWorker *file_worker_{};
     FileWorker *var_fileworker_{};
 
     mutable std::mutex mutex_;
