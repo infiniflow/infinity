@@ -60,14 +60,14 @@ CreateField CreateField::LoadFromFile(LocalFileHandle *file_handle) {
 
 bool BlockVersion::operator==(const BlockVersion &rhs) const {
     std::shared_lock<std::shared_mutex> lock_created(rw_mutex_);
-    if (this->created_.size() != rhs.created_.size() || this->deleted_.size() != rhs.deleted_.size())
+    if (created_.size() != rhs.created_.size() || deleted_.size() != rhs.deleted_.size())
         return false;
-    for (size_t i = 0; i < this->created_.size(); i++) {
-        if (this->created_[i] != rhs.created_[i])
+    for (size_t i = 0; i < created_.size(); i++) {
+        if (created_[i] != rhs.created_[i])
             return false;
     }
-    for (size_t i = 0; i < this->deleted_.size(); i++) {
-        if (this->deleted_[i] != rhs.deleted_[i])
+    for (size_t i = 0; i < deleted_.size(); i++) {
+        if (deleted_[i] != rhs.deleted_[i])
             return false;
     }
     return true;
@@ -110,14 +110,14 @@ i64 BlockVersion::GetRowCount() const {
     return row_count;
 }
 
-bool BlockVersion::SaveToFile(void *&mmap_p, size_t &mmap_size, TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
-    // if (mmap_true) {
-    //     munmap(mmap_true, mmap_true_size);
-    //     mmap_true = nullptr;
-    //     // return true;
-    // }
+bool BlockVersion::SaveToFile(void *&mmap_p,
+                              size_t &mmap_size,
+                              const std::string &rel_path,
+                              TxnTimeStamp checkpoint_ts,
+                              LocalFileHandle &file_handle) const {
     bool is_modified = false;
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+
     BlockOffset create_size = created_.size();
     while (create_size > 0 && created_[create_size - 1].create_ts_ > checkpoint_ts) {
         --create_size;
@@ -130,7 +130,9 @@ bool BlockVersion::SaveToFile(void *&mmap_p, size_t &mmap_size, TxnTimeStamp che
     ftruncate(fd, mmap_size);
     size_t offset{};
     mmap_p = mmap(nullptr, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-
+    if (mmap_p == MAP_FAILED) {
+        std::println("oops..");
+    }
     std::memcpy((char *)mmap_p + offset, &create_size, sizeof(create_size));
     offset += sizeof(create_size);
 
@@ -168,73 +170,41 @@ bool BlockVersion::SaveToFile(void *&mmap_p, size_t &mmap_size, TxnTimeStamp che
     return !is_modified;
 }
 
-void BlockVersion::SpillToFile(LocalFileHandle *file_handle) const {
-    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
-    BlockOffset create_size = created_.size();
-    Status status = file_handle->Append(&create_size, sizeof(create_size));
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
+void BlockVersion::LoadFromFile(void *&data, size_t &mmap_size, void *&mmap_p, LocalFileHandle *file_handle) {
+    // std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+    // auto *block_version = static_cast<BlockVersion *>(data);
+    auto block_version = std::make_unique<BlockVersion>();
+    size_t offset{};
+
+    BlockOffset create_size;
+    std::memcpy(&create_size, (char *)mmap_p + offset, sizeof(create_size));
+    offset += sizeof(create_size);
+    block_version->created_.reserve(create_size);
+    for (BlockOffset i = 0; i < create_size; i++) {
+        CreateField create_field;
+        std::memcpy(&create_field.create_ts_, (char *)mmap_p + offset, sizeof(TxnTimeStamp));
+        offset += sizeof(TxnTimeStamp);
+        std::memcpy(&create_field.row_count_, (char *)mmap_p + offset, sizeof(TxnTimeStamp));
+        offset += sizeof(TxnTimeStamp);
+
+        block_version->created_.push_back(create_field);
     }
-    for (const auto &create : created_) {
-        create.SaveToFile(file_handle);
+    LOG_TRACE(fmt::format("BlockVersion::LoadFromFile version, created: {}", create_size));
+    BlockOffset capacity;
+    std::memcpy(&capacity, (char *)mmap_p + offset, sizeof(capacity));
+    offset += sizeof(capacity);
+    block_version->deleted_.resize(capacity);
+    for (BlockOffset i = 0; i < capacity; i++) {
+        // std::println("version R pointer: {}", mmap_p);
+        std::memcpy(&block_version->deleted_[i], (char *)mmap_p + offset, sizeof(TxnTimeStamp));
+        offset += sizeof(TxnTimeStamp);
     }
-
-    BlockOffset capacity = deleted_.size();
-    status = file_handle->Append(&capacity, sizeof(capacity));
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
-    status = file_handle->Append(deleted_.data(), capacity * sizeof(TxnTimeStamp));
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
-}
-
-std::unique_ptr<BlockVersion> BlockVersion::LoadFromFile(void *&mmap_true, LocalFileHandle *file_handle) {
-    if (!mmap_true) {
-        auto block_version = std::make_unique<BlockVersion>();
-
-        BlockOffset create_size;
-        file_handle->Read(&create_size, sizeof(create_size));
-        block_version->created_.reserve(create_size);
-        for (BlockOffset i = 0; i < create_size; i++) {
-            block_version->created_.push_back(CreateField::LoadFromFile(file_handle));
-        }
-        LOG_TRACE(fmt::format("BlockVersion::LoadFromFile version, created: {}", create_size));
-        BlockOffset capacity;
-        file_handle->Read(&capacity, sizeof(capacity));
-        block_version->deleted_.resize(capacity);
-        for (BlockOffset i = 0; i < capacity; i++) {
-            file_handle->Read(&block_version->deleted_[i], sizeof(TxnTimeStamp));
-        }
-        return block_version;
-    } else {
-        auto block_version = std::make_unique<BlockVersion>();
-        size_t offset{};
-
-        BlockOffset create_size;
-        std::memcpy(&create_size, (char *)mmap_true + offset, sizeof(create_size));
-        offset += sizeof(create_size);
-        block_version->created_.reserve(create_size);
-        for (BlockOffset i = 0; i < create_size; i++) {
-            CreateField create_field;
-            std::memcpy(&create_field.create_ts_, (char *)mmap_true + offset, sizeof(TxnTimeStamp));
-            offset += sizeof(TxnTimeStamp);
-            std::memcpy(&create_field.row_count_, (char *)mmap_true + offset, sizeof(TxnTimeStamp));
-            offset += sizeof(TxnTimeStamp);
-
-            block_version->created_.push_back(create_field);
-        }
-        LOG_TRACE(fmt::format("BlockVersion::LoadFromFile version, created: {}", create_size));
-        BlockOffset capacity;
-        std::memcpy(&capacity, (char *)mmap_true + offset, sizeof(capacity));
-        offset += sizeof(capacity);
-        block_version->deleted_.resize(capacity);
-        for (BlockOffset i = 0; i < capacity; i++) {
-            std::memcpy(&block_version->deleted_[i], (char *)mmap_true + offset, sizeof(TxnTimeStamp));
-            offset += sizeof(TxnTimeStamp);
-        }
-        return block_version;
+    auto fd = file_handle->fd();
+    mmap_size = sizeof(create_size) + sizeof(capacity) + (2 * create_size + capacity) * sizeof(TxnTimeStamp);
+    mmap_p = mmap(nullptr, mmap_size, PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+    if (mmap_p == MAP_FAILED) {
+        std::println("that code: {}", mmap_size);
+        mmap_p = nullptr;
     }
 }
 

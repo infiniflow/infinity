@@ -41,7 +41,9 @@ RawFileWorker::~RawFileWorker() {
     mmap_ = nullptr;
 }
 
-void RawFileWorker::AllocateInMemory() { data_ = static_cast<void *>(new char[buffer_size_]); }
+void RawFileWorker::AllocateInMemory() {
+    data_ = static_cast<void *>(new char[buffer_size_]);
+}
 
 void RawFileWorker::FreeInMemory() {
     delete[] static_cast<char *>(data_);
@@ -56,14 +58,18 @@ bool RawFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     }
 
     mmap_size_ = buffer_size_;
-    auto fd = file_handle_->fd();
-    ftruncate(fd, mmap_size_);
-    mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+    if (mmap_size_ == 0) {
 
-    size_t offset{};
+    } else {
+        auto fd = file_handle_->fd();
+        ftruncate(fd, mmap_size_);
+        mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
 
-    std::memcpy((char *)mmap_ + offset, data_, buffer_size_);
-    offset += buffer_size_;
+        size_t offset{};
+
+        std::memcpy((char *)mmap_ + offset, data_, buffer_size_);
+        offset += buffer_size_;
+    }
     // auto status = file_handle_->Append(data_, buffer_size_);
     prepare_success = true; // Not run defer_fn
     return true;
@@ -78,7 +84,10 @@ void RawFileWorker::Read(size_t file_size, bool other) {
         auto [nbytes, status1] = file_handle_->Read(data_, buffer_size_);
 
         mmap_size_ = buffer_size_;
-        mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+        mmap_ = mmap(nullptr, mmap_size_, PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+        if (mmap_ == MAP_FAILED) {
+            mmap_ = nullptr;
+        }
     }
 }
 

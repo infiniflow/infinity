@@ -15,6 +15,7 @@
 module;
 
 #include <cerrno>
+#include <unistd.h>
 
 module infinity_core:file_worker.impl;
 
@@ -45,13 +46,13 @@ FileWorker::FileWorker(std::shared_ptr<std::string> rel_file_path) : rel_file_pa
     file_worker_manager_ = InfinityContext::instance().storage()->fileworker_manager();
 }
 
-FileWorker::~FileWorker() {}
-
 bool FileWorker::Write(const FileWorkerSaveCtx &ctx) {
+    std::lock_guard l(l_);
     if (data_ == nullptr) {
         UnrecoverableError("No data will be written.");
     }
 
+    [[maybe_unused]] auto tmp = GetFilePathTemp();
     auto [file_handle, status] = VirtualStore::Open(GetFilePathTemp(), FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(status.message());
@@ -61,9 +62,10 @@ bool FileWorker::Write(const FileWorkerSaveCtx &ctx) {
     bool prepare_success = false;
 
     bool all_save = Write(prepare_success, ctx);
-    if (prepare_success) {
-        file_handle_->Sync();
-    }
+    // if (prepare_success) {
+    //     file_handle_->Sync();
+    // }
+    close(file_handle_->fd());
     return all_save;
 }
 
@@ -121,8 +123,7 @@ void FileWorker::MoveFile() {
             VirtualStore::MakeDirectory(data_path_parent);
         }
         VirtualStore::Copy(data_path, temp_path); // sys call, may need copy
-    }
-    else {
+    } else {
         PersistResultHandler handler(persistence_manager_);
         if (temp_path.find("/var/infinity/tmp/import") != std::string::npos) {
             return;

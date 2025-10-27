@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <unistd.h>
+
 export module infinity_core:file_worker;
 
 import :file_worker_type;
@@ -30,18 +34,31 @@ export class FileWorkerManager;
 
 export struct FileWorkerSaveCtx {};
 
+export enum class FileWorkerTag {
+    kBmp,
+    kData,
+    kEmvb,
+    kHnsw,
+    kIndex,
+    kRaw,
+    kSecondary,
+    kVar,
+    kVersion,
+};
+
 export class FileWorker {
 public:
     explicit FileWorker(std::shared_ptr<std::string> file_path);
 
     // No destruct here
-    virtual ~FileWorker();
+    virtual ~FileWorker() = default;
 
 public:
     [[nodiscard]] bool Write(const FileWorkerSaveCtx &ctx = {});
 
     template <typename T>
-    void Read(T *&data) {
+    void Read(T &data) {
+        std::lock_guard l(l_);
         size_t file_size = 0;
 
         auto temp_path = GetFilePathTemp();
@@ -57,9 +74,11 @@ public:
         }
         if (flag) {
             auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kRead);
+            // DeferFn fn([]{})
             if (!status.ok()) {
                 // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
-                data = static_cast<T *>(data_);
+                data = static_cast<T>(data_);
+                close(file_handle->fd());
                 return;
             }
 
@@ -76,24 +95,27 @@ public:
 
             file_handle_ = std::move(file_handle);
             Read(file_size, true);
-            data = static_cast<T *>(data_);
+            close(file_handle_->fd());
+            data = static_cast<T>(data_);
         } else {
             if (file_path.empty()) {
-                data = static_cast<T *>(data_);
+                data = static_cast<T>(data_);
                 return;
             }
             if (!persistence_manager_) {
                 auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kRead);
                 if (!status.ok()) {
                     // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
-                    data = static_cast<T *>(data_);
+                    data = static_cast<T>(data_);
+                    close(file_handle->fd());
                     return;
                 }
                 file_size = file_handle->FileSize();
 
                 file_handle_ = std::move(file_handle);
                 Read(file_size, true);
-                data = static_cast<T *>(data_);
+                data = static_cast<T>(data_);
+                close(file_handle_->fd());
                 return;
             }
             auto result = persistence_manager_->GetObjCache(file_path);
@@ -102,7 +124,8 @@ public:
             auto [file_handle, status] = VirtualStore::Open(true_file_path, FileAccessMode::kRead);
             if (!status.ok()) {
                 // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
-                data = static_cast<T *>(data_);
+                data = static_cast<T>(data_);
+                close(file_handle->fd());
                 return;
             }
             if (persistence_manager_) {
@@ -114,7 +137,8 @@ public:
 
             file_handle_ = std::move(file_handle);
             Read(file_size, true);
-            data = static_cast<T *>(data_);
+            close(file_handle_->fd());
+            data = static_cast<T>(data_);
         }
     }
 

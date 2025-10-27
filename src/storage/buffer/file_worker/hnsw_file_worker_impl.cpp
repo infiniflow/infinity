@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <sys/mman.h>
+#include <unistd.h>
+
 module infinity_core:hnsw_file_worker.impl;
 
 import :hnsw_file_worker;
@@ -57,22 +62,12 @@ HnswFileWorker::HnswFileWorker(std::shared_ptr<std::string> file_path,
 }
 
 HnswFileWorker::~HnswFileWorker() {
-    // if (data_ != nullptr) {
-    //     FreeInMemory();
-    //     data_ = nullptr;
-    // }
-    // if (mmap_data_ != nullptr) {
-    //     FreeFromMmapImpl();
-    //     mmap_data_ = nullptr;
-    // }
-
     HnswFileWorker::FreeInMemory();
+    munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
 void HnswFileWorker::AllocateInMemory() {
-    // if (data_) {
-    //     UnrecoverableError("Data is already allocated.");
-    // }
     data_ = static_cast<void *>(new HnswHandlerPtr());
 }
 
@@ -97,17 +92,9 @@ bool HnswFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) 
 }
 
 void HnswFileWorker::Read(size_t file_size, bool other) {
-    // if (data_ != nullptr) {
-    //     UnrecoverableError("Data is already allocated.");
-    // }
     data_ = static_cast<void *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_).release()));
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
-    // if (from_spill) {
-    //     (*hnsw_handler)->Load(*file_handle_);
-    // } else
-    {
-        (*hnsw_handler)->LoadFromPtr(*file_handle_, file_size);
-    }
+    (*hnsw_handler)->LoadFromPtr(*file_handle_, file_size);
 }
 
 } // namespace infinity

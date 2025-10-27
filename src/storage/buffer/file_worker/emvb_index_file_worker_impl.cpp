@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <sys/mman.h>
+#include <unistd.h>
+
 module infinity_core:emvb_index_file_worker.impl;
 
 import :emvb_index_file_worker;
@@ -42,6 +47,9 @@ EMVBIndexFileWorker::~EMVBIndexFileWorker() {
     //     data_ = nullptr;
     // }
     FreeInMemory();
+
+    munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
 void EMVBIndexFileWorker::AllocateInMemory() {
@@ -92,6 +100,7 @@ void EMVBIndexFileWorker::Read(size_t file_size, bool other) {
     // if (data_) {
     //     UnrecoverableError("Data is already allocated.");
     // }
+    std::println("R emvb");
     const auto column_embedding_dim = GetEmbeddingInfo()->Dimension();
     const auto *index_emvb = static_cast<IndexEMVB *>(index_base_.get());
     const auto residual_pq_subspace_num = index_emvb->residual_pq_subspace_num_;
