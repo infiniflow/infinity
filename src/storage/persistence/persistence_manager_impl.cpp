@@ -111,6 +111,7 @@ PersistenceManager::~PersistenceManager() {
 
 PersistWriteResult PersistenceManager::Persist(const std::string &file_path, const std::string &tmp_file_path, bool try_compose) {
     PersistWriteResult result;
+    Status status;
 
     std::error_code ec;
     fs::path src_fp = tmp_file_path;
@@ -120,23 +121,11 @@ PersistWriteResult PersistenceManager::Persist(const std::string &file_path, con
         UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
     }
     std::string pm_fp_key = KeyEncode::PMObjectKey(local_path);
-    std::string pm_fp_value;
-    Status status = kv_store_->Get(pm_fp_key, pm_fp_value);
-    if (status.ok()) {
-        // Cleanup the file if it already exists in the KV
-        status = kv_store_->Delete(pm_fp_key, false);
-        if (!status.ok()) {
-            UnrecoverableError(fmt::format("Failed to delete object for local path {}", local_path));
-        }
-        ObjAddr obj_addr;
-        obj_addr.Deserialize(pm_fp_value);
-        CleanupNoLock(obj_addr, result.persist_keys_, result.drop_from_remote_keys_);
-        LOG_TRACE(fmt::format("Persist deleted mapping from local path {} to ObjAddr({}, {}, {})",
-                              local_path,
-                              obj_addr.obj_key_,
-                              obj_addr.part_offset_,
-                              obj_addr.part_size_));
-    }
+
+    // Check if the object for local path exists in the KV.
+    // If it exists, we will delete the object later after we persist the local path to new object.
+    std::string pm_fp_value{};
+    kv_store_->Get(pm_fp_key, pm_fp_value);
 
     size_t src_size = fs::file_size(src_fp, ec);
     if (ec) {
@@ -156,9 +145,7 @@ PersistWriteResult PersistenceManager::Persist(const std::string &file_path, con
 
         result.persist_keys_.push_back(ObjAddr::KeyEmpty);
         result.obj_addr_ = obj_addr;
-        return result;
-    }
-    if (!try_compose || src_size >= object_size_limit_) {
+    } else if (!try_compose || src_size >= object_size_limit_) {
         std::string obj_key = ObjCreate();
         fs::path dst_fp = workspace_;
         dst_fp.append(obj_key);
@@ -183,34 +170,47 @@ PersistWriteResult PersistenceManager::Persist(const std::string &file_path, con
                               obj_addr.part_size_));
         result.persist_keys_.push_back(obj_key);
         result.obj_addr_ = obj_addr;
-        return result;
-    }
-    std::lock_guard<std::mutex> lock(mtx_);
-    if (int(src_size) >= CurrentObjRoomNoLock()) {
-        CurrentObjFinalizeNoLock(result.persist_keys_);
-    }
-    current_object_size_ = (current_object_size_ + ObjAlignment - 1) & ~(ObjAlignment - 1);
-    ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
-    CurrentObjAppendNoLock(tmp_file_path, src_size);
-    fs::remove(tmp_file_path, ec);
-    if (ec) {
-        UnrecoverableError(fmt::format("Failed to remove {}", tmp_file_path));
+    } else {
+        std::lock_guard<std::mutex> lock(mtx_);
+        if (int(src_size) >= CurrentObjRoomNoLock()) {
+            CurrentObjFinalizeNoLock(result.persist_keys_);
+        }
+        current_object_size_ = (current_object_size_ + ObjAlignment - 1) & ~(ObjAlignment - 1);
+        ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
+        CurrentObjAppendNoLock(tmp_file_path, src_size);
+        fs::remove(tmp_file_path, ec);
+        if (ec) {
+            UnrecoverableError(fmt::format("Failed to remove {}", tmp_file_path));
+        }
+
+        object_stats_->PutNew(current_object_key_, std::make_shared<ObjStat>(current_object_size_, current_object_parts_, current_object_ref_count_));
+        LOG_TRACE(fmt::format("Persist current object {}", current_object_key_));
+
+        status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump(), false);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        LOG_TRACE(fmt::format("Persist local path {} to composed ObjAddr ({}, {}, {})",
+                              local_path,
+                              obj_addr.obj_key_,
+                              obj_addr.part_offset_,
+                              obj_addr.part_size_));
+        result.obj_addr_ = obj_addr;
     }
 
-    object_stats_->PutNew(current_object_key_, std::make_shared<ObjStat>(current_object_size_, current_object_parts_, current_object_ref_count_));
-    LOG_TRACE(fmt::format("Persist current object {}", current_object_key_));
-
-    status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump(), false);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
+    //  Cleanup the old object for local path.
+    if (!pm_fp_value.empty()) {
+        ObjAddr obj_addr;
+        obj_addr.Deserialize(pm_fp_value);
+        CleanupNoLock(obj_addr, result.persist_keys_, result.drop_from_remote_keys_);
+        LOG_TRACE(fmt::format("Persist deleted mapping from local path {} to ObjAddr({}, {}, {})",
+                              local_path,
+                              obj_addr.obj_key_,
+                              obj_addr.part_offset_,
+                              obj_addr.part_size_));
     }
 
-    LOG_TRACE(fmt::format("Persist local path {} to composed ObjAddr ({}, {}, {})",
-                          local_path,
-                          obj_addr.obj_key_,
-                          obj_addr.part_offset_,
-                          obj_addr.part_size_));
-    result.obj_addr_ = obj_addr;
     return result;
 }
 
