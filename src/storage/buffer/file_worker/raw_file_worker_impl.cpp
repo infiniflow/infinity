@@ -52,19 +52,19 @@ void RawFileWorker::FreeInMemory() {
 
 bool RawFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     assert(data_ != nullptr && buffer_size_ > 0);
-    if (mmap_) {
-        munmap(mmap_, mmap_size_);
-        mmap_ = nullptr;
-    }
 
+    auto old_mmap_size = mmap_size_;
     mmap_size_ = buffer_size_;
     if (mmap_size_ == 0) {
 
     } else {
         auto fd = file_handle_->fd();
         ftruncate(fd, mmap_size_);
-        mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
-
+        if (mmap_ == nullptr) {
+            mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+        } else {
+            mmap_ = mremap(mmap_, old_mmap_size, mmap_size_, MREMAP_MAYMOVE);
+        }
         size_t offset{};
 
         std::memcpy((char *)mmap_ + offset, data_, buffer_size_);

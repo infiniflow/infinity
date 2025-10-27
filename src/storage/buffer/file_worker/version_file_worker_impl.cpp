@@ -52,25 +52,12 @@ void VersionFileWorker::FreeInMemory() {
     if (data_ == nullptr) {
         return;
     }
-    std::println("free the allocate version");
     auto *data = static_cast<BlockVersion *>(data_);
     delete data;
     data_ = nullptr;
-
-    munmap(mmap_, mmap_size_);
-    mmap_ = nullptr;
 }
 
 bool VersionFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &base_ctx) {
-    if (mmap_) {
-        munmap(mmap_, mmap_size_);
-        // mremap();
-        // mmap_size_ = mmap_size_;
-    }
-
-    if (data_ == nullptr) {
-        UnrecoverableError("Data is not allocated.");
-    }
     auto *data = static_cast<BlockVersion *>(data_);
 
     const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
@@ -84,11 +71,6 @@ bool VersionFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ba
     return false;
 }
 
-void VersionFileWorker::Read(size_t file_size, bool other) {
-    if (!data_) {
-        std::println("???????????");
-    }
-    BlockVersion::LoadFromFile(data_, mmap_size_, mmap_, file_handle_.get());
-}
+void VersionFileWorker::Read(size_t file_size, bool other) { BlockVersion::LoadFromFile(data_, mmap_size_, mmap_, file_handle_.get()); }
 
 } // namespace infinity

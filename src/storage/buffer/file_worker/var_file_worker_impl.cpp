@@ -50,20 +50,11 @@ void VarFileWorker::FreeInMemory() {
     auto *buffer = static_cast<VarBuffer *>(data_);
     delete buffer;
     data_ = nullptr;
-
-    munmap(mmap_, mmap_size_);
-    mmap_ = nullptr;
 }
 
 bool VarFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-    auto old_mmap_size = mmap_size_;
-    if (mmap_) {
-        munmap(mmap_, mmap_size_);
-    }
-    if (data_ == nullptr) {
-        UnrecoverableError("Data is not allocated.");
-    }
     const auto *buffer = static_cast<const VarBuffer *>(data_);
+    auto old_mmap_size = mmap_size_;
     mmap_size_ = buffer->TotalSize();
     auto buffer_data = std::make_unique<char[]>(mmap_size_);
     char *ptr = buffer_data.get();
@@ -72,7 +63,11 @@ bool VarFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     auto fd = file_handle_->fd();
     ftruncate(fd, mmap_size_);
 
-    mmap_ = mmap(nullptr, mmap_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (mmap_ == nullptr) {
+        mmap_ = mmap(nullptr, mmap_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    } else {
+        mmap_ = mremap(mmap_, old_mmap_size, mmap_size_, MREMAP_MAYMOVE);
+    }
     if (mmap_ == MAP_FAILED) {
         mmap_ = nullptr;
     } else {

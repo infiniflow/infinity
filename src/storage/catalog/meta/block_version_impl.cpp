@@ -126,10 +126,15 @@ bool BlockVersion::SaveToFile(void *&mmap_p,
 
     BlockOffset capacity = deleted_.size();
     auto fd = file_handle.fd();
+    auto old_mmap_size = mmap_size;
     mmap_size = sizeof(create_size) + sizeof(capacity) + (2 * create_size + capacity) * sizeof(TxnTimeStamp);
     ftruncate(fd, mmap_size);
     size_t offset{};
-    mmap_p = mmap(nullptr, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (mmap_p == nullptr) {
+        mmap_p = mmap(nullptr, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    } else {
+        mmap_p = mremap(mmap_p, old_mmap_size, mmap_size, MREMAP_MAYMOVE);
+    }
     if (mmap_p == MAP_FAILED) {
         std::println("oops..");
     }

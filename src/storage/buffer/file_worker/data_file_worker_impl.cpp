@@ -77,18 +77,19 @@ bool DataFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) 
     // - header: buffer size
     // - data buffer
     // - footer: checksum
-    if (mmap_) {
-        munmap(mmap_, mmap_size_);
-        mmap_ = nullptr;
-    }
 
+    auto old_mmap_size = mmap_size_;
     mmap_size_ = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
     if (mmap_size_ == 0) {
 
     } else {
         auto fd = file_handle_->fd();
         VirtualStore::Truncate(GetFilePathTemp(), mmap_size_);
-        mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+        if (mmap_ == nullptr) {
+            mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+        } else {
+            mmap_ = mremap(mmap_, old_mmap_size, mmap_size_, MREMAP_MAYMOVE);
+        }
         size_t offset{};
 
         u64 magic_number = 0x00dd3344;
@@ -115,7 +116,6 @@ bool DataFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) 
     }
 
     prepare_success = true; // Not run defer_fn
-    // munmap(mmap_true_, mmap_len);
     return true;
 }
 
