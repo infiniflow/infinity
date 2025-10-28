@@ -336,7 +336,7 @@ public:
         IncreaseMemoryUsageBase(mem_usage);
     }
 
-    void Dump(FileWorker *buffer_obj, size_t *dump_size_ptr = nullptr);
+    void Dump(FileWorker *file_worker, size_t *dump_size_ptr = nullptr);
 
 public:
     // LSG setting

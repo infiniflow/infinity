@@ -318,7 +318,7 @@ f32 PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::GetSingleIPDistance(const u32 embed
     f32 result = 0.0f;
     ip_table += query_id;
     const u32 stride = subspace_centroid_num_ * query_num;
-    const std::array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM> *encoded_embedding_ptr_ = nullptr;
+    const std::array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM> *encoded_embedding_ptr_{};
     {
         std::shared_lock lock(this->rw_mutex_);
         encoded_embedding_ptr_ = &encoded_embedding_data_[embedding_id];

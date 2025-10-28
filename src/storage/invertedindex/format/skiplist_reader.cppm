@@ -130,7 +130,7 @@ protected:
     std::pair<int, bool> LoadBuffer() override;
 
 private:
-    PostingByteSlice *skiplist_buffer_ = nullptr;
+    PostingByteSlice *skiplist_buffer_{};
     PostingByteSliceReader skiplist_reader_;
 };
 

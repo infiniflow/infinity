@@ -136,7 +136,7 @@ TEST_P(CleanupTaskTest, SLOW_test_delete_db_simple) {
 
         // Wait for the cleanup task to run
         LOG_INFO(fmt::format("cleanup_interval: {} seconds, wait for cleanup task to run", cleanup_interval));
-        std::this_thread::sleep_for(std::chrono::seconds(cleanup_interval * 10));
+        std::this_thread::sleep_for(std::chrono::seconds(cleanup_interval + 1));
 
         CheckFilePaths(delete_file_paths, exist_file_paths);
     }

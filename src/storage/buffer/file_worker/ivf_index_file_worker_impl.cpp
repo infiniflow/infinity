@@ -56,6 +56,8 @@ bool IVFIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &c
     if (data_) {
         auto index = static_cast<IVFIndexInChunk *>(data_);
         index->SaveIndexInner(*file_handle_);
+
+        file_handle_->Sync();
         prepare_success = true;
         LOG_TRACE("Finished WriteToFileImpl(bool &prepare_success).");
     } else {

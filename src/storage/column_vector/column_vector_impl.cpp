@@ -247,8 +247,8 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, size_t capacity) {
     }
 }
 
-void ColumnVector::Initialize(FileWorker *buffer_obj,
-                              FileWorker *outline_buffer_obj,
+void ColumnVector::Initialize(FileWorker *file_worker,
+                              FileWorker *var_file_worker,
                               size_t current_row_count,
                               ColumnVectorMode vector_tipe,
                               ColumnVectorType vector_type,
@@ -260,10 +260,10 @@ void ColumnVector::Initialize(FileWorker *buffer_obj,
     }
 
     if (vector_type_ == ColumnVectorType::kConstant) {
-        buffer_ = VectorBuffer::Make(buffer_obj, outline_buffer_obj, data_type_size_, 1, vector_buffer_type);
+        buffer_ = VectorBuffer::Make(file_worker, var_file_worker, data_type_size_, 1, vector_buffer_type);
         nulls_ptr_ = Bitmask::MakeSharedAllTrue(1);
     } else {
-        buffer_ = VectorBuffer::Make(buffer_obj, outline_buffer_obj, data_type_size_, capacity_, vector_buffer_type);
+        buffer_ = VectorBuffer::Make(file_worker, var_file_worker, data_type_size_, capacity_, vector_buffer_type);
         nulls_ptr_ = Bitmask::MakeSharedAllTrue(capacity_);
     }
     switch (vector_tipe) {
@@ -279,7 +279,7 @@ void ColumnVector::Initialize(FileWorker *buffer_obj,
     tail_index_.store(current_row_count);
 }
 
-void ColumnVector::SetToCatalog(FileWorker *buffer_obj, FileWorker *outline_buffer_obj, ColumnVectorMode vector_tipe) {
+void ColumnVector::SetToCatalog(FileWorker *file_worker, FileWorker *var_file_worker, ColumnVectorMode vector_tipe) {
     if (buffer_.get() == nullptr) {
         UnrecoverableError("Column vector is not initialized.");
     }
@@ -287,7 +287,7 @@ void ColumnVector::SetToCatalog(FileWorker *buffer_obj, FileWorker *outline_buff
     if (vector_type_ == ColumnVectorType::kConstant) {
         UnrecoverableError("Constant column vector cannot be set to catalog.");
     } else {
-        buffer_->SetToCatalog(buffer_obj, outline_buffer_obj);
+        buffer_->SetToCatalog(file_worker, var_file_worker);
     }
     switch (vector_tipe) {
         case ColumnVectorMode::kReadWrite: {

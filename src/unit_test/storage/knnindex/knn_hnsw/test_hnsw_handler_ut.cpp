@@ -137,7 +137,7 @@ protected:
     HnswEncodeType encode_type;
     HnswBuildType build_type;
 
-    std::unique_ptr<float[]> data = nullptr;
+    std::unique_ptr<float[]> data{};
     std::string filepath;
     const std::string save_dir_ = GetFullTmpDir();
 };
@@ -252,7 +252,7 @@ TEST_F(HnswHandlerTest, test_compress) {
 //         size_t file_size = VirtualStore::GetFileSize(filepath);
 // #define USE_MMAP
 // #ifdef USE_MMAP
-//         unsigned char *data_ptr = nullptr;
+//         unsigned char *data_ptr{};
 //         int ret = VirtualStore::MmapFile(filepath, data_ptr, file_size);
 //         if (ret < 0) {
 //             UnrecoverableError("mmap failed");

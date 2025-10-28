@@ -199,13 +199,13 @@ std::tuple<size_t, Status> BlockMeta::GetRowCnt1() {
     }
 #if 1
     TableMeta &table_meta = segment_meta_.table_meta();
-    auto row_cnt = infinity::GetBlockRowCount(&kv_instance_,
-                                              table_meta.db_id_str(),
-                                              table_meta.table_id_str(),
-                                              segment_meta_.segment_id(),
-                                              block_id_,
-                                              begin_ts_,
-                                              commit_ts_);
+    auto row_cnt = GetBlockRowCount(&kv_instance_,
+                                    table_meta.db_id_str(),
+                                    table_meta.table_id_str(),
+                                    segment_meta_.segment_id(),
+                                    block_id_,
+                                    begin_ts_,
+                                    commit_ts_);
 
     std::lock_guard<std::mutex> lock(mtx_);
     row_cnt_ = row_cnt;

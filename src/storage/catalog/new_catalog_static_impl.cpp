@@ -1068,16 +1068,16 @@ Status NewCatalog::GetColumnVector(ColumnMeta &column_meta,
                                    ColumnVector &column_vector) {
     std::shared_ptr<DataType> column_type = col_def->type();
 
-    FileWorker *buffer_obj = nullptr;
-    FileWorker *outline_buffer_obj = nullptr;
-    Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
+    FileWorker *file_worker{};
+    FileWorker *var_file_worker{};
+    Status status = column_meta.GetColumnBuffer(file_worker, var_file_worker);
     if (!status.ok()) {
         return status;
     }
 
     column_vector = ColumnVector(column_type);
-    // buffer_obj->file_worker()->ReadFromFile(true);
-    column_vector.Initialize(buffer_obj, outline_buffer_obj, row_count, tipe);
+    // file_worker->file_worker()->ReadFromFile(true);
+    column_vector.Initialize(file_worker, var_file_worker, row_count, tipe);
     return Status::OK();
 }
 

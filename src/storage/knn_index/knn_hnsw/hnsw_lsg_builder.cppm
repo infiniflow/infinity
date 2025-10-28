@@ -396,8 +396,8 @@ private:
     }
 
 private:
-    const IndexHnsw *index_hnsw_ = nullptr;
-    std::shared_ptr<ColumnDef> column_def_ = nullptr;
+    const IndexHnsw *index_hnsw_{};
+    std::shared_ptr<ColumnDef> column_def_;
 
     std::unique_ptr<KnnDistanceBase1> knn_distance_;
 

@@ -533,7 +533,7 @@ private:
                             SegmentMeta &segment_meta,
                             RowID base_rowid,
                             u32 row_cnt,
-                            FileWorker *buffer_obj);
+                            FileWorker *file_worker);
 
     Status OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, const std::vector<std::unique_ptr<InitParameter>> &params);
 

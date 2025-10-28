@@ -15,6 +15,7 @@
 module;
 
 #include <ranges>
+#include <sys/mman.h>
 
 module infinity_core:new_txn_data.impl;
 
@@ -372,7 +373,7 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
         // auto seg = fmt::format("{}_{}", vv[0], stoull(vv[1]) + segment_ids[0]);
         // auto path1 = fmt::format("/{}/{}/data/{}/{}/{}/{}/{}", v[1], v[2], v[5], v[6], seg, v[8], v[9]);
         //
-        // new_map.emplace(path1, buffer_obj);
+        // new_map.emplace(path1, file_worker);
     }
     // fileworker_map.rehash(fileworker_map.size());
 
@@ -1365,6 +1366,7 @@ Status NewTxn::CheckpointInner() {
     for (auto it = fileworker_map.begin(); it != fileworker_map.end();) {
         const auto &ptr = it->second;
         if (ptr->rel_file_path_->find("import") == std::string::npos) {
+            msync(ptr->mmap_, ptr->mmap_size_, MS_SYNC);
             ptr->MoveFile();
             ++it;
         } else {
@@ -1863,16 +1865,16 @@ Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
     LOG_TRACE("NewTxn::FlushColumnFiles begin");
     for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
         ColumnMeta column_meta(column_idx, block_meta);
-        FileWorker *buffer_obj = nullptr;
-        FileWorker *outline_buffer_obj = nullptr;
+        FileWorker *file_worker{};
+        FileWorker *var_file_worker{};
 
-        status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
+        status = column_meta.GetColumnBuffer(file_worker, var_file_worker);
         if (!status.ok()) {
             return status;
         }
-        buffer_obj->MoveFile();
-        if (outline_buffer_obj) {
-            outline_buffer_obj->MoveFile();
+        file_worker->MoveFile();
+        if (var_file_worker) {
+            var_file_worker->MoveFile();
         }
     }
     LOG_TRACE("NewTxn::FlushColumnFiles end");

@@ -534,8 +534,8 @@ void InfinityContext::StopThriftServers() {
         stop_servers_func_();
         start_server_ = false;
         // Not set to nullptr, to enable restart the server.
-        // start_servers_func_ = nullptr;
-        // stop_servers_func_ = nullptr;
+        // start_servers_func_ {};
+        // stop_servers_func_ {};
     }
     // close all thrift sessions
     const auto removed_session_count = InfinityThriftService::ClearSessionMap();

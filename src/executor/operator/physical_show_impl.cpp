@@ -2304,7 +2304,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
                 for (const auto &path : paths) {
                     file_worker = buffer_manager->GetFileWorker(path);
                     if (file_worker != nullptr) {
-                        // auto file_size = buffer_obj->GetBufferSize();
+                        // auto file_size = file_worker->GetBufferSize();
                         // block_size += file_size;
                     } else {
                         RecoverableError(status);

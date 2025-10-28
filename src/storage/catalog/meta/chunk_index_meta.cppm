@@ -85,7 +85,7 @@ private:
 
     std::optional<ChunkIndexMetaInfo> chunk_info_;
 
-    FileWorker *index_buffer_ = nullptr;
+    FileWorker *index_buffer_{};
 };
 
 } // namespace infinity

@@ -49,7 +49,7 @@ public:
 
     virtual void InsertBlockData(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt) = 0;
 
-    virtual void Dump(FileWorker *buffer_obj) const = 0;
+    virtual void Dump(FileWorker *file_worker) const = 0;
 
     virtual std::pair<u32, Bitmask> RangeQuery(const void *input) const = 0;
 

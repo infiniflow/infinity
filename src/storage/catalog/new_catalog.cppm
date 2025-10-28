@@ -128,7 +128,7 @@ public:
     BlockOffset cur() const { return cur_; }
 
 private:
-    NewTxnGetVisibleRangeState *visit_state_ = nullptr;
+    NewTxnGetVisibleRangeState *visit_state_{};
     std::pair<BlockOffset, BlockOffset> visible_range_ = {0, 0};
     BlockOffset cur_ = 0;
     bool end_ = false;

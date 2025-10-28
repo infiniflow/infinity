@@ -416,7 +416,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
 
                 FileWorker *index_file_worker{};
                 {
-                    // Status status = NewCatalog::GetChunkIndex(old_chunk_meta, buffer_obj);
+                    // Status status = NewCatalog::GetChunkIndex(old_chunk_meta, file_worker);
                     status = old_chunk_meta.GetIndexBuffer(index_file_worker);
                     if (!status.ok()) {
                         return status;
@@ -1531,7 +1531,7 @@ Status NewTxn::OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
                                 SegmentMeta &segment_meta,
                                 RowID base_rowid,
                                 u32 total_row_cnt,
-                                FileWorker *buffer_obj) {
+                                FileWorker *file_worker) {
     auto [block_ids, status] = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
         return status;
@@ -1563,7 +1563,7 @@ Status NewTxn::OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
             memory_hnsw_index->InsertVecs(base_rowid.segment_offset_, col, offset, row_cnt);
         }
 
-        memory_hnsw_index->Dump(buffer_obj);
+        memory_hnsw_index->Dump(file_worker);
     } else if (index_base->index_type_ == IndexType::kBMP) {
         auto memory_bmp_index = std::make_shared<BMPIndexInMem>(base_rowid, index_base.get(), column_def.get());
 
@@ -1585,7 +1585,7 @@ Status NewTxn::OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
             u32 offset = 0;
             memory_bmp_index->AddDocs(base_rowid.segment_offset_, col, offset, row_cnt);
         }
-        memory_bmp_index->Dump(buffer_obj);
+        memory_bmp_index->Dump(file_worker);
     } else {
         UnrecoverableError("Not implemented yet");
     }

@@ -37,7 +37,7 @@ protected:
     mutable std::shared_mutex rw_mutex_ = {};
     u32 input_row_count_ = 0;
     u32 input_embedding_count_ = 0;
-    IVF_Index_Storage *ivf_index_storage_ = nullptr;
+    IVF_Index_Storage *ivf_index_storage_{};
     bool own_ivf_index_storage_ = true;
     FileWorker *dump_obj_{};
 
@@ -58,7 +58,7 @@ public:
     virtual u32 GetRowCount() const = 0;
 
     virtual void InsertBlockData(const SegmentOffset block_offset, const ColumnVector &col, BlockOffset row_offset, BlockOffset row_cnt) = 0;
-    virtual void Dump(FileWorker *buffer_obj, size_t *p_dump_size = nullptr) = 0;
+    virtual void Dump(FileWorker *file_worker, size_t *p_dump_size = nullptr) = 0;
     void SearchIndex(const KnnDistanceBase1 *knn_distance,
                      const void *query_ptr,
                      EmbeddingDataType query_element_type,

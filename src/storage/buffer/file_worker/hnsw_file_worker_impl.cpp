@@ -83,22 +83,22 @@ bool HnswFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) 
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
     (*hnsw_handler)->SaveToPtr(*file_handle_);
 
-    auto fd = file_handle_->fd();
-    mmap_size_ = index_size_;
-    mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+    file_handle_->Sync();
+    // auto fd = file_handle_->fd();
+    // mmap_size_ = index_size_;
+    // mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
     prepare_success = true;
     return true;
 }
 
 void HnswFileWorker::Read(size_t file_size, bool other) {
-    // data_ = static_cast<void *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_).release()));
+    FreeInMemory();
+    data_ = static_cast<void *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_).release()));
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
-    // (*hnsw_handler)->LoadFromPtr(*file_handle_, file_size);
 
-    // int ret = VirtualStore::MmapFile(read_path, mmap_addr_, file_size);
+    (*hnsw_handler)->LoadFromPtr(*file_handle_, file_size);
 
-    // auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
-    (*hnsw_handler)->LoadFromPtr(*file_handle_, (char *)mmap_, file_size);
+    // (*hnsw_handler)->LoadFromPtr(*file_handle_, (char *)mmap_, file_size);
 }
 
 } // namespace infinity

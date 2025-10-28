@@ -136,7 +136,7 @@ public:
 
     void AddDocs(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count);
 
-    void Dump(FileWorker *buffer_obj, size_t *dump_size = nullptr);
+    void Dump(FileWorker *file_worker, size_t *dump_size = nullptr);
 
     const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 

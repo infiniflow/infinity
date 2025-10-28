@@ -219,8 +219,8 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        FileWorker *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        FileWorker *file_worker{};
+        status = chunk_index_meta.GetIndexBuffer(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = txn_mgr->CommitTxn(txn);

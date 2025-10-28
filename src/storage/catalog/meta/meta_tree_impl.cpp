@@ -777,7 +777,7 @@ std::shared_ptr<TableCache> MetaTableObject::RestoreTableCache(Storage *storage_
         UnrecoverableError(fmt::format("DB id or table id is invalid: {}, cause: {}", table_key->ToString(), e.what()));
     }
 
-    std::shared_ptr<TableCache> table_cache = nullptr;
+    std::shared_ptr<TableCache> table_cache;
     if (unsealed_segment_id == 0 and unsealed_segment_offset == 0) {
         table_cache = std::make_shared<TableCache>(table_id, table_key->table_name_);
     } else {
@@ -789,7 +789,7 @@ std::shared_ptr<TableCache> MetaTableObject::RestoreTableCache(Storage *storage_
     auto kv_instance_ptr = kv_store->GetInstance();
     for (const auto &segment_pair : segment_map_) {
         SegmentID segment_id = segment_pair.first;
-        std::shared_ptr<SegmentCache> segment_cache = nullptr;
+        std::shared_ptr<SegmentCache> segment_cache;
         if (segment_id == unsealed_segment_id) {
             table_cache->unsealed_segment_cache_ = std::make_shared<SegmentCache>(segment_id, unsealed_segment_offset);
         } else {

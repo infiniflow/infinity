@@ -44,11 +44,11 @@ struct SecondaryIndexChunkDataReader {
     u32 next_offset_ = 0;
     const void *key_ptr_ = nullptr;
     const SegmentOffset *offset_ptr_ = nullptr;
-    SecondaryIndexChunkDataReader(FileWorker *buffer_obj, u32 row_count) {
-        handle_ = buffer_obj;
+    SecondaryIndexChunkDataReader(FileWorker *file_worker, u32 row_count) {
+        handle_ = file_worker;
         row_count_ = row_count;
         const SecondaryIndexDataBase<HighCardinalityTag> *index{};
-        buffer_obj->Read(index);
+        file_worker->Read(index);
         std::tie(key_ptr_, offset_ptr_) = index->GetKeyOffsetPointer();
         assert(index->GetChunkRowCount() == row_count_);
     }
@@ -73,8 +73,8 @@ struct SecondaryIndexChunkMerger {
         pq_;
     explicit SecondaryIndexChunkMerger(const std::vector<std::pair<u32, FileWorker *>> &buffer_objs) {
         readers_.reserve(buffer_objs.size());
-        for (const auto &[row_count, buffer_obj] : buffer_objs) {
-            readers_.emplace_back(buffer_obj, row_count);
+        for (const auto &[row_count, file_worker] : buffer_objs) {
+            readers_.emplace_back(file_worker, row_count);
         }
         OrderedKeyType key = {};
         u32 offset = 0;

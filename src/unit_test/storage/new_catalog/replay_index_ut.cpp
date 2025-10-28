@@ -408,12 +408,12 @@ TEST_P(TestTxnReplayIndex, SLOW_test_replay_append_with_index) {
         // int32_t begin_val = 2;
         // int32_t end_val = 3;
 
-        FileWorker *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        FileWorker *file_worker{};
+        status = chunk_index_meta.GetIndexBuffer(file_worker);
         EXPECT_TRUE(status.ok());
 
         // {
-        //     BufferHandle buffer_handle = buffer_obj->Load();
+        //     BufferHandle buffer_handle = file_worker->Load();
         //     auto *index = static_cast<const SecondaryIndexData *>(buffer_handle.GetData());
 
         //     [[maybe_unused]] const auto [begin_approx_pos, begin_lower, begin_upper] = index->SearchPGM(&begin_val);
@@ -681,8 +681,8 @@ TEST_P(TestTxnReplayIndex, SLOW_test_populate_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        FileWorker *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        FileWorker *file_worker = nullptr;
+        status = chunk_index_meta.GetIndexBuffer(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr_->CommitTxn(txn);

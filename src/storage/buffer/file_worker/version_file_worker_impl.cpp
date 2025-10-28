@@ -49,9 +49,6 @@ void VersionFileWorker::AllocateInMemory() {
 }
 
 void VersionFileWorker::FreeInMemory() {
-    if (data_ == nullptr) {
-        return;
-    }
     auto *data = static_cast<BlockVersion *>(data_);
     delete data;
     data_ = nullptr;
@@ -71,6 +68,9 @@ bool VersionFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ba
     return false;
 }
 
-void VersionFileWorker::Read(size_t file_size, bool other) { BlockVersion::LoadFromFile(data_, mmap_size_, mmap_, file_handle_.get()); }
+void VersionFileWorker::Read(size_t file_size, bool other) {
+    // FreeInMemory();
+    BlockVersion::LoadFromFile(data_, mmap_size_, mmap_, file_handle_.get());
+}
 
 } // namespace infinity

@@ -45,16 +45,16 @@ std::shared_ptr<VectorBuffer> VectorBuffer::Make(const size_t data_type_size, co
 }
 
 std::shared_ptr<VectorBuffer>
-VectorBuffer::Make(FileWorker *buffer_obj, FileWorker *outline_buffer_obj, size_t data_type_size, size_t capacity, VectorBufferType buffer_type) {
+VectorBuffer::Make(FileWorker *file_worker, FileWorker *var_file_worker, size_t data_type_size, size_t capacity, VectorBufferType buffer_type) {
     std::shared_ptr<VectorBuffer> buffer_ptr = std::make_shared<VectorBuffer>();
     buffer_ptr->buffer_type_ = buffer_type;
     switch (buffer_type) {
         case VectorBufferType::kCompactBit: {
-            buffer_ptr->InitializeCompactBit(buffer_obj, capacity);
+            buffer_ptr->InitializeCompactBit(file_worker, capacity);
             break;
         }
         default: {
-            buffer_ptr->Initialize(buffer_obj, outline_buffer_obj, data_type_size, capacity);
+            buffer_ptr->Initialize(file_worker, var_file_worker, data_type_size, capacity);
             break;
         }
     }
@@ -90,57 +90,57 @@ void VectorBuffer::Initialize(size_t type_size, size_t capacity) {
     capacity_ = capacity;
 }
 
-void VectorBuffer::InitializeCompactBit(FileWorker *buffer_obj, size_t capacity) {
+void VectorBuffer::InitializeCompactBit(FileWorker *file_worker, size_t capacity) {
     if (initialized_) {
         UnrecoverableError("std::vector buffer is already initialized.");
     }
     size_t data_size = (capacity + 7) / 8;
-    if (buffer_obj == nullptr) {
+    if (file_worker == nullptr) {
         UnrecoverableError("Buffer object is nullptr.");
     }
-    // if (buffer_obj->GetBufferSize() != data_size) {
+    // if (file_worker->GetBufferSize() != data_size) {
     //     UnrecoverableError("Buffer object size is not equal to data size.");
     // }
-    // ptr_ = buffer_obj->Load();
-    ptr_ = buffer_obj;
+    // ptr_ = file_worker->Load();
+    ptr_ = file_worker;
     initialized_ = true;
     data_size_ = data_size;
     capacity_ = capacity;
 }
 
-void VectorBuffer::Initialize(FileWorker *buffer_obj, FileWorker *outline_buffer_obj, size_t type_size, size_t capacity) {
+void VectorBuffer::Initialize(FileWorker *file_worker, FileWorker *var_file_worker, size_t type_size, size_t capacity) {
     if (initialized_) {
         UnrecoverableError("std::vector buffer is already initialized.");
     }
     size_t data_size = type_size * capacity;
-    if (buffer_obj == nullptr) {
+    if (file_worker == nullptr) {
         UnrecoverableError("Buffer object is nullptr.");
     }
-    // if (buffer_obj->GetBufferSize() != data_size) {
+    // if (file_worker->GetBufferSize() != data_size) {
     //     UnrecoverableError("Buffer object size is not equal to data size.");
     // }
-    // ptr_ = buffer_obj->Load();
-    ptr_ = buffer_obj;
+    // ptr_ = file_worker->Load();
+    ptr_ = file_worker;
     if (buffer_type_ == VectorBufferType::kVarBuffer) {
-        var_buffer_mgr_ = std::make_unique<VarBufferManager>(outline_buffer_obj);
+        var_buffer_mgr_ = std::make_unique<VarBufferManager>(var_file_worker);
     }
     initialized_ = true;
     data_size_ = data_size;
     capacity_ = capacity;
 }
 
-void VectorBuffer::SetToCatalog(FileWorker *buffer_obj, FileWorker *outline_buffer_obj) {
+void VectorBuffer::SetToCatalog(FileWorker *file_worker, FileWorker *var_file_worker) {
     if (!std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
         UnrecoverableError("Cannot convert to new catalog");
     }
 
     void *src_ptr = std::get<std::unique_ptr<char[]>>(ptr_).release();
-    buffer_obj->SetData(src_ptr);
+    file_worker->SetData(src_ptr);
 
-    // ptr_ = buffer_obj->Load();
-    ptr_ = buffer_obj;
+    // ptr_ = file_worker->Load();
+    ptr_ = file_worker;
     if (buffer_type_ == VectorBufferType::kVarBuffer) {
-        var_buffer_mgr_->SetToCatalog(outline_buffer_obj);
+        var_buffer_mgr_->SetToCatalog(var_file_worker);
     }
 }
 

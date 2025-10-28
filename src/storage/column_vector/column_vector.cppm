@@ -130,7 +130,7 @@ public:
                     ColumnVectorType vector_type = ColumnVectorType::kFlat,
                     size_t capacity = DEFAULT_VECTOR_SIZE);
 
-    void SetToCatalog(FileWorker *buffer_obj, FileWorker *outline_buffer_obj, ColumnVectorMode vector_tipe);
+    void SetToCatalog(FileWorker *file_worker, FileWorker *var_file_worker, ColumnVectorMode vector_tipe);
 
     void Initialize(const ColumnVector &other, const Selection &input_select);
 
@@ -991,7 +991,7 @@ public:
     FlatType operator[](u32 index) { return data_ptr_[index]; }
 
 private:
-    const FlatType *data_ptr_ = nullptr;
+    const FlatType *data_ptr_{};
 };
 
 // Return Iterator for BooleanT ColumnVector
@@ -1018,7 +1018,7 @@ public:
     }
 
 private:
-    VectorBuffer *buffer_ = nullptr;
+    VectorBuffer *buffer_{};
     u32 idx_ = {};
 };
 
@@ -1061,8 +1061,8 @@ public:
     }
 
 private:
-    const VarcharT *data_ptr_ = nullptr;
-    // VectorBuffer *vec_buffer_ = nullptr;
+    const VarcharT *data_ptr_{};
+    // VectorBuffer *vec_buffer_{};
     std::shared_ptr<ColumnVector> col_;
     u32 idx_ = {};
 

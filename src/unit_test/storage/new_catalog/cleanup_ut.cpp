@@ -637,8 +637,8 @@ TEST_P(TestTxnCleanup, cleanup_and_optimize_index) {
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
             }
 
-            FileWorker *buffer_obj = nullptr;
-            status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+            FileWorker *file_worker = nullptr;
+            status = chunk_index_meta.GetIndexBuffer(file_worker);
             EXPECT_TRUE(status.ok());
 
             status = new_txn_mgr_->CommitTxn(txn);
@@ -896,8 +896,8 @@ TEST_P(TestTxnCleanup, cleanup_and_dump_index) {
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(2, 0));
             }
 
-            FileWorker *buffer_obj = nullptr;
-            status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+            FileWorker *file_worker = nullptr;
+            status = chunk_index_meta.GetIndexBuffer(file_worker);
             EXPECT_TRUE(status.ok());
 
             status = new_txn_mgr_->CommitTxn(txn);

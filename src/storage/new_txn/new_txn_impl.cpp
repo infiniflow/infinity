@@ -815,8 +815,8 @@ Status NewTxn::DropColumns(const std::string &db_name, const std::string &table_
         column_keys.emplace_back(column_key);
     }
 
-    std::vector<std::string> *index_id_strs_ptr = nullptr;
-    std::vector<std::string> *index_name_strs_ptr = nullptr;
+    std::vector<std::string> *index_id_strs_ptr{};
+    std::vector<std::string> *index_name_strs_ptr{};
     status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
     if (!status.ok()) {
         return status;
@@ -865,8 +865,8 @@ Status NewTxn::ListTable(const std::string &db_name, std::vector<std::string> &t
     if (!status.ok()) {
         return status;
     }
-    std::vector<std::string> *table_id_strs_ptr = nullptr;
-    std::vector<std::string> *table_names_ptr = nullptr;
+    std::vector<std::string> *table_id_strs_ptr{};
+    std::vector<std::string> *table_names_ptr{};
     status = db_meta->GetTableIDs(table_id_strs_ptr, &table_names_ptr);
     if (!status.ok()) {
         return status;
@@ -1290,7 +1290,7 @@ std::tuple<std::vector<std::shared_ptr<SegmentInfo>>, Status> NewTxn::GetSegment
     std::vector<std::shared_ptr<SegmentInfo>> segment_info_list;
     std::shared_ptr<DBMeta> db_meta;
     std::shared_ptr<TableMeta> table_meta;
-    std::vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::vector<SegmentID> *segment_ids_ptr{};
     TxnTimeStamp create_timestamp;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
@@ -1339,7 +1339,7 @@ NewTxn::GetBlocksInfo(const std::string &db_name, const std::string &table_name,
         return {block_info_list, status};
     }
     SegmentMeta segment_meta(segment_id, *table_meta);
-    std::vector<BlockID> *block_ids_ptr = nullptr;
+    std::vector<BlockID> *block_ids_ptr{};
     std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
         return {block_info_list, status};
@@ -1411,14 +1411,14 @@ std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSna
     database_snapshot_info->db_name_ = db_name;
     database_snapshot_info->db_id_str_ = db_meta->db_id_str();
 
-    std::vector<std::string> *table_ids_ptr = nullptr;
-    std::vector<std::string> *table_names_ptr = nullptr;
+    std::vector<std::string> *table_ids_ptr{};
+    std::vector<std::string> *table_names_ptr{};
     status = db_meta->GetTableIDs(table_ids_ptr, &table_names_ptr);
     if (!status.ok()) {
         return {nullptr, status};
     }
 
-    // std::string *db_comment = nullptr;
+    // std::string *db_comment{};
     // status = db_meta->GetComment(db_comment);
     // database_snapshot_info->db_comment_ = *db_comment;
     database_snapshot_info->db_next_table_id_str_ = std::to_string(std::stoull(table_ids_ptr->back()) + 1);
@@ -4221,7 +4221,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                                  abort_ts,
                                  MAX_TIMESTAMP,
                                  meta_cache);
-            std::vector<std::string> *index_id_strs_ptr = nullptr;
+            std::vector<std::string> *index_id_strs_ptr{};
             Status status = table_meta.GetIndexIDs(index_id_strs_ptr);
             if (!status.ok()) {
                 RecoverableError(status);

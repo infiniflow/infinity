@@ -72,15 +72,10 @@ bool SecondaryIndexFileWorker::Write(bool &prepare_success, const FileWorkerSave
 }
 
 void SecondaryIndexFileWorker::Read(size_t file_size, bool other) {
-    std::println("R sec");
-    // if (!data_) [[likely]] {
     auto index = GetSecondaryIndexData(column_def_->type(), row_count_, false);
     index->ReadIndexInner(*file_handle_);
     data_ = static_cast<void *>(index);
     LOG_TRACE("Finished Read().");
-    // } else {
-    //     UnrecoverableError("Read: data_ is not nullptr");
-    // }
 }
 
 } // namespace infinity

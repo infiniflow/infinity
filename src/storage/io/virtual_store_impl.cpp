@@ -124,7 +124,8 @@ std::tuple<std::unique_ptr<LocalFileHandle>, Status> VirtualStore::Open(const st
     // }
     switch (access_mode) {
         case FileAccessMode::kRead: {
-            fd = open(path.c_str(), O_RDONLY, 0666);
+            // fd = open(path.c_str(), O_RDONLY, 0666);
+            fd = open(path.c_str(), O_RDWR, 0666);
             break;
         }
         case FileAccessMode::kWrite: {

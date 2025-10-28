@@ -178,39 +178,33 @@ bool BlockVersion::SaveToFile(void *&mmap_p,
 void BlockVersion::LoadFromFile(void *&data, size_t &mmap_size, void *&mmap_p, LocalFileHandle *file_handle) {
     // std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     // auto *block_version = static_cast<BlockVersion *>(data);
-    auto block_version = std::make_unique<BlockVersion>();
-    size_t offset{};
+    if (!mmap_p) {
+        auto block_version = std::make_unique<BlockVersion>();
 
-    BlockOffset create_size;
-    std::memcpy(&create_size, (char *)mmap_p + offset, sizeof(create_size));
-    offset += sizeof(create_size);
-    block_version->created_.reserve(create_size);
-    for (BlockOffset i = 0; i < create_size; i++) {
-        CreateField create_field;
-        std::memcpy(&create_field.create_ts_, (char *)mmap_p + offset, sizeof(TxnTimeStamp));
-        offset += sizeof(TxnTimeStamp);
-        std::memcpy(&create_field.row_count_, (char *)mmap_p + offset, sizeof(TxnTimeStamp));
-        offset += sizeof(TxnTimeStamp);
+        BlockOffset create_size;
+        file_handle->Read(&create_size, sizeof(create_size));
+        block_version->created_.reserve(create_size);
+        for (BlockOffset i = 0; i < create_size; i++) {
+            block_version->created_.push_back(CreateField::LoadFromFile(file_handle));
+        }
+        LOG_TRACE(fmt::format("BlockVersion::LoadFromFile version, created: {}", create_size));
+        BlockOffset capacity;
+        file_handle->Read(&capacity, sizeof(capacity));
+        block_version->deleted_.resize(capacity);
+        for (BlockOffset i = 0; i < capacity; i++) {
+            file_handle->Read(&block_version->deleted_[i], sizeof(TxnTimeStamp));
+        }
 
-        block_version->created_.push_back(create_field);
+        auto fd = file_handle->fd();
+        mmap_size = sizeof(create_size) + sizeof(capacity) + (2 * create_size + capacity) * sizeof(TxnTimeStamp);
+        mmap_p = mmap(nullptr, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 /*align_offset*/);
+        if (mmap_p == MAP_FAILED) {
+            std::println("that code version: {}", mmap_size);
+            mmap_p = nullptr;
+        }
+        delete static_cast<BlockVersion *>(data);
+        data = block_version.release();
     }
-    LOG_TRACE(fmt::format("BlockVersion::LoadFromFile version, created: {}", create_size));
-    BlockOffset capacity;
-    std::memcpy(&capacity, (char *)mmap_p + offset, sizeof(capacity));
-    offset += sizeof(capacity);
-    block_version->deleted_.resize(capacity);
-    for (BlockOffset i = 0; i < capacity; i++) {
-        // std::println("version R pointer: {}", mmap_p);
-        std::memcpy(&block_version->deleted_[i], (char *)mmap_p + offset, sizeof(TxnTimeStamp));
-        offset += sizeof(TxnTimeStamp);
-    }
-    // auto fd = file_handle->fd();
-    mmap_size = sizeof(create_size) + sizeof(capacity) + (2 * create_size + capacity) * sizeof(TxnTimeStamp);
-    // mmap_p = mmap(nullptr, mmap_size, PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
-    // if (mmap_p == MAP_FAILED) {
-    //     std::println("that code: {}", mmap_size);
-    //     mmap_p = nullptr;
-    // }
 }
 
 void BlockVersion::GetCreateTS(size_t offset, size_t size, ColumnVector &res) const {

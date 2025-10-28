@@ -81,39 +81,40 @@ bool DataFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) 
     auto old_mmap_size = mmap_size_;
     mmap_size_ = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
     if (mmap_size_ == 0) {
-
-    } else {
-        auto fd = file_handle_->fd();
-        VirtualStore::Truncate(GetFilePathTemp(), mmap_size_);
-        if (mmap_ == nullptr) {
-            mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
-        } else {
-            mmap_ = mremap(mmap_, old_mmap_size, mmap_size_, MREMAP_MAYMOVE);
-        }
-        size_t offset{};
-
-        u64 magic_number = 0x00dd3344;
-        std::memcpy((char *)mmap_ + offset, &magic_number, sizeof(u64));
-        offset += sizeof(u64);
-
-        std::memcpy((char *)mmap_ + offset, &buffer_size_, sizeof(buffer_size_));
-        offset += sizeof(buffer_size_);
-
-        size_t data_size = data_size_.load();
-        std::memcpy((char *)mmap_ + offset, data_, data_size);
-        offset += data_size;
-
-        size_t unused_size = buffer_size_ - data_size;
-        if (unused_size > 0) {
-            std::string str(unused_size, '\0');
-            std::memcpy((char *)mmap_ + offset, str.c_str(), unused_size);
-            offset += unused_size;
-        }
-
-        u64 checksum{};
-        std::memcpy((char *)mmap_ + offset, &checksum, sizeof(checksum));
-        offset += sizeof(u64);
+        prepare_success = true;
+        return true;
     }
+
+    auto fd = file_handle_->fd();
+    VirtualStore::Truncate(GetFilePathTemp(), mmap_size_);
+    if (mmap_ == nullptr) {
+        mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+    } else {
+        mmap_ = mremap(mmap_, old_mmap_size, mmap_size_, MREMAP_MAYMOVE);
+    }
+    size_t offset{};
+
+    u64 magic_number = 0x00dd3344;
+    std::memcpy((char *)mmap_ + offset, &magic_number, sizeof(u64));
+    offset += sizeof(u64);
+
+    std::memcpy((char *)mmap_ + offset, &buffer_size_, sizeof(buffer_size_));
+    offset += sizeof(buffer_size_);
+
+    size_t data_size = data_size_.load();
+    std::memcpy((char *)mmap_ + offset, data_, data_size);
+    offset += data_size;
+
+    size_t unused_size = buffer_size_ - data_size;
+    if (unused_size > 0) {
+        std::string str(unused_size, '\0');
+        std::memcpy((char *)mmap_ + offset, str.c_str(), unused_size);
+        offset += unused_size;
+    }
+
+    u64 checksum{};
+    std::memcpy((char *)mmap_ + offset, &checksum, sizeof(checksum));
+    offset += sizeof(u64);
 
     prepare_success = true; // Not run defer_fn
     return true;
@@ -171,9 +172,9 @@ void DataFileWorker::Read(size_t file_size, bool other) {
         auto fd = file_handle_->fd();
         mmap_size_ = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
         // std::memcpy((char *)mmap_true_, data_, mmap_true_size_);
-        mmap_ = mmap(nullptr, mmap_size_, PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+        mmap_ = mmap(nullptr, mmap_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 /*align_offset*/);
         if (mmap_ == MAP_FAILED) {
-            std::println("that code 2: {}", mmap_size_);
+            std::println("that code data: {}", mmap_size_);
             mmap_ = nullptr;
         }
     }

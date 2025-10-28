@@ -620,17 +620,17 @@ void HnswIndexInMem::InsertVecs(SegmentOffset block_offset,
     IncreaseMemoryUsageBase(mem_usage);
 }
 
-void HnswIndexInMem::Dump(FileWorker *buffer_obj, size_t *dump_size_ptr) {
+void HnswIndexInMem::Dump(FileWorker *file_worker, size_t *dump_size_ptr) {
     if (dump_size_ptr != nullptr) {
         size_t dump_size = hnsw_handler_->MemUsage();
         *dump_size_ptr = dump_size;
     }
 
     HnswHandlerPtr *data_ptr{};
-    buffer_obj->Read(data_ptr);
+    file_worker->Read(data_ptr);
     *data_ptr = hnsw_handler_;
     own_memory_ = false;
-    chunk_obj_ = std::move(buffer_obj);
+    chunk_obj_ = std::move(file_worker);
 }
 
 size_t

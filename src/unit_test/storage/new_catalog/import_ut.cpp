@@ -316,8 +316,8 @@ TEST_P(TestTxnImport, test_import_with_index) {
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(segment_id, 0));
             }
 
-            FileWorker *buffer_obj = nullptr;
-            status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+            FileWorker *file_worker = nullptr;
+            status = chunk_index_meta.GetIndexBuffer(file_worker);
             EXPECT_TRUE(status.ok());
         };
         {
@@ -547,8 +547,8 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(segment_id, 0));
             }
 
-            FileWorker *buffer_obj = nullptr;
-            status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+            FileWorker *file_worker = nullptr;
+            status = chunk_index_meta.GetIndexBuffer(file_worker);
             EXPECT_TRUE(status.ok());
         };
         {

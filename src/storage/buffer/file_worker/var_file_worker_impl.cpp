@@ -92,6 +92,9 @@ void VarFileWorker::Read(size_t file_size, bool other) {
         // } else {
         size_t buffer_size = file_size;
         // }
+        if (buffer_size == 0) {
+            return;
+        }
 
         auto buffer = std::make_unique<char[]>(buffer_size);
 
@@ -110,9 +113,9 @@ void VarFileWorker::Read(size_t file_size, bool other) {
 
         auto fd = file_handle_->fd();
         mmap_size_ = buffer_size;
-        mmap_ = mmap(nullptr, mmap_size_, PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+        mmap_ = mmap(nullptr, mmap_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 /*align_offset*/);
         if (mmap_ == MAP_FAILED) {
-            std::println("that code: {}", mmap_size_);
+            std::println("that code var: {}", mmap_size_);
             mmap_ = nullptr;
         }
     }
