@@ -1135,7 +1135,7 @@ Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, size_t offset, size_
         return status;
     }
 
-    const BlockVersion * block_version{};
+    const BlockVersion *block_version{};
     version_buffer->Read(block_version);
     {
         std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);

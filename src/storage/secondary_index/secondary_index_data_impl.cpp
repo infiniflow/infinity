@@ -39,7 +39,7 @@ namespace infinity {
 template <typename RawValueType>
 struct SecondaryIndexChunkDataReader {
     using OrderedKeyType = ConvertToOrderedType<RawValueType>;
-    FileWorker * handle_;
+    FileWorker *handle_;
     u32 row_count_ = 0;
     u32 next_offset_ = 0;
     const void *key_ptr_ = nullptr;
