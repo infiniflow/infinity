@@ -86,10 +86,8 @@ protected:
     std::string tree_cmd;
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         WalReplayTest,
-                         ::testing::Values(BaseTestParamStr::VFS_OFF_CONFIG_PATH));
-                         // ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, WalReplayTest, ::testing::Values(BaseTestParamStr::VFS_OFF_CONFIG_PATH));
+// ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(WalReplayTest, wal_replay_database) {
     {
