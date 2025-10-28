@@ -683,7 +683,13 @@ PersistWriteResult PersistenceManager::CleanupStaleObjectData() {
         if (obj_key == current_object_key_ || obj_key == "KEY_EMPTY") {
             continue;
         }
-        auto &range_set = object_range_map[obj_key];
+
+        auto range_it = object_range_map.find(obj_key);
+        if (range_it == object_range_map.end()) {
+            LOG_WARN(fmt::format("Failed to find range info for object {}", obj_key));
+            continue;
+        }
+        auto &range_set = range_it->second;
         size_t range_end = object_addr.part_offset_ + object_addr.part_size_;
         range_end = (range_end + ObjAlignment - 1) & ~(ObjAlignment - 1);
         Range obj_range(object_addr.part_offset_, range_end);
