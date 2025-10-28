@@ -604,11 +604,11 @@ jobs:
 
       - name: Build reldeb version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb -j --target infinity knn_import_benchmark knn_query_benchmark"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb -j --target infinity test_main knn_import_benchmark knn_query_benchmark"
 
       - name: Upload artifacts
         if: ${{ !cancelled() && !failure() }}
-        run: tar -cf - cmake-build-reldeb/src/infinity cmake-build-reldeb/benchmark/local_infinity/{knn_import_benchmark,knn_query_benchmark} | tar -C ${ARTIFACTS_DIR} -xf -
+        run: tar -cf - cmake-build-reldeb/src/{infinity,test_main} cmake-build-reldeb/benchmark/local_infinity/{knn_import_benchmark,knn_query_benchmark} | tar -C ${ARTIFACTS_DIR} -xf -
 
       - name: Remove build container
         if: always()
