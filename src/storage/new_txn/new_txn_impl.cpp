@@ -4534,7 +4534,6 @@ Status NewTxn::Rollback() {
 }
 
 Status NewTxn::Cleanup() {
-
     if (base_txn_store_ != nullptr) {
         return Status::UnexpectedError("txn store is not null");
     }
@@ -4570,30 +4569,38 @@ Status NewTxn::Cleanup() {
         return status;
     }
 
-    for (auto &key : dropped_keys) {
-        status = kv_instance->Delete(key);
+    if (metas.empty()) {
+        LOG_TRACE("Cleanup: No data need to clean.");
+    } else {
+        status = CleanupInner(metas);
         if (!status.ok()) {
             return status;
         }
+
+        for (auto &key : dropped_keys) {
+            status = kv_instance->Delete(key);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+
+        txn_store->dropped_keys_ = dropped_keys;
+        txn_store->metas_ = metas;
     }
 
-    if (metas.empty()) {
-        LOG_TRACE("Cleanup: No data need to clean. Try to remove all empty directories...");
-        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-        auto data_dir_str = buffer_mgr->GetFullDataDir();
-        auto data_dir = static_cast<std::filesystem::path>(*data_dir_str);
-        // Delete empty dir
-        VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
-        return Status::OK();
-    }
+    // Delete empty dir
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    auto data_dir_str = buffer_mgr->GetFullDataDir();
+    auto data_dir = static_cast<std::filesystem::path>(*data_dir_str);
+    VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
 
-    status = CleanupInner(metas);
-    if (!status.ok()) {
-        return status;
+    // Clean up stale object data that has no corresponding file path
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    if (pm != nullptr) {
+        PersistResultHandler handler(pm);
+        PersistWriteResult result = pm->CleanupStaleObjectData();
+        handler.HandleWriteResult(result);
     }
-
-    txn_store->dropped_keys_ = dropped_keys;
-    txn_store->metas_ = metas;
 
     return Status::OK();
 }
