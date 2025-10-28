@@ -51,14 +51,6 @@ import column_def;
 
 namespace infinity {
 
-WalManager::WalManager(Storage *storage, std::string wal_dir, u64 wal_size_threshold, FlushOptionType flush_option)
-    : cfg_wal_size_threshold_(wal_size_threshold), wal_dir_(wal_dir), wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), storage_(storage),
-      running_(false), flush_option_(flush_option), last_ckp_wal_size_(0), checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS) {
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount("WalManager");
-#endif
-}
-
 WalManager::WalManager(Storage *storage, std::string wal_dir, std::string data_dir, u64 wal_size_threshold, FlushOptionType flush_option)
     : cfg_wal_size_threshold_(wal_size_threshold), wal_dir_(wal_dir), wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), data_path_(data_dir),
       storage_(storage), running_(false), flush_option_(flush_option), last_ckp_wal_size_(0), checkpoint_in_progress_(false),
@@ -357,6 +349,23 @@ void WalManager::NewFlush() {
             // TODO: if txn is checkpoint, swap WAL file
         }
         txn_batch.clear();
+
+        if (!VirtualStore::Exists(wal_path_)) {
+            LOG_ERROR(fmt::format("WAL file: {} does not exist", wal_path_));
+            LOG_ERROR(fmt::format("To list the files in WAL directory: {}", wal_dir_));
+            auto [entries, status] = VirtualStore::ListDirectory(wal_dir_);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+            for (const auto &entry : entries) {
+                const auto &filename = entry->path().string();
+                LOG_ERROR(fmt::format("WAL file: {} ", filename));
+            }
+            if (entries.empty()) {
+                LOG_ERROR(fmt::format("No files in {}", wal_dir_));
+            }
+            UnrecoverableError("WAL files not found");
+        }
 
         // Check if the wal file is too large, swap to a new one.
         try {

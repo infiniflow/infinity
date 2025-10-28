@@ -23,7 +23,7 @@ import internal_types;
 import data_type;
 import alter_statement;
 import column_def;
-
+import statement_common;
 namespace infinity {
 
 export class LogicalAlter : public LogicalNode {
@@ -79,6 +79,24 @@ public:
 
 public:
     std::vector<std::string> column_names_;
+};
+
+export class LogicalAlterIndex : public LogicalAlter {
+public:
+    LogicalAlterIndex(u64 node_id,
+                      const std::shared_ptr<TableInfo> &table_info,
+                      std::string index_name,
+                      std::vector<std::unique_ptr<InitParameter>> opt_params)
+        : LogicalAlter(node_id, table_info, AlterStatementType::kAlterIndex), index_name_(std::move(index_name)), opt_params_(std::move(opt_params)) {
+    }
+
+    std::string ToString(i64 &space) const final;
+
+    std::string name() final { return "LogicalAlterIndex"; }
+
+public:
+    std::string index_name_;
+    std::vector<std::unique_ptr<InitParameter>> opt_params_;
 };
 
 } // namespace infinity

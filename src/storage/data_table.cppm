@@ -89,7 +89,7 @@ public:
     [[nodiscard]] inline std::string *result_msg() const { return result_msg_.get(); }
 
 public:
-    [[nodiscard]] std::string ToString() const;
+    // [[nodiscard]] std::string ToString() const;
 
     [[nodiscard]] std::shared_ptr<std::vector<RowID>> GetRowIDVector() const;
 

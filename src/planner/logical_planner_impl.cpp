@@ -1354,6 +1354,14 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, std::shared_ptr<Bin
             this->logical_plan_ = std::make_shared<LogicalDropColumns>(bind_context_ptr->GetNewLogicalNodeId(), table_info, std::move(column_names));
             break;
         }
+        case AlterStatementType::kAlterIndex: {
+            auto *alter_index_statement = static_cast<AlterIndexStatement *>(statement);
+            this->logical_plan_ = std::make_shared<LogicalAlterIndex>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                      table_info,
+                                                                      alter_index_statement->index_name_,
+                                                                      std::move(alter_index_statement->opt_params_));
+            break;
+        }
         default: {
             RecoverableError(Status::NotSupport("Alter statement isn't supported."));
         }

@@ -75,8 +75,6 @@ private:
     std::string GetTableIndexTag(const std::string &tag) const;
 
 public:
-    std::string FtIndexCacheTag() const;
-
     // Methods for secondary index cardinality
     Status SetSecondaryIndexCardinality(SecondaryIndexCardinality cardinality);
 

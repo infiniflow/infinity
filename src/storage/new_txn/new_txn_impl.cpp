@@ -1639,8 +1639,6 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
         return status;
     }
 
-    LOG_DEBUG(fmt::format("checkpoint ts {}, got {} DBs.", checkpoint_ts, db_id_strs_ptr->size()));
-
     // Put the data into local txn store
     if (base_txn_store_ != nullptr) {
         return Status::UnexpectedError("txn store is not null");
@@ -1848,7 +1846,7 @@ Status NewTxn::Commit() {
         TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(this);
         SetTxnCommitting(commit_ts);
         SetTxnCommitted();
-        if (!meta_cache_items_.empty() || !cache_infos_.empty()) {
+        if (!MetaCacheAndCacheInfoEmpty()) {
             txn_mgr_->SaveOrResetMetaCacheForReadTxn(this);
         }
 
@@ -2354,24 +2352,6 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
     }
     return Status::OK();
 }
-
-//
-// Status NewTxn::PrepareCommitCreateDB() {
-//    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-//
-//    CreateDBTxnStore *txn_store = static_cast<CreateDBTxnStore *>(base_txn_store_.get());
-//    std::string db_id_str = std::to_string(txn_store->db_id_);
-//    std::shared_ptr<DBMeta> db_meta;
-//    Status status = NewCatalog::AddNewDB(kv_instance_.get(), db_id_str, commit_ts, txn_store->db_name_,
-//    txn_store->comment_ptr_.get(), db_meta); if (!status.ok()) {
-//        UnrecoverableError(status.message());
-//    }
-//
-//    std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdCreateDatabaseV2>(txn_store->db_name_, db_id_str,
-//    *txn_store->comment_ptr_); wal_entry_->cmds_.push_back(wal_command);
-//    txn_context_ptr_->AddOperation(std::make_shared<std::string>(wal_command->ToString()));
-//    return Status::OK();
-//}
 
 Status NewTxn::PrepareCommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
@@ -4529,23 +4509,27 @@ Status NewTxn::Cleanup() {
     base_txn_store_ = std::make_shared<CleanupTxnStore>();
     auto *txn_store = static_cast<CleanupTxnStore *>(base_txn_store_.get());
     txn_store->timestamp_ = begin_ts;
+    LOG_TRACE(txn_store->ToString());
 
     auto last_cleanup_ts = new_catalog_->GetLastCleanupTS();
     auto oldest_txn_begin_ts = txn_mgr_->GetOldestAliveTS();
     auto last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
 
-    if (last_cleanup_ts >= oldest_txn_begin_ts) {
-        LOG_TRACE(fmt::format("SKIP cleanup. last_cleanup_ts: {}, oldest_txn_begin_ts: {}", last_cleanup_ts, oldest_txn_begin_ts));
+    // We will only clean up entities dropped before both the begin timestamp of active transactions and the latest checkpoint,
+    // ensuring the entities are no longer needed.
+    TxnTimeStamp visible_ts = std::min(oldest_txn_begin_ts, last_checkpoint_ts);
+    if (last_cleanup_ts < visible_ts) {
+        LOG_INFO(fmt::format("Cleaning ts < {} dropped entities...", visible_ts));
+    } else {
+        LOG_INFO(fmt::format("SKIP cleanup. last_cleanup_ts: {}, oldest_txn_begin_ts: {}, last_checkpoint_ts: {}",
+                             last_cleanup_ts,
+                             oldest_txn_begin_ts,
+                             last_checkpoint_ts));
 
         return Status::OK();
     }
 
     auto *kv_instance = kv_instance_.get();
-
-    TxnTimeStamp visible_ts = std::min(begin_ts, last_checkpoint_ts);
-
-    LOG_INFO(fmt::format("Cleaning ts < {} dropped entities...", visible_ts));
-
     std::vector<std::string> dropped_keys;
     std::vector<std::shared_ptr<MetaKey>> metas;
     Status status = new_catalog_->GetCleanedMeta(visible_ts, kv_instance, metas, dropped_keys);
@@ -4580,8 +4564,6 @@ Status NewTxn::Cleanup() {
 
     return Status::OK();
 }
-
-Status NewTxn::ReplayCleanup(WalCmdCleanup *cleanup_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
 
 Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) {
     KVInstance *kv_instance = kv_instance_.get();
@@ -5447,17 +5429,30 @@ Status NewTxn::CheckpointForSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
     return Status::OK();
 }
 
-void NewTxn::AddMetaCache(const std::shared_ptr<MetaBaseCache> &meta_base_cache) { meta_cache_items_.emplace_back(meta_base_cache); }
+void NewTxn::AddMetaCache(const std::shared_ptr<MetaBaseCache> &meta_base_cache) {
+    std::lock_guard<std::mutex> lock(cache_mtx_);
+    meta_cache_items_.emplace_back(meta_base_cache);
+}
 
-void NewTxn::AddCacheInfo(const std::shared_ptr<CacheInfo> &cache_info) { cache_infos_.emplace_back(cache_info); }
+void NewTxn::AddCacheInfo(const std::shared_ptr<CacheInfo> &cache_info) {
+    std::lock_guard<std::mutex> lock(cache_mtx_);
+    cache_infos_.emplace_back(cache_info);
+}
+
+bool NewTxn::MetaCacheAndCacheInfoEmpty() {
+    std::lock_guard<std::mutex> lock(cache_mtx_);
+    return meta_cache_items_.empty() && cache_infos_.empty();
+}
 
 void NewTxn::ResetMetaCacheAndCacheInfo() {
+    std::lock_guard<std::mutex> lock(cache_mtx_);
     meta_cache_items_.clear();
     cache_infos_.clear();
 }
 
 void NewTxn::SaveMetaCacheAndCacheInfo() {
     MetaCache *meta_cache_ptr = txn_mgr_->storage()->meta_cache();
+    std::lock_guard<std::mutex> lock(cache_mtx_);
     meta_cache_ptr->Put(meta_cache_items_, cache_infos_, BeginTS());
 }
 

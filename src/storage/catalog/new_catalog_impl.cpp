@@ -311,24 +311,8 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts,
     while (iter->Valid() && iter->Key().starts_with(drop_prefix)) {
         std::string drop_key = iter->Key().ToString();
         std::string commit_ts_str = iter->Value().ToString();
+        drop_ts = std::stoull(commit_ts_str);
 
-        auto keys = infinity::Partition(drop_key, '|');
-        const std::string &type_str = keys[1];
-        const std::string &meta_str = keys[2];
-        auto meta_infos = infinity::Partition(meta_str, '/');
-        if (type_str == "db") {
-            drop_ts = std::stoull(meta_infos[1]);
-        } else if (type_str == "tbl") {
-            drop_ts = std::stoull(meta_infos[2]);
-        } else if (type_str == "tbl_name") {
-            drop_ts = std::stoull(meta_infos[2]);
-        } else if (type_str == "tbl_col") {
-            drop_ts = std::stoull(meta_infos[3]);
-        } else if (type_str == "idx") {
-            drop_ts = std::stoull(meta_infos[3]);
-        } else {
-            drop_ts = std::stoull(commit_ts_str); // It might not be an integer
-        }
         if (drop_ts <= ts) {
             drop_keys.emplace_back(drop_key);
         }

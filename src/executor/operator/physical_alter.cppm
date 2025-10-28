@@ -112,4 +112,27 @@ private:
     const std::vector<std::string> &column_names_;
 };
 
+export class PhysicalAlterIndex final : public PhysicalAlter {
+public:
+    PhysicalAlterIndex(const std::shared_ptr<TableInfo> &table_info,
+                       std::string index_name,
+                       std::vector<std::unique_ptr<InitParameter>> opt_params,
+                       std::shared_ptr<std::vector<std::string>> output_names,
+                       std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types,
+                       u64 id,
+                       std::shared_ptr<std::vector<LoadMeta>> load_metas)
+        : PhysicalAlter(table_info, AlterStatementType::kAlterIndex, std::move(output_names), std::move(output_types), id, load_metas),
+          index_name_(std::move(index_name)), opt_params_(std::move(opt_params)) {}
+
+    ~PhysicalAlterIndex() override = default;
+
+    void Init(QueryContext *query_context) override;
+
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
+
+private:
+    std::string index_name_{};
+    std::vector<std::unique_ptr<InitParameter>> opt_params_;
+};
+
 } // namespace infinity

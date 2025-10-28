@@ -129,5 +129,28 @@ TEST_P(TestTableCache, test_table_cache) {
         EXPECT_EQ(table_cache_ptr->prepare_segment_offset_, 8388604);
         EXPECT_EQ(table_cache_ptr->commit_segment_id_, 0);
         EXPECT_EQ(table_cache_ptr->commit_segment_offset_, 8190);
+
+        append_prepare_info = table_cache_ptr->uncommitted_append_infos_.front();
+        table_cache_ptr->CommitAppendNolock(append_prepare_info, append_prepare_info->transaction_id_);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->segment_id_, 1);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->row_count_, 8388604);
+        EXPECT_EQ(table_cache_ptr->next_segment_id(), 2);
+        EXPECT_EQ(table_cache_ptr->prepare_segment_id_, 1);
+        EXPECT_EQ(table_cache_ptr->prepare_segment_offset_, 8388604);
+        EXPECT_EQ(table_cache_ptr->commit_segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->commit_segment_offset_, 8192);
+
+        while (!table_cache_ptr->uncommitted_append_infos_.empty()) {
+            append_prepare_info = table_cache_ptr->uncommitted_append_infos_.front();
+            table_cache_ptr->CommitAppendNolock(append_prepare_info, append_prepare_info->transaction_id_);
+        }
+
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->segment_id_, 1);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->row_count_, 8388604);
+        EXPECT_EQ(table_cache_ptr->next_segment_id(), 2);
+        EXPECT_EQ(table_cache_ptr->prepare_segment_id_, 1);
+        EXPECT_EQ(table_cache_ptr->prepare_segment_offset_, 8388604);
+        EXPECT_EQ(table_cache_ptr->commit_segment_id_, 1);
+        EXPECT_EQ(table_cache_ptr->commit_segment_offset_, 8388604);
     }
 }

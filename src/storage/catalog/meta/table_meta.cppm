@@ -81,7 +81,6 @@ public:
 
     Status RemoveSegmentIDs1(const std::vector<SegmentID> &segment_ids);
 
-    std::pair<SegmentID, Status> AddSegmentID1(TxnTimeStamp commit_ts);
     Status AddSegmentWithID(TxnTimeStamp commit_ts, SegmentID segment_id);
 
     Status CommitSegment(SegmentID segment_id, TxnTimeStamp commit_ts);

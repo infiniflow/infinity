@@ -232,8 +232,6 @@ public:
 
     static Status MemIndexRecover(NewTxn *txn);
 
-    static Status MemIndexCommit(NewTxn *txn);
-
     static Status GetAllMemIndexes(NewTxn *txn, std::vector<std::shared_ptr<MemIndex>> &mem_indexes, std::vector<MemIndexID> &mem_index_ids);
 
     static Status AddNewDB(NewTxn *txn,
@@ -276,8 +274,6 @@ public:
 
     static Status AddNewBlockWithID(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, std::optional<BlockMeta> &block_meta, BlockID block_id);
 
-    static Status AddNewBlockForTransform(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, std::optional<BlockMeta> &block_meta);
-
     static Status LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockInfo &block_info, TxnTimeStamp checkpoint_ts);
 
     static Status CleanBlock(BlockMeta &block_meta, UsageFlag usage_flag);
@@ -285,10 +281,7 @@ public:
     static Status
     AddNewBlockColumn(BlockMeta &block_meta, size_t column_idx, const std::shared_ptr<ColumnDef> &column_def, std::optional<ColumnMeta> &column_meta);
 
-    static Status
-    AddNewBlockColumnForTransform(BlockMeta &block_meta, size_t column_idx, std::optional<ColumnMeta> &column_meta, TxnTimeStamp commit_ts);
-
-    static Status CleanBlockColumn(ColumnMeta &column_meta, const std::shared_ptr<ColumnDef>& column_def, UsageFlag usage_flag);
+    static Status CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag);
 
     static Status RestoreNewSegmentIndex1(TableIndexMeta &table_index_meta,
                                           NewTxn *new_txn,

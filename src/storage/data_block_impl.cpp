@@ -81,48 +81,6 @@ void DataBlock::Init(const DataBlock *input, const std::shared_ptr<Selection> &i
     this->Finalize();
 }
 
-void DataBlock::Init(const std::shared_ptr<DataBlock> &input, const std::shared_ptr<Selection> &input_select) { Init(input.get(), input_select); }
-
-void DataBlock::Init(const std::shared_ptr<DataBlock> &input, size_t start_idx, size_t end_idx) {
-    if (initialized) {
-        UnrecoverableError("Data block was initialized before.");
-    }
-    if (input.get() == nullptr) {
-        UnrecoverableError("Invalid input data block");
-    }
-    column_count_ = input->column_count();
-    if (column_count_ == 0) {
-        UnrecoverableError("Empty column vectors.");
-    }
-    column_vectors.reserve(column_count_);
-    for (size_t idx = 0; idx < column_count_; ++idx) {
-        column_vectors.emplace_back(std::make_shared<ColumnVector>(input->column_vectors[idx]->data_type()));
-        column_vectors.back()->Initialize(*(input->column_vectors[idx]), start_idx, end_idx);
-    }
-    capacity_ = column_vectors[0]->capacity();
-    initialized = true;
-    this->Finalize();
-}
-
-std::shared_ptr<DataBlock> DataBlock::MoveFrom(std::shared_ptr<DataBlock> &input) {
-    if (!input->Finalized()) {
-        UnrecoverableError("Input data block is not finalized.");
-    }
-    auto data_block = DataBlock::Make();
-    size_t capacity = input->row_count();
-    if (capacity) {
-        // because size of bitmap in datablock need to be power of 2
-        if (__builtin_popcount(capacity) > 1) {
-            capacity = 1 << (sizeof(size_t) * 8 - __builtin_clz(capacity));
-        }
-        data_block->Init(input, 0, capacity);
-        data_block->row_count_ = input->row_count();
-        data_block->finalized = true;
-    }
-    input->Reset();
-    return data_block;
-}
-
 void DataBlock::Init(const std::vector<std::shared_ptr<DataType>> &types, size_t capacity) {
     if (initialized) {
         UnrecoverableError("Data block was initialized before.");

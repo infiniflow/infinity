@@ -110,4 +110,32 @@ bool PhysicalDropColumns::Execute(QueryContext *query_context, OperatorState *op
     return true;
 }
 
+void PhysicalAlterIndex::Init(QueryContext *query_context) {}
+
+bool PhysicalAlterIndex::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+    if (storage_mode == StorageMode::kUnInitialized) {
+        UnrecoverableError("Uninitialized storage mode");
+    }
+
+    if (storage_mode != StorageMode::kWritable) {
+        operator_state->status_ = Status::InvalidNodeRole("Attempt to write on non-writable node");
+        operator_state->SetComplete();
+        return true;
+    }
+
+    LOG_INFO(fmt::format("AlterIndex {}.{}::{} begin", *table_info_->db_name_, *table_info_->table_name_, index_name_));
+
+    NewTxn *new_txn = query_context->GetNewTxn();
+    new_txn->SetTxnType(TransactionType::kAlterIndex);
+    Status status = new_txn->OptimizeIndexByParams(*table_info_->db_name_, *table_info_->table_name_, index_name_, std::move(opt_params_));
+    if (!status.ok()) {
+        operator_state->status_ = status;
+        RecoverableError(status);
+    }
+
+    operator_state->SetComplete();
+    return true;
+}
+
 } // namespace infinity

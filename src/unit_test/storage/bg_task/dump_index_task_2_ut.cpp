@@ -110,11 +110,10 @@ TEST_P(DumpMemIndexTaskTest2, row_cnt_exceed_memory_quota) {
     append();
 
     // Wait for the mem index dump in background to finish
-    sleep(1);
+    sleep(2);
 
     // Check chunk index after first mem index dump
     {
-        auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kRead);
 
         std::shared_ptr<DBMeta> db_meta;
@@ -159,11 +158,10 @@ TEST_P(DumpMemIndexTaskTest2, row_cnt_exceed_memory_quota) {
     append();
 
     // Wait for the mem index dump in background to finish
-    sleep(1);
+    sleep(2);
 
     // Check chunk index after second mem index dump
     {
-        auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kRead);
 
         std::shared_ptr<DBMeta> db_meta;

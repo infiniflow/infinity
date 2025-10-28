@@ -52,4 +52,9 @@ std::string LogicalDropColumns::ToString(i64 &space) const {
     return "";
 }
 
+std::string LogicalAlterIndex::ToString(i64 &space) const {
+    //
+    return "";
+}
+
 } // namespace infinity

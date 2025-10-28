@@ -2252,27 +2252,6 @@ optimize_statement: OPTIMIZE table_name {
     free($2->table_name_ptr_);
     delete $2;
 }
-//   1         2      3        4            5
-| OPTIMIZE IDENTIFIER ON table_name with_index_param_list{
-    $$ = new infinity::OptimizeStatement();
-    if($4->schema_name_ptr_ != nullptr) {
-        $$->schema_name_ = $4->schema_name_ptr_;
-        free($4->schema_name_ptr_);
-    }
-    $$->table_name_ = $4->table_name_ptr_;
-    free($4->table_name_ptr_);
-    delete $4;
-
-    ParserHelper::ToLower($2);
-    $$->index_name_ = $2;
-    free($2);
-
-    for (auto *&index_param : *$5) {
-        $$->opt_params_.emplace_back(std::unique_ptr<infinity::InitParameter>(index_param));
-        index_param = nullptr;
-    }
-    delete $5;
-};
 
 /*
  * Command
@@ -2753,6 +2732,24 @@ alter_statement : ALTER TABLE table_name RENAME TO IDENTIFIER {
     free($3->schema_name_ptr_);
     free($3->table_name_ptr_);
     delete $3;
+}
+| ALTER IDENTIFIER ON table_name with_index_param_list{
+    auto *ret = new infinity::AlterIndexStatement($4->schema_name_ptr_, $4->table_name_ptr_);
+    $$ = ret;
+
+    free($4->schema_name_ptr_);
+    free($4->table_name_ptr_);
+    delete $4;
+
+    ParserHelper::ToLower($2);
+    ret->index_name_ = $2;
+    free($2);
+
+    for (auto *&index_param : *$5) {
+        ret->opt_params_.emplace_back(std::unique_ptr<infinity::InitParameter>(index_param));
+        index_param = nullptr;
+    }
+    delete $5;
 }
 
 check_statement : CHECK SYSTEM {

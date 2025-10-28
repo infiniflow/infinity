@@ -216,8 +216,6 @@ std::string TableIndexMeta::GetTableIndexTag(const std::string &tag) const {
     return KeyEncode::CatalogIndexTagKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, tag);
 }
 
-std::string TableIndexMeta::FtIndexCacheTag() const { return GetTableIndexTag("ft_cache"); }
-
 Status TableIndexMeta::GetTableIndexInfo(TableIndexInfo &table_index_info) {
     Status status;
     if (!segment_ids_) {

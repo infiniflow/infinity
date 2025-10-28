@@ -41,7 +41,6 @@ export import :virtual_store;
 export import :storage;
 export import :data_table;
 export import :periodic_trigger;
-export import :update_segment_bloom_filter_task;
 export import :build_fast_rough_filter_task;
 export import :bg_task_type;
 export import :bg_task;

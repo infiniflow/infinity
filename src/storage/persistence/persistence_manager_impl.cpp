@@ -57,21 +57,21 @@ void ObjAddr::Deserialize(std::string_view obj_str) {
     part_size_ = doc["part_size"].get<size_t>();
 }
 
-size_t ObjAddr::GetSizeInBytes() const { return sizeof(int32_t) + obj_key_.size() + sizeof(size_t) + sizeof(size_t); }
-
-void ObjAddr::WriteBufAdv(char *&buf) const {
-    ::infinity::WriteBufAdv(buf, obj_key_);
-    ::infinity::WriteBufAdv(buf, part_offset_);
-    ::infinity::WriteBufAdv(buf, part_size_);
-}
-
-ObjAddr ObjAddr::ReadBufAdv(const char *&buf) {
-    ObjAddr ret;
-    ret.obj_key_ = ::infinity::ReadBufAdv<std::string>(buf);
-    ret.part_offset_ = ::infinity::ReadBufAdv<size_t>(buf);
-    ret.part_size_ = ::infinity::ReadBufAdv<size_t>(buf);
-    return ret;
-}
+// size_t ObjAddr::GetSizeInBytes() const { return sizeof(int32_t) + obj_key_.size() + sizeof(size_t) + sizeof(size_t); }
+//
+// void ObjAddr::WriteBufAdv(char *&buf) const {
+//     ::infinity::WriteBufAdv(buf, obj_key_);
+//     ::infinity::WriteBufAdv(buf, part_offset_);
+//     ::infinity::WriteBufAdv(buf, part_size_);
+// }
+//
+// ObjAddr ObjAddr::ReadBufAdv(const char *&buf) {
+//     ObjAddr ret;
+//     ret.obj_key_ = ::infinity::ReadBufAdv<std::string>(buf);
+//     ret.part_offset_ = ::infinity::ReadBufAdv<size_t>(buf);
+//     ret.part_size_ = ::infinity::ReadBufAdv<size_t>(buf);
+//     return ret;
+// }
 
 PersistenceManager::PersistenceManager(Storage *storage,
                                        const std::string &workspace,
@@ -111,6 +111,7 @@ PersistenceManager::~PersistenceManager() {
 
 PersistWriteResult PersistenceManager::Persist(std::string_view file_path, std::string_view tmp_file_path, bool try_compose) {
     PersistWriteResult result;
+    Status status;
 
     std::error_code ec;
     fs::path src_fp = tmp_file_path;
@@ -120,23 +121,11 @@ PersistWriteResult PersistenceManager::Persist(std::string_view file_path, std::
         UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
     }
     std::string pm_fp_key = KeyEncode::PMObjectKey(local_path);
-    std::string pm_fp_value;
-    Status status = kv_store_->Get(pm_fp_key, pm_fp_value);
-    if (status.ok()) {
-        // Cleanup the file if it already exists in the KV
-        status = kv_store_->Delete(pm_fp_key, false);
-        if (!status.ok()) {
-            UnrecoverableError(fmt::format("Failed to delete object for local path {}", local_path));
-        }
-        ObjAddr obj_addr;
-        obj_addr.Deserialize(pm_fp_value);
-        CleanupNoLock(obj_addr, result.persist_keys_, result.drop_from_remote_keys_);
-        LOG_TRACE(fmt::format("Persist deleted mapping from local path {} to ObjAddr({}, {}, {})",
-                              local_path,
-                              obj_addr.obj_key_,
-                              obj_addr.part_offset_,
-                              obj_addr.part_size_));
-    }
+
+    // Check if the object for local path exists in the KV.
+    // If it exists, we will delete the object later after we persist the local path to new object.
+    std::string pm_fp_value{};
+    kv_store_->Get(pm_fp_key, pm_fp_value);
 
     size_t src_size = fs::file_size(src_fp, ec);
     if (ec) {
@@ -156,9 +145,7 @@ PersistWriteResult PersistenceManager::Persist(std::string_view file_path, std::
 
         result.persist_keys_.push_back(ObjAddr::KeyEmpty);
         result.obj_addr_ = obj_addr;
-        return result;
-    }
-    if (!try_compose || src_size >= object_size_limit_) {
+    } else if (!try_compose || src_size >= object_size_limit_) {
         std::string obj_key = ObjCreate();
         fs::path dst_fp = workspace_;
         dst_fp.append(obj_key);
@@ -183,34 +170,47 @@ PersistWriteResult PersistenceManager::Persist(std::string_view file_path, std::
                               obj_addr.part_size_));
         result.persist_keys_.push_back(obj_key);
         result.obj_addr_ = obj_addr;
-        return result;
-    }
-    std::lock_guard<std::mutex> lock(mtx_);
-    if (static_cast<int>(src_size) >= CurrentObjRoomNoLock()) {
-        CurrentObjFinalizeNoLock(result.persist_keys_);
-    }
-    current_object_size_ = (current_object_size_ + ObjAlignment - 1) & ~(ObjAlignment - 1);
-    ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
-    CurrentObjAppendNoLock(tmp_file_path, src_size);
-    // fs::remove(tmp_file_path, ec);
+    } else {
+        std::lock_guard<std::mutex> lock(mtx_);
+        if (static_cast<int>(src_size) >= CurrentObjRoomNoLock()) {
+            CurrentObjFinalizeNoLock(result.persist_keys_);
+        }
+        current_object_size_ = (current_object_size_ + ObjAlignment - 1) & ~(ObjAlignment - 1);
+        ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
+        CurrentObjAppendNoLock(tmp_file_path, src_size);
+        // fs::remove(tmp_file_path, ec);
     // if (ec) {
     //     UnrecoverableError(fmt::format("Failed to remove {}", tmp_file_path));
     // }
 
-    object_stats_->PutNew(current_object_key_, std::make_shared<ObjStat>(current_object_size_, current_object_parts_, current_object_ref_count_));
-    LOG_TRACE(fmt::format("Persist current object {}", current_object_key_));
+        object_stats_->PutNew(current_object_key_, std::make_shared<ObjStat>(current_object_size_, current_object_parts_, current_object_ref_count_));
+        LOG_TRACE(fmt::format("Persist current object {}", current_object_key_));
 
-    status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump(), false);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
+        status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump(), false);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        LOG_TRACE(fmt::format("Persist local path {} to composed ObjAddr ({}, {}, {})",
+                              local_path,
+                              obj_addr.obj_key_,
+                              obj_addr.part_offset_,
+                              obj_addr.part_size_));
+        result.obj_addr_ = obj_addr;
     }
 
-    LOG_TRACE(fmt::format("Persist local path {} to composed ObjAddr ({}, {}, {})",
-                          local_path,
-                          obj_addr.obj_key_,
-                          obj_addr.part_offset_,
-                          obj_addr.part_size_));
-    result.obj_addr_ = obj_addr;
+    //  Cleanup the old object for local path.
+    if (!pm_fp_value.empty()) {
+        ObjAddr obj_addr;
+        obj_addr.Deserialize(pm_fp_value);
+        CleanupNoLock(obj_addr, result.persist_keys_, result.drop_from_remote_keys_);
+        LOG_TRACE(fmt::format("Persist deleted mapping from local path {} to ObjAddr({}, {}, {})",
+                              local_path,
+                              obj_addr.obj_key_,
+                              obj_addr.part_offset_,
+                              obj_addr.part_size_));
+    }
+
     return result;
 }
 
@@ -337,22 +337,22 @@ PersistReadResult PersistenceManager::GetObjCache(std::string_view file_path) {
     return result;
 }
 
-std::tuple<size_t, Status> PersistenceManager::GetDirectorySize(const std::string &path_str) {
-    size_t total_size = 0;
-
-    if (!VirtualStore::Exists(path_str)) {
-        return {0, Status::IOError(fmt::format("{} doesn't exist.", path_str))};
-    }
-
-    const fs::path path(path_str);
-    for (const auto &entry : fs::recursive_directory_iterator(path)) {
-        if (fs::is_regular_file(entry.status())) {
-            total_size += fs::file_size(entry.path());
-        }
-    }
-
-    return {total_size, Status::OK()};
-}
+// std::tuple<size_t, Status> PersistenceManager::GetDirectorySize(const std::string &path_str) {
+//     size_t total_size = 0;
+//
+//     if (!VirtualStore::Exists(path_str)) {
+//         return {0, Status::IOError(fmt::format("{} doesn't exist.", path_str))};
+//     }
+//
+//     const fs::path path(path_str);
+//     for (const auto &entry : fs::recursive_directory_iterator(path)) {
+//         if (fs::is_regular_file(entry.status())) {
+//             total_size += fs::file_size(entry.path());
+//         }
+//     }
+//
+//     return {total_size, Status::OK()};
+// }
 
 std::tuple<size_t, Status> PersistenceManager::GetFileSize(std::string_view file_path) {
     PersistReadResult result;
@@ -373,23 +373,23 @@ std::tuple<size_t, Status> PersistenceManager::GetFileSize(std::string_view file
     return {obj_addr.part_size_, Status::OK()};
 }
 
-ObjAddr PersistenceManager::GetObjCacheWithoutCnt(std::string_view local_path) {
-    auto lock_path = RemovePrefix(local_path);
-    if (lock_path.empty()) {
-        UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
-    }
-
-    std::string pm_fp_key = KeyEncode::PMObjectKey(local_path);
-    std::string value;
-    Status status = kv_store_->Get(pm_fp_key, value);
-    if (!status.ok()) {
-        LOG_WARN(fmt::format("GetFileSize Failed to find object for local path {}: {}", local_path, status.message()));
-        return ObjAddr();
-    }
-    ObjAddr obj_addr;
-    obj_addr.Deserialize(value);
-    return obj_addr;
-}
+// ObjAddr PersistenceManager::GetObjCacheWithoutCnt(const std::string &local_path) {
+//     std::string lock_path = RemovePrefix(local_path);
+//     if (lock_path.empty()) {
+//         UnrecoverableError(fmt::format("Failed to find local path of {}", local_path));
+//     }
+//
+//     std::string pm_fp_key = KeyEncode::PMObjectKey(local_path);
+//     std::string value;
+//     Status status = kv_store_->Get(pm_fp_key, value);
+//     if (!status.ok()) {
+//         LOG_WARN(fmt::format("GetFileSize Failed to find object for local path {}: {}", local_path, status.message()));
+//         return ObjAddr();
+//     }
+//     ObjAddr obj_addr;
+//     obj_addr.Deserialize(value);
+//     return obj_addr;
+// }
 
 PersistWriteResult PersistenceManager::PutObjCache(std::string_view file_path) {
     PersistWriteResult result;
@@ -573,30 +573,30 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
     }
 }
 
-ObjStat PersistenceManager::GetObjStatByObjAddr(const ObjAddr &obj_addr) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    std::shared_ptr<ObjStat> obj_stat = object_stats_->GetNoCount(obj_addr.obj_key_);
-    if (obj_stat == nullptr) {
-        return ObjStat();
-    }
-    return *obj_stat;
-}
-
-void PersistenceManager::SaveLocalPath(const std::string &file_path, const ObjAddr &object_addr) { AddObjAddrToKVStore(file_path, object_addr); }
-
-void PersistenceManager::SaveObjStat(const std::string &obj_key, const std::shared_ptr<ObjStat> &obj_stat) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    object_stats_->PutNoCount(obj_key, obj_stat);
-}
-
-void PersistenceManager::AddObjAddrToKVStore(std::string_view path, const ObjAddr &obj_addr) {
-    std::string key = KeyEncode::PMObjectKey(RemovePrefix(path));
-    std::string value = obj_addr.Serialize().dump();
-    Status status = kv_store_->Put(key, value, false);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
-}
+// ObjStat PersistenceManager::GetObjStatByObjAddr(const ObjAddr &obj_addr) {
+//     std::lock_guard<std::mutex> lock(mtx_);
+//     std::shared_ptr<ObjStat> obj_stat = object_stats_->GetNoCount(obj_addr.obj_key_);
+//     if (obj_stat == nullptr) {
+//         return ObjStat();
+//     }
+//     return *obj_stat;
+// }
+//
+// void PersistenceManager::SaveLocalPath(const std::string &file_path, const ObjAddr &object_addr) { AddObjAddrToKVStore(file_path, object_addr); }
+//
+// void PersistenceManager::SaveObjStat(const std::string &obj_key, const std::shared_ptr<ObjStat> &obj_stat) {
+//     std::lock_guard<std::mutex> lock(mtx_);
+//     object_stats_->PutNoCount(obj_key, obj_stat);
+// }
+//
+// void PersistenceManager::AddObjAddrToKVStore(const std::string &path, const ObjAddr &obj_addr) {
+//     std::string key = KeyEncode::PMObjectKey(RemovePrefix(path));
+//     std::string value = obj_addr.Serialize().dump();
+//     Status status = kv_store_->Put(key, value, false);
+//     if (!status.ok()) {
+//         UnrecoverableError(status.message());
+//     }
+// }
 
 std::string_view PersistenceManager::RemovePrefix(std::string_view path) {
     if (path.starts_with(local_data_dir_)) {

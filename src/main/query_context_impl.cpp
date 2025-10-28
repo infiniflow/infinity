@@ -416,6 +416,10 @@ void QueryContext::BeginTxn(const BaseStatement *base_statement) {
                     transaction_type = TransactionType::kRenameTable;
                     break;
                 }
+                case AlterStatementType::kAlterIndex: {
+                    transaction_type = TransactionType::kAlterIndex;
+                    break;
+                }
                 case AlterStatementType::kInvalid: {
                     std::string error_msg = "Invalid alter statement type";
                     LOG_CRITICAL(error_msg);

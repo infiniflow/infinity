@@ -675,7 +675,7 @@ Status NewTxn::Compact(const std::string &db_name, const std::string &table_name
         return status;
     }
 
-    LOG_TRACE(fmt::format("To compact segments {}", segment_ids.size()));
+    LOG_TRACE(fmt::format("To compact segments size: {}", segment_ids.size()));
     for (SegmentID segment_id : segment_ids) {
         SegmentMeta segment_meta(segment_id, table_meta);
 

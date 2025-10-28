@@ -595,6 +595,16 @@ std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildAlter(const std::shared_
                                                          logical_operator->node_id(),
                                                          logical_operator->load_metas());
         }
+        case AlterStatementType::kAlterIndex: {
+            auto *logical_alter_index = static_cast<LogicalAlterIndex *>(logical_alter);
+            return std::make_unique<PhysicalAlterIndex>(logical_alter_index->table_info_,
+                                                        logical_alter_index->index_name_,
+                                                        std::move(logical_alter_index->opt_params_),
+                                                        logical_operator->GetOutputNames(),
+                                                        logical_operator->GetOutputTypes(),
+                                                        logical_operator->node_id(),
+                                                        logical_operator->load_metas());
+        }
         default: {
             RecoverableError(Status::NotSupport("Alter statement isn't supported."));
         }

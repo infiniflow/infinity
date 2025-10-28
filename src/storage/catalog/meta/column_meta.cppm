@@ -56,8 +56,6 @@ public:
 private:
     Status GetColumnBuffer(FileWorker *&column_buffer, FileWorker *&outline_buffer, const std::shared_ptr<ColumnDef>& column_def);
 
-    Status LoadChunkOffset();
-
     Status LoadColumnBuffer(std::shared_ptr<ColumnDef> column_def);
 
 private:

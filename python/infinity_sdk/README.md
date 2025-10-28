@@ -63,7 +63,7 @@ Infinity supports two working modes, embedded mode and client-server mode. The f
 
 2. Install the `infinity-sdk` package:
    ```bash
-   pip install infinity-sdk==0.6.0
+   pip install infinity-sdk==0.6.1
    ```
 
 3. Use Infinity to conduct a dense vector search:

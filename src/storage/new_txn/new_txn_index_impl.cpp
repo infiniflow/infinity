@@ -1126,8 +1126,6 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
-
 Status NewTxn::InitSegmentIndex(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta) {
     Status status;
     std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
@@ -1688,8 +1686,6 @@ Status NewTxn::ReplayOptimizeIndeByParams(WalCmdOptimizeV2 *optimize_cmd) {
     return OptimizeIndexByParams(optimize_cmd->db_name_, optimize_cmd->table_name_, optimize_cmd->index_name_, std::move(optimize_cmd->params_));
 }
 
-Status NewTxn::ReplayOptimize(WalCmdOptimizeV2 *optimize_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
-
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {
     auto mem_index = segment_index_meta.PopMemIndex();
     if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
@@ -1871,11 +1867,17 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta,
     RowID start_row_id(segment_id, 0);
     for (const ChunkIndexMetaInfo &chunk_index_meta_info : chunk_index_meta_infos) {
         if (chunk_index_meta_info.base_row_id_ != start_row_id) {
-            UnrecoverableError(fmt::format("Chunk index row alignment error: Expected {} but got {}",
+            UnrecoverableError(fmt::format("Chunk index row alignment error: Expected {}.{} but got {}.{}",
+                                           start_row_id.segment_id_,
+                                           start_row_id.segment_offset_,
                                            chunk_index_meta_info.base_row_id_.segment_id_,
-                                           start_row_id.segment_id_));
+                                           chunk_index_meta_info.base_row_id_.segment_offset_));
         }
         start_row_id = chunk_index_meta_info.base_row_id_ + chunk_index_meta_info.row_cnt_;
+        LOG_TRACE(fmt::format("CountMemIndexGapInSegment: Chunk index row id {}.{}, row count {}",
+                              chunk_index_meta_info.base_row_id_.segment_id_,
+                              chunk_index_meta_info.base_row_id_.segment_offset_,
+                              chunk_index_meta_info.row_cnt_));
     }
 
     std::vector<BlockID> *block_ids_ptr = nullptr;

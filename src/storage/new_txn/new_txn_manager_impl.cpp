@@ -193,10 +193,10 @@ TxnTimeStamp NewTxnManager::GetReadCommitTS(NewTxn *txn) {
     return commit_ts;
 }
 
-TxnTimeStamp NewTxnManager::GetCurrentTS() {
-    std::lock_guard guard(locker_);
-    return current_ts_;
-}
+// TxnTimeStamp NewTxnManager::GetCurrentTS() {
+//     std::lock_guard guard(locker_);
+//     return current_ts_;
+// }
 
 // Prepare to commit WriteTxn
 TxnTimeStamp NewTxnManager::GetWriteCommitTS(std::shared_ptr<NewTxn> txn) {
