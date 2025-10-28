@@ -1600,6 +1600,7 @@ TxnTimeStamp NewTxn::GetCurrentCkpTS() const {
 }
 
 Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
+    [[maybe_unused]] auto &file_worker_map = InfinityContext::instance().storage()->fileworker_manager()->fileworker_map();
     TransactionType txn_type = GetTxnType();
     if (txn_type != TransactionType::kNewCheckpoint && txn_type != TransactionType::kCreateTableSnapshot) {
         UnrecoverableError(fmt::format("Expected transaction type is checkpoint or create table snapshot."));
@@ -1609,7 +1610,6 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
         UnrecoverableError(fmt::format("last checkpoint ts isn't correct: {}", last_ckp_ts));
     }
 
-    Status status;
     TxnTimeStamp checkpoint_ts = txn_context_ptr_->begin_ts_;
     // CheckpointOption option{checkpoint_ts};
 
@@ -1634,7 +1634,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
     std::vector<std::string> *db_id_strs_ptr{};
     std::vector<std::string> *db_names_ptr{};
     CatalogMeta catalog_meta(this);
-    status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
+    Status status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
     if (!status.ok()) {
         return status;
     }

@@ -41,11 +41,20 @@ RawFileWorker::~RawFileWorker() {
     mmap_ = nullptr;
 }
 
+std::atomic_int cnt_raw, cnt_raw_n;
+
 void RawFileWorker::AllocateInMemory() {
+    cnt_raw.fetch_add(buffer_size_);
+    cnt_raw_n.fetch_add(1);
+    std::println("+, cnt_raw: {}, cnt_raw_n: {}, buffer_size: {}", cnt_raw.load(), cnt_raw_n.load(), buffer_size_);
     data_ = static_cast<void *>(new char[buffer_size_]);
 }
 
 void RawFileWorker::FreeInMemory() {
+    cnt_raw.fetch_sub(buffer_size_);
+    cnt_raw_n.fetch_sub(1);
+    std::println("-, cnt_raw: {}, cnt_raw_n: {}, buffer_size: {}", cnt_raw.load(), cnt_raw_n.load(), buffer_size_);
+
     delete[] static_cast<char *>(data_);
     data_ = nullptr;
 }
@@ -77,9 +86,10 @@ bool RawFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
 
 void RawFileWorker::Read(size_t file_size, bool other) {
     if (!mmap_) {
-        buffer_size_ = file_handle_->FileSize();
         FreeInMemory();
-        data_ = static_cast<void *>(new char[buffer_size_]);
+        buffer_size_ = file_handle_->FileSize();
+        AllocateInMemory();
+        // data_ = static_cast<void *>(new char[buffer_size_]);
         auto fd = file_handle_->fd();
         auto [nbytes, status1] = file_handle_->Read(data_, buffer_size_);
 

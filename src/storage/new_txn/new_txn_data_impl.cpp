@@ -1353,11 +1353,22 @@ Status NewTxn::DropColumnsData(TableMeta &table_meta, const std::vector<ColumnID
 }
 
 Status NewTxn::CheckpointInner() {
-    auto fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
-    auto &fileworker_map = fileworker_mgr->fileworker_map();
-    for (const auto &ptr : fileworker_map | std::views::values) {
+    auto &fileworker_map = InfinityContext::instance().storage()->fileworker_manager()->fileworker_map();
+    // for (const auto &[_, ptr] : fileworker_map) {
+    //     if (ptr->rel_file_path_->find("import") == std::string::npos) {
+    //         ptr->MoveFile();
+    //     } else {
+    //         fileworker_map.erase(_);
+    //     }
+    // }
+
+    for (auto it = fileworker_map.begin(); it != fileworker_map.end(); ) {
+        const auto& ptr = it->second;          // 读取指针
         if (ptr->rel_file_path_->find("import") == std::string::npos) {
             ptr->MoveFile();
+            ++it;                               // 正常前进
+        } else {
+            it = fileworker_map.erase(it);      // erase 返回下一个迭代器
         }
     }
 
@@ -1874,7 +1885,7 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
                                     const u64 &input_block_idx,
                                     std::vector<std::string> *file_worker_paths) {
     Status status;
-    FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+    auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
 
     if (!input_block->Finalized()) {
         UnrecoverableError("Attempt to import unfinalized data block");

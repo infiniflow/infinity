@@ -46,7 +46,11 @@ void VarFileWorker::AllocateInMemory() {
     data_ = static_cast<void *>(buffer);
 }
 
+// int cnt;
+
 void VarFileWorker::FreeInMemory() {
+    // --cnt;
+    // std::println("aaa: {}", cnt);
     auto *buffer = static_cast<VarBuffer *>(data_);
     delete buffer;
     data_ = nullptr;
@@ -99,6 +103,8 @@ void VarFileWorker::Read(size_t file_size, bool other) {
         //     UnrecoverableError(fmt::format("Read {} bytes from file failed, only {} bytes read.", buffer_size_, nbytes));
         // }
         FreeInMemory();
+        // ++cnt;
+        // std::println("bbb: {}", cnt);
         auto *var_buffer = new VarBuffer(this, std::move(buffer), buffer_size);
         data_ = static_cast<void *>(var_buffer);
 

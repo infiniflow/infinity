@@ -53,20 +53,20 @@ DataFileWorker::~DataFileWorker() {
     mmap_ = nullptr;
 }
 
+// std::atomic_size_t cnt_data{};
+// std::atomic_int cnt_data_n{};
+
 void DataFileWorker::AllocateInMemory() {
-    // if (data_ != nullptr) {
-    //     UnrecoverableError("Data is already allocated.");
-    // }
-    // if (buffer_size_ == 0) {
-    //     UnrecoverableError("Buffer size is 0.");
-    // }
+    // cnt_data.fetch_add(buffer_size_);
+    // cnt_data_n.fetch_add(1);
+    // std::println("+, cnt_data: {}, buffer_size: {}, cnt: {}", cnt_data.load(), buffer_size_, cnt_data_n.load());
     data_ = static_cast<void *>(new char[buffer_size_]{});
 }
 
 void DataFileWorker::FreeInMemory() {
-    if (data_ == nullptr) {
-        UnrecoverableError("Data is already freed.");
-    }
+    // cnt_data.fetch_sub(buffer_size_);
+    // cnt_data_n.fetch_sub(1);
+    // std::println("-, cnt_data: {}, buffer_size: {}, cnt: {}", cnt_data.load(), buffer_size_, cnt_data_n.load());
     delete[] static_cast<char *>(data_);
     data_ = nullptr;
 }
@@ -125,7 +125,7 @@ void DataFileWorker::Read(size_t file_size, bool other) {
             RecoverableError(Status::DataIOError(fmt::format("Incorrect file length {}.", file_size)));
         }
         // file header: magic number, buffer_size
-        u64 magic_number{0};
+        u64 magic_number{};
         auto [nbytes1, status1] = file_handle_->Read(&magic_number, sizeof(magic_number));
         if (!status1.ok()) {
             RecoverableError(status1);
@@ -137,6 +137,7 @@ void DataFileWorker::Read(size_t file_size, bool other) {
             RecoverableError(Status::DataIOError(fmt::format("Read magic error, {} != 0x00dd3344.", magic_number)));
         }
 
+        FreeInMemory();
         // u64 buffer_size_{};
         auto [nbytes2, status2] = file_handle_->Read(&buffer_size_, sizeof(buffer_size_));
         if (nbytes2 != sizeof(buffer_size_)) {
@@ -150,8 +151,9 @@ void DataFileWorker::Read(size_t file_size, bool other) {
         }
 
         // file body
-        FreeInMemory();
-        data_ = static_cast<void *>(new char[buffer_size_]);
+
+        AllocateInMemory();
+        // data_ = static_cast<void *>(new char[buffer_size_]);
         auto [nbytes3, status3] = file_handle_->Read(data_, buffer_size_);
         if (nbytes3 != buffer_size_) {
             Status status = Status::DataIOError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes3));
