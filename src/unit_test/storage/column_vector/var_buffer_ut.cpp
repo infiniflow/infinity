@@ -54,11 +54,12 @@ TEST_F(VarBufferTest, test1) {
         const auto *res2 = var_buffer.Get(26, 26);
         EXPECT_EQ(std::string_view(res2, 26), std::string_view(data.get(), 26));
 
-        try {
-            [[maybe_unused]] const auto *res3 = var_buffer.Get(52, 26);
-            FAIL();
-        } catch (UnrecoverableException &e) {
-        }
+        // try {
+            EXPECT_THROW_WITHOUT_STACKTRACE(var_buffer.Get(52, 26), UnrecoverableException);
+        //     [[maybe_unused]] const auto *res3 = var_buffer.Get(52, 26);
+        //     FAIL();
+        // } catch (UnrecoverableException &e) {
+        // }
     };
 
     test(var_buffer);

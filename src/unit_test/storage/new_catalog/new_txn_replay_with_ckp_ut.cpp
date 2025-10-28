@@ -218,7 +218,7 @@ TEST_P(TxnReplayExceptionTest, test_replay_import) {
     {
         auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<std::string>(), "file_name", {column_def1->name()});
         auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_def1->index_name_)),
-                                          TransactionType::kCreateIndex);
+                                           TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
@@ -228,7 +228,7 @@ TEST_P(TxnReplayExceptionTest, test_replay_import) {
     {
         auto index_def2 = IndexFullText::Make(index_name2, std::make_shared<std::string>(), "file_name", {column_def2->name()}, {});
         auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_def2->index_name_)),
-                                          TransactionType::kCreateIndex);
+                                           TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_def2, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);

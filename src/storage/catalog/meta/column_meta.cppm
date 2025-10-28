@@ -41,7 +41,7 @@ public:
 
     Status LoadSet();
 
-    Status UninitSet(const std::shared_ptr<ColumnDef>& column_def, UsageFlag usage_flag);
+    Status UninitSet(const std::shared_ptr<ColumnDef> &column_def, UsageFlag usage_flag);
 
     Status GetColumnBuffer(FileWorker *&column_buffer, FileWorker *&outline_buffer);
 
@@ -54,7 +54,7 @@ public:
     Status RestoreFromSnapshot(ColumnID column_id);
 
 private:
-    Status GetColumnBuffer(FileWorker *&column_buffer, FileWorker *&outline_buffer, const std::shared_ptr<ColumnDef>& column_def);
+    Status GetColumnBuffer(FileWorker *&column_buffer, FileWorker *&outline_buffer, const std::shared_ptr<ColumnDef> &column_def);
 
     Status LoadColumnBuffer(std::shared_ptr<ColumnDef> column_def);
 

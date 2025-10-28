@@ -214,7 +214,7 @@ TEST_P(TestTxnReplayImport, test_import_with_index) {
     }
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
         auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
-                                          TransactionType::kCreateIndex);
+                                           TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);

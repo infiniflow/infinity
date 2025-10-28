@@ -1362,13 +1362,13 @@ Status NewTxn::CheckpointInner() {
     //     }
     // }
 
-    for (auto it = fileworker_map.begin(); it != fileworker_map.end(); ) {
-        const auto& ptr = it->second;          // 读取指针
+    for (auto it = fileworker_map.begin(); it != fileworker_map.end();) {
+        const auto &ptr = it->second;
         if (ptr->rel_file_path_->find("import") == std::string::npos) {
             ptr->MoveFile();
-            ++it;                               // 正常前进
+            ++it;
         } else {
-            it = fileworker_map.erase(it);      // erase 返回下一个迭代器
+            it = fileworker_map.erase(it);
         }
     }
 

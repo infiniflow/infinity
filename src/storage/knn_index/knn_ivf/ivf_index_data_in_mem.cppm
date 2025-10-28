@@ -39,7 +39,7 @@ protected:
     u32 input_embedding_count_ = 0;
     IVF_Index_Storage *ivf_index_storage_ = nullptr;
     bool own_ivf_index_storage_ = true;
-    FileWorker * dump_obj_{};
+    FileWorker *dump_obj_{};
 
     const IndexIVFOption &ivf_option() const { return ivf_index_storage_->ivf_option(); }
     u32 embedding_dimension() const { return ivf_index_storage_->embedding_dimension(); }

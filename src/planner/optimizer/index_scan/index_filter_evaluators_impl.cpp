@@ -781,7 +781,7 @@ struct TrunkReaderT<ColumnValueType, HighCardinalityTag> final : TrunkReader<Col
     void OutPut(Bitmask &selected_rows) override {
         const u32 begin_pos = begin_pos_;
         const u32 end_pos = end_pos_;
-        const SecondaryIndexDataBase<HighCardinalityTag> * index{};
+        const SecondaryIndexDataBase<HighCardinalityTag> *index{};
         index_buffer_->Read(index);
         const auto [key_ptr, offset_ptr] = index->GetKeyOffsetPointer();
         // output result

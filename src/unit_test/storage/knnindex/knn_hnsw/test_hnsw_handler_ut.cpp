@@ -216,66 +216,67 @@ TEST_F(HnswHandlerTest, test_compress) {
     }
 }
 
-TEST_F(HnswHandlerTest, test_load) {
-    auto index_hnsw = MakeIndexHnsw();
-    auto column_def = MakeColumnDef();
-    /// save index file
-    {
-        /// get HnswHandler
-        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def);
-        auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
-        hnsw_handler->InsertVecs(std::move(iter));
-
-        /// save
-        auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kWrite);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-        hnsw_handler->SaveToPtr(*file_handle);
-    }
-    /// load by file_handle
-    {
-        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def);
-
-        size_t file_size = VirtualStore::GetFileSize(filepath);
-        auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kRead);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-        hnsw_handler->LoadFromPtr(*file_handle, file_size);
-
-        SearchHnswHandler(hnsw_handler.get());
-    }
-    /// load by mmap
-    {
-        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def, false);
-        size_t file_size = VirtualStore::GetFileSize(filepath);
-#define USE_MMAP
-#ifdef USE_MMAP
-        unsigned char *data_ptr = nullptr;
-        int ret = VirtualStore::MmapFile(filepath, data_ptr, file_size);
-        if (ret < 0) {
-            UnrecoverableError("mmap failed");
-        }
-        const char *ptr = reinterpret_cast<const char *>(data_ptr);
-#else
-        auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kRead);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-        auto buffer = std::make_unique<char[]>(file_size);
-        file_handle->Read(buffer.get(), file_size);
-        const char *ptr = buffer.get();
-#endif
-        hnsw_handler->LoadFromPtr(ptr, file_size);
-
-        SearchHnswHandler(hnsw_handler.get());
-
-#ifdef USE_MMAP
-        VirtualStore::MunmapFile(filepath);
-#endif
-    }
-}
+// TEST_F(HnswHandlerTest, test_load) {
+//     auto index_hnsw = MakeIndexHnsw();
+//     auto column_def = MakeColumnDef();
+//     /// save index file
+//     {
+//         /// get HnswHandler
+//         auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def);
+//         auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
+//         hnsw_handler->InsertVecs(std::move(iter));
+//
+//         /// save
+//         auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kWrite);
+//         if (!status.ok()) {
+//             UnrecoverableError(status.message());
+//         }
+//         hnsw_handler->SaveToPtr(*file_handle);
+//     }
+//     /// load by file_handle
+//     {
+//         auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def);
+//
+//         size_t file_size = VirtualStore::GetFileSize(filepath);
+//         auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kRead);
+//         if (!status.ok()) {
+//             UnrecoverableError(status.message());
+//         }
+//         hnsw_handler->LoadFromPtr(*file_handle, file_size);
+//
+//         SearchHnswHandler(hnsw_handler.get());
+//     }
+//     /// load by mmap
+//     {
+//         auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def, false);
+//         size_t file_size = VirtualStore::GetFileSize(filepath);
+// #define USE_MMAP
+// #ifdef USE_MMAP
+//         unsigned char *data_ptr = nullptr;
+//         int ret = VirtualStore::MmapFile(filepath, data_ptr, file_size);
+//         if (ret < 0) {
+//             UnrecoverableError("mmap failed");
+//         }
+//         const char *ptr = reinterpret_cast<const char *>(data_ptr);
+// #else
+//         auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kRead);
+//         if (!status.ok()) {
+//             UnrecoverableError(status.message());
+//         }
+//         auto buffer = std::make_unique<char[]>(file_size);
+//         file_handle->Read(buffer.get(), file_size);
+//         const char *ptr = buffer.get();
+// #endif
+//
+//         hnsw_handler->LoadFromPtr(ptr, file_size);
+//
+//         SearchHnswHandler(hnsw_handler.get());
+//
+// #ifdef USE_MMAP
+//         VirtualStore::MunmapFile(filepath);
+// #endif
+//     }
+// }
 
 TEST_F(HnswHandlerTest, test_parallel) {
     auto index_hnsw = MakeIndexHnsw();

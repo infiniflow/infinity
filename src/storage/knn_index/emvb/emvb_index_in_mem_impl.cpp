@@ -107,7 +107,7 @@ void EMVBIndexInMem::Dump(FileWorker *file_worker) {
     }
     is_built_.clear(std::memory_order_release);
 
-    EMVBIndex * data_ptr{};
+    EMVBIndex *data_ptr{};
     file_worker->Read(data_ptr);
     *data_ptr = std::move(*emvb_index_); // call move in lock
     emvb_index_.reset();

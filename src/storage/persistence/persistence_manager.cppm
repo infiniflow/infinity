@@ -61,7 +61,7 @@ export struct PersistReadResult {
     ObjAddr obj_addr_;                               // where data should read from
     std::vector<std::string> drop_keys_;             // object that should be removed from local disk. because of 1. disk used over limit
     std::vector<std::string> drop_from_remote_keys_; // object that should be removed from remote storage. because of object's all parts are deleted
-    std::shared_ptr<ObjStat> obj_stat_;     // object stat
+    std::shared_ptr<ObjStat> obj_stat_;              // object stat
 };
 
 export class PersistenceManager {

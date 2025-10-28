@@ -281,7 +281,7 @@ public:
     static Status
     AddNewBlockColumn(BlockMeta &block_meta, size_t column_idx, const std::shared_ptr<ColumnDef> &column_def, std::optional<ColumnMeta> &column_meta);
 
-    static Status CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag);
+    static Status CleanBlockColumn(ColumnMeta &column_meta, const std::shared_ptr<ColumnDef> &column_def, UsageFlag usage_flag);
 
     static Status RestoreNewSegmentIndex1(TableIndexMeta &table_index_meta,
                                           NewTxn *new_txn,

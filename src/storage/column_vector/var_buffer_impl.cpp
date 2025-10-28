@@ -66,8 +66,7 @@ const char *VarBuffer::Get(size_t offset, size_t size) const {
     size_t offset_in_buffer = offset - buffer_size_prefix_sum_[i];
     if (offset_in_buffer + size > buffer_size_prefix_sum_[i + 1]) {
         std::string error_msg =
-            fmt::format("offset {} and size {} is out of range [{}, {})", offset, size, buffer_size_prefix_sum_[i], buffer_size_prefix_sum_[i +
-            1]);
+            fmt::format("offset {} and size {} is out of range [{}, {})", offset, size, buffer_size_prefix_sum_[i], buffer_size_prefix_sum_[i + 1]);
         UnrecoverableError(error_msg);
     }
     return buffers[i].get() + offset_in_buffer;
@@ -140,7 +139,7 @@ VarBuffer *VarBufferManager::GetInnerNoLock() {
             return mem_buffer_.get();
         }
         case BufferType::kNewCatalog: {
-            VarBuffer* var_buffer{};
+            VarBuffer *var_buffer{};
             var_fileworker_->Read(var_buffer);
             return var_buffer;
         }

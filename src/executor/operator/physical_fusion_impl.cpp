@@ -379,7 +379,12 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
         return lhs.row_id_ < rhs.row_id_;
     });
     // 3. calculate score
-    CalculateFusionMatchTensorRerankerScores(rerank_docs, fileworker_mgr, column_data_type, column_id, block_index, *fusion_expr_->match_tensor_expr_);
+    CalculateFusionMatchTensorRerankerScores(rerank_docs,
+                                             fileworker_mgr,
+                                             column_data_type,
+                                             column_id,
+                                             block_index,
+                                             *fusion_expr_->match_tensor_expr_);
     // 4. sort by score
     std::sort(rerank_docs.begin(), rerank_docs.end(), [](const MatchTensorRerankDoc &lhs, const MatchTensorRerankDoc &rhs) noexcept {
         return lhs.score_ > rhs.score_;

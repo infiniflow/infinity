@@ -179,9 +179,9 @@ PersistWriteResult PersistenceManager::Persist(std::string_view file_path, std::
         ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
         CurrentObjAppendNoLock(tmp_file_path, src_size);
         // fs::remove(tmp_file_path, ec);
-    // if (ec) {
-    //     UnrecoverableError(fmt::format("Failed to remove {}", tmp_file_path));
-    // }
+        // if (ec) {
+        //     UnrecoverableError(fmt::format("Failed to remove {}", tmp_file_path));
+        // }
 
         object_stats_->PutNew(current_object_key_, std::make_shared<ObjStat>(current_object_size_, current_object_parts_, current_object_ref_count_));
         LOG_TRACE(fmt::format("Persist current object {}", current_object_key_));

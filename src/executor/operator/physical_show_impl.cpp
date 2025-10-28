@@ -4019,7 +4019,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         //     };
         //
         //     std::shared_ptr<TableDef> table_def =
-        //         TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+        //         TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr,
+        //         output_column_defs);
         //     output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
         //
         //     std::vector<std::shared_ptr<DataType>> output_column_types{
@@ -4104,7 +4105,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         //     };
         //
         //     std::shared_ptr<TableDef> table_def =
-        //         TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+        //         TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr,
+        //         output_column_defs);
         //     output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
         //
         //     std::vector<std::shared_ptr<DataType>> output_column_types{

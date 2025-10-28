@@ -476,7 +476,7 @@ export using ::rocksdb::EventListener;
 export using ::rocksdb::DB;
 export using ::rocksdb::FlushJobInfo;
 export using ::rocksdb::CompactionJobInfo;
-}
+} // namespace rocksdb
 
 namespace re2 {
 export using ::re2::RE2;

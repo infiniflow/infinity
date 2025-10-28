@@ -358,26 +358,26 @@ protected:
 
             // Dump all indexes for segment 0 after each append (each block)
             auto *dump_txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem indexes block {}", block_id)),
-                                                   TransactionType::kDumpMemIndex);
+                                                    TransactionType::kDumpMemIndex);
 
             Status dump_status = dump_txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
             EXPECT_TRUE(dump_status.ok());
             new_txn_mgr_->CommitTxn(dump_txn);
 
             dump_txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem indexes block {}", block_id)),
-                                             TransactionType::kDumpMemIndex);
+                                              TransactionType::kDumpMemIndex);
             dump_status = dump_txn->DumpMemIndex(*db_name, *table_name, *index_name2, 0);
             EXPECT_TRUE(dump_status.ok());
             new_txn_mgr_->CommitTxn(dump_txn);
 
             dump_txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem indexes block {}", block_id)),
-                                             TransactionType::kDumpMemIndex);
+                                              TransactionType::kDumpMemIndex);
             dump_status = dump_txn->DumpMemIndex(*db_name, *table_name, *index_name3, 0);
             EXPECT_TRUE(dump_status.ok());
             new_txn_mgr_->CommitTxn(dump_txn);
 
             dump_txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem indexes block {}", block_id)),
-                                             TransactionType::kDumpMemIndex);
+                                              TransactionType::kDumpMemIndex);
             dump_status = dump_txn->DumpMemIndex(*db_name, *table_name, *index_name4, 0);
             EXPECT_TRUE(dump_status.ok());
             new_txn_mgr_->CommitTxn(dump_txn);

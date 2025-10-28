@@ -1970,36 +1970,36 @@ Status NewTxn::RecoverMemIndex(TableIndexMeta &table_index_meta) {
     return Status::OK();
 }
 
-Status NewTxn::CommitMemIndex(TableIndexMeta &table_index_meta) {
-
-    auto [index_base, status] = table_index_meta.GetIndexBase();
-    if (!status.ok()) {
-        return status;
-    }
-
-    if (index_base->index_type_ != IndexType::kFullText) {
-        return Status::OK();
-    }
-
-    std::vector<SegmentID> *index_segment_ids_ptr = nullptr;
-    std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
-    if (!status.ok()) {
-        return status;
-    }
-    for (SegmentID segment_id : *index_segment_ids_ptr) {
-        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-
-        std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-        if (mem_index) {
-            std::shared_ptr<MemoryIndexer> memory_indexer = mem_index->GetFulltextIndex();
-            if (memory_indexer) {
-                memory_indexer->Commit();
-            }
-        }
-    }
-
-    return Status::OK();
-}
+// Status NewTxn::CommitMemIndex(TableIndexMeta &table_index_meta) {
+//
+//     auto [index_base, status] = table_index_meta.GetIndexBase();
+//     if (!status.ok()) {
+//         return status;
+//     }
+//
+//     if (index_base->index_type_ != IndexType::kFullText) {
+//         return Status::OK();
+//     }
+//
+//     std::vector<SegmentID> *index_segment_ids_ptr = nullptr;
+//     std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
+//     if (!status.ok()) {
+//         return status;
+//     }
+//     for (SegmentID segment_id : *index_segment_ids_ptr) {
+//         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
+//
+//         std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+//         if (mem_index) {
+//             std::shared_ptr<MemoryIndexer> memory_indexer = mem_index->GetFulltextIndex();
+//             if (memory_indexer) {
+//                 memory_indexer->Commit();
+//             }
+//         }
+//     }
+//
+//     return Status::OK();
+// }
 
 Status NewTxn::GetFullTextIndexReader(const std::string &db_name, const std::string &table_name, std::shared_ptr<IndexReader> &index_reader) {
     std::shared_ptr<DBMeta> db_meta;

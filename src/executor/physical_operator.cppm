@@ -149,8 +149,9 @@ export struct OutputToDataBlockHelper {
                           const u32 output_row_id) {
         output_job_infos.emplace_back(segment_id, block_id, column_id, block_offset, output_block_id, output_column_id, output_row_id);
     }
-    void
-    OutputToDataBlock(FileWorkerManager *fileworker_mgr, const BlockIndex *block_index, const std::vector<std::unique_ptr<DataBlock>> &output_data_blocks);
+    void OutputToDataBlock(FileWorkerManager *fileworker_mgr,
+                           const BlockIndex *block_index,
+                           const std::vector<std::unique_ptr<DataBlock>> &output_data_blocks);
 };
 
 } // namespace infinity

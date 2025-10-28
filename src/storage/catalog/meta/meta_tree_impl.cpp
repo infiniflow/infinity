@@ -729,11 +729,11 @@ size_t MetaTableObject::GetCurrentSegmentRowCount(Storage *storage_ptr) const {
     BlockID current_block_id = segment_object->GetCurrentBlockID();
     auto *file_worker_mgr = storage_ptr->fileworker_manager();
     auto rel_version_path = fmt::format("db_{}/tbl_{}/seg_{}/blk_{}/{}",
-                                             table_meta_key->db_id_str_,
-                                             table_meta_key->table_id_str_,
-                                             unsealed_segment_id,
-                                             current_block_id,
-                                             BlockVersion::PATH);
+                                        table_meta_key->db_id_str_,
+                                        table_meta_key->table_id_str_,
+                                        unsealed_segment_id,
+                                        current_block_id,
+                                        BlockVersion::PATH);
     auto *version_file_worker = file_worker_mgr->GetFileWorker(rel_version_path);
     if (version_file_worker == nullptr) {
         UnrecoverableError(fmt::format("Can't get version from: {}", rel_version_path));
