@@ -608,7 +608,7 @@ jobs:
 
       - name: Upload artifacts
         if: ${{ !cancelled() && !failure() }}
-        run: tar -cf - cmake-build-reldeb/src/{infinity} cmake-build-reldeb/benchmark/local_infinity/{knn_import_benchmark,knn_query_benchmark} | tar -C ${ARTIFACTS_DIR} -xf -
+        run: tar -cf - cmake-build-reldeb/src/infinity cmake-build-reldeb/benchmark/local_infinity/{knn_import_benchmark,knn_query_benchmark} | tar -C ${ARTIFACTS_DIR} -xf -
 
       - name: Remove build container
         if: always()
