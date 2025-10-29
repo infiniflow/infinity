@@ -35,8 +35,11 @@ inline void LoopFor(size_t id_begin, size_t id_end, size_t thread_id, Function f
     //    auto [data_base, status1] = infinity->GetDatabase("default_db");
     //    auto [table, status2] = data_base->GetTable(table_name);
     //    std::shared_ptr<Table> shared_table(std::move(table));
+    std::cout << "aaaaaa\n";
+    size_t cnt{};
     for (auto id = id_begin; id < id_end; ++id) {
         fn(id, thread_id, infinity.get(), db_name, table_name);
+        std::cout << ++cnt << " " << id_end << "\n";
     }
 }
 
@@ -61,6 +64,7 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn
 }
 
 int main(int argc, char *argv[]) {
+    std::cout << "?????\n";
     if (argc < 3) {
         std::cout << "query gist/sift ef=? , with optional test_data_path (default to /infinity/test/data in docker) and optional infinity path "
                      "(default to /var/infinity)"
@@ -161,6 +165,7 @@ int main(int argc, char *argv[]) {
         ground_truth_sets_10.resize(gt_count);
         ground_truth_sets_100.resize(gt_count);
         for (size_t i = 0; i < gt_count; ++i) {
+            std::cout << "i: " << i << '\n';
             for (int j = 0; j < gt_top_k; ++j) {
                 auto x = gt[i * gt_top_k + j];
                 if (j < 1) {
@@ -178,12 +183,14 @@ int main(int argc, char *argv[]) {
     float elapsed_s_sum = 0;
     float recall_1 = 0, recall_10 = 0, recall_100 = 0;
     for (size_t times = 0; times < total_times + 2; ++times) {
+        std::cout << "times: " << times << '\n';
         std::cout << "--- Start to run search benchmark: " << std::endl;
         std::vector<std::vector<uint64_t>> query_results(query_count);
         for (auto &v : query_results) {
             v.reserve(100);
         }
         auto query_function = [&](size_t query_idx, size_t thread_id, Infinity *infinity, const std::string &db_name, const std::string &table_name) {
+            std::cout << "call query function\n";
             KnnExpr *knn_expr = new KnnExpr();
             knn_expr->dimension_ = dimension;
             knn_expr->distance_type_ = KnnDistanceType::kL2;

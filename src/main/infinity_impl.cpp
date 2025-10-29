@@ -1155,6 +1155,9 @@ QueryResult Infinity::Search(const std::string &db_name,
                              std::vector<ParsedExpr *> *group_by_list,
                              ParsedExpr *having,
                              bool total_hits_count_flag) {
+    std::cout << "may display\n";
+    std::chrono::time_point<std::chrono::steady_clock> start, end;
+    start = std::chrono::steady_clock::now();
     if (total_hits_count_flag) {
         if (limit == nullptr) {
             QueryResult query_result;
@@ -1236,8 +1239,12 @@ QueryResult Infinity::Search(const std::string &db_name,
     group_by_list = nullptr;
     search_expr = nullptr;
 
+    end = std::chrono::steady_clock::now();
+    std::println("cost: {}", std::chrono::duration_cast<milliseconds>(end - start));
     QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
 
+    end = std::chrono::steady_clock::now();
+    std::println("cost: {}", std::chrono::duration_cast<milliseconds>(end - start));
     return result;
 }
 

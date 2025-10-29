@@ -84,19 +84,29 @@ bool HnswFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) 
     (*hnsw_handler)->SaveToPtr(*file_handle_);
 
     file_handle_->Sync();
-    // auto fd = file_handle_->fd();
-    // mmap_size_ = index_size_;
-    // mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+    auto fd = file_handle_->fd();
+    mmap_size_ = file_handle_->FileSize();
+    mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
     prepare_success = true;
     return true;
 }
 
 void HnswFileWorker::Read(size_t file_size, bool other) {
+    std::chrono::time_point<std::chrono::steady_clock> start, end;
+    start = std::chrono::steady_clock::now();
     FreeInMemory();
-    data_ = static_cast<void *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_).release()));
-    auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
+    // data_ = static_cast<void *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_).release()));
+    // auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
+    //
+    // (*hnsw_handler)->LoadFromPtr(*file_handle_, file_size);
 
-    (*hnsw_handler)->LoadFromPtr(*file_handle_, file_size);
+    data_ = static_cast<void *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_, false).release()));
+    auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
+    (*hnsw_handler)->LoadFromPtr(*file_handle_, static_cast<const char *>(mmap_), mmap_size_);
+    // return true;
+
+    end = std::chrono::steady_clock::now();
+    std::println("Hnsw Read cost: {}", std::chrono::duration_cast<std::chrono::milliseconds>(end - start));
 
     // (*hnsw_handler)->LoadFromPtr(*file_handle_, (char *)mmap_, file_size);
 }

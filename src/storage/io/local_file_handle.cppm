@@ -48,7 +48,7 @@ private:
 
 private:
     i32 fd_{-1};
-    std::string path_{};
+    std::string path_;
     FileAccessMode access_mode_{FileAccessMode::kInvalid};
 };
 
