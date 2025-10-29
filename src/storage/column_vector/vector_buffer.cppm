@@ -58,23 +58,13 @@ public:
 
     void Copy(char *input, size_t size);
 
-    [[nodiscard]] char *GetDataMut() {
+    [[nodiscard]] char *GetData() const {
         if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
             return std::get<std::unique_ptr<char[]>>(ptr_).get();
         } else {
             void *data{};
             std::get<FileWorker *>(ptr_)->Read(data);
             return static_cast<char *>(data);
-        }
-    }
-
-    [[nodiscard]] const char *GetData() const {
-        if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
-            return std::get<std::unique_ptr<char[]>>(ptr_).get();
-        } else {
-            void *data{};
-            std::get<FileWorker *>(ptr_)->Read(data);
-            return static_cast<const char *>(data);
         }
     }
 

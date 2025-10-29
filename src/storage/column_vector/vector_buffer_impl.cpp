@@ -161,7 +161,7 @@ void VectorBuffer::Copy(char *input, size_t size) {
         UnrecoverableError("Attempt to copy an amount of data that cannot currently be accommodated");
     }
     // std::memcpy(data_.get(), input, size);
-    std::memcpy(GetDataMut(), input, size);
+    std::memcpy(GetData(), input, size);
 }
 
 bool VectorBuffer::RawPointerGetCompactBit(const u8 *src_ptr_u8, size_t idx) {
@@ -191,7 +191,7 @@ void VectorBuffer::SetCompactBit(size_t idx, bool val) {
     if (idx >= capacity_) {
         UnrecoverableError("Index out of range.");
     }
-    VectorBuffer::RawPointerSetCompactBit(reinterpret_cast<u8 *>(GetDataMut()), idx, val);
+    VectorBuffer::RawPointerSetCompactBit(reinterpret_cast<u8 *>(GetData()), idx, val);
 }
 
 bool VectorBuffer::CompactBitIsSame(const std::shared_ptr<VectorBuffer> &lhs,

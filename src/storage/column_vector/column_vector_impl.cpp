@@ -240,7 +240,7 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, size_t capacity) {
             buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
             nulls_ptr_ = Bitmask::MakeSharedAllTrue(capacity_);
         }
-        data_ptr_ = buffer_->GetDataMut();
+        data_ptr_ = buffer_->GetData();
     } else {
         // Initialize after reset will come to this branch
         buffer_->ResetToInit(vector_buffer_type);
@@ -268,7 +268,7 @@ void ColumnVector::Initialize(FileWorker *file_worker,
     }
     switch (vector_tipe) {
         case ColumnVectorMode::kReadWrite: {
-            data_ptr_ = buffer_->GetDataMut();
+            data_ptr_ = buffer_->GetData();
             break;
         }
         case ColumnVectorMode::kReadOnly: {
@@ -291,7 +291,7 @@ void ColumnVector::SetToCatalog(FileWorker *file_worker, FileWorker *var_file_wo
     }
     switch (vector_tipe) {
         case ColumnVectorMode::kReadWrite: {
-            data_ptr_ = buffer_->GetDataMut();
+            data_ptr_ = buffer_->GetData();
             break;
         }
         case ColumnVectorMode::kReadOnly: {

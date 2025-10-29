@@ -128,12 +128,12 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 //     }
 // }
 
-TEST_P(BlockVersionTest, DISABLED_DEPRECATED_delete_test) {
-    BlockVersion block_version(8192);
-    block_version.Delete(2, 30);
-    Status status = block_version.Delete(2, 30);
-    EXPECT_FALSE(status.ok());
-}
+// TEST_P(BlockVersionTest, DISABLED_DEPRECATED_delete_test) {
+//     BlockVersion block_version(8192);
+//     block_version.Delete(2, 30);
+//     Status status = block_version.Delete(2, 30);
+//     EXPECT_FALSE(status.ok());
+// }
 
 TEST_P(BlockVersionTest, check_delete_test) {
     BlockVersion block_version(8192);

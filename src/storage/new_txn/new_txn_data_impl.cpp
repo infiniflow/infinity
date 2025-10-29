@@ -631,8 +631,6 @@ Status NewTxn::Update(const std::string &db_name,
 }
 
 Status NewTxn::Compact(const std::string &db_name, const std::string &table_name, const std::vector<SegmentID> &segment_ids) {
-
-    //    LOG_INFO(fmt::format("Start to compact segment ids: {}", segment_ids.size()));
     LOG_INFO(fmt::format("Compact db_name: {}, table_name: {}, segment ids: {}", db_name, table_name, fmt::join(segment_ids, " ")));
 
     CheckTxn(db_name);
@@ -1064,8 +1062,8 @@ Status NewTxn::PrintVersionInBlock(BlockMeta &block_meta, const std::vector<Bloc
 
 Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_state) {
     NewTxnGetVisibleRangeState range_state;
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    auto begin_ts = txn_context_ptr_->begin_ts_;
+    auto commit_ts = txn_context_ptr_->commit_ts_;
     auto status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, range_state);
     if (!status.ok()) {
         return status;
