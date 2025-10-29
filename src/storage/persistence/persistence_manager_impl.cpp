@@ -652,24 +652,23 @@ std::unordered_map<std::string, ObjAddr> PersistenceManager::GetAllFiles() const
     const std::string &obj_prefix = KeyEncode::PMObjectPrefix();
     size_t obj_prefix_len = obj_prefix.size();
 
-    std::unique_ptr<KVInstance> kv_instance = kv_store_->GetInstance();
-    auto iter = kv_instance->GetIterator();
-    iter->Seek(obj_prefix);
-    while (iter->Valid() && iter->Key().starts_with(obj_prefix)) {
-        std::string path = iter->Key().ToString().substr(obj_prefix_len);
-        ObjAddr obj_addr;
-        obj_addr.Deserialize(iter->Value().ToString());
-        local_path_obj.emplace(path, obj_addr);
-        iter->Next();
+    std::vector<std::pair<std::string, std::string>> all_key_values = kv_store_->GetAllKeyValue();
+    for (const auto &[key, value] : all_key_values) {
+        if (key.starts_with(obj_prefix)) {
+            std::string path = key.substr(obj_prefix_len);
+            ObjAddr obj_addr;
+            obj_addr.Deserialize(value);
+            local_path_obj.emplace(path, obj_addr);
+        }
     }
     return local_path_obj;
 }
 
 PersistWriteResult PersistenceManager::CleanupStaleObjectData() {
     PersistWriteResult result;
-    std::unordered_map<std::string, ObjAddr> file_objaddr_map = GetAllFiles();
     std::unordered_map<std::string, std::shared_ptr<ObjStat>> object_objstat_map = GetAllObjects();
     object_objstat_map.erase(current_object_key_); // Exclude current object from cleanup
+    std::unordered_map<std::string, ObjAddr> file_objaddr_map = GetAllFiles();
     std::unordered_map<std::string, std::set<Range>> object_range_map;
 
     // Initialize range map with deleted ranges from each object.
