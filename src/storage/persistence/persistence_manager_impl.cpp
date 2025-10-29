@@ -666,10 +666,14 @@ std::unordered_map<std::string, ObjAddr> PersistenceManager::GetAllFiles() const
 
 PersistWriteResult PersistenceManager::CleanupStaleObjectData() {
     PersistWriteResult result;
-    std::unordered_map<std::string, std::shared_ptr<ObjStat>> object_objstat_map = GetAllObjects();
-    object_objstat_map.erase(current_object_key_); // Exclude current object from cleanup
-    std::unordered_map<std::string, ObjAddr> file_objaddr_map = GetAllFiles();
     std::unordered_map<std::string, std::set<Range>> object_range_map;
+    std::unordered_map<std::string, std::shared_ptr<ObjStat>> object_objstat_map;
+    std::unordered_map<std::string, ObjAddr> file_objaddr_map;
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        object_objstat_map = GetAllObjects();
+        file_objaddr_map = GetAllFiles();
+    }
 
     // Initialize range map with deleted ranges from each object.
     for (const auto &[obj_key, obj_stat_ptr] : object_objstat_map) {
@@ -679,7 +683,7 @@ PersistWriteResult PersistenceManager::CleanupStaleObjectData() {
     // Process each file to merge and update ranges of each object.
     for (const auto &[file_path, object_addr] : file_objaddr_map) {
         std::string obj_key = object_addr.obj_key_;
-        if (obj_key == current_object_key_ || obj_key == "KEY_EMPTY") {
+        if (obj_key == "KEY_EMPTY") {
             continue;
         }
 
