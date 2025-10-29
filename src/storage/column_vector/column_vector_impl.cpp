@@ -267,12 +267,10 @@ void ColumnVector::Initialize(FileWorker *file_worker,
         nulls_ptr_ = Bitmask::MakeSharedAllTrue(capacity_);
     }
     switch (vector_tipe) {
-        case ColumnVectorMode::kReadWrite: {
-            data_ptr_ = buffer_->GetData();
-            break;
-        }
+        case ColumnVectorMode::kReadWrite:
+            [[fallthrough]];
         case ColumnVectorMode::kReadOnly: {
-            data_ptr_ = const_cast<char *>(buffer_->GetData());
+            data_ptr_ = buffer_->GetData();
             break;
         }
     }

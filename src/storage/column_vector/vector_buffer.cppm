@@ -61,11 +61,10 @@ public:
     [[nodiscard]] char *GetData() const {
         if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
             return std::get<std::unique_ptr<char[]>>(ptr_).get();
-        } else {
-            void *data{};
-            std::get<FileWorker *>(ptr_)->Read(data);
-            return static_cast<char *>(data);
         }
+        void *data{};
+        std::get<FileWorker *>(ptr_)->Read(data);
+        return static_cast<char *>(data);
     }
 
     [[nodiscard]] bool GetCompactBit(size_t idx) const;
