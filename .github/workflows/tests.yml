@@ -9,7 +9,7 @@ on:
       - 'docs/**'
       - '*.md'
   pull_request:
-    types: [ opened, synchronize, reopened, labeled ]
+    types: [ labeled, synchronize, reopened ]
     paths-ignore:
       - 'docs/**'
       - '*.md'

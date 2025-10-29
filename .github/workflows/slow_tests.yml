@@ -8,11 +8,9 @@ on:
   # The "create tags" trigger is specifically focused on the creation of new tags, while the "push tags" trigger is activated when tags are pushed, including both new tag creations and updates to existing tags.
   create:
     tags:
-      - "v*.*.*"                  # normal release
-      - "nightly"                 # mutable tag
       - "slow-test"               # mutable tag
   pull_request:
-    types: [ opened, synchronize, reopened, labeled ]
+    types: [ labeled, synchronize, reopened ]
     paths-ignore:
       - 'docs/**'
       - '*.md'
