@@ -76,10 +76,13 @@ jobs:
 
     - name: Build release version
       run: |
-        sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCPACK_PACKAGE_VERSION=${RELEASE_TAG} -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb --target infinity"
+        sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCPACK_PACKAGE_VERSION=${RELEASE_TAG} -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb --target infinity && cd /infinity/cmake-build-reldeb && cpack"
 
-    - name: Build RPM and DEB
-      run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/cmake-build-reldeb && cpack"
+    - name: Build and push infinity-sdk
+      if: startsWith(github.ref, 'refs/tags/v')
+      run: |
+        sudo rm -fr cmake-build-reldeb
+        sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/python/infinity_sdk && uv build && uv publish --token ${{ secrets.PYPI_API_TOKEN }}"
 
     - name: Create or overwrite a release
       # https://github.com/actions/upload-release-asset has been replaced by https://github.com/softprops/action-gh-release
@@ -95,25 +98,11 @@ jobs:
           cmake-build-reldeb/infinity-*.rpm
           cmake-build-reldeb/infinity-*.tar.gz
 
-    - name: Purge binary packages
-      run: sudo rm -rf cmake-build-reldeb/infinity-*.deb cmake-build-reldeb/infinity-*.rpm cmake-build-reldeb/infinity-*.tar.gz
-
-    - name: Build and push
+    - name: Build and push image
       run: |
         echo ${{ secrets.DOCKERHUB_TOKEN }} | sudo docker login --username infiniflow --password-stdin
         sudo docker build -t infiniflow/infinity:${RELEASE_TAG} -f scripts/Dockerfile_infinity .
         sudo docker push infiniflow/infinity:${RELEASE_TAG}
-
-    - name: Build infinity-sdk
-      if: startsWith(github.ref, 'refs/tags/v')
-      run: |
-        sudo rm -fr cmake-build-reldeb
-        sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -rf wheelhouse && pip3 wheel ./python/infinity_sdk -v -w wheelhouse --no-deps"
-
-    - name: Publish package distributions to PyPI
-      if: startsWith(github.ref, 'refs/tags/v')
-      run: |
-        twine upload wheelhouse/* -u __token__ -p ${{ secrets.PYPI_API_TOKEN }}
 
     - name: Destroy builder container
       if: always()  # always run this step even if previous steps failed
