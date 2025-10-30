@@ -4,7 +4,7 @@ import random
 
 
 def generate(generate_if_exists: bool, copy_dir: str):
-    row_n = 10000
+    row_n = 1000000
     repeat_n = 100
     csv_dir = "./test/data/csv"
     slt_dir = "./test/sql/dql/filter"

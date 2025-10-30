@@ -56,7 +56,7 @@ public:
         if (order_by_blocks_.empty()) {
             return;
         }
-        eval_results_ = PhysicalTop::GetEvalColumns(expressions_, expr_states_, order_by_blocks_);
+        eval_results_ = TopSolver::GetEvalColumns(expressions_, expr_states_, order_by_blocks_);
     }
 
     bool Compare(BlockRawIndex left_index, BlockRawIndex right_index) {
