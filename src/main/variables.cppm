@@ -36,6 +36,7 @@ export enum class GlobalVariable {
     kBackgroundTaskCount,     // global
     kRunningBGTask,           // global
     kRunningCompactTask,      // global
+    kRunningOptimizeTask,     // global
     kSystemMemoryUsage,       // global
     kOpenFileCount,           // global
     kCPUUsage,                // global

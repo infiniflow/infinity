@@ -108,7 +108,7 @@ void OptimizeIndexPeriodicTrigger::Trigger() {
 
     LOG_DEBUG(fmt::format("Trigger optimize index task, after {} seconds", duration_.load()));
     optimize_task_ = std::make_shared<NotifyOptimizeTask>();
-    compact_processor_->Submit(optimize_task_);
+    optimize_processor_->Submit(optimize_task_);
 }
 
 } // namespace infinity
