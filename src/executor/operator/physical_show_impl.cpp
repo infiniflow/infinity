@@ -4095,7 +4095,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             output_block_ptr->Init(output_column_types);
 
             FileWorkerManager *buffer_manager = query_context->storage()->fileworker_manager();
-            Value value = Value::MakeBigInt(buffer_manager->BufferedObjectCount());
+            Value value = Value::MakeBigInt(buffer_manager->FileWorkerMapSize());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
@@ -4741,7 +4741,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 {
                     // option value
                     FileWorkerManager *buffer_manager = query_context->storage()->fileworker_manager();
-                    Value value = Value::MakeVarchar(std::to_string(buffer_manager->BufferedObjectCount()));
+                    Value value = Value::MakeVarchar(std::to_string(buffer_manager->FileWorkerMapSize()));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
                 }

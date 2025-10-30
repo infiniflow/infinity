@@ -65,8 +65,8 @@ private:
 
     std::optional<size_t> chunk_offset_;
 
-    FileWorker *column_buffer_ = nullptr;
-    FileWorker *outline_buffer_ = nullptr;
+    FileWorker *column_buffer_{};
+    FileWorker *var_file_worker_{};
 };
 
 } // namespace infinity

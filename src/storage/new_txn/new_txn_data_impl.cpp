@@ -144,6 +144,7 @@ struct NewTxnCompactState {
 
                 [[maybe_unused]] auto foo = data_file_worker->Write({}, data_size);
                 if (var_file_worker) {
+                    std::println("fuck A");
                     [[maybe_unused]] auto foo = var_file_worker->Write();
                 }
             }
@@ -951,7 +952,8 @@ NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t appen
     }
 
     [[maybe_unused]] auto foo = data_file_worker->Write({}, data_size);
-    if (var_file_worker != nullptr) {
+    if (var_file_worker) {
+        std::println("fuck B");
         [[maybe_unused]] auto foo1 = var_file_worker->Write();
     }
 
@@ -1252,6 +1254,7 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
         // // XXX
         [[maybe_unused]] auto foo = data_file_worker->Write({}, data_size);
         if (var_file_worker) {
+            std::println("fuck C");
             [[maybe_unused]] auto foo = var_file_worker->Write();
         }
 
@@ -1963,6 +1966,7 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
         col->SetToCatalog(data_file_worker, var_file_worker, ColumnVectorMode::kReadWrite);
         [[maybe_unused]] auto foo = data_file_worker->Write({}, data_size);
         if (var_file_worker) {
+            std::println("fuck D");
             [[maybe_unused]] auto foo = var_file_worker->Write();
         }
     }

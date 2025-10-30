@@ -85,8 +85,9 @@ bool VarFileWorker::Write(bool &prepare_success, size_t data_size, const FileWor
 }
 
 void VarFileWorker::Read(size_t file_size, bool other) {
-    // std::println("R var");
+    std::println("R var out");
     if (!mmap_) {
+        std::println("R var mmap");
         // if (file_size < buffer_size_) {
         //     UnrecoverableError(fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_));
         // } else {

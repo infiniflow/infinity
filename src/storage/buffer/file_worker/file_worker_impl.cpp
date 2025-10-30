@@ -139,6 +139,7 @@ void FileWorker::MoveFile() {
 }
 
 void FileWorker::SetData(void *data) {
+    std::lock_guard l(l_);
     data_ = data;
     [[maybe_unused]] auto foo = Write();
 }

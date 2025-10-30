@@ -66,7 +66,7 @@ FileWorker *FileWorkerManager::GetFileWorker(const std::string &rel_file_path) {
     return nullptr;
 }
 
-size_t FileWorkerManager::BufferedObjectCount() {
+size_t FileWorkerManager::FileWorkerMapSize() {
     std::unique_lock lock(w_locker_);
     return fileworker_map_.size();
 }
@@ -93,7 +93,7 @@ Status FileWorkerManager::RemoveCleanList(KVInstance *kv_instance) {
             //     UnrecoverableError(fmt::format("FileWorkerManager::RemoveClean: file {} not found.", file_path.c_str()));
             // }
         }
-        fileworker_map_.rehash(fileworker_map_.size());
+        // fileworker_map_.rehash(fileworker_map_.size());
     }
     return Status::OK();
 }

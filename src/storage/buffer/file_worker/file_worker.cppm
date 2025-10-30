@@ -174,9 +174,9 @@ public:
     ObjAddr obj_addr_;
     void *mmap_{};
     size_t mmap_size_{};
+    void *data_{};
 
 protected:
-    void *data_{};
     std::unique_ptr<LocalFileHandle> file_handle_;
 };
 } // namespace infinity

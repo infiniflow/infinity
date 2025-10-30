@@ -45,7 +45,7 @@ public:
 
     std::shared_ptr<std::string> GetTempDir() const { return temp_dir_; }
 
-    size_t BufferedObjectCount();
+    size_t FileWorkerMapSize();
 
     Status RemoveCleanList(KVInstance *kv_instance);
 

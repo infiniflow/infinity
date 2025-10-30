@@ -141,6 +141,8 @@ VarBuffer *VarBufferManager::GetInnerNoLock() {
         case BufferType::kNewCatalog: {
             VarBuffer *var_buffer{};
             var_fileworker_->Read(var_buffer);
+            // var_buffer = static_cast<VarBuffer *>(var_fileworker_->data_);
+            std::println("fuck this lock");
             return var_buffer;
         }
     }

@@ -68,7 +68,7 @@ Status ColumnMeta::InitSet(const std::shared_ptr<ColumnDef> &col_def) {
         auto file_name = fmt::format("col_{}_out", column_id);
         auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir, file_name));
         auto outline_file_worker = std::make_unique<VarFileWorker>(rel_file_path, 0 /*buffer_size*/);
-        outline_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(outline_file_worker));
+        var_file_worker_ = fileworker_mgr->EmplaceFileWorker(std::move(outline_file_worker));
     }
     return Status::OK();
 }
@@ -104,7 +104,7 @@ Status ColumnMeta::LoadSet() {
         size_t chunk_offset = 0;
         auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, filename));
         auto outline_file_worker = std::make_unique<VarFileWorker>(rel_file_path, chunk_offset);
-        outline_buffer_ = fileworker_mgr->EmplaceFileWorker(std::move(outline_file_worker));
+        var_file_worker_ = fileworker_mgr->EmplaceFileWorker(std::move(outline_file_worker));
     }
     return Status::OK();
 }
@@ -143,7 +143,7 @@ Status ColumnMeta::GetColumnBuffer(FileWorker *&column_buffer, FileWorker *&outl
         }
     }
     column_buffer = column_buffer_;
-    outline_buffer = outline_buffer_;
+    outline_buffer = var_file_worker_;
     return Status::OK();
 }
 
@@ -161,13 +161,13 @@ std::tuple<size_t, Status> ColumnMeta::GetColumnSize(size_t row_cnt, const std::
 Status ColumnMeta::UninitSet(const std::shared_ptr<ColumnDef> &column_def, UsageFlag usage_flag) {
 
     if (usage_flag == UsageFlag::kOther) {
-        auto status = GetColumnBuffer(column_buffer_, outline_buffer_, column_def);
+        auto status = GetColumnBuffer(column_buffer_, var_file_worker_, column_def);
         if (!status.ok()) {
             return status;
         }
         column_buffer_->PickForCleanup();
-        if (outline_buffer_) {
-            outline_buffer_->PickForCleanup();
+        if (var_file_worker_) {
+            var_file_worker_->PickForCleanup();
         }
     }
 
@@ -198,8 +198,8 @@ Status ColumnMeta::LoadColumnBuffer(std::shared_ptr<ColumnDef> column_def) {
     if (buffer_type == VectorBufferType::kVarBuffer) {
         auto outline_file_name = fmt::format("col_{}_out", column_id);
         auto outline_file_path = fmt::format("{}/{}", *block_dir, outline_file_name);
-        outline_buffer_ = fileworker_mgr->GetFileWorker(outline_file_path);
-        if (outline_buffer_ == nullptr) {
+        var_file_worker_ = fileworker_mgr->GetFileWorker(outline_file_path);
+        if (var_file_worker_ == nullptr) {
             return Status::BufferManagerError(fmt::format("Get outline buffer object failed: {}", outline_file_path));
         }
     }
