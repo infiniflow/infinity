@@ -83,7 +83,7 @@ void CompactionProcessor::Submit(const std::shared_ptr<BGTask> &bg_task) {
     ++task_count_;
 }
 
-void CompactionProcessor::NewDoCompact() {
+void CompactionProcessor::NewNotifyCompact() {
     LOG_TRACE("Background task triggered compaction");
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     std::vector<std::pair<std::string, std::string>> db_table_names;
@@ -252,62 +252,6 @@ Status CompactionProcessor::NewManualCompact(NewTxn *new_txn, const std::string 
     return Status(ErrorCode::kOk, std::move(result_msg));
 }
 
-void CompactionProcessor::NewScanAndOptimize() {
-    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    auto new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("optimize index"), TransactionType::kOptimizeIndex);
-    LOG_INFO(fmt::format("Optimize all indexes begin ts: {}", new_txn_shared->BeginTS()));
-
-    std::shared_ptr<BGTaskInfo> bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kNotifyOptimize);
-    Status status = new_txn_shared->OptimizeAllIndexes();
-    if (status.ok()) {
-        Status commit_status = new_txn_mgr->CommitTxn(new_txn_shared.get());
-        if (!commit_status.ok()) {
-            LOG_ERROR(fmt::format("Commit optimize all indexes failed: {}", commit_status.message()));
-        }
-
-        OptimizeIndexTxnStore *optimize_idx_store = static_cast<OptimizeIndexTxnStore *>(new_txn_shared->GetTxnStore());
-        if (optimize_idx_store != nullptr) {
-            for (const OptimizeIndexStoreEntry &store_entry : optimize_idx_store->entries_) {
-                size_t size = store_entry.new_chunk_infos_.size();
-                std::vector<ChunkID> chunk_ids(size);
-                for (size_t i = 0; i < size; ++i) {
-                    chunk_ids[i] = store_entry.new_chunk_infos_[i].chunk_id_;
-                }
-                std::string task_text = fmt::format("Txn: {}, commit: {}, optimize index: {}.{}.{} segment: {} with chunks: {} into {}",
-                                                    new_txn_shared->TxnID(),
-                                                    new_txn_shared->CommitTS(),
-                                                    store_entry.db_name_,
-                                                    store_entry.table_name_,
-                                                    store_entry.index_name_,
-                                                    store_entry.segment_id_,
-                                                    fmt::join(store_entry.deprecate_chunks_, ","),
-                                                    fmt::join(chunk_ids, ","));
-
-                LOG_DEBUG(task_text);
-                bg_task_info->task_info_list_.emplace_back(task_text);
-                if (commit_status.ok()) {
-                    bg_task_info->status_list_.emplace_back("OK");
-                } else {
-                    bg_task_info->status_list_.emplace_back(commit_status.message());
-                }
-            }
-        }
-    } else {
-        LOG_ERROR(fmt::format("optimize all indexes failed: {}", status.message()));
-        Status rollback_status = new_txn_mgr->RollBackTxn(new_txn_shared.get());
-        if (!rollback_status.ok()) {
-            UnrecoverableError(rollback_status.message());
-        }
-        std::string task_text = "Optimize all indexes";
-        bg_task_info->task_info_list_.emplace_back(task_text);
-        bg_task_info->status_list_.emplace_back(status.message());
-    }
-
-    if (!bg_task_info->task_info_list_.empty()) {
-        new_txn_mgr->AddTaskInfo(bg_task_info);
-    }
-}
-
 void CompactionProcessor::Process() {
     bool running = true;
     while (running) {
@@ -320,7 +264,7 @@ void CompactionProcessor::Process() {
                     running = false;
                     break;
                 }
-                case BGTaskType::kCompact: {
+                case BGTaskType::kManualCompact: {
                     // Triggered by compact command
                     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
                     if (storage_mode == StorageMode::kUnInitialized) {
@@ -328,11 +272,8 @@ void CompactionProcessor::Process() {
                     }
                     if (storage_mode == StorageMode::kWritable) {
                         LOG_DEBUG("Command compact start.");
-
-                        auto *compact_task = static_cast<NewCompactTask *>(bg_task.get());
-
+                        auto *compact_task = static_cast<ManualCompactTask *>(bg_task.get());
                         compact_task->result_status_ = NewManualCompact(compact_task->new_txn_, compact_task->db_name_, compact_task->table_name_);
-
                         LOG_DEBUG("Command compact end.");
                     }
                     break;
@@ -345,26 +286,8 @@ void CompactionProcessor::Process() {
                     }
                     if (storage_mode == StorageMode::kWritable) {
                         LOG_DEBUG("Periodic compact start.");
-
-                        //                        auto *compact_task = static_cast<NotifyCompactTask *>(bg_task.get());
-                        NewDoCompact();
-
+                        NewNotifyCompact();
                         LOG_DEBUG("Periodic compact end.");
-                    }
-                    break;
-                }
-                case BGTaskType::kNotifyOptimize: {
-                    //                    auto *optimize_task = static_cast<NotifyOptimizeTask *>(bg_task.get());
-
-                    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
-                    if (storage_mode == StorageMode::kUnInitialized) {
-                        UnrecoverableError("Uninitialized storage mode");
-                    }
-                    if (storage_mode == StorageMode::kWritable) {
-                        LOG_DEBUG("Optimize start.");
-
-                        NewScanAndOptimize();
-                        LOG_DEBUG("Optimize done.");
                     }
                     break;
                 }

@@ -87,8 +87,11 @@ Status CleanupTask::Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_clea
     return Status::OK();
 }
 
-NewCompactTask::NewCompactTask(NewTxn *new_txn, std::string db_name, std::string table_name)
-    : BGTask(BGTaskType::kCompact, false), new_txn_(new_txn), db_name_(db_name), table_name_(table_name) {}
+ManualCompactTask::ManualCompactTask(NewTxn *new_txn, std::string db_name, std::string table_name)
+    : BGTask(BGTaskType::kManualCompact, false), new_txn_(new_txn), db_name_(db_name), table_name_(table_name) {}
+
+ManualOptimizeTask::ManualOptimizeTask(NewTxn *new_txn, std::string db_name, std::string table_name)
+    : BGTask(BGTaskType::kManualOptimize, false), new_txn_(new_txn), db_name_(db_name), table_name_(table_name) {}
 
 DumpMemIndexTask::DumpMemIndexTask(const std::string &db_name,
                                    const std::string &table_name,

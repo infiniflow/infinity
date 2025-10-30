@@ -111,8 +111,6 @@ public:
     std::string ToString() const override { return "CleanupTask"; }
 
     Status Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_cleanup_ts);
-
-private:
 };
 
 export class NotifyCompactTask final : public BGTask {
@@ -124,11 +122,11 @@ public:
     std::string ToString() const override { return "NotifyCompactTask"; }
 };
 
-export class NewCompactTask final : public BGTask {
+export class ManualCompactTask final : public BGTask {
 public:
-    NewCompactTask(NewTxn *new_txn, std::string db_name, std::string table_name);
+    ManualCompactTask(NewTxn *new_txn, std::string db_name, std::string table_name);
 
-    std::string ToString() const override { return "NewCompactTask"; }
+    std::string ToString() const override { return "ManualCompactTask"; }
 
     NewTxn *new_txn_ = nullptr;
     std::string db_name_;
@@ -137,11 +135,22 @@ public:
 
 export class NotifyOptimizeTask final : public BGTask {
 public:
-    NotifyOptimizeTask(bool new_optimize = false) : BGTask(BGTaskType::kNotifyOptimize, true) {}
+    NotifyOptimizeTask() : BGTask(BGTaskType::kNotifyOptimize, true) {}
 
     ~NotifyOptimizeTask() override = default;
 
     std::string ToString() const override { return "NotifyOptimizeTask"; }
+};
+
+export class ManualOptimizeTask final : public BGTask {
+public:
+    ManualOptimizeTask(NewTxn *new_txn, std::string db_name, std::string table_name);
+
+    std::string ToString() const override { return "ManualOptimizeTask"; }
+
+    NewTxn *new_txn_ = nullptr;
+    std::string db_name_;
+    std::string table_name_;
 };
 
 export class DumpMemIndexTask final : public BGTask {

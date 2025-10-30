@@ -42,12 +42,16 @@ std::string ToString(BGTaskType type) {
             return "NotifyCompact";
             break;
         }
-        case BGTaskType::kCompact: {
-            return "Compact";
+        case BGTaskType::kManualCompact: {
+            return "ManualCompact";
             break;
         }
         case BGTaskType::kNotifyOptimize: {
             return "NotifyOptimize";
+            break;
+        }
+        case BGTaskType::kManualOptimize: {
+            return "ManualOptimize";
             break;
         }
         case BGTaskType::kCleanup: {

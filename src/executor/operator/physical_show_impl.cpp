@@ -47,6 +47,7 @@ import :logger;
 import :memory_indexer;
 import :background_process;
 import :compaction_process;
+import :optimization_process;
 import :bg_task;
 import :bg_task_type;
 import :file_worker_type;
@@ -4321,6 +4322,27 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             CompactionProcessor *compaction_processor = query_context->storage()->compaction_processor();
             Value value = Value::MakeBigInt(compaction_processor->RunningTaskCount());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case GlobalVariable::kRunningOptimizeTask: {
+            std::vector<std::shared_ptr<ColumnDef>> output_column_defs = {
+                std::make_shared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            };
+
+            std::shared_ptr<TableDef> table_def =
+                TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("variables"), nullptr, output_column_defs);
+            output_ = std::make_shared<DataTable>(table_def, TableType::kResult);
+
+            std::vector<std::shared_ptr<DataType>> output_column_types{
+                integer_type,
+            };
+
+            output_block_ptr->Init(output_column_types);
+
+            OptimizationProcessor *optimize_processor = query_context->storage()->optimization_processor();
+            Value value = Value::MakeBigInt(optimize_processor->RunningTaskCount());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;

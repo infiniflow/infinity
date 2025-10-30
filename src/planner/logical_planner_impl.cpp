@@ -2130,9 +2130,7 @@ Status LogicalPlanner::BuildOptimize(OptimizeStatement *statement, std::shared_p
     std::shared_ptr<LogicalNode> logical_optimize =
         std::make_shared<LogicalOptimize>(bind_context_ptr->GetNewLogicalNodeId(),
                                           statement->schema_name_,
-                                          statement->table_name_,
-                                          statement->index_name_,
-                                          std::move(statement->opt_params_)); // Can't be rerun the txn, since the options are moved.
+                                          statement->table_name_); // Can't be rerun the txn, since the options are moved.
     this->logical_plan_ = logical_optimize;
     return Status::OK();
 }

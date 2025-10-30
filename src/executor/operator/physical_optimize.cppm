@@ -32,14 +32,9 @@ namespace infinity {
 
 export class PhysicalOptimize final : public PhysicalOperator {
 public:
-    explicit PhysicalOptimize(u64 id,
-                              std::string db_name,
-                              std::string table_name,
-                              std::string index_name,
-                              std::vector<std::unique_ptr<InitParameter>> opt_params,
-                              std::shared_ptr<std::vector<LoadMeta>> load_metas)
+    explicit PhysicalOptimize(u64 id, std::string db_name, std::string table_name, std::shared_ptr<std::vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kOptimize, nullptr, nullptr, id, load_metas), db_name_(std::move(db_name)),
-          table_name_(std::move(table_name)), index_name_(std::move(index_name)), opt_params_(std::move(opt_params)) {}
+          table_name_(std::move(table_name)) {}
 
     ~PhysicalOptimize() override = default;
 
@@ -54,8 +49,6 @@ public:
 private:
     std::string db_name_{};
     std::string table_name_{};
-    std::string index_name_{};
-    std::vector<std::unique_ptr<InitParameter>> opt_params_;
 
     std::shared_ptr<std::vector<std::string>> output_names_{};
     std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};

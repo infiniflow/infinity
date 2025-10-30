@@ -58,16 +58,14 @@ public:
 
     void Submit(const std::shared_ptr<BGTask> &bg_task);
 
-    void NewDoCompact();
-
-    Status NewManualCompact(NewTxn *new_txn, const std::string &db_name, const std::string &table_name);
-
     u64 RunningTaskCount() const { return task_count_; }
 
     void AddTestCommand(BGTaskType type, const std::string &command) { test_commander_.Add(type, command); }
 
 private:
-    void NewScanAndOptimize();
+    void NewNotifyCompact();
+
+    Status NewManualCompact(NewTxn *new_txn, const std::string &db_name, const std::string &table_name);
 
     void Process();
 

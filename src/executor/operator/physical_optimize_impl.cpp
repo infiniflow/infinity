@@ -25,6 +25,8 @@ import :base_table_ref;
 import :wal_manager;
 import :infinity_context;
 import :new_txn;
+import :optimization_process;
+import :bg_task;
 
 import std;
 import third_party;
@@ -34,27 +36,16 @@ namespace infinity {
 void PhysicalOptimize::Init(QueryContext *query_context) {}
 
 bool PhysicalOptimize::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
-    if (storage_mode == StorageMode::kUnInitialized) {
-        UnrecoverableError("Uninitialized storage mode");
-    }
+    auto *optimize_operator_state = static_cast<OptimizeOperatorState *>(operator_state);
+    auto *new_txn = query_context->GetNewTxn();
 
-    if (storage_mode != StorageMode::kWritable) {
-        operator_state->status_ = Status::InvalidNodeRole("Attempt to write on non-writable node");
-        operator_state->SetComplete();
-        return true;
-    }
+    auto optimize_task = std::make_shared<ManualOptimizeTask>(new_txn, db_name_, table_name_);
+    auto *optimize_processor = InfinityContext::instance().storage()->optimization_processor();
+    optimize_processor->Submit(optimize_task);
+    optimize_task->Wait();
 
-    LOG_INFO(fmt::format("OptimizeIndex {}.{} begin", db_name_, table_name_));
-
-    NewTxn *new_txn = query_context->GetNewTxn();
-    Status status = new_txn->OptimizeTableIndexes(db_name_, table_name_);
-    if (!status.ok()) {
-        operator_state->status_ = status;
-        RecoverableError(status);
-    }
-
-    operator_state->SetComplete();
+    optimize_operator_state->status_ = optimize_task->result_status_;
+    optimize_operator_state->SetComplete();
     return true;
 }
 

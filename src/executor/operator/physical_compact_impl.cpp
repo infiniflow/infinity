@@ -32,7 +32,7 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     const std::string &table_name = *base_table_ref_->table_info_->table_name_;
     auto *new_txn = query_context->GetNewTxn();
 
-    auto compact_task = std::make_shared<NewCompactTask>(new_txn, db_name, table_name);
+    auto compact_task = std::make_shared<ManualCompactTask>(new_txn, db_name, table_name);
     auto *compaction_processor = InfinityContext::instance().storage()->compaction_processor();
     compaction_processor->Submit(compact_task);
     compact_task->Wait();
