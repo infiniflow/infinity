@@ -287,7 +287,7 @@ jobs:
             until find . -name "infinity*.profraw" -size +0 | grep -q .; do
               sleep 1s
             done
-          '
+          ' || echo "Warning: infinity*.profraw is still empty after 30s"
           ls -lh infinity*.profraw
           
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
@@ -396,7 +396,7 @@ jobs:
             until find . -name "infinity*.profraw" -size +0 | grep -q .; do
               sleep 1s
             done
-          '
+          ' || echo "Warning: infinity*.profraw is still empty after 30s"
           ls -lh infinity*.profraw
           
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
@@ -465,7 +465,7 @@ jobs:
             until find . -name "infinity*.profraw" -size +0 | grep -q .; do
               sleep 1s
             done
-          '
+          ' || echo "Warning: infinity*.profraw is still empty after 30s"
           ls -lh infinity*.profraw
           
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
@@ -535,7 +535,7 @@ jobs:
             until find . -name "infinity*.profraw" -size +0 | grep -q .; do
               sleep 1s
             done
-          '
+          ' || echo "Warning: infinity*.profraw is still empty after 30s"
           ls -lh infinity*.profraw
           
           sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov"
