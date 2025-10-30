@@ -76,7 +76,7 @@ void HnswFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-bool HnswFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool HnswFileWorker::Write(bool &prepare_success, size_t data_size, const FileWorkerSaveCtx &ctx) {
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
     (*hnsw_handler)->SaveToPtr(*file_handle_);
 

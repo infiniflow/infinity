@@ -54,7 +54,7 @@ public:
     virtual ~FileWorker() = default;
 
 public:
-    [[nodiscard]] bool Write(const FileWorkerSaveCtx &ctx = {});
+    [[nodiscard]] bool Write(const FileWorkerSaveCtx &ctx = {}, size_t data_size = -1);
 
     template <typename T>
     void Read(T &data) {
@@ -154,8 +154,6 @@ public:
 
     void SetData(void *data);
 
-    virtual void SetDataSize(size_t size);
-
     // Get an absolute file path. As key of a buffer handle.
     [[nodiscard]] std::string GetFilePath() const;
 
@@ -164,7 +162,7 @@ public:
     Status CleanupFile() const;
 
 protected:
-    virtual bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
+    virtual bool Write(bool &prepare_success, size_t data_size = -1, const FileWorkerSaveCtx &ctx = {}) = 0;
 
     virtual void Read(size_t file_size, bool other) = 0;
 

@@ -34,14 +34,12 @@ public:
     FileWorkerType Type() const override { return FileWorkerType::kDataFile; }
 
 protected:
-    bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(bool &prepare_success, size_t data_size, const FileWorkerSaveCtx &ctx) override;
 
     void Read(size_t file_size, bool other) override;
 
-    void SetDataSize(size_t size) override;
-
 private:
-    size_t buffer_size_;
-    std::atomic<size_t> data_size_{};
+    size_t buffer_size_{};
+    size_t data_size_{};
 };
 } // namespace infinity

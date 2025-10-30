@@ -89,7 +89,7 @@ void EMVBIndexFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-bool EMVBIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool EMVBIndexFileWorker::Write(bool &prepare_success, size_t data_size, const FileWorkerSaveCtx &ctx) {
     auto *index = static_cast<EMVBIndex *>(data_);
     index->SaveIndexInner(*file_handle_);
     prepare_success = true;

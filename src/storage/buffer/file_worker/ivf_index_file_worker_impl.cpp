@@ -52,7 +52,7 @@ void IVFIndexFileWorker::FreeInMemory() {
     }
 }
 
-bool IVFIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool IVFIndexFileWorker::Write(bool &prepare_success, size_t data_size, const FileWorkerSaveCtx &ctx) {
     if (data_) {
         auto index = static_cast<IVFIndexInChunk *>(data_);
         index->SaveIndexInner(*file_handle_);

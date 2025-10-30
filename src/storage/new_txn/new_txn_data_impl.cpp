@@ -141,9 +141,8 @@ struct NewTxnCompactState {
                 if (!status2.ok()) {
                     return status;
                 }
-                data_file_worker->SetDataSize(data_size);
 
-                [[maybe_unused]] auto foo = data_file_worker->Write();
+                [[maybe_unused]] auto foo = data_file_worker->Write({}, data_size);
                 if (var_file_worker) {
                     [[maybe_unused]] auto foo = var_file_worker->Write();
                 }
@@ -950,8 +949,8 @@ NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t appen
     if (!status2.ok()) {
         return status;
     }
-    data_file_worker->SetDataSize(data_size);
-    [[maybe_unused]] auto foo = data_file_worker->Write();
+
+    [[maybe_unused]] auto foo = data_file_worker->Write({}, data_size);
     if (var_file_worker != nullptr) {
         [[maybe_unused]] auto foo1 = var_file_worker->Write();
     }
@@ -1249,10 +1248,9 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
         if (!status2.ok()) {
             return status;
         }
-        data_file_worker->SetDataSize(data_size);
 
         // // XXX
-        [[maybe_unused]] auto foo = data_file_worker->Write();
+        [[maybe_unused]] auto foo = data_file_worker->Write({}, data_size);
         if (var_file_worker) {
             [[maybe_unused]] auto foo = var_file_worker->Write();
         }
@@ -1962,14 +1960,12 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
         } else {
             data_size = row_cnt * col_def->type()->Size();
         }
-        data_file_worker->SetDataSize(data_size);
 
-        col->SetToCatalog(data_file_worker, var_file_worker, ColumnVectorMode::kReadWrite);
-
-        [[maybe_unused]] auto foo = data_file_worker->Write();
+        [[maybe_unused]] auto foo = data_file_worker->Write({}, data_size);
         if (var_file_worker) {
             [[maybe_unused]] auto foo = var_file_worker->Write();
         }
+        col->SetToCatalog(data_file_worker, var_file_worker, ColumnVectorMode::kReadWrite);
     }
 
     return Status::OK();

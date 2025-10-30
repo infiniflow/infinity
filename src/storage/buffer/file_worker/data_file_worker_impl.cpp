@@ -71,7 +71,7 @@ void DataFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-bool DataFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool DataFileWorker::Write(bool &prepare_success, size_t data_size, const FileWorkerSaveCtx &ctx) {
     // File structure:
     // - header: magic number
     // - header: buffer size
@@ -101,7 +101,6 @@ bool DataFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) 
     std::memcpy((char *)mmap_ + offset, &buffer_size_, sizeof(buffer_size_));
     offset += sizeof(buffer_size_);
 
-    size_t data_size = data_size_.load();
     std::memcpy((char *)mmap_ + offset, data_, data_size);
     offset += data_size;
 
@@ -180,10 +179,4 @@ void DataFileWorker::Read(size_t file_size, bool other) {
     }
 }
 
-void DataFileWorker::SetDataSize(size_t size) {
-    if (data_ == nullptr) {
-        UnrecoverableError("Data has not been set.");
-    }
-    data_size_.store(size);
-}
 } // namespace infinity

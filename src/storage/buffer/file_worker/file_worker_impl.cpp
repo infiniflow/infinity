@@ -46,7 +46,7 @@ FileWorker::FileWorker(std::shared_ptr<std::string> rel_file_path) : rel_file_pa
     file_worker_manager_ = InfinityContext::instance().storage()->fileworker_manager();
 }
 
-bool FileWorker::Write(const FileWorkerSaveCtx &ctx) {
+bool FileWorker::Write(const FileWorkerSaveCtx &ctx, size_t data_size /* just for data_file_worker */) {
     std::lock_guard l(l_);
     if (data_ == nullptr) {
         UnrecoverableError("No data will be written.");
@@ -61,7 +61,7 @@ bool FileWorker::Write(const FileWorkerSaveCtx &ctx) {
 
     bool prepare_success = false;
 
-    bool all_save = Write(prepare_success, ctx);
+    bool all_save = Write(prepare_success, data_size, ctx);
     // if (prepare_success) {
     //     file_handle_->Sync();
     // }
@@ -142,8 +142,6 @@ void FileWorker::SetData(void *data) {
     data_ = data;
     [[maybe_unused]] auto foo = Write();
 }
-
-void FileWorker::SetDataSize(size_t size) { UnrecoverableError("Not implemented"); }
 
 // Get absolute file path. As key of buffer handle.
 std::string FileWorker::GetFilePath() const { return fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *rel_file_path_); }

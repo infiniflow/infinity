@@ -54,7 +54,7 @@ void VersionFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-bool VersionFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &base_ctx) {
+bool VersionFileWorker::Write(bool &prepare_success, size_t data_size, const FileWorkerSaveCtx &base_ctx) {
     auto *data = static_cast<BlockVersion *>(data_);
 
     const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);

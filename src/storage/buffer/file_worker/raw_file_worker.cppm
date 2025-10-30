@@ -38,7 +38,7 @@ public:
     FileWorkerType Type() const override { return FileWorkerType::kRawFile; }
 
 protected:
-    bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(bool &prepare_success, size_t data_size, const FileWorkerSaveCtx &ctx) override;
 
     void Read(size_t file_size, bool other) override;
 

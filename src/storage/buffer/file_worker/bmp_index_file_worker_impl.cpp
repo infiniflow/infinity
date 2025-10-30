@@ -87,7 +87,7 @@ void BMPIndexFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-bool BMPIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool BMPIndexFileWorker::Write(bool &prepare_success, size_t data_size, const FileWorkerSaveCtx &ctx) {
     auto *bmp_handler = reinterpret_cast<BMPHandlerPtr *>(data_);
     (*bmp_handler)->SaveToPtr(*file_handle_);
 

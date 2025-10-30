@@ -59,7 +59,7 @@ void RawFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-bool RawFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool RawFileWorker::Write(bool &prepare_success, size_t data_size, const FileWorkerSaveCtx &ctx) {
     assert(data_ != nullptr && buffer_size_ > 0);
 
     auto old_mmap_size = mmap_size_;

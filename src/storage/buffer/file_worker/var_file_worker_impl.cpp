@@ -56,7 +56,7 @@ void VarFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-bool VarFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool VarFileWorker::Write(bool &prepare_success, size_t data_size, const FileWorkerSaveCtx &ctx) {
     const auto *buffer = static_cast<const VarBuffer *>(data_);
     auto old_mmap_size = mmap_size_;
     mmap_size_ = buffer->TotalSize();
