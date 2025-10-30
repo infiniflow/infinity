@@ -18,6 +18,7 @@ export module infinity_core:periodic_trigger;
 
 import :background_process;
 import :compaction_process;
+import :optimization_process;
 import :wal_manager;
 
 import std;
@@ -90,15 +91,15 @@ private:
 
 export class OptimizeIndexPeriodicTrigger final : public PeriodicTrigger {
 public:
-    explicit OptimizeIndexPeriodicTrigger(const i64 interval, CompactionProcessor *compact_processor)
-        : PeriodicTrigger(interval), compact_processor_(compact_processor) {}
+    explicit OptimizeIndexPeriodicTrigger(const i64 interval, OptimizationProcessor *optimize_processor)
+        : PeriodicTrigger(interval), optimize_processor_(optimize_processor) {}
 
     explicit OptimizeIndexPeriodicTrigger(const i64 interval) : PeriodicTrigger(interval) {}
 
     void Trigger() override;
 
 private:
-    CompactionProcessor *compact_processor_{};
+    OptimizationProcessor *optimize_processor_{};
     std::shared_ptr<NotifyOptimizeTask> optimize_task_{};
 };
 

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export module infinity_core:dump_index_process;
+export module infinity_core:optimization_process;
 
 import :bg_task_type;
 import :blocking_queue;
@@ -22,28 +22,30 @@ namespace infinity {
 
 class NewTxn;
 class BGTask;
-class DumpMemIndexTask;
+class TableMeta;
 
-export class DumpIndexProcessor {
+export class OptimizationProcessor {
 public:
-    DumpIndexProcessor();
-    ~DumpIndexProcessor();
+    OptimizationProcessor();
+    ~OptimizationProcessor();
 
     void Start();
 
     void Stop();
 
-    void Submit(std::shared_ptr<BGTask> bg_task);
+    void Submit(const std::shared_ptr<BGTask> &bg_task);
 
     u64 RunningTaskCount() const { return task_count_; }
 
 private:
-    void DoDump(DumpMemIndexTask *dump_task);
+    void NewNotifyOptimize();
+
+    Status NewManualOptimize(NewTxn *new_txn, const std::string &db_name, const std::string &table_name);
 
     void Process();
 
 private:
-    BlockingQueue<std::shared_ptr<BGTask>> task_queue_{"DumpIndexProcessor"};
+    BlockingQueue<std::shared_ptr<BGTask>> task_queue_{"OptimizationProcessor"};
 
     std::thread processor_thread_{};
 

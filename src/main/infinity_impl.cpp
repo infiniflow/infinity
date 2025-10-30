@@ -1252,16 +1252,6 @@ QueryResult Infinity::Optimize(const std::string &db_name, const std::string &ta
     optimize_statement->table_name_ = table_name;
     ToLower(optimize_statement->table_name_);
 
-    if (!optimize_option.index_name_.empty()) {
-        optimize_statement->index_name_ = std::move(optimize_option.index_name_);
-        ToLower(optimize_statement->index_name_);
-        for (auto *param_ptr : optimize_option.opt_params_) {
-            auto param = std::make_unique<InitParameter>(std::move(param_ptr->param_name_), std::move(param_ptr->param_value_));
-            optimize_statement->opt_params_.push_back(std::move(param));
-            delete param_ptr;
-        }
-    }
-
     QueryResult result = query_context_ptr->QueryStatement(optimize_statement.get());
     return result;
 }

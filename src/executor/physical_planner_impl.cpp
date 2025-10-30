@@ -933,8 +933,6 @@ std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildOptimize(const std::shar
     return std::make_unique<PhysicalOptimize>(logical_optimize->node_id(),
                                               logical_optimize->schema_name(),
                                               logical_optimize->object_name(),
-                                              logical_optimize->index_name_,
-                                              std::move(logical_optimize->opt_params_),
                                               logical_operator->load_metas());
 }
 
