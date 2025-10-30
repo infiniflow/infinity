@@ -101,7 +101,10 @@ bool DataFileWorker::Write(bool &prepare_success, size_t data_size, const FileWo
     std::memcpy((char *)mmap_ + offset, &buffer_size_, sizeof(buffer_size_));
     offset += sizeof(buffer_size_);
 
-    std::memcpy((char *)mmap_ + offset, data_, data_size);
+    if (data_size != static_cast<size_t>(-1)) {
+        data_size_ = data_size;
+    }
+    std::memcpy((char *)mmap_ + offset, data_, data_size_);
     offset += data_size;
 
     size_t unused_size = buffer_size_ - data_size;

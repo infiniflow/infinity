@@ -129,16 +129,16 @@ void VectorBuffer::Initialize(FileWorker *file_worker, FileWorker *var_file_work
     capacity_ = capacity;
 }
 
-void VectorBuffer::SetToCatalog(FileWorker *file_worker, FileWorker *var_file_worker) {
+void VectorBuffer::SetToCatalog(FileWorker *data_file_worker, FileWorker *var_file_worker) {
     if (!std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
         UnrecoverableError("Cannot convert to new catalog");
     }
 
     void *src_ptr = std::get<std::unique_ptr<char[]>>(ptr_).release();
-    file_worker->SetData(src_ptr);
+    data_file_worker->SetData(src_ptr);
 
     // ptr_ = file_worker->Load();
-    ptr_ = file_worker;
+    ptr_ = data_file_worker;
     if (buffer_type_ == VectorBufferType::kVarBuffer) {
         var_buffer_mgr_->SetToCatalog(var_file_worker);
     }

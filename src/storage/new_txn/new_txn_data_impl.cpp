@@ -1960,12 +1960,11 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
         } else {
             data_size = row_cnt * col_def->type()->Size();
         }
-
+        col->SetToCatalog(data_file_worker, var_file_worker, ColumnVectorMode::kReadWrite);
         [[maybe_unused]] auto foo = data_file_worker->Write({}, data_size);
         if (var_file_worker) {
             [[maybe_unused]] auto foo = var_file_worker->Write();
         }
-        col->SetToCatalog(data_file_worker, var_file_worker, ColumnVectorMode::kReadWrite);
     }
 
     return Status::OK();

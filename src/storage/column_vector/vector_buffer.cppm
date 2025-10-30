@@ -52,7 +52,7 @@ public:
 
     void Initialize(FileWorker *file_worker, FileWorker *var_file_worker, size_t type_size, size_t capacity);
 
-    void SetToCatalog(FileWorker *file_worker, FileWorker *var_file_worker);
+    void SetToCatalog(FileWorker *data_file_worker, FileWorker *var_file_worker);
 
     void ResetToInit(VectorBufferType type);
 
