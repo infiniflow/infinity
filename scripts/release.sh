@@ -25,6 +25,7 @@ REMOTE_NAME=$(git remote -v | awk '/github\.com[/:]infiniflow\/infinity/ && $3 =
 RELEASE_DATETIME=$(date --rfc-3339=seconds)
 BUILDER_CONTAINER=infinity_build_ubuntu20_clang20
 BUILDER_IMAGE=infiniflow/infinity_builder:ubuntu20_clang20
+WORKSPACE="$(git rev-parse --show-toplevel)"
 
 function git_retag() {
     git push $REMOTE_NAME :refs/tags/$RELEASE_TAG
@@ -37,12 +38,19 @@ function build() {
         TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
         docker run -d --privileged --name $BUILDER_CONTAINER -e TZ=$TZ -v $HOME:$HOME -v /boot:/boot --network host --hostname $BUILDER_CONTAINER $BUILDER_IMAGE
     fi
-    WORKSPACE="$(git rev-parse --show-toplevel)"
     docker exec $BUILDER_CONTAINER bash -c "git config --global safe.directory \"*\" && cd $WORKSPACE && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCPACK_PACKAGE_VERSION=$RELEASE_TAG -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -DCMAKE_VERBOSE_MAKEFILE=ON -S $WORKSPACE -B $WORKSPACE/cmake-build-reldeb"
     docker exec $BUILDER_CONTAINER bash -c "cmake --build $WORKSPACE/cmake-build-reldeb --target infinity"
     docker exec $BUILDER_CONTAINER bash -c "cd $WORKSPACE/cmake-build-reldeb && rm -f *.deb *.rpm *.gz && cpack"
-    docker exec $BUILDER_CONTAINER bash -c "cd $WORKSPACE && rm -rf wheelhouse && pip3 wheel ./python/infinity_sdk -v -w wheelhouse --no-deps"
+    docker exec $BUILDER_CONTAINER bash -c "cd $WORKSPACE/python/infinity_sdk && uv build"
     docker build -t infiniflow/infinity:${RELEASE_TAG} -f scripts/Dockerfile_infinity .
+}
+
+function publish_sdk() {
+    if [[ "$PRERELEASE" == "false" ]]; then
+        cd $WORKSPACE/python/infinity_sdk && uv publish --token $PYPI_API_TOKEN
+    else
+        echo "Skipping twine upload because $RELEASE_TAG is a prerelease."
+    fi
 }
 
 function publish_github() {
@@ -64,16 +72,8 @@ function publish_image() {
     docker push infiniflow/infinity:${RELEASE_TAG}
 }
 
-function publish_sdk() {
-    if [[ "$PRERELEASE" == "false" ]]; then
-        twine upload -u __token__ -p $PYPI_API_TOKEN wheelhouse/*
-    else
-        echo "Skipping twine upload because $RELEASE_TAG is a prerelease."
-    fi
-}
-
 git_retag
 build
+publish_sdk
 publish_github
 publish_image
-publish_sdk
