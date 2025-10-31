@@ -534,7 +534,7 @@ std::shared_ptr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
 
             break;
         }
-        case WalCommandType::OPTIMIZE_V2: {
+        case WalCommandType::ALTER_INDEX_V2: {
             std::string db_name = ReadBufAdv<std::string>(ptr);
             std::string db_id = ReadBufAdv<std::string>(ptr);
             std::string table_name = ReadBufAdv<std::string>(ptr);
@@ -546,7 +546,7 @@ std::shared_ptr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             for (i32 i = 0; i < param_n; i++) {
                 params.push_back(InitParameter::ReadAdv(ptr));
             }
-            cmd = std::make_shared<WalCmdOptimizeV2>(db_name, db_id, table_name, table_id, index_name, index_id, std::move(params));
+            cmd = std::make_shared<WalCmdAlterIndexV2>(db_name, db_id, table_name, table_id, index_name, index_id, std::move(params));
             break;
         }
         case WalCommandType::DUMP_INDEX_V2: {
@@ -854,8 +854,8 @@ bool WalCmdCompactV2::operator==(const WalCmd &other) const {
     return true;
 }
 
-bool WalCmdOptimizeV2::operator==(const WalCmd &other) const {
-    auto other_cmd = dynamic_cast<const WalCmdOptimizeV2 *>(&other);
+bool WalCmdAlterIndexV2::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdAlterIndexV2 *>(&other);
     return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && db_id_ == other_cmd->db_id_ && table_name_ == other_cmd->table_name_ &&
            table_id_ == other_cmd->table_id_ && index_name_ == other_cmd->index_name_ && index_id_ == other_cmd->index_id_ &&
            params_ == other_cmd->params_;
@@ -1025,7 +1025,7 @@ i32 WalCmdCompactV2::GetSizeInBytes() const {
     return size + sizeof(i32) + this->deprecated_segment_ids_.size() * sizeof(SegmentID);
 }
 
-i32 WalCmdOptimizeV2::GetSizeInBytes() const {
+i32 WalCmdAlterIndexV2::GetSizeInBytes() const {
     i32 size = sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + db_id_.size() + sizeof(i32) + table_name_.size() + sizeof(i32) +
                table_id_.size() + sizeof(i32) + index_name_.size() + sizeof(i32) + index_id_.size();
     size += sizeof(i32);
@@ -1297,8 +1297,8 @@ void WalCmdCompactV2::WriteAdv(char *&buf) const {
     }
 }
 
-void WalCmdOptimizeV2::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, WalCommandType::OPTIMIZE_V2);
+void WalCmdAlterIndexV2::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::ALTER_INDEX_V2);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->db_id_);
     WriteBufAdv(buf, this->table_name_);
@@ -1529,9 +1529,9 @@ std::string WalCmdCompactV2::ToString() const {
     return std::move(ss).str();
 }
 
-std::string WalCmdOptimizeV2::ToString() const {
+std::string WalCmdAlterIndexV2::ToString() const {
     std::stringstream ss;
-    ss << "Optimize: " << std::endl;
+    ss << "Alter index: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "db id: " << db_id_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
@@ -1742,7 +1742,7 @@ std::string WalCmdCompactV2::CompactInfo() const {
     return std::string();
 }
 
-std::string WalCmdOptimizeV2::CompactInfo() const {
+std::string WalCmdAlterIndexV2::CompactInfo() const {
     std::stringstream ss;
     for (auto &param_ptr : params_) {
         ss << param_ptr->ToString() << " | ";
@@ -1966,7 +1966,7 @@ std::vector<std::shared_ptr<EraseBaseCache>> WalCmdCompactV2::ToCachedMeta(TxnTi
     return cache_items;
 }
 
-std::vector<std::shared_ptr<EraseBaseCache>> WalCmdOptimizeV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
+std::vector<std::shared_ptr<EraseBaseCache>> WalCmdAlterIndexV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
     std::vector<std::shared_ptr<EraseBaseCache>> cache_items;
     cache_items.push_back(std::make_shared<MetaEraseDbCache>(db_name_));
     cache_items.push_back(std::make_shared<MetaEraseTableCache>(std::stoull(db_id_), table_name_));
@@ -2262,8 +2262,8 @@ std::string WalCmd::WalCommandTypeToString(WalCommandType type) {
         case WalCommandType::COMPACT_V2:
             command = "COMPACT_V2";
             break;
-        case WalCommandType::OPTIMIZE_V2:
-            command = "OPTIMIZE_V2";
+        case WalCommandType::ALTER_INDEX_V2:
+            command = "ALTER_INDEX_V2";
             break;
         case WalCommandType::DUMP_INDEX_V2:
             command = "DUMP_INDEX_V2";

@@ -346,7 +346,7 @@ struct ExportOption {
 6:  i64 row_limit,
 }
 
-struct OptimizeOptions {
+struct AlterIndexOptions {
 1:  string index_name,
 2:  list<InitParameter> opt_params = []
 }
@@ -502,7 +502,13 @@ struct ShowIndexResponse {
 struct OptimizeRequest {
 1: string db_name,
 2: string table_name,
-3: OptimizeOptions optimize_options,
+3: i64 session_id,
+}
+
+struct AlterIndexRequest {
+1: string db_name,
+2: string table_name,
+3: AlterIndexOptions alter_index_options,
 4: i64 session_id,
 }
 
@@ -896,6 +902,8 @@ CommonResponse DropIndex(1:DropIndexRequest request),
 ShowIndexResponse ShowIndex(1:ShowIndexRequest request),
 
 CommonResponse Optimize(1:OptimizeRequest request),
+
+CommonResponse AlterIndex(1:AlterIndexRequest request),
 
 CommonResponse AddColumns(1:AddColumnsRequest request),
 CommonResponse DropColumns(1:DropColumnsRequest request),

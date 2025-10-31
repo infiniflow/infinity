@@ -699,8 +699,8 @@ class TestInfinity:
                                                          index.IndexType.FullText))
             assert res.error_code == ErrorCode.OK
         else:
-            table_obj.optimize("body_index", {})
-            table_obj.optimize("body2_index", {})
+            table_obj.optimize()
+            table_obj.optimize()
             time.sleep(40)
 
         res, extra_result = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(

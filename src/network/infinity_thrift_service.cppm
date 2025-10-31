@@ -116,6 +116,8 @@ public:
 
     void Optimize(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::OptimizeRequest &request) final;
 
+    void AlterIndex(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::AlterIndexRequest &request) final;
+
     void AddColumns(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::AddColumnsRequest &request) final;
 
     void DropColumns(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropColumnsRequest &request) final;
@@ -236,7 +238,7 @@ private:
 
     static std::tuple<UpdateExpr *, Status> GetUpdateExprFromProto(const infinity_thrift_rpc::UpdateExpr &update_expr);
 
-    static OptimizeOptions GetParsedOptimizeOptionFromProto(const infinity_thrift_rpc::OptimizeOptions &options);
+    static AlterIndexOptions GetParsedAlterIndexOptionFromProto(const infinity_thrift_rpc::AlterIndexOptions &options);
 
     static infinity_thrift_rpc::ColumnType::type DataTypeToProtoColumnType(const std::shared_ptr<DataType> &data_type);
 

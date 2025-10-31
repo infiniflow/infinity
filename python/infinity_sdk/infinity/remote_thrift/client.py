@@ -370,9 +370,14 @@ class ThriftInfinityClient:
         return self.client.ShowCurrentNode(ShowCurrentNodeRequest(session_id=self.session_id))
 
     @retry_wrapper
-    def optimize(self, db_name: str, table_name: str, optimize_opt: ttypes.OptimizeOptions):
-        return self.client.Optimize(OptimizeRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
-                                                    optimize_options=optimize_opt))
+    def optimize(self, db_name: str, table_name: str):
+        return self.client.Optimize(OptimizeRequest(session_id=self.session_id, db_name=db_name, table_name=table_name))
+
+    @retry_wrapper
+    def alter_index(self, db_name: str, table_name: str, alter_index_opt: ttypes.AlterIndexOptions):
+        return self.client.AlterIndex(
+            AlterIndexRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                              alter_index_options=alter_index_opt))
 
     @retry_wrapper
     def add_columns(self, db_name: str, table_name: str, column_defs: list):

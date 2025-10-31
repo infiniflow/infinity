@@ -232,7 +232,9 @@ public:
                        ParsedExpr *having,
                        bool total_hits_count_flag);
 
-    QueryResult Optimize(const std::string &db_name, const std::string &table_name, OptimizeOptions optimize_options = OptimizeOptions{});
+    QueryResult Optimize(const std::string &db_name, const std::string &table_name);
+
+    QueryResult AlterIndex(const std::string &db_name, const std::string &table_name, AlterIndexOptions alter_index_option);
 
     QueryResult AddColumns(const std::string &db_name, const std::string &table_name, std::vector<std::shared_ptr<ColumnDef>> column_defs);
 

@@ -284,9 +284,9 @@ std::string AlterIndexTxnStore::ToString() const {
 std::shared_ptr<WalEntry> AlterIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     std::shared_ptr<WalEntry> wal_entry = std::make_shared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
-    std::shared_ptr<WalCmdOptimizeV2> opt_command =
-        std::make_shared<WalCmdOptimizeV2>(db_name_, db_id_str_, table_name_, table_id_str_, index_name_, index_id_str_, std::move(params_));
-    wal_entry->cmds_.push_back(static_pointer_cast<WalCmd>(opt_command));
+    std::shared_ptr<WalCmdAlterIndexV2> alter_index_command =
+        std::make_shared<WalCmdAlterIndexV2>(db_name_, db_id_str_, table_name_, table_id_str_, index_name_, index_id_str_, std::move(params_));
+    wal_entry->cmds_.push_back(static_pointer_cast<WalCmd>(alter_index_command));
     return wal_entry;
 }
 
