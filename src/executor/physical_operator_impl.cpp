@@ -173,7 +173,7 @@ void OutputToDataBlockHelper::OutputToDataBlock(FileWorkerManager *fileworker_mg
             cache_column_id = column_id;
         }
         auto val_for_update = cache_column_vector.GetValueByIndex(block_offset);
-        output_data_blocks[output_block_id]->column_vectors[output_column_id]->SetValueByIndex(output_row_id, val_for_update);
+        output_data_blocks[output_block_id]->column_vectors_[output_column_id]->SetValueByIndex(output_row_id, val_for_update);
     }
     output_job_infos.clear();
 

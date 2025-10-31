@@ -99,7 +99,7 @@ private:
     } type_;
 
     std::unique_ptr<VarBuffer> mem_buffer_;
-    FileWorker *file_worker_{};
+    FileWorker *data_file_worker_{};
     FileWorker *var_fileworker_{};
 
     mutable std::mutex mutex_;

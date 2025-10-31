@@ -132,7 +132,7 @@ struct NewTxnCompactState {
                 FileWorker *data_file_worker{};
                 FileWorker *var_file_worker{};
 
-                Status status = column_meta.GetColumnBuffer(data_file_worker, var_file_worker);
+                Status status = column_meta.GetFileWorker(data_file_worker, var_file_worker);
                 if (!status.ok()) {
                     return status;
                 }
@@ -143,10 +143,12 @@ struct NewTxnCompactState {
                 }
                 data_file_worker->SetDataSize(data_size);
 
-                [[maybe_unused]] auto foo = data_file_worker->Write();
-                if (var_file_worker) {
-                    [[maybe_unused]] auto foo = var_file_worker->Write();
-                }
+                // auto data = std::make_shared<char[]>(data_size);
+                // auto var = std::make_shared<char[]>(data_size);
+                // data_file_worker->Write(data);
+                // if (var_file_worker) {
+                //     var_file_worker->Write(var);
+                // }
             }
         }
         block_meta_.reset();
@@ -509,9 +511,9 @@ Status NewTxn::AppendInner(const std::string &db_name,
     std::vector<std::shared_ptr<DataType>> column_types;
     for (size_t col_id = 0; col_id < column_count; ++col_id) {
         column_types.emplace_back((*column_defs)[col_id]->type());
-        if (*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
+        if (*column_types.back() != *input_block->column_vectors_[col_id]->data_type()) {
             LOG_ERROR(fmt::format("Attempt to insert different type data into transaction table store"));
-            return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors[col_id]->data_type()->ToString());
+            return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors_[col_id]->data_type()->ToString());
         }
     }
 
@@ -887,7 +889,7 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_t
 }
 
 Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t append_rows, const DataBlock *input_block, size_t input_offset) {
-    std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
+    auto block_dir_ptr = block_meta.GetBlockDir();
     auto [version_file_worker, status] = block_meta.GetVersionBuffer();
     if (!status.ok()) {
         return status;
@@ -909,7 +911,7 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
 
         // append in column file
         for (size_t column_idx = 0; column_idx < input_block->column_count(); ++column_idx) {
-            const ColumnVector &column_vector = *input_block->column_vectors[column_idx];
+            const ColumnVector &column_vector = *input_block->column_vectors_[column_idx];
             ColumnMeta column_meta(column_idx, block_meta);
             status = AppendInColumn(column_meta, block_offset, append_rows, column_vector, input_offset);
             if (!status.ok()) {
@@ -918,11 +920,11 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
         }
 
         // append in version file.
-        BlockVersion *block_version{};
+        std::shared_ptr<BlockVersion> block_version;
         version_file_worker->Read(block_version);
         block_version->Append(commit_ts, block_offset + append_rows);
         VersionFileWorkerSaveCtx version_file_worker_save_ctx{commit_ts};
-        [[maybe_unused]] auto foo = version_file_worker->Write(version_file_worker_save_ctx);
+        version_file_worker->Write(std::span{block_version.get(), 1}, version_file_worker_save_ctx);
     }
     return Status::OK();
 }
@@ -941,7 +943,7 @@ NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t appen
 
     FileWorker *data_file_worker{};
     FileWorker *var_file_worker{};
-    Status status = column_meta.GetColumnBuffer(data_file_worker, var_file_worker);
+    Status status = column_meta.GetFileWorker(data_file_worker, var_file_worker);
     if (!status.ok()) {
         return status;
     }
@@ -951,15 +953,16 @@ NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t appen
         return status;
     }
     data_file_worker->SetDataSize(data_size);
-    [[maybe_unused]] auto foo = data_file_worker->Write();
-    if (var_file_worker != nullptr) {
-        [[maybe_unused]] auto foo1 = var_file_worker->Write();
-    }
 
-    if (auto *var_buffer_mgr = dest_vec.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
-        //     Ensure buffer obj is loaded.
-        size_t _ = var_buffer_mgr->TotalSize();
-    }
+    data_file_worker->Write(std::span{dest_vec.data().get(), dest_vec.Size()});
+    // if (var_file_worker) {
+    //     var_file_worker->Write(var);
+    // }
+    //
+    // if (auto *var_buffer_mgr = dest_vec.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
+    //     //     Ensure buffer obj is loaded.
+    //     size_t _ = var_buffer_mgr->TotalSize();
+    // }
     return Status::OK();
 }
 
@@ -982,7 +985,7 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
 
         // delete in version file
-        BlockVersion *block_version{};
+        std::shared_ptr<BlockVersion> block_version;
         version_buffer->Read(block_version);
         undo_block_offsets.reserve(block_offsets.size());
         for (BlockOffset block_offset : block_offsets) {
@@ -994,7 +997,7 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
         }
         block_lock->max_ts_ = std::max(block_lock->max_ts_, commit_ts); // FIXME: remove max_ts, undo delete should not revert max_ts
         VersionFileWorkerSaveCtx version_file_worker_save_ctx{commit_ts};
-        [[maybe_unused]] auto foo = version_buffer->Write(version_file_worker_save_ctx);
+        version_buffer->Write(std::span{block_version.get(), 1}, version_file_worker_save_ctx);
     }
     return Status::OK();
 }
@@ -1020,7 +1023,7 @@ Status NewTxn::RollbackDeleteInBlock(BlockMeta &block_meta, const std::vector<Bl
         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
 
         // delete in version file
-        BlockVersion *block_version{};
+        std::shared_ptr<BlockVersion> block_version;
         version_buffer->Read(block_version);
         for (BlockOffset block_offset : block_offsets) {
             block_version->RollbackDelete(block_offset);
@@ -1048,7 +1051,7 @@ Status NewTxn::PrintVersionInBlock(BlockMeta &block_meta, const std::vector<Bloc
         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
 
         // delete in version file
-        BlockVersion *block_version{};
+        std::shared_ptr<BlockVersion> block_version;
         version_buffer->Read(block_version);
         for (BlockOffset block_offset : block_offsets) {
             status = block_version->Print(begin_ts, block_offset, ignore_invisible);
@@ -1240,7 +1243,7 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
 
         FileWorker *data_file_worker{};
         FileWorker *var_file_worker{};
-        status = column_meta->GetColumnBuffer(data_file_worker, var_file_worker);
+        status = column_meta->GetFileWorker(data_file_worker, var_file_worker);
         if (!status.ok()) {
             return status;
         }
@@ -1252,10 +1255,12 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
         data_file_worker->SetDataSize(data_size);
 
         // // XXX
-        [[maybe_unused]] auto foo = data_file_worker->Write();
-        if (var_file_worker) {
-            [[maybe_unused]] auto foo = var_file_worker->Write();
-        }
+        // auto data = std::make_shared<char[]>(data_size);
+        // auto var = std::make_shared<char[]>(data_size);
+        // data_file_worker->Write(data);
+        // if (var_file_worker) {
+        //     var_file_worker->Write(var);
+        // }
 
         if (VarBufferManager *var_buffer_mgr = column_vector.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
             //     Ensure buffer obj is loaded.
@@ -1788,14 +1793,15 @@ Status NewTxn::AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segm
         BlockMeta block_meta(block_info.block_id_, segment_meta);
         std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
 
-        auto [version_buffer, status] = block_meta.GetVersionBuffer();
+        auto [version_file_worker, status] = block_meta.GetVersionBuffer();
         if (!status.ok()) {
             return status;
         }
-        BlockVersion *block_version{};
-        version_buffer->Read(block_version);
+        std::shared_ptr<BlockVersion> block_version;
+        version_file_worker->Read(block_version);
 
         block_version->Append(save_ts, block_info.row_count_);
+        // version_file_worker->Write(block_version);
     }
     return Status::OK();
 }
@@ -1811,11 +1817,11 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
         if (!status.ok()) {
             return status;
         }
-        BlockVersion *block_version{};
+        std::shared_ptr<BlockVersion> block_version;
         version_buffer->Read(block_version);
 
         block_version->CommitAppend(save_ts, commit_ts);
-        [[maybe_unused]] auto foo = version_buffer->Write(VersionFileWorkerSaveCtx(commit_ts));
+        version_buffer->Write(std::span{block_version.get(), 1}, VersionFileWorkerSaveCtx(commit_ts));
 
         std::shared_ptr<BlockLock> block_lock;
         status = block_meta.GetBlockLock(block_lock);
@@ -1866,7 +1872,7 @@ Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
         FileWorker *file_worker{};
         FileWorker *var_file_worker{};
 
-        status = column_meta.GetColumnBuffer(file_worker, var_file_worker);
+        status = column_meta.GetFileWorker(file_worker, var_file_worker);
         if (!status.ok()) {
             return status;
         }
@@ -1906,9 +1912,9 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
     std::vector<std::shared_ptr<DataType>> column_types;
     for (size_t col_id = 0; col_id < table_column_count; ++col_id) {
         column_types.emplace_back(table_info->column_defs_[col_id]->type());
-        if (*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
+        if (*column_types.back() != *input_block->column_vectors_[col_id]->data_type()) {
             LOG_ERROR(fmt::format("Attempt to import different type data into transaction table store"));
-            return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors[col_id]->data_type()->ToString());
+            return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors_[col_id]->data_type()->ToString());
         }
     }
 
@@ -1918,7 +1924,7 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
     size_t block_idx = input_block_idx % DEFAULT_BLOCK_PER_SEGMENT;
 
     for (size_t i = 0; i < input_block->column_count(); ++i) {
-        std::shared_ptr<ColumnVector> col = input_block->column_vectors[i];
+        std::shared_ptr<ColumnVector> col = input_block->column_vectors_[i];
         auto col_def = table_info->column_defs_[i];
 
         FileWorker *data_file_worker{};
@@ -1966,10 +1972,13 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
 
         col->SetToCatalog(data_file_worker, var_file_worker, ColumnVectorMode::kReadWrite);
 
-        [[maybe_unused]] auto foo = data_file_worker->Write();
-        if (var_file_worker) {
-            [[maybe_unused]] auto foo = var_file_worker->Write();
-        }
+        // auto data = std::make_shared<char[]>(data_size);
+        // auto var = std::make_shared<char[]>(data_size);
+        //
+        // [[maybe_unused]] auto foo = data_file_worker->Write(data);
+        // if (var_file_worker) {
+        //     [[maybe_unused]] auto foo = var_file_worker->Write(var);
+        // }
     }
 
     return Status::OK();

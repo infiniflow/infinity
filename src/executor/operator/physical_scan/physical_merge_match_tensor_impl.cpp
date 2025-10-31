@@ -121,9 +121,9 @@ void PhysicalMergeMatchTensor::ExecuteInner(QueryContext *query_context, MergeMa
                 return true;
             } else {
                 const float *middle_val_ptr =
-                    reinterpret_cast<const float *>(middle_data_block_array[middle.block_id_]->column_vectors[score_column_idx]->data());
+                    reinterpret_cast<const float *>(middle_data_block_array[middle.block_id_]->column_vectors_[score_column_idx]->data().get());
                 const float *input_val_ptr = reinterpret_cast<const float *>(
-                    input_data_block_array[input.block_id_ - middle_block_cnt]->column_vectors[score_column_idx]->data());
+                    input_data_block_array[input.block_id_ - middle_block_cnt]->column_vectors_[score_column_idx]->data().get());
                 return middle_val_ptr[middle.block_offset_] >= input_val_ptr[input.block_offset_];
             }
         };

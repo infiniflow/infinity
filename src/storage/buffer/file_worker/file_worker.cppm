@@ -22,6 +22,11 @@ import :file_worker_type;
 import :persistence_manager;
 import :defer_op;
 import :virtual_store;
+// import :bmp_handler;
+// import :hnsw_handler;
+// import :secondary_index_data;
+import :block_version;
+import :emvb_index;
 
 import std.compat;
 import third_party;
@@ -31,6 +36,20 @@ namespace infinity {
 class LocalFileHandle;
 class Status;
 export class FileWorkerManager;
+export class BMPHandler;
+using BMPHandlerPtr = BMPHandler *;
+
+export struct HnswHandler;
+using HnswHandlerPtr = HnswHandler *;
+
+export struct HighCardinalityTag;
+export struct LowCardinalityTag;
+export template <typename CardinalityTag>
+class SecondaryIndexDataBase;
+
+export class IVFIndexInChunk;
+
+export class VarBuffer;
 
 export struct FileWorkerSaveCtx {};
 
@@ -53,11 +72,27 @@ public:
     // No destruct here
     virtual ~FileWorker() = default;
 
-public:
-    [[nodiscard]] bool Write(const FileWorkerSaveCtx &ctx = {});
+    bool Write(auto data, const FileWorkerSaveCtx &ctx = {}) {
+        std::lock_guard l(l_);
 
-    template <typename T>
-    void Read(T &data) {
+        [[maybe_unused]] auto tmp = GetFilePathTemp();
+        auto [file_handle, status] = VirtualStore::Open(GetFilePathTemp(), FileAccessMode::kWrite);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        file_handle_ = std::move(file_handle);
+
+        bool prepare_success = false;
+
+        bool all_save = Write(data, prepare_success, ctx);
+        if (prepare_success) {
+            file_handle_->Sync();
+        }
+        close(file_handle_->fd());
+        return all_save;
+    }
+
+    void Read(auto &data) {
         std::lock_guard l(l_);
         size_t file_size = 0;
 
@@ -77,7 +112,7 @@ public:
             // DeferFn fn([]{})
             if (!status.ok()) {
                 // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
-                data = static_cast<T>(data_);
+                // data = static_cast<T>(data_);
                 close(file_handle->fd());
                 return;
             }
@@ -94,27 +129,27 @@ public:
             }
 
             file_handle_ = std::move(file_handle);
-            Read(file_size, true);
+            Read(data, file_size);
             close(file_handle_->fd());
-            data = static_cast<T>(data_);
+            // data = static_cast<T>(data_);
         } else {
             if (file_path.empty()) {
-                data = static_cast<T>(data_);
+                // data = static_cast<T>(data_);
                 return;
             }
             if (!persistence_manager_) {
                 auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kRead);
                 if (!status.ok()) {
                     // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
-                    data = static_cast<T>(data_);
+                    // data = static_cast<T>(data_);
                     close(file_handle->fd());
                     return;
                 }
                 file_size = file_handle->FileSize();
 
                 file_handle_ = std::move(file_handle);
-                Read(file_size, true);
-                data = static_cast<T>(data_);
+                Read(data, file_size);
+                // data = static_cast<T>(data_);
                 close(file_handle_->fd());
                 return;
             }
@@ -124,7 +159,7 @@ public:
             auto [file_handle, status] = VirtualStore::Open(true_file_path, FileAccessMode::kRead);
             if (!status.ok()) {
                 // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
-                data = static_cast<T>(data_);
+                // data = static_cast<T>(data_);
                 close(file_handle->fd());
                 return;
             }
@@ -136,9 +171,9 @@ public:
             }
 
             file_handle_ = std::move(file_handle);
-            Read(file_size, true);
+            Read(data, file_size);
             close(file_handle_->fd());
-            data = static_cast<T>(data_);
+            // data = static_cast<T>(data_);
         }
     }
 
@@ -146,13 +181,9 @@ public:
 
     void MoveFile();
 
-    virtual void AllocateInMemory() = 0;
-
-    virtual void FreeInMemory() = 0;
-
     virtual FileWorkerType Type() const = 0;
 
-    void SetData(void *data);
+    // void SetData(void *data);
 
     virtual void SetDataSize(size_t size);
 
@@ -164,9 +195,39 @@ public:
     Status CleanupFile() const;
 
 protected:
-    virtual bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
+    virtual bool Write(std::span<BMPHandlerPtr> data, bool &prepare_success, const FileWorkerSaveCtx &ctx) { return false; }
 
-    virtual void Read(size_t file_size, bool other) = 0;
+    virtual void Read(std::shared_ptr<BMPHandlerPtr> &data, size_t file_size) {}
+
+    virtual bool Write(std::span<char> data, bool &prepare_success, const FileWorkerSaveCtx &ctx) { return false; }
+
+    virtual void Read(std::shared_ptr<char[]> &data, size_t file_size) {}
+
+    virtual bool Write(std::span<EMVBIndex> data, bool &prepare_success, const FileWorkerSaveCtx &ctx) { return false; }
+
+    virtual void Read(std::shared_ptr<EMVBIndex> &data, size_t file_size) {}
+
+    virtual bool Write(std::span<HnswHandlerPtr> data, bool &prepare_success, const FileWorkerSaveCtx &ctx) { return false; }
+
+    virtual void Read(std::shared_ptr<HnswHandlerPtr> &data, size_t file_size) {}
+
+    virtual bool Write(std::span<IVFIndexInChunk> data, bool &prepare_success, const FileWorkerSaveCtx &ctx) { return false; }
+
+    virtual void Read(std::shared_ptr<IVFIndexInChunk> &data, size_t file_size) {}
+
+    virtual bool Write(SecondaryIndexDataBase<HighCardinalityTag> *data, bool &prepare_success, const FileWorkerSaveCtx &ctx) { return false; }
+    virtual bool Write(SecondaryIndexDataBase<LowCardinalityTag> *data, bool &prepare_success, const FileWorkerSaveCtx &ctx) { return false; }
+
+    virtual void Read(std::shared_ptr<SecondaryIndexDataBase<HighCardinalityTag>> &data, size_t file_size) {}
+    virtual void Read(std::shared_ptr<SecondaryIndexDataBase<LowCardinalityTag>> &data, size_t file_size) {}
+
+    virtual bool Write(std::span<VarBuffer> data, bool &prepare_success, const FileWorkerSaveCtx &ctx) { return false; }
+
+    virtual void Read(std::shared_ptr<VarBuffer> &data, size_t file_size) {}
+
+    virtual bool Write(std::span<BlockVersion> data, bool &prepare_success, const FileWorkerSaveCtx &ctx) { return false; }
+
+    virtual void Read(std::shared_ptr<BlockVersion> &data, size_t file_size) {}
 
 public:
     std::mutex l_;
@@ -178,7 +239,6 @@ public:
     size_t mmap_size_{};
 
 protected:
-    void *data_{};
     std::unique_ptr<LocalFileHandle> file_handle_;
 };
 } // namespace infinity

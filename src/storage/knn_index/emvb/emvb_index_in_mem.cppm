@@ -26,7 +26,7 @@ namespace infinity {
 class IndexBase;
 class EMVBIndex;
 struct BlockIndex;
-class ColumnVector;
+struct ColumnVector;
 class KVInstance;
 struct ChunkIndexMetaInfo;
 class MetaCache;
@@ -79,7 +79,7 @@ public:
 
     void Insert(const ColumnVector &col, u32 row_offset, u32 row_count, KVInstance &kv_instance, TxnTimeStamp begin_ts, MetaCache *meta_cache);
 
-    void Dump(FileWorker *file_worker);
+    void Dump(FileWorker *index_file_worker);
 
     // return id: offset in the segment
     std::variant<std::pair<u32, u32>, EMVBInMemQueryResultType> SearchWithBitmask(const f32 *query_ptr,

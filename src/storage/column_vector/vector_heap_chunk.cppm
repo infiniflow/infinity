@@ -50,21 +50,10 @@ public:
     const char *GetPtr() const { // Pattern Matching here
         if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
             return std::get<std::unique_ptr<char[]>>(ptr_).get();
-        } else {
-            void *data{};
-            std::get<FileWorker *>(ptr_)->Read(data);
-            return static_cast<const char *>(data);
         }
-    }
-
-    char *GetPtrMut() {
-        if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
-            return std::get<std::unique_ptr<char[]>>(ptr_).get();
-        } else {
-            void *data{};
-            std::get<FileWorker *>(ptr_)->Read(data);
-            return static_cast<char *>(data);
-        }
+        std::shared_ptr<char[]> data;
+        std::get<FileWorker *>(ptr_)->Read(data);
+        return data.get(); // dangling
     }
 
 private:

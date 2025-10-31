@@ -175,7 +175,7 @@ bool BlockVersion::SaveToFile(void *&mmap_p,
     return !is_modified;
 }
 
-void BlockVersion::LoadFromFile(void *&data, size_t &mmap_size, void *&mmap_p, LocalFileHandle *file_handle) {
+void BlockVersion::LoadFromFile(std::shared_ptr<BlockVersion> &data, size_t &mmap_size, void *&mmap_p, LocalFileHandle *file_handle) {
     // std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     // auto *block_version = static_cast<BlockVersion *>(data);
     if (!mmap_p) {
@@ -202,8 +202,7 @@ void BlockVersion::LoadFromFile(void *&data, size_t &mmap_size, void *&mmap_p, L
             std::println("that code version: {}", mmap_size);
             mmap_p = nullptr;
         }
-        delete static_cast<BlockVersion *>(data);
-        data = block_version.release();
+        data = std::move(block_version);
     }
 }
 

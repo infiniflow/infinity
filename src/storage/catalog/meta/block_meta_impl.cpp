@@ -108,7 +108,7 @@ Status BlockMeta::RestoreSetFromSnapshot() {
         return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
     }
 
-    BlockVersion *block_version{};
+    std::shared_ptr<BlockVersion> block_version;
     version_file_worker_->Read(block_version);
     block_version->RestoreFromSnapshot(commit_ts_);
 

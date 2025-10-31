@@ -21,7 +21,7 @@ import :new_catalog;
 
 namespace infinity {
 
-class BlockIndex;
+struct BlockIndex;
 
 export class TableScanFunctionData : public TableFunctionData {
 public:

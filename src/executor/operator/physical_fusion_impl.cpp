@@ -173,11 +173,11 @@ void PhysicalFusion::ExecuteRRFWeighted(const std::map<u64, std::vector<std::uni
                                                input_data_block->column_count(),
                                                GetOutputTypes()->size()));
             }
-            auto &row_id_column = *input_data_block->column_vectors[input_data_block->column_count() - 1];
-            auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
+            auto &row_id_column = *input_data_block->column_vectors_[input_data_block->column_count() - 1];
+            auto row_ids = reinterpret_cast<RowID *>(row_id_column.data().get());
             size_t row_n = input_data_block->row_count();
-            auto &row_score_column = *input_data_block->column_vectors[input_data_block->column_count() - 2];
-            auto row_scores = reinterpret_cast<float *>(row_score_column.data());
+            auto &row_score_column = *input_data_block->column_vectors_[input_data_block->column_count() - 2];
+            auto row_scores = reinterpret_cast<float *>(row_score_column.data().get());
             for (size_t i = 0; i < row_n; i++) {
                 RowID docId = row_ids[i];
                 if (rescore_map.find(docId) == rescore_map.end()) {
@@ -296,12 +296,12 @@ void PhysicalFusion::ExecuteRRFWeighted(const std::map<u64, std::vector<std::uni
         const auto &input_blocks = input_data_blocks.at(doc.from_input_data_block_id_);
         size_t column_n = GetOutputTypes()->size() - 2;
         for (size_t i = 0; i < column_n; ++i) {
-            output_data_block->column_vectors[i]->AppendWith(*input_blocks[doc.from_block_idx_]->column_vectors[i], doc.from_row_idx_, 1);
+            output_data_block->column_vectors_[i]->AppendWith(*input_blocks[doc.from_block_idx_]->column_vectors_[i], doc.from_row_idx_, 1);
         }
         // 4.2 add hidden columns: score, row_id
         Value v = Value::MakeFloat(doc.fusion_score_);
-        output_data_block->column_vectors[column_n]->AppendValue(v);
-        output_data_block->column_vectors[column_n + 1]->AppendWith(doc.row_id_, 1);
+        output_data_block->column_vectors_[column_n]->AppendValue(v);
+        output_data_block->column_vectors_[column_n + 1]->AppendWith(doc.row_id_, 1);
         row_count++;
     }
     output_data_block->Finalize();
@@ -360,8 +360,8 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
                                                input_data_block->column_count(),
                                                GetOutputTypes()->size()));
             }
-            auto &row_id_column = *input_data_block->column_vectors[input_data_block->column_count() - 1];
-            auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
+            auto &row_id_column = *input_data_block->column_vectors_[input_data_block->column_count() - 1];
+            auto row_ids = reinterpret_cast<RowID *>(row_id_column.data().get());
             u32 row_n = input_data_block->row_count();
             for (u32 i = 0; i < row_n; i++) {
                 const RowID doc_id = row_ids[i];
@@ -409,12 +409,12 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
         const u32 row_idx = doc.from_row_idx_;
         const ColumnID column_n = GetOutputTypes()->size() - 2;
         for (ColumnID i = 0; i < column_n; ++i) {
-            output_data_block->column_vectors[i]->AppendWith(*input_blocks[block_idx]->column_vectors[i], row_idx, 1);
+            output_data_block->column_vectors_[i]->AppendWith(*input_blocks[block_idx]->column_vectors_[i], row_idx, 1);
         }
         // 4.2 add hidden columns: score, row_id
         Value v = Value::MakeFloat(doc.score_);
-        output_data_block->column_vectors[column_n]->AppendValue(v);
-        output_data_block->column_vectors[column_n + 1]->AppendWith(doc.row_id_, 1);
+        output_data_block->column_vectors_[column_n]->AppendValue(v);
+        output_data_block->column_vectors_[column_n + 1]->AppendWith(doc.row_id_, 1);
         row_count++;
     }
     output_data_block->Finalize();

@@ -620,7 +620,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            std::shared_ptr<MemIndex> mem_index = segment_index_meta->GetMemIndex();
+            auto mem_index = segment_index_meta->GetMemIndex();
             return std::make_tuple(chunk_ids_ptr, mem_index);
         };
 
@@ -644,17 +644,17 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                     auto [chunk_ids_ptr, mem_index] = get_chunks();
                     for (ChunkID chunk_id : *chunk_ids_ptr) {
                         ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
-                        FileWorker *index_buffer{};
-                        status = chunk_index_meta.GetIndexBuffer(index_buffer);
+                        FileWorker *index_file_worker{};
+                        status = chunk_index_meta.GetIndexBuffer(index_file_worker);
                         if (!status.ok()) {
                             UnrecoverableError(status.message());
                         }
-                        const IVFIndexInChunk *ivf_chunk{};
-                        index_buffer->Read(ivf_chunk);
-                        ivf_result_handler->Search(ivf_chunk);
+                        std::shared_ptr<IVFIndexInChunk> ivf_chunk;
+                        index_file_worker->Read(ivf_chunk);
+                        ivf_result_handler->Search(ivf_chunk.get());
                     }
                     if (mem_index) {
-                        std::shared_ptr<IVFIndexInMem> memory_ivf_index = mem_index->GetIVFIndex();
+                        auto memory_ivf_index = mem_index->GetIVFIndex();
                         if (memory_ivf_index != nullptr) {
                             ivf_result_handler->Search(memory_ivf_index.get());
                         }
@@ -732,7 +732,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                                                                   block_offset);
                 } else {
                     const auto data_ptr =
-                        reinterpret_cast<const ColumnDataType *>(column_vector.data() + block_offset * column_vector.data_type_size_);
+                        reinterpret_cast<const ColumnDataType *>(column_vector.data().get() + block_offset * column_vector.data_type_size_);
                     DistanceDataType result_dist = dist_func->dist_func_(knn_query_ptr, data_ptr, embedding_dim);
                     const RowID db_row_id(segment_id, segment_offset);
                     merge_heap->Search(0, &result_dist, &db_row_id, 1);
@@ -770,7 +770,7 @@ struct BruteForceBlockScan<LogicalType::kEmbedding, ColumnDataType, C, DistanceD
                         const BlockID block_id,
                         const BlockOffset row_count,
                         const Bitmask &bitmask) {
-        const ColumnDataType *target_ptr = reinterpret_cast<const ColumnDataType *>(column_vector.data());
+        const auto *target_ptr = reinterpret_cast<const ColumnDataType *>(column_vector.data().get());
         merge_heap->Search(knn_query_ptr, target_ptr, embedding_dim, dist_func->dist_func_, row_count, segment_id, block_id, bitmask);
     }
 };
@@ -956,7 +956,7 @@ void ExecuteHnswSearch(QueryContext *query_context,
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        const HnswHandlerPtr *hnsw_handler{};
+        std::shared_ptr<HnswHandlerPtr> hnsw_handler;
         index_file_worker->Read(hnsw_handler);
         hnsw_search(*hnsw_handler, false);
     }

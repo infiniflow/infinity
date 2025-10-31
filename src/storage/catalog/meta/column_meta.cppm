@@ -43,7 +43,7 @@ public:
 
     Status UninitSet(const std::shared_ptr<ColumnDef> &column_def, UsageFlag usage_flag);
 
-    Status GetColumnBuffer(FileWorker *&column_buffer, FileWorker *&outline_buffer);
+    Status GetFileWorker(FileWorker *&column_buffer, FileWorker *&outline_buffer);
 
     std::tuple<size_t, Status> GetColumnSize(size_t row_cnt, const std::shared_ptr<ColumnDef> &col_def) const;
 
@@ -54,7 +54,7 @@ public:
     Status RestoreFromSnapshot(ColumnID column_id);
 
 private:
-    Status GetColumnBuffer(FileWorker *&column_buffer, FileWorker *&outline_buffer, const std::shared_ptr<ColumnDef> &column_def);
+    Status GetFileWorker(FileWorker *&data_file_worker, FileWorker *&var_file_worker, const std::shared_ptr<ColumnDef> &column_def);
 
     Status LoadColumnBuffer(std::shared_ptr<ColumnDef> column_def);
 
@@ -65,8 +65,8 @@ private:
 
     std::optional<size_t> chunk_offset_;
 
-    FileWorker *column_buffer_ = nullptr;
-    FileWorker *outline_buffer_ = nullptr;
+    FileWorker *data_file_worker_ = nullptr;
+    FileWorker *var_file_worker_ = nullptr;
 };
 
 } // namespace infinity

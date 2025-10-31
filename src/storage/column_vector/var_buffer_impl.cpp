@@ -109,7 +109,7 @@ size_t VarBufferManager::Append(std::unique_ptr<char[]> data, size_t size) {
 }
 
 VarBufferManager::VarBufferManager(FileWorker *var_file_worker)
-    : type_(BufferType::kNewCatalog), file_worker_(nullptr), var_fileworker_(var_file_worker) {}
+    : type_(BufferType::kNewCatalog), data_file_worker_(nullptr), var_fileworker_(var_file_worker) {}
 
 size_t VarBufferManager::Append(const char *data, size_t size) {
     auto buffer = std::make_unique<char[]>(size);
@@ -127,7 +127,9 @@ void VarBufferManager::SetToCatalog(FileWorker *var_file_worker) {
     if (!mem_buffer_) {
         mem_buffer_ = std::make_unique<VarBuffer>();
     }
-    var_fileworker_->SetData(mem_buffer_.release());
+    // var_fileworker_->SetData(mem_buffer_.release());
+    var_fileworker_->Write(std::span{mem_buffer_.get(), 1});
+    mem_buffer_.reset(); // this is shit
 }
 
 VarBuffer *VarBufferManager::GetInnerNoLock() {
@@ -139,9 +141,9 @@ VarBuffer *VarBufferManager::GetInnerNoLock() {
             return mem_buffer_.get();
         }
         case BufferType::kNewCatalog: {
-            VarBuffer *var_buffer{};
+            std::shared_ptr<VarBuffer> var_buffer;
             var_fileworker_->Read(var_buffer);
-            return var_buffer;
+            return var_buffer.get(); // dangling
         }
     }
 }

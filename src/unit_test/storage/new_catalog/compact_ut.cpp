@@ -690,7 +690,7 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
         auto check_column = [&](ColumnMeta &column_meta) {
             FileWorker *column_buffer = nullptr;
             FileWorker *outline_buffer = nullptr;
-            Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
+            Status status = column_meta.GetFileWorker(column_buffer, outline_buffer);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(column_buffer, nullptr);
             if (column_meta.column_idx() != 0) {
@@ -747,7 +747,7 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
         auto check_column = [&](ColumnMeta &column_meta) {
             FileWorker *column_buffer = nullptr;
             FileWorker *outline_buffer = nullptr;
-            Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
+            Status status = column_meta.GetFileWorker(column_buffer, outline_buffer);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(column_buffer, nullptr);
             if (column_meta.column_idx() != 0) {
@@ -961,7 +961,7 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
         auto check_column = [&](ColumnMeta &column_meta) {
             FileWorker *column_buffer = nullptr;
             FileWorker *outline_buffer = nullptr;
-            Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
+            Status status = column_meta.GetFileWorker(column_buffer, outline_buffer);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(column_buffer, nullptr);
             // EXPECT_NE(outline_buffer, nullptr);

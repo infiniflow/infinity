@@ -31,33 +31,15 @@ import third_party;
 
 namespace infinity {
 
-VarFileWorker::VarFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_size) : FileWorker(std::move(file_path)) {
-    VarFileWorker::AllocateInMemory();
-}
+VarFileWorker::VarFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_size) : FileWorker(std::move(file_path)) {}
 
 VarFileWorker::~VarFileWorker() {
-    VarFileWorker::FreeInMemory();
     munmap(mmap_, mmap_size_);
     mmap_ = nullptr;
 }
 
-void VarFileWorker::AllocateInMemory() {
-    auto *buffer = new VarBuffer(this);
-    data_ = static_cast<void *>(buffer);
-}
-
-// int cnt;
-
-void VarFileWorker::FreeInMemory() {
-    // --cnt;
-    // std::println("aaa: {}", cnt);
-    auto *buffer = static_cast<VarBuffer *>(data_);
-    delete buffer;
-    data_ = nullptr;
-}
-
-bool VarFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-    const auto *buffer = static_cast<const VarBuffer *>(data_);
+bool VarFileWorker::Write(std::span<VarBuffer> data, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+    const auto *buffer = data.data();
     auto old_mmap_size = mmap_size_;
     mmap_size_ = buffer->TotalSize();
     auto buffer_data = std::make_unique<char[]>(mmap_size_);
@@ -84,8 +66,7 @@ bool VarFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     return true;
 }
 
-void VarFileWorker::Read(size_t file_size, bool other) {
-    // std::println("R var");
+void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, size_t file_size) {
     if (!mmap_) {
         // if (file_size < buffer_size_) {
         //     UnrecoverableError(fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_));
@@ -105,11 +86,8 @@ void VarFileWorker::Read(size_t file_size, bool other) {
         // if (nbytes != buffer_size_) {
         //     UnrecoverableError(fmt::format("Read {} bytes from file failed, only {} bytes read.", buffer_size_, nbytes));
         // }
-        FreeInMemory();
-        // ++cnt;
-        // std::println("bbb: {}", cnt);
-        auto *var_buffer = new VarBuffer(this, std::move(buffer), buffer_size);
-        data_ = static_cast<void *>(var_buffer);
+
+        data = std::make_shared<VarBuffer>(this, std::move(buffer), buffer_size);
 
         auto fd = file_handle_->fd();
         mmap_size_ = buffer_size;

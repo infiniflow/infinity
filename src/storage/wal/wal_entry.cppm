@@ -36,7 +36,7 @@ enum class SegmentStatus : u8;
 class ChunkIndexMeta;
 class ChunkIndexMetaInfo;
 class BlockMeta;
-class SegmentMeta;
+export class SegmentMeta;
 struct EraseBaseCache;
 
 export enum class WalCommandType : i8 {

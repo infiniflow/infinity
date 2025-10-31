@@ -392,7 +392,7 @@ void Connection::SendQueryResponse(const QueryResult &query_result) {
 
             // iterate each column_vector of the block
             for (size_t column_id = 0; column_id < column_count; ++column_id) {
-                auto &column_vector = block->column_vectors[column_id];
+                auto &column_vector = block->column_vectors_[column_id];
                 const std::string string_value = column_vector->ToString(row_id);
                 values_as_strings[column_id] = string_value;
                 string_length_sum += string_value.size();

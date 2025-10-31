@@ -47,7 +47,7 @@ struct SecondaryIndexChunkDataReader {
     SecondaryIndexChunkDataReader(FileWorker *file_worker, u32 row_count) {
         handle_ = file_worker;
         row_count_ = row_count;
-        const SecondaryIndexDataBase<HighCardinalityTag> *index{};
+        std::shared_ptr<SecondaryIndexDataBase<HighCardinalityTag>> index;
         file_worker->Read(index);
         std::tie(key_ptr_, offset_ptr_) = index->GetKeyOffsetPointer();
         assert(index->GetChunkRowCount() == row_count_);

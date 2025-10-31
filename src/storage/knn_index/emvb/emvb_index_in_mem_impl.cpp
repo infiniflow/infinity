@@ -100,17 +100,18 @@ void EMVBIndexInMem::Insert(const ColumnVector &column_vector,
     }
 }
 
-void EMVBIndexInMem::Dump(FileWorker *file_worker) {
+void EMVBIndexInMem::Dump(FileWorker *index_file_worker) {
     std::unique_lock lock(rw_mutex_);
     if (!is_built_.test(std::memory_order_acquire)) {
         UnrecoverableError("EMVBIndexInMem Dump: index not built yet!");
     }
     is_built_.clear(std::memory_order_release);
 
-    EMVBIndex *data_ptr{};
-    file_worker->Read(data_ptr);
-    *data_ptr = std::move(*emvb_index_); // call move in lock
+    std::shared_ptr<EMVBIndex> data_ptr;
+    index_file_worker->Read(data_ptr);
+    data_ptr = std::move(emvb_index_); // call move in lock
     emvb_index_.reset();
+    index_file_worker->Write(std::span{data_ptr.get(), 1});
 }
 
 std::shared_ptr<EMVBIndexInMem>

@@ -73,7 +73,7 @@ bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
         for (size_t expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
             //        std::vector<std::shared_ptr<ColumnVector>> blocks_column;
             //        blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
-            evaluator.Execute(expressions_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors[expr_idx]);
+            evaluator.Execute(expressions_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors_[expr_idx]);
         }
         output_data_block->Finalize();
         project_operator_state->SetComplete();
@@ -103,12 +103,12 @@ bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
             }
 
             for (size_t expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
-                evaluator.Execute(expressions_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors[expr_idx]);
+                evaluator.Execute(expressions_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors_[expr_idx]);
 
                 auto it = highlight_columns_.find(expr_idx);
                 if (it != highlight_columns_.end()) {
-                    size_t num_rows = output_data_block->column_vectors[expr_idx]->Size();
-                    std::shared_ptr<ColumnVector> highlight_column = ColumnVector::Make(output_data_block->column_vectors[expr_idx]->data_type());
+                    size_t num_rows = output_data_block->column_vectors_[expr_idx]->Size();
+                    std::shared_ptr<ColumnVector> highlight_column = ColumnVector::Make(output_data_block->column_vectors_[expr_idx]->data_type());
                     highlight_column->Initialize(ColumnVectorType::kFlat, num_rows);
 
                     std::shared_ptr<HighlightInfo> highlight_info = it->second;
@@ -121,20 +121,20 @@ bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
                         }
                         analyzer->SetCharOffset(true);
                         for (size_t i = 0; i < num_rows; ++i) {
-                            std::string raw_content = output_data_block->column_vectors[expr_idx]->GetValueByIndex(i).GetVarchar();
+                            std::string raw_content = output_data_block->column_vectors_[expr_idx]->GetValueByIndex(i).GetVarchar();
                             std::string output;
                             Highlighter::instance().GetHighlightWithStemmer(query_terms, raw_content, output, analyzer.get());
                             highlight_column->AppendValue(Value::MakeVarchar(output));
                         }
                     } else {
                         for (size_t i = 0; i < num_rows; ++i) {
-                            std::string raw_content = output_data_block->column_vectors[expr_idx]->GetValueByIndex(i).GetVarchar();
+                            std::string raw_content = output_data_block->column_vectors_[expr_idx]->GetValueByIndex(i).GetVarchar();
                             std::string output;
                             Highlighter::instance().GetHighlightWithoutStemmer(query_terms, raw_content, output);
                             highlight_column->AppendValue(Value::MakeVarchar(output));
                         }
                     }
-                    output_data_block->column_vectors[expr_idx] = std::move(highlight_column);
+                    output_data_block->column_vectors_[expr_idx] = std::move(highlight_column);
                 }
             }
             output_data_block->Finalize();

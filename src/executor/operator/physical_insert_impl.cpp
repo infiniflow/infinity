@@ -160,7 +160,7 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
         DataBlock *first_block = prev_op_state->data_block_array_[0].get();
         bool needs_casting = false;
         for (size_t i = 0; i < first_block->column_count() && i < target_types.size(); ++i) {
-            if (*target_types[i] != *first_block->column_vectors[i]->data_type()) {
+            if (*target_types[i] != *first_block->column_vectors_[i]->data_type()) {
                 needs_casting = true;
                 break;
             }
@@ -173,8 +173,8 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
 
                 // Cast each column if needed
                 for (size_t col_idx = 0; col_idx < input_data_block_ptr->column_count() && col_idx < target_types.size(); ++col_idx) {
-                    auto source_column = input_data_block_ptr->column_vectors[col_idx];
-                    auto target_column = output_block->column_vectors[col_idx];
+                    auto source_column = input_data_block_ptr->column_vectors_[col_idx];
+                    auto target_column = output_block->column_vectors_[col_idx];
                     auto target_type = target_types[col_idx];
 
                     if (*source_column->data_type() == *target_type) {
@@ -250,7 +250,7 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
             for (size_t expr_idx = 0; expr_idx < column_count; ++expr_idx) {
                 const std::shared_ptr<BaseExpression> &expr = value_list_[row_idx][expr_idx];
                 std::shared_ptr<ExpressionState> expr_state = ExpressionState::CreateState(expr);
-                evaluator.Execute(expr, expr_state, output_block_tmp->column_vectors[expr_idx]);
+                evaluator.Execute(expr, expr_state, output_block_tmp->column_vectors_[expr_idx]);
             }
             output_block->AppendWith(output_block_tmp);
         }

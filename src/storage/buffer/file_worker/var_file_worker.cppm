@@ -17,6 +17,7 @@ export module infinity_core:var_file_worker;
 import :file_worker;
 import :file_worker_type;
 import :persistence_manager;
+import :var_buffer;
 
 namespace infinity {
 
@@ -26,17 +27,12 @@ public:
 
     virtual ~VarFileWorker() override;
 
-public:
-    void AllocateInMemory() override;
-
-    void FreeInMemory() override;
-
     FileWorkerType Type() const override { return FileWorkerType::kVarFile; }
 
 protected:
-    bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(std::span<VarBuffer> data, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void Read(size_t file_size, bool other) override;
+    void Read(std::shared_ptr<VarBuffer> &data, size_t file_size) override;
 };
 
 } // namespace infinity

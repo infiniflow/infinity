@@ -163,7 +163,7 @@ size_t GetBlockRowCount(KVInstance *kv_instance,
         UnrecoverableError(fmt::format("Get version buffer failed: {}", rel_version_filepath));
     }
 
-    BlockVersion *block_version{};
+    auto block_version = std::make_shared<BlockVersion>();
     version_buffer->Read(block_version);
 
     size_t row_cnt = 0;

@@ -57,30 +57,17 @@ HnswFileWorker::HnswFileWorker(std::shared_ptr<std::string> file_path,
         }
     }
     index_size_ = index_size;
-
-    HnswFileWorker::AllocateInMemory();
 }
 
 HnswFileWorker::~HnswFileWorker() {
-    HnswFileWorker::FreeInMemory();
     munmap(mmap_, mmap_size_);
     mmap_ = nullptr;
 }
 
-void HnswFileWorker::AllocateInMemory() { data_ = static_cast<void *>(new HnswHandlerPtr()); }
-
-void HnswFileWorker::FreeInMemory() {
-    auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
-    delete *hnsw_handler;
-    delete hnsw_handler;
-    data_ = nullptr;
-}
-
-bool HnswFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-    auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
+bool HnswFileWorker::Write(std::span<HnswHandlerPtr> data, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+    auto *hnsw_handler = data.data();
     (*hnsw_handler)->SaveToPtr(*file_handle_);
 
-    file_handle_->Sync();
     auto fd = file_handle_->fd();
     mmap_size_ = file_handle_->FileSize();
     mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
@@ -88,27 +75,17 @@ bool HnswFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) 
     return true;
 }
 
-void HnswFileWorker::Read(size_t file_size, bool other) {
+void HnswFileWorker::Read(std::shared_ptr<HnswHandlerPtr> &data, size_t file_size) {
     if (!mmap_) {
-        FreeInMemory();
-        data_ = static_cast<void *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_).release()));
-        auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
+        auto *hnsw_handler = data.get();
 
         (*hnsw_handler)->LoadFromPtr(*file_handle_, file_size);
-
-        // return true;
 
         auto fd = file_handle_->fd();
         mmap_size_ = file_handle_->FileSize();
         mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
         // (*hnsw_handler)->LoadFromPtr(*file_handle_, (char *)mmap_, file_size);
     }
-    // else {
-    //     FreeInMemory();
-    //     data_ = static_cast<void *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_, false).release()));
-    //     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
-    //     (*hnsw_handler)->LoadFromPtr(*file_handle_, static_cast<const char *>(mmap_), mmap_size_);
-    // }
 }
 
 } // namespace infinity

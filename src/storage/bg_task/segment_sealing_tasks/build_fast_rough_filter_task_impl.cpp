@@ -238,7 +238,7 @@ void BuildFastRoughFilterTask::BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &
             // for boolean, only 0 and 1
             bool have_0 = false;
             bool have_1 = false;
-            auto *u8_ptr = reinterpret_cast<const u8 *>(column_vector.data());
+            auto *u8_ptr = reinterpret_cast<const u8 *>(column_vector.data().get());
             for (auto block_off_opt = block_visitor.Next(); block_off_opt; block_off_opt = block_visitor.Next()) {
                 BlockOffset block_off = *block_off_opt;
                 if (!have_0 or !have_1) {

@@ -52,7 +52,7 @@ public:
 
     const char *GetEmbedding(size_t offset) override {
         size_t block_offset = UpdateColumnVector(offset);
-        return cur_column_vector_.data() + block_offset * cur_column_vector_.data_type_size_;
+        return cur_column_vector_.data().get() + block_offset * cur_column_vector_.data_type_size_;
     }
 
     std::pair<std::span<const char>, size_t> GetMultiVector(size_t offset) override {

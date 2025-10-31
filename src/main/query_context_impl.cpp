@@ -171,10 +171,10 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
         }
     }
 
-    std::vector<std::shared_ptr<LogicalNode>> logical_plans{};
-    std::vector<std::unique_ptr<PhysicalOperator>> physical_plans{};
-    std::shared_ptr<PlanFragment> plan_fragment{};
-    std::unique_ptr<Notifier> notifier{};
+    std::vector<std::shared_ptr<LogicalNode>> logical_plans;
+    std::vector<std::unique_ptr<PhysicalOperator>> physical_plans;
+    std::shared_ptr<PlanFragment> plan_fragment;
+    std::unique_ptr<Notifier> notifier;
 
     query_id_ = session_ptr_->query_count();
     //    ProfilerStart("Query");

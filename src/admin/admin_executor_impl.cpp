@@ -194,21 +194,21 @@ QueryResult AdminExecutor::ListLogFiles(QueryContext *query_context, const Admin
         // index
         Value value = Value::MakeBigInt(row_count);
         ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
     }
 
     {
         // file_name
         Value value = Value::MakeVarchar(temp_wal_info->path_);
         ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
     }
 
     {
         // type
         Value value = Value::MakeVarchar("mutable");
         ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
     }
 
     ++row_count;
@@ -223,21 +223,21 @@ QueryResult AdminExecutor::ListLogFiles(QueryContext *query_context, const Admin
             // index
             Value value = Value::MakeBigInt(row_count);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
 
         {
             // file_name
             Value value = Value::MakeVarchar(wal_info.path_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
 
         {
             // type
             Value value = Value::MakeVarchar("immutable");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
 
         ++row_count;
@@ -297,14 +297,14 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext *query_context, const AdminS
         {
             Value value = Value::MakeVarchar("index");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(file_index));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -313,14 +313,14 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext *query_context, const AdminS
         {
             Value value = Value::MakeVarchar("path");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(file_path);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -329,14 +329,14 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext *query_context, const AdminS
         {
             Value value = Value::MakeVarchar("file_size");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(file_size));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -345,14 +345,14 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext *query_context, const AdminS
         {
             Value value = Value::MakeVarchar("status");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(is_wal_good ? "good" : "bad");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -361,14 +361,14 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext *query_context, const AdminS
         {
             Value value = Value::MakeVarchar("entry_count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(wal_entries.size()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -431,42 +431,42 @@ QueryResult AdminExecutor::ListLogIndexes(QueryContext *query_context, const Adm
             // index
             Value value = Value::MakeBigInt(row_count);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
 
         {
             // size
             Value value = Value::MakeBigInt(wal_entry->size_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
 
         {
             // transaction_id
             Value value = Value::MakeBigInt(wal_entry->txn_id_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
 
         {
             // commit_ts
             Value value = Value::MakeBigInt(wal_entry->commit_ts_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[3]);
         }
 
         {
             // commit_ts
             Value value = Value::MakeBigInt(wal_entry->cmds_.size());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[4]);
         }
 
         {
             // Commands
             Value value = Value::MakeVarchar(wal_entry->CompactInfo());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[5]);
         }
 
         ++row_count;
@@ -538,21 +538,21 @@ QueryResult AdminExecutor::ShowLogIndex(QueryContext *query_context, const Admin
             // index
             Value value = Value::MakeBigInt(row_count);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
 
         {
             // type
             Value value = Value::MakeVarchar(WalCmd::WalCommandTypeToString(wal_cmd->GetType()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
 
         {
             // content
             Value value = Value::MakeVarchar(wal_cmd->CompactInfo());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
 
         ++row_count;
@@ -3695,14 +3695,14 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
             {
                 Value value = Value::MakeVarchar("name");
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
 
             ++column_id;
             {
                 Value value = Value::MakeVarchar(server_node->node_name());
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
         }
 
@@ -3711,14 +3711,14 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
             {
                 Value value = Value::MakeVarchar("role");
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
 
             ++column_id;
             {
                 Value value = Value::MakeVarchar(ToString(server_node->node_role()));
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
         }
 
@@ -3727,14 +3727,14 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
             {
                 Value value = Value::MakeVarchar("status");
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
 
             ++column_id;
             {
                 Value value = Value::MakeVarchar(ToString(server_node->node_status()));
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
         }
 
@@ -3743,14 +3743,14 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
             {
                 Value value = Value::MakeVarchar("address");
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
 
             ++column_id;
             {
                 Value value = Value::MakeVarchar(fmt::format("{}:{}", server_node->node_ip(), server_node->node_port()));
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
         }
 
@@ -3759,7 +3759,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
             {
                 Value value = Value::MakeVarchar("update_time");
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
 
             ++column_id;
@@ -3768,7 +3768,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
                 const std::time_t t_c = server_node->update_ts();
                 Value value = Value::MakeVarchar(std::ctime(&t_c));
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
         }
     } else {
@@ -3778,14 +3778,14 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
             {
                 Value value = Value::MakeVarchar("role");
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
 
             ++column_id;
             {
                 Value value = Value::MakeVarchar(ToString(server_role));
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
         }
 
@@ -3794,7 +3794,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
             {
                 Value value = Value::MakeVarchar("status");
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
 
             ++column_id;
@@ -3806,7 +3806,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
                 }
                 Value value = Value::MakeVarchar(infinity_status);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
         }
     }

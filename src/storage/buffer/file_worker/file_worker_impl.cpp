@@ -46,28 +46,25 @@ FileWorker::FileWorker(std::shared_ptr<std::string> rel_file_path) : rel_file_pa
     file_worker_manager_ = InfinityContext::instance().storage()->fileworker_manager();
 }
 
-bool FileWorker::Write(const FileWorkerSaveCtx &ctx) {
-    std::lock_guard l(l_);
-    if (data_ == nullptr) {
-        UnrecoverableError("No data will be written.");
-    }
-
-    [[maybe_unused]] auto tmp = GetFilePathTemp();
-    auto [file_handle, status] = VirtualStore::Open(GetFilePathTemp(), FileAccessMode::kWrite);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
-    file_handle_ = std::move(file_handle);
-
-    bool prepare_success = false;
-
-    bool all_save = Write(prepare_success, ctx);
-    // if (prepare_success) {
-    //     file_handle_->Sync();
-    // }
-    close(file_handle_->fd());
-    return all_save;
-}
+// bool FileWorker::Write(auto &data, const FileWorkerSaveCtx &ctx) {
+//     std::lock_guard l(l_);
+//
+//     [[maybe_unused]] auto tmp = GetFilePathTemp();
+//     auto [file_handle, status] = VirtualStore::Open(GetFilePathTemp(), FileAccessMode::kWrite);
+//     if (!status.ok()) {
+//         UnrecoverableError(status.message());
+//     }
+//     file_handle_ = std::move(file_handle);
+//
+//     bool prepare_success = false;
+//
+//     bool all_save = Write(prepare_success, ctx);
+//     if (prepare_success) {
+//         file_handle_->Sync();
+//     }
+//     close(file_handle_->fd());
+//     return all_save;
+// }
 
 // template<typename T>
 // void FileWorker::Read(T *&data) {
@@ -138,10 +135,10 @@ void FileWorker::MoveFile() {
     }
 }
 
-void FileWorker::SetData(void *data) {
-    data_ = data;
-    [[maybe_unused]] auto foo = Write();
-}
+// void FileWorker::SetData(void *data) {
+//     data_ = data;
+//     [[maybe_unused]] auto foo = Write();
+// }
 
 void FileWorker::SetDataSize(size_t size) { UnrecoverableError("Not implemented"); }
 

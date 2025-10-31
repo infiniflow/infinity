@@ -189,6 +189,7 @@ TEST_F(InfinityTest, test1) {
         insert_row->values_ = std::move(values);
         std::vector<InsertRowExpr *> *insert_rows = new std::vector<InsertRowExpr *>();
         insert_rows->emplace_back(insert_row);
+
         infinity->Insert("default_db", "table1", insert_rows);
 
         //        QueryResult Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &vector_expr,
