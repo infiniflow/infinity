@@ -1334,7 +1334,7 @@ std::shared_ptr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
 }
 
 std::shared_ptr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
-    std::shared_ptr<DataTable> result_table = nullptr;
+    std::shared_ptr<DataTable> result_table;
     for (const auto &task : tasks_) {
         if (!task->sink_state_->status_.ok()) {
             RecoverableError(task->sink_state_->status_);
@@ -1395,7 +1395,7 @@ std::shared_ptr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() 
 }
 
 std::shared_ptr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
-    std::shared_ptr<DataTable> result_table = nullptr;
+    std::shared_ptr<DataTable> result_table;
     for (const auto &task : tasks_) {
         if (!task->sink_state_->status_.ok()) {
             RecoverableError(task->sink_state_->status_);

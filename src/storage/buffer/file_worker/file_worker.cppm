@@ -14,39 +14,135 @@
 
 module;
 
+#include <unistd.h>
+
 export module infinity_core:file_worker;
 
 import :file_worker_type;
 import :persistence_manager;
 import :defer_op;
+import :virtual_store;
 
 import std.compat;
 import third_party;
 
 namespace infinity {
 
-class KVInstance;
 class LocalFileHandle;
 class Status;
+export class FileWorkerManager;
 
 export struct FileWorkerSaveCtx {};
 
+export enum class FileWorkerTag {
+    kBmp,
+    kData,
+    kEmvb,
+    kHnsw,
+    kIndex,
+    kRaw,
+    kSecondary,
+    kVar,
+    kVersion,
+};
+
 export class FileWorker {
 public:
-    // spill_dir_ is not init here
-    explicit FileWorker(std::shared_ptr<std::string> data_dir,
-                        std::shared_ptr<std::string> temp_dir,
-                        std::shared_ptr<std::string> file_dir,
-                        std::shared_ptr<std::string> file_name,
-                        PersistenceManager *persistence_manager);
+    explicit FileWorker(std::shared_ptr<std::string> file_path);
 
     // No destruct here
-    virtual ~FileWorker();
+    virtual ~FileWorker() = default;
 
 public:
-    [[nodiscard]] bool WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx = {});
+    [[nodiscard]] bool Write(const FileWorkerSaveCtx &ctx = {}, size_t data_size = -1);
 
-    void ReadFromFile(bool from_spill);
+    template <typename T>
+    void Read(T &data) {
+        std::lock_guard l(l_);
+        size_t file_size = 0;
+
+        auto temp_path = GetFilePathTemp();
+        auto data_path = GetFilePath();
+        bool flag{};
+        std::string file_path;
+        if (VirtualStore::Exists(temp_path)) { // branchless
+            file_path = temp_path;
+            flag = true;
+        } else if (VirtualStore::Exists(data_path, true)) {
+            file_path = data_path;
+            flag = false;
+        }
+        if (flag) {
+            auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kRead);
+            // DeferFn fn([]{})
+            if (!status.ok()) {
+                // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+                data = static_cast<T>(data_);
+                close(file_handle->fd());
+                return;
+            }
+
+            if (flag) {
+                file_size = file_handle->FileSize();
+            } else {
+                if (persistence_manager_) {
+                    file_handle->Seek(obj_addr_.part_offset_);
+                    file_size = obj_addr_.part_size_;
+                } else {
+                    file_size = file_handle->FileSize();
+                }
+            }
+
+            file_handle_ = std::move(file_handle);
+            Read(file_size, true);
+            close(file_handle_->fd());
+            data = static_cast<T>(data_);
+        } else {
+            if (file_path.empty()) {
+                data = static_cast<T>(data_);
+                return;
+            }
+            if (!persistence_manager_) {
+                auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kRead);
+                if (!status.ok()) {
+                    // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+                    data = static_cast<T>(data_);
+                    close(file_handle->fd());
+                    return;
+                }
+                file_size = file_handle->FileSize();
+
+                file_handle_ = std::move(file_handle);
+                Read(file_size, true);
+                data = static_cast<T>(data_);
+                close(file_handle_->fd());
+                return;
+            }
+            auto result = persistence_manager_->GetObjCache(file_path);
+            obj_addr_ = result.obj_addr_;
+            auto true_file_path = fmt::format("/var/infinity/persistence/{}", obj_addr_.obj_key_);
+            auto [file_handle, status] = VirtualStore::Open(true_file_path, FileAccessMode::kRead);
+            if (!status.ok()) {
+                // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+                data = static_cast<T>(data_);
+                close(file_handle->fd());
+                return;
+            }
+            if (persistence_manager_) {
+                file_handle->Seek(obj_addr_.part_offset_);
+                file_size = obj_addr_.part_size_;
+            } else {
+                file_size = file_handle->FileSize();
+            }
+
+            file_handle_ = std::move(file_handle);
+            Read(file_size, true);
+            close(file_handle_->fd());
+            data = static_cast<T>(data_);
+        }
+    }
+
+    void PickForCleanup();
 
     void MoveFile();
 
@@ -54,60 +150,33 @@ public:
 
     virtual void FreeInMemory() = 0;
 
-    virtual size_t GetMemoryCost() const = 0;
-
     virtual FileWorkerType Type() const = 0;
-
-    void *GetData() const { return data_; }
 
     void SetData(void *data);
 
-    virtual void SetDataSize(size_t size);
-
     // Get an absolute file path. As key of a buffer handle.
-    std::string GetFilePath() const;
+    [[nodiscard]] std::string GetFilePath() const;
+
+    [[nodiscard]] std::string GetFilePathTemp() const;
 
     Status CleanupFile() const;
 
-    void CleanupTempFile() const;
-
 protected:
-    virtual bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
+    virtual bool Write(bool &prepare_success, size_t data_size = -1, const FileWorkerSaveCtx &ctx = {}) = 0;
 
-    virtual void ReadFromFileImpl(size_t file_size, bool from_spill) = 0;
-
-    std::string ChooseFileDir(bool spill) const;
-
-    std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> GetFilePathInner(bool spill);
+    virtual void Read(size_t file_size, bool other) = 0;
 
 public:
-    const std::shared_ptr<std::string> data_dir_{};
-    const std::shared_ptr<std::string> temp_dir_{};
-    const std::shared_ptr<std::string> file_dir_{};
-    const std::shared_ptr<std::string> file_name_{};
+    std::mutex l_;
+    std::shared_ptr<std::string> rel_file_path_;
     PersistenceManager *persistence_manager_{};
-    ObjAddr obj_addr_{};
+    FileWorkerManager *file_worker_manager_;
+    ObjAddr obj_addr_;
+    void *mmap_{};
+    size_t mmap_size_{};
+    void *data_{};
 
 protected:
-    void *data_{nullptr};
-    std::unique_ptr<LocalFileHandle> file_handle_{nullptr};
-
-public:
-    void *GetMmapData() const { return mmap_data_; }
-
-    void Mmap();
-
-    void Munmap();
-
-    void MmapNotNeed();
-
-protected:
-    virtual bool ReadFromMmapImpl([[maybe_unused]] const void *ptr, [[maybe_unused]] size_t size);
-
-    virtual void FreeFromMmapImpl();
-
-protected:
-    u8 *mmap_addr_{nullptr};
-    u8 *mmap_data_{nullptr};
+    std::unique_ptr<LocalFileHandle> file_handle_;
 };
 } // namespace infinity

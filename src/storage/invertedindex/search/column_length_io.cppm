@@ -20,8 +20,6 @@ export module infinity_core:column_length_io;
 
 import :index_defines;
 import :memory_indexer;
-import :buffer_obj;
-import :buffer_handle;
 import :column_index_reader;
 
 import internal_types;
@@ -37,7 +35,7 @@ public:
     ~FullTextColumnLengthReader();
 
     inline u32 GetColumnLength(RowID row_id) {
-        if (row_id >= current_chunk_base_rowid_ && row_id < current_chunk_base_rowid_ + current_chunk_row_count_) [[likely]] {
+        if (row_id >= current_chunk_base_rowid_ && row_id < current_chunk_base_rowid_ + current_chunk_row_count_) {
             assert(column_lengths_ != nullptr);
             return column_lengths_[row_id - current_chunk_base_rowid_];
         }
@@ -64,7 +62,7 @@ private:
     const u32 *column_lengths_{nullptr};
     RowID current_chunk_base_rowid_{(u64)0};
     u32 current_chunk_row_count_{0};
-    BufferHandle current_chunk_buffer_handle_{};
+    FileWorker *current_chunk_buffer_obj_{};
 };
 
 } // namespace infinity

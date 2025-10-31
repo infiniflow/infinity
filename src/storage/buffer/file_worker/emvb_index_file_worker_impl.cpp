@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <sys/mman.h>
+#include <unistd.h>
+
 module infinity_core:emvb_index_file_worker.impl;
 
 import :emvb_index_file_worker;
@@ -37,19 +42,23 @@ import internal_types;
 namespace infinity {
 
 EMVBIndexFileWorker::~EMVBIndexFileWorker() {
-    if (data_ != nullptr) {
-        FreeInMemory();
-        data_ = nullptr;
-    }
+    // if (data_ != nullptr) {
+    //     FreeInMemory();
+    //     data_ = nullptr;
+    // }
+    FreeInMemory();
+
+    munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
 void EMVBIndexFileWorker::AllocateInMemory() {
-    if (data_) {
-        UnrecoverableError("Data is already allocated.");
-    }
-    if (index_base_->index_type_ != IndexType::kEMVB) {
-        UnrecoverableError("Index type is mismatched");
-    }
+    // if (data_) {
+    //     UnrecoverableError("Data is already allocated.");
+    // }
+    // if (index_base_->index_type_ != IndexType::kEMVB) {
+    //     UnrecoverableError("Index type is mismatched");
+    // }
     const auto &data_type = column_def_->type();
     if (data_type->type() != LogicalType::kTensor) {
         UnrecoverableError("EMVB Index should be created on Tensor column now.");
@@ -72,25 +81,26 @@ void EMVBIndexFileWorker::AllocateInMemory() {
 }
 
 void EMVBIndexFileWorker::FreeInMemory() {
-    if (!data_) {
-        UnrecoverableError("Data is not allocated.");
-    }
+    // if (!data_) {
+    //     UnrecoverableError("Data is not allocated.");
+    // }
     auto index = static_cast<EMVBIndex *>(data_);
     delete index;
     data_ = nullptr;
 }
 
-bool EMVBIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool EMVBIndexFileWorker::Write(bool &prepare_success, size_t data_size, const FileWorkerSaveCtx &ctx) {
     auto *index = static_cast<EMVBIndex *>(data_);
     index->SaveIndexInner(*file_handle_);
     prepare_success = true;
     return true;
 }
 
-void EMVBIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
-    if (data_) {
-        UnrecoverableError("Data is already allocated.");
-    }
+void EMVBIndexFileWorker::Read(size_t file_size, bool other) {
+    // if (data_) {
+    //     UnrecoverableError("Data is already allocated.");
+    // }
+    std::println("R emvb");
     const auto column_embedding_dim = GetEmbeddingInfo()->Dimension();
     const auto *index_emvb = static_cast<IndexEMVB *>(index_base_.get());
     const auto residual_pq_subspace_num = index_emvb->residual_pq_subspace_num_;

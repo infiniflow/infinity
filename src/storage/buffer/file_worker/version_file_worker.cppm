@@ -16,12 +16,11 @@ export module infinity_core:version_file_worker;
 
 import :file_worker;
 import :file_worker_type;
-import :buffer_obj;
 import :persistence_manager;
 
 namespace infinity {
 
-export struct VersionFileWorkerSaveCtx : public FileWorkerSaveCtx {
+export struct VersionFileWorkerSaveCtx final : public FileWorkerSaveCtx {
     VersionFileWorkerSaveCtx(TxnTimeStamp checkpoint_ts) : checkpoint_ts_(checkpoint_ts) {}
 
     TxnTimeStamp checkpoint_ts_{};
@@ -29,12 +28,7 @@ export struct VersionFileWorkerSaveCtx : public FileWorkerSaveCtx {
 
 export class VersionFileWorker : public FileWorker {
 public:
-    explicit VersionFileWorker(std::shared_ptr<std::string> data_dir,
-                               std::shared_ptr<std::string> temp_dir,
-                               std::shared_ptr<std::string> file_dir,
-                               std::shared_ptr<std::string> file_name,
-                               size_t capacity,
-                               PersistenceManager *persistence_manager);
+    explicit VersionFileWorker(std::shared_ptr<std::string> file_path, size_t capacity);
 
     virtual ~VersionFileWorker() override;
 
@@ -43,14 +37,11 @@ public:
 
     void FreeInMemory() override;
 
-    size_t GetMemoryCost() const override;
-
     FileWorkerType Type() const override { return FileWorkerType::kVersionDataFile; }
 
-protected:
-    bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(bool &prepare_success, size_t data_size, const FileWorkerSaveCtx &ctx) override;
 
-    void ReadFromFileImpl(size_t file_size, bool from_spill) override;
+    void Read(size_t file_size, bool other) override;
 
 private:
     size_t capacity_{};

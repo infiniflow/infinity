@@ -483,7 +483,7 @@ class TestMemIdx:
         decorator1 = infinity_runner_decorator_factory(config1, uri, infinity_runner)
         decorator2 = infinity_runner_decorator_factory(config2, uri, infinity_runner)
 
-        data_dir = "/var/infinity/data"
+        tmp_dir = "/var/infinity/tmp"
         idx1_name = "index1"
         idx2_name = "index2"
 
@@ -542,10 +542,10 @@ class TestMemIdx:
             time.sleep(3)
 
             # 2 chunk indexes for each index
-            db1_dir = data_dir + "/db_2"
+            db1_dir = tmp_dir + "/db_2"
             idx1_dirs = list(pathlib.Path(db1_dir).rglob(f"*chunk*"))
             assert len(idx1_dirs) == 2
-            db2_dir = data_dir + "/db_3"
+            db2_dir = tmp_dir + "/db_3"
             idx2_dirs = list(pathlib.Path(db2_dir).rglob(f"*chunk*"))
             assert len(idx2_dirs) == 2
 
@@ -557,11 +557,11 @@ class TestMemIdx:
             time.sleep(20)
 
             # new chunk index is generated after optimize for each index
-            db1_dir = data_dir + "/db_2"
+            db1_dir = tmp_dir + "/db_2"
             idx1_dirs = list(pathlib.Path(db1_dir).rglob(f"*chunk*"))
             print(idx1_dirs)
             assert len(idx1_dirs) == 3
-            db2_dir = data_dir + "/db_3"
+            db2_dir = tmp_dir + "/db_3"
             idx2_dirs = list(pathlib.Path(db2_dir).rglob(f"*chunk*"))
             assert len(idx2_dirs) == 3
 
@@ -572,11 +572,11 @@ class TestMemIdx:
             infinity_obj.cleanup()
 
             # after checkpoint (during restart) and cleanup, 2 old chunks of each index are removed
-            db1_dir = data_dir + "/db_2"
+            db1_dir = tmp_dir + "/db_2"
             idx1_dirs = list(pathlib.Path(db1_dir).rglob(f"*chunk*"))
             print(idx1_dirs)
             assert len(idx1_dirs) == 1
-            db2_dir = data_dir + "/db_3"
+            db2_dir = tmp_dir + "/db_3"
             idx2_dirs = list(pathlib.Path(db2_dir).rglob(f"*chunk*"))
             assert len(idx2_dirs) == 1
 

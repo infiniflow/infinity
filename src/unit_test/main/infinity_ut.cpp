@@ -207,7 +207,7 @@ TEST_F(InfinityTest, test1) {
         col2->names_.emplace_back(col2_name);
         output_columns->emplace_back(col2);
 
-        SearchExpr *search_expr = nullptr;
+        SearchExpr *search_expr{};
 
         result =
             infinity
@@ -287,10 +287,10 @@ TEST_F(InfinityTest, test2) {
         EXPECT_EQ(result.IsOk(), true);
     }
 
-    {
-        QueryResult result = infinity->ShowVariable("unused_buffer_object", SetScope::kGlobal);
-        EXPECT_EQ(result.IsOk(), true);
-    }
+    // {
+    //     QueryResult result = infinity->ShowVariable("unused_buffer_object", SetScope::kGlobal);
+    //     EXPECT_EQ(result.IsOk(), true);
+    // }
 
     {
         QueryResult result = infinity->ShowVariable("next_transaction_id", SetScope::kGlobal);
@@ -322,10 +322,10 @@ TEST_F(InfinityTest, test2) {
         EXPECT_EQ(result.IsOk(), true);
     }
 
-    {
-        QueryResult result = infinity->ShowVariable("buffer_usage", SetScope::kGlobal);
-        EXPECT_EQ(result.IsOk(), true);
-    }
+    // {
+    //     QueryResult result = infinity->ShowVariable("buffer_usage", SetScope::kGlobal);
+    //     EXPECT_EQ(result.IsOk(), true);
+    // }
 
     {
         QueryResult result = infinity->ShowVariable("error", SetScope::kGlobal);

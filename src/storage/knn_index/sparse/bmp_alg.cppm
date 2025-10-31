@@ -363,9 +363,9 @@ public:
     void SaveToPtr(LocalFileHandle &file_handle) {
         Finalize();
 
-        char *p0 = nullptr;
+        char *p0{};
         GetSizeToPtr(p0);
-        char *p1 = nullptr;
+        char *p1{};
         size_t size = p0 - p1;
         auto buffer = std::make_unique<char[]>(size);
         char *p = buffer.get();

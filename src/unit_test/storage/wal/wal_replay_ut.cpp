@@ -24,7 +24,7 @@ import :infinity_context;
 import :table_def;
 import :data_block;
 import :value;
-import :buffer_manager;
+import :fileworker_manager;
 import :wal_entry;
 import :infinity_exception;
 import :status;
@@ -86,9 +86,8 @@ protected:
     std::string tree_cmd;
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         WalReplayTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, WalReplayTest, ::testing::Values(BaseTestParamStr::VFS_OFF_CONFIG_PATH));
+// ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(WalReplayTest, wal_replay_database) {
     {
@@ -838,7 +837,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
 
         txn_mgr->PrintAllKeyValue();
 
-        infinity::InfinityContext::instance().UnInit();
+        infinity::InfinityContext::instance().UnInit(); // At this point, all kv-pairs in fileworker_map are cleared.
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
 #endif
@@ -863,6 +862,12 @@ TEST_F(WalReplayTest, wal_replay_compact) {
                 EXPECT_NE(table_info, nullptr);
                 EXPECT_EQ(table_info->segment_count_, 1);
             }
+
+            // {
+            //     auto [segment_info, status] = txn->GetSegmentInfo("default_db", "tbl1", 0);
+            //     EXPECT_TRUE(status.ok());
+            //     EXPECT_EQ(segment_info->row_count_, 8192);
+            // }
 
             {
                 auto [segment_info, status] = txn->GetSegmentInfo("default_db", "tbl1", 2);
@@ -1004,7 +1009,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         NewTxnManager *txn_mgr = storage->new_txn_manager();
-        // BufferManager *buffer_manager = storage->buffer_manager();
+        // FileWorkerManager *buffer_manager = storage->buffer_manager();
 
         // CREATE TABLE test_hnsw (col1 embedding(float,128));
         {

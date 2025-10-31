@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <sys/mman.h>
+#include <unistd.h>
+
 module infinity_core:secondary_index_file_worker.impl;
 
 import :secondary_index_file_worker;
@@ -29,16 +34,13 @@ import third_party;
 namespace infinity {
 
 SecondaryIndexFileWorker::~SecondaryIndexFileWorker() {
-    if (data_ != nullptr) {
-        FreeInMemory();
-        data_ = nullptr;
-    }
+    FreeInMemory();
+    munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
 void SecondaryIndexFileWorker::AllocateInMemory() {
-    if (data_) [[unlikely]] {
-        UnrecoverableError("AllocateInMemory: Already allocated.");
-    } else if (auto &data_type = column_def_->type(); data_type->CanBuildSecondaryIndex()) [[likely]] {
+    if (auto &data_type = column_def_->type(); data_type->CanBuildSecondaryIndex()) [[likely]] {
         data_ = static_cast<void *>(GetSecondaryIndexData(data_type, row_count_, true));
         LOG_TRACE("Finished AllocateInMemory().");
     } else {
@@ -57,7 +59,7 @@ void SecondaryIndexFileWorker::FreeInMemory() {
     }
 }
 
-bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool SecondaryIndexFileWorker::Write(bool &prepare_success, size_t data_size, const FileWorkerSaveCtx &ctx) {
     if (data_) [[likely]] {
         auto index = static_cast<SecondaryIndexData *>(data_);
         index->SaveIndexInner(*file_handle_);
@@ -69,15 +71,11 @@ bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_succ
     return true;
 }
 
-void SecondaryIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
-    if (!data_) [[likely]] {
-        auto index = GetSecondaryIndexData(column_def_->type(), row_count_, false);
-        index->ReadIndexInner(*file_handle_);
-        data_ = static_cast<void *>(index);
-        LOG_TRACE("Finished ReadFromFileImpl().");
-    } else {
-        UnrecoverableError("ReadFromFileImpl: data_ is not nullptr");
-    }
+void SecondaryIndexFileWorker::Read(size_t file_size, bool other) {
+    auto index = GetSecondaryIndexData(column_def_->type(), row_count_, false);
+    index->ReadIndexInner(*file_handle_);
+    data_ = static_cast<void *>(index);
+    LOG_TRACE("Finished Read().");
 }
 
 } // namespace infinity

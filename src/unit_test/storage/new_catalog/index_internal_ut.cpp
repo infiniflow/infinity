@@ -42,8 +42,6 @@ import :value;
 import :kv_code;
 import :kv_store;
 import :new_txn;
-import :buffer_obj;
-import :buffer_handle;
 import :secondary_index_in_mem;
 import :secondary_index_data;
 import :segment_meta;
@@ -206,8 +204,8 @@ TEST_P(TestTxnIndexInternal, test_index0) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        FileWorker *file_worker = nullptr;
+        status = chunk_index_meta.GetIndexBuffer(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -265,8 +263,8 @@ TEST_P(TestTxnIndexInternal, test_index0) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        FileWorker *file_worker = nullptr;
+        status = chunk_index_meta.GetIndexBuffer(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -290,7 +288,7 @@ TEST_P(TestTxnIndexInternal, test_index0) {
     });
 }
 
-TEST_P(TestTxnIndexInternal, test_index) {
+TEST_P(TestTxnIndexInternal, SLOW_test_index) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -530,12 +528,12 @@ TEST_P(TestTxnIndexInternal, test_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        FileWorker *file_worker = nullptr;
+        status = chunk_index_meta.GetIndexBuffer(file_worker);
         EXPECT_TRUE(status.ok());
 
         // {
-        //     BufferHandle buffer_handle = buffer_obj->Load();
+        //     BufferHandle buffer_handle = file_worker->Load();
         //     auto *index = static_cast<const SecondaryIndexData *>(buffer_handle.GetData());
 
         //     [[maybe_unused]] const auto [begin_approx_pos, begin_lower, begin_upper] = index->SearchPGM(&begin_val);
@@ -630,12 +628,12 @@ TEST_P(TestTxnIndexInternal, test_index) {
         // int32_t begin_val = 2;
         // int32_t end_val = 3;
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        FileWorker *file_worker = nullptr;
+        status = chunk_index_meta.GetIndexBuffer(file_worker);
         EXPECT_TRUE(status.ok());
 
         // {
-        //     BufferHandle buffer_handle = buffer_obj->Load();
+        //     BufferHandle buffer_handle = file_worker->Load();
         //     auto *index = static_cast<const SecondaryIndexData *>(buffer_handle.GetData());
 
         //     [[maybe_unused]] const auto [begin_approx_pos, begin_lower, begin_upper] = index->SearchPGM(&begin_val);
@@ -816,8 +814,8 @@ TEST_P(TestTxnIndexInternal, test_populate_index0) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        FileWorker *file_worker = nullptr;
+        status = chunk_index_meta.GetIndexBuffer(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -837,7 +835,7 @@ TEST_P(TestTxnIndexInternal, test_populate_index0) {
     });
 }
 
-TEST_P(TestTxnIndexInternal, DISABLED_SLOW_test_populate_index) {
+TEST_P(TestTxnIndexInternal, SLOW_test_populate_index) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -1057,8 +1055,8 @@ TEST_P(TestTxnIndexInternal, DISABLED_SLOW_test_populate_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        FileWorker *file_worker = nullptr;
+        status = chunk_index_meta.GetIndexBuffer(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);

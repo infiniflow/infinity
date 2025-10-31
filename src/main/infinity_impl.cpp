@@ -1237,7 +1237,6 @@ QueryResult Infinity::Search(const std::string &db_name,
     search_expr = nullptr;
 
     QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
-
     return result;
 }
 

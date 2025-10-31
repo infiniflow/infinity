@@ -116,7 +116,7 @@ protected:
     void CheckFilePaths(std::vector<std::string> &delete_file_paths, std::vector<std::string> &exist_file_paths);
 
 private:
-    // Validate if given path satisfy all of following:
+    // Validate if given path satisfy all following:
     // - The path is a directory or symlink to a directory.
     // - Current user has read, write, and execute permission of the path.
     bool ValidateDirPermission(const char *path_str) {

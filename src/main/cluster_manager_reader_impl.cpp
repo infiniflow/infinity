@@ -105,7 +105,7 @@ Status ClusterManager::RegisterToLeader() {
 Status ClusterManager::RegisterToLeaderNoLock() {
     // Register to leader, used by follower and learner
     Storage *storage_ptr = InfinityContext::instance().storage();
-    std::shared_ptr<RegisterPeerTask> register_peer_task = nullptr;
+    std::shared_ptr<RegisterPeerTask> register_peer_task{};
     if (storage_ptr->reader_init_phase() == ReaderInitPhase::kPhase2) {
         register_peer_task =
             std::make_shared<RegisterPeerTask>(this_node_->node_name(), this_node_->node_role(), this_node_->node_ip(), this_node_->node_port(), 0);
@@ -182,7 +182,7 @@ void ClusterManager::HeartBeatToLeaderThread() {
         // Update latest update time
         auto hb_now = std::chrono::system_clock::now();
         auto hb_time_since_epoch = hb_now.time_since_epoch();
-        std::shared_ptr<HeartBeatPeerTask> hb_task = nullptr;
+        std::shared_ptr<HeartBeatPeerTask> hb_task{};
         {
             std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
             this_node_->set_update_ts(std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count());

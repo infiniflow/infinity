@@ -31,7 +31,7 @@ import :result_cache_manager;
 import :logger;
 import :data_block;
 import :cached_match;
-import :buffer_manager;
+import :fileworker_manager;
 import :block_index;
 import :block_meta;
 import :column_meta;
@@ -100,7 +100,7 @@ void PhysicalOperator::InputLoad(QueryContext *query_context,
             }
         }
     }
-    output_to_data_block_helper.OutputToDataBlock(query_context->storage()->buffer_manager(),
+    output_to_data_block_helper.OutputToDataBlock(query_context->storage()->fileworker_manager(),
                                                   table_ref->block_index_.get(),
                                                   operator_state->prev_op_state_->data_block_array_);
 }
@@ -127,7 +127,7 @@ std::shared_ptr<std::vector<std::shared_ptr<DataType>>> PhysicalCommonFunctionUs
     return output_types;
 }
 
-void OutputToDataBlockHelper::OutputToDataBlock(BufferManager *buffer_mgr,
+void OutputToDataBlockHelper::OutputToDataBlock(FileWorkerManager *fileworker_mgr,
                                                 const BlockIndex *block_index,
                                                 const std::vector<std::unique_ptr<DataBlock>> &output_data_blocks) {
     std::sort(output_job_infos.begin(), output_job_infos.end());

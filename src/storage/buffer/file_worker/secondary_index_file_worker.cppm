@@ -29,22 +29,13 @@ namespace infinity {
 // pgm index
 export class SecondaryIndexFileWorker final : public IndexFileWorker {
 public:
-    explicit SecondaryIndexFileWorker(std::shared_ptr<std::string> data_dir,
-                                      std::shared_ptr<std::string> temp_dir,
-                                      std::shared_ptr<std::string> file_dir,
-                                      std::shared_ptr<std::string> file_name,
+    explicit SecondaryIndexFileWorker(std::shared_ptr<std::string> file_path,
                                       std::shared_ptr<IndexBase> index_base,
                                       std::shared_ptr<ColumnDef> column_def,
-                                      u32 row_count,
-                                      PersistenceManager *persistence_manager)
-        : IndexFileWorker(std::move(data_dir),
-                          std::move(temp_dir),
-                          std::move(file_dir),
-                          std::move(file_name),
-                          std::move(index_base),
-                          std::move(column_def),
-                          persistence_manager),
-          row_count_(row_count) {}
+                                      u32 row_count)
+        : IndexFileWorker(std::move(file_path), std::move(index_base), std::move(column_def)), row_count_(row_count) {
+        AllocateInMemory();
+    }
 
     ~SecondaryIndexFileWorker() override;
 
@@ -55,9 +46,9 @@ public:
     FileWorkerType Type() const override { return FileWorkerType::kSecondaryIndexFile; }
 
 protected:
-    bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(bool &prepare_success, size_t data_size, const FileWorkerSaveCtx &ctx) override;
 
-    void ReadFromFileImpl(size_t file_size, bool from_spill) override;
+    void Read(size_t file_size, bool other) override;
 
     const u32 row_count_{};
 };

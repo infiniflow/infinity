@@ -174,7 +174,7 @@ private:
     bool enable_{};
 
     BaseProfiler profiler_;
-    const PhysicalOperator *active_operator_ = nullptr;
+    const PhysicalOperator *active_operator_{};
 };
 
 export class QueryProfiler {

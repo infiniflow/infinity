@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <sys/mman.h>
+#include <unistd.h>
+
 module infinity_core:ivf_index_file_worker.impl;
 
 import :ivf_index_file_worker;
@@ -28,34 +33,31 @@ import third_party;
 namespace infinity {
 
 IVFIndexFileWorker::~IVFIndexFileWorker() {
-    if (data_ != nullptr) {
-        FreeInMemory();
-        data_ = nullptr;
-    }
+    FreeInMemory();
+
+    munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
 void IVFIndexFileWorker::AllocateInMemory() {
-    if (data_) [[unlikely]] {
-        UnrecoverableError("AllocateInMemory: Already allocated.");
-    }
     data_ = static_cast<void *>(IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get()));
 }
 
 void IVFIndexFileWorker::FreeInMemory() {
-    if (data_) [[likely]] {
+    if (data_) {
         auto index = static_cast<IVFIndexInChunk *>(data_);
         delete index;
         data_ = nullptr;
         LOG_TRACE("Finished IVFIndexFileWorker::FreeInMemory(), deleted data_ ptr.");
-    } else {
-        UnrecoverableError("FreeInMemory: Data is not allocated.");
     }
 }
 
-bool IVFIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-    if (data_) [[likely]] {
+bool IVFIndexFileWorker::Write(bool &prepare_success, size_t data_size, const FileWorkerSaveCtx &ctx) {
+    if (data_) {
         auto index = static_cast<IVFIndexInChunk *>(data_);
         index->SaveIndexInner(*file_handle_);
+
+        file_handle_->Sync();
         prepare_success = true;
         LOG_TRACE("Finished WriteToFileImpl(bool &prepare_success).");
     } else {
@@ -64,15 +66,11 @@ bool IVFIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, c
     return true;
 }
 
-void IVFIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
-    if (!data_) [[likely]] {
-        auto index = IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get());
-        index->ReadIndexInner(*file_handle_);
-        data_ = static_cast<void *>(index);
-        LOG_TRACE("Finished ReadFromFileImpl().");
-    } else {
-        UnrecoverableError("ReadFromFileImpl: data_ is not nullptr");
-    }
+void IVFIndexFileWorker::Read(size_t file_size, bool other) {
+    auto index = IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get());
+    index->ReadIndexInner(*file_handle_);
+    data_ = static_cast<void *>(index);
+    LOG_TRACE("Finished Read().");
 }
 
 } // namespace infinity

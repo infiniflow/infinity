@@ -25,7 +25,7 @@ import :merge_knn_data;
 import :knn_result_handler;
 import :merge_knn;
 import :block_index;
-import :buffer_manager;
+import :fileworker_manager;
 import :default_values;
 import :data_block;
 import :knn_expression;

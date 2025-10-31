@@ -16,7 +16,7 @@ module;
 
 export module infinity_core:build_fast_rough_filter_task;
 
-import :buffer_manager;
+import :fileworker_manager;
 import :infinity_exception;
 import :filter_value_type_classification;
 

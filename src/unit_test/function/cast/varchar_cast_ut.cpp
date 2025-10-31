@@ -169,7 +169,7 @@ TEST_F(VarcharCastTest, varchar_cast1) {
         Value v = Value::MakeVarchar(s1);
         input_column_vector->AppendValue(v);
 
-        VarcharT *varchar_ptr = (VarcharT *)(input_column_vector->buffer_.get()->GetDataMut());
+        VarcharT *varchar_ptr = (VarcharT *)(input_column_vector->buffer_.get()->GetData());
 
         BigIntT target{0};
         bool result = TryCastVarcharVector::Run(varchar_ptr[0], input_column_vector.get(), target);
@@ -217,7 +217,7 @@ TEST_F(VarcharCastTest, varchar_cast1) {
         Value v = Value::MakeVarchar(s1);
         input_column_vector->AppendValue(v);
 
-        VarcharT *varchar_ptr = (VarcharT *)(input_column_vector->buffer_.get()->GetDataMut());
+        VarcharT *varchar_ptr = (VarcharT *)(input_column_vector->buffer_.get()->GetData());
 
         FloatT target{0};
         bool result = TryCastVarcharVector::Run(varchar_ptr[0], input_column_vector.get(), target);
@@ -265,7 +265,7 @@ TEST_F(VarcharCastTest, varchar_cast1) {
         Value v = Value::MakeVarchar(s1);
         input_column_vector->AppendValue(v);
 
-        VarcharT *varchar_ptr = (VarcharT *)(input_column_vector->buffer_.get()->GetDataMut());
+        VarcharT *varchar_ptr = (VarcharT *)(input_column_vector->buffer_.get()->GetData());
 
         DoubleT target{0};
         bool result = TryCastVarcharVector::Run(varchar_ptr[0], input_column_vector.get(), target);
