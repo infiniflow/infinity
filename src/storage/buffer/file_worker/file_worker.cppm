@@ -46,7 +46,7 @@ public:
 public:
     [[nodiscard]] bool WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx = {});
 
-    bool WriteSnapshotToFile(const std::string &snapshot_name, bool to_spill, const FileWorkerSaveCtx &ctx = {});
+    bool WriteSnapshotFile(const std::string &snapshot_name, const std::string &temp_snapshot_name, bool to_spill, const FileWorkerSaveCtx &ctx = {});
 
     void ReadFromFile(bool from_spill);
 

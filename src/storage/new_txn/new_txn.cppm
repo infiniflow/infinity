@@ -127,7 +127,7 @@ export struct CheckpointOption {
 export struct SnapshotOption {
     TxnTimeStamp checkpoint_ts_ = 0;
     std::string snapshot_name_{};
-    TransactionID txn_id_{};
+    std::string temp_snapshot_name_{};
 };
 
 export struct ChunkInfoForCreateIndex {

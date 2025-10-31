@@ -1472,7 +1472,7 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
 
                 FileWorker *file_worker = version_buffer->file_worker();
                 VersionFileWorkerSaveCtx ctx(option.checkpoint_ts_);
-                file_worker->WriteSnapshotToFile(option.snapshot_name_, true, ctx);
+                file_worker->WriteSnapshotFile(option.snapshot_name_, option.temp_snapshot_name_, true, ctx);
             }
             if (flush_column) {
                 std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs;
@@ -1493,12 +1493,12 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
 
                     if (buffer_obj) {
                         FileWorker *file_worker = buffer_obj->file_worker();
-                        file_worker->WriteSnapshotToFile(option.snapshot_name_, true);
+                        file_worker->WriteSnapshotFile(option.snapshot_name_, option.temp_snapshot_name_, true);
                     }
 
                     if (outline_buffer_obj) {
                         FileWorker *file_worker = outline_buffer_obj->file_worker();
-                        file_worker->WriteSnapshotToFile(option.snapshot_name_, true);
+                        file_worker->WriteSnapshotFile(option.snapshot_name_, option.temp_snapshot_name_, true);
                     }
                 }
                 LOG_TRACE("NewTxn::FlushColumnFiles end");

@@ -60,15 +60,60 @@ FileWorker::~FileWorker() {
 #endif
 }
 
-bool FileWorker::WriteSnapshotToFile(const std::string &snapshot_name, bool to_spill, const FileWorkerSaveCtx &ctx) {
+bool FileWorker::WriteSnapshotFile(const std::string &snapshot_name,
+                                   const std::string &temp_snapshot_name,
+                                   bool to_spill,
+                                   const FileWorkerSaveCtx &ctx) {
     if (data_ == nullptr) {
         UnrecoverableError("No data will be written.");
     }
 
     if (!to_spill) {
-        // Create temporary directory for atomic operation
-        // std::string temp_write_dir = fmt::format("{}/temp_{}_{}", snapshot_dir, snapshot_name, txn_id);
-        UnrecoverableError("Only spill file can be written to snapshot.");
+        std::string temp_write_dir = std::filesystem::path(*temp_dir_) / snapshot_name / *file_dir_;
+        std::string temp_write_path = fmt::format("{}/{}", temp_write_dir, *file_name_);
+
+        Status create_temp_status = VirtualStore::MakeDirectory(temp_write_dir);
+        if (!create_temp_status.ok()) {
+            LOG_DEBUG(fmt::format("Create temporary directory {} failed: {}", temp_write_dir, create_temp_status.message()));
+            return false;
+        }
+
+        auto [file_handle, status] = VirtualStore::Open(temp_write_path, FileAccessMode::kWrite);
+        if (!status.ok()) {
+            LOG_DEBUG(fmt::format("Open temporary file {} failed: {}", temp_write_path, status.message()));
+            return false;
+        }
+
+        file_handle_ = std::move(file_handle);
+        DeferFn defer_fn([&]() { file_handle_ = nullptr; });
+
+        bool prepare_success = false;
+        bool all_save = WriteToFileImpl(to_spill, prepare_success, ctx);
+        if (prepare_success) {
+            file_handle_->Sync();
+        }
+
+        std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+        std::string final_write_dir = std::filesystem::path(snapshot_dir) / snapshot_name / *file_dir_;
+        if (!VirtualStore::Exists(final_write_dir)) {
+            VirtualStore::MakeDirectory(final_write_dir);
+        }
+
+        // Atomic rename operation
+        try {
+            Status rename_status = VirtualStore::Rename(temp_write_dir, final_write_dir);
+            if (!rename_status.ok()) {
+                LOG_ERROR(fmt::format("Rename {} to {} failed: {}", temp_write_dir, final_write_dir, rename_status.message()));
+                VirtualStore::RemoveDirectory(temp_write_dir);
+                return false;
+            }
+        } catch (const std::exception &e) {
+            LOG_ERROR(fmt::format("Rename {} to {} failed: {}", temp_write_dir, final_write_dir, e.what()));
+            VirtualStore::RemoveDirectory(temp_write_dir);
+            return false;
+        }
+
+        return all_save;
     } else {
         std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
         std::string write_dir = std::filesystem::path(snapshot_dir) / snapshot_name / *file_dir_;
@@ -90,6 +135,7 @@ bool FileWorker::WriteSnapshotToFile(const std::string &snapshot_name, bool to_s
         if (prepare_success) {
             file_handle_->Sync();
         }
+
         return all_save;
     }
 

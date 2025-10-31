@@ -5439,7 +5439,8 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
 
     Status status;
     TxnTimeStamp checkpoint_ts = txn_context_ptr_->begin_ts_;
-    SnapshotOption option{checkpoint_ts, snapshot_name, this->TxnID()};
+    std::string temp_snapshot_name = fmt::format("temp_{}_{}", snapshot_name, this->TxnID());
+    SnapshotOption option{checkpoint_ts, snapshot_name, temp_snapshot_name};
 
     current_ckp_ts_ = checkpoint_ts;
     LOG_INFO(fmt::format("checkpoint ts for snapshot: {}", current_ckp_ts_));
