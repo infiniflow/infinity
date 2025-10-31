@@ -124,6 +124,12 @@ export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
 };
 
+export struct SnapshotOption {
+    TxnTimeStamp checkpoint_ts_ = 0;
+    std::string snapshot_name_{};
+    TransactionID txn_id_{};
+};
+
 export struct ChunkInfoForCreateIndex {
     std::string db_id_{};
     std::string table_id_{};
@@ -546,8 +552,10 @@ private:
     Status DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id);
 
     Status CheckpointDB(DBMeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
+    Status CheckpointDB(DBMeta &db_meta, const SnapshotOption &option, CheckpointTxnStore *ckp_txn_store);
 
     Status CheckpointTable(TableMeta &table_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
+    Status CheckpointTable(TableMeta &table_meta, const SnapshotOption &option, CheckpointTxnStore *ckp_txn_store);
 
     Status
     CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, std::vector<std::pair<RowID, u64>> &append_ranges);
@@ -582,7 +590,7 @@ private:
     Status PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files = false);
     Status PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd);
     Status CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
-    Status CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store);
+    Status CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store, std::string &snapshot_name);
 
     Status AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
     Status CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);

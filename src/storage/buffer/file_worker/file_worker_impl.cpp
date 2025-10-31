@@ -60,6 +60,42 @@ FileWorker::~FileWorker() {
 #endif
 }
 
+bool FileWorker::WriteSnapshotToFile(const std::string &snapshot_name, bool to_spill, const FileWorkerSaveCtx &ctx) {
+    if (data_ == nullptr) {
+        UnrecoverableError("No data will be written.");
+    }
+
+    if (!to_spill) {
+        // Create temporary directory for atomic operation
+        // std::string temp_write_dir = fmt::format("{}/temp_{}_{}", snapshot_dir, snapshot_name, txn_id);
+        UnrecoverableError("Only spill file can be written to snapshot.");
+    } else {
+        std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+        std::string write_dir = std::filesystem::path(snapshot_dir) / snapshot_name / *file_dir_;
+        std::string write_path = fmt::format("{}/{}", write_dir, *file_name_);
+
+        if (!VirtualStore::Exists(write_dir)) {
+            VirtualStore::MakeDirectory(write_dir);
+        }
+
+        auto [file_handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        file_handle_ = std::move(file_handle);
+        DeferFn defer_fn([&]() { file_handle_ = nullptr; });
+
+        bool prepare_success = false;
+        bool all_save = WriteToFileImpl(false, prepare_success, ctx);
+        if (prepare_success) {
+            file_handle_->Sync();
+        }
+        return all_save;
+    }
+
+    return true;
+}
+
 bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
     if (data_ == nullptr) {
         UnrecoverableError("No data will be written.");

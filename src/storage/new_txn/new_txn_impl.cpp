@@ -1676,6 +1676,29 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
     return Status::OK();
 }
 
+Status NewTxn::CheckpointDB(DBMeta &db_meta, const SnapshotOption &option, CheckpointTxnStore *ckp_txn_store) {
+    std::vector<std::string> *table_id_strs_ptr;
+    std::vector<std::string> *table_names_ptr;
+    Status status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+
+    size_t table_count = table_id_strs_ptr->size();
+    LOG_DEBUG(fmt::format("checkpoint ts {}, db id {}, got {} tables.", option.checkpoint_ts_, db_meta.db_id_str(), table_count));
+    for (size_t idx = 0; idx < table_count; ++idx) {
+        const std::string &table_id_str = table_id_strs_ptr->at(idx);
+        const std::string &table_name = table_names_ptr->at(idx);
+        TableMeta table_meta(db_meta.db_id_str(), table_id_str, table_name, this);
+        status = this->CheckpointTable(table_meta, option, ckp_txn_store);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    return Status::OK();
+}
+
 Status NewTxn::CheckpointDB(DBMeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store) {
     std::vector<std::string> *table_id_strs_ptr;
     std::vector<std::string> *table_names_ptr;
@@ -2359,7 +2382,7 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
     // After calling Checkpoint()
     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
     std::shared_ptr<CheckpointTxnStore> ckp_txn_store = std::make_shared<CheckpointTxnStore>(last_checkpoint_ts, true);
-    Status status = this->CheckpointforSnapshot(last_checkpoint_ts, ckp_txn_store.get());
+    Status status = this->CheckpointforSnapshot(last_checkpoint_ts, ckp_txn_store.get(), snapshot_name);
     if (!status.ok()) {
         return status;
     }
@@ -5404,7 +5427,7 @@ Status NewTxn::CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create
     return Status::OK();
 }
 
-Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store) {
+Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store, std::string &snapshot_name) {
     TransactionType txn_type = GetTxnType();
     if (txn_type != TransactionType::kNewCheckpoint && txn_type != TransactionType::kCreateTableSnapshot) {
         UnrecoverableError(fmt::format("Expected transaction type is checkpoint or create table snapshot."));
@@ -5416,7 +5439,7 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
 
     Status status;
     TxnTimeStamp checkpoint_ts = txn_context_ptr_->begin_ts_;
-    CheckpointOption option{checkpoint_ts};
+    SnapshotOption option{checkpoint_ts, snapshot_name, this->TxnID()};
 
     current_ckp_ts_ = checkpoint_ts;
     LOG_INFO(fmt::format("checkpoint ts for snapshot: {}", current_ckp_ts_));
@@ -5452,13 +5475,6 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
         if (!status.ok()) {
             return status;
         }
-    }
-
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    if (pm != nullptr) {
-        PersistResultHandler handler(pm);
-        PersistWriteResult result = pm->CurrentObjFinalize(true);
-        handler.HandleWriteResult(result);
     }
 
     status = txn_mgr_->kv_store()->Flush();

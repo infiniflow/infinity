@@ -1421,6 +1421,118 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const CheckpointOption &op
     return Status::OK();
 }
 
+Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &option, CheckpointTxnStore *ckp_txn_store) {
+    Status status;
+
+    std::vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
+    if (!status.ok()) {
+        return status;
+    }
+
+    std::vector<BlockID> *block_ids_ptr = nullptr;
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentMeta segment_meta(segment_id, table_meta);
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        if (!status.ok()) {
+            return status;
+        }
+        for (BlockID block_id : *block_ids_ptr) {
+            BlockMeta block_meta(block_id, segment_meta);
+
+            std::shared_ptr<BlockLock> block_lock;
+            status = block_meta.GetBlockLock(block_lock);
+            if (!status.ok()) {
+                LOG_TRACE(fmt::format("NewTxn::CheckpointTable segment_id {}, block_id {}, got no BlockLock", segment_id, block_id));
+                continue;
+            }
+
+            bool flush_version = false;
+            bool flush_column = false;
+            {
+                // TODO: Refactor min_ts_ and max_ts_ to per-column-ts
+                std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
+                if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
+                    flush_version = true;
+                }
+                if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
+                    flush_column = true;
+                }
+            }
+            if (flush_version) {
+                std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
+                BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+
+                std::string version_filepath =
+                    InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + std::string(BlockVersion::PATH);
+                BufferObj *version_buffer = buffer_mgr->GetBufferObject(version_filepath);
+                if (version_buffer == nullptr) {
+                    return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
+                }
+
+                FileWorker *file_worker = version_buffer->file_worker();
+                VersionFileWorkerSaveCtx ctx(option.checkpoint_ts_);
+                file_worker->WriteSnapshotToFile(option.snapshot_name_, true, ctx);
+            }
+            if (flush_column) {
+                std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs;
+                std::tie(column_defs, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
+                if (!status.ok()) {
+                    return status;
+                }
+                LOG_TRACE("NewTxn::FlushColumnFiles begin");
+                for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
+                    ColumnMeta column_meta(column_idx, block_meta);
+                    BufferObj *buffer_obj = nullptr;
+                    BufferObj *outline_buffer_obj = nullptr;
+
+                    status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
+                    if (!status.ok()) {
+                        return status;
+                    }
+
+                    if (buffer_obj) {
+                        FileWorker *file_worker = buffer_obj->file_worker();
+                        file_worker->WriteSnapshotToFile(option.snapshot_name_, true);
+                    }
+
+                    if (outline_buffer_obj) {
+                        FileWorker *file_worker = outline_buffer_obj->file_worker();
+                        file_worker->WriteSnapshotToFile(option.snapshot_name_, true);
+                    }
+                }
+                LOG_TRACE("NewTxn::FlushColumnFiles end");
+            }
+            LOG_TRACE(fmt::format("NewTxn::CheckpointTable segment_id {}, block_id {}, flush_column {}, flush_version {}, option.checkpoint_ts_ {}, "
+                                  "block min_ts {}, block "
+                                  "max_ts {}, block checkpoint_ts {}",
+                                  segment_id,
+                                  block_id,
+                                  flush_column,
+                                  flush_version,
+                                  option.checkpoint_ts_,
+                                  block_lock->min_ts_,
+                                  block_lock->max_ts_,
+                                  block_lock->checkpoint_ts_));
+            if (!flush_column or !flush_version) {
+                continue;
+            } else {
+                auto flush_data_entry = std::make_shared<FlushDataEntry>(table_meta.db_id_str(), table_meta.table_id_str(), segment_id, block_id);
+                if (flush_column && flush_version) {
+                    flush_data_entry->to_flush_ = "data and version";
+                } else if (flush_column) {
+                    flush_data_entry->to_flush_ = "data";
+                } else {
+                    flush_data_entry->to_flush_ = "version";
+                }
+                ckp_txn_store->entries_.emplace_back(flush_data_entry);
+            }
+        }
+    }
+
+    return Status::OK();
+}
+
 Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const std::string &db_id_str = import_cmd->db_id_;

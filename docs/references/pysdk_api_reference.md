@@ -584,6 +584,71 @@ db_object.create_table("my_table", {"c1": {"type": "tensorarray,6,float"}}, Conf
 
 ---
 
+### drop_table
+
+```python
+db_object.drop_table(table_name, conflict_type = ConflictType.Error)
+```
+
+Deletes a table from the database by its name.
+
+#### Parameters
+
+##### table_name: `str`, *Required*
+
+A non-empty string indicating the name of the table to delete.
+
+##### conflict_type: `ConflictType`, *Optional*
+
+- `Error`: Raise an error if the specified table does not exist.
+- `Ignore`: Ignore the operation and proceed regardless, if the specified table does not exist.
+
+:::tip NOTE
+You may want to import the `infinity.common` package to set `ConflictType`:
+
+```python
+from infinity.common import ConflictType
+```
+
+:::
+
+:::tip NOTE
+If `ConflictType` is not set, it defaults to `Error`.
+:::
+
+#### Returns
+
+A structure containing the following attributes:
+
+- `error_code`: `int`
+  - `0`: The operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
+#### Examples
+
+```python
+# Delete a table named 'my_table':
+# If the specified table does not exist, raise an error. 
+db_object.drop_table("my_table")
+```
+
+```python
+# Delete a table named 'my_table':
+# If the specified table does not exist, raise an error (same as above). 
+db_object.drop_table("my_table", infinity.common.ConflictType.Error)
+```
+
+```python
+from infinity.common import ConflictType
+# Delete a table named 'my_table':
+# If the specified table does not exist, silently ignore the operation and proceed.
+db_object.drop_table("my_table", ConflictType.Ignore)
+```
+
+---
+
 ### create_table_snapshot
 
 ```python
@@ -684,71 +749,6 @@ A structure containing the following attributes:
 # Delete a snapshot named 'my_snapshot':
 # If the specified snapshot does not exist, raise an error.
 infinity_obj.drop_snapshot("my_snapshot")
-```
-
----
-
-### drop_table
-
-```python
-db_object.drop_table(table_name, conflict_type = ConflictType.Error)
-```
-
-Deletes a table from the database by its name.
-
-#### Parameters
-
-##### table_name: `str`, *Required*
-
-A non-empty string indicating the name of the table to delete.
-
-##### conflict_type: `ConflictType`, *Optional*
-
-- `Error`: Raise an error if the specified table does not exist.
-- `Ignore`: Ignore the operation and proceed regardless, if the specified table does not exist.
-
-:::tip NOTE
-You may want to import the `infinity.common` package to set `ConflictType`:
-
-```python
-from infinity.common import ConflictType
-```
-
-:::
-
-:::tip NOTE
-If `ConflictType` is not set, it defaults to `Error`.
-:::
-
-#### Returns
-
-A structure containing the following attributes:
-
-- `error_code`: `int`
-  - `0`: The operation succeeds.
-  - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
-
-#### Examples
-
-```python
-# Delete a table named 'my_table':
-# If the specified table does not exist, raise an error. 
-db_object.drop_table("my_table")
-```
-
-```python
-# Delete a table named 'my_table':
-# If the specified table does not exist, raise an error (same as above). 
-db_object.drop_table("my_table", infinity.common.ConflictType.Error)
-```
-
-```python
-from infinity.common import ConflictType
-# Delete a table named 'my_table':
-# If the specified table does not exist, silently ignore the operation and proceed.
-db_object.drop_table("my_table", ConflictType.Ignore)
 ```
 
 ---
