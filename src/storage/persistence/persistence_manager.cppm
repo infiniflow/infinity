@@ -38,6 +38,9 @@ export struct ObjAddr {
     size_t part_offset_{};
     size_t part_size_{};
 
+    ObjAddr() {}
+    ObjAddr(const std::string &obj_key, size_t part_offset, size_t part_size) : obj_key_(obj_key), part_offset_(part_offset), part_size_(part_size) {}
+
     bool Valid() const { return !obj_key_.empty(); }
 
     nlohmann::json Serialize() const;
@@ -97,6 +100,9 @@ public:
     [[nodiscard]] PersistWriteResult PutObjCache(const std::string &file_path);
 
     [[nodiscard]] PersistWriteResult Cleanup(const std::string &file_path);
+
+    // Clean up stale object data that has no corresponding file path
+    PersistWriteResult CleanupStaleObjectData();
 
     /**
      * Utils
