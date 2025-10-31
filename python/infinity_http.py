@@ -683,18 +683,23 @@ class table_http:
         return database_result(index_names=index_list)
 
     def dump_index(self, index_name):
-        url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
+        url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}/dump"
         h = self.net.set_up_header(["accept"])
         r = self.net.request(url, "put", h)
         self.net.raise_exception(r)
         return database_result()
 
-    def optimize(self, index_name="", optimize_options={}):
+    def optimize(self):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/optimize"
+        h = self.net.set_up_header(["accept", "content-type"])
+        r = self.net.request(url, "put", h)
+        self.net.raise_exception(r)
+        return database_result()
+
+    def alter_index(self, index_name="", alter_index_options={}):
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
-        h = self.net.set_up_header(
-            ["accept", "content-type"],
-        )
-        opt_opt = {"optimize_options": optimize_options}
+        h = self.net.set_up_header(["accept", "content-type"])
+        opt_opt = {"alter_index_options": alter_index_options}
         r = self.net.request(url, "put", h, opt_opt)
         self.net.raise_exception(r)
         return database_result()

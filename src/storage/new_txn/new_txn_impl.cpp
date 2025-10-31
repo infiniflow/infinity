@@ -2179,8 +2179,8 @@ Status NewTxn::PrepareCommit() {
                 }
                 break;
             }
-            case WalCommandType::OPTIMIZE_V2: {
-                [[maybe_unused]] auto *optimize_cmd = static_cast<WalCmdOptimizeV2 *>(command.get());
+            case WalCommandType::ALTER_INDEX_V2: {
+                [[maybe_unused]] auto *optimize_cmd = static_cast<WalCmdAlterIndexV2 *>(command.get());
                 break;
             }
             case WalCommandType::CLEANUP: {
@@ -4925,10 +4925,10 @@ Status NewTxn::ReplayWalCmd(const std::shared_ptr<WalCmd> &command, TxnTimeStamp
             }
             break;
         }
-        case WalCommandType::OPTIMIZE_V2: {
-            auto *optimize_cmd = static_cast<WalCmdOptimizeV2 *>(command.get());
+        case WalCommandType::ALTER_INDEX_V2: {
+            auto *alter_index_cmd = static_cast<WalCmdAlterIndexV2 *>(command.get());
 
-            Status status = ReplayOptimizeIndeByParams(optimize_cmd);
+            Status status = ReplayAlterIndexByParams(alter_index_cmd);
             if (!status.ok()) {
                 return status;
             }
@@ -5189,9 +5189,9 @@ std::string NewTxn::GetTableIdStr() {
                 auto *compact_cmd = static_cast<WalCmdCompactV2 *>(command.get());
                 return compact_cmd->table_id_;
             }
-            case WalCommandType::OPTIMIZE_V2: {
-                auto *optimize_cmd = static_cast<WalCmdOptimizeV2 *>(command.get());
-                return optimize_cmd->table_id_;
+            case WalCommandType::ALTER_INDEX_V2: {
+                auto *alter_index_cmd = static_cast<WalCmdAlterIndexV2 *>(command.get());
+                return alter_index_cmd->table_id_;
             }
             default: {
                 break;
