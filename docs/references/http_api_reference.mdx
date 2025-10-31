@@ -523,6 +523,133 @@ The response includes a JSON object like the following:
 
 ---
 
+### Drop table
+
+**DELETE** `/databases/{database_name}/tables/{table_name}`
+
+Deletes a table from a specified database. If the table does not exist, the action taken depends on the `"drop_option"` parameter.
+
+#### Request
+
+- Method: DELETE
+- URL: `/databases/{database_name}/tables/{table_name}`
+- Headers:
+- `accept: application/json`
+- `content-Type: application/json`
+- Body:
+- `"drop_option"`: `enum<string>`
+
+##### Request example
+
+```shell
+curl --request DELETE \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' {"drop_option": "ignore_if_not_exists"} '
+```
+
+##### Request parameters
+
+- `database_name`: (*Path parameter*)
+The name of the database.
+- `table_name`: (*Path parameter*)
+The name of the table to delete.
+- `"drop_option"`: (*Body parameter*), `enum<string>`, *Optional*
+- `"error"`: (Default) Raise an error if the specified table does not exist.
+- `"ignore_if_not_exists"`: Ignore the operation and proceed regardless, if the specified database does not exist.
+
+#### Response
+
+<Tabs
+    defaultValue="s200"
+    values={[
+        {label: 'Status code 200', value: 's200'},
+        {label: 'Status code 500', value: 's500'},
+    ]}>
+    <TabItem value="s200">
+
+        The response includes a JSON object like the following:
+
+        ```shell
+        {
+            "error_code": 0
+        }
+        ```
+
+        - `"error_code"`: `integer`
+        `0`: The operation succeeds.
+
+    </TabItem>
+    <TabItem value="s500">
+
+        The response includes a JSON object like the following:
+
+        ```shell
+        {
+            "error_code": 3022,
+            "error_msg": "Table {table_name} doesn't exist in {database_name}."
+        }
+        ```
+
+        - `"error_code"`: `integer`
+        A non-zero value indicates a specific error condition.
+        - `"error_msg"`: `string`
+        When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
+
+    </TabItem>
+</Tabs>
+
+---
+
+### List tables
+
+**GET** `/databases/{database_name}/tables`
+
+Retrieves a list of all available tables in a specified database.
+
+#### Request
+
+- Method: GET
+- URL: `/databases/{database_name}/tables`
+- Headers: `accept: application/json`
+
+##### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/databases/{database_name}/tables \
+     --header 'accept: application/json'
+```
+
+##### Request parameters
+
+- `database_name`: (*Path parameter*)
+The name of the database.
+
+#### Response
+
+##### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0,
+    "tables":
+    [
+         "table_1",
+         "table_2",
+         "table_n"
+    ]
+}
+```
+
+- `"error_code"`: `integer`
+`0`: The operation succeeds.
+
+---
+
 ### create table snapshot
 
 **POST** `/snapshots`
@@ -750,133 +877,6 @@ The response includes a JSON object like the following:
 
 </TabItem>
 </Tabs>
-
----
-
-### Drop table
-
-**DELETE** `/databases/{database_name}/tables/{table_name}`
-
-Deletes a table from a specified database. If the table does not exist, the action taken depends on the `"drop_option"` parameter.
-
-#### Request
-
-- Method: DELETE
-- URL: `/databases/{database_name}/tables/{table_name}`
-- Headers:
-  - `accept: application/json`
-  - `content-Type: application/json`
-- Body:
-  - `"drop_option"`: `enum<string>`
-
-##### Request example
-
-```shell
-curl --request DELETE \
-     --url http://localhost:23820/databases/{database_name}/tables/{table_name} \
-     --header 'accept: application/json' \
-     --header 'content-type: application/json' \
-     --data ' {"drop_option": "ignore_if_not_exists"} '
-```
-
-##### Request parameters
-
-- `database_name`: (*Path parameter*)  
-  The name of the database.
-- `table_name`: (*Path parameter*)  
-  The name of the table to delete.
-- `"drop_option"`: (*Body parameter*), `enum<string>`, *Optional*  
-  - `"error"`: (Default) Raise an error if the specified table does not exist.
-  - `"ignore_if_not_exists"`: Ignore the operation and proceed regardless, if the specified database does not exist.
-
-#### Response
-
-<Tabs
-  defaultValue="s200"
-  values={[
-    {label: 'Status code 200', value: 's200'},
-    {label: 'Status code 500', value: 's500'},
-  ]}>
-  <TabItem value="s200">
-
-The response includes a JSON object like the following:
-
-```shell
-{
-    "error_code": 0
-}
-```
-
-- `"error_code"`: `integer`  
-  `0`: The operation succeeds.
-
-</TabItem>
-  <TabItem value="s500">
-
-The response includes a JSON object like the following:
-
-```shell
-{
-    "error_code": 3022,
-    "error_msg": "Table {table_name} doesn't exist in {database_name}."
-}
-```
-
-- `"error_code"`: `integer`  
-  A non-zero value indicates a specific error condition.
-- `"error_msg"`: `string`  
-  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
-
-</TabItem>
-</Tabs>
-
----
-
-### List tables
-
-**GET** `/databases/{database_name}/tables`
-
-Retrieves a list of all available tables in a specified database.
-
-#### Request
-
-- Method: GET
-- URL: `/databases/{database_name}/tables`
-- Headers: `accept: application/json`
-
-##### Request example
-
-```shell
-curl --request GET \
-     --url http://localhost:23820/databases/{database_name}/tables \
-     --header 'accept: application/json'
-```
-
-##### Request parameters
-
-- `database_name`: (*Path parameter*)  
-  The name of the database.
-
-#### Response
-
-##### Status code 200
-
-The response includes a JSON object like the following:
-
-```shell
-{
-    "error_code": 0,
-    "tables": 
-    [
-         "table_1",
-         "table_2",
-         "table_n"
-    ]
-}
-```
-
-- `"error_code"`: `integer`  
-  `0`: The operation succeeds.
 
 ---
 
