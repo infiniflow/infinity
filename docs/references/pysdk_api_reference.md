@@ -584,6 +584,110 @@ db_object.create_table("my_table", {"c1": {"type": "tensorarray,6,float"}}, Conf
 
 ---
 
+### create_table_snapshot
+
+```python
+db_object.create_table_snapshot(snapshot_name, table_name)
+```
+
+Creates a snapshot of the specified table with the given snapshot name.
+
+#### Parameters
+
+##### snapshot_name: `str`, *Required*
+
+A non-empty string indicating the name of the table snapshot.
+
+##### table_name: `str`, *Required*
+
+A non-empty string indicating the name of the table.
+
+#### Returns
+
+A structure containing the following attributes:
+
+- `error_code`: `int`
+  - `0`: The operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
+#### Examples
+```python
+# Create a snapshot named 'my_snapshot' of the table 'my_table':
+# If the specified snapshot already exists or the specified table does not exist, raise an error.
+db_object.create_table_snapshot("my_snapshot", "my_table")
+```
+
+---
+
+### restore_table_snapshot
+
+```python
+db_object.restore_table_snapshot(snapshot_name)
+```
+
+Restores a table from the specified snapshot.
+
+#### Parameters
+
+##### snapshot_name: `str`, *Required*
+
+A non-empty string indicating the name of the table snapshot.
+
+#### Returns
+
+A structure containing the following attributes:
+
+- `error_code`: `int`
+  - `0`: The operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
+#### Examples
+```python
+# Restore a table from the snapshot 'my_snapshot':
+# If the specified snapshot does not exist, raise an error.
+db_object.restore_table_snapshot("my_snapshot")
+```
+
+---
+
+### drop_snapshot
+
+```python
+infinity_obj.drop_snapshot(snapshot_name)
+```
+
+Deletes a snapshot with the specified name.
+
+#### Parameters
+
+##### snapshot_name: `str`, *Required*
+
+A non-empty string indicating the name of the snapshot.
+
+#### Returns
+
+A structure containing the following attributes:
+
+- `error_code`: `int`
+  - `0`: The operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
+#### Examples
+
+```python
+# Delete a snapshot named 'my_snapshot':
+# If the specified snapshot does not exist, raise an error.
+infinity_obj.drop_snapshot("my_snapshot")
+```
+
+---
+
 ### drop_table
 
 ```python

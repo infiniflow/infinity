@@ -523,6 +523,236 @@ The response includes a JSON object like the following:
 
 ---
 
+### create table snapshot
+
+**POST** `/snapshots`
+
+Creates a snapshot of the specified table with the given snapshot name.
+
+#### Request
+
+- Method: POST
+- URL: `/snapshots`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+  - `"db_name"`: `string`
+  - `"table_name"`: `string`
+  - `"snapshot_name"`: `string`
+
+##### Request example
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/snapshots \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' {
+         "db_name" : "default_db",
+         "table_name" : "my_table",
+         "snapshot_name" : "my_snapshot"
+    } '
+```
+
+##### Request parameters
+- `db_name`: (*Body parameter*)
+  The name of the database.
+- `table_name`: (*Body parameter*)
+  The name of the table.
+- `snapshot_name`: (*Body parameter*)
+  The name of the snapshot.
+
+#### Response
+
+#### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3022,
+    "error_msg": "{table_name} doesn't exist."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+### restore table snapshot
+
+**POST** `/snapshots/restore`
+
+Restores a table from the specified snapshot.
+
+#### Request
+
+- Method: POST
+- URL: `/snapshots/restore`
+- Headers:
+- `accept: application/json`
+- `content-Type: application/json`
+- Body:
+- `"snapshot_name"`: `string`
+
+##### Request example
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/snapshots/restore \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' {
+         "snapshot_name" : "my_snapshot"
+    } '
+```
+
+##### Request parameters
+- `snapshot_name`: (*Body parameter*)
+The name of the snapshot.
+
+#### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 7008,
+    "error_msg": "File: /var/infinity/snapshot/{snapshot_name}/{snapshot_name}.json isn't found."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+### drop snapshot
+
+**DELETE** `/snapshots/{snapshot_name}`
+
+Deletes a snapshot with the specified name.
+
+#### Request
+
+- Method: POST
+- URL: `/snapshots/{snapshot_name}`
+- Headers:
+- `accept: application/json`
+- Body:
+- `"snapshot_name"`: `string`
+
+##### Request example
+
+```shell
+curl --request DELETE \
+     --url http://localhost:23820/snapshots/{snapshot_name} \
+     --header 'accept: application/json'
+```
+
+##### Request parameters
+- `snapshot_name`: (*Path parameter*)
+The name of the snapshot.
+
+#### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3088,
+    "error_msg": "Snapshot: {snapshot_name} not found."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
 ### Drop table
 
 **DELETE** `/databases/{database_name}/tables/{table_name}`
