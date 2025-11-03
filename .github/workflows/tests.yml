@@ -22,7 +22,9 @@ concurrency:
 jobs:
   code_static_check:
     name: code_static_check
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
+    if: ${{ github.event_name != 'pull_request' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'ci')  ||
+      ((github.event.action == 'synchronize' || github.event.action == 'reopened') && contains(github.event.pull_request.labels.*.name, 'ci')) }}
     runs-on: [ "self-hosted", "infinity-test" ]
     steps:
       - name: Ensure workspace ownership
@@ -41,7 +43,7 @@ jobs:
           fetch-tags: false
 
       - name: Backup code
-        if: ${{ !cancelled() && !failure() && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci')) }}
+        if: ${{ !cancelled() && !failure() }}
         run: |
           if [[ ${{ github.event_name }} != 'pull_request' ]]; then
             HEAD=$(git rev-parse HEAD)
@@ -138,7 +140,6 @@ jobs:
 
   debug_build:
     name: debug_build
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-build" ]
     needs: code_static_check
     steps:
@@ -172,7 +173,6 @@ jobs:
 
   debug_unit_test:
     name: debug_unit_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     needs: debug_build
     steps:
@@ -233,7 +233,6 @@ jobs:
 
   debug_sqllogical_test:
     name: debug_sqllogical_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     needs: debug_build
     steps:
@@ -301,7 +300,6 @@ jobs:
 
   debug_restart_test:
     name: debug_restart_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     needs: debug_build
     steps:
@@ -342,7 +340,6 @@ jobs:
 
   debug_pysdk_test:
     name: debug_pysdk_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     needs: debug_build
     steps:
@@ -411,7 +408,6 @@ jobs:
 
   debug_http_test:
     name: debug_http_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     needs: debug_build
     steps:
@@ -480,7 +476,6 @@ jobs:
 
   debug_pysdk_parallel_test:
     name: debug_pysdk_parallel_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     needs:
       - debug_build
@@ -549,7 +544,6 @@ jobs:
 
   debug_upload_codecov:
     name: debug_upload_codecov
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     needs: [debug_unit_test, debug_sqllogical_test, debug_pysdk_test, debug_http_test,debug_pysdk_parallel_test]
     steps:
@@ -582,7 +576,6 @@ jobs:
 
   reldeb_build:
     name: reldeb_build
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-build" ]
     needs: code_static_check
     steps:
@@ -616,7 +609,6 @@ jobs:
 
   reldeb_unit_test:
     name: reldeb_unit_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     needs: reldeb_build
     steps:
@@ -670,7 +662,6 @@ jobs:
 
   reldeb_sqllogical_test:
     name: reldeb_sqllogical_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     needs: reldeb_build
     steps:
@@ -719,7 +710,6 @@ jobs:
 
   reldeb_pysdk_test:
     name: reldeb_pysdk_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     needs: reldeb_build
     steps:
@@ -767,7 +757,6 @@ jobs:
 
   reldeb_http_test:
     name: reldeb_http_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     needs: reldeb_build
     steps:
@@ -815,7 +804,6 @@ jobs:
 
   reldeb_pysdk_parallel_test:
     name: reldeb_pysdk_parallel_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     needs: reldeb_build
     steps:
@@ -863,7 +851,6 @@ jobs:
 
   reldeb_minio_pysdk_test:
     name: reldeb_minio_pysdk_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     needs: reldeb_build
     steps:
@@ -926,7 +913,6 @@ jobs:
 
   reldeb_minio_parallel_test:
     name: reldeb_minio_parallel_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     needs: reldeb_build
     steps:
@@ -993,7 +979,6 @@ jobs:
 
   reldeb_benchmark:
     name: reldeb_benchmark
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "benchmark" ]
     needs: reldeb_build
     steps:
