@@ -1423,6 +1423,14 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const CheckpointOption &op
 
 Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &option, CheckpointTxnStore *ckp_txn_store) {
     Status status;
+    std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
+
+    auto [db_name, table_name] = table_meta.GetDBTableName();
+    std::tie(table_snapshot_info, status) = table_meta.MapMetaToSnapShotInfo(db_name, table_name);
+    if (!status.ok()) {
+        return status;
+    }
+    table_snapshot_info->snapshot_name_ = option.snapshot_name_;
 
     std::vector<SegmentID> *segment_ids_ptr = nullptr;
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
@@ -1459,7 +1467,8 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                     flush_column = true;
                 }
             }
-            if (flush_version) {
+
+            {
                 std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
                 BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
 
@@ -1472,9 +1481,10 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
 
                 FileWorker *file_worker = version_buffer->file_worker();
                 VersionFileWorkerSaveCtx ctx(option.checkpoint_ts_);
-                file_worker->WriteSnapshotFile(option.snapshot_name_, option.temp_snapshot_name_, true, ctx);
+                file_worker->WriteSnapshotFile(table_snapshot_info, flush_version, ctx);
             }
-            if (flush_column) {
+
+            {
                 std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs;
                 std::tie(column_defs, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
                 if (!status.ok()) {
@@ -1493,12 +1503,12 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
 
                     if (buffer_obj) {
                         FileWorker *file_worker = buffer_obj->file_worker();
-                        file_worker->WriteSnapshotFile(option.snapshot_name_, option.temp_snapshot_name_, true);
+                        file_worker->WriteSnapshotFile(table_snapshot_info, flush_column);
                     }
 
                     if (outline_buffer_obj) {
                         FileWorker *file_worker = outline_buffer_obj->file_worker();
-                        file_worker->WriteSnapshotFile(option.snapshot_name_, option.temp_snapshot_name_, true);
+                        file_worker->WriteSnapshotFile(table_snapshot_info, flush_column);
                     }
                 }
                 LOG_TRACE("NewTxn::FlushColumnFiles end");

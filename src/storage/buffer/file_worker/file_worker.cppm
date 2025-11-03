@@ -19,6 +19,7 @@ export module infinity_core:file_worker;
 import :file_worker_type;
 import :persistence_manager;
 import :defer_op;
+import :snapshot_info;
 
 import std.compat;
 import third_party;
@@ -46,7 +47,7 @@ public:
 public:
     [[nodiscard]] bool WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx = {});
 
-    bool WriteSnapshotFile(const std::string &snapshot_name, const std::string &temp_snapshot_name, bool to_spill, const FileWorkerSaveCtx &ctx = {});
+    bool WriteSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info, bool use_memory, const FileWorkerSaveCtx &ctx = {});
 
     void ReadFromFile(bool from_spill);
 
