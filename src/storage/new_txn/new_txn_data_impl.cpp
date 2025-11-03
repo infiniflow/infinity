@@ -1509,7 +1509,7 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
         }
     }
 
-    // End timing for data copying
+    // End timing for data serialization
     auto data_end_time = std::chrono::high_resolution_clock::now();
     auto data_duration = std::chrono::duration_cast<std::chrono::milliseconds>(data_end_time - data_start_time);
     LOG_INFO(fmt::format("Saving data and version files took {} ms", data_duration.count()));
@@ -1580,10 +1580,13 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
         }
     }
 
-    // End timing for index copying
+    // End timing for index serialization
     auto index_end_time = std::chrono::high_resolution_clock::now();
     auto index_duration = std::chrono::duration_cast<std::chrono::milliseconds>(index_end_time - index_start_time);
     LOG_INFO(fmt::format("Saving index files took {} ms", index_duration.count()));
+
+    // Start timing for JSON serialization
+    auto json_start_time = std::chrono::high_resolution_clock::now();
 
     // Create metadata JSON
     nlohmann::json json_res = table_snapshot_info->CreateSnapshotMetadataJSON();
@@ -1608,6 +1611,11 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
         return status;
     }
     snapshot_file_handle->Sync();
+
+    // End timing for json serialization
+    auto json_end_time = std::chrono::high_resolution_clock::now();
+    auto json_duration = std::chrono::duration_cast<std::chrono::milliseconds>(json_end_time - json_start_time);
+    LOG_INFO(fmt::format("Saving json files took {} ms", json_duration.count()));
 
     return Status::OK();
 }
