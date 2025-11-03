@@ -1227,29 +1227,74 @@ table_object.create_index(
 ### optimize_index
 
 ```python
-table_obj.optimize(index_name, opt_params: dict[str, str])
+table_obj.optimize()
 ```
 
-Optimize an index by its name.
+Optimize all indexes in a table.
+
+#### Returns
+
+A structure containing the following attributes:
+
+- `error_code`: `int`
+    - `0`: The operation succeeds.
+    - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
+#### Examples
+
+```python
+# Optimize all indexes in table
+res = table_object.optimize()
+```
+
+---
+
+---
+
+### alter_index
+
+```python
+table_obj.alter_index(index_name, opt_params: dict[str, str])
+```
+
+alter an index by its name.
 
 #### Parameters
 
 ##### index_name: `str`, *Required*
 
-A non-empty string indicating the name of the index to optimize.
+A non-empty string indicating the name of the index to alter.
 
 ##### opt_params: `dict[str, str]`, *Required*
 
-A dictionary specifying the optimization parameters for the selected index type. Each key-value pair in the dictionary corresponds to a parameter and its value:
+A dictionary specifying the alter index parameters for the selected index type. Each key-value pair in the dictionary corresponds to a parameter and its value:
 
 - Parameters settings for an HNSW index:
-  - `"compress_to_lvq"`: *Optional* - Defaults to `"false"`. Compress existing plain HNSW index to LVQ index.
-  - `"compress_to_rabitq"`: *Optional* - Defaults to `"false"`. Compress existing plain HNSW index to RaBitQ index.
-  - `"lvq_avg"`: *Optional* - Defaults to `"false"`. Calculate the average of the LVQ index.
+    - `"compress_to_lvq"`: *Optional* - Defaults to `"false"`. Compress existing plain HNSW index to LVQ index.
+    - `"compress_to_rabitq"`: *Optional* - Defaults to `"false"`. Compress existing plain HNSW index to RaBitQ index.
+    - `"lvq_avg"`: *Optional* - Defaults to `"false"`. Calculate the average of the LVQ index.
 - Parameters settings for an BMP index:
-  - `"topk"`: *Optional* - Optimize bmp index for topk search.
-  - `"bp_reorder"`: *Optional* - Defaults to `"false"`. Reorder internal sequence of the bmp index by heuristic rules(binary partition).
+    - `"topk"`: *Optional* - Alter bmp index for topk search.
+    - `"bp_reorder"`: *Optional* - Defaults to `"false"`. Reorder internal sequence of the bmp index by heuristic rules(binary partition).
 
+#### Returns
+
+A structure containing the following attributes:
+
+- `error_code`: `int`
+    - `0`: The operation succeeds.
+    - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
+#### Examples
+
+```python
+# Alter BMP index my_index
+res = table_object.alter_index("my_index", {"topk": "3", "bp_reorder" : ""})
+```
 ---
 
 ---

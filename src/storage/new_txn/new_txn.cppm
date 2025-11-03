@@ -56,7 +56,7 @@ struct WalCmdDumpIndexV2;
 struct WalChunkIndexInfo;
 struct WalSegmentInfo;
 struct WalCmdCheckpointV2;
-struct WalCmdOptimizeV2;
+struct WalCmdAlterIndexV2;
 struct WalCmdCleanup;
 struct WalCmdCreateTableSnapshot;
 struct WalCmdRestoreTableSnapshot;
@@ -298,10 +298,10 @@ private:
                               const std::string &table_key);
 
 public:
-    Status OptimizeIndexByParams(const std::string &db_name,
-                                 const std::string &table_name,
-                                 const std::string &index_name,
-                                 std::vector<std::unique_ptr<InitParameter>> params);
+    Status AlterIndexByParams(const std::string &db_name,
+                              const std::string &table_name,
+                              const std::string &index_name,
+                              std::vector<std::unique_ptr<InitParameter>> params);
 
     Status ListIndex(const std::string &db_name, const std::string &table_name, std::vector<std::string> &index_names);
 
@@ -321,8 +321,6 @@ private:
     Status ReplayDelete(WalCmdDeleteV2 *delete_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_ts, i64 txn_id);
-    Status ReplayOptimize(WalCmdOptimizeV2 *optimize_cmd, TxnTimeStamp commit_ts, i64 txn_id);
-    Status ReplayCheckpoint(WalCmdCheckpointV2 *optimize_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayCleanup(WalCmdCleanup *cleanup_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_table_cmd, TxnTimeStamp commit_ts, i64 txn_id);
 
@@ -545,9 +543,9 @@ private:
                             u32 row_cnt,
                             BufferObj *buffer_obj);
 
-    Status OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, const std::vector<std::unique_ptr<InitParameter>> &params);
+    Status AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, const std::vector<std::unique_ptr<InitParameter>> &params);
 
-    Status ReplayOptimizeIndeByParams(WalCmdOptimizeV2 *optimize_cmd);
+    Status ReplayAlterIndexByParams(WalCmdAlterIndexV2 *alter_index_cmd);
 
     Status DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id);
 

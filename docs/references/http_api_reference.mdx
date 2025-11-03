@@ -1352,6 +1352,88 @@ The response includes a JSON object like the following:
 
 ---
 
+### Alter index
+
+**PUT** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
+
+Alter index parameters on a specified index of table.
+
+#### Request
+
+- Method: PUT
+- URL: `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+  - `parameter_name`: `string`
+
+##### Request example
+
+- Alter a BMP index
+
+```shell
+curl --request PUT \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '{ "topk": "3", "bp_reorder": "" }'
+```
+
+##### Request parameters
+
+- `database_name`: Required (*Path parameter*)  
+  The name of the database.
+- `table_name`: Required (*Path parameter*)  
+  The name of the table.
+- `index_name`: Required (*Path parameter*)  
+  The name of the index.
+- `json object containing index parameter key-value pairs`: Required (*Body parameter*)  
+  A list of index parameter key-value pairs to alter
+
+#### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3018,
+    "error_msg": "Duplicate index: {index} in {table_name}."
+}
+```
+
+- `"error_code"`: `integer`
+  A non-zero value indicates a specific error condition.
+- `"error_msg"`: `string`
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
 ### List indexes
 
 **GET** `/databases/{database_name}/tables/{table_name}/indexes`
@@ -3715,6 +3797,78 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 - `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
 - `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+### Optimize Index
+
+**PUT** `/databases/{database_name}/tables/{table_name}/optimize`
+
+Performs an index optimization operation on a specified table.
+
+#### Request
+
+- Method: PUT
+- URL: `/databases/{database_name}/tables/{table_name}/optimize`
+- Headers:
+  - `accept: application/json`
+  - `content-type: application/json`
+
+##### Request example
+
+```shell
+curl --request PUT \
+    --url http://localhost:23820/databases/{database_name}/tables/{table_name}/optimize \
+    --header 'accept: application/json' \
+    --header 'content-type: application/json' \
+```
+
+##### Request parameters
+
+- `db_name`: Required (*Path parameter*)
+- `table_name`: Required (*Path parameter*)
+`db_name` and `table_name` specifies the table to perform index optimization.
+
+#### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":3022,
+    "error_msg":"Table id_timep doesn't exist@src/planner/query_binder.cpp:423"
+}
+```
+
+- `"error_code"`: `integer`
+  A non-zero value indicates a specific error condition.
+- `"error_msg"`: `string`
   When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
 
 </TabItem>

@@ -65,6 +65,7 @@ export enum class WalCommandType : i8 {
     RENAME_TABLE_V2 = 43,
     ADD_COLUMNS_V2 = 44,
     DROP_COLUMNS_V2 = 45,
+    ALTER_INDEX_V2 = 46,
 
     // -----------------------------
     // Flush
@@ -83,7 +84,6 @@ export enum class WalCommandType : i8 {
     // Other
     // -----------------------------
     DUMMY = 103,
-    OPTIMIZE_V2 = 106,
     DUMP_INDEX_V2 = 107,
     CLEANUP = 108
 };
@@ -567,18 +567,18 @@ export struct WalCmdCompactV2 final : public WalCmd {
     const std::vector<SegmentID> deprecated_segment_ids_{};
 };
 
-export struct WalCmdOptimizeV2 final : public WalCmd {
-    WalCmdOptimizeV2(const std::string &db_name,
-                     const std::string &db_id,
-                     const std::string &table_name,
-                     const std::string &table_id,
-                     const std::string &index_name,
-                     const std::string &index_id,
-                     std::vector<std::unique_ptr<InitParameter>> &&params)
-        : WalCmd(WalCommandType::OPTIMIZE_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
+export struct WalCmdAlterIndexV2 final : public WalCmd {
+    WalCmdAlterIndexV2(const std::string &db_name,
+                       const std::string &db_id,
+                       const std::string &table_name,
+                       const std::string &table_id,
+                       const std::string &index_name,
+                       const std::string &index_id,
+                       std::vector<std::unique_ptr<InitParameter>> &&params)
+        : WalCmd(WalCommandType::ALTER_INDEX_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
           index_name_(index_name), index_id_(index_id), params_(std::move(params)) {}
 
-    ~WalCmdOptimizeV2() override = default;
+    ~WalCmdAlterIndexV2() override = default;
 
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
