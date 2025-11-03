@@ -23,7 +23,9 @@ concurrency:
 jobs:
   download_code:
     name: download_code
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
+    if: ${{ github.event_name != 'pull_request' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'slow-test')  ||
+      ((github.event.action == 'synchronize' || github.event.action == 'reopened') && contains(github.event.pull_request.labels.*.name, 'slow-test')) }}
     runs-on: [ "self-hosted", "slow-test" ]
     steps:
       - name: Ensure workspace ownership
@@ -50,7 +52,6 @@ jobs:
 
   debug_build:
     name: debug_build
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     needs: download_code
     steps:
@@ -88,7 +89,6 @@ jobs:
 
   debug_unit_test:
     name: debug_unit_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     needs: debug_build
     steps:
@@ -127,7 +127,6 @@ jobs:
 
   debug_tsan_restart_test:
     name: debug_tsan_restart_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     needs: debug_build
     steps:
@@ -173,7 +172,6 @@ jobs:
 
   debug_tsan_cluster_test:
     name: debug_tsan_cluster_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     needs: debug_build
     steps:
@@ -215,7 +213,6 @@ jobs:
 
   debug_tsan_parallel_test:
     name: debug_tsan_parallel_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     needs:
       - debug_build
@@ -264,7 +261,6 @@ jobs:
 
   reldeb_build:
     name: reldeb_build
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     needs: download_code
     steps:
@@ -298,7 +294,6 @@ jobs:
 
   reldeb_unit_test:
     name: reldeb_unit_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     needs: reldeb_build
     steps:
@@ -337,7 +332,6 @@ jobs:
 
   reldeb_parallel_test:
     name: reldeb_parallel_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     needs:
       - reldeb_build
@@ -386,7 +380,6 @@ jobs:
 
   reldeb_restart_test:
     name: reldeb_restart_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     needs: reldeb_build
     steps:
