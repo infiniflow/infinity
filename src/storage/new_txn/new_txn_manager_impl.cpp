@@ -872,11 +872,11 @@ SystemCache *NewTxnManager::GetSystemCachePtr() const { return system_cache_.get
 
 void NewTxnManager::UpdateTxnBeginTS(NewTxn *txn) {
     std::lock_guard guard(locker_);
+    TxnTimeStamp old_begin_ts = txn->BeginTS();
     TxnTimeStamp new_begin_ts = current_ts_ + 1;
     txn->SetBeginTS(new_begin_ts);
     ++begin_txn_map_[new_begin_ts];
 
-    TxnTimeStamp old_begin_ts = txn->BeginTS();
     auto old_it = begin_txn_map_.find(old_begin_ts);
     if (old_it == begin_txn_map_.end()) {
         UnrecoverableError(fmt::format("UpdateTxnBeginTS: NewTxn: {} with begin ts: {} not found in begin_txn_map_", txn->TxnID(), old_begin_ts));
