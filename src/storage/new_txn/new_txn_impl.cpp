@@ -1859,10 +1859,10 @@ WalEntry *NewTxn::GetWALEntry() const { return wal_entry_.get(); }
 //     this->SetTxnBegin(ts);
 // }
 
-// void NewTxn::SetBeginTS(TxnTimeStamp begin_ts) {
-//     LOG_TRACE(fmt::format("NewTxn: {} is Begin. begin ts: {}", txn_context_ptr_->txn_id_, begin_ts));
-//     this->SetTxnBegin(begin_ts);
-// }
+void NewTxn::SetBeginTS(TxnTimeStamp begin_ts) {
+    LOG_TRACE(fmt::format("NewTxn: {} begins processing. Set begin_ts to: {}", txn_context_ptr_->txn_id_, begin_ts));
+    txn_context_ptr_->begin_ts_ = begin_ts;
+}
 
 Status NewTxn::Commit() {
     if (base_txn_store_ == nullptr or this->readonly()) {

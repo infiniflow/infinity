@@ -652,10 +652,12 @@ void NewTxnManager::CleanupTxn(NewTxn *txn) {
 void NewTxnManager::CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto begin_txn_iter = begin_txn_map_.find(begin_ts);
     if (begin_txn_iter == begin_txn_map_.end()) {
-        UnrecoverableError(fmt::format("NewTxn: {} with begin ts: {} not found in begin_txn_map_", txn_id, begin_ts));
+        UnrecoverableError(fmt::format("CleanupTxnBottomNolock: NewTxn: {} with begin ts: {} not found in begin_txn_map_", txn_id, begin_ts));
     }
-    --begin_txn_iter->second;
     if (begin_txn_iter->second == 0) {
+        UnrecoverableError(fmt::format("CleanupTxnBottomNolock: Txn count with begin ts: {} in begin_txn_map_ is 0", begin_ts));
+    }
+    if (--begin_txn_iter->second == 0) {
         begin_txn_map_.erase(begin_txn_iter);
     }
 
@@ -867,6 +869,25 @@ void NewTxnManager::RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, Ne
 }
 
 SystemCache *NewTxnManager::GetSystemCachePtr() const { return system_cache_.get(); }
+
+void NewTxnManager::UpdateTxnBeginTS(NewTxn *txn) {
+    std::lock_guard guard(locker_);
+    TxnTimeStamp old_begin_ts = txn->BeginTS();
+    TxnTimeStamp new_begin_ts = current_ts_ + 1;
+    txn->SetBeginTS(new_begin_ts);
+    ++begin_txn_map_[new_begin_ts];
+
+    auto old_it = begin_txn_map_.find(old_begin_ts);
+    if (old_it == begin_txn_map_.end()) {
+        UnrecoverableError(fmt::format("UpdateTxnBeginTS: NewTxn: {} with begin ts: {} not found in begin_txn_map_", txn->TxnID(), old_begin_ts));
+    }
+    if (old_it->second == 0) {
+        UnrecoverableError(fmt::format("UpdateTxnBeginTS: Txn count with begin ts: {} in begin_txn_map_ is 0", old_begin_ts));
+    }
+    if (--old_it->second == 0) {
+        begin_txn_map_.erase(old_it);
+    }
+}
 
 void NewTxnManager::CollectInfo(NewTxn *txn) {
     switch (txn->GetTxnType()) {
