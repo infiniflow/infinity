@@ -1438,6 +1438,8 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
         return status;
     }
 
+    auto data_start_time = std::chrono::high_resolution_clock::now();
+
     std::vector<BlockID> *block_ids_ptr = nullptr;
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta);
@@ -1463,9 +1465,6 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                 }
             }
 
-            bool flush_column = use_memory;
-            bool flush_version = use_memory;
-
             {
                 std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
                 BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
@@ -1490,15 +1489,9 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
 
                 for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
                     ColumnMeta column_meta(column_idx, block_meta);
-
-                    // std::vector<std::string> paths;
-                    // status = column_meta.FilePaths(paths);
-                    // if (!status.ok()) {
-                    //     return status;
-                    // }
-
                     BufferObj *buffer_obj = nullptr;
                     BufferObj *outline_buffer_obj = nullptr;
+
                     status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
                     if (!status.ok()) {
                         return status;
@@ -1513,32 +1506,15 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                     }
                 }
             }
-            LOG_TRACE(fmt::format("NewTxn::CheckpointTable segment_id {}, block_id {}, flush_column {}, flush_version {}, option.checkpoint_ts_ {}, "
-                                  "block min_ts {}, block "
-                                  "max_ts {}, block checkpoint_ts {}",
-                                  segment_id,
-                                  block_id,
-                                  flush_column,
-                                  flush_version,
-                                  option.checkpoint_ts_,
-                                  block_lock->min_ts_,
-                                  block_lock->max_ts_,
-                                  block_lock->checkpoint_ts_));
-            if (!flush_column or !flush_version) {
-                continue;
-            } else {
-                auto flush_data_entry = std::make_shared<FlushDataEntry>(table_meta.db_id_str(), table_meta.table_id_str(), segment_id, block_id);
-                if (flush_column && flush_version) {
-                    flush_data_entry->to_flush_ = "data and version";
-                } else if (flush_column) {
-                    flush_data_entry->to_flush_ = "data";
-                } else {
-                    flush_data_entry->to_flush_ = "version";
-                }
-                ckp_txn_store->entries_.emplace_back(flush_data_entry);
-            }
         }
     }
+
+    // End timing for data copying
+    auto data_end_time = std::chrono::high_resolution_clock::now();
+    auto data_duration = std::chrono::duration_cast<std::chrono::milliseconds>(data_end_time - data_start_time);
+    LOG_INFO(fmt::format("Saving data and version files took {} ms", data_duration.count()));
+
+    auto index_start_time = std::chrono::high_resolution_clock::now();
 
     // get all index ids
     std::vector<std::string> *index_ids_ptr = nullptr;
@@ -1575,19 +1551,18 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
 
             // Allocate new chunk ID for this dump
             ChunkID chunk_id = 0;
-            Status status;
             std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
             if (!status.ok()) {
                 return status;
             }
 
-            // Get old chunk IDs for cleanup (if any exist)
             std::vector<ChunkID> old_chunk_ids;
             auto [existing_chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1();
             if (chunk_status.ok()) {
                 old_chunk_ids = *existing_chunk_ids_ptr;
             }
 
+            // Save the index file to disk
             BufferObj *buffer_obj = nullptr;
             for (auto &old_chunk_id : old_chunk_ids) {
                 ChunkIndexMeta chunk_index_meta(old_chunk_id, segment_index_meta);
@@ -1595,7 +1570,7 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                 buffer_obj->SaveSnapshot(table_snapshot_info, false);
             }
 
-            // Actually dump the memory index to disk
+            // Save the memory index to disk
             status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id, table_snapshot_info);
             if (!status.ok() && status.code() != ErrorCode::kEmptyMemIndex) {
                 return status;
@@ -1604,6 +1579,35 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
             LOG_INFO(fmt::format("Successfully dumped segment {} to chunk {}", segment_id, chunk_id));
         }
     }
+
+    // End timing for index copying
+    auto index_end_time = std::chrono::high_resolution_clock::now();
+    auto index_duration = std::chrono::duration_cast<std::chrono::milliseconds>(index_end_time - index_start_time);
+    LOG_INFO(fmt::format("Saving index files took {} ms", index_duration.count()));
+
+    // Create metadata JSON
+    nlohmann::json json_res = table_snapshot_info->CreateSnapshotMetadataJSON();
+    std::string json_string = json_res.dump();
+
+    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    if (!VirtualStore::Exists(snapshot_dir)) {
+        status = VirtualStore::MakeDirectory(snapshot_dir);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    std::string meta_path = fmt::format("{}/{}/{}.json", snapshot_dir, table_snapshot_info->snapshot_name_, table_snapshot_info->snapshot_name_);
+    auto [snapshot_file_handle, meta_status] = VirtualStore::Open(meta_path, FileAccessMode::kWrite);
+    if (!meta_status.ok()) {
+        return meta_status;
+    }
+
+    status = snapshot_file_handle->Append(json_string.data(), json_string.size());
+    if (!status.ok()) {
+        return status;
+    }
+    snapshot_file_handle->Sync();
 
     return Status::OK();
 }

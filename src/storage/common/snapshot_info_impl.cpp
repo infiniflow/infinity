@@ -265,8 +265,8 @@ std::shared_ptr<TableIndexSnapshotInfo> TableIndexSnapshotInfo::Deserialize(cons
 
 Status TableSnapshotInfo::Serialize(const std::string &save_dir, TransactionID txn_id) {
 
-    // Config *config = InfinityContext::instance().config();
-    // PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
+    Config *config = InfinityContext::instance().config();
+    PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
 
     LOG_INFO(fmt::format("Serialize snapshot at {} with txn_id {}", snapshot_name_, txn_id));
 
@@ -281,90 +281,92 @@ Status TableSnapshotInfo::Serialize(const std::string &save_dir, TransactionID t
         return create_temp_status;
     }
 
-    // // Get files
-    // std::vector<std::string> original_files = GetFiles();
+    // Get files
+    std::vector<std::string> original_files = GetFiles();
 
-    // // Copy files to temporary location
-    // if (persistence_manager != nullptr) {
-    //     PersistResultHandler pm_handler(persistence_manager);
-    //     for (const auto &file : original_files) {
-    //         PersistReadResult result = persistence_manager->GetObjCache(file);
-    //         const ObjAddr &obj_addr = pm_handler.HandleReadResult(result);
-    //         if (!obj_addr.Valid()) {
-    //             continue;
-    //         }
-    //
-    //         DeferFn defer_fn([&]() {
-    //             auto res = persistence_manager->PutObjCache(file);
-    //             pm_handler.HandleWriteResult(res);
-    //         });
-    //
-    //         std::string read_path = persistence_manager->GetObjPath(obj_addr.obj_key_);
-    //         LOG_INFO(fmt::format("READ: {} from {}", file, read_path));
-    //
-    //         auto [reader_handle, reader_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
-    //         if (!reader_open_status.ok()) {
-    //             VirtualStore::RemoveDirectory(temp_snapshot_dir);
-    //             return reader_open_status;
-    //         }
-    //
-    //         auto seek_status = reader_handle->Seek(obj_addr.part_offset_);
-    //         if (!seek_status.ok()) {
-    //             VirtualStore::RemoveDirectory(temp_snapshot_dir);
-    //             return seek_status;
-    //         }
-    //
-    //         auto file_size = obj_addr.part_size_;
-    //         auto buffer = std::make_unique<char[]>(file_size);
-    //         auto [nread, read_status] = reader_handle->Read(buffer.get(), file_size);
-    //
-    //         std::string dst_file_path = fmt::format("{}/{}", temp_snapshot_dir, file);
-    //         std::string dst_dir = VirtualStore::GetParentPath(dst_file_path);
-    //
-    //         if (!VirtualStore::Exists(dst_dir)) {
-    //             Status mkdir_status = VirtualStore::MakeDirectory(dst_dir);
-    //             if (!mkdir_status.ok()) {
-    //                 VirtualStore::RemoveDirectory(temp_snapshot_dir);
-    //                 return mkdir_status;
-    //             }
-    //         }
-    //
-    //         auto [write_file_handle, writer_open_status] = VirtualStore::Open(dst_file_path, FileAccessMode::kWrite);
-    //         if (!writer_open_status.ok()) {
-    //             VirtualStore::RemoveDirectory(temp_snapshot_dir);
-    //             return writer_open_status;
-    //         }
-    //
-    //         Status write_status = write_file_handle->Append(buffer.get(), file_size);
-    //         if (!write_status.ok()) {
-    //             VirtualStore::RemoveDirectory(temp_snapshot_dir);
-    //             return write_status;
-    //         }
-    //         write_file_handle->Sync();
-    //         // Validate FST files after copying to catch corruption early
-    //         if (dst_file_path.find(".dic") != std::string::npos) {
-    //             bool is_valid = ValidateFstFile(dst_file_path);
-    //             if (!is_valid) {
-    //                 LOG_WARN("FST validation failed during snapshot creation for file: " + dst_file_path);
-    //                 // Continue with snapshot creation but log the warning
-    //             } else {
-    //                 LOG_DEBUG("FST validation passed during snapshot creation for file: " + dst_file_path);
-    //             }
-    //         }
-    //     }
-    // } else {
-    //     std::string data_dir = config->DataDir();
-    //     for (const auto &file : original_files) {
-    //         std::string src_file_path = fmt::format("{}/{}", data_dir, file);
-    //         std::string dst_file_path = fmt::format("{}/{}", temp_snapshot_dir, file);
-    //
-    //         Status copy_status = VirtualStore::Copy(dst_file_path, src_file_path);
-    //         if (!copy_status.ok()) {
-    //             VirtualStore::RemoveDirectory(temp_snapshot_dir);
-    //             return copy_status;
-    //         }
-    //     }
-    // }
+    // Copy files to temporary location
+    if (persistence_manager != nullptr) {
+        PersistResultHandler pm_handler(persistence_manager);
+        for (const auto &file : original_files) {
+            PersistReadResult result = persistence_manager->GetObjCache(file);
+            DeferFn defer_fn([&]() {
+                auto res = persistence_manager->PutObjCache(file);
+                pm_handler.HandleWriteResult(res);
+            });
+
+            const ObjAddr &obj_addr = pm_handler.HandleReadResult(result);
+            if (!obj_addr.Valid()) {
+                // Clean up temp directory on failure
+                VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                std::string error_msg = fmt::format("Failed to find object for local path {}", file);
+                return Status::FileNotFound(error_msg);
+            }
+            std::string read_path = persistence_manager->GetObjPath(obj_addr.obj_key_);
+            LOG_INFO(fmt::format("READ: {} from {}", file, read_path));
+
+            auto [reader_handle, reader_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
+            if (!reader_open_status.ok()) {
+                VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                return reader_open_status;
+            }
+
+            auto seek_status = reader_handle->Seek(obj_addr.part_offset_);
+            if (!seek_status.ok()) {
+                VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                return seek_status;
+            }
+
+            auto file_size = obj_addr.part_size_;
+            auto buffer = std::make_unique<char[]>(file_size);
+            auto [nread, read_status] = reader_handle->Read(buffer.get(), file_size);
+
+            std::string dst_file_path = fmt::format("{}/{}", temp_snapshot_dir, file);
+            std::string dst_dir = VirtualStore::GetParentPath(dst_file_path);
+
+            if (!VirtualStore::Exists(dst_dir)) {
+                Status mkdir_status = VirtualStore::MakeDirectory(dst_dir);
+                if (!mkdir_status.ok()) {
+                    VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                    return mkdir_status;
+                }
+            }
+
+            auto [write_file_handle, writer_open_status] = VirtualStore::Open(dst_file_path, FileAccessMode::kWrite);
+            if (!writer_open_status.ok()) {
+                VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                return writer_open_status;
+            }
+
+            Status write_status = write_file_handle->Append(buffer.get(), file_size);
+            if (!write_status.ok()) {
+                VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                return write_status;
+            }
+            write_file_handle->Sync();
+            // Validate FST files after copying to catch corruption early
+            if (dst_file_path.find(".dic") != std::string::npos) {
+                bool is_valid = ValidateFstFile(dst_file_path);
+                if (!is_valid) {
+                    LOG_WARN("FST validation failed during snapshot creation for file: " + dst_file_path);
+                    // Continue with snapshot creation but log the warning
+                } else {
+                    LOG_DEBUG("FST validation passed during snapshot creation for file: " + dst_file_path);
+                }
+            }
+        }
+    } else {
+        std::string data_dir = config->DataDir();
+        for (const auto &file : original_files) {
+            std::string src_file_path = fmt::format("{}/{}", data_dir, file);
+            std::string dst_file_path = fmt::format("{}/{}", temp_snapshot_dir, file);
+
+            Status copy_status = VirtualStore::Copy(dst_file_path, src_file_path);
+            if (!copy_status.ok()) {
+                VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                return copy_status;
+            }
+        }
+    }
 
     // End timing for data copying
     auto data_copy_end = std::chrono::high_resolution_clock::now();
@@ -383,74 +385,48 @@ Status TableSnapshotInfo::Serialize(const std::string &save_dir, TransactionID t
     auto json_duration = std::chrono::duration_cast<std::chrono::milliseconds>(json_end - json_start);
     LOG_INFO(fmt::format("JSON serialization took {} ms", json_duration.count()));
 
-    std::string snapshot_dir = fmt::format("{}/{}", save_dir, snapshot_name_);
-    if (!VirtualStore::Exists(snapshot_dir)) {
-        Status mkdir_status = VirtualStore::MakeDirectory(snapshot_dir);
-        if (!mkdir_status.ok()) {
-            VirtualStore::RemoveDirectory(temp_snapshot_dir);
-            return mkdir_status;
-        }
-    }
-
-    std::string meta_path = fmt::format("{}/{}.json", snapshot_dir, snapshot_name_);
-    auto [snapshot_file_handle, status] = VirtualStore::Open(meta_path, FileAccessMode::kWrite);
+    // Write metadata to temporary location
+    std::string temp_meta_path = fmt::format("{}/{}.json", temp_snapshot_dir, snapshot_name_);
+    auto [snapshot_file_handle, status] = VirtualStore::Open(temp_meta_path, FileAccessMode::kWrite);
     if (!status.ok()) {
         VirtualStore::RemoveDirectory(temp_snapshot_dir);
-        VirtualStore::RemoveDirectory(snapshot_dir);
         return status;
     }
 
     status = snapshot_file_handle->Append(json_string.data(), json_string.size());
     if (!status.ok()) {
         VirtualStore::RemoveDirectory(temp_snapshot_dir);
-        VirtualStore::RemoveDirectory(snapshot_dir);
         return status;
     }
     snapshot_file_handle->Sync();
-    VirtualStore::RemoveDirectory(temp_snapshot_dir);
 
-    //    // Write metadata to temporary location
-    //    std::string temp_meta_path = fmt::format("{}/{}.json", temp_snapshot_dir, snapshot_name_);
-    //    auto [snapshot_file_handle, status] = VirtualStore::Open(temp_meta_path, FileAccessMode::kWrite);
-    //    if (!status.ok()) {
-    //        VirtualStore::RemoveDirectory(temp_snapshot_dir);
-    //        return status;
-    //    }
-    //
-    //    status = snapshot_file_handle->Append(json_string.data(), json_string.size());
-    //    if (!status.ok()) {
-    //        VirtualStore::RemoveDirectory(temp_snapshot_dir);
-    //        return status;
-    //    }
-    //    snapshot_file_handle->Sync();
-    //
-    //    // Atomically move temporary directory to final location
-    //    std::string final_snapshot_dir = fmt::format("{}/{}", save_dir, snapshot_name_);
-    //
-    //    // Ensure save directory exists
-    //    if (!VirtualStore::Exists(save_dir)) {
-    //        Status mkdir_status = VirtualStore::MakeDirectory(save_dir);
-    //        if (!mkdir_status.ok()) {
-    //            VirtualStore::RemoveDirectory(temp_snapshot_dir);
-    //            return mkdir_status;
-    //        }
-    //    }
-    //    if (VirtualStore::Exists(final_snapshot_dir)) {
-    //        VirtualStore::RemoveDirectory(temp_snapshot_dir);
-    //        return Status::SnapshotAlreadyExists(snapshot_name_);
-    //    }
-    //
-    //    // Atomic rename operation
-    //    try {
-    //        Status rename_status = VirtualStore::Rename(temp_snapshot_dir, final_snapshot_dir);
-    //        if (!rename_status.ok()) {
-    //            VirtualStore::RemoveDirectory(temp_snapshot_dir);
-    //            return rename_status;
-    //        }
-    //    } catch (const std::exception &e) {
-    //        VirtualStore::RemoveDirectory(temp_snapshot_dir);
-    //        return Status::SnapshotAlreadyExists(snapshot_name_);
-    //    }
+    // Atomically move temporary directory to final location
+    std::string final_snapshot_dir = fmt::format("{}/{}", save_dir, snapshot_name_);
+
+    // Ensure save directory exists
+    if (!VirtualStore::Exists(save_dir)) {
+        Status mkdir_status = VirtualStore::MakeDirectory(save_dir);
+        if (!mkdir_status.ok()) {
+            VirtualStore::RemoveDirectory(temp_snapshot_dir);
+            return mkdir_status;
+        }
+    }
+    if (VirtualStore::Exists(final_snapshot_dir)) {
+        VirtualStore::RemoveDirectory(temp_snapshot_dir);
+        return Status::SnapshotAlreadyExists(snapshot_name_);
+    }
+
+    // Atomic rename operation
+    try {
+        Status rename_status = VirtualStore::Rename(temp_snapshot_dir, final_snapshot_dir);
+        if (!rename_status.ok()) {
+            VirtualStore::RemoveDirectory(temp_snapshot_dir);
+            return rename_status;
+        }
+    } catch (const std::exception &e) {
+        VirtualStore::RemoveDirectory(temp_snapshot_dir);
+        return Status::SnapshotAlreadyExists(snapshot_name_);
+    }
 
     LOG_INFO(fmt::format("Atomic snapshot creation completed: {}", json_res.dump()));
     return Status::OK();

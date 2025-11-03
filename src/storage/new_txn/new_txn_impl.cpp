@@ -2387,25 +2387,25 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
         return status;
     }
 
-    // Check if checkpoint actually happened
-    if (ckp_txn_store != nullptr) {
-        if (!ckp_txn_store->entries_.empty()) {
-            LOG_INFO(fmt::format("Checkpoint successful! {} blocks flushed", ckp_txn_store->entries_.size()));
-
-            // Use the transaction store to generate WAL command
-            std::shared_ptr<WalEntry> wal_entry = ckp_txn_store->ToWalEntry(txn_context_ptr_->commit_ts_);
-
-            // There's only ONE command - the checkpoint command
-            if (!wal_entry->cmds_.empty()) {
-                // auto checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(wal_entry->cmds_[0].get());
-                // PrepareCommitCheckpoint(checkpoint_cmd);
-            }
-        } else {
-            LOG_INFO("Checkpoint transaction exists but no blocks were flushed (skip checkpoint)");
-        }
-    } else {
-        LOG_INFO("No checkpoint transaction found");
-    }
+    // // Check if checkpoint actually happened
+    // if (ckp_txn_store != nullptr) {
+    //     if (!ckp_txn_store->entries_.empty()) {
+    //         LOG_INFO(fmt::format("Checkpoint successful! {} blocks flushed", ckp_txn_store->entries_.size()));
+    //
+    //         // Use the transaction store to generate WAL command
+    //         std::shared_ptr<WalEntry> wal_entry = ckp_txn_store->ToWalEntry(txn_context_ptr_->commit_ts_);
+    //
+    //         // There's only ONE command - the checkpoint command
+    //         if (!wal_entry->cmds_.empty()) {
+    //             auto checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(wal_entry->cmds_[0].get());
+    //             PrepareCommitCheckpoint(checkpoint_cmd);
+    //         }
+    //     } else {
+    //         LOG_INFO("Checkpoint transaction exists but no blocks were flushed (skip checkpoint)");
+    //     }
+    // } else {
+    //     LOG_INFO("No checkpoint transaction found");
+    // }
     return Status::OK();
 }
 
@@ -5398,31 +5398,31 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
 
 Status NewTxn::CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create_table_snapshot_cmd) {
 
-    ManualDumpIndex(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_);
-
-    // create a new snapshot
-    std::shared_ptr<DBMeta> db_meta;
-    std::shared_ptr<TableMeta> table_meta;
-    TxnTimeStamp create_timestamp;
-    Status status = GetTableMeta(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_, db_meta, table_meta, create_timestamp);
-    if (!status.ok()) {
-        return status;
-    }
-    table_meta->SetBeginTS(txn_context_ptr_->commit_ts_);
-
-    std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
-    std::tie(table_snapshot_info, status) =
-        table_meta->MapMetaToSnapShotInfo(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_);
-    if (!status.ok()) {
-        return status;
-    }
-    table_snapshot_info->snapshot_name_ = create_table_snapshot_cmd->snapshot_name_;
-
-    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    status = table_snapshot_info->Serialize(snapshot_dir, this->TxnID());
-    if (!status.ok()) {
-        return status;
-    }
+    // ManualDumpIndex(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_);
+    //
+    // // create a new snapshot
+    // std::shared_ptr<DBMeta> db_meta;
+    // std::shared_ptr<TableMeta> table_meta;
+    // TxnTimeStamp create_timestamp;
+    // Status status = GetTableMeta(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_, db_meta, table_meta,
+    // create_timestamp); if (!status.ok()) {
+    //     return status;
+    // }
+    // table_meta->SetBeginTS(txn_context_ptr_->commit_ts_);
+    //
+    // std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
+    // std::tie(table_snapshot_info, status) =
+    //     table_meta->MapMetaToSnapShotInfo(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_);
+    // if (!status.ok()) {
+    //     return status;
+    // }
+    // table_snapshot_info->snapshot_name_ = create_table_snapshot_cmd->snapshot_name_;
+    //
+    // std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    // status = table_snapshot_info->Serialize(snapshot_dir, this->TxnID());
+    // if (!status.ok()) {
+    //     return status;
+    // }
 
     return Status::OK();
 }
