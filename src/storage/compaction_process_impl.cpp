@@ -211,7 +211,7 @@ void CompactionProcessor::NewNotifyCompact() {
 
 Status CompactionProcessor::NewManualCompact(NewTxn *new_txn, const std::string &db_name, const std::string &table_name) {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    new_txn->SetBeginTS(new_txn_mgr->CurrentTS() + 1);
+    new_txn_mgr->UpdateTxnBeginTS(new_txn);
 
     std::unique_ptr<std::string> result_msg;
     LOG_TRACE(fmt::format("Compact command triggered compaction: {}.{}", db_name, table_name));

@@ -1861,7 +1861,6 @@ WalEntry *NewTxn::GetWALEntry() const { return wal_entry_.get(); }
 
 void NewTxn::SetBeginTS(TxnTimeStamp begin_ts) {
     LOG_TRACE(fmt::format("NewTxn: {} begins processing. Set begin_ts to: {}", txn_context_ptr_->txn_id_, begin_ts));
-    txn_mgr_->UpdateBeginTxnMap(txn_context_ptr_->begin_ts_, begin_ts);
     txn_context_ptr_->begin_ts_ = begin_ts;
 }
 

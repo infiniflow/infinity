@@ -159,7 +159,7 @@ public:
         return last_kv_commit_ts_;
     }
 
-    void UpdateBeginTxnMap(TxnTimeStamp old_begin_ts, TxnTimeStamp new_begin_ts);
+    void UpdateTxnBeginTS(NewTxn *txn);
 
 private:
     mutable std::mutex locker_{};
