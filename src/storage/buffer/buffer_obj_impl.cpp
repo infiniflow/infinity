@@ -218,6 +218,13 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
     return write;
 }
 
+bool BufferObj::SaveSnapshot(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info, bool use_memory, const FileWorkerSaveCtx &ctx) {
+    std::unique_lock<std::mutex> locker(w_locker_);
+
+    bool all_save = file_worker_->WriteSnapshotFile(table_snapshot_info, use_memory, ctx);
+    return all_save;
+}
+
 void BufferObj::PickForCleanup() {
     std::unique_lock<std::mutex> locker(w_locker_);
     if (obj_rc_ == 0) {

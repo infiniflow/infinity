@@ -65,6 +65,7 @@ bool FileWorker::WriteSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &tab
     std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     std::string write_dir = std::filesystem::path(snapshot_dir) / snapshot_name / *file_dir_;
     std::string write_path = fmt::format("{}/{}", write_dir, *file_name_);
+    std::string src_path = this->GetFilePath();
 
     if (!VirtualStore::Exists(write_dir)) {
         VirtualStore::MakeDirectory(write_dir);
@@ -86,54 +87,46 @@ bool FileWorker::WriteSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &tab
 
         return all_save;
     } else {
-        std::string data_dir = InfinityContext::instance().config()->DataDir();
-        std::vector<std::string> original_files = table_snapshot_info->GetFiles();
-
         PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
         if (persistence_manager != nullptr) {
             PersistResultHandler pm_handler(persistence_manager);
-            for (const auto &file : original_files) {
-                PersistReadResult result = persistence_manager->GetObjCache(file);
-                const ObjAddr &obj_addr = result.obj_addr_;
-                if (!obj_addr.Valid()) {
-                    continue;
-                }
-
-                std::string read_path = persistence_manager->GetObjPath(obj_addr.obj_key_);
-                LOG_INFO(fmt::format("READ: {} from {}", file, read_path));
-
-                auto [read_handle, read_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
-                if (!read_open_status.ok()) {
-                    UnrecoverableError(read_open_status.message());
-                }
-
-                auto seek_status = read_handle->Seek(obj_addr.part_offset_);
-                if (!seek_status.ok()) {
-                    UnrecoverableError(seek_status.message());
-                }
-
-                auto file_size = obj_addr.part_size_;
-                auto buffer = std::make_unique<char[]>(file_size);
-                auto [nread, read_status] = read_handle->Read(buffer.get(), file_size);
-
-                auto [write_handle, write_open_status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
-                if (!write_open_status.ok()) {
-                    UnrecoverableError(write_open_status.message());
-                }
-
-                Status write_status = write_handle->Append(buffer.get(), file_size);
-                if (!write_status.ok()) {
-                    UnrecoverableError(write_status.message());
-                }
-                write_handle->Sync();
+            PersistReadResult result = persistence_manager->GetObjCache(src_path);
+            const ObjAddr &obj_addr = result.obj_addr_;
+            if (!obj_addr.Valid()) {
+                return true;
             }
+
+            std::string read_path = persistence_manager->GetObjPath(obj_addr.obj_key_);
+            LOG_INFO(fmt::format("READ: {} from {}", src_path, read_path));
+
+            auto [read_handle, read_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
+            if (!read_open_status.ok()) {
+                UnrecoverableError(read_open_status.message());
+            }
+
+            auto seek_status = read_handle->Seek(obj_addr.part_offset_);
+            if (!seek_status.ok()) {
+                UnrecoverableError(seek_status.message());
+            }
+
+            auto file_size = obj_addr.part_size_;
+            auto buffer = std::make_unique<char[]>(file_size);
+            auto [nread, read_status] = read_handle->Read(buffer.get(), file_size);
+
+            auto [write_handle, write_open_status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
+            if (!write_open_status.ok()) {
+                UnrecoverableError(write_open_status.message());
+            }
+
+            Status write_status = write_handle->Append(buffer.get(), file_size);
+            if (!write_status.ok()) {
+                UnrecoverableError(write_status.message());
+            }
+            write_handle->Sync();
         } else {
-            for (const auto &file : original_files) {
-                std::string read_path = fmt::format("{}/{}", data_dir, file);
-                Status status = VirtualStore::Copy(write_path, read_path);
-                if (!status.ok()) {
-                    UnrecoverableError(status.message());
-                }
+            Status status = VirtualStore::Copy(write_path, src_path);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
             }
         }
     }

@@ -2397,8 +2397,8 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
 
             // There's only ONE command - the checkpoint command
             if (!wal_entry->cmds_.empty()) {
-                auto checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(wal_entry->cmds_[0].get());
-                PrepareCommitCheckpoint(checkpoint_cmd);
+                // auto checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(wal_entry->cmds_[0].get());
+                // PrepareCommitCheckpoint(checkpoint_cmd);
             }
         } else {
             LOG_INFO("Checkpoint transaction exists but no blocks were flushed (skip checkpoint)");

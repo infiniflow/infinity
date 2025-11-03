@@ -1695,6 +1695,162 @@ Status NewTxn::ReplayAlterIndexByParams(WalCmdAlterIndexV2 *alter_index_cmd) {
                               std::move(alter_index_cmd->params_));
 }
 
+Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta,
+                                   const ChunkID &new_chunk_id,
+                                   const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info) {
+    std::shared_ptr<MemIndex> mem_index = segment_index_meta.PopMemIndex();
+    if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+        return Status::EmptyMemIndex();
+    }
+    mem_index->WaitUpdate();
+    LOG_TRACE(fmt::format("NewTxn::DumpSegmentMemIndex WaitUpdate mem_index {:p}", (void *)mem_index.get()));
+    TableIndexMeta &table_index_meta = segment_index_meta.table_index_meta();
+    auto [index_base, index_status] = table_index_meta.GetIndexBase();
+    if (!index_status.ok()) {
+        return index_status;
+    }
+
+    std::shared_ptr<SecondaryIndexInMem> memory_secondary_index = nullptr;
+    std::shared_ptr<IVFIndexInMem> memory_ivf_index = nullptr;
+    std::shared_ptr<HnswIndexInMem> memory_hnsw_index = nullptr;
+    std::shared_ptr<BMPIndexInMem> memory_bmp_index = nullptr;
+    std::shared_ptr<EMVBIndexInMem> memory_emvb_index = nullptr;
+
+    // dump mem index only happens in parallel with read, not write, so no lock is needed.
+    switch (index_base->index_type_) {
+        case IndexType::kSecondary: {
+            memory_secondary_index = mem_index->GetSecondaryIndex();
+            if (memory_secondary_index == nullptr) {
+                return Status::EmptyMemIndex();
+            }
+            break;
+        }
+        case IndexType::kFullText: {
+            std::shared_ptr<MemoryIndexer> memory_indexer = mem_index->GetFulltextIndex();
+            if (memory_indexer == nullptr) {
+                return Status::EmptyMemIndex();
+            }
+            memory_indexer->Dump(false /*offline*/, false /*spill*/);
+            break;
+        }
+        case IndexType::kIVF: {
+            memory_ivf_index = mem_index->GetIVFIndex();
+            if (memory_ivf_index == nullptr) {
+                return Status::EmptyMemIndex();
+            }
+            break;
+        }
+        case IndexType::kHnsw: {
+            memory_hnsw_index = mem_index->GetHnswIndex();
+            if (memory_hnsw_index == nullptr) {
+                return Status::EmptyMemIndex();
+            }
+            break;
+        }
+        case IndexType::kBMP: {
+            memory_bmp_index = mem_index->GetBMPIndex();
+            if (memory_bmp_index == nullptr) {
+                return Status::EmptyMemIndex();
+            }
+            break;
+        }
+        case IndexType::kEMVB: {
+            memory_emvb_index = mem_index->GetEMVBIndex();
+            if (memory_emvb_index == nullptr) {
+                return Status::EmptyMemIndex();
+            }
+            break;
+        }
+        case IndexType::kDiskAnn: {
+            UnrecoverableError("Not implemented yet");
+            break;
+        }
+        default: {
+            UnrecoverableError("Not implemented yet");
+        }
+    }
+
+    // NOTE: ChunkIndexMetaInfo::term_cnt_ is unstalbe before MemoryIndexer::Dump()!
+    ChunkIndexMetaInfo chunk_index_meta_info;
+    if (mem_index->GetBaseMemIndex() != nullptr) {
+        chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
+    } else if (mem_index->GetEMVBIndex() != nullptr) {
+        chunk_index_meta_info = mem_index->GetEMVBIndex()->GetChunkIndexMetaInfo();
+    } else {
+        UnrecoverableError("Invalid mem index");
+    }
+
+    std::optional<ChunkIndexMeta> chunk_index_meta;
+    BufferObj *buffer_obj = nullptr;
+    {
+        Status status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
+                                                      this,
+                                                      new_chunk_id,
+                                                      chunk_index_meta_info.base_row_id_,
+                                                      chunk_index_meta_info.row_cnt_,
+                                                      chunk_index_meta_info.term_cnt_,
+                                                      chunk_index_meta_info.base_name_,
+                                                      chunk_index_meta_info.index_size_,
+                                                      chunk_index_meta);
+        if (!status.ok()) {
+            return status;
+        }
+
+        chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
+                                                       table_index_meta.table_meta().table_id_str(),
+                                                       segment_index_meta.segment_id(),
+                                                       new_chunk_id});
+
+        status = chunk_index_meta->GetIndexBuffer(buffer_obj);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    switch (index_base->index_type_) {
+        case IndexType::kSecondary: {
+            memory_secondary_index->Dump(buffer_obj);
+            buffer_obj->SaveSnapshot(table_snapshot_info, true);
+            break;
+        }
+        case IndexType::kFullText: {
+            break;
+        }
+        case IndexType::kIVF: {
+            memory_ivf_index->Dump(buffer_obj);
+            buffer_obj->SaveSnapshot(table_snapshot_info, true);
+            break;
+        }
+        case IndexType::kHnsw: {
+            memory_hnsw_index->Dump(buffer_obj);
+            buffer_obj->SaveSnapshot(table_snapshot_info, true);
+            break;
+        }
+        case IndexType::kBMP: {
+            memory_bmp_index->Dump(buffer_obj);
+            buffer_obj->SaveSnapshot(table_snapshot_info, true);
+            break;
+        }
+        case IndexType::kEMVB: {
+            memory_emvb_index->Dump(buffer_obj);
+            buffer_obj->SaveSnapshot(table_snapshot_info, true);
+            break;
+        }
+        default: {
+            UnrecoverableError("Not implemented yet");
+        }
+    }
+
+    mem_index->ClearMemIndex();
+    auto *storage = InfinityContext::instance().storage();
+    if (storage != nullptr) {
+        auto *memindex_tracer = storage->memindex_tracer();
+        if (memindex_tracer != nullptr) {
+            memindex_tracer->DumpDone(mem_index);
+        }
+    }
+    return Status::OK();
+}
+
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {
     std::shared_ptr<MemIndex> mem_index = segment_index_meta.PopMemIndex();
     if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {

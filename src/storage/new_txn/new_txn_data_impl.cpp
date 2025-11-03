@@ -1455,18 +1455,16 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                 continue;
             }
 
-            bool flush_version = false;
-            bool flush_column = false;
+            bool use_memory = false;
             {
-                // TODO: Refactor min_ts_ and max_ts_ to per-column-ts
                 std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
                 if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
-                    flush_version = true;
-                }
-                if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
-                    flush_column = true;
+                    use_memory = true;
                 }
             }
+
+            bool flush_column = use_memory;
+            bool flush_version = use_memory;
 
             {
                 std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
@@ -1479,9 +1477,8 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                     return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
                 }
 
-                FileWorker *file_worker = version_buffer->file_worker();
                 VersionFileWorkerSaveCtx ctx(option.checkpoint_ts_);
-                file_worker->WriteSnapshotFile(table_snapshot_info, flush_version, ctx);
+                version_buffer->SaveSnapshot(table_snapshot_info, use_memory, ctx);
             }
 
             {
@@ -1490,28 +1487,31 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                 if (!status.ok()) {
                     return status;
                 }
-                LOG_TRACE("NewTxn::FlushColumnFiles begin");
+
                 for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
                     ColumnMeta column_meta(column_idx, block_meta);
+
+                    // std::vector<std::string> paths;
+                    // status = column_meta.FilePaths(paths);
+                    // if (!status.ok()) {
+                    //     return status;
+                    // }
+
                     BufferObj *buffer_obj = nullptr;
                     BufferObj *outline_buffer_obj = nullptr;
-
                     status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
                     if (!status.ok()) {
                         return status;
                     }
 
                     if (buffer_obj) {
-                        FileWorker *file_worker = buffer_obj->file_worker();
-                        file_worker->WriteSnapshotFile(table_snapshot_info, flush_column);
+                        buffer_obj->SaveSnapshot(table_snapshot_info, use_memory);
                     }
 
                     if (outline_buffer_obj) {
-                        FileWorker *file_worker = outline_buffer_obj->file_worker();
-                        file_worker->WriteSnapshotFile(table_snapshot_info, flush_column);
+                        outline_buffer_obj->SaveSnapshot(table_snapshot_info, use_memory);
                     }
                 }
-                LOG_TRACE("NewTxn::FlushColumnFiles end");
             }
             LOG_TRACE(fmt::format("NewTxn::CheckpointTable segment_id {}, block_id {}, flush_column {}, flush_version {}, option.checkpoint_ts_ {}, "
                                   "block min_ts {}, block "
@@ -1537,6 +1537,71 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                 }
                 ckp_txn_store->entries_.emplace_back(flush_data_entry);
             }
+        }
+    }
+
+    // get all index ids
+    std::vector<std::string> *index_ids_ptr = nullptr;
+    std::vector<std::string> *index_names_ptr = nullptr;
+    status = table_meta.GetIndexIDs(index_ids_ptr, &index_names_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+
+    size_t index_count = index_ids_ptr->size();
+    for (size_t i = 0; i < index_count; ++i) {
+        const std::string &index_id_str = (*index_ids_ptr)[i];
+        const std::string &index_name_str = (*index_names_ptr)[i];
+        TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
+
+        // Get all segment IDs for this index
+        std::vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
+        if (!status.ok()) {
+            return status;
+        }
+
+        // Loop through all segments and dump each one
+        for (SegmentID segment_id : *segment_ids_ptr) {
+            SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
+
+            // Get memory index for this segment
+            std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+            if (mem_index == nullptr || mem_index->IsDumping() || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+                LOG_INFO(fmt::format("Skipping segment {} - no memory index to dump", segment_id));
+                continue;
+            }
+            mem_index->SetIsDumping(true);
+
+            // Allocate new chunk ID for this dump
+            ChunkID chunk_id = 0;
+            Status status;
+            std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+            if (!status.ok()) {
+                return status;
+            }
+
+            // Get old chunk IDs for cleanup (if any exist)
+            std::vector<ChunkID> old_chunk_ids;
+            auto [existing_chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1();
+            if (chunk_status.ok()) {
+                old_chunk_ids = *existing_chunk_ids_ptr;
+            }
+
+            BufferObj *buffer_obj = nullptr;
+            for (auto &old_chunk_id : old_chunk_ids) {
+                ChunkIndexMeta chunk_index_meta(old_chunk_id, segment_index_meta);
+                Status status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+                buffer_obj->SaveSnapshot(table_snapshot_info, false);
+            }
+
+            // Actually dump the memory index to disk
+            status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id, table_snapshot_info);
+            if (!status.ok() && status.code() != ErrorCode::kEmptyMemIndex) {
+                return status;
+            }
+
+            LOG_INFO(fmt::format("Successfully dumped segment {} to chunk {}", segment_id, chunk_id));
         }
     }
 
