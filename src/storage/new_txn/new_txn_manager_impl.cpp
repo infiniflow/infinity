@@ -868,6 +868,18 @@ void NewTxnManager::RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, Ne
 
 SystemCache *NewTxnManager::GetSystemCachePtr() const { return system_cache_.get(); }
 
+void NewTxnManager::UpdateBeginTxnMap(TxnTimeStamp old_begin_ts, TxnTimeStamp new_begin_ts) {
+    std::lock_guard guard(locker_);
+    ++begin_txn_map_[new_begin_ts];
+
+    auto old_it = begin_txn_map_.find(old_begin_ts);
+    if (old_it != begin_txn_map_.end()) {
+        if (--old_it->second == 0) {
+            begin_txn_map_.erase(old_it);
+        }
+    }
+}
+
 void NewTxnManager::CollectInfo(NewTxn *txn) {
     switch (txn->GetTxnType()) {
         case TransactionType::kNewCheckpoint: {

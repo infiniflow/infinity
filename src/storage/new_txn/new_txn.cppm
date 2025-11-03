@@ -164,7 +164,7 @@ public:
 
     //    void Begin();
 
-    //    void SetBeginTS(TxnTimeStamp begin_ts);
+    void SetBeginTS(TxnTimeStamp begin_ts);
 
     Status Commit();
 
