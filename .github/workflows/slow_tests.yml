@@ -9,8 +9,11 @@ on:
   create:
     tags:
       - "slow-test"               # mutable tag
-  pull_request:
-    types: [ labeled, synchronize, reopened ]
+  # The only difference between pull_request and pull_request_target is the context in which the workflow runs:
+  # — pull_request_target workflows use the workflow files from the default branch, and secrets are available.
+  # — pull_request workflows use the workflow files from the pull request branch, and secrets are unavailable.
+  pull_request_target:
+    types: [ synchronize, ready_for_review ]
     paths-ignore:
       - 'docs/**'
       - '*.md'
@@ -23,16 +26,14 @@ concurrency:
 jobs:
   download_code:
     name: download_code
-    if: ${{ github.event_name != 'pull_request' ||
-      (github.event.action == 'labeled' && github.event.label.name == 'slow-test')  ||
-      ((github.event.action == 'synchronize' || github.event.action == 'reopened') && contains(github.event.pull_request.labels.*.name, 'slow-test')) }}
+    if: ${{ github.event_name != 'pull_request_target' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     steps:
       - name: Ensure workspace ownership
         if: ${{ !cancelled() && !failure() }}
         run: |
           echo "Workflow triggered by ${{ github.event_name }}"
-          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+          if [[ ${{ github.event_name }} == 'pull_request_target' ]]; then
             echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
           fi
           echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE

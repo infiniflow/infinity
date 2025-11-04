@@ -8,8 +8,11 @@ on:
     paths-ignore:
       - 'docs/**'
       - '*.md'
-  pull_request:
-    types: [ labeled, synchronize, reopened ]
+  # The only difference between pull_request and pull_request_target is the context in which the workflow runs:
+  # — pull_request_target workflows use the workflow files from the default branch, and secrets are available.
+  # — pull_request workflows use the workflow files from the pull request branch, and secrets are unavailable.
+  pull_request_target:
+    types: [ synchronize, ready_for_review ]
     paths-ignore:
       - 'docs/**'
       - '*.md'
@@ -22,16 +25,14 @@ concurrency:
 jobs:
   code_static_check:
     name: code_static_check
-    if: ${{ github.event_name != 'pull_request' ||
-      (github.event.action == 'labeled' && github.event.label.name == 'ci')  ||
-      ((github.event.action == 'synchronize' || github.event.action == 'reopened') && contains(github.event.pull_request.labels.*.name, 'ci')) }}
+    if: ${{ github.event_name != 'pull_request_target' || contains(github.event.pull_request.labels.*.name, 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     steps:
       - name: Ensure workspace ownership
         if: ${{ !cancelled() && !failure() }}
         run: |
           echo "Workflow triggered by ${{ github.event_name }}"
-          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+          if [[ ${{ github.event_name }} == 'pull_request_target' ]]; then
             echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
           fi
           echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
@@ -45,7 +46,7 @@ jobs:
       - name: Backup code
         if: ${{ !cancelled() && !failure() }}
         run: |
-          if [[ ${{ github.event_name }} != 'pull_request' ]]; then
+          if [[ ${{ github.event_name }} != 'pull_request_target' ]]; then
             HEAD=$(git rev-parse HEAD)
             # Find a PR that introduced a given commit
             gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
@@ -101,7 +102,7 @@ jobs:
       - name: Check format of changed C/C++ files
         if: ${{ !cancelled() && !failure() }}
         run: |
-          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+          if [[ ${{ github.event_name }} == 'pull_request_target' ]]; then
             CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} \
               | grep -E '\.(cpp|h|hpp|cppm)$' \
               | grep -v 'third_party/' \
@@ -635,7 +636,7 @@ jobs:
         run: |
           MINIO_CONTAINER_NAME=minio_${TEST_CONTAINER_NAME}
           echo "MINIO_CONTAINER_NAME=${MINIO_CONTAINER_NAME}" >> $GITHUB_ENV
-          rm -rf {MINIO_CONTAINER_NAME && mkdir -p ${MINIO_CONTAINER_NAME}
+          rm -rf ${MINIO_CONTAINER_NAME} && mkdir -p ${MINIO_CONTAINER_NAME}
           sudo docker run -d --net=container:${TEST_CONTAINER_NAME} --name ${MINIO_CONTAINER_NAME} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_CONTAINER_NAME}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
           sleep 5s
           if ! sudo docker ps --filter "name=${MINIO_CONTAINER_NAME}" --filter "status=running" | grep -q ${MINIO_CONTAINER_NAME}; then
@@ -880,7 +881,7 @@ jobs:
         run: |
           MINIO_CONTAINER_NAME=minio_${TEST_CONTAINER_NAME}
           echo "MINIO_CONTAINER_NAME=${MINIO_CONTAINER_NAME}" >> $GITHUB_ENV
-          rm -rf {MINIO_CONTAINER_NAME} && mkdir ${MINIO_CONTAINER_NAME}
+          rm -rf ${MINIO_CONTAINER_NAME} && mkdir -p ${MINIO_CONTAINER_NAME}
           sudo docker run -d --net=container:${TEST_CONTAINER_NAME} --name ${MINIO_CONTAINER_NAME} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_CONTAINER_NAME}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
           sleep 5s
           if ! sudo docker ps --filter "name=${MINIO_CONTAINER_NAME}" --filter "status=running" | grep -q ${MINIO_CONTAINER_NAME}; then
