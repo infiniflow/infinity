@@ -129,9 +129,9 @@ bool FileWorker::WriteSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &tab
                 UnrecoverableError(status.message());
             }
         }
-    }
 
-    return true;
+        return true;
+    }
 }
 
 bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {

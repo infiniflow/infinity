@@ -1430,7 +1430,9 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
     if (!status.ok()) {
         return status;
     }
-    table_snapshot_info->snapshot_name_ = option.snapshot_name_;
+
+    CreateTableSnapshotTxnStore *create_txn_store = static_cast<CreateTableSnapshotTxnStore *>(base_txn_store_.get());
+    table_snapshot_info->snapshot_name_ = create_txn_store->snapshot_name_;
 
     std::vector<SegmentID> *segment_ids_ptr = nullptr;
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();

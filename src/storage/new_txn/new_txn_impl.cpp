@@ -2380,32 +2380,15 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
     //     }
     // }
     // After calling Checkpoint()
-    TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
-    std::shared_ptr<CheckpointTxnStore> ckp_txn_store = std::make_shared<CheckpointTxnStore>(last_checkpoint_ts, true);
-    Status status = this->CheckpointforSnapshot(last_checkpoint_ts, ckp_txn_store.get(), snapshot_name);
+
+    TxnTimeStamp last_ckp_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
+    std::shared_ptr<CheckpointTxnStore> ckp_txn_store = std::make_shared<CheckpointTxnStore>(last_ckp_ts, true);
+
+    Status status = this->CheckpointforSnapshot(last_ckp_ts, ckp_txn_store.get(), SnapshotType::kTableSnapshot);
     if (!status.ok()) {
         return status;
     }
 
-    // // Check if checkpoint actually happened
-    // if (ckp_txn_store != nullptr) {
-    //     if (!ckp_txn_store->entries_.empty()) {
-    //         LOG_INFO(fmt::format("Checkpoint successful! {} blocks flushed", ckp_txn_store->entries_.size()));
-    //
-    //         // Use the transaction store to generate WAL command
-    //         std::shared_ptr<WalEntry> wal_entry = ckp_txn_store->ToWalEntry(txn_context_ptr_->commit_ts_);
-    //
-    //         // There's only ONE command - the checkpoint command
-    //         if (!wal_entry->cmds_.empty()) {
-    //             auto checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(wal_entry->cmds_[0].get());
-    //             PrepareCommitCheckpoint(checkpoint_cmd);
-    //         }
-    //     } else {
-    //         LOG_INFO("Checkpoint transaction exists but no blocks were flushed (skip checkpoint)");
-    //     }
-    // } else {
-    //     LOG_INFO("No checkpoint transaction found");
-    // }
     return Status::OK();
 }
 
@@ -5427,7 +5410,7 @@ Status NewTxn::CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create
     return Status::OK();
 }
 
-Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store, std::string &snapshot_name) {
+Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store, SnapshotType snapshot_type) {
     TransactionType txn_type = GetTxnType();
     if (txn_type != TransactionType::kNewCheckpoint && txn_type != TransactionType::kCreateTableSnapshot) {
         UnrecoverableError(fmt::format("Expected transaction type is checkpoint or create table snapshot."));
@@ -5439,14 +5422,12 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
 
     Status status;
     TxnTimeStamp checkpoint_ts = txn_context_ptr_->begin_ts_;
-    std::string temp_snapshot_name = fmt::format("temp_{}_{}", snapshot_name, this->TxnID());
-    SnapshotOption option{checkpoint_ts, snapshot_name, temp_snapshot_name};
+    SnapshotOption option{checkpoint_ts};
 
     current_ckp_ts_ = checkpoint_ts;
     LOG_INFO(fmt::format("checkpoint ts for snapshot: {}", current_ckp_ts_));
 
     if (last_ckp_ts > 0 and last_ckp_ts + 2 >= checkpoint_ts) {
-        // last checkpoint ts: last checkpoint txn begin ts. checkpoint is the begin_ts of current txn
         txn_context_ptr_->txn_type_ = TransactionType::kSkippedCheckpoint;
         LOG_INFO(fmt::format("Last checkpoint ts {}, this checkpoint begin ts: {}, SKIP CHECKPOINT", last_ckp_ts, checkpoint_ts));
         return Status::OK();
@@ -5459,22 +5440,56 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
     }
     DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
 
-    std::vector<std::string> *db_id_strs_ptr;
-    std::vector<std::string> *db_names_ptr;
-    CatalogMeta catalog_meta(this);
-    status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
-    if (!status.ok()) {
-        return status;
-    }
+    switch (snapshot_type) {
+        case SnapshotType::kTableSnapshot: {
+            CreateTableSnapshotTxnStore *create_txn_store = static_cast<CreateTableSnapshotTxnStore *>(base_txn_store_.get());
+            std::string db_name = create_txn_store->db_name_;
+            std::string table_name = create_txn_store->table_name_;
 
-    size_t db_count = db_id_strs_ptr->size();
-    for (size_t idx = 0; idx < db_count; ++idx) {
-        const std::string &db_id_str = db_id_strs_ptr->at(idx);
-        const std::string &db_name = db_names_ptr->at(idx);
-        DBMeta db_meta(db_id_str, db_name, this);
-        status = this->CheckpointDB(db_meta, option, txn_store);
-        if (!status.ok()) {
-            return status;
+            std::shared_ptr<DBMeta> db_meta;
+            std::shared_ptr<TableMeta> table_meta;
+            std::string table_key;
+            TxnTimeStamp create_timestamp;
+
+            status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp, &table_key);
+            if (!status.ok()) {
+                return status;
+            }
+
+            status = CheckpointTable(*table_meta, option, txn_store);
+            if (!status.ok()) {
+                return status;
+            }
+
+            break;
+        }
+        case SnapshotType::kDatabaseSnapshot: {
+            std::vector<std::string> *db_id_strs_ptr;
+            std::vector<std::string> *db_names_ptr;
+            CatalogMeta catalog_meta(this);
+            status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
+            if (!status.ok()) {
+                return status;
+            }
+
+            size_t db_count = db_id_strs_ptr->size();
+            for (size_t idx = 0; idx < db_count; ++idx) {
+                const std::string &db_id_str = db_id_strs_ptr->at(idx);
+                const std::string &db_name = db_names_ptr->at(idx);
+                DBMeta db_meta(db_id_str, db_name, this);
+                status = CheckpointDB(db_meta, option, txn_store);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+            break;
+        }
+        case SnapshotType::kSystemSnapshot: {
+            break;
+        }
+        case SnapshotType::kUnknown: {
+            UnrecoverableError("Invalid SnapshotType.");
+            break;
         }
     }
 

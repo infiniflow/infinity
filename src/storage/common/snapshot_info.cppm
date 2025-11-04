@@ -27,6 +27,8 @@ import command_statement;
 
 namespace infinity {
 
+export enum class SnapshotType { kUnknown, kDatabaseSnapshot, kTableSnapshot, kSystemSnapshot };
+
 export struct SnapshotInfo {
     // structure to represent the snapshot
     std::string snapshot_name_;

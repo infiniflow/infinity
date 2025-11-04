@@ -126,8 +126,6 @@ export struct CheckpointOption {
 
 export struct SnapshotOption {
     TxnTimeStamp checkpoint_ts_ = 0;
-    std::string snapshot_name_{};
-    std::string temp_snapshot_name_{};
 };
 
 export struct ChunkInfoForCreateIndex {
@@ -591,7 +589,7 @@ private:
     Status PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files = false);
     Status PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd);
     Status CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
-    Status CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store, std::string &snapshot_name);
+    Status CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store, SnapshotType snapshot_type);
 
     Status AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
     Status CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);

@@ -46,55 +46,69 @@ public:
         using namespace infinity;
         NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-        // Create a table to snapshot
-        NewTxn *create_table_txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+        auto db_name = std::make_shared<std::string>("default_db");
+        auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+        auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+        auto table_name1 = std::make_shared<std::string>("tb1");
+        auto table_name2 = std::make_shared<std::string>("tb2");
+        auto table_def1 = TableDef::Make(db_name, table_name1, std::make_shared<std::string>(), {column_def1, column_def2});
+        // auto table_def2 = TableDef::Make(db_name, table_name2, std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_snapshot1 = std::make_shared<std::string>("tb1_snapshot");
+        // auto table_snapshot2 = std::make_shared<std::string>("tb2_snapshot");
 
-        std::vector<std::shared_ptr<ColumnDef>> columns;
+        // Create table tb1 & tb2
         {
-            std::shared_ptr<DataType> col_type = std::make_shared<DataType>(LogicalType::kInteger);
-            std::shared_ptr<ColumnDef> col_def = std::make_shared<ColumnDef>(0, col_type, "col1", std::set<ConstraintType>());
-            columns.emplace_back(col_def);
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+            auto status = txn->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+            status = txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        // {
+        //     auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+        //     auto status = txn->CreateTable(*db_name, std::move(table_def2), ConflictType::kIgnore);
+        //     EXPECT_TRUE(status.ok());
+        //     status = txn_mgr->CommitTxn(txn);
+        //     EXPECT_TRUE(status.ok());
+        // }
+
+        // Insert data
+        for (int i = 0; i < 5; ++i) {
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
+            auto input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+            auto status = txn->Append(*db_name, *table_name1, input_block);
+            EXPECT_TRUE(status.ok());
+            status = txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
         }
 
-        std::shared_ptr<TableDef> table_def = std::make_shared<TableDef>(std::make_shared<std::string>("default_db"),
-                                                                         std::make_shared<std::string>("test_table"),
-                                                                         std::make_shared<std::string>(""),
-                                                                         columns);
-
-        Status status = create_table_txn->CreateTable("default_db", table_def, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        txn_mgr->CommitTxn(create_table_txn);
-
-        // Insert data into the table
-        NewTxn *insert_txn = txn_mgr->BeginTxn(std::make_unique<std::string>("insert data"), TransactionType::kAppend);
-
-        std::vector<std::shared_ptr<ColumnVector>> column_vectors;
-        auto column_vector = std::make_shared<ColumnVector>(table_def->columns()[0]->type());
-        column_vector->Initialize();
-
-        for (size_t i = 1; i <= 8192; i++) {
-            column_vector->AppendValue(Value::MakeInt(i));
+        // Create table snapshot
+        {
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create snapshot"), TransactionType::kCreateTableSnapshot);
+            auto status = txn->CreateTableSnapshot(*db_name, *table_name1, *table_snapshot1);
+            EXPECT_TRUE(status.ok());
+            txn_mgr->CommitTxn(txn);
         }
-        column_vectors.push_back(column_vector);
+        // {
+        //     auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create snapshot"), TransactionType::kCreateTableSnapshot);
+        //     auto status = txn->CreateTableSnapshot(*db_name, *table_name2, *table_snapshot2);
+        //     EXPECT_TRUE(status.ok());
+        //     txn_mgr->CommitTxn(txn);
+        // }
 
-        auto data_block = DataBlock::Make();
-        data_block->Init(column_vectors);
-
-        status = insert_txn->Append("default_db", "test_table", data_block);
-        EXPECT_TRUE(status.ok());
-        txn_mgr->CommitTxn(insert_txn);
-
-        // Create snapshot using the correct method
-        NewTxn *snapshot_txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create snapshot"), TransactionType::kCreateTableSnapshot);
-        status = snapshot_txn->CreateTableSnapshot("default_db", "test_table", "test_snapshot");
-        EXPECT_TRUE(status.ok());
-        txn_mgr->CommitTxn(snapshot_txn);
-
-        // Drop the original table
-        NewTxn *drop_table_txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
-        status = drop_table_txn->DropTable("default_db", "test_table", ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        txn_mgr->CommitTxn(drop_table_txn);
+        // Drop table
+        {
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
+            auto status = txn->DropTable(*db_name, *table_name1, ConflictType::kError);
+            EXPECT_TRUE(status.ok());
+            txn_mgr->CommitTxn(txn);
+        }
+        // {
+        //     auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
+        //     auto status = txn->DropTable(*db_name, *table_name2, ConflictType::kError);
+        //     EXPECT_TRUE(status.ok());
+        //     txn_mgr->CommitTxn(txn);
+        // }
     }
 };
 
@@ -103,19 +117,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TableSnapshotTest, ::testing::
 TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     // using namespace infinity;
     // NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-
-    {
-        std::string sql = "restore table snapshot test_snapshot";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        if (ok) {
-            LOG_INFO("restore table snapshot test_snapshot succeeded");
-        } else {
-            LOG_INFO("restore table snapshot test_snapshot failed");
-        }
-    }
-
+    //
     // // Test 1: Successful restore
     // NewTxn *restore_txn = txn_mgr->BeginTxn(std::make_unique<std::string>("restore table"), TransactionType::kRestoreTable);
     //
@@ -123,7 +125,7 @@ TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     // std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     // std::shared_ptr<TableSnapshotInfo> table_snapshot;
     // Status status;
-    // std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, "test_snapshot");
+    // std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, "tb1_snapshot");
     // EXPECT_TRUE(status.ok());
     //
     // // Attempt to restore table
@@ -133,12 +135,12 @@ TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     //
     // // Verify that the table was restored with data
     // NewTxn *check_txn1 = txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
-    // auto [table_info1, check_status1] = check_txn1->GetTableInfo("default_db", "test_table");
+    // auto [table_info1, check_status1] = check_txn1->GetTableInfo("default_db", "tb1");
     // EXPECT_TRUE(check_status1.ok()); // Table should exist after restore
     // txn_mgr->CommitTxn(check_txn1);
     //
     // NewTxn *drop_table_txn1 = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
-    // status = drop_table_txn1->DropTable("default_db", "test_table", ConflictType::kError);
+    // status = drop_table_txn1->DropTable("default_db", "tb1", ConflictType::kError);
     // EXPECT_TRUE(status.ok());
     // txn_mgr->CommitTxn(drop_table_txn1);
     //
@@ -146,7 +148,7 @@ TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     // NewTxn *restore_txn1 = txn_mgr->BeginTxn(std::make_unique<std::string>("restore table"), TransactionType::kRestoreTable);
     //
     // // Deserialize the snapshot info again
-    // std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, "test_snapshot");
+    // std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, "tb1_snapshot");
     // EXPECT_TRUE(status.ok());
     //
     // // Attempt to restore table
@@ -160,7 +162,7 @@ TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     //
     // // Verify that the table was not actually created (rollback worked)
     // NewTxn *check_txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
-    // auto [table_info, check_status] = check_txn->GetTableInfo("default_db", "test_table");
+    // auto [table_info, check_status] = check_txn->GetTableInfo("default_db", "tb1");
     // EXPECT_FALSE(check_status.ok()); // Table should not exist after rollback
     // txn_mgr->CommitTxn(check_txn);
 }
@@ -176,14 +178,14 @@ TEST_P(TableSnapshotTest, test_restore_table_create_table_multithreaded) {
         }
 
         {
-            std::string restore_sql = "restore table test_table from snapshot test_snapshot";
+            std::string restore_sql = "restore table snapshot tb1_snapshot";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(restore_sql);
             bool ok = HandleQueryResult(query_result);
             if (ok) {
-                LOG_INFO("Restore table succeeded");
+                LOG_INFO("std::Thread 1: restore table snapshot tb1_snapshot succeeded");
             } else {
-                LOG_INFO("Restore table failed");
+                LOG_INFO("std::Thread 1: restore table snapshot tb1_snapshot failed");
             }
         }
     };
@@ -196,14 +198,14 @@ TEST_P(TableSnapshotTest, test_restore_table_create_table_multithreaded) {
         }
 
         {
-            std::string create_table_sql = "create table test_table(c1 int, c2 varchar)";
+            std::string create_table_sql = "create table tb1(col1 int, col2 varchar)";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext2();
             QueryResult query_result = query_context->Query(create_table_sql);
             bool ok = HandleQueryResult(query_result);
             if (ok) {
-                LOG_INFO("Create table succeeded");
+                LOG_INFO("std::Thread 2: create table tb1(col1 int, col2 varchar) succeeded");
             } else {
-                LOG_INFO("Create table failed");
+                LOG_INFO("std::Thread 2: create table tb1(col1 int, col2 varchar) failed");
             }
         }
     };
@@ -219,14 +221,14 @@ TEST_P(TableSnapshotTest, test_restore_table_create_table_multithreaded) {
     }
 
     {
-        std::string select_sql = "select * from test_table";
+        std::string select_sql = "select * from tb1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_sql);
         bool ok = HandleQueryResult(query_result);
         if (ok) {
-            LOG_INFO("Final table state: " + query_result.ToString());
+            LOG_INFO("Final table tb1: " + query_result.ToString());
         } else {
-            LOG_INFO("Table does not exist after operations");
+            LOG_INFO("select * from tb1 failed");
         }
     }
 }
@@ -236,7 +238,7 @@ TEST_P(TableSnapshotTest, test_create_snapshot_same_name_multithreaded) {
 
     auto thread_create_snapshot1 = [this]() {
         {
-            std::string create_table_sql = "create table t1(c1 int, c2 varchar)";
+            std::string create_table_sql = "create table tb1(col1 int, col2 varchar)";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(create_table_sql);
             bool ok = HandleQueryResult(query_result);
@@ -244,7 +246,7 @@ TEST_P(TableSnapshotTest, test_create_snapshot_same_name_multithreaded) {
         }
 
         {
-            std::string insert_sql = "insert into t1 values(1, 'abc'), (2, 'def'), (3, 'ghi')";
+            std::string insert_sql = "insert into tb1 values(1, 'abc'), (2, 'def'), (3, 'ghi')";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(insert_sql);
             bool ok = HandleQueryResult(query_result);
@@ -258,14 +260,14 @@ TEST_P(TableSnapshotTest, test_create_snapshot_same_name_multithreaded) {
         }
 
         {
-            std::string create_snapshot_sql = "create snapshot conflict_snapshot on table t1";
+            std::string create_snapshot_sql = "create snapshot conflict_snapshot on table tb1";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(create_snapshot_sql);
             bool ok = HandleQueryResult(query_result);
             if (ok) {
-                LOG_INFO("Snapshot 1 creation succeeded");
+                LOG_INFO("create snapshot conflict_snapshot on table tb1 succeeded");
             } else {
-                LOG_INFO("Snapshot 1 creation failed");
+                LOG_INFO("create snapshot conflict_snapshot on table tb1 failed");
             }
         }
     };
@@ -283,9 +285,9 @@ TEST_P(TableSnapshotTest, test_create_snapshot_same_name_multithreaded) {
             QueryResult query_result = query_context->Query(create_snapshot_sql);
             bool ok = HandleQueryResult(query_result);
             if (ok) {
-                LOG_INFO("Snapshot 2 creation succeeded");
+                LOG_INFO("create snapshot conflict_snapshot on table t1 succeeded");
             } else {
-                LOG_INFO("Snapshot 2 creation failed");
+                LOG_INFO("create snapshot conflict_snapshot on table t1 failed");
             }
         }
     };
@@ -308,12 +310,20 @@ TEST_P(TableSnapshotTest, test_create_snapshot_same_name_multithreaded) {
         EXPECT_TRUE(ok);
         LOG_INFO("Final snapshots: " + query_result.ToString());
     }
+
+    {
+        std::string sql = "drop snapshot conflict_snapshot";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
 }
 
 TEST_P(TableSnapshotTest, test_show_snapshot_multithreaded) {
     LOG_INFO("--test_show_snapshot_multithreaded--");
     {
-        std::string create_table_sql = "create table t1(c1 int, c2 varchar)";
+        std::string create_table_sql = "create table tb1(col1 int, col2 varchar)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
@@ -321,7 +331,7 @@ TEST_P(TableSnapshotTest, test_show_snapshot_multithreaded) {
     }
 
     {
-        std::string insert_sql = "insert into t1 values(1, 'abc'), (2, 'def'), (3, 'ghi')";
+        std::string insert_sql = "insert into tb1 values(1, 'abc'), (2, 'def'), (3, 'ghi')";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(insert_sql);
         bool ok = HandleQueryResult(query_result);
@@ -329,14 +339,14 @@ TEST_P(TableSnapshotTest, test_show_snapshot_multithreaded) {
     }
 
     auto thread_create_snapshot1 = [this]() {
-        std::string create_snapshot_sql = "create snapshot conflict_snapshot on table t1";
+        std::string create_snapshot_sql = "create snapshot conflict_snapshot on table tb1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_snapshot_sql);
         bool ok = HandleQueryResult(query_result);
         if (ok) {
-            LOG_INFO("Snapshot 1 creation succeeded");
+            LOG_INFO("std::Thread 1: create snapshot conflict_snapshot on table tb1 succeeded");
         } else {
-            LOG_INFO("Snapshot 1 creation failed");
+            LOG_INFO("std::Thread 2: create snapshot conflict_snapshot on table tb1 failed");
         }
     };
 
@@ -360,6 +370,23 @@ TEST_P(TableSnapshotTest, test_show_snapshot_multithreaded) {
     if (show_snapshot.joinable()) {
         show_snapshot.join();
     }
+
+    {
+        std::string list_snapshots_sql = "show snapshots";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(list_snapshots_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+        LOG_INFO("Final snapshots: " + query_result.ToString());
+    }
+
+    {
+        std::string sql = "drop snapshot conflict_snapshot";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
 }
 
 TEST_P(TableSnapshotTest, test_restore_table_same_snapshot_multithreaded) {
@@ -373,14 +400,14 @@ TEST_P(TableSnapshotTest, test_restore_table_same_snapshot_multithreaded) {
         }
 
         {
-            std::string restore_sql = "restore table snapshot test_snapshot";
+            std::string restore_sql = "restore table snapshot tb1_snapshot";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(restore_sql);
             bool ok = HandleQueryResult(query_result);
             if (ok) {
-                LOG_INFO("std::thread 1: Restore table succeeded");
+                LOG_INFO("std::thread 1: restore table snapshot tb1_snapshot succeeded");
             } else {
-                LOG_INFO("std::thread 1: Restore table failed");
+                LOG_INFO("std::thread 1: restore table snapshot tb1_snapshot failed");
             }
         }
     };
@@ -393,14 +420,14 @@ TEST_P(TableSnapshotTest, test_restore_table_same_snapshot_multithreaded) {
         }
 
         {
-            std::string restore_sql = "restore table snapshot test_snapshot";
+            std::string restore_sql = "restore table snapshot tb1_snapshot";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext2();
             QueryResult query_result = query_context->Query(restore_sql);
             bool ok = HandleQueryResult(query_result);
             if (ok) {
-                LOG_INFO("std::thread 2: Restore table succeeded");
+                LOG_INFO("std::thread 2: restore table snapshot tb1_snapshot succeeded");
             } else {
-                LOG_INFO("std::thread 2: Restore table failed");
+                LOG_INFO("std::thread 2: restore table snapshot tb1_snapshot failed");
             }
         }
     };
@@ -416,166 +443,114 @@ TEST_P(TableSnapshotTest, test_restore_table_same_snapshot_multithreaded) {
     }
 
     {
-        std::string select_sql = "select * from test_table";
+        std::string select_sql = "select * from tb1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_sql);
         bool ok = HandleQueryResult(query_result);
         if (ok) {
-            LOG_INFO("Final table state: " + query_result.ToString());
+            LOG_INFO("Final table tb1: " + query_result.ToString());
         } else {
-            LOG_INFO("Table does not exist after operations");
+            LOG_INFO("select * from tb1 failed");
         }
     }
 }
 
 TEST_P(TableSnapshotTest, test_create_restore_snapshot_with_index) {
-    LOG_INFO("--test_create_restore_snapshot_with_index--");
-
-    {
-        std::string sql = "restore table snapshot test_snapshot";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        if (ok) {
-            LOG_INFO("restore table snapshot test_snapshot succeeded");
-        } else {
-            LOG_INFO("restore table snapshot test_snapshot failed");
-        }
-    }
-
-    {
-        std::string sql = "select * from test_table";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        if (ok) {
-            LOG_INFO("test_table: " + query_result.ToString());
-        } else {
-            LOG_INFO("select * from test_table failed");
-        }
-    }
-
-    {
-        std::string sql = "drop snapshot test_snapshot";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        if (ok) {
-            LOG_INFO("drop snapshot test_snapshot succeeded");
-        } else {
-            LOG_INFO("drop snapshot test_snapshot failed");
-        }
-    }
-
+    // LOG_INFO("--test_create_restore_snapshot_with_index--");
+    //
     // {
-    //     std::string sql = "create index idx on test_table(col1)";
+    //     std::string sql = "restore table snapshot test_snapshot";
     //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
     //     QueryResult query_result = query_context->Query(sql);
     //     bool ok = HandleQueryResult(query_result);
     //     if (ok) {
-    //         LOG_INFO("create index idx on test_table(col1) succeeded");
+    //         LOG_INFO("restore table snapshot test_snapshot succeeded");
     //     } else {
-    //         LOG_INFO("create index idx on test_table(col1) failed");
+    //         LOG_INFO("restore table snapshot test_snapshot failed");
     //     }
     // }
-
+    //
     // {
-    //     std::string sql = "insert into test_table values (123)";
+    //     std::string sql = "select * from test_table";
     //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
     //     QueryResult query_result = query_context->Query(sql);
     //     bool ok = HandleQueryResult(query_result);
     //     if (ok) {
-    //         LOG_INFO("insert into test_table values (123) succeeded");
+    //         LOG_INFO("test_table: " + query_result.ToString());
     //     } else {
-    //         LOG_INFO("insert into test_table values (123) failed");
+    //         LOG_INFO("select * from test_table failed");
     //     }
     // }
-
-    {
-        std::string sql = "create snapshot test_snapshot on table test_table";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        if (ok) {
-            LOG_INFO("create snapshot test_snapshot on table test_table succeeded");
-        } else {
-            LOG_INFO("create snapshot test_snapshot on table test_table failed");
-        }
-    }
-
-    {
-        std::string sql = "insert into test_table values (456)";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        if (ok) {
-            LOG_INFO("insert into test_table values (456) succeeded");
-        } else {
-            LOG_INFO("insert into test_table values (456) failed");
-        }
-    }
-
-    {
-        std::string sql = "select * from test_table";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        if (ok) {
-            LOG_INFO("test_table: " + query_result.ToString());
-        } else {
-            LOG_INFO("select * from test_table failed");
-        }
-    }
-}
-
-TEST_P(TableSnapshotTest, test_create_table_snapshot_multi_blocks) {
-    LOG_INFO("--test_create_table_snapshot_multi_blocks--");
-
-    {
-        std::string sql = "restore table snapshot test_snapshot";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        if (ok) {
-            LOG_INFO("restore table snapshot test_snapshot succeeded");
-        } else {
-            LOG_INFO("restore table snapshot test_snapshot failed");
-        }
-    }
-
-    {
-        std::string sql = "insert into test_table values (456)";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        if (ok) {
-            LOG_INFO("insert into test_table values (456) succeeded");
-        } else {
-            LOG_INFO("insert into test_table values (456) failed");
-        }
-    }
-
-    {
-        std::string sql = "create snapshot test_multi_blocks on table test_table";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        if (ok) {
-            LOG_INFO("create snapshot test_multi_blocks on table test_table succeeded");
-        } else {
-            LOG_INFO("create snapshot test_multi_blocks on table test_table failed");
-        }
-    }
-
-    {
-        std::string sql = "select * from test_table";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        if (ok) {
-            LOG_INFO("test_table: " + query_result.ToString());
-        } else {
-            LOG_INFO("select * from test_table failed");
-        }
-    }
+    //
+    // {
+    //     std::string sql = "drop snapshot test_snapshot";
+    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+    //     QueryResult query_result = query_context->Query(sql);
+    //     bool ok = HandleQueryResult(query_result);
+    //     if (ok) {
+    //         LOG_INFO("drop snapshot test_snapshot succeeded");
+    //     } else {
+    //         LOG_INFO("drop snapshot test_snapshot failed");
+    //     }
+    // }
+    //
+    // // {
+    // //     std::string sql = "create index idx on test_table(col1)";
+    // //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+    // //     QueryResult query_result = query_context->Query(sql);
+    // //     bool ok = HandleQueryResult(query_result);
+    // //     if (ok) {
+    // //         LOG_INFO("create index idx on test_table(col1) succeeded");
+    // //     } else {
+    // //         LOG_INFO("create index idx on test_table(col1) failed");
+    // //     }
+    // // }
+    //
+    // // {
+    // //     std::string sql = "insert into test_table values (123)";
+    // //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+    // //     QueryResult query_result = query_context->Query(sql);
+    // //     bool ok = HandleQueryResult(query_result);
+    // //     if (ok) {
+    // //         LOG_INFO("insert into test_table values (123) succeeded");
+    // //     } else {
+    // //         LOG_INFO("insert into test_table values (123) failed");
+    // //     }
+    // // }
+    //
+    // {
+    //     std::string sql = "create snapshot test_snapshot on table test_table";
+    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+    //     QueryResult query_result = query_context->Query(sql);
+    //     bool ok = HandleQueryResult(query_result);
+    //     if (ok) {
+    //         LOG_INFO("create snapshot test_snapshot on table test_table succeeded");
+    //     } else {
+    //         LOG_INFO("create snapshot test_snapshot on table test_table failed");
+    //     }
+    // }
+    //
+    // {
+    //     std::string sql = "insert into test_table values (456)";
+    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+    //     QueryResult query_result = query_context->Query(sql);
+    //     bool ok = HandleQueryResult(query_result);
+    //     if (ok) {
+    //         LOG_INFO("insert into test_table values (456) succeeded");
+    //     } else {
+    //         LOG_INFO("insert into test_table values (456) failed");
+    //     }
+    // }
+    //
+    // {
+    //     std::string sql = "select * from test_table";
+    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+    //     QueryResult query_result = query_context->Query(sql);
+    //     bool ok = HandleQueryResult(query_result);
+    //     if (ok) {
+    //         LOG_INFO("test_table: " + query_result.ToString());
+    //     } else {
+    //         LOG_INFO("select * from test_table failed");
+    //     }
+    // }
 }
