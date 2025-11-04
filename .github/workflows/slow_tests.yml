@@ -10,22 +10,21 @@ on:
     tags:
       - "slow-test"               # mutable tag
   pull_request:
-    types: [ labeled, synchronize, reopened ]
+    types: [ labeled ]
     paths-ignore:
       - 'docs/**'
       - '*.md'
 
 # https://docs.github.com/en/actions/using-jobs/using-concurrency
+# Use a different group for each label, so they won't cancel in-progress real runs for the same PR.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ (github.event_name == 'pull_request' && github.event.action == 'labeled') && github.event.label.name || 'nolabel' }}
   cancel-in-progress: true
 
 jobs:
   download_code:
     name: download_code
-    if: ${{ github.event_name != 'pull_request' ||
-      (github.event.action == 'labeled' && github.event.label.name == 'slow-test')  ||
-      ((github.event.action == 'synchronize' || github.event.action == 'reopened') && contains(github.event.pull_request.labels.*.name, 'slow-test')) }}
+    if: ${{ github.event_name != 'pull_request' || (github.event.action == 'labeled' && github.event.label.name == 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     steps:
       - name: Ensure workspace ownership

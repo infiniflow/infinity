@@ -9,22 +9,21 @@ on:
       - 'docs/**'
       - '*.md'
   pull_request:
-    types: [ labeled, synchronize, reopened ]
+    types: [ labeled ]
     paths-ignore:
       - 'docs/**'
       - '*.md'
 
 # https://docs.github.com/en/actions/using-jobs/using-concurrency
+# Use a different group for each label, so they won't cancel in-progress real runs for the same PR.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ (github.event_name == 'pull_request' && github.event.action == 'labeled') && github.event.label.name || 'nolabel' }}
   cancel-in-progress: true
 
 jobs:
   code_static_check:
     name: code_static_check
-    if: ${{ github.event_name != 'pull_request' ||
-      (github.event.action == 'labeled' && github.event.label.name == 'ci')  ||
-      ((github.event.action == 'synchronize' || github.event.action == 'reopened') && contains(github.event.pull_request.labels.*.name, 'ci')) }}
+    if: ${{ github.event_name != 'pull_request' || (github.event.action == 'labeled' && github.event.label.name == 'ci') }}
     runs-on: [ "self-hosted", "infinity-test" ]
     steps:
       - name: Ensure workspace ownership
@@ -635,7 +634,7 @@ jobs:
         run: |
           MINIO_CONTAINER_NAME=minio_${TEST_CONTAINER_NAME}
           echo "MINIO_CONTAINER_NAME=${MINIO_CONTAINER_NAME}" >> $GITHUB_ENV
-          rm -rf {MINIO_CONTAINER_NAME && mkdir -p ${MINIO_CONTAINER_NAME}
+          rm -rf ${MINIO_CONTAINER_NAME} && mkdir -p ${MINIO_CONTAINER_NAME}
           sudo docker run -d --net=container:${TEST_CONTAINER_NAME} --name ${MINIO_CONTAINER_NAME} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_CONTAINER_NAME}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
           sleep 5s
           if ! sudo docker ps --filter "name=${MINIO_CONTAINER_NAME}" --filter "status=running" | grep -q ${MINIO_CONTAINER_NAME}; then
@@ -880,7 +879,7 @@ jobs:
         run: |
           MINIO_CONTAINER_NAME=minio_${TEST_CONTAINER_NAME}
           echo "MINIO_CONTAINER_NAME=${MINIO_CONTAINER_NAME}" >> $GITHUB_ENV
-          rm -rf {MINIO_CONTAINER_NAME} && mkdir ${MINIO_CONTAINER_NAME}
+          rm -rf ${MINIO_CONTAINER_NAME} && mkdir -p ${MINIO_CONTAINER_NAME}
           sudo docker run -d --net=container:${TEST_CONTAINER_NAME} --name ${MINIO_CONTAINER_NAME} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_CONTAINER_NAME}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
           sleep 5s
           if ! sudo docker ps --filter "name=${MINIO_CONTAINER_NAME}" --filter "status=running" | grep -q ${MINIO_CONTAINER_NAME}; then
