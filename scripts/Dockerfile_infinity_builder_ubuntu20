@@ -163,12 +163,21 @@ ENV CMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake  \
 RUN ln -s /opt/vcpkg/vcpkg_installed/x64-linux/tools/thrift/thrift /usr/local/bin/thrift \
     && chmod 1777 /tmp
 
-RUN pip3 config set global.index-url https://mirrors.aliyun.com/pypi/simple && pip3 config set global.trusted-host mirrors.aliyun.com
+# Install uv
+RUN  --mount=type=bind,source=uv-x86_64-unknown-linux-gnu.tar.gz,target=/root/uv-x86_64-unknown-linux-gnu.tar.gz \
+    mkdir -p /etc/uv \
+    && echo "[[index]]" > /etc/uv/uv.toml \
+    && echo 'url = "https://pypi.tuna.tsinghua.edu.cn/simple"' >> /etc/uv/uv.toml \
+    && echo "default = true" >> /etc/uv/uv.toml \
+    && tar xzf /root/uv-x86_64-unknown-linux-gnu.tar.gz \
+    && cp uv-x86_64-unknown-linux-gnu/* /usr/local/bin/ \
+    && rm -rf uv-x86_64-unknown-linux-gnu \
+    && uv python install python3.10
+
+RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && pip3 config set global.trusted-host pypi.tuna.tsinghua.edu.cn
 
 # Install infinity python sdk and other packages for later use by infinity tests
 RUN --mount=type=bind,source=python/requirements.txt,target=/root/requirements_1.txt --mount=type=bind,source=python/benchmark/requirements.txt,target=/root/requirements_2.txt  --mount=type=bind,source=python/restart_test/requirements.txt,target=/root/requirements_3.txt --mount=type=bind,source=python/test_cluster/requirements.txt,target=/root/requirements_4.txt \
-    pip3 config set global.index-url https://mirrors.aliyun.com/pypi/simple && pip3 config set global.trusted-host mirrors.aliyun.com \
-    && pip3 install --no-input wheel auditwheel patchelf twine \
-    && pip3 install --no-input -r /root/requirements_1.txt -r /root/requirements_2.txt -r /root/requirements_3.txt -r /root/requirements_4.txt
+    pip3 install --no-input -r /root/requirements_1.txt -r /root/requirements_2.txt -r /root/requirements_3.txt -r /root/requirements_4.txt
 
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]
