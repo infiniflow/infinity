@@ -50,13 +50,10 @@ public:
         auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
         auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
         auto table_name1 = std::make_shared<std::string>("tb1");
-        auto table_name2 = std::make_shared<std::string>("tb2");
         auto table_def1 = TableDef::Make(db_name, table_name1, std::make_shared<std::string>(), {column_def1, column_def2});
-        // auto table_def2 = TableDef::Make(db_name, table_name2, std::make_shared<std::string>(), {column_def1, column_def2});
         auto table_snapshot1 = std::make_shared<std::string>("tb1_snapshot");
-        // auto table_snapshot2 = std::make_shared<std::string>("tb2_snapshot");
 
-        // Create table tb1 & tb2
+        // Create table
         {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
             auto status = txn->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
@@ -64,18 +61,11 @@ public:
             status = txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
-        // {
-        //     auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
-        //     auto status = txn->CreateTable(*db_name, std::move(table_def2), ConflictType::kIgnore);
-        //     EXPECT_TRUE(status.ok());
-        //     status = txn_mgr->CommitTxn(txn);
-        //     EXPECT_TRUE(status.ok());
-        // }
 
-        // Insert data
-        for (int i = 0; i < 5; ++i) {
+        // Insert data to multi-blocks
+        for (IntegerT i = 0; i < 5; ++i) {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
-            auto input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+            auto input_block = MakeInputBlock(Value::MakeInt(i), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
             auto status = txn->Append(*db_name, *table_name1, input_block);
             EXPECT_TRUE(status.ok());
             status = txn_mgr->CommitTxn(txn);
@@ -89,12 +79,6 @@ public:
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
-        // {
-        //     auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create snapshot"), TransactionType::kCreateTableSnapshot);
-        //     auto status = txn->CreateTableSnapshot(*db_name, *table_name2, *table_snapshot2);
-        //     EXPECT_TRUE(status.ok());
-        //     txn_mgr->CommitTxn(txn);
-        // }
 
         // Drop table
         {
@@ -103,12 +87,6 @@ public:
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
-        // {
-        //     auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
-        //     auto status = txn->DropTable(*db_name, *table_name2, ConflictType::kError);
-        //     EXPECT_TRUE(status.ok());
-        //     txn_mgr->CommitTxn(txn);
-        // }
     }
 };
 
