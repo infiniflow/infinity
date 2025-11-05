@@ -49,24 +49,40 @@ public:
         auto db_name = std::make_shared<std::string>("default_db");
         auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
         auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-        auto table_name1 = std::make_shared<std::string>("tb1");
-        auto table_def1 = TableDef::Make(db_name, table_name1, std::make_shared<std::string>(), {column_def1, column_def2});
-        auto table_snapshot1 = std::make_shared<std::string>("tb1_snapshot");
+        auto table_name = std::make_shared<std::string>("tb1");
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
+        auto table_snapshot = std::make_shared<std::string>("tb1_snapshot");
 
         // Create table
         {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
-            auto status = txn->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
+            auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             status = txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
+        }
+
+        // Create index
+        {
+            std::string create_index_sql = "create index idx1 on tb1(col1)";
+            std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+            QueryResult query_result = query_context->Query(create_index_sql);
+            bool ok = HandleQueryResult(query_result);
+            EXPECT_TRUE(ok);
+        }
+        {
+            std::string create_index_sql = "create index idx2 on tb1(col2) using fulltext";
+            std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+            QueryResult query_result = query_context->Query(create_index_sql);
+            bool ok = HandleQueryResult(query_result);
+            EXPECT_TRUE(ok);
         }
 
         // Insert data to multi-blocks
         for (IntegerT i = 0; i < 5; ++i) {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
             auto input_block = MakeInputBlock(Value::MakeInt(i), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
-            auto status = txn->Append(*db_name, *table_name1, input_block);
+            auto status = txn->Append(*db_name, *table_name, input_block);
             EXPECT_TRUE(status.ok());
             status = txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -75,7 +91,7 @@ public:
         // Create table snapshot
         {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create snapshot"), TransactionType::kCreateTableSnapshot);
-            auto status = txn->CreateTableSnapshot(*db_name, *table_name1, *table_snapshot1);
+            auto status = txn->CreateTableSnapshot(*db_name, *table_name, *table_snapshot);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
@@ -83,7 +99,7 @@ public:
         // Drop table
         {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
-            auto status = txn->DropTable(*db_name, *table_name1, ConflictType::kError);
+            auto status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
@@ -431,104 +447,4 @@ TEST_P(TableSnapshotTest, test_restore_table_same_snapshot_multithreaded) {
             LOG_INFO("select * from tb1 failed");
         }
     }
-}
-
-TEST_P(TableSnapshotTest, test_create_restore_snapshot_with_index) {
-    // LOG_INFO("--test_create_restore_snapshot_with_index--");
-    //
-    // {
-    //     std::string sql = "restore table snapshot test_snapshot";
-    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-    //     QueryResult query_result = query_context->Query(sql);
-    //     bool ok = HandleQueryResult(query_result);
-    //     if (ok) {
-    //         LOG_INFO("restore table snapshot test_snapshot succeeded");
-    //     } else {
-    //         LOG_INFO("restore table snapshot test_snapshot failed");
-    //     }
-    // }
-    //
-    // {
-    //     std::string sql = "select * from test_table";
-    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-    //     QueryResult query_result = query_context->Query(sql);
-    //     bool ok = HandleQueryResult(query_result);
-    //     if (ok) {
-    //         LOG_INFO("test_table: " + query_result.ToString());
-    //     } else {
-    //         LOG_INFO("select * from test_table failed");
-    //     }
-    // }
-    //
-    // {
-    //     std::string sql = "drop snapshot test_snapshot";
-    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-    //     QueryResult query_result = query_context->Query(sql);
-    //     bool ok = HandleQueryResult(query_result);
-    //     if (ok) {
-    //         LOG_INFO("drop snapshot test_snapshot succeeded");
-    //     } else {
-    //         LOG_INFO("drop snapshot test_snapshot failed");
-    //     }
-    // }
-    //
-    // // {
-    // //     std::string sql = "create index idx on test_table(col1)";
-    // //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-    // //     QueryResult query_result = query_context->Query(sql);
-    // //     bool ok = HandleQueryResult(query_result);
-    // //     if (ok) {
-    // //         LOG_INFO("create index idx on test_table(col1) succeeded");
-    // //     } else {
-    // //         LOG_INFO("create index idx on test_table(col1) failed");
-    // //     }
-    // // }
-    //
-    // // {
-    // //     std::string sql = "insert into test_table values (123)";
-    // //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-    // //     QueryResult query_result = query_context->Query(sql);
-    // //     bool ok = HandleQueryResult(query_result);
-    // //     if (ok) {
-    // //         LOG_INFO("insert into test_table values (123) succeeded");
-    // //     } else {
-    // //         LOG_INFO("insert into test_table values (123) failed");
-    // //     }
-    // // }
-    //
-    // {
-    //     std::string sql = "create snapshot test_snapshot on table test_table";
-    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-    //     QueryResult query_result = query_context->Query(sql);
-    //     bool ok = HandleQueryResult(query_result);
-    //     if (ok) {
-    //         LOG_INFO("create snapshot test_snapshot on table test_table succeeded");
-    //     } else {
-    //         LOG_INFO("create snapshot test_snapshot on table test_table failed");
-    //     }
-    // }
-    //
-    // {
-    //     std::string sql = "insert into test_table values (456)";
-    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-    //     QueryResult query_result = query_context->Query(sql);
-    //     bool ok = HandleQueryResult(query_result);
-    //     if (ok) {
-    //         LOG_INFO("insert into test_table values (456) succeeded");
-    //     } else {
-    //         LOG_INFO("insert into test_table values (456) failed");
-    //     }
-    // }
-    //
-    // {
-    //     std::string sql = "select * from test_table";
-    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-    //     QueryResult query_result = query_context->Query(sql);
-    //     bool ok = HandleQueryResult(query_result);
-    //     if (ok) {
-    //         LOG_INFO("test_table: " + query_result.ToString());
-    //     } else {
-    //         LOG_INFO("select * from test_table failed");
-    //     }
-    // }
 }
