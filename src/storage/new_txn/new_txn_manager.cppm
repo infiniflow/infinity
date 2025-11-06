@@ -159,7 +159,7 @@ public:
         return last_kv_commit_ts_;
     }
 
-    void UpdateTxnBeginTS(NewTxn *txn);
+    void UpdateTxnBeginTSAndKVInstance(NewTxn *txn);
 
 private:
     mutable std::mutex locker_{};

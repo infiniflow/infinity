@@ -165,6 +165,7 @@ public:
     //    void Begin();
 
     void SetBeginTS(TxnTimeStamp begin_ts);
+    void UpdateKVInstance(std::unique_ptr<KVInstance> kv_instance);
 
     Status Commit();
 
