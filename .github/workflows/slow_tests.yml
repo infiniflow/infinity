@@ -5,10 +5,6 @@ on:
   # https://docs.github.com/zh/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#schedule
   schedule:
     - cron: '30 16 * * *' # utc-8: 16:30
-  # The "create tags" trigger is specifically focused on the creation of new tags, while the "push tags" trigger is activated when tags are pushed, including both new tag creations and updates to existing tags.
-  create:
-    tags:
-      - "slow-test"               # mutable tag
   # The only difference between pull_request and pull_request_target is the context in which the workflow runs:
   # — pull_request_target workflows use the workflow files from the default branch, and secrets are available.
   # — pull_request workflows use the workflow files from the pull request branch, and secrets are unavailable.
@@ -32,11 +28,11 @@ jobs:
       - name: Ensure workspace ownership
         if: ${{ !cancelled() && !failure() }}
         run: |
-          echo "Workflow triggered by ${{ github.event_name }}"
-          if [[ ${{ github.event_name }} == 'pull_request_target' ]]; then
+          echo "Workflow triggered by ${GITHUB_EVENT_NAME}"
+          if [[ ${GITHUB_EVENT_NAME} == 'pull_request_target' ]]; then
             echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
           fi
-          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
 
       - name: Check out code
         uses: actions/checkout@v5
@@ -48,7 +44,7 @@ jobs:
         run: |
           tar --create --gzip --file=infinity.tgz .git $(git ls-files)
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
           mkdir -p ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
 
   debug_build:
@@ -59,18 +55,18 @@ jobs:
       - name: Prepare code
         if: ${{ !cancelled() && !failure() }}
         run: |
-          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
           tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
 
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
         run: |
           BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
+          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Build debug version
         if: ${{ !cancelled() && !failure() }}
@@ -96,9 +92,9 @@ jobs:
       - name: Prepare code and artifacts
         if: ${{ !cancelled() && !failure() }}
         run: |
-          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug/src/test_main | tar --extract --file=-
 
@@ -106,9 +102,9 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -118,7 +114,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_unit_test && cp debug_unit_test*.log ${ARTIFACTS_DIR}/debug_unit_test/
-          echo 'debug unit test log' && tail -n 1000 debug_unit_test*.log
+          echo "debug unit test log" && tail -n 1000 debug_unit_test*.log
 
       - name: Remove test container
         if: always()
@@ -134,9 +130,9 @@ jobs:
       - name: Prepare code and artifacts
         if: ${{ !cancelled() && !failure() }}
         run: |
-          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
           tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug-tsan/src/infinity | tar --extract --file=-
 
@@ -149,9 +145,9 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -164,8 +160,8 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          mkdir -p ${ARTIFACTS_DIR}/debug_tsan_restart_test && sudo chown -R $USER . && cp restart_test*.log* ${ARTIFACTS_DIR}/debug_tsan_restart_test/
-          echo 'restart_test log(last 1000 lines):' && tail -n 1000 restart_test*.log*
+          mkdir -p ${ARTIFACTS_DIR}/debug_tsan_restart_test && sudo chown -R ${USER} . && cp restart_test*.log* ${ARTIFACTS_DIR}/debug_tsan_restart_test/
+          echo "restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log*
 
       - name: Remove test container
         if: always()
@@ -179,9 +175,9 @@ jobs:
       - name: Prepare code and artifacts
         if: ${{ !cancelled() && !failure() }}
         run: |
-          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
           tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug-tsan/src/infinity | tar --extract --file=-
 
@@ -189,9 +185,9 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -221,9 +217,9 @@ jobs:
       - name: Prepare code and artifacts
         if: ${{ !cancelled() && !failure() }}
         run: |
-          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug-tsan/src/infinity | tar -xf -
 
@@ -231,9 +227,9 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -252,9 +248,9 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          mkdir -p ${ARTIFACTS_DIR}/debug_tsan_parallel_test && sudo chown -R $USER . && cp debug_tsan_parallel*.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
+          mkdir -p ${ARTIFACTS_DIR}/debug_tsan_parallel_test && sudo chown -R ${USER} . && cp debug_tsan_parallel*.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
           sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
-          echo 'debug tsan parallel log' && tail -n 1000 debug_tsan_parallel*.log
+          echo "debug tsan parallel log" && tail -n 1000 debug_tsan_parallel*.log
 
       - name: Remove test container
         if: always()
@@ -268,18 +264,18 @@ jobs:
       - name: Prepare code
         if: ${{ !cancelled() && !failure() }}
         run: |
-          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
 
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
         run: |
           BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
+          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Build reldeb version
         if: ${{ !cancelled() && !failure() }}
@@ -301,9 +297,9 @@ jobs:
       - name: Prepare code and artifacts
         if: ${{ !cancelled() && !failure() }}
         run: |
-          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
           tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-reldeb/src/test_main | tar --extract --file=-
 
@@ -311,9 +307,9 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Unit test reldeb version
         if: ${{ !cancelled() && !failure() }}
@@ -323,7 +319,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_unit_test && cp reldeb_unit_test*.log ${ARTIFACTS_DIR}/reldeb_unit_test/
-          echo 'reldeb unit test log' && tail -n 1000 reldeb_unit_test*.log
+          echo "reldeb unit test log" && tail -n 1000 reldeb_unit_test*.log
 
       - name: Remove test container
         if: always()
@@ -340,9 +336,9 @@ jobs:
       - name: Prepare code and artifacts
         if: ${{ !cancelled() && !failure() }}
         run: |
-          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
           tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-reldeb/src/infinity | tar --extract --file=-
 
@@ -350,9 +346,9 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -373,7 +369,7 @@ jobs:
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_parallel_test && cp reldeb_parallel_stderr.log ${ARTIFACTS_DIR}/reldeb_parallel_test/
           sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_parallel_test/
-          echo 'reldeb parallel log' && tail -n 1000 reldeb_parallel*.log
+          echo "reldeb parallel log" && tail -n 1000 reldeb_parallel*.log
 
       - name: Remove test container
         if: always()
@@ -387,9 +383,9 @@ jobs:
       - name: Prepare code and artifacts
         if: ${{ !cancelled() && !failure() }}
         run: |
-          echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> $GITHUB_ENV
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/infinity | tar -xf -
 
@@ -402,9 +398,9 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -419,7 +415,7 @@ jobs:
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_restart_test
           cp restart_test*.log* ${ARTIFACTS_DIR}/reldeb_restart_test/
-          echo 'reldeb_restart_test log(last 1000 lines):' && tail -n 1000 restart_test*.log*
+          echo "reldeb_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log*
 
       - name: Remove test container
         if: always()
