@@ -652,17 +652,120 @@ std::unordered_map<std::string, ObjAddr> PersistenceManager::GetAllFiles() const
     const std::string &obj_prefix = KeyEncode::PMObjectPrefix();
     size_t obj_prefix_len = obj_prefix.size();
 
-    std::unique_ptr<KVInstance> kv_instance = kv_store_->GetInstance();
-    auto iter = kv_instance->GetIterator();
-    iter->Seek(obj_prefix);
-    while (iter->Valid() && iter->Key().starts_with(obj_prefix)) {
-        std::string path = iter->Key().ToString().substr(obj_prefix_len);
-        ObjAddr obj_addr;
-        obj_addr.Deserialize(iter->Value().ToString());
-        local_path_obj.emplace(path, obj_addr);
-        iter->Next();
+    std::vector<std::pair<std::string, std::string>> all_key_values = kv_store_->GetAllKeyValue();
+    for (const auto &[key, value] : all_key_values) {
+        if (key.starts_with(obj_prefix)) {
+            std::string path = key.substr(obj_prefix_len);
+            ObjAddr obj_addr;
+            obj_addr.Deserialize(value);
+            local_path_obj.emplace(path, obj_addr);
+        }
     }
     return local_path_obj;
+}
+
+PersistWriteResult PersistenceManager::CleanupStaleObjectData() {
+    PersistWriteResult result;
+    std::unordered_map<std::string, std::set<Range>> object_range_map;
+    std::unordered_map<std::string, std::shared_ptr<ObjStat>> object_objstat_map;
+    std::unordered_map<std::string, ObjAddr> file_objaddr_map;
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        object_objstat_map = GetAllObjects();
+        file_objaddr_map = GetAllFiles();
+    }
+
+    // Initialize range map with deleted ranges from each object.
+    for (const auto &[obj_key, obj_stat_ptr] : object_objstat_map) {
+        object_range_map[obj_key] = obj_stat_ptr->deleted_ranges_;
+    }
+
+    // Process each file to merge and update ranges of each object.
+    for (const auto &[file_path, object_addr] : file_objaddr_map) {
+        std::string obj_key = object_addr.obj_key_;
+        if (obj_key == "KEY_EMPTY") {
+            continue;
+        }
+
+        auto range_it = object_range_map.find(obj_key);
+        if (range_it == object_range_map.end()) {
+            LOG_WARN(fmt::format("Failed to find range info for object {}", obj_key));
+            continue;
+        }
+        auto &range_set = range_it->second;
+        size_t range_end = object_addr.part_offset_ + object_addr.part_size_;
+        range_end = (range_end + ObjAlignment - 1) & ~(ObjAlignment - 1);
+        Range obj_range(object_addr.part_offset_, range_end);
+        Range range(obj_range);
+
+        std::vector<std::set<Range>::iterator> to_erase;
+        auto it = range_set.lower_bound(range);
+        if (it != range_set.begin()) {
+            auto prev_it = std::prev(it);
+            if (prev_it->end_ >= range.start_) {
+                range.start_ = std::min(range.start_, prev_it->start_);
+                range.end_ = std::max(range.end_, prev_it->end_);
+                to_erase.push_back(prev_it);
+            }
+        }
+
+        while (it != range_set.end() && it->start_ <= range.end_) {
+            range.end_ = std::max(range.end_, it->end_);
+            to_erase.push_back(it);
+            ++it;
+        }
+
+        for (auto &erase_it : to_erase) {
+            range_set.erase(erase_it);
+        }
+        range_set.insert(range);
+    }
+
+    // Find and clean up missing ranges for each object.
+    for (auto &obj_range : object_range_map) {
+        auto &obj_stat = object_objstat_map[obj_range.first];
+        size_t obj_size = (obj_stat->obj_size_ + ObjAlignment - 1) & ~(ObjAlignment - 1);
+        auto &ranges = obj_range.second;
+        if (ranges.size() == 1 && ranges.begin()->start_ == 0 && ranges.begin()->end_ == obj_size) {
+            continue;
+        }
+
+        std::vector<Range> missing_ranges;
+        if (ranges.empty()) {
+            if (obj_size > 0) {
+                missing_ranges.push_back({0, obj_size});
+            }
+        } else {
+            auto first_it = ranges.begin();
+            if (first_it->start_ > 0) {
+                missing_ranges.push_back({0, first_it->start_});
+            }
+
+            auto it = ranges.begin();
+            auto next_it = std::next(it);
+            while (next_it != ranges.end()) {
+                if (it->end_ < next_it->start_) {
+                    missing_ranges.push_back({it->end_, next_it->start_});
+                }
+                ++it;
+                ++next_it;
+            }
+
+            auto last_it = ranges.rbegin();
+            if (last_it->end_ < obj_size) {
+                missing_ranges.push_back({last_it->end_, obj_size});
+            }
+        }
+
+        if (!missing_ranges.empty()) {
+            LOG_INFO("Cleanup stale object data");
+            for (auto &missing_range : missing_ranges) {
+                ObjAddr obj_addr(obj_range.first, missing_range.start_, missing_range.end_ - missing_range.start_);
+                CleanupNoLock(obj_addr, result.persist_keys_, result.drop_from_remote_keys_, true);
+            }
+        }
+    }
+    return result;
 }
 
 } // namespace infinity

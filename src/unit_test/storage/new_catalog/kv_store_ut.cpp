@@ -513,3 +513,41 @@ TEST_F(TestTxnKVStoreTest, wal) {
     status = kv_store->Destroy(rocksdb_tmp_path);
     EXPECT_TRUE(status.ok());
 }
+
+TEST_F(TestTxnKVStoreTest, ImmediateVisibility) {
+    using namespace infinity;
+    const auto rocksdb_tmp_path = fmt::format("{}/rocksdb_visibility", GetFullTmpDir());
+
+    std::unique_ptr<KVStore> kv_store = std::make_unique<KVStore>();
+    Status status = kv_store->Init(rocksdb_tmp_path);
+    EXPECT_TRUE(status.ok());
+
+    const int num_iterations = 1000;
+
+    for (int i = 0; i < num_iterations; ++i) {
+        std::string key = "key_" + std::to_string(i);
+        std::string value = "value_" + std::to_string(i);
+
+        status = kv_store->Put(key, value, false); // 启用WAL
+        EXPECT_TRUE(status.ok()) << "Put failed at iteration " << i;
+
+        std::string retrieved_value;
+        status = kv_store->Get(key, retrieved_value);
+        EXPECT_TRUE(status.ok()) << "Get failed at iteration " << i;
+        EXPECT_EQ(retrieved_value, value) << "Value mismatch at iteration " << i << ", expected: " << value << ", got: " << retrieved_value;
+
+        if (i % 10 == 0) {
+            std::cout << "Iteration " << i << " passed" << std::endl;
+        }
+    }
+
+    auto final_data = kv_store->GetAllKeyValue();
+    EXPECT_EQ(final_data.size(), num_iterations) << "Expected " << num_iterations << " items, got " << final_data.size();
+
+    status = kv_store->Uninit();
+    EXPECT_TRUE(status.ok());
+    status = kv_store->Destroy(rocksdb_tmp_path);
+    EXPECT_TRUE(status.ok());
+
+    std::cout << "Immediate visibility test completed successfully!" << std::endl;
+}
