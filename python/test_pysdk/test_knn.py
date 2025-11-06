@@ -20,9 +20,11 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 
+
 @pytest.fixture(scope="class")
 def http(request):
     return request.config.getoption("--http")
+
 
 @pytest.fixture(scope="class")
 def setup_class(request, http):
@@ -1034,7 +1036,7 @@ class TestInfinity:
     def test_sparse_knn_with_index(self, check_data, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_sparse_knn_with_index" + suffix, ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_sparse_knn_with_index" + suffix,
+        table_obj = db_obj.create_table("TEST_SPARSE_KNN_WITH_INDEX" + suffix,
                                         {"c1": {"type": "int"}, "c2": {"type": "sparse,100,float,int8"}},
                                         ConflictType.Error)
         if not check_data:
@@ -1046,7 +1048,7 @@ class TestInfinity:
                                                index.IndexType.BMP,
                                                {"block_size": "8", "compress_type": "compress"}), ConflictType.Error)
 
-        table_obj.optimize("idx1", {"topk": "3", "bp_reorder": ""})
+        table_obj.alter_index("idx1", {"topk": "3", "bp_reorder": ""})
 
         res, extra_result = (table_obj
                              .output(["*", "_row_id", "_similarity"])
@@ -1538,7 +1540,7 @@ class TestInfinity:
                                                index.IndexType.BMP,
                                                {"block_size": "8", "compress_type": "compress"}), ConflictType.Error)
 
-        table_obj.optimize("idx1", {"topk": "3"})
+        table_obj.alter_index("idx1", {"topk": "3"})
 
         with pytest.raises(InfinityException) as e:
             res, extra_result = (table_obj
@@ -1822,7 +1824,8 @@ class TestInfinity:
         table_obj.insert([{"c1": 4, "c2": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1]}])
         table_obj.insert([{"c1": 5, "c2": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1]}])
 
-        res, extra_result = table_obj.output(["*", "_distance"]).match_dense("c2", [0] * 16, "bit", "hamming", 3).to_df()
+        res, extra_result = table_obj.output(["*", "_distance"]).match_dense("c2", [0] * 16, "bit", "hamming",
+                                                                             3).to_df()
         print(res.dtypes)
         print(res)
         if suffix == "_http":
@@ -1857,7 +1860,7 @@ class TestInfinity:
                                                index.IndexType.BMP,
                                                {"block_size": "8", "compress_type": "raww"}), ConflictType.Error)
 
-        table_obj.optimize("idx1", {"topk": "3"})
+        table_obj.alter_index("idx1", {"topk": "3"})
 
         res, extra_result = (table_obj
                              .output(["*", "_row_id", "_similarity"])
@@ -1998,6 +2001,7 @@ class TestInfinity:
         # generate normalized vectors
         import numpy as np
         np.random.seed(42)
+
         def generate_normalized_multivector(shape, dtype=np.float32):
             x = np.random.randn(*shape).astype(dtype)
             x /= np.linalg.norm(x, axis=1, keepdims=True)  # L2 normalize
@@ -2039,7 +2043,8 @@ class TestInfinity:
         print(maxsims)
         topK_maxsims = maxsims[:topK]
         # Convert list of tuples to dictionary format for Polars DataFrame
-        topK_res = pl.DataFrame({"page_no": [item[0] for item in topK_maxsims], "SIMILARITY": [item[1] for item in topK_maxsims]})
+        topK_res = pl.DataFrame(
+            {"page_no": [item[0] for item in topK_maxsims], "SIMILARITY": [item[1] for item in topK_maxsims]})
         # Cast SIMILARITY column to float32
         adjusted_topK = int(topK * 0.6)
         topK_res = topK_res.with_columns(pl.col("SIMILARITY").cast(pl.Float32))
@@ -2063,7 +2068,6 @@ class TestInfinity:
         print(brute_force_res)
         pl_assert_frame_equal(brute_force_res, topK_res)
 
-
         res = table_obj.create_index("my_index",
                                      index.IndexInfo("page_multivec",
                                                      index.IndexType.Hnsw,
@@ -2082,7 +2086,6 @@ class TestInfinity:
         res = db_obj.drop_table(table_name, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-
     @pytest.mark.parametrize("embedding_dimension", [8, 16])
     def test_multivector_bit(self, embedding_dimension, suffix):
         assert embedding_dimension % 8 == 0
@@ -2093,9 +2096,9 @@ class TestInfinity:
         # generate a bit-vector
         def generate_bit_multivector(shape, dtype=np.int8):
             x = np.random.randint(0, 2, size=shape, dtype=dtype)
-            bit_array =  [[1 if x > 0.0 else 0 for x in one_list] for one_list in x]
+            bit_array = [[1 if x > 0.0 else 0 for x in one_list] for one_list in x]
             return bit_array
-        
+
         def flatten_bit_multivector(data_multivec: list[list[int]]) -> list[int]:
             return [item for sublist in data_multivec for item in sublist]
 
@@ -2130,7 +2133,8 @@ class TestInfinity:
         print(f"maxsims: {maxsims}")
         topK_maxsims = maxsims[:topK]
         # Convert list of tuples to dictionary format for Polars DataFrame
-        topK_res = pl.DataFrame({"page_no": [item[0] for item in topK_maxsims], "DISTANCE": [item[1] for item in topK_maxsims]})
+        topK_res = pl.DataFrame(
+            {"page_no": [item[0] for item in topK_maxsims], "DISTANCE": [item[1] for item in topK_maxsims]})
         # Cast DISTANCE column to float32
         topK_res = topK_res.with_columns(pl.col("DISTANCE").cast(pl.Float32))
 

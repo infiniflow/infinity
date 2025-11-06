@@ -2029,6 +2029,31 @@ public:
 
         auto database_name = request->getPathVariable("database_name");
         auto table_name = request->getPathVariable("table_name");
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        const QueryResult result = infinity->Optimize(database_name, table_name);
+
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_msg"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class AlterIndexHandler final : public HttpRequestHandler {
+public:
+    std::shared_ptr<OutgoingResponse> handle(const std::shared_ptr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto database_name = request->getPathVariable("database_name");
+        auto table_name = request->getPathVariable("table_name");
         auto index_name = request->getPathVariable("index_name");
 
         std::string body_info_str = request->readBodyToString();
@@ -2041,8 +2066,8 @@ public:
         HTTPStatus http_status;
         http_status = HTTPStatus::CODE_200;
 
-        OptimizeOptions optimize_options;
-        optimize_options.index_name_ = index_name;
+        AlterIndexOptions alter_index_options;
+        alter_index_options.index_name_ = index_name;
         if (simdjson::value val; doc["optimize_options"].get(val) == simdjson::SUCCESS) {
             if (val.type() != simdjson::json_type::object) {
                 json_response["error_code"] = ErrorCode::kInvalidParameterValue;
@@ -2056,11 +2081,41 @@ public:
                 auto *init_param = new InitParameter();
                 init_param->param_name_ = key;
                 init_param->param_value_ = value;
-                optimize_options.opt_params_.emplace_back(init_param);
+                alter_index_options.opt_params_.emplace_back(init_param);
             }
         }
 
-        const QueryResult result = infinity->Optimize(database_name, table_name, std::move(optimize_options));
+        const QueryResult result = infinity->AlterIndex(database_name, table_name, std::move(alter_index_options));
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_msg"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class DumpIndexHandler final : public HttpRequestHandler {
+public:
+    std::shared_ptr<OutgoingResponse> handle(const std::shared_ptr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto database_name = request->getPathVariable("database_name");
+        auto table_name = request->getPathVariable("table_name");
+        auto index_name = request->getPathVariable("index_name");
+
+        std::string body_info_str = request->readBodyToString();
+        simdjson::padded_string json_pad(body_info_str);
+        simdjson::parser parser;
+        simdjson::document doc = parser.iterate(json_pad);
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        const QueryResult result = infinity->DumpIndex(database_name, table_name, index_name);
         if (result.IsOk()) {
             json_response["error_code"] = 0;
             http_status = HTTPStatus::CODE_200;
@@ -4193,7 +4248,9 @@ std::thread HTTPServer::Start(const std::string &ip_address, u16 port) {
                   std::make_shared<ShowTableIndexChunkHandler>());
     router->route("DELETE", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", std::make_shared<DropIndexHandler>());
     router->route("POST", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", std::make_shared<CreateIndexHandler>());
-    router->route("PUT", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", std::make_shared<OptimizeIndexHandler>());
+    router->route("PUT", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", std::make_shared<AlterIndexHandler>());
+    router->route("PUT", "/databases/{database_name}/tables/{table_name}/optimize", std::make_shared<OptimizeIndexHandler>());
+    router->route("PUT", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}/dump", std::make_shared<DumpIndexHandler>());
 
     // alter
     router->route("POST", "/databases/{database_name}/tables/{table_name}/columns", std::make_shared<AddColumnsHandler>());

@@ -532,7 +532,8 @@ U8CosDistanceFuncType Get_HNSW_U8Cos_ptr() {
 }
 
 U8DistanceFuncType Get_Rabitq_U8IP_64_ptr() {
-#if defined(__AVX512BW__)
+#if 0
+//#if defined(__AVX512BW__)
     if (IsAVX512BWSupported()) {
         return &U8BinIPAVX512BW;
     }
@@ -551,7 +552,8 @@ U8DistanceFuncType Get_Rabitq_U8IP_64_ptr() {
 }
 
 U8DistanceFuncType Get_Rabitq_U8IP_32_ptr() {
-#if defined(__AVX512BW__)
+#if 0
+//#if defined(__AVX512BW__)
     if (IsAVX512BWSupported()) {
         return &U8BinIPAVX512BWResidual;
     }
@@ -570,7 +572,8 @@ U8DistanceFuncType Get_Rabitq_U8IP_32_ptr() {
 }
 
 U8DistanceFuncType Get_Rabitq_U8IP_16_ptr() {
-#if defined(__AVX512BW__)
+#if 0
+//#if defined(__AVX512BW__)
     if (IsAVX512BWSupported()) {
         return &U8BinIPAVX512BWResidual;
     }
@@ -589,7 +592,8 @@ U8DistanceFuncType Get_Rabitq_U8IP_16_ptr() {
 }
 
 U8DistanceFuncType Get_Rabitq_U8IP_ptr() {
-#if defined(__AVX512BW__)
+#if 0
+//#if defined(__AVX512BW__)
     if (IsAVX512BWSupported()) {
         return &U8BinIPAVX512BWResidual;
     }

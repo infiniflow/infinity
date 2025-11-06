@@ -103,8 +103,8 @@ class ThriftInfinityClient:
         # version: 0.6.0.dev3, client_version: 29
         # version: 0.6.0.dev4 and 0.6.0.dev5, client_version: 30
         # version: 0.6.0.dev6, client_version: 31
-        # version: 0.6.0.dev7 and 0.6.0 and 0.6.1, client_version: 32
-        res = self.client.Connect(ConnectRequest(client_version=32))  # 0.6.1
+        # version: 0.6.0.dev7 and 0.6.0 and 0.6.1 and 0.6.2 and 0.6.3 and 0.6.4, client_version: 32
+        res = self.client.Connect(ConnectRequest(client_version=32))  # 0.6.4
         if res.error_code != 0:
             raise InfinityException(res.error_code, res.error_msg)
         self.session_id = res.session_id
@@ -370,9 +370,14 @@ class ThriftInfinityClient:
         return self.client.ShowCurrentNode(ShowCurrentNodeRequest(session_id=self.session_id))
 
     @retry_wrapper
-    def optimize(self, db_name: str, table_name: str, optimize_opt: ttypes.OptimizeOptions):
-        return self.client.Optimize(OptimizeRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
-                                                    optimize_options=optimize_opt))
+    def optimize(self, db_name: str, table_name: str):
+        return self.client.Optimize(OptimizeRequest(session_id=self.session_id, db_name=db_name, table_name=table_name))
+
+    @retry_wrapper
+    def alter_index(self, db_name: str, table_name: str, alter_index_opt: ttypes.AlterIndexOptions):
+        return self.client.AlterIndex(
+            AlterIndexRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                              alter_index_options=alter_index_opt))
 
     @retry_wrapper
     def add_columns(self, db_name: str, table_name: str, column_defs: list):

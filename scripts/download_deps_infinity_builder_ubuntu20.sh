@@ -35,7 +35,8 @@ https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.
 https://github.com/gperftools/gperftools/releases/download/gperftools-2.17/gperftools-2.17.tar.gz
 https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.3/sqllogictest-bin-v0.28.3-x86_64-unknown-linux-musl.tar.gz
 https://github.com/rui314/mold/releases/download/v2.40.3/mold-2.40.3-x86_64-linux.tar.gz
-https://download.docker.com/linux/static/stable/x86_64/docker-28.3.3.tgz"
+https://download.docker.com/linux/static/stable/x86_64/docker-28.3.3.tgz
+https://github.com/astral-sh/uv/releases/download/0.9.7/uv-x86_64-unknown-linux-gnu.tar.gz"
 
 SAVEIFS=$IFS   # Save current IFS (Internal Field Separator)
 IFS=$'\n'      # Change IFS to newline char

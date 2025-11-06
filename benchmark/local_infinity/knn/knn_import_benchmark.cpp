@@ -204,16 +204,16 @@ int main(int argc, char *argv[]) {
         }
 
         if (args.encode_type_ == EncodeType::CompressToLVQ || args.encode_type_ == EncodeType::CompressToRabitq) {
-            OptimizeOptions options;
+            AlterIndexOptions options;
             options.index_name_ = index_name;
             if (args.encode_type_ == EncodeType::CompressToLVQ) {
                 options.opt_params_.emplace_back(new InitParameter("compress_to_lvq"));
             } else {
                 options.opt_params_.emplace_back(new InitParameter("compress_to_rabitq"));
             }
-            query_result = infinity->Optimize(db_name, table_name, options);
+            query_result = infinity->AlterIndex(db_name, table_name, options);
             if (!query_result.IsOk()) {
-                std::cout << "Fail to optimize index." << profiler.ElapsedToString() << std::endl;
+                std::cout << "Fail to alter index." << profiler.ElapsedToString() << std::endl;
                 profiler.End();
                 break;
             }

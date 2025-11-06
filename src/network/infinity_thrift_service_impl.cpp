@@ -100,7 +100,7 @@ ClientVersions::ClientVersions() {
     client_version_map_[29] = std::string("0.6.0.dev3");
     client_version_map_[30] = std::string("0.6.0.dev5");
     client_version_map_[31] = std::string("0.6.0.dev6");
-    client_version_map_[32] = std::string("0.6.1");
+    client_version_map_[32] = std::string("0.6.4");
 }
 
 std::pair<const char *, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
@@ -1169,9 +1169,20 @@ void InfinityThriftService::Optimize(infinity_thrift_rpc::CommonResponse &respon
         return;
     }
 
-    auto optimize_options = GetParsedOptimizeOptionFromProto(request.optimize_options);
+    const QueryResult result = infinity->Optimize(request.db_name, request.table_name);
+    ProcessQueryResult(response, result);
+}
 
-    const QueryResult result = infinity->Optimize(request.db_name, request.table_name, std::move(optimize_options));
+void InfinityThriftService::AlterIndex(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::AlterIndexRequest &request) {
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+
+    auto alter_index_option = GetParsedAlterIndexOptionFromProto(request.alter_index_options);
+
+    const QueryResult result = infinity->AlterIndex(request.db_name, request.table_name, std::move(alter_index_option));
     ProcessQueryResult(response, result);
 }
 
@@ -2645,8 +2656,8 @@ std::tuple<UpdateExpr *, Status> InfinityThriftService::GetUpdateExprFromProto(c
     return {up_expr, status};
 }
 
-OptimizeOptions InfinityThriftService::GetParsedOptimizeOptionFromProto(const infinity_thrift_rpc::OptimizeOptions &options) {
-    OptimizeOptions opt;
+AlterIndexOptions InfinityThriftService::GetParsedAlterIndexOptionFromProto(const infinity_thrift_rpc::AlterIndexOptions &options) {
+    AlterIndexOptions opt;
     opt.index_name_ = options.index_name;
     for (const auto &param : options.opt_params) {
         auto *init_param = new InitParameter();

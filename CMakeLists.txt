@@ -23,7 +23,7 @@ if (NOT CMAKE_TOOLCHAIN_FILE)
     endif ()
 endif ()
 
-project(infinity VERSION 0.6.1)
+project(infinity VERSION 0.6.4)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -335,14 +335,60 @@ endif ()
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
 
-#add_definitions(-march=native)
-add_definitions(-DSIMDE_ENABLE_NATIVE_ALIASES)
-if (CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "18.0")
+if (APPLE)
     if (X86_64)
-        add_definitions(-mevex512)
-    else ()
-        add_definitions(-march=native)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep SSE4.2"
+                RESULT_VARIABLE SUPPORT_SSE42
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX2"
+                RESULT_VARIABLE SUPPORT_AVX2
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX512"
+                RESULT_VARIABLE SUPPORT_AVX512
+                OUTPUT_QUIET
+                ERROR_QUIET)
     endif ()
+else ()
+    #Linux
+    if (X86_64)
+        execute_process(COMMAND grep -qw sse4_2 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_SSE42
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+        execute_process(COMMAND grep -qw avx2 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_AVX2
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+        execute_process(COMMAND grep -qw avx512f /proc/cpuinfo && grep -qw avx512dq /proc/cpuinfo && grep -qw avx512bw /proc/cpuinfo && grep -qw avx512vl /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_AVX512
+                OUTPUT_QUIET
+                ERROR_QUIET)
+    endif ()
+endif ()
+
+add_definitions(-DSIMDE_ENABLE_NATIVE_ALIASES)
+if (X86_64)
+    if (SUPPORT_AVX512 EQUAL 0)
+        message(STATUS "Compiled by AVX512")
+        add_definitions(-mavx512f -mavx512dq -mavx512bw -mavx512vl -mevex512)
+    elseif (SUPPORT_AVX2 EQUAL 0)
+        message(STATUS "Compiled by AVX2")
+        add_definitions(-mavx2)
+    elseif (SUPPORT_SSE42 EQUAL 0)
+        message(STATUS "Compiled by SSE4_2")
+        add_definitions(-msse4.2)
+    else ()
+        message(FATAL_ERROR "This project requires following cpu flag: sse4_2.")
+    endif ()
+    add_definitions(-mfma -mf16c -mpopcnt -mbmi2)
+else ()
+    add_definitions(-march=native)
 endif ()
 
 execute_process(

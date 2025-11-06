@@ -2,61 +2,6 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm.in ${CMAK
 
 ### Infinity
 
-### WARNING: DONT MOVE FOLLOWING COMMAND TO OTHER PLACE.
-
-# add_definitions(-march=native)
-# add_definitions(-msse4.2 -mfma)
-# add_definitions(-mavx2 -mf16c -mpopcnt)
-
-
-if (APPLE)
-    if (X86_64)
-        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep FMA"
-                RESULT_VARIABLE SUPPORT_FMA
-                OUTPUT_QUIET
-                ERROR_QUIET)
-
-        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep SSE4.2"
-                RESULT_VARIABLE SUPPORT_SSE42
-                OUTPUT_QUIET
-                ERROR_QUIET)
-
-        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX2"
-                RESULT_VARIABLE SUPPORT_AVX2
-                OUTPUT_QUIET
-                ERROR_QUIET)
-
-        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX512"
-                RESULT_VARIABLE SUPPORT_AVX512
-                OUTPUT_QUIET
-                ERROR_QUIET)
-    endif ()
-else ()
-    #Linux
-    if (X86_64)
-        execute_process(COMMAND grep -q fma /proc/cpuinfo
-                RESULT_VARIABLE SUPPORT_FMA
-                OUTPUT_QUIET
-                ERROR_QUIET)
-
-        execute_process(COMMAND grep -q sse4_2 /proc/cpuinfo
-                RESULT_VARIABLE SUPPORT_SSE42
-                OUTPUT_QUIET
-                ERROR_QUIET)
-
-        execute_process(COMMAND grep -q avx2 /proc/cpuinfo
-                RESULT_VARIABLE SUPPORT_AVX2
-                OUTPUT_QUIET
-                ERROR_QUIET)
-
-        execute_process(COMMAND grep -q avx512 /proc/cpuinfo
-                RESULT_VARIABLE SUPPORT_AVX512
-                OUTPUT_QUIET
-                ERROR_QUIET)
-    endif ()
-endif ()
-
-
 file(GLOB_RECURSE
         main_cpp
         CONFIGURE_DEPENDS
@@ -369,26 +314,6 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curl/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/darts/")
 
-if (X86_64)
-    if (NOT SUPPORT_FMA EQUAL 0)
-        message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
-    endif ()
-
-    if (NOT SUPPORT_SSE42 EQUAL 0)
-        message(FATAL_ERROR "This project requires the processor support sse4_2 instructions.")
-    endif ()
-
-    if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
-        message("Compiled by AVX2 or AVX512")
-        add_definitions(-march=native)
-        target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-march=native>)
-    else ()
-        message("Compiled by SSE")
-        add_definitions(-msse4.2 -mfma)
-        target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
-    endif ()
-endif ()
-
 add_executable(infinity
         ${main_cpp}
 )
@@ -620,18 +545,3 @@ target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/"
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
-
-# target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
-if (X86_64)
-    if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
-        message("Compiled by AVX2 or AVX512")
-        add_definitions(-mavx2 -mfma -mf16c -mpopcnt)
-        target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
-    else ()
-        message("Compiled by SSE")
-        add_definitions(-msse4.2 -mfma)
-        target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
-    endif ()
-else ()
-    add_definitions(-march=native)
-endif ()

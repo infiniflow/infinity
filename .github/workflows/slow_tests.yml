@@ -5,14 +5,16 @@ on:
   # https://docs.github.com/zh/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#schedule
   schedule:
     - cron: '30 16 * * *' # utc-8: 16:30
-  # The "create tags" trigger is specifically focused on the creation of new tags, while the "push tags" trigger is activated when tags are pushed, including both new tag creations and updates to existing tags.
-  create:
+  # Use push: tags to trigger only when the mutable tag 'slow-test' is pushed/updated.
+  # 'create' does not support tag name filters and would fire for any tag creation.
+  push:
     tags:
-      - "v*.*.*"                  # normal release
-      - "nightly"                 # mutable tag
-      - "slow-test"               # mutable tag
-  pull_request:
-    types: [ opened, synchronize, reopened, labeled ]
+      - 'slow-test'                 # mutable tag
+  # The only difference between pull_request and pull_request_target is the context in which the workflow runs:
+  # — pull_request_target workflows use the workflow files from the default branch, and secrets are available.
+  # — pull_request workflows use the workflow files from the pull request branch, and secrets are unavailable.
+  pull_request_target:
+    types: [ synchronize, ready_for_review ]
     paths-ignore:
       - 'docs/**'
       - '*.md'
@@ -25,14 +27,14 @@ concurrency:
 jobs:
   download_code:
     name: download_code
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
+    if: ${{ github.event_name != 'pull_request_target' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     steps:
       - name: Ensure workspace ownership
         if: ${{ !cancelled() && !failure() }}
         run: |
           echo "Workflow triggered by ${{ github.event_name }}"
-          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+          if [[ ${{ github.event_name }} == 'pull_request_target' ]]; then
             echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
           fi
           echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
@@ -52,7 +54,6 @@ jobs:
 
   debug_build:
     name: debug_build
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     needs: download_code
     steps:
@@ -90,7 +91,6 @@ jobs:
 
   debug_unit_test:
     name: debug_unit_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     needs: debug_build
     steps:
@@ -129,7 +129,6 @@ jobs:
 
   debug_tsan_restart_test:
     name: debug_tsan_restart_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     needs: debug_build
     steps:
@@ -175,7 +174,6 @@ jobs:
 
   debug_tsan_cluster_test:
     name: debug_tsan_cluster_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     needs: debug_build
     steps:
@@ -217,7 +215,6 @@ jobs:
 
   debug_tsan_parallel_test:
     name: debug_tsan_parallel_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     needs:
       - debug_build
@@ -266,7 +263,6 @@ jobs:
 
   reldeb_build:
     name: reldeb_build
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     needs: download_code
     steps:
@@ -300,7 +296,6 @@ jobs:
 
   reldeb_unit_test:
     name: reldeb_unit_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     needs: reldeb_build
     steps:
@@ -339,7 +334,6 @@ jobs:
 
   reldeb_parallel_test:
     name: reldeb_parallel_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     needs:
       - reldeb_build
@@ -388,7 +382,6 @@ jobs:
 
   reldeb_restart_test:
     name: reldeb_restart_test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: [ "self-hosted", "slow-test" ]
     needs: reldeb_build
     steps:

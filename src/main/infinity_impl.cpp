@@ -1241,7 +1241,7 @@ QueryResult Infinity::Search(const std::string &db_name,
     return result;
 }
 
-QueryResult Infinity::Optimize(const std::string &db_name, const std::string &table_name, OptimizeOptions optimize_option) {
+QueryResult Infinity::Optimize(const std::string &db_name, const std::string &table_name) {
     std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
     std::unique_ptr<OptimizeStatement> optimize_statement = std::make_unique<OptimizeStatement>();
@@ -1252,17 +1252,26 @@ QueryResult Infinity::Optimize(const std::string &db_name, const std::string &ta
     optimize_statement->table_name_ = table_name;
     ToLower(optimize_statement->table_name_);
 
-    if (!optimize_option.index_name_.empty()) {
-        optimize_statement->index_name_ = std::move(optimize_option.index_name_);
-        ToLower(optimize_statement->index_name_);
-        for (auto *param_ptr : optimize_option.opt_params_) {
-            auto param = std::make_unique<InitParameter>(std::move(param_ptr->param_name_), std::move(param_ptr->param_value_));
-            optimize_statement->opt_params_.push_back(std::move(param));
-            delete param_ptr;
-        }
+    QueryResult result = query_context_ptr->QueryStatement(optimize_statement.get());
+    return result;
+}
+
+QueryResult Infinity::AlterIndex(const std::string &db_name, const std::string &table_name, AlterIndexOptions alter_index_option) {
+    std::unique_ptr<QueryContext> query_context_ptr;
+    GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
+    std::unique_ptr<AlterIndexStatement> alter_index_statement = std::make_unique<AlterIndexStatement>(db_name.c_str(), table_name.c_str());
+    alter_index_statement->index_name_ = std::move(alter_index_option.index_name_);
+    ToLower(alter_index_statement->schema_name_);
+    ToLower(alter_index_statement->table_name_);
+    ToLower(alter_index_statement->index_name_);
+
+    for (auto *param_ptr : alter_index_option.opt_params_) {
+        auto param = std::make_unique<InitParameter>(std::move(param_ptr->param_name_), std::move(param_ptr->param_value_));
+        alter_index_statement->opt_params_.push_back(std::move(param));
+        delete param_ptr;
     }
 
-    QueryResult result = query_context_ptr->QueryStatement(optimize_statement.get());
+    QueryResult result = query_context_ptr->QueryStatement(alter_index_statement.get());
     return result;
 }
 
