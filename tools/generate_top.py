@@ -4,7 +4,8 @@ import random
 
 
 def generate(generate_if_exists: bool, copy_dir: str):
-    row_n = 10000
+    # generate 123 blocks so that each PhysicalTop Task handles multiple blocks
+    row_n = 1000000
     limit_offset = [[10, 9000], [10, 10], [8, 9995], [9000, 1000]]
     csv_dir = "./test/data/csv"
     slt_dir = "./test/sql/dql/sort_top"
@@ -41,13 +42,6 @@ def generate(generate_if_exists: bool, copy_dir: str):
         top_slt_file.write("statement ok\n")
         top_slt_file.write(
             "COPY {} FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );\n".format(table_name, copy_path))
-        top_slt_file.write("\nquery I\n")
-        top_slt_file.write(
-            "SELECT * FROM {} order by c1 - c1, c2 desc, c1 + c1 limit 10 offset 3330;\n".format(table_name))
-        top_slt_file.write("----\n")
-        top_slt_file.write("9990 true\n9993 true\n9996 true\n9999 true\n")
-        top_slt_file.write(
-            "1 false\n2 false\n4 false\n5 false\n7 false\n8 false\n")
 
         for lim_off in limit_offset:
             limit = lim_off[0]
@@ -64,6 +58,14 @@ def generate(generate_if_exists: bool, copy_dir: str):
                     top_slt_file.write("{} true\n".format(k))
                 else:
                     top_slt_file.write("{} false\n".format(k))
+
+        top_slt_file.write("\nquery I\n")
+        top_slt_file.write(
+            "SELECT * FROM {} order by c1 - c1, c2 desc, c1 + c1 limit 10 offset 333330;\n".format(table_name))
+        top_slt_file.write("----\n")
+        top_slt_file.write("999990 true\n999993 true\n999996 true\n999999 true\n")
+        top_slt_file.write(
+            "1 false\n2 false\n4 false\n5 false\n7 false\n8 false\n")
 
         top_slt_file.write("\n")
         top_slt_file.write("statement ok\n")

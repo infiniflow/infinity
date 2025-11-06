@@ -65,6 +65,41 @@ private:
         sort_functions_; // sort functions
 };
 
+export class TopSolver {
+public:
+    explicit TopSolver(u32 limit,
+                       const CompareTwoRowAndPreferLeft &prefer_left_function,
+                       const std::vector<std::shared_ptr<BaseExpression>> &expressions,
+                       std::vector<std::shared_ptr<ExpressionState>> &expr_stats)
+        : limit_(limit), prefer_left_function_(prefer_left_function), expressions_(expressions), expr_states_(expr_stats) {}
+
+    // Usage: Call `Solve()` multiple times to accumulate result into the same output block array, then call `Finalize()` once.
+    void Solve(const std::vector<std::unique_ptr<DataBlock>> &input_data_block_array,
+               std::vector<std::unique_ptr<DataBlock>> &output_data_block_array);
+
+    void Finalize(std::vector<std::unique_ptr<DataBlock>> &output_data_block_array, u32 solved, u32 offset);
+
+    // for Top and MergeTop
+    static std::vector<std::vector<std::shared_ptr<ColumnVector>>> GetEvalColumns(const std::vector<std::shared_ptr<BaseExpression>> &expressions,
+                                                                                  std::vector<std::shared_ptr<ExpressionState>> &expr_states,
+                                                                                  const std::vector<std::unique_ptr<DataBlock>> &data_block_array);
+
+private:
+    u32 limit_{};
+    const CompareTwoRowAndPreferLeft &prefer_left_function_; // sort functions
+    const std::vector<std::shared_ptr<BaseExpression>> &expressions_;
+    std::vector<std::shared_ptr<ExpressionState>> &expr_states_;
+    std::function<bool(std::pair<u32, u32> &, std::pair<u32, u32> &)> compare_id_for_heap_;
+
+    void Init();
+
+    void GetEvalColumns(const std::vector<std::unique_ptr<DataBlock>> &data_block_array);
+
+    void WriteToOutput(const std::vector<std::unique_ptr<DataBlock>> &input_data_block_array,
+                       const std::vector<std::pair<u32, u32>> &selected_row_ids,
+                       std::vector<std::unique_ptr<DataBlock>> &output_data_block_array);
+};
+
 export class PhysicalTop : public PhysicalOperator {
 public:
     explicit PhysicalTop(u64 id,
@@ -110,12 +145,7 @@ public:
     inline auto const &GetInnerCompareFunction() const { return prefer_left_function_; }
 
     // for Top and MergeTop
-    static void HandleOutputOffset(u32 total_row_cnt, u32 offset, std::vector<std::unique_ptr<DataBlock>> &output_data_block_array);
-
-    // for Top and MergeTop
-    static std::vector<std::vector<std::shared_ptr<ColumnVector>>> GetEvalColumns(const std::vector<std::shared_ptr<BaseExpression>> &expressions,
-                                                                                  std::vector<std::shared_ptr<ExpressionState>> &expr_states,
-                                                                                  const std::vector<std::unique_ptr<DataBlock>> &data_block_array);
+    static void HandleOutputOffset(std::vector<std::unique_ptr<DataBlock>> &output_data_block_array, u32 offset);
 
     // for Top and Sort
     static std::function<std::strong_ordering(const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32)>
