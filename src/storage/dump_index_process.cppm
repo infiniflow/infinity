@@ -43,7 +43,7 @@ private:
     void Process();
 
 private:
-    BlockingQueue<std::shared_ptr<BGTask>> task_queue_{"DumpIndexProcessor"};
+    BlockingQueue<std::shared_ptr<BGTask>> task_queue_{"DumpIndexProcessor", 1024 * 1024};
 
     std::thread processor_thread_{};
 
