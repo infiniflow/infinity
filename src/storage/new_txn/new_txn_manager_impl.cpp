@@ -870,23 +870,29 @@ void NewTxnManager::RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, Ne
 
 SystemCache *NewTxnManager::GetSystemCachePtr() const { return system_cache_.get(); }
 
-void NewTxnManager::UpdateTxnBeginTS(NewTxn *txn) {
+void NewTxnManager::UpdateTxnBeginTSAndKVInstance(NewTxn *txn) {
     std::lock_guard guard(locker_);
     TxnTimeStamp old_begin_ts = txn->BeginTS();
     TxnTimeStamp new_begin_ts = current_ts_ + 1;
+    if (new_begin_ts == old_begin_ts) {
+        return;
+    }
     txn->SetBeginTS(new_begin_ts);
     ++begin_txn_map_[new_begin_ts];
 
     auto old_it = begin_txn_map_.find(old_begin_ts);
     if (old_it == begin_txn_map_.end()) {
-        UnrecoverableError(fmt::format("UpdateTxnBeginTS: NewTxn: {} with begin ts: {} not found in begin_txn_map_", txn->TxnID(), old_begin_ts));
+        UnrecoverableError(
+            fmt::format("UpdateTxnBeginTSAndKVInstance: NewTxn: {} with begin ts: {} not found in begin_txn_map_", txn->TxnID(), old_begin_ts));
     }
     if (old_it->second == 0) {
-        UnrecoverableError(fmt::format("UpdateTxnBeginTS: Txn count with begin ts: {} in begin_txn_map_ is 0", old_begin_ts));
+        UnrecoverableError(fmt::format("UpdateTxnBeginTSAndKVInstance: Txn count with begin ts: {} in begin_txn_map_ is 0", old_begin_ts));
     }
     if (--old_it->second == 0) {
         begin_txn_map_.erase(old_it);
     }
+
+    txn->UpdateKVInstance(kv_store_->GetInstance());
 }
 
 void NewTxnManager::CollectInfo(NewTxn *txn) {

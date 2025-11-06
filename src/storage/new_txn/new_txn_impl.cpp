@@ -1864,6 +1864,11 @@ void NewTxn::SetBeginTS(TxnTimeStamp begin_ts) {
     txn_context_ptr_->begin_ts_ = begin_ts;
 }
 
+void NewTxn::UpdateKVInstance(std::unique_ptr<KVInstance> kv_instance) {
+    kv_instance_->Commit();
+    kv_instance_ = std::move(kv_instance);
+}
+
 Status NewTxn::Commit() {
     if (base_txn_store_ == nullptr or this->readonly()) {
         if (base_txn_store_ != nullptr) {
