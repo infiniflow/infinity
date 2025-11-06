@@ -5,10 +5,11 @@ on:
   # https://docs.github.com/zh/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#schedule
   schedule:
     - cron: '30 16 * * *' # utc-8: 16:30
-  # The "create tags" trigger is specifically focused on the creation of new tags, while the "push tags" trigger is activated when tags are pushed, including both new tag creations and updates to existing tags.
-  create:
+  # Use push: tags to trigger only when the mutable tag 'slow-test' is pushed/updated.
+  # 'create' does not support tag name filters and would fire for any tag creation.
+  push:
     tags:
-      - "slow-test"               # mutable tag
+      - 'slow-test'                 # mutable tag
   # The only difference between pull_request and pull_request_target is the context in which the workflow runs:
   # — pull_request_target workflows use the workflow files from the default branch, and secrets are available.
   # — pull_request workflows use the workflow files from the pull request branch, and secrets are unavailable.
