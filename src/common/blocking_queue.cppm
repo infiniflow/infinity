@@ -68,6 +68,22 @@ public:
         return true;
     }
 
+    bool TryEnqueue(T &&task) {
+        {
+            if (!allow_enqueue_) {
+                return false;
+            }
+
+            std::unique_lock<std::mutex> lock(queue_mutex_);
+            if (queue_.size() >= capacity_) {
+                return false;
+            }
+            queue_.push_back(std::forward<T>(task));
+        }
+        empty_cv_.notify_one();
+        return true;
+    }
+
     void EnqueueBulk(std::vector<T> &input_array) {
         {
             std::unique_lock<std::mutex> lock(queue_mutex_);
