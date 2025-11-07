@@ -26,16 +26,16 @@ import std;
 
 namespace infinity {
 
-static std::string FragmentTitle(u64 fragment_id, bool is_head) {
+static std::string FragmentTitle(u64 fragment_id, FragmentType fragment_type, bool is_head) {
     if (!is_head) {
-        return "FRAGMENT #" + std::to_string(fragment_id);
+        return "FRAGMENT #" + std::to_string(fragment_id) + ", " + FragmentType2String(fragment_type);
     }
 
-    return "FRAGMENT (" + std::to_string(fragment_id) + ")";
+    return "FRAGMENT (" + std::to_string(fragment_id) + ", " + FragmentType2String(fragment_type) + ")";
 }
 
 void ExplainFragment::Explain(PlanFragment *plan_fragment_ptr, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size) {
-    result->emplace_back(std::make_shared<std::string>(FragmentTitle(plan_fragment_ptr->FragmentID(), true)));
+    result->emplace_back(std::make_shared<std::string>(FragmentTitle(plan_fragment_ptr->FragmentID(), plan_fragment_ptr->GetFragmentType(), true)));
 
     if (plan_fragment_ptr->GetSinkNode()) {
         ExplainPhysicalPlan::Explain(plan_fragment_ptr->GetSinkNode(), result, false, 2);
@@ -57,7 +57,8 @@ void ExplainFragment::Explain(PlanFragment *plan_fragment_ptr, std::shared_ptr<s
                 if (i > 0) {
                     fragment_footer += ", ";
                 }
-                fragment_footer += FragmentTitle(plan_fragment_ptr->Children()[i]->FragmentID(), false);
+                fragment_footer +=
+                    FragmentTitle(plan_fragment_ptr->Children()[i]->FragmentID(), plan_fragment_ptr->Children()[i]->GetFragmentType(), false);
             }
             result->back() = std::make_shared<std::string>(fragment_footer);
         }

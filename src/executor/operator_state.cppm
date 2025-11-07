@@ -228,8 +228,8 @@ export struct MergeTopOperatorState : public OperatorState {
     inline explicit MergeTopOperatorState() : OperatorState(PhysicalOperatorType::kMergeTop) {}
     std::vector<std::shared_ptr<ExpressionState>> expr_states_;         // expression states
     std::vector<std::unique_ptr<DataBlock>> middle_sorted_data_blocks_; // middle result
-    u32 middle_result_count_{};
     std::vector<std::unique_ptr<DataBlock>> input_data_blocks_;
+    u32 execution_count_{}; // count of middle result update
     bool input_complete_{false};
 };
 
@@ -237,6 +237,7 @@ export struct MergeTopOperatorState : public OperatorState {
 export struct TopOperatorState : public OperatorState {
     inline explicit TopOperatorState() : OperatorState(PhysicalOperatorType::kTop) {}
     std::vector<std::shared_ptr<ExpressionState>> expr_states_; // expression states
+    u32 execution_count_{};                                     // count of  middle result update
 };
 
 // Projection

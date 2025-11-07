@@ -82,6 +82,7 @@ public:
 
     std::unique_ptr<TxnInfo> GetTxnInfoByID(TransactionID txn_id) const;
 
+    std::vector<std::shared_ptr<TxnContext>> GetTxnContextHistoriesNoLock() const;
     std::vector<std::shared_ptr<TxnContext>> GetTxnContextHistories() const;
 
     // This function is only used for unit test.
@@ -158,6 +159,8 @@ public:
         std::lock_guard guard(locker_);
         return last_kv_commit_ts_;
     }
+
+    void UpdateTxnBeginTSAndKVInstance(NewTxn *txn);
 
 private:
     mutable std::mutex locker_{};

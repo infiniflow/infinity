@@ -1483,7 +1483,8 @@ Status NewTxn::OptimizeFtIndex(std::shared_ptr<IndexBase> index_base,
                 return status;
             }
         }
-        if (chunk_id == 0) {
+        // Initialize base_rowid for the first chunk
+        if (iter == chunk_ids.begin()) {
             base_rowid = chunk_info_ptr->base_row_id_;
         }
         if (const RowID expect_base_row_id = base_rowid + total_row_count; chunk_info_ptr->base_row_id_ > expect_base_row_id) {

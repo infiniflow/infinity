@@ -108,7 +108,7 @@ test33 3.620001
 query I
 EXPLAIN FRAGMENT SELECT title, SCORE() FROM sqllogic_fusion_rerank_maxsim SEARCH MATCH TEXT ('body', 'off', 'topn=4'), MATCH TENSOR (t, [1.0, 0.0, 0.0, 0.0], 'float', 'maxsim', 'topn=2'), FUSION('rrf'), FUSION('match_tensor', 'column_name=t;search_tensor=[[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]];tensor_data_type=float;match_method=MaxSim;topn=2');
 ----
-FRAGMENT (1)
+FRAGMENT (1, SerialMaterialize)
 -> SINK (9) Result
 -> PROJECT (6)
    - table index: #4
@@ -119,9 +119,9 @@ FRAGMENT (1)
 -> FUSION (4)
    - fusion: #FUSION('rrf', '')
    - output columns: [__score, __rowid]
--> SOURCE (10) LocalQueue: FRAGMENT #2, FRAGMENT #3
+-> SOURCE (10) LocalQueue: FRAGMENT #2, SerialMaterialize, FRAGMENT #3, SerialMaterialize
 (empty)
-FRAGMENT (2)
+FRAGMENT (2, SerialMaterialize)
 -> SINK (11) LocalQueue
 -> MATCH (2)
    - table name: sqllogic_fusion_rerank_maxsim(default_db.sqllogic_fusion_rerank_maxsim)
@@ -133,7 +133,7 @@ FRAGMENT (2)
 -> SOURCE (12) Table
 (empty)
 (empty)
-FRAGMENT (3)
+FRAGMENT (3, SerialMaterialize)
 -> SINK (13) LocalQueue
 -> MatchTensorScan (3)
    - table name: sqllogic_fusion_rerank_maxsim(default_db.sqllogic_fusion_rerank_maxsim)

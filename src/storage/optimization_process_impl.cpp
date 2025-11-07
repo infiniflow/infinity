@@ -83,6 +83,8 @@ void OptimizationProcessor::Submit(const std::shared_ptr<BGTask> &bg_task) {
 }
 
 Status OptimizationProcessor::NewManualOptimize(NewTxn *new_txn, const std::string &db_name, const std::string &table_name) {
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    new_txn_mgr->UpdateTxnBeginTSAndKVInstance(new_txn);
     return new_txn->OptimizeTableIndexes(db_name, table_name);
 }
 
