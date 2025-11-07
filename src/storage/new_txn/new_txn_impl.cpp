@@ -1625,14 +1625,6 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
         return Status::OK();
     }
 
-    auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
-    if (!wal_manager->SetCheckpointing()) {
-        // Checkpointing
-        LOG_INFO(fmt::format("checkpoint ts: {} skipped due to the system is checkpointing.", checkpoint_ts));
-        return Status::OK();
-    }
-    DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
-
     std::vector<std::string> *db_id_strs_ptr;
     std::vector<std::string> *db_names_ptr;
     CatalogMeta catalog_meta(this);
@@ -5426,19 +5418,17 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
     current_ckp_ts_ = checkpoint_ts;
     LOG_INFO(fmt::format("checkpoint ts for snapshot: {}", current_ckp_ts_));
 
+    if (!txn_mgr_->SetCheckpointBeginTS(checkpoint_ts)) {
+        LOG_ERROR(fmt::format("Create snapshot with txn: {} is conflicted with another checkpoint transaction.", this->TxnID()));
+        return Status::Checkpointing();
+    }
+
     if (last_ckp_ts > 0 and last_ckp_ts + 2 >= checkpoint_ts) {
         // last checkpoint ts: last checkpoint txn begin ts. checkpoint is the begin_ts of current txn
         txn_context_ptr_->txn_type_ = TransactionType::kSkippedCheckpoint;
         LOG_INFO(fmt::format("Last checkpoint ts {}, this checkpoint begin ts: {}, SKIP CHECKPOINT", last_ckp_ts, checkpoint_ts));
         return Status::OK();
     }
-
-    auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
-    if (!wal_manager->SetCheckpointing()) {
-        LOG_ERROR(fmt::format("Create snapshot with txn: {} is conflicted with another checkpoint transaction.", this->TxnID()));
-        return Status::Checkpointing();
-    }
-    DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
 
     std::vector<std::string> *db_id_strs_ptr;
     std::vector<std::string> *db_names_ptr;
