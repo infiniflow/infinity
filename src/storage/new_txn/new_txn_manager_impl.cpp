@@ -381,10 +381,10 @@ std::unique_ptr<TxnInfo> NewTxnManager::GetTxnInfoByID(TransactionID txn_id) con
     return std::make_unique<TxnInfo>(iter->first, iter->second->GetTxnText());
 }
 
-std::vector<std::shared_ptr<TxnContext>> NewTxnManager::GetTxnContextHistories() const {
-    std::unique_lock w_lock(locker_);
+std::vector<std::shared_ptr<TxnContext>> NewTxnManager::GetTxnContextHistoriesNoLock() const {
+
     std::vector<std::shared_ptr<TxnContext>> txn_context_histories;
-    txn_context_histories.reserve(txn_context_histories_.size());
+    txn_context_histories.reserve(txn_context_histories_.size() + txn_map_.size());
 
     for (const auto &context_ptr : txn_context_histories_) {
         txn_context_histories.emplace_back(context_ptr);
@@ -395,6 +395,11 @@ std::vector<std::shared_ptr<TxnContext>> NewTxnManager::GetTxnContextHistories()
     }
 
     return txn_context_histories;
+}
+
+std::vector<std::shared_ptr<TxnContext>> NewTxnManager::GetTxnContextHistories() const {
+    std::unique_lock w_lock(locker_);
+    return GetTxnContextHistoriesNoLock();
 }
 
 void NewTxnManager::SetNewSystemTS(TxnTimeStamp new_system_ts) {

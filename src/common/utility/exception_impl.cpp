@@ -31,7 +31,7 @@ void PrintTransactionHistory() {
         LOG_WARN("TxnManager is null");
         return;
     }
-    std::vector<std::shared_ptr<TxnContext>> txn_contexts = txn_manager->GetTxnContextHistories();
+    std::vector<std::shared_ptr<TxnContext>> txn_contexts = txn_manager->GetTxnContextHistoriesNoLock();
 
     std::ostringstream oss;
     size_t history_count = txn_contexts.size();
