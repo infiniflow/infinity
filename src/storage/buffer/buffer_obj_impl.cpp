@@ -218,10 +218,13 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
     return write;
 }
 
-bool BufferObj::SaveSnapshot(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info, bool use_memory, const FileWorkerSaveCtx &ctx) {
+bool BufferObj::SaveSnapshot(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info,
+                             bool use_memory,
+                             const FileWorkerSaveCtx &ctx,
+                             size_t data_size) {
     std::unique_lock<std::mutex> locker(w_locker_);
 
-    bool all_save = file_worker_->WriteSnapshotFile(table_snapshot_info, use_memory, ctx);
+    bool all_save = file_worker_->WriteSnapshotFile(table_snapshot_info, use_memory, ctx, data_size);
     return all_save;
 }
 

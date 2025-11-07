@@ -60,7 +60,10 @@ FileWorker::~FileWorker() {
 #endif
 }
 
-bool FileWorker::WriteSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info, bool use_memory, const FileWorkerSaveCtx &ctx) {
+bool FileWorker::WriteSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info,
+                                   bool use_memory,
+                                   const FileWorkerSaveCtx &ctx,
+                                   size_t data_size) {
     std::string snapshot_name = table_snapshot_info->snapshot_name_;
     std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     std::string write_dir = std::filesystem::path(snapshot_dir) / snapshot_name / *file_dir_;
@@ -80,7 +83,7 @@ bool FileWorker::WriteSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &tab
         DeferFn defer_fn([&]() { file_handle_ = nullptr; });
 
         bool prepare_success = false;
-        bool all_save = WriteToFileImpl(false, prepare_success, ctx);
+        bool all_save = WriteSnapshotFileImpl(data_size, prepare_success, ctx);
         if (prepare_success) {
             file_handle_->Sync();
         }
@@ -93,7 +96,7 @@ bool FileWorker::WriteSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &tab
             PersistReadResult result = persistence_manager->GetObjCache(src_path);
             const ObjAddr &obj_addr = result.obj_addr_;
             if (!obj_addr.Valid()) {
-                return true;
+                return false;
             }
 
             std::string read_path = persistence_manager->GetObjPath(obj_addr.obj_key_);
@@ -132,6 +135,10 @@ bool FileWorker::WriteSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &tab
 
         return true;
     }
+}
+
+bool FileWorker::WriteSnapshotFileImpl(size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+    return WriteToFileImpl(false, prepare_success, ctx);
 }
 
 bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {

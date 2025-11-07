@@ -2365,6 +2365,11 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeta &table_meta, const std:
                 }
             }
         }
+
+        status = RecoverMemIndex(*table_index_meta);
+        if (!status.ok()) {
+            return status;
+        }
     }
     if (!is_link_files) {
         status = table_meta.SetNextIndexID(std::to_string(max_index_id + 1));

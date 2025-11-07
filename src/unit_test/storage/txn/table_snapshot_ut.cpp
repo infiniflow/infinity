@@ -35,7 +35,26 @@ public:
     std::condition_variable cv_{};
     bool ready_{false};
 
+    std::shared_ptr<std::string> db_name;
+    std::shared_ptr<ColumnDef> column_def1;
+    std::shared_ptr<ColumnDef> column_def2;
+    std::shared_ptr<std::string> table_name;
+    std::shared_ptr<TableDef> table_def;
+    std::shared_ptr<std::string> table_snapshot_name;
+
     std::shared_ptr<TableSnapshotInfo> table_snapshot_;
+
+    void PrintTableRowCount() {
+        std::string select_sql = fmt::format("select count(*) from {}", *table_name);
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(select_sql);
+        bool ok = HandleQueryResult(query_result);
+        if (ok) {
+            LOG_INFO(fmt::format("RowCount: {}", query_result.ToString()));
+        } else {
+            LOG_INFO("GetTableRowCount failed");
+        }
+    }
 
     void SetUp() override {
         NewRequestTest::SetUp();
@@ -46,12 +65,12 @@ public:
         using namespace infinity;
         NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-        auto db_name = std::make_shared<std::string>("default_db");
-        auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-        auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-        auto table_name = std::make_shared<std::string>("tb1");
-        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
-        auto table_snapshot = std::make_shared<std::string>("tb1_snapshot");
+        db_name = std::make_shared<std::string>("default_db");
+        column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+        column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kInteger), "col2", std::set<ConstraintType>());
+        table_name = std::make_shared<std::string>("tb1");
+        table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
+        table_snapshot_name = std::make_shared<std::string>("tb1_snapshot");
 
         // Create table
         {
@@ -70,28 +89,55 @@ public:
             bool ok = HandleQueryResult(query_result);
             EXPECT_TRUE(ok);
         }
-        {
-            std::string create_index_sql = "create index idx2 on tb1(col2) using fulltext";
-            std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-            QueryResult query_result = query_context->Query(create_index_sql);
-            bool ok = HandleQueryResult(query_result);
-            EXPECT_TRUE(ok);
-        }
+        // {
+        //     std::string create_index_sql = "create index idx2 on tb1(col2) using fulltext";
+        //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        //     QueryResult query_result = query_context->Query(create_index_sql);
+        //     bool ok = HandleQueryResult(query_result);
+        //     EXPECT_TRUE(ok);
+        // }
 
         // Insert data to multi-blocks
-        for (IntegerT i = 0; i < 5; ++i) {
+        {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
-            auto input_block = MakeInputBlock(Value::MakeInt(i), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+            // auto input_block = MakeInputBlock(Value::MakeInt(999), Value::MakeVarchar("abc"), 100);
+            auto input_block = std::make_shared<DataBlock>();
+            {
+                auto col1 = ColumnVector::Make(column_def1->type());
+                col1->Initialize();
+                for (u32 i = 0; i < 100; ++i) {
+                    col1->AppendValue(Value::MakeInt(999));
+                }
+                input_block->InsertVector(col1, 0);
+            }
+            {
+                auto col2 = ColumnVector::Make(column_def2->type());
+                col2->Initialize();
+                for (u32 i = 0; i < 100; ++i) {
+                    col2->AppendValue(Value::MakeInt(999));
+                }
+                input_block->InsertVector(col2, 1);
+            }
+            input_block->Finalize();
+
             auto status = txn->Append(*db_name, *table_name, input_block);
             EXPECT_TRUE(status.ok());
             status = txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
+        // for (IntegerT i = 0; i < 11; ++i) {
+        //     auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
+        //     auto input_block = MakeInputBlock(Value::MakeInt(i), Value::MakeVarchar("abc"), 8192);
+        //     auto status = txn->Append(*db_name, *table_name, input_block);
+        //     EXPECT_TRUE(status.ok());
+        //     status = txn_mgr->CommitTxn(txn);
+        //     EXPECT_TRUE(status.ok());
+        // }
 
         // Create table snapshot
         {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create snapshot"), TransactionType::kCreateTableSnapshot);
-            auto status = txn->CreateTableSnapshot(*db_name, *table_name, *table_snapshot);
+            auto status = txn->CreateTableSnapshot(*db_name, *table_name, *table_snapshot_name);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
@@ -447,4 +493,160 @@ TEST_P(TableSnapshotTest, test_restore_table_same_snapshot_multithreaded) {
             LOG_INFO("select * from tb1 failed");
         }
     }
+}
+
+TEST_P(TableSnapshotTest, test_create_snapshot_delete_data) {
+    using namespace infinity;
+    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    {
+        std::string restore_sql = "restore table snapshot tb1_snapshot";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(restore_sql);
+        bool ok = HandleQueryResult(query_result);
+        if (ok) {
+            LOG_INFO("std::Thread 1: restore table snapshot tb1_snapshot succeeded");
+        } else {
+            LOG_INFO("std::Thread 1: restore table snapshot tb1_snapshot failed");
+        }
+    }
+
+    PrintTableRowCount();
+
+    Status status;
+    std::vector<RowID> row_ids;
+
+    auto *txn1 = txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
+    for (size_t row_id = 80; row_id < 100; ++row_id) {
+        row_ids.push_back(RowID(0, row_id));
+    }
+    status = txn1->Delete("default_db", "tb1", row_ids);
+
+    status = txn_mgr->CommitTxn(txn1);
+    if (!status.ok()) {
+        LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
+    }
+
+    PrintTableRowCount();
+
+    // {
+    //     std::string delete_req_sql = "delete from tb1";
+    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+    //     QueryResult query_result = query_context->Query(delete_req_sql);
+    //     bool ok = HandleQueryResult(query_result);
+    //     EXPECT_TRUE(ok);
+    //
+    //     PrintTableRowCount();
+    // }
+
+    auto *txn2 = txn_mgr->BeginTxn(std::make_unique<std::string>("create snapshot"), TransactionType::kCreateTableSnapshot);
+    status = txn2->CreateTableSnapshot("default_db", "tb1", "test_delete");
+    if (!status.ok()) {
+        LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
+    }
+
+    auto *txn3 = txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
+
+    row_ids.clear();
+    for (size_t row_id = 80; row_id < 100; ++row_id) {
+        row_ids.push_back(RowID(0, row_id));
+    }
+    status = txn3->Delete("default_db", "tb1", row_ids);
+    if (!status.ok()) {
+        LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
+    }
+
+    status = txn_mgr->CommitTxn(txn2);
+    if (!status.ok()) {
+        LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
+    }
+
+    status = txn_mgr->CommitTxn(txn3);
+    if (!status.ok()) {
+        LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
+    }
+
+    // Drop table
+    {
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
+        auto status = txn->DropTable("default_db", "tb1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        txn_mgr->CommitTxn(txn);
+    }
+
+    {
+        std::string restore_sql = "restore table snapshot test_delete";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(restore_sql);
+        bool ok = HandleQueryResult(query_result);
+        if (ok) {
+            LOG_INFO("std::Thread 1: restore table snapshot test_delete succeeded");
+        } else {
+            LOG_INFO("std::Thread 1: restore table snapshot test_delete failed");
+        }
+    }
+
+    PrintTableRowCount();
+}
+
+TEST_P(TableSnapshotTest, test_create_snapshot_insert_data) {
+    using namespace infinity;
+    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    {
+        std::string restore_sql = "restore table snapshot tb1_snapshot";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(restore_sql);
+        bool ok = HandleQueryResult(query_result);
+        if (ok) {
+            LOG_INFO("std::Thread 1: restore table snapshot tb1_snapshot succeeded");
+        } else {
+            LOG_INFO("std::Thread 1: restore table snapshot tb1_snapshot failed");
+        }
+    }
+
+    Status status;
+
+    auto *txn1 = txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
+    auto input_block = MakeInputBlock(Value::MakeInt(999), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 900);
+    status = txn1->Append(*db_name, *table_name, input_block);
+    EXPECT_TRUE(status.ok());
+
+    auto *txn2 = txn_mgr->BeginTxn(std::make_unique<std::string>("create snapshot"), TransactionType::kCreateTableSnapshot);
+    status = txn2->CreateTableSnapshot("default_db", "tb1", "test_insert");
+    if (!status.ok()) {
+        LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
+    }
+
+    status = txn_mgr->CommitTxn(txn2);
+    if (!status.ok()) {
+        LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
+    }
+
+    status = txn_mgr->CommitTxn(txn1);
+    if (!status.ok()) {
+        LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
+    }
+
+    // Drop table
+    {
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
+        auto status = txn->DropTable("default_db", "tb1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        txn_mgr->CommitTxn(txn);
+    }
+
+    {
+        std::string restore_sql = "restore table snapshot test_insert";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(restore_sql);
+        bool ok = HandleQueryResult(query_result);
+        if (ok) {
+            LOG_INFO("std::Thread 1: restore table snapshot test_insert succeeded");
+        } else {
+            LOG_INFO("std::Thread 1: restore table snapshot test_insert failed");
+        }
+    }
+
+    PrintTableRowCount();
 }

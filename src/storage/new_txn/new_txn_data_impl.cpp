@@ -1466,6 +1466,7 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                     use_memory = true;
                 }
             }
+            LOG_INFO(fmt::format("use_memory: {}", use_memory ? "true" : "false"));
 
             {
                 std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
@@ -1489,6 +1490,22 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                     return status;
                 }
 
+                NewTxnGetVisibleRangeState state;
+                status = NewCatalog::GetBlockVisibleRange(block_meta, txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_, state);
+                if (!status.ok()) {
+                    return status;
+                }
+
+                std::pair<BlockOffset, BlockOffset> range;
+                BlockOffset row_cnt = 0;
+                while (true) {
+                    bool has_next = state.Next(row_cnt, range);
+                    if (!has_next) {
+                        break;
+                    }
+                    row_cnt = range.second;
+                }
+
                 for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
                     ColumnMeta column_meta(column_idx, block_meta);
                     BufferObj *buffer_obj = nullptr;
@@ -1499,8 +1516,11 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                         return status;
                     }
 
+                    size_t total_data_size = 0;
+                    std::tie(total_data_size, status) = column_meta.GetColumnSize(row_cnt, (*column_defs)[column_idx]);
+
                     if (buffer_obj) {
-                        buffer_obj->SaveSnapshot(table_snapshot_info, use_memory);
+                        buffer_obj->SaveSnapshot(table_snapshot_info, use_memory, {}, total_data_size);
                     }
 
                     if (outline_buffer_obj) {
@@ -1545,11 +1565,12 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
 
             // Get memory index for this segment
             std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-            if (mem_index == nullptr || mem_index->IsDumping() || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
-                LOG_INFO(fmt::format("Skipping segment {} - no memory index to dump", segment_id));
-                continue;
-            }
-            mem_index->SetIsDumping(true);
+            // if (mem_index == nullptr || mem_index->IsDumping() || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() ==
+            // nullptr)) {
+            //     LOG_INFO(fmt::format("Skipping segment {} - no memory index to dump", segment_id));
+            //     continue;
+            // }
+            // mem_index->SetIsDumping(true);
 
             // Allocate new chunk ID for this dump
             ChunkID chunk_id = 0;
@@ -1571,14 +1592,6 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                 Status status = chunk_index_meta.GetIndexBuffer(buffer_obj);
                 buffer_obj->SaveSnapshot(table_snapshot_info, false);
             }
-
-            // Save the memory index to disk
-            status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id, table_snapshot_info);
-            if (!status.ok() && status.code() != ErrorCode::kEmptyMemIndex) {
-                return status;
-            }
-
-            LOG_INFO(fmt::format("Successfully dumped segment {} to chunk {}", segment_id, chunk_id));
         }
     }
 
