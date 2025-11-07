@@ -118,9 +118,6 @@ void AppendMemIndexBatch::WaitForCompletion() {
     cv_.wait(lock, [this] { return task_count_ == 0; });
 }
 
-TestCommandTask::TestCommandTask(std::string command_content)
-    : BGTask(BGTaskType::kTestCommand, true), command_content_(std::move(command_content)) {}
-
 BGTaskInfo::BGTaskInfo(BGTaskType type) : type_(type), task_time_(std::chrono::system_clock::now()) {}
 
 } // namespace infinity

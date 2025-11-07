@@ -319,11 +319,9 @@ Status TableMeta::LoadSet() {
             return status;
         }
         if (index_def->index_type_ == IndexType::kFullText) {
-            NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-            std::string ft_index_cache_key = GetTableTag("ft_index_cache");
             auto ft_index_cache = std::make_shared<TableIndexReaderCache>(db_id_str_, table_id_str_, table_name_);
-            status = new_catalog->AddFtIndexCache(std::move(ft_index_cache_key), std::move(ft_index_cache));
             LOG_DEBUG(fmt::format("Add ft index cache for table: {}, commit ts: {}", table_id_str_, commit_ts_));
+            status = AddFtIndexCache(std::move(ft_index_cache));
             if (!status.ok()) {
                 return status;
             }
@@ -905,32 +903,32 @@ std::tuple<std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>>, Status> Tab
     return {column_defs_, Status::OK()};
 }
 
-Status TableMeta::GetNextRowID(RowID &next_row_id) {
-    SegmentID unsealed_segment_id = 0;
-    Status status = GetUnsealedSegmentID(unsealed_segment_id);
-    if (!status.ok()) {
-        if (status.code() != ErrorCode::kNotFound) {
-            return status;
-        }
-        std::vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = GetSegmentIDs1();
-        if (!status.ok()) {
-            return status;
-        }
-        SegmentID segment_id = segment_ids_ptr->empty() ? 0 : segment_ids_ptr->back() + 1;
-        next_row_id = RowID(segment_id, 0);
-        return Status::OK();
-    }
-
-    SegmentMeta segment_meta(unsealed_segment_id, *this);
-    size_t seg_row_cnt = 0;
-    std::tie(seg_row_cnt, status) = segment_meta.GetRowCnt1();
-    if (!status.ok()) {
-        return status;
-    }
-    next_row_id = RowID(unsealed_segment_id, seg_row_cnt);
-    return Status::OK();
-}
+// Status TableMeta::GetNextRowID(RowID &next_row_id) {
+//     SegmentID unsealed_segment_id = 0;
+//     Status status = GetUnsealedSegmentID(unsealed_segment_id);
+//     if (!status.ok()) {
+//         if (status.code() != ErrorCode::kNotFound) {
+//             return status;
+//         }
+//         std::vector<SegmentID> *segment_ids_ptr = nullptr;
+//         std::tie(segment_ids_ptr, status) = GetSegmentIDs1();
+//         if (!status.ok()) {
+//             return status;
+//         }
+//         SegmentID segment_id = segment_ids_ptr->empty() ? 0 : segment_ids_ptr->back() + 1;
+//         next_row_id = RowID(segment_id, 0);
+//         return Status::OK();
+//     }
+//
+//     SegmentMeta segment_meta(unsealed_segment_id, *this);
+//     size_t seg_row_cnt = 0;
+//     std::tie(seg_row_cnt, status) = segment_meta.GetRowCnt1();
+//     if (!status.ok()) {
+//         return status;
+//     }
+//     next_row_id = RowID(unsealed_segment_id, seg_row_cnt);
+//     return Status::OK();
+// }
 
 std::tuple<std::string, Status> TableMeta::GetNextIndexID() {
     std::string next_index_id_key = GetTableTag(NEXT_INDEX_ID.data());

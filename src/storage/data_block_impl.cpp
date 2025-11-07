@@ -110,18 +110,18 @@ void DataBlock::Init(const std::vector<std::shared_ptr<ColumnVector>> &input_vec
     Finalize();
 }
 
-void DataBlock::UnInit() {
-    if (!initialized) {
-        // Already in un-initialized state
-        return;
-    }
-
-    column_vectors.clear();
-
-    row_count_ = 0;
-    initialized = false;
-    finalized = false;
-}
+// void DataBlock::UnInit() {
+//     if (!initialized) {
+//         // Already in un-initialized state
+//         return;
+//     }
+//
+//     column_vectors.clear();
+//
+//     row_count_ = 0;
+//     initialized = false;
+//     finalized = false;
+// }
 
 void DataBlock::Reset() {
     if (!initialized) {
