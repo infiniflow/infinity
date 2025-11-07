@@ -520,7 +520,7 @@ TEST_P(TableSnapshotTest, test_create_snapshot_delete_data) {
     for (size_t row_id = 80; row_id < 100; ++row_id) {
         row_ids.push_back(RowID(0, row_id));
     }
-    status = txn1->Delete("default_db", "tb1", row_ids);
+    status = txn1->Delete(*db_name, *table_name, row_ids);
 
     status = txn_mgr->CommitTxn(txn1);
     if (!status.ok()) {
@@ -529,18 +529,8 @@ TEST_P(TableSnapshotTest, test_create_snapshot_delete_data) {
 
     PrintTableRowCount();
 
-    // {
-    //     std::string delete_req_sql = "delete from tb1";
-    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-    //     QueryResult query_result = query_context->Query(delete_req_sql);
-    //     bool ok = HandleQueryResult(query_result);
-    //     EXPECT_TRUE(ok);
-    //
-    //     PrintTableRowCount();
-    // }
-
     auto *txn2 = txn_mgr->BeginTxn(std::make_unique<std::string>("create snapshot"), TransactionType::kCreateTableSnapshot);
-    status = txn2->CreateTableSnapshot("default_db", "tb1", "test_delete");
+    status = txn2->CreateTableSnapshot(*db_name, *table_name, "test_delete");
     if (!status.ok()) {
         LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
     }
@@ -548,10 +538,10 @@ TEST_P(TableSnapshotTest, test_create_snapshot_delete_data) {
     auto *txn3 = txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
 
     row_ids.clear();
-    for (size_t row_id = 80; row_id < 100; ++row_id) {
+    for (size_t row_id = 0; row_id < 50; ++row_id) {
         row_ids.push_back(RowID(0, row_id));
     }
-    status = txn3->Delete("default_db", "tb1", row_ids);
+    status = txn3->Delete(*db_name, *table_name, row_ids);
     if (!status.ok()) {
         LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
     }
@@ -569,7 +559,7 @@ TEST_P(TableSnapshotTest, test_create_snapshot_delete_data) {
     // Drop table
     {
         auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
-        auto status = txn->DropTable("default_db", "tb1", ConflictType::kError);
+        auto status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
