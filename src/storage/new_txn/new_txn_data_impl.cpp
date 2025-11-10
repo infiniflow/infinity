@@ -1578,61 +1578,88 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
             for (auto &old_chunk_id : old_chunk_ids) {
                 ChunkIndexMeta chunk_index_meta(old_chunk_id, segment_index_meta);
                 if (index_def->index_type_ == IndexType::kFullText) {
-                    // ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-                    // Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
-                    // if (!status.ok()) {
-                    //     return status;
-                    // }
-                    //
-                    // std::vector<std::string> old_files;
-                    // old_files.emplace_back(chunk_info_ptr->base_name_ + ".dic");
-                    // old_files.emplace_back(chunk_info_ptr->base_name_ + ".pos");
-                    // old_files.emplace_back(chunk_info_ptr->base_name_ + ".len");
-                    //
-                    // PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-                    // PersistResultHandler handler(pm);
-                    //
-                    // std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-                    // std::string snapshot_name = table_snapshot_info->snapshot_name_;
-                    // std::string index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(),
-                    // segment_index_meta.GetSegmentIndexDir()->c_str()); std::string write_dir = std::filesystem::path(snapshot_dir) / snapshot_name
-                    // / index_dir;
-                    //
-                    // for (const auto& file : old_files) {
-                    //     PersistReadResult result= pm->GetObjCache(file);
-                    //
-                    //     const ObjAddr &obj_addr = result.obj_addr_;
-                    //     if (!obj_addr.Valid()) {
-                    //
-                    //     }
-                    //
-                    //     std::string read_path = pm->GetObjPath(obj_addr.obj_key_);
-                    //     std::string write_path = fmt::format("{}/{}", write_dir, file);
-                    //
-                    //     status = VirtualStore::Copy(write_path, read_path);
-                    //     if (!status.ok()) {
-                    //         UnrecoverableError(status.message());
-                    //     }
-                    // }
-
-                    BufferObj *index_buffer_dic = nullptr;
-                    BufferObj *index_buffer_pos = nullptr;
-                    BufferObj *index_buffer_len = nullptr;
-
-                    status = chunk_index_meta.GetFulltextIndexBuffer(index_buffer_dic, index_buffer_pos, index_buffer_len);
+                    ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+                    Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
                     if (!status.ok()) {
                         return status;
                     }
 
-                    if (index_buffer_dic) {
-                        index_buffer_dic->SaveSnapshot(table_snapshot_info, false);
+                    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+                    PersistResultHandler handler(pm);
+
+                    std::string data_dir = InfinityContext::instance().config()->DataDir();
+                    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+                    std::string snapshot_name = table_snapshot_info->snapshot_name_;
+                    std::string index_dir = segment_index_meta.GetSegmentIndexDir()->c_str();
+
+                    std::string read_dir = std::filesystem::path(data_dir) / index_dir;
+                    std::string write_dir = std::filesystem::path(snapshot_dir) / snapshot_name / index_dir;
+
+                    if (!VirtualStore::Exists(write_dir)) {
+                        VirtualStore::MakeDirectory(write_dir);
                     }
-                    if (index_buffer_pos) {
-                        index_buffer_pos->SaveSnapshot(table_snapshot_info, false);
+
+                    std::vector<std::string> old_files;
+                    old_files.emplace_back(chunk_info_ptr->base_name_ + ".dic");
+                    old_files.emplace_back(chunk_info_ptr->base_name_ + ".pos");
+                    old_files.emplace_back(chunk_info_ptr->base_name_ + ".len");
+
+                    for (const auto &file : old_files) {
+                        std::string input_file = std::filesystem::path(read_dir) / file;
+                        PersistReadResult result = pm->GetObjCache(input_file);
+
+                        const ObjAddr &obj_addr = result.obj_addr_;
+                        if (!obj_addr.Valid()) {
+                            UnrecoverableError(fmt::format("GetObjCache failed: {}", input_file));
+                        }
+
+                        std::string read_path = pm->GetObjPath(obj_addr.obj_key_);
+                        std::string write_path = std::filesystem::path(write_dir) / file;
+                        LOG_TRACE(fmt::format("Persist Fulltext index, Read path: {}, Write path: {}", read_path, write_path));
+
+                        auto [read_handle, read_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
+                        if (!read_open_status.ok()) {
+                            UnrecoverableError(read_open_status.message());
+                        }
+
+                        auto seek_status = read_handle->Seek(obj_addr.part_offset_);
+                        if (!seek_status.ok()) {
+                            UnrecoverableError(seek_status.message());
+                        }
+
+                        auto file_size = obj_addr.part_size_;
+                        auto buffer = std::make_unique<char[]>(file_size);
+                        auto [nread, read_status] = read_handle->Read(buffer.get(), file_size);
+
+                        auto [write_handle, write_open_status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
+                        if (!write_open_status.ok()) {
+                            UnrecoverableError(write_open_status.message());
+                        }
+
+                        Status write_status = write_handle->Append(buffer.get(), file_size);
+                        if (!write_status.ok()) {
+                            UnrecoverableError(write_status.message());
+                        }
+                        write_handle->Sync();
                     }
-                    if (index_buffer_len) {
-                        index_buffer_len->SaveSnapshot(table_snapshot_info, false);
-                    }
+                    // BufferObj *index_buffer_dic = nullptr;
+                    // BufferObj *index_buffer_pos = nullptr;
+                    // BufferObj *index_buffer_len = nullptr;
+                    //
+                    // status = chunk_index_meta.GetFulltextIndexBuffer(index_buffer_dic, index_buffer_pos, index_buffer_len);
+                    // if (!status.ok()) {
+                    //     return status;
+                    // }
+                    //
+                    // if (index_buffer_dic) {
+                    //     index_buffer_dic->SaveSnapshot(table_snapshot_info, false);
+                    // }
+                    // if (index_buffer_pos) {
+                    //     index_buffer_pos->SaveSnapshot(table_snapshot_info, false);
+                    // }
+                    // if (index_buffer_len) {
+                    //     index_buffer_len->SaveSnapshot(table_snapshot_info, false);
+                    // }
                 } else {
                     BufferObj *buffer_obj = nullptr;
 
