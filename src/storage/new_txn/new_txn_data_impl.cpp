@@ -1552,6 +1552,12 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
         const std::string &index_name_str = (*index_names_ptr)[i];
         TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
 
+        // Get index types
+        auto [index_def, index_status] = table_index_meta.GetIndexBase();
+        if (!index_status.ok()) {
+            return index_status;
+        }
+
         // Get all segment IDs for this index
         std::vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
@@ -1569,11 +1575,74 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
             }
 
             // Save the index file to disk
-            BufferObj *buffer_obj = nullptr;
             for (auto &old_chunk_id : old_chunk_ids) {
                 ChunkIndexMeta chunk_index_meta(old_chunk_id, segment_index_meta);
-                Status status = chunk_index_meta.GetIndexBuffer(buffer_obj);
-                buffer_obj->SaveSnapshot(table_snapshot_info, false);
+                if (index_def->index_type_ == IndexType::kFullText) {
+                    // ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+                    // Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
+                    // if (!status.ok()) {
+                    //     return status;
+                    // }
+                    //
+                    // std::vector<std::string> old_files;
+                    // old_files.emplace_back(chunk_info_ptr->base_name_ + ".dic");
+                    // old_files.emplace_back(chunk_info_ptr->base_name_ + ".pos");
+                    // old_files.emplace_back(chunk_info_ptr->base_name_ + ".len");
+                    //
+                    // PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+                    // PersistResultHandler handler(pm);
+                    //
+                    // std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+                    // std::string snapshot_name = table_snapshot_info->snapshot_name_;
+                    // std::string index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(),
+                    // segment_index_meta.GetSegmentIndexDir()->c_str()); std::string write_dir = std::filesystem::path(snapshot_dir) / snapshot_name
+                    // / index_dir;
+                    //
+                    // for (const auto& file : old_files) {
+                    //     PersistReadResult result= pm->GetObjCache(file);
+                    //
+                    //     const ObjAddr &obj_addr = result.obj_addr_;
+                    //     if (!obj_addr.Valid()) {
+                    //
+                    //     }
+                    //
+                    //     std::string read_path = pm->GetObjPath(obj_addr.obj_key_);
+                    //     std::string write_path = fmt::format("{}/{}", write_dir, file);
+                    //
+                    //     status = VirtualStore::Copy(write_path, read_path);
+                    //     if (!status.ok()) {
+                    //         UnrecoverableError(status.message());
+                    //     }
+                    // }
+
+                    BufferObj *index_buffer_dic = nullptr;
+                    BufferObj *index_buffer_pos = nullptr;
+                    BufferObj *index_buffer_len = nullptr;
+
+                    status = chunk_index_meta.GetFulltextIndexBuffer(index_buffer_dic, index_buffer_pos, index_buffer_len);
+                    if (!status.ok()) {
+                        return status;
+                    }
+
+                    if (index_buffer_dic) {
+                        index_buffer_dic->SaveSnapshot(table_snapshot_info, false);
+                    }
+                    if (index_buffer_pos) {
+                        index_buffer_pos->SaveSnapshot(table_snapshot_info, false);
+                    }
+                    if (index_buffer_len) {
+                        index_buffer_len->SaveSnapshot(table_snapshot_info, false);
+                    }
+                } else {
+                    BufferObj *buffer_obj = nullptr;
+
+                    Status status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+                    if (!status.ok()) {
+                        return status;
+                    }
+
+                    buffer_obj->SaveSnapshot(table_snapshot_info, false);
+                }
             }
         }
     }

@@ -98,6 +98,59 @@ Status ChunkIndexMeta::GetIndexBuffer(BufferObj *&index_buffer) {
     return Status::OK();
 }
 
+Status ChunkIndexMeta::GetFulltextIndexBuffer(BufferObj *&index_buffer_dic, BufferObj *&index_buffer_pos, BufferObj *&index_buffer_len) {
+    if (!index_buffer_) {
+        TableIndexMeta &table_index_meta = segment_index_meta_.table_index_meta();
+
+        std::string index_dir =
+            fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), segment_index_meta_.GetSegmentIndexDir()->c_str());
+        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+
+        auto [index_def, index_status] = table_index_meta.GetIndexBase();
+        if (!index_status.ok()) {
+            return index_status;
+        }
+
+        ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+        Status status = this->GetChunkInfo(chunk_info_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+
+        {
+            auto column_dictionary_file_name = chunk_info_ptr->base_name_ + DICT_SUFFIX;
+            std::string index_filepath = fmt::format("{}/{}", index_dir, column_dictionary_file_name);
+            index_buffer_ = buffer_mgr->GetBufferObject(index_filepath);
+            if (index_buffer_ == nullptr) {
+                // return Status::BufferManagerError(fmt::format("GetBufferObject failed: {}", index_filepath));
+            }
+        }
+
+        {
+            auto column_position_file_name = chunk_info_ptr->base_name_ + POSTING_SUFFIX;
+            std::string index_filepath = fmt::format("{}/{}", index_dir, column_position_file_name);
+            index_buffer_ = buffer_mgr->GetBufferObject(index_filepath);
+            if (index_buffer_ == nullptr) {
+                // return Status::BufferManagerError(fmt::format("GetBufferObject failed: {}", index_filepath));
+            }
+        }
+
+        {
+            auto column_length_file_name = chunk_info_ptr->base_name_ + LENGTH_SUFFIX;
+            std::string index_filepath = fmt::format("{}/{}", index_dir, column_length_file_name);
+            index_buffer_ = buffer_mgr->GetBufferObject(index_filepath);
+            if (index_buffer_ == nullptr) {
+                // return Status::BufferManagerError(fmt::format("GetBufferObject failed: {}", index_filepath));
+            }
+        }
+    }
+
+    index_buffer_dic = index_buffer_;
+    index_buffer_pos = index_buffer_;
+    index_buffer_len = index_buffer_;
+    return Status::OK();
+}
+
 Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
     chunk_info_ = chunk_info;
     {

@@ -57,8 +57,8 @@ public:
     }
 
     void TearDown() override {
-        std::string cmd = "rm -rf " + InfinityContext::instance().config()->SnapshotDir();
-        system(cmd.c_str());
+        // std::string cmd = "rm -rf " + InfinityContext::instance().config()->SnapshotDir();
+        // system(cmd.c_str());
 
         BaseTestParamStr::TearDown();
     }
