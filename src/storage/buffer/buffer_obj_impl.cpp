@@ -224,8 +224,37 @@ bool BufferObj::SaveSnapshot(const std::shared_ptr<TableSnapshotInfo> &table_sna
                              size_t data_size) {
     std::unique_lock<std::mutex> locker(w_locker_);
 
-    bool all_save = file_worker_->WriteSnapshotFile(table_snapshot_info, use_memory, ctx, data_size);
-    return all_save;
+    LOG_TRACE(fmt::format("BufferObj::SaveSnapshot, type_: {}, status_: {}, file: {}", int(type_), int(status_), GetFilename()));
+
+    if (type_ == BufferType::kEphemeral) {
+        switch (status_) {
+            case BufferStatus::kNew: {
+                file_worker_->AllocateInMemory();
+                buffer_mgr_->PushGCQueue(this);
+            }
+            case BufferStatus::kLoaded:
+                [[fallthrough]];
+            case BufferStatus::kUnloaded: {
+                file_worker_->WriteSnapshotFile(table_snapshot_info, use_memory, ctx, data_size);
+                break;
+            }
+            case BufferStatus::kFreed: {
+                file_worker_->WriteSnapshotFile1(table_snapshot_info, use_memory, ctx, data_size);
+                break;
+            }
+            default: {
+                UnrecoverableError(fmt::format("Invalid buffer status: {}.", BufferStatusToString(status_)));
+            }
+        }
+    } else if (type_ == BufferType::kTemp) {
+        file_worker_->WriteSnapshotFile1(table_snapshot_info, use_memory, ctx, data_size);
+    } else if (type_ == BufferType::kPersistent) {
+        file_worker_->WriteSnapshotFile(table_snapshot_info, use_memory, ctx, data_size);
+    } else {
+        file_worker_->WriteSnapshotFile(table_snapshot_info, use_memory, ctx, data_size);
+    }
+
+    return true;
 }
 
 void BufferObj::PickForCleanup() {

@@ -51,6 +51,10 @@ public:
                            bool use_memory,
                            const FileWorkerSaveCtx &ctx = {},
                            size_t data_size = 0);
+    bool WriteSnapshotFile1(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info,
+                            bool use_memory,
+                            const FileWorkerSaveCtx &ctx = {},
+                            size_t data_size = 0);
 
     void ReadFromFile(bool from_spill);
 

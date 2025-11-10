@@ -1466,7 +1466,7 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                     use_memory = true;
                 }
             }
-            LOG_INFO(fmt::format("use_memory: {}", use_memory ? "true" : "false"));
+            LOG_TRACE(fmt::format("block: {}, use_memory: {}", block_id, use_memory ? "true" : "false"));
 
             {
                 std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
@@ -1559,25 +1559,8 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
             return status;
         }
 
-        // Loop through all segments and dump each one
         for (SegmentID segment_id : *segment_ids_ptr) {
             SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-
-            // Get memory index for this segment
-            std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-            // if (mem_index == nullptr || mem_index->IsDumping() || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() ==
-            // nullptr)) {
-            //     LOG_INFO(fmt::format("Skipping segment {} - no memory index to dump", segment_id));
-            //     continue;
-            // }
-            // mem_index->SetIsDumping(true);
-
-            // Allocate new chunk ID for this dump
-            ChunkID chunk_id = 0;
-            std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
-            if (!status.ok()) {
-                return status;
-            }
 
             std::vector<ChunkID> old_chunk_ids;
             auto [existing_chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1();
