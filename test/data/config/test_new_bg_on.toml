@@ -13,7 +13,6 @@ log_level                = "trace"
 [storage]
 compact_interval         = "2s"
 cleanup_interval         = "2s"
-optimize_interval        = "2s"
 mem_index_capacity       = 8192
 
 [buffer]
