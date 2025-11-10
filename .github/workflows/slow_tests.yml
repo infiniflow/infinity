@@ -83,7 +83,10 @@ jobs:
 
       - name: Remove build container
         if: always()
-        run: sudo docker rm -f -v ${BUILDER_CONTAINER}
+        run: |
+          if [[ -n "${BUILDER_CONTAINER}" ]]; then
+            sudo docker rm -f -v "${BUILDER_CONTAINER}"
+          fi
 
   debug_unit_test:
     name: debug_unit_test
@@ -102,14 +105,14 @@ jobs:
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}
         run: |
-          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> ${GITHUB_ENV}
+          TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER=${TEST_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter=*SLOW_* > debug_unit_test_stdout.log 2> debug_unit_test_stderr.log"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter=*SLOW_* > debug_unit_test_stdout.log 2> debug_unit_test_stderr.log"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -120,8 +123,9 @@ jobs:
       - name: Remove test container
         if: always()
         run: |
-          sudo docker rm -f -v ${MINIO_CONTAINER_NAME} ${TEST_CONTAINER_NAME}
-          rm -rf ${MINIO_CONTAINER_NAME}
+          if [[ -n "${MINIO_CONTAINER}" ]]; then sudo docker rm -f -v "${MINIO_CONTAINER}"; fi
+          if [[ -n "${TEST_CONTAINER}" ]]; then sudo docker rm -f -v "${TEST_CONTAINER}"; fi
+          rm -rf ${MINIO_CONTAINER}
 
   debug_tsan_restart_test:
     name: debug_tsan_restart_test
@@ -145,18 +149,18 @@ jobs:
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}
         run: |
-          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> ${GITHUB_ENV}
+          TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER=${TEST_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
 
       - name: Run restart test
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 TSAN_OPTIONS=log_path=restart_test_tsan.log python3 tools/run_restart_test.py --infinity_path=cmake-build-debug-tsan/src/infinity"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 TSAN_OPTIONS=log_path=restart_test_tsan.log python3 tools/run_restart_test.py --infinity_path=cmake-build-debug-tsan/src/infinity"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -166,7 +170,10 @@ jobs:
 
       - name: Remove test container
         if: always()
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          if [[ -n "${TEST_CONTAINER}" ]]; then
+            sudo docker rm -f -v "${TEST_CONTAINER}"
+          fi
 
   debug_tsan_cluster_test:
     name: debug_tsan_cluster_test
@@ -185,29 +192,32 @@ jobs:
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}
         run: |
-          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> ${GITHUB_ENV}
+          TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER=${TEST_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
 
       - name: Run cluster test
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && rm -fr /var/infinity && python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug-tsan/src/infinity"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug-tsan/src/infinity"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "find /var/infinity/ -name '*.log' -type f | tar --create --gzip --file=/infinity/cluster_test.tgz --files-from=-"
+          sudo docker exec ${TEST_CONTAINER} bash -c "find /var/infinity/ -name '*.log' -type f | tar --create --gzip --file=/infinity/cluster_test.tgz --files-from=-"
           mkdir -p ${ARTIFACTS_DIR}/debug_tsan_cluster_test
           tar --directory=${ARTIFACTS_DIR}/debug_tsan_cluster_test --strip-components=2 --extract --gzip --file=cluster_test.tgz
 
       - name: Remove test container
         if: always()
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          if [[ -n "${TEST_CONTAINER}" ]]; then
+            sudo docker rm -f -v "${TEST_CONTAINER}"
+          fi
 
   debug_tsan_parallel_test:
     name: debug_tsan_parallel_test
@@ -227,35 +237,38 @@ jobs:
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}
         run: |
-          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> ${GITHUB_ENV}
+          TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER=${TEST_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 TSAN_OPTIONS=log_path=debug_tsan_parallel_tsan.log cmake-build-debug-tsan/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> debug_tsan_parallel_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER} bash -c "cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 TSAN_OPTIONS=log_path=debug_tsan_parallel_tsan.log cmake-build-debug-tsan/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> debug_tsan_parallel_stderr.log"
 
       - name: Run HTTP infinity test debug version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && python3 tools/run_parallel_test.py"
+          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_parallel_test.py"
           sleep 1s
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_tsan_parallel_test && sudo chown -R ${USER} . && cp debug_tsan_parallel*.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
+          sudo docker cp ${TEST_CONTAINER}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
           echo "debug tsan parallel log" && tail -n 1000 debug_tsan_parallel*.log
 
       - name: Remove test container
         if: always()
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          if [[ -n "${TEST_CONTAINER}" ]]; then
+            sudo docker rm -f -v "${TEST_CONTAINER}"
+          fi
 
   reldeb_build:
     name: reldeb_build
@@ -288,7 +301,10 @@ jobs:
 
       - name: Remove build container
         if: always()
-        run: sudo docker rm -f -v ${BUILDER_CONTAINER}
+        run: |
+          if [[ -n "${BUILDER_CONTAINER}" ]]; then
+            sudo docker rm -f -v "${BUILDER_CONTAINER}"
+          fi
 
   reldeb_unit_test:
     name: reldeb_unit_test
@@ -307,14 +323,14 @@ jobs:
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}
         run: |
-          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> ${GITHUB_ENV}
+          TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER=${TEST_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Unit test reldeb version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-reldeb/src/test_main --gtest_also_run_disabled_tests --gtest_filter=*SLOW_* > reldeb_unit_test_stdout.log 2> reldeb_unit_test_stderr.log"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-reldeb/src/test_main --gtest_also_run_disabled_tests --gtest_filter=*SLOW_* > reldeb_unit_test_stdout.log 2> reldeb_unit_test_stderr.log"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -325,8 +341,9 @@ jobs:
       - name: Remove test container
         if: always()
         run: |
-          sudo docker rm -f -v ${MINIO_CONTAINER_NAME} ${TEST_CONTAINER_NAME}
-          rm -rf ${MINIO_CONTAINER_NAME}
+          if [[ -n "${MINIO_CONTAINER}" ]]; then sudo docker rm -f -v "${MINIO_CONTAINER}"; fi
+          if [[ -n "${TEST_CONTAINER}" ]]; then sudo docker rm -f -v "${TEST_CONTAINER}"; fi
+          rm -rf ${MINIO_CONTAINER}
 
   reldeb_parallel_test:
     name: reldeb_parallel_test
@@ -346,35 +363,38 @@ jobs:
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}
         run: |
-          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> ${GITHUB_ENV}
+          TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER=${TEST_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
 
       - name: Start infinity reldeb version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec -d ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> reldeb_parallel_stderr.log"
+        run: sudo docker exec -d ${TEST_CONTAINER} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> reldeb_parallel_stderr.log"
 
       - name: Run HTTP infinity reldeb version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && python3 tools/run_pytest_parallel_continuous.py"
+          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_pytest_parallel_continuous.py"
           sleep 1s
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_parallel_test && cp reldeb_parallel_stderr.log ${ARTIFACTS_DIR}/reldeb_parallel_test/
-          sudo docker cp ${TEST_CONTAINER_NAME}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_parallel_test/
+          sudo docker cp ${TEST_CONTAINER}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_parallel_test/
           echo "reldeb parallel log" && tail -n 1000 reldeb_parallel*.log
 
       - name: Remove test container
         if: always()
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          if [[ -n "${TEST_CONTAINER}" ]]; then
+            sudo docker rm -f -v "${TEST_CONTAINER}"
+          fi
 
   reldeb_restart_test:
     name: reldeb_restart_test
@@ -398,18 +418,18 @@ jobs:
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}
         run: |
-          TEST_CONTAINER_NAME=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "TEST_CONTAINER_NAME=${TEST_CONTAINER_NAME}" >> ${GITHUB_ENV}
+          TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "TEST_CONTAINER=${TEST_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER_NAME} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
 
       - name: Run restart test
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER_NAME} bash -c "cd /infinity/ && python3 tools/run_restart_test_continuously.py --infinity_path=cmake-build-reldeb/src/infinity"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_restart_test_continuously.py --infinity_path=cmake-build-reldeb/src/infinity"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -420,4 +440,7 @@ jobs:
 
       - name: Remove test container
         if: always()
-        run: sudo docker rm -f -v ${TEST_CONTAINER_NAME}
+        run: |
+          if [[ -n "${TEST_CONTAINER}" ]]; then
+            sudo docker rm -f -v "${TEST_CONTAINER}"
+          fi

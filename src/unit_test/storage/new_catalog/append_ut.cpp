@@ -896,7 +896,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
     }
-#if 0
+
     //                                                  t1                  append                                   commit (fail)
     //                                                  |--------------------|------------------------------------------|
     //                    |----------------------|----------|
@@ -3222,7 +3222,7 @@ TEST_P(TestTxnAppend, test_append_append) {
     //    t1                                                   append                                   commit (success)
     //    |------------------------------------------------------|------------------------------------------|
     //                    |----------------------|----------|
-    //                    t2                  add column  commit (success)
+    //                    t2                  append  commit (success)
     {
         std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -3518,7 +3518,8 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
                             ColumnMeta column_meta(column_idx, block_meta);
                             ColumnVector col;
 
-                            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
+                            Status status =
+                                NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
                             EXPECT_TRUE(status.ok());
 
                             for (size_t row_id = 0; row_id < 4096; ++row_id) {
@@ -3533,7 +3534,8 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
                             ColumnMeta column_meta(column_idx, block_meta);
                             ColumnVector col;
 
-                            Status status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
+                            Status status =
+                                NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_count, ColumnVectorMode::kReadOnly, col);
                             EXPECT_TRUE(status.ok());
 
                             for (size_t row_id = 0; row_id < 4096; ++row_id) {
@@ -3638,7 +3640,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         EXPECT_EQ(index_names_ptr->size(), 1);
         EXPECT_EQ(index_names_ptr->at(0), "idx1");
 
-        TableIndexMeta table_index_meta(index_id_strs_ptr->at(0), *table_meta);
+        TableIndexMeta table_index_meta(index_id_strs_ptr->at(0), index_names_ptr->at(0), *table_meta);
         auto [index_base, index_status] = table_index_meta.GetIndexBase();
         EXPECT_TRUE(index_status.ok());
         EXPECT_EQ(*index_base->index_name_, std::string("idx1"));
@@ -4122,7 +4124,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         EXPECT_EQ(index_names_ptr->size(), 1);
         EXPECT_EQ(index_names_ptr->at(0), "idx1");
 
-        TableIndexMeta table_index_meta(index_id_strs_ptr->at(0), *table_meta);
+        TableIndexMeta table_index_meta(index_id_strs_ptr->at(0), index_names_ptr->at(0), *table_meta);
         auto [index_base, index_status] = table_index_meta.GetIndexBase();
         EXPECT_TRUE(index_status.ok());
         EXPECT_EQ(*index_base->index_name_, std::string("idx1"));
@@ -4594,11 +4596,315 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
 
         // For compact
         for (int i = 0; i < 2; ++i) {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("import {}", i)), TransactionType::kDumpMemIndex);
-                Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("import {}", i)), TransactionType::kImport);
+            std::vector<std::shared_ptr<DataBlock>> input_blocks = {
+                MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192)};
+            Status status = txn->Import(*db_name, *table_name, input_blocks);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+    };
+
+    auto CheckTable = [&](const std::vector<SegmentID> &segment_ids) {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
+
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        TxnTimeStamp create_timestamp;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
+        EXPECT_TRUE(status.ok());
+
+        std::vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*segment_ids_ptr, segment_ids);
+    };
+
+    auto DropDB = [&] {
+        // drop database
+        auto *txn5 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
+        Status status = txn5->DropDatabase("db1", ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+    };
+
+    //    t1      append      commit (success)
+    //    |----------|---------|
+    //                            |----------------------|----------|
+    //                           t2                  compact  commit (success)
+    {
+        PrepareForCompact();
+
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
+        Status status = txn4->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+        // compact
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({2, 3});
+
+        DropDB();
+    }
+
+    //    t1      append      commit (success)
+    //    |----------|---------|
+    //                    |------------------|----------------|
+    //                    t2             compact           commit
+    {
+        PrepareForCompact();
+
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
+        Status status = txn4->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+
+        // compact
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({2, 3});
+
+        DropDB();
+    }
+
+    //    t1      append                       commit (success)
+    //    |----------|--------------------------------|
+    //                    |-----------------------|-------------------------|
+    //                    t2                  compact                   commit (success)
+    {
+        PrepareForCompact();
+
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
+        Status status = txn4->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+
+        // compact
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({2, 3});
+
+        DropDB();
+    }
+
+    //    t1      append                                   commit (success)
+    //    |----------|-----------------------------------------------|
+    //                    |-------------|-----------------------|
+    //                    t2        compact          commit (success)
+    {
+        PrepareForCompact();
+
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
+        Status status = txn4->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+
+        // compact
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({2, 3});
+
+        DropDB();
+    }
+
+    //    t1                                      append                                    commit (success)
+    //    |------------------------------------------|------------------------------------------|
+    //                    |----------------------|------------------------------|
+    //                    t2                compact                     commit (success)
+    {
+        PrepareForCompact();
+
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+
+        auto *txn4 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
+
+        // compact
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
+        Status status = txn2->Compact(*db_name, *table_name, {0, 1});
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        status = txn4->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({2, 3});
+
+        DropDB();
+    }
+
+    //    t1                                                   append                                   commit (success)
+    //    |------------------------------------------------------|------------------------------------------|
+    //                    |----------------------|------------|
+    //                    t2                  compact commit (success)
+    {
+        PrepareForCompact();
+
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
+
+        // compact
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
+        Status status = txn2->Compact(*db_name, *table_name, {0, 1});
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        status = txn3->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({2, 3});
+
+        DropDB();
+    }
+
+    //                                                  t1                  append                                   commit (success)
+    //                                                  |--------------------|------------------------------------------|
+    //                    |----------------------|---------------|
+    //                    t2                  compact   commit (success)
+    {
+        PrepareForCompact();
+
+        // compact
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
+        Status status = txn2->Compact(*db_name, *table_name, {0, 1});
+        EXPECT_TRUE(status.ok());
+
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
+
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        status = txn3->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({2, 3});
+
+        DropDB();
+    }
+
+    //                                                           t1                  append                             commit (success)
+    //                                                          |--------------------|------------------------------------------|
+    //                    |-----------------|------------|
+    //                    t2           compact   commit (success)
+    {
+        PrepareForCompact();
+
+        // compact
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
+        Status status = txn2->Compact(*db_name, *table_name, {0, 1});
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn3 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
+        std::shared_ptr<DataBlock> input_block1 = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+        status = txn3->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({2, 3});
+
+        DropDB();
+    }
+}
+
+TEST_P(TestTxnAppend, test_append_and_optimize_index) {
+
+    using namespace infinity;
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
+
+    auto index_name1 = std::make_shared<std::string>("index1");
+    auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<std::string>(), "file_name", {column_def1->name()});
+
+    auto PrepareForAppendAndOptimize = [&] {
+        {
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
+            Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        {
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+            Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        {
+            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kCreateIndex);
+            Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+
+        // For optimize
+        for (int i = 0; i < 2; ++i) {
+            {
+                auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("append {}", i)), TransactionType::kAppend);
+                std::shared_ptr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+                Status status = txn->Append(*db_name, *table_name, input_block);
                 EXPECT_TRUE(status.ok());
                 status = new_txn_mgr->CommitTxn(txn);
                 EXPECT_TRUE(status.ok());
+            }
+
+            //            new_txn_mgr->PrintAllKeyValue();
+            {
+                auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump index {}", i)), TransactionType::kDumpMemIndex);
+                Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+                EXPECT_TRUE(status.ok());
+                status = new_txn_mgr->CommitTxn(txn);
             }
         }
 
@@ -4909,5 +5215,4 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
 
         DropDB();
     }
-#endif
 }

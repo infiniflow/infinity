@@ -29,7 +29,6 @@ import :session_manager;
 import :txn_state;
 import :new_txn;
 import :new_catalog;
-import :bg_query_state;
 import :new_txn_manager;
 import :admin_executor;
 import :utility;

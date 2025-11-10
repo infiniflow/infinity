@@ -127,7 +127,6 @@ bool PhysicalAlterIndex::Execute(QueryContext *query_context, OperatorState *ope
     LOG_INFO(fmt::format("AlterIndex {}.{}::{} begin", *table_info_->db_name_, *table_info_->table_name_, index_name_));
 
     NewTxn *new_txn = query_context->GetNewTxn();
-    new_txn->SetTxnType(TransactionType::kAlterIndex);
     Status status = new_txn->AlterIndexByParams(*table_info_->db_name_, *table_info_->table_name_, index_name_, std::move(opt_params_));
     if (!status.ok()) {
         operator_state->status_ = status;

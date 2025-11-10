@@ -382,8 +382,6 @@ public:
 
     bool NeedToAllocate() const;
 
-    void SetTxnType(TransactionType type);
-
     bool IsWriteTransaction() const;
 
     void SetTxnCommitted();

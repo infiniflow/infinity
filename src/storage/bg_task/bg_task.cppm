@@ -213,7 +213,7 @@ export struct AppendMemIndexBatch {
 
 export class TestCommandTask final : public BGTask {
 public:
-    TestCommandTask(std::string command_content);
+    TestCommandTask(std::string command_content) : BGTask(BGTaskType::kTestCommand, true), command_content_(std::move(command_content)) {}
 
     ~TestCommandTask() override = default;
 
