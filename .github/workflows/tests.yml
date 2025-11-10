@@ -567,7 +567,7 @@ jobs:
   debug_upload_codecov:
     name: debug_upload_codecov
     runs-on: [ "self-hosted", "infinity-test" ]
-    needs: [debug_unit_test, debug_sqllogical_test, debug_pysdk_test, debug_http_test,debug_pysdk_parallel_test]
+    needs: code_static_check
     steps:
       - name: Prepare code and artifacts
         if: ${{ !cancelled() && !failure() }}
@@ -578,6 +578,7 @@ jobs:
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/infinity | tar -xf -
           COMMIT_SHA=$(git rev-parse HEAD)
+          echo "${COMMIT_SHA}"
           echo "COMMIT_SHA=${COMMIT_SHA}" >> ${GITHUB_ENV}
 
       - name: Start test container
@@ -591,6 +592,7 @@ jobs:
       - name: Upload coverage reports to Codecov
         if: ${{ !cancelled() && !failure() }}
         run: |
+          echo "${COMMIT_SHA}"
           ./scripts/upload_codecov.sh
 
       - name: Remove test container
