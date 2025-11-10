@@ -58,7 +58,7 @@ export struct MetaTableObject final : public MetaObject {
     MetaTableObject(const std::shared_ptr<MetaKey> &meta_key) : MetaObject(MetaType::kTable, meta_key) {}
     nlohmann::json ToJson() const final;
 
-    const std::string &GetTableName() const;
+    // const std::string &GetTableName() const;
     SegmentID GetNextSegmentID() const;
     SegmentID GetUnsealedSegmentID() const;
     size_t GetCurrentSegmentRowCount(Storage *storage_ptr) const;
@@ -167,7 +167,7 @@ public:
     static std::unordered_set<std::string> GetDataVfsOffPathSet();
     std::vector<std::string> CheckMetaDataMapping(CheckStmtType tag, std::optional<std::string> db_table_str);
 
-    std::vector<MetaTableObject *> ListTables() const;
+    // std::vector<MetaTableObject *> ListTables() const;
     std::unique_ptr<SystemCache> RestoreSystemCache(Storage *storage_ptr) const;
 
     nlohmann::json ToJson() const;

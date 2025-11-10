@@ -48,7 +48,7 @@ public:
 
     void Init(const std::vector<std::shared_ptr<ColumnVector>> &column_vectors);
 
-    void UnInit();
+    // void UnInit();
 
     [[nodiscard]] bool Initialized() const { return initialized; }
 

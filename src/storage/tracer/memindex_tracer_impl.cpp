@@ -157,14 +157,6 @@ void BGMemIndexTracer::TriggerDump(std::shared_ptr<DumpMemIndexTask> dump_task) 
     dump_index_processor->Submit(std::move(dump_task));
 }
 
-NewTxn *BGMemIndexTracer::GetTxn() {
-    if (!txn_mgr_) {
-        return nullptr;
-    }
-    NewTxn *txn = txn_mgr_->BeginTxn(std::make_unique<std::string>("Dump index"), TransactionType::kDumpMemIndex);
-    return txn;
-}
-
 std::vector<std::shared_ptr<MemIndexDetail>> BGMemIndexTracer::GetAllMemIndexes(NewTxn *new_txn) {
     std::vector<std::shared_ptr<MemIndexDetail>> mem_index_details;
     std::vector<std::shared_ptr<MemIndex>> mem_indexes;

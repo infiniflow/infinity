@@ -134,8 +134,6 @@ public:
         task_queue_.Enqueue(std::move(task));
     }
 
-    NewTxn *GetTxn() override { return nullptr; }
-
     std::vector<std::shared_ptr<MemIndexDetail>> GetAllMemIndexes(NewTxn *new_txn) override { return catalog_.GetMemIndexes(); }
 
     void HandleDump(std::shared_ptr<DumpMemIndexTask> task);

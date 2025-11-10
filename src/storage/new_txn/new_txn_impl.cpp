@@ -1778,37 +1778,6 @@ bool NewTxn::NeedToAllocate() const {
     return false;
 }
 
-void NewTxn::SetTxnType(TransactionType type) {
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-    if (txn_context_ptr_->txn_type_ == type) {
-        return;
-    }
-
-    switch (txn_context_ptr_->txn_type_) {
-        case TransactionType::kInvalid: {
-            txn_context_ptr_->txn_type_ = type;
-            break;
-        }
-        case TransactionType::kOptimizeIndex: {
-            if (type == TransactionType::kAlterIndex) {
-                txn_context_ptr_->txn_type_ = type;
-            } else {
-                UnrecoverableError(fmt::format("Attempt to change transaction type from {} to {}",
-                                               TransactionType2Str(txn_context_ptr_->txn_type_),
-                                               TransactionType2Str(type)));
-            }
-            break;
-        }
-        default: {
-            std::string err_msg = fmt::format("Attempt to change transaction type from {} to {}",
-                                              TransactionType2Str(txn_context_ptr_->txn_type_),
-                                              TransactionType2Str(type));
-            LOG_CRITICAL(err_msg);
-            UnrecoverableError(err_msg);
-        }
-    }
-}
-
 bool NewTxn::IsWriteTransaction() const { return txn_context_ptr_->is_write_transaction_; }
 
 void NewTxn::SetTxnRollbacking(TxnTimeStamp rollback_ts) {
@@ -3577,31 +3546,7 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kOptimizeIndex: {
-            OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            const std::vector<std::string> &prev_db_names = optimize_index_txn_store->db_names_;
-            const std::map<std::string, std::vector<std::string>> &prev_table_names_in_db = optimize_index_txn_store->table_names_in_db_;
-
-            // If there are multiple databases or multiple tables involved in index optimization, the optimization is processed for
-            // all indexes.
-            if (db_names.size() > 1 || prev_db_names.size() > 1 || table_names_in_db.at(db_names[0]).size() > 1 ||
-                prev_table_names_in_db.at(prev_db_names[0]).size() > 1) {
-                conflict = true;
-            } else {
-                for (const auto &prev_store_entry : optimize_index_txn_store->entries_) {
-                    for (const auto &current_store_entry : txn_store.entries_) {
-                        if (prev_store_entry.db_name_ == current_store_entry.db_name_ &&
-                            prev_store_entry.table_name_ == current_store_entry.table_name_ &&
-                            prev_store_entry.index_name_ == current_store_entry.index_name_) {
-                            retry_query = false;
-                            conflict = true;
-                            break;
-                        }
-                    }
-                    if (conflict) {
-                        break;
-                    }
-                }
-            }
+            UnrecoverableError("There should be no concurrent optimize txns");
             break;
         }
         case TransactionType::kAppend: {
@@ -3740,10 +3685,7 @@ bool NewTxn::CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kDumpMemIndex: {
-            DumpMemIndexTxnStore *dump_mem_index_txn_store = static_cast<DumpMemIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            if (dump_mem_index_txn_store->db_name_ == db_name && dump_mem_index_txn_store->table_name_ == table_name) {
-                conflict = true;
-            }
+            UnrecoverableError("There should be no concurrent dump txns.");
             break;
         }
         case TransactionType::kDropIndex: {
