@@ -1,9 +1,6 @@
 #!/bin/bash
 
 echo $COMMIT_SHA
-COMMIT_SHA=$(git rev-parse HEAD)
-echo "after"
-echo $COMMIT_SHA
 
 upload_file() {
   local name="$1"
