@@ -1499,9 +1499,7 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
         return Status::OK();
     };
 
-    [[maybe_unused]] auto CreateSnapshotByMapping = [&](const std::string &file) -> Status {
-
-    };
+    [[maybe_unused]] auto CreateSnapshotByMapping = [&](const std::string &file) -> Status { return Status::OK(); };
 
     auto data_start_time = std::chrono::high_resolution_clock::now();
 
