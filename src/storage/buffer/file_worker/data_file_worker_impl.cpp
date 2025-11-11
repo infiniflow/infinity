@@ -135,8 +135,7 @@ bool DataFileWorker::WriteSnapshotFileImpl(size_t data_size, bool &prepare_succe
         RecoverableError(status);
     }
 
-    // data_size = data_size_.load();
-    LOG_INFO(fmt::format("data_size={}, data_size_={}", data_size, data_size_.load()));
+    LOG_INFO(fmt::format("data_size = {}, data_size_ = {}", data_size, data_size_.load()));
     data_size = data_size_.load();
 
     status = file_handle_->Append(data_, data_size);

@@ -94,9 +94,9 @@ bool FileWorker::WriteSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &tab
         if (persistence_manager != nullptr) {
             PersistResultHandler pm_handler(persistence_manager);
             PersistReadResult result = persistence_manager->GetObjCache(src_path);
-            const ObjAddr &obj_addr = result.obj_addr_;
+            const ObjAddr &obj_addr = pm_handler.HandleReadResult(result);
             if (!obj_addr.Valid()) {
-                return false;
+                UnrecoverableError(fmt::format("GetObjCache failed: {}", src_path));
             }
 
             std::string read_path = persistence_manager->GetObjPath(obj_addr.obj_key_);
@@ -168,7 +168,7 @@ bool FileWorker::WriteSnapshotFile1(const std::shared_ptr<TableSnapshotInfo> &ta
         if (persistence_manager != nullptr) {
             PersistResultHandler pm_handler(persistence_manager);
             PersistReadResult result = persistence_manager->GetObjCache(src_path);
-            const ObjAddr &obj_addr = result.obj_addr_;
+            const ObjAddr &obj_addr = pm_handler.HandleReadResult(result);
             if (!obj_addr.Valid()) {
                 return false;
             }

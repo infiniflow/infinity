@@ -1495,16 +1495,18 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                 if (!status.ok()) {
                     return status;
                 }
+                BlockOffset row_cnt = state.block_offset_end();
 
-                std::pair<BlockOffset, BlockOffset> range;
-                BlockOffset row_cnt = 0;
-                while (true) {
-                    bool has_next = state.Next(row_cnt, range);
-                    if (!has_next) {
-                        break;
-                    }
-                    row_cnt = range.second;
-                }
+                // std::pair<BlockOffset, BlockOffset> range;
+                // BlockOffset row_cnt = 0;
+                // while (true) {
+                //     bool has_next = state.Next(row_cnt, range);
+                //     if (!has_next) {
+                //         break;
+                //     }
+                //     row_cnt = range.second;
+                //     LOG_TRACE(fmt::format("range.first: {}, range.second: {}", range.first, range.second));
+                // }
 
                 for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
                     ColumnMeta column_meta(column_idx, block_meta);
@@ -1578,12 +1580,6 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
             for (auto &old_chunk_id : old_chunk_ids) {
                 ChunkIndexMeta chunk_index_meta(old_chunk_id, segment_index_meta);
                 if (index_def->index_type_ == IndexType::kFullText) {
-                    ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-                    Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
-                    if (!status.ok()) {
-                        return status;
-                    }
-
                     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
                     PersistResultHandler handler(pm);
 
@@ -1599,6 +1595,12 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                         VirtualStore::MakeDirectory(write_dir);
                     }
 
+                    ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+                    Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
+                    if (!status.ok()) {
+                        return status;
+                    }
+
                     std::vector<std::string> old_files;
                     old_files.emplace_back(chunk_info_ptr->base_name_ + ".dic");
                     old_files.emplace_back(chunk_info_ptr->base_name_ + ".pos");
@@ -1607,8 +1609,7 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                     for (const auto &file : old_files) {
                         std::string input_file = std::filesystem::path(read_dir) / file;
                         PersistReadResult result = pm->GetObjCache(input_file);
-
-                        const ObjAddr &obj_addr = result.obj_addr_;
+                        const ObjAddr &obj_addr = handler.HandleReadResult(result);
                         if (!obj_addr.Valid()) {
                             UnrecoverableError(fmt::format("GetObjCache failed: {}", input_file));
                         }
@@ -1642,24 +1643,6 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                         }
                         write_handle->Sync();
                     }
-                    // BufferObj *index_buffer_dic = nullptr;
-                    // BufferObj *index_buffer_pos = nullptr;
-                    // BufferObj *index_buffer_len = nullptr;
-                    //
-                    // status = chunk_index_meta.GetFulltextIndexBuffer(index_buffer_dic, index_buffer_pos, index_buffer_len);
-                    // if (!status.ok()) {
-                    //     return status;
-                    // }
-                    //
-                    // if (index_buffer_dic) {
-                    //     index_buffer_dic->SaveSnapshot(table_snapshot_info, false);
-                    // }
-                    // if (index_buffer_pos) {
-                    //     index_buffer_pos->SaveSnapshot(table_snapshot_info, false);
-                    // }
-                    // if (index_buffer_len) {
-                    //     index_buffer_len->SaveSnapshot(table_snapshot_info, false);
-                    // }
                 } else {
                     BufferObj *buffer_obj = nullptr;
 

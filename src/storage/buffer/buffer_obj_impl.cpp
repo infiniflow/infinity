@@ -231,6 +231,7 @@ bool BufferObj::SaveSnapshot(const std::shared_ptr<TableSnapshotInfo> &table_sna
             case BufferStatus::kNew: {
                 file_worker_->AllocateInMemory();
                 buffer_mgr_->PushGCQueue(this);
+                break;
             }
             case BufferStatus::kLoaded:
                 [[fallthrough]];
@@ -249,7 +250,7 @@ bool BufferObj::SaveSnapshot(const std::shared_ptr<TableSnapshotInfo> &table_sna
     } else if (type_ == BufferType::kTemp) {
         file_worker_->WriteSnapshotFile1(table_snapshot_info, use_memory, ctx, data_size);
     } else {
-        file_worker_->WriteSnapshotFile(table_snapshot_info, use_memory, ctx, data_size);
+        file_worker_->WriteSnapshotFile(table_snapshot_info, false, ctx, data_size);
     }
 
     return true;

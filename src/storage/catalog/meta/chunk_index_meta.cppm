@@ -55,7 +55,6 @@ public:
     Status GetChunkInfo(ChunkIndexMetaInfo *&chunk_info);
 
     Status GetIndexBuffer(BufferObj *&index_buffer);
-    Status GetFulltextIndexBuffer(BufferObj *&index_buffer_dic, BufferObj *&index_buffer_pos, BufferObj *&index_buffer_len);
 
     Status InitSet(const ChunkIndexMetaInfo &chunk_info);
 

@@ -252,17 +252,7 @@ TEST_P(TableSnapshotTest, test_restore_table_create_table_multithreaded) {
         waiter.join();
     }
 
-    {
-        std::string select_sql = "select * from tb1";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(select_sql);
-        bool ok = HandleQueryResult(query_result);
-        if (ok) {
-            LOG_INFO("Final table tb1: " + query_result.ToString());
-        } else {
-            LOG_INFO("select * from tb1 failed");
-        }
-    }
+    PrintTableRowCount();
 }
 
 TEST_P(TableSnapshotTest, test_create_snapshot_same_name_multithreaded) {
@@ -474,17 +464,7 @@ TEST_P(TableSnapshotTest, test_restore_table_same_snapshot_multithreaded) {
         waiter.join();
     }
 
-    {
-        std::string select_sql = "select * from tb1";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(select_sql);
-        bool ok = HandleQueryResult(query_result);
-        if (ok) {
-            LOG_INFO("Final table tb1: " + query_result.ToString());
-        } else {
-            LOG_INFO("select * from tb1 failed");
-        }
-    }
+    PrintTableRowCount();
 }
 
 TEST_P(TableSnapshotTest, test_create_snapshot_delete_data) {
@@ -506,18 +486,19 @@ TEST_P(TableSnapshotTest, test_create_snapshot_delete_data) {
     PrintTableRowCount();
 
     Status status;
-    // std::vector<RowID> row_ids;
+    std::vector<RowID> row_ids;
 
-    // auto *txn1 = txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
-    // for (size_t row_id = 80; row_id < 100; ++row_id) {
-    //     row_ids.push_back(RowID(0, row_id));
-    // }
-    // status = txn1->Delete(*db_name, *table_name, row_ids);
-    //
-    // status = txn_mgr->CommitTxn(txn1);
-    // if (!status.ok()) {
-    //     LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
-    // }
+    row_ids.clear();
+    auto *txn1 = txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
+    for (size_t row_id = 1000; row_id < 11000; ++row_id) {
+        row_ids.push_back(RowID(0, row_id));
+    }
+    status = txn1->Delete(*db_name, *table_name, row_ids);
+
+    status = txn_mgr->CommitTxn(txn1);
+    if (!status.ok()) {
+        LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
+    }
 
     PrintTableRowCount();
 
@@ -527,26 +508,26 @@ TEST_P(TableSnapshotTest, test_create_snapshot_delete_data) {
         LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
     }
 
-    // auto *txn3 = txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
-    //
-    // row_ids.clear();
-    // for (size_t row_id = 0; row_id < 50; ++row_id) {
-    //     row_ids.push_back(RowID(0, row_id));
-    // }
-    // status = txn3->Delete(*db_name, *table_name, row_ids);
-    // if (!status.ok()) {
-    //     LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
-    // }
+    auto *txn3 = txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
+
+    row_ids.clear();
+    for (size_t row_id = 20000; row_id < 30000; ++row_id) {
+        row_ids.push_back(RowID(0, row_id));
+    }
+    status = txn3->Delete(*db_name, *table_name, row_ids);
+    if (!status.ok()) {
+        LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
+    }
 
     status = txn_mgr->CommitTxn(txn2);
     if (!status.ok()) {
         LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
     }
 
-    // status = txn_mgr->CommitTxn(txn3);
-    // if (!status.ok()) {
-    //     LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
-    // }
+    status = txn_mgr->CommitTxn(txn3);
+    if (!status.ok()) {
+        LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
+    }
 
     // Drop table
     {
