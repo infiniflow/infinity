@@ -1424,20 +1424,14 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const CheckpointOption &op
 Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &option, CheckpointTxnStore *ckp_txn_store) {
     Status status;
     std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
+
     auto [db_name, table_name] = table_meta.GetDBTableName();
     std::tie(table_snapshot_info, status) = table_meta.MapMetaToSnapShotInfo(db_name, table_name);
     if (!status.ok()) {
         return status;
     }
-
     CreateTableSnapshotTxnStore *create_txn_store = static_cast<CreateTableSnapshotTxnStore *>(base_txn_store_.get());
     table_snapshot_info->snapshot_name_ = create_txn_store->snapshot_name_;
-
-    std::vector<SegmentID> *segment_ids_ptr = nullptr;
-    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
-    if (!status.ok()) {
-        return status;
-    }
 
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     std::string data_dir = InfinityContext::instance().config()->DataDir();
@@ -1505,12 +1499,17 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
         return Status::OK();
     };
 
-    // auto CreateSnapshotByMapping = [&]() -> Status {
-    //
-    //
-    // };
+    [[maybe_unused]] auto CreateSnapshotByMapping = [&](const std::string &file) -> Status {
+
+    };
 
     auto data_start_time = std::chrono::high_resolution_clock::now();
+
+    std::vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
+    if (!status.ok()) {
+        return status;
+    }
 
     std::vector<BlockID> *block_ids_ptr = nullptr;
     for (SegmentID segment_id : *segment_ids_ptr) {
