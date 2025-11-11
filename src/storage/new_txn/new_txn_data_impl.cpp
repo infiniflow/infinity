@@ -1495,18 +1495,18 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                 if (!status.ok()) {
                     return status;
                 }
-                BlockOffset row_cnt = state.block_offset_end();
 
-                // std::pair<BlockOffset, BlockOffset> range;
-                // BlockOffset row_cnt = 0;
-                // while (true) {
-                //     bool has_next = state.Next(row_cnt, range);
-                //     if (!has_next) {
-                //         break;
-                //     }
-                //     row_cnt = range.second;
-                //     LOG_TRACE(fmt::format("range.first: {}, range.second: {}", range.first, range.second));
-                // }
+                std::pair<BlockOffset, BlockOffset> range;
+                BlockOffset row_cnt = 0;
+                while (true) {
+                    bool has_next = state.Next(row_cnt, range);
+                    if (!has_next) {
+                        break;
+                    }
+                    row_cnt = range.second;
+                    LOG_TRACE(fmt::format("range.first: {}, range.second: {}", range.first, range.second));
+                }
+                LOG_TRACE(fmt::format("row_cnt: {}", row_cnt));
 
                 for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
                     ColumnMeta column_meta(column_idx, block_meta);
