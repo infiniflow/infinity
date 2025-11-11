@@ -390,11 +390,11 @@ bool PhysicalTop::Execute(QueryContext *, OperatorState *operator_state) {
     top_solver.Solve(input_data_block_array, output_data_block_array);
     execution_count++;
     input_data_block_array.clear();
+    if (total_hits_count_flag_) {
+        top_operator_state->total_hits_count_flag_ = true;
+        top_operator_state->total_hits_count_ += total_hits_row_count;
+    }
     if (prev_op_state->Complete()) {
-        if (total_hits_count_flag_) {
-            top_operator_state->total_hits_count_flag_ = true;
-            top_operator_state->total_hits_count_ += total_hits_row_count;
-        }
         top_solver.Finalize(output_data_block_array, execution_count, offset_);
         top_operator_state->SetComplete();
         return true;
