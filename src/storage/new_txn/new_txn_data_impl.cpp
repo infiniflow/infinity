@@ -1424,7 +1424,6 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const CheckpointOption &op
 Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &option, CheckpointTxnStore *ckp_txn_store) {
     Status status;
     std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
-
     auto [db_name, table_name] = table_meta.GetDBTableName();
     std::tie(table_snapshot_info, status) = table_meta.MapMetaToSnapShotInfo(db_name, table_name);
     if (!status.ok()) {
@@ -1439,6 +1438,77 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
     if (!status.ok()) {
         return status;
     }
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    std::string data_dir = InfinityContext::instance().config()->DataDir();
+    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    std::string snapshot_name = table_snapshot_info->snapshot_name_;
+
+    [[maybe_unused]] auto CreateSnapshotByIO = [&](const std::string &file) -> Status {
+        if (pm != nullptr) {
+            PersistResultHandler handler(pm);
+            PersistReadResult result = pm->GetObjCache(file);
+            DeferFn defer_fn([&]() {
+                auto res = pm->PutObjCache(file);
+                handler.HandleWriteResult(res);
+            });
+
+            const ObjAddr &obj_addr = handler.HandleReadResult(result);
+            if (!obj_addr.Valid()) {
+                UnrecoverableError(fmt::format("GetObjCache failed: {}", file));
+            }
+
+            std::string read_path = pm->GetObjPath(obj_addr.obj_key_);
+            std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
+            LOG_TRACE(fmt::format("CreateSnapshotByIO, Read path: {}, Write path: {}", read_path, write_path));
+
+            std::string write_dir = VirtualStore::GetParentPath(write_path);
+            if (!VirtualStore::Exists(write_dir)) {
+                VirtualStore::MakeDirectory(write_dir);
+            }
+
+            auto [read_handle, read_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
+            if (!read_open_status.ok()) {
+                UnrecoverableError(read_open_status.message());
+            }
+
+            auto seek_status = read_handle->Seek(obj_addr.part_offset_);
+            if (!seek_status.ok()) {
+                UnrecoverableError(seek_status.message());
+            }
+
+            auto file_size = obj_addr.part_size_;
+            auto buffer = std::make_unique<char[]>(file_size);
+            auto [nread, read_status] = read_handle->Read(buffer.get(), file_size);
+
+            auto [write_handle, write_open_status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
+            if (!write_open_status.ok()) {
+                UnrecoverableError(write_open_status.message());
+            }
+
+            Status write_status = write_handle->Append(buffer.get(), file_size);
+            if (!write_status.ok()) {
+                UnrecoverableError(write_status.message());
+            }
+            write_handle->Sync();
+        } else {
+            std::string read_path = fmt::format("{}/{}", data_dir, file);
+            std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
+            LOG_TRACE(fmt::format("CreateSnapshotByIO, Read path: {}, Write path: {}", read_path, write_path));
+
+            Status status = VirtualStore::Copy(write_path, read_path);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+        }
+
+        return Status::OK();
+    };
+
+    // auto CreateSnapshotByMapping = [&]() -> Status {
+    //
+    //
+    // };
 
     auto data_start_time = std::chrono::high_resolution_clock::now();
 
@@ -1538,161 +1608,44 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
     auto data_duration = std::chrono::duration_cast<std::chrono::milliseconds>(data_end_time - data_start_time);
     LOG_INFO(fmt::format("Saving data and version files took {} ms", data_duration.count()));
 
-    auto index_start_time = std::chrono::high_resolution_clock::now();
+    {
+        auto index_start_time = std::chrono::high_resolution_clock::now();
 
-    // get all index ids
-    std::vector<std::string> *index_ids_ptr = nullptr;
-    std::vector<std::string> *index_names_ptr = nullptr;
-    status = table_meta.GetIndexIDs(index_ids_ptr, &index_names_ptr);
-    if (!status.ok()) {
-        return status;
-    }
-
-    size_t index_count = index_ids_ptr->size();
-    for (size_t i = 0; i < index_count; ++i) {
-        const std::string &index_id_str = (*index_ids_ptr)[i];
-        const std::string &index_name_str = (*index_names_ptr)[i];
-        TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
-
-        // Get index types
-        auto [index_def, index_status] = table_index_meta.GetIndexBase();
-        if (!index_status.ok()) {
-            return index_status;
+        std::vector<std::string> index_files = table_snapshot_info->GetIndexFiles();
+        for (const auto &index_file : index_files) {
+            status = CreateSnapshotByIO(index_file);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
         }
 
-        // Get all segment IDs for this index
-        std::vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
+        auto index_end_time = std::chrono::high_resolution_clock::now();
+        auto index_duration = std::chrono::duration_cast<std::chrono::milliseconds>(index_end_time - index_start_time);
+        LOG_TRACE(fmt::format("Saving index files took {} ms", index_duration.count()));
+    }
+
+    {
+        auto json_start_time = std::chrono::high_resolution_clock::now();
+
+        nlohmann::json json_res = table_snapshot_info->CreateSnapshotMetadataJSON();
+        std::string json_string = json_res.dump();
+
+        std::string meta_path = fmt::format("{}/{}/{}.json", snapshot_dir, table_snapshot_info->snapshot_name_, table_snapshot_info->snapshot_name_);
+        auto [snapshot_file_handle, meta_status] = VirtualStore::Open(meta_path, FileAccessMode::kWrite);
+        if (!meta_status.ok()) {
+            return meta_status;
+        }
+
+        status = snapshot_file_handle->Append(json_string.data(), json_string.size());
         if (!status.ok()) {
             return status;
         }
+        snapshot_file_handle->Sync();
 
-        for (SegmentID segment_id : *segment_ids_ptr) {
-            SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-
-            std::vector<ChunkID> old_chunk_ids;
-            auto [existing_chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1();
-            if (chunk_status.ok()) {
-                old_chunk_ids = *existing_chunk_ids_ptr;
-            }
-
-            // Save the index file to disk
-            for (auto &old_chunk_id : old_chunk_ids) {
-                ChunkIndexMeta chunk_index_meta(old_chunk_id, segment_index_meta);
-                if (index_def->index_type_ == IndexType::kFullText) {
-                    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-                    PersistResultHandler handler(pm);
-
-                    std::string data_dir = InfinityContext::instance().config()->DataDir();
-                    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-                    std::string snapshot_name = table_snapshot_info->snapshot_name_;
-                    std::string index_dir = segment_index_meta.GetSegmentIndexDir()->c_str();
-
-                    std::string read_dir = std::filesystem::path(data_dir) / index_dir;
-                    std::string write_dir = std::filesystem::path(snapshot_dir) / snapshot_name / index_dir;
-
-                    if (!VirtualStore::Exists(write_dir)) {
-                        VirtualStore::MakeDirectory(write_dir);
-                    }
-
-                    ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-                    Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
-                    if (!status.ok()) {
-                        return status;
-                    }
-
-                    std::vector<std::string> old_files;
-                    old_files.emplace_back(chunk_info_ptr->base_name_ + ".dic");
-                    old_files.emplace_back(chunk_info_ptr->base_name_ + ".pos");
-                    old_files.emplace_back(chunk_info_ptr->base_name_ + ".len");
-
-                    for (const auto &file : old_files) {
-                        std::string input_file = std::filesystem::path(read_dir) / file;
-                        PersistReadResult result = pm->GetObjCache(input_file);
-                        const ObjAddr &obj_addr = handler.HandleReadResult(result);
-                        if (!obj_addr.Valid()) {
-                            UnrecoverableError(fmt::format("GetObjCache failed: {}", input_file));
-                        }
-
-                        std::string read_path = pm->GetObjPath(obj_addr.obj_key_);
-                        std::string write_path = std::filesystem::path(write_dir) / file;
-                        LOG_TRACE(fmt::format("Persist Fulltext index, Read path: {}, Write path: {}", read_path, write_path));
-
-                        auto [read_handle, read_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
-                        if (!read_open_status.ok()) {
-                            UnrecoverableError(read_open_status.message());
-                        }
-
-                        auto seek_status = read_handle->Seek(obj_addr.part_offset_);
-                        if (!seek_status.ok()) {
-                            UnrecoverableError(seek_status.message());
-                        }
-
-                        auto file_size = obj_addr.part_size_;
-                        auto buffer = std::make_unique<char[]>(file_size);
-                        auto [nread, read_status] = read_handle->Read(buffer.get(), file_size);
-
-                        auto [write_handle, write_open_status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
-                        if (!write_open_status.ok()) {
-                            UnrecoverableError(write_open_status.message());
-                        }
-
-                        Status write_status = write_handle->Append(buffer.get(), file_size);
-                        if (!write_status.ok()) {
-                            UnrecoverableError(write_status.message());
-                        }
-                        write_handle->Sync();
-                    }
-                } else {
-                    BufferObj *buffer_obj = nullptr;
-
-                    Status status = chunk_index_meta.GetIndexBuffer(buffer_obj);
-                    if (!status.ok()) {
-                        return status;
-                    }
-
-                    buffer_obj->SaveSnapshot(table_snapshot_info, false);
-                }
-            }
-        }
+        auto json_end_time = std::chrono::high_resolution_clock::now();
+        auto json_duration = std::chrono::duration_cast<std::chrono::milliseconds>(json_end_time - json_start_time);
+        LOG_TRACE(fmt::format("Saving json files took {} ms", json_duration.count()));
     }
-
-    // End timing for index serialization
-    auto index_end_time = std::chrono::high_resolution_clock::now();
-    auto index_duration = std::chrono::duration_cast<std::chrono::milliseconds>(index_end_time - index_start_time);
-    LOG_INFO(fmt::format("Saving index files took {} ms", index_duration.count()));
-
-    // Start timing for JSON serialization
-    auto json_start_time = std::chrono::high_resolution_clock::now();
-
-    // Create metadata JSON
-    nlohmann::json json_res = table_snapshot_info->CreateSnapshotMetadataJSON();
-    std::string json_string = json_res.dump();
-
-    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    if (!VirtualStore::Exists(snapshot_dir)) {
-        status = VirtualStore::MakeDirectory(snapshot_dir);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-
-    std::string meta_path = fmt::format("{}/{}/{}.json", snapshot_dir, table_snapshot_info->snapshot_name_, table_snapshot_info->snapshot_name_);
-    auto [snapshot_file_handle, meta_status] = VirtualStore::Open(meta_path, FileAccessMode::kWrite);
-    if (!meta_status.ok()) {
-        return meta_status;
-    }
-
-    status = snapshot_file_handle->Append(json_string.data(), json_string.size());
-    if (!status.ok()) {
-        return status;
-    }
-    snapshot_file_handle->Sync();
-
-    // End timing for json serialization
-    auto json_end_time = std::chrono::high_resolution_clock::now();
-    auto json_duration = std::chrono::duration_cast<std::chrono::milliseconds>(json_end_time - json_start_time);
-    LOG_INFO(fmt::format("Saving json files took {} ms", json_duration.count()));
 
     return Status::OK();
 }

@@ -134,6 +134,7 @@ export struct TableSnapshotInfo : public SnapshotInfo {
     std::map<SegmentID, std::shared_ptr<SegmentSnapshotInfo>> segment_snapshots_{};
     std::map<std::string, std::shared_ptr<TableIndexSnapshotInfo>> table_index_snapshots_{};
 
+    std::vector<std::string> GetIndexFiles() const;
     std::vector<std::string> GetFiles() const;
     Status Serialize(const std::string &save_path, TxnTimeStamp commit_ts);
     std::string ToString() const;
