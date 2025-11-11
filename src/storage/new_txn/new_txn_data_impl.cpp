@@ -1438,67 +1438,6 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
     std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     std::string snapshot_name = table_snapshot_info->snapshot_name_;
 
-    [[maybe_unused]] auto CreateSnapshotByIO = [&](const std::string &file) -> Status {
-        if (pm != nullptr) {
-            PersistResultHandler handler(pm);
-            PersistReadResult result = pm->GetObjCache(file);
-            DeferFn defer_fn([&]() {
-                auto res = pm->PutObjCache(file);
-                handler.HandleWriteResult(res);
-            });
-
-            const ObjAddr &obj_addr = handler.HandleReadResult(result);
-            if (!obj_addr.Valid()) {
-                UnrecoverableError(fmt::format("GetObjCache failed: {}", file));
-            }
-
-            std::string read_path = pm->GetObjPath(obj_addr.obj_key_);
-            std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
-            LOG_TRACE(fmt::format("CreateSnapshotByIO, Read path: {}, Write path: {}", read_path, write_path));
-
-            std::string write_dir = VirtualStore::GetParentPath(write_path);
-            if (!VirtualStore::Exists(write_dir)) {
-                VirtualStore::MakeDirectory(write_dir);
-            }
-
-            auto [read_handle, read_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
-            if (!read_open_status.ok()) {
-                UnrecoverableError(read_open_status.message());
-            }
-
-            auto seek_status = read_handle->Seek(obj_addr.part_offset_);
-            if (!seek_status.ok()) {
-                UnrecoverableError(seek_status.message());
-            }
-
-            auto file_size = obj_addr.part_size_;
-            auto buffer = std::make_unique<char[]>(file_size);
-            auto [nread, read_status] = read_handle->Read(buffer.get(), file_size);
-
-            auto [write_handle, write_open_status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
-            if (!write_open_status.ok()) {
-                UnrecoverableError(write_open_status.message());
-            }
-
-            Status write_status = write_handle->Append(buffer.get(), file_size);
-            if (!write_status.ok()) {
-                UnrecoverableError(write_status.message());
-            }
-            write_handle->Sync();
-        } else {
-            std::string read_path = fmt::format("{}/{}", data_dir, file);
-            std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
-            LOG_TRACE(fmt::format("CreateSnapshotByIO, Read path: {}, Write path: {}", read_path, write_path));
-
-            Status status = VirtualStore::Copy(write_path, read_path);
-            if (!status.ok()) {
-                UnrecoverableError(status.message());
-            }
-        }
-
-        return Status::OK();
-    };
-
     [[maybe_unused]] auto CreateSnapshotByMapping = [&](const std::string &file) -> Status { return Status::OK(); };
 
     auto data_start_time = std::chrono::high_resolution_clock::now();
@@ -1606,11 +1545,72 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
     LOG_INFO(fmt::format("Saving data and version files took {} ms", data_duration.count()));
 
     {
+        auto CreateSnapshotFile = [&](const std::string &file) -> Status {
+            if (pm != nullptr) {
+                PersistResultHandler handler(pm);
+                PersistReadResult result = pm->GetObjCache(file);
+                DeferFn defer_fn([&]() {
+                    auto res = pm->PutObjCache(file);
+                    handler.HandleWriteResult(res);
+                });
+
+                const ObjAddr &obj_addr = handler.HandleReadResult(result);
+                if (!obj_addr.Valid()) {
+                    UnrecoverableError(fmt::format("GetObjCache failed: {}", file));
+                }
+
+                std::string read_path = pm->GetObjPath(obj_addr.obj_key_);
+                std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
+                LOG_TRACE(fmt::format("CreateSnapshotByIO, Read path: {}, Write path: {}", read_path, write_path));
+
+                std::string write_dir = VirtualStore::GetParentPath(write_path);
+                if (!VirtualStore::Exists(write_dir)) {
+                    VirtualStore::MakeDirectory(write_dir);
+                }
+
+                auto [read_handle, read_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
+                if (!read_open_status.ok()) {
+                    UnrecoverableError(read_open_status.message());
+                }
+
+                auto seek_status = read_handle->Seek(obj_addr.part_offset_);
+                if (!seek_status.ok()) {
+                    UnrecoverableError(seek_status.message());
+                }
+
+                auto file_size = obj_addr.part_size_;
+                auto buffer = std::make_unique<char[]>(file_size);
+                auto [nread, read_status] = read_handle->Read(buffer.get(), file_size);
+
+                auto [write_handle, write_open_status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
+                if (!write_open_status.ok()) {
+                    UnrecoverableError(write_open_status.message());
+                }
+
+                Status write_status = write_handle->Append(buffer.get(), file_size);
+                if (!write_status.ok()) {
+                    UnrecoverableError(write_status.message());
+                }
+                write_handle->Sync();
+            } else {
+                std::string read_path = fmt::format("{}/{}", data_dir, file);
+                std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
+                LOG_TRACE(fmt::format("CreateSnapshotByIO, Read path: {}, Write path: {}", read_path, write_path));
+
+                Status status = VirtualStore::Copy(write_path, read_path);
+                if (!status.ok()) {
+                    UnrecoverableError(status.message());
+                }
+            }
+
+            return Status::OK();
+        };
+
         auto index_start_time = std::chrono::high_resolution_clock::now();
 
         std::vector<std::string> index_files = table_snapshot_info->GetIndexFiles();
         for (const auto &index_file : index_files) {
-            status = CreateSnapshotByIO(index_file);
+            status = CreateSnapshotFile(index_file);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
