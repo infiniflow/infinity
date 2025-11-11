@@ -577,6 +577,9 @@ jobs:
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/infinity | tar -xf -
+          COMMIT_SHA=${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.pull_request.head.sha || github.sha }}
+          echo "COMMIT_SHA=${COMMIT_SHA}"
+          echo "COMMIT_SHA=${COMMIT_SHA}" >> ${GITHUB_ENV}
 
       - name: Start test container
         if: ${{ !cancelled() && !failure() }}

@@ -1,4 +1,6 @@
-#!/bin/bash   
+#!/bin/bash
+
+echo $COMMIT_SHA
 
 upload_file() {
   local name="$1"
@@ -13,7 +15,7 @@ upload_file() {
 
   RETRY_COUNT=0
   while [ $RETRY_COUNT -lt 5 ]; do
-    if codecov upload-process --disable-search --fail-on-error -t "$CODECOV_TOKEN" -n "$name" -F "$flag" -f "$file"; then
+    if codecov upload-process --disable-search --fail-on-error -t "$CODECOV_TOKEN" -n "$name" -F "$flag" -f "$file" -C "$COMMIT_SHA"; then
       echo "Upload successful for $flag"
       return 0
     fi
