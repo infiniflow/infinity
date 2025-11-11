@@ -1539,7 +1539,6 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
         }
     }
 
-    // End timing for data serialization
     auto data_end_time = std::chrono::high_resolution_clock::now();
     auto data_duration = std::chrono::duration_cast<std::chrono::milliseconds>(data_end_time - data_start_time);
     LOG_INFO(fmt::format("Saving data and version files took {} ms", data_duration.count()));
@@ -1561,7 +1560,7 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
 
                 std::string read_path = pm->GetObjPath(obj_addr.obj_key_);
                 std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
-                LOG_TRACE(fmt::format("CreateSnapshotByIO, Read path: {}, Write path: {}", read_path, write_path));
+                LOG_TRACE(fmt::format("CreateSnapshotFile, Read path: {}, Write path: {}", read_path, write_path));
 
                 std::string write_dir = VirtualStore::GetParentPath(write_path);
                 if (!VirtualStore::Exists(write_dir)) {
@@ -1595,7 +1594,7 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
             } else {
                 std::string read_path = fmt::format("{}/{}", data_dir, file);
                 std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
-                LOG_TRACE(fmt::format("CreateSnapshotByIO, Read path: {}, Write path: {}", read_path, write_path));
+                LOG_TRACE(fmt::format("CreateSnapshotFile, Read path: {}, Write path: {}", read_path, write_path));
 
                 Status status = VirtualStore::Copy(write_path, read_path);
                 if (!status.ok()) {

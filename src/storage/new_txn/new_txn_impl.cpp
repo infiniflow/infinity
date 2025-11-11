@@ -2357,6 +2357,7 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
 
     TxnTimeStamp last_ckp_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
     std::shared_ptr<CheckpointTxnStore> ckp_txn_store = std::make_shared<CheckpointTxnStore>(last_ckp_ts, true);
+    LOG_TRACE(fmt::format("last_ckp_ts: {}, begin_ts: {}, commit_ts: {}", last_ckp_ts, txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_));
 
     Status status = this->CheckpointforSnapshot(last_ckp_ts, ckp_txn_store.get(), SnapshotType::kTableSnapshot);
     if (!status.ok()) {
