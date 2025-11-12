@@ -533,10 +533,10 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     return Status::OK();
 }
 
-Status NewTxn::OptimizeIndexByParams(const std::string &db_name,
-                                     const std::string &table_name,
-                                     const std::string &index_name,
-                                     std::vector<std::unique_ptr<InitParameter>> raw_params) {
+Status NewTxn::AlterIndexByParams(const std::string &db_name,
+                                  const std::string &table_name,
+                                  const std::string &index_name,
+                                  std::vector<std::unique_ptr<InitParameter>> raw_params) {
     Status status = Status::OK();
 
     std::shared_ptr<DBMeta> db_meta;
@@ -611,7 +611,7 @@ Status NewTxn::OptimizeIndexByParams(const std::string &db_name,
 
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-        Status status = OptimizeSegmentIndexByParams(segment_index_meta, raw_params);
+        Status status = AlterSegmentIndexByParams(segment_index_meta, raw_params);
         if (!status.ok()) {
             return status;
         }
@@ -1476,7 +1476,8 @@ Status NewTxn::OptimizeFtIndex(std::shared_ptr<IndexBase> index_base,
                 return status;
             }
         }
-        if (chunk_id == 0) {
+        // Initialize base_rowid for the first chunk
+        if (iter == chunk_ids.begin()) {
             base_rowid = chunk_info_ptr->base_row_id_;
         }
         if (const RowID expect_base_row_id = base_rowid + total_row_count; chunk_info_ptr->base_row_id_ > expect_base_row_id) {
@@ -1592,7 +1593,7 @@ Status NewTxn::OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
     return Status::OK();
 }
 
-Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, const std::vector<std::unique_ptr<InitParameter>> &raw_params) {
+Status NewTxn::AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, const std::vector<std::unique_ptr<InitParameter>> &raw_params) {
     Status status;
     std::shared_ptr<IndexBase> index_base;
 
@@ -1682,8 +1683,11 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
     return Status::OK();
 }
 
-Status NewTxn::ReplayOptimizeIndeByParams(WalCmdOptimizeV2 *optimize_cmd) {
-    return OptimizeIndexByParams(optimize_cmd->db_name_, optimize_cmd->table_name_, optimize_cmd->index_name_, std::move(optimize_cmd->params_));
+Status NewTxn::ReplayAlterIndexByParams(WalCmdAlterIndexV2 *alter_index_cmd) {
+    return AlterIndexByParams(alter_index_cmd->db_name_,
+                              alter_index_cmd->table_name_,
+                              alter_index_cmd->index_name_,
+                              std::move(alter_index_cmd->params_));
 }
 
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {

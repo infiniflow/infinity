@@ -77,7 +77,7 @@ Status SegmentMeta::InitSet() {
 //     return Status::OK();
 // }
 
-Status SegmentMeta::UninitSet(UsageFlag usage_flag) { return UninitSet(usage_flag, begin_ts_); }
+// Status SegmentMeta::UninitSet(UsageFlag usage_flag) { return UninitSet(usage_flag, begin_ts_); }
 
 Status SegmentMeta::UninitSet(UsageFlag usage_flag, TxnTimeStamp begin_ts) {
     {
@@ -218,17 +218,6 @@ Status SegmentMeta::CommitBlock(BlockID block_id, TxnTimeStamp commit_ts) {
         return status;
     }
     return Status::OK();
-}
-
-std::tuple<std::shared_ptr<std::string>, Status> SegmentMeta::GetSegmentDir() {
-    std::string seg_dir_key = GetSegmentTag("dir");
-    std::string seg_dir;
-    Status status = kv_instance_.Get(seg_dir_key, seg_dir);
-    if (!status.ok()) {
-        return {nullptr, status};
-    }
-    segment_dir_ = seg_dir;
-    return {std::make_shared<std::string>(seg_dir), Status::OK()};
 }
 
 std::tuple<std::vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1() {
@@ -380,12 +369,6 @@ std::tuple<std::shared_ptr<SegmentSnapshotInfo>, Status> SegmentMeta::MapMetaToS
 
     std::shared_ptr<SegmentSnapshotInfo> segment_snapshot_info = std::make_shared<SegmentSnapshotInfo>();
     Status status;
-    // TODO: FIGURE OUT WHAT SegmentDir do
-    // auto [segment_dir_ptr, status] = GetSegmentDir();
-    // if (!status.ok()) {
-    //     return {nullptr, status};
-    // }
-    // segment_snapshot_info->segment_dir_ = *segment_dir_ptr;
     segment_snapshot_info->segment_id_ = segment_id_;
     segment_snapshot_info->create_ts_ = GetCreateTimestampFromKV();
     status = GetFirstDeleteTS(segment_snapshot_info->first_delete_ts_);

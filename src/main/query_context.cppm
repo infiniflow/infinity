@@ -39,7 +39,6 @@ class LogicalPlanner;
 class PhysicalPlanner;
 export class FragmentBuilder;
 class TaskScheduler;
-struct BGQueryState;
 
 export class QueryContext {
 

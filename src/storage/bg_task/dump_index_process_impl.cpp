@@ -67,8 +67,11 @@ void DumpIndexProcessor::Stop() {
 }
 
 void DumpIndexProcessor::Submit(std::shared_ptr<BGTask> bg_task) {
-    task_queue_.Enqueue(std::move(bg_task));
-    ++task_count_;
+    if (task_queue_.TryEnqueue(std::move(bg_task))) {
+        ++task_count_;
+    } else {
+        LOG_WARN(fmt::format("Task queue of DumpIndexProcessor is full, skip the task. Queue size is {}", task_queue_.Size()));
+    }
 }
 
 void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {

@@ -98,10 +98,6 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
     ExpressionEvaluator expr_evaluator;
 
     auto data_type = std::make_shared<DataType>(LogicalType::kBigInt);
-    auto col_def = std::make_shared<ColumnDef>(0, data_type, "c1", std::set<ConstraintType>());
-    auto table_def =
-        TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("t1"), std::make_shared<std::string>(), {col_def});
-    auto input_table = DataTable::Make(table_def, TableType::kDataTable);
 
     {
         auto input_data_block = DataBlock::Make();
@@ -202,11 +198,6 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
     EXPECT_STREQ(func_expr->ToString().c_str(), "(8192 - c1)");
 
     ExpressionEvaluator expr_evaluator;
-
-    auto col_def = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(DataType(LogicalType::kBigInt)), "c1", std::set<ConstraintType>());
-    auto table_def =
-        TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("t1"), std::make_shared<std::string>(), {col_def});
-    auto input_table = DataTable::Make(table_def, TableType::kDataTable);
 
     {
         auto input_data_block = DataBlock::Make();

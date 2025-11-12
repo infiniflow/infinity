@@ -92,7 +92,6 @@ export import :txn_allocator_task;
 export import :txn_allocator;
 export import :base_txn_store;
 export import :new_txn_manager;
-export import :bg_query_state;
 export import :data_access_state;
 export import :block_column_iter;
 export import :view;

@@ -471,11 +471,14 @@ class RemoteTable():
     def explain(self, explain_type: ExplainType = ExplainType.Physical):
         return self.query_builder.explain(explain_type)
 
-    def optimize(self, index_name: str, opt_params: dict[str, str]):
-        opt_options = ttypes.OptimizeOptions()
+    def optimize(self):
+        return self._conn.optimize(db_name=self._db_name, table_name=self._table_name)
+
+    def alter_index(self, index_name: str, opt_params: dict[str, str]):
+        opt_options = ttypes.AlterIndexOptions()
         opt_options.index_name = index_name
         opt_options.opt_params = [ttypes.InitParameter(k, v) for k, v in opt_params.items()]
-        return self._conn.optimize(db_name=self._db_name, table_name=self._table_name, optimize_opt=opt_options)
+        return self._conn.alter_index(db_name=self._db_name, table_name=self._table_name, alter_index_opt=opt_options)
 
     def add_columns(self, column_defs: dict):
         column_defs_list = []

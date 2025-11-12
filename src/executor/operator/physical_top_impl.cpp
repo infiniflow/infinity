@@ -39,141 +39,185 @@ import data_type;
 
 namespace infinity {
 
-class TopSolver {
-public:
-    explicit TopSolver(u32 limit, const CompareTwoRowAndPreferLeft &prefer_left_function)
-        : limit_(limit), prefer_left_function_(prefer_left_function) {
-        Init();
+std::vector<std::vector<std::shared_ptr<ColumnVector>>> TopSolver::GetEvalColumns(const std::vector<std::shared_ptr<BaseExpression>> &expressions,
+                                                                                  std::vector<std::shared_ptr<ExpressionState>> &expr_states,
+                                                                                  const std::vector<std::unique_ptr<DataBlock>> &data_block_array) {
+    std::vector<std::vector<std::shared_ptr<ColumnVector>>> eval_columns;
+    eval_columns.reserve(data_block_array.size());
+    const u32 sort_expr_count = expressions.size();
+    for (auto &data_block_ptr : data_block_array) {
+        std::vector<std::shared_ptr<ColumnVector>> results;
+        ExpressionEvaluator expr_evaluator;
+        expr_evaluator.Init(data_block_ptr.get());
+        results.reserve(sort_expr_count);
+        for (u32 expr_id = 0; expr_id < sort_expr_count; ++expr_id) {
+            auto &expr = expressions[expr_id];
+            std::shared_ptr<ColumnVector> result_vector;
+            if (expr->type() != ExpressionType::kReference) {
+                // need to initialize the result vector
+                result_vector = std::make_shared<ColumnVector>(std::make_shared<DataType>(expr->Type()));
+                result_vector->Initialize();
+            }
+            expr_evaluator.Execute(expr, expr_states[expr_id], result_vector);
+            results.emplace_back(std::move(result_vector));
+        }
+        eval_columns.emplace_back(std::move(results));
     }
-    u32 WriteTopResultsToOutput(const std::vector<std::vector<std::shared_ptr<ColumnVector>>> &eval_columns,
-                                const std::vector<std::unique_ptr<DataBlock>> &input_data_block_array,
-                                std::vector<std::unique_ptr<DataBlock>> &output_data_block_array) {
-        ResetInput(eval_columns);
-        SolveTop();
-        WriteToOutput(input_data_block_array, output_data_block_array);
-        return size_;
+    return eval_columns;
+}
+
+void TopSolver::Init() {
+    for (size_t i = 0; i < expressions_.size(); i++) {
+        auto expr_state = ExpressionState::CreateState(expressions_[i]);
+        expr_states_.push_back(expr_state);
+    }
+}
+
+void TopSolver::Solve(const std::vector<std::unique_ptr<DataBlock>> &input_data_block_array,
+                      std::vector<std::unique_ptr<DataBlock>> &output_data_block_array) {
+    std::vector<std::vector<std::shared_ptr<ColumnVector>>> eval_columns = GetEvalColumns(expressions_, expr_states_, input_data_block_array);
+    // Using a lambda to compare elements with proper capture
+    auto custom_less = [this, &eval_columns](const std::pair<u32, u32> &x, const std::pair<u32, u32> &y) -> bool {
+        return prefer_left_function_.Compare(eval_columns[x.first], x.second, eval_columns[y.first], y.second);
+    };
+    std::vector<std::pair<u32, u32>> block_row_ids; //(block_idx, row_idx)
+    std::priority_queue pq(block_row_ids.begin(), block_row_ids.begin(), custom_less);
+    for (size_t i = 0; i < input_data_block_array.size(); i++) {
+        for (size_t j = 0; j < input_data_block_array[i]->row_count(); j++) {
+            std::pair<u32, u32> current_block_row_id = std::make_pair<u32, u32>(i, j);
+            if (pq.size() < limit_) {
+                pq.push(current_block_row_id);
+            } else {
+                if (custom_less(current_block_row_id, pq.top())) {
+                    pq.pop();
+                    pq.push(current_block_row_id);
+                }
+            }
+        }
     }
 
-private:
-    u32 size_{};
-    u32 limit_{};
-    const CompareTwoRowAndPreferLeft &prefer_left_function_; // sort functions
-    std::unique_ptr<std::pair<u32, u32>[]> candidate_local_row_ids_;
-    std::pair<u32, u32> *row_ids_ptr_ = nullptr; // with offset, start from 1, for heap sort
-    const std::vector<std::vector<std::shared_ptr<ColumnVector>>> *input_data_ = nullptr;
-    void Init() {
-        candidate_local_row_ids_ = std::make_unique_for_overwrite<std::pair<u32, u32>[]>(limit_);
-        row_ids_ptr_ = candidate_local_row_ids_.get() - 1;
+    while (!pq.empty()) {
+        std::pair<u32, u32> block_row_id = pq.top();
+        pq.pop();
+        block_row_ids.push_back(block_row_id);
     }
-    void ResetInput(const std::vector<std::vector<std::shared_ptr<ColumnVector>>> &eval_columns) {
-        size_ = 0;
-        input_data_ = &eval_columns;
-    }
-    void HeapifyDown(u32 index, auto compare) {
-        if (index == 0 || (index << 1) > size_) {
-            return;
-        }
-        auto tmp_id = row_ids_ptr_[index];
-        for (u32 sub; (sub = (index << 1)) <= size_; index = sub) {
-            if (sub + 1 <= size_ && compare(row_ids_ptr_[sub + 1], row_ids_ptr_[sub])) {
-                ++sub;
-            }
-            if (!compare(row_ids_ptr_[sub], tmp_id)) {
+    std::reverse(block_row_ids.begin(), block_row_ids.end());
+
+    WriteToOutput(input_data_block_array, block_row_ids, output_data_block_array);
+}
+
+void TopSolver::Finalize(std::vector<std::unique_ptr<DataBlock>> &output_data_block_array, u32 execution_count, u32 offset) {
+    if (execution_count <= 1 && offset == 0)
+        return;
+    std::vector<std::unique_ptr<DataBlock>> input_data_block_array;
+    std::swap(input_data_block_array, output_data_block_array);
+    size_t total_hits_row_count = std::accumulate(input_data_block_array.begin(), input_data_block_array.end(), 0, [](u32 x, const auto &y) -> u32 {
+        return x + y->row_count();
+    });
+    if (total_hits_row_count <= offset)
+        return;
+    std::vector<std::pair<u32, u32>> block_row_ids; //(block_idx, row_idx)
+    if (execution_count <= 1) {
+        u32 skipped = 0;
+        size_t block_idx = 0;
+        for (; block_idx < input_data_block_array.size(); block_idx++) {
+            u32 block_row_cnt = input_data_block_array[block_idx]->row_count();
+            if (skipped + block_row_cnt > offset)
                 break;
-            }
-            row_ids_ptr_[index] = row_ids_ptr_[sub];
+            skipped += block_row_cnt;
         }
-        row_ids_ptr_[index] = tmp_id;
-    }
-    void AddCandidate(std::pair<u32, u32> add_id, auto compare) {
-        // when heap is full, only add candidate when compare(heap_top, add_id) is true
-        if (size_ == limit_) {
-            if (compare(row_ids_ptr_[1], add_id)) {
-                row_ids_ptr_[1] = add_id;
-                HeapifyDown(1, compare);
+        if (block_idx < input_data_block_array.size()) {
+            for (size_t i = offset - skipped; i < input_data_block_array[block_idx]->row_count(); i++)
+                block_row_ids.push_back(std::make_pair<u32, u32>(block_idx, i));
+            block_idx++;
+            for (; block_idx < input_data_block_array.size(); block_idx++) {
+                for (size_t i = 0; i < input_data_block_array[block_idx]->row_count(); i++)
+                    block_row_ids.push_back(std::make_pair<u32, u32>(block_idx, i));
+            }
+        }
+    } else {
+        for (size_t block_idx = 0; block_idx < input_data_block_array.size(); block_idx++) {
+            if (input_data_block_array[block_idx]->row_count() > 0) {
+                block_row_ids.push_back(std::make_pair<u32, u32>(block_idx, 0));
+            }
+        }
+        if (block_row_ids.size() == 1) {
+            size_t block_idx = block_row_ids[0].first;
+            u32 limit = std::min(limit_, (u32)input_data_block_array[block_idx]->row_count());
+            block_row_ids.clear();
+            for (size_t i = offset; i < limit; i++) {
+                block_row_ids.push_back(std::make_pair<u32, u32>(block_idx, i));
             }
         } else {
-            ++size_;
-            row_ids_ptr_[size_] = add_id;
-            if (size_ == limit_) {
-                for (u32 index = size_ / 2; index > 0; --index) {
-                    HeapifyDown(index, compare);
+            // Using a lambda to compare elements with proper capture
+            // Need to get eval_columns first for Finalize comparison
+            std::vector<std::vector<std::shared_ptr<ColumnVector>>> eval_columns = GetEvalColumns(expressions_, expr_states_, input_data_block_array);
+            auto custom_less = [this, &eval_columns](const std::pair<u32, u32> &x, const std::pair<u32, u32> &y) -> bool {
+                return !prefer_left_function_.Compare(eval_columns[x.first], x.second, eval_columns[y.first], y.second);
+            };
+            std::priority_queue pq(block_row_ids.begin(), block_row_ids.end(), custom_less);
+            block_row_ids.clear();
+            u32 skipped = 0;
+            while (skipped + block_row_ids.size() < limit_ && !pq.empty()) {
+                std::pair<u32, u32> block_row_id = pq.top();
+                pq.pop();
+                if (skipped < offset) {
+                    skipped++;
+                } else {
+                    block_row_ids.push_back(block_row_id);
+                }
+                if (block_row_id.second + 1 < input_data_block_array[block_row_id.first]->row_count()) {
+                    pq.push(std::make_pair(block_row_id.first, block_row_id.second + 1));
                 }
             }
         }
     }
-    void SortResult(auto compare) {
-        auto size_backup = size_;
-        if (size_ < limit_) {
-            for (u32 index = size_ / 2; index > 0; --index) {
-                HeapifyDown(index, compare);
-            }
-        }
-        while (size_ > 1) {
-            std::swap(row_ids_ptr_[size_], row_ids_ptr_[1]);
-            --size_;
-            HeapifyDown(1, compare);
-        }
-        size_ = size_backup;
+    WriteToOutput(input_data_block_array, block_row_ids, output_data_block_array);
+}
+
+void TopSolver::WriteToOutput(const std::vector<std::unique_ptr<DataBlock>> &input_data_block_array,
+                              const std::vector<std::pair<u32, u32>> &selected_row_ids,
+                              std::vector<std::unique_ptr<DataBlock>> &output_data_block_array) {
+    auto const &db_types = input_data_block_array[0]->types();
+    u32 output_block_id = output_data_block_array.size();
+    u32 output_block_row_id = 0;
+    {
+        // prepare output blocks
+        i64 row_cnt = selected_row_ids.size();
+        do {
+            auto data_block = DataBlock::MakeUniquePtr();
+            // u32 need_capacity = Min(DEFAULT_BLOCK_CAPACITY, row_cnt);
+            u32 need_capacity = DEFAULT_BLOCK_CAPACITY; // need to assume full capacity for MergeTop
+            data_block->Init(db_types, need_capacity);
+            output_data_block_array.emplace_back(std::move(data_block));
+            row_cnt -= need_capacity;
+        } while (row_cnt > 0);
     }
-    void SolveTop() {
-        // compare_id_for_heap: for heap sort
-        // example: x = heap_top, y = candidate, return true if y should be put into heap
-        auto compare_id_for_heap = [&](std::pair<u32, u32> x, std::pair<u32, u32> y) -> bool {
-            return !prefer_left_function_.Compare((*input_data_)[x.first], x.second, (*input_data_)[y.first], y.second);
-        };
-        const u32 input_block_cnt = input_data_->size();
-        for (u32 block_id = 0; block_id < input_block_cnt; ++block_id) {
-            const u32 row_cnt = (*input_data_)[block_id][0]->Size();
-            for (u32 row_id = 0; row_id < row_cnt; ++row_id) {
-                AddCandidate({block_id, row_id}, compare_id_for_heap);
+    auto output_block_ptr = output_data_block_array[output_block_id].get();
+    u32 next_candidate_id = 0;
+    // handle one input block in one loop
+    while (next_candidate_id < selected_row_ids.size()) {
+        u32 input_block_id = selected_row_ids[next_candidate_id].first;
+        auto input_block_ptr = input_data_block_array[input_block_id].get();
+        // handle one input row in one loop
+        while (next_candidate_id < selected_row_ids.size()) {
+            auto [block_id, row_id] = selected_row_ids[next_candidate_id];
+            if (block_id != input_block_id) {
+                break;
             }
-        }
-        SortResult(compare_id_for_heap);
-    }
-    void WriteToOutput(const std::vector<std::unique_ptr<DataBlock>> &input_data_block_array,
-                       std::vector<std::unique_ptr<DataBlock>> &output_data_block_array) {
-        auto const &db_types = input_data_block_array[0]->types();
-        {
-            // prepare output blocks
-            i64 row_cnt = size_;
-            do {
-                auto data_block = DataBlock::MakeUniquePtr();
-                // u32 need_capacity = Min(DEFAULT_BLOCK_CAPACITY, row_cnt);
-                u32 need_capacity = DEFAULT_BLOCK_CAPACITY; // need to assume full capacity for MergeTop
-                data_block->Init(db_types, need_capacity);
-                output_data_block_array.emplace_back(std::move(data_block));
-                row_cnt -= need_capacity;
-            } while (row_cnt > 0);
-        }
-        u32 output_block_id = 0;
-        u32 output_block_row_id = 0;
-        auto output_block_ptr = output_data_block_array[output_block_id].get();
-        u32 next_candidate_id = 0;
-        // handle one input block in one loop
-        while (next_candidate_id < size_) {
-            u32 input_block_id = candidate_local_row_ids_[next_candidate_id].first;
-            auto input_block_ptr = input_data_block_array[input_block_id].get();
-            // handle one input row in one loop
-            while (next_candidate_id < size_) {
-                auto [block_id, row_id] = candidate_local_row_ids_[next_candidate_id];
-                if (block_id != input_block_id) {
-                    break;
-                }
-                if (output_block_row_id == DEFAULT_BLOCK_CAPACITY) {
-                    output_block_ptr->Finalize();
-                    ++output_block_id;
-                    output_block_ptr = output_data_block_array[output_block_id].get();
-                    output_block_row_id = 0;
-                }
-                output_block_ptr->AppendWith(input_block_ptr, row_id, 1);
-                ++output_block_row_id;
-                ++next_candidate_id;
+            if (output_block_row_id == DEFAULT_BLOCK_CAPACITY) {
+                output_block_ptr->Finalize();
+                ++output_block_id;
+                output_block_ptr = output_data_block_array[output_block_id].get();
+                output_block_row_id = 0;
             }
+            output_block_ptr->AppendWith(input_block_ptr, row_id, 1);
+            ++output_block_row_id;
+            ++next_candidate_id;
         }
-        output_block_ptr->Finalize();
     }
-};
+    output_block_ptr->Finalize();
+}
 
 std::function<std::strong_ordering(const std::shared_ptr<ColumnVector> &, u32, const std::shared_ptr<ColumnVector> &, u32)>
 InvalidPhysicalTopCompareType(const DataType &type_) {
@@ -330,114 +374,32 @@ void PhysicalTop::Init(QueryContext *query_context) {
     prefer_left_function_ = CompareTwoRowAndPreferLeft(std::move(sort_functions));
 }
 
-// Behavior now: always sort the output results
+// Behavior now: always sort the output results, and `PhysicalTop::Execute()` may run multiple times.
 bool PhysicalTop::Execute(QueryContext *, OperatorState *operator_state) {
     TopOperatorState *top_operator_state = (TopOperatorState *)operator_state;
     auto prev_op_state = top_operator_state->prev_op_state_;
-    if ((offset_ != 0) and !(prev_op_state->Complete())) {
-        UnrecoverableError("Only 1 PhysicalTop job but !(prev_op_state->Complete())");
-    }
     auto &input_data_block_array = prev_op_state->data_block_array_;
     auto &output_data_block_array = top_operator_state->data_block_array_;
+    auto &execution_count = top_operator_state->execution_count_;
 
     size_t total_hits_row_count = std::accumulate(input_data_block_array.begin(), input_data_block_array.end(), 0, [](u32 x, const auto &y) -> u32 {
         return x + y->row_count();
     });
-    // sometimes the input_data_block_array is empty, but the operator is not complete
-    if (total_hits_row_count == 0) {
-        input_data_block_array.clear();
-        if (prev_op_state->Complete()) {
-            if (total_hits_count_flag_) {
-                top_operator_state->total_hits_count_flag_ = true;
-                top_operator_state->total_hits_count_ = 0;
-            }
-            top_operator_state->SetComplete();
-        }
+    // PhysicalPlanner::BuildTop() initialized `limit_` as `offset + limit`
+    TopSolver top_solver(limit_, prefer_left_function_, sort_expressions_, top_operator_state->expr_states_);
+    top_solver.Solve(input_data_block_array, output_data_block_array);
+    execution_count++;
+    input_data_block_array.clear();
+    if (total_hits_count_flag_) {
+        top_operator_state->total_hits_count_flag_ = true;
+        top_operator_state->total_hits_count_ += total_hits_row_count;
+    }
+    if (prev_op_state->Complete()) {
+        top_solver.Finalize(output_data_block_array, execution_count, offset_);
+        top_operator_state->SetComplete();
         return true;
     }
-    if (!output_data_block_array.empty()) {
-        UnrecoverableError("output data_block_array_ is not empty");
-    }
-    auto eval_columns = GetEvalColumns(sort_expressions_, top_operator_state->expr_states_, input_data_block_array);
-    TopSolver solve_top(limit_, prefer_left_function_);
-    auto output_row_cnt = solve_top.WriteTopResultsToOutput(eval_columns, input_data_block_array, output_data_block_array);
-    input_data_block_array.clear();
-    HandleOutputOffset(output_row_cnt, offset_, output_data_block_array);
-    if (prev_op_state->Complete()) {
-        if (total_hits_count_flag_) {
-            top_operator_state->total_hits_count_flag_ = true;
-            top_operator_state->total_hits_count_ = total_hits_row_count;
-        }
-        top_operator_state->SetComplete();
-    }
-    return true;
-}
-
-void PhysicalTop::HandleOutputOffset(u32 total_row_cnt, u32 offset, std::vector<std::unique_ptr<DataBlock>> &output_data_block_array) {
-    if (offset == 0) {
-        return;
-    }
-    if (offset >= total_row_cnt) {
-        output_data_block_array.clear();
-        return;
-    }
-    if (offset % DEFAULT_BLOCK_CAPACITY == 0) {
-        output_data_block_array.erase(output_data_block_array.begin(), output_data_block_array.begin() + offset / DEFAULT_BLOCK_CAPACITY);
-        return;
-    }
-    std::unique_ptr<DataBlock> swap_block;
-    if (offset >= DEFAULT_BLOCK_CAPACITY) {
-        std::swap(output_data_block_array[0], swap_block);
-    } else {
-        u32 need_capacity = DEFAULT_BLOCK_CAPACITY; // need to assume full capacity for MergeTop
-        swap_block = DataBlock::MakeUniquePtr();
-        swap_block->Init(output_data_block_array[0]->types(), need_capacity);
-    }
-    u32 result_row_cnt = total_row_cnt - offset;
-    u32 result_block_cnt = result_row_cnt / DEFAULT_BLOCK_CAPACITY + ((result_row_cnt % DEFAULT_BLOCK_CAPACITY) != 0);
-    for (u32 i = 0; i < result_block_cnt; ++i) {
-        swap_block->Reset();
-        u32 copy_row_cnt = std::min(DEFAULT_BLOCK_CAPACITY, result_row_cnt - i * DEFAULT_BLOCK_CAPACITY);
-        u32 start_row_id = offset + i * DEFAULT_BLOCK_CAPACITY;
-        u32 start_block_id = start_row_id / DEFAULT_BLOCK_CAPACITY;
-        u32 start_block_offset = start_row_id % DEFAULT_BLOCK_CAPACITY;
-        u32 start_block_copy_cnt = std::min(copy_row_cnt, u32(DEFAULT_BLOCK_CAPACITY - start_block_offset));
-        swap_block->AppendWith(output_data_block_array[start_block_id].get(), start_block_offset, start_block_copy_cnt);
-        u32 next_block_copy_cnt = copy_row_cnt - start_block_copy_cnt;
-        if (next_block_copy_cnt > 0) {
-            swap_block->AppendWith(output_data_block_array[start_block_id + 1].get(), 0, next_block_copy_cnt);
-        }
-        swap_block->Finalize();
-        std::swap(swap_block, output_data_block_array[i]);
-    }
-    output_data_block_array.resize(result_block_cnt);
-}
-
-std::vector<std::vector<std::shared_ptr<ColumnVector>>> PhysicalTop::GetEvalColumns(const std::vector<std::shared_ptr<BaseExpression>> &expressions,
-                                                                                    std::vector<std::shared_ptr<ExpressionState>> &expr_states,
-                                                                                    const std::vector<std::unique_ptr<DataBlock>> &data_block_array) {
-    std::vector<std::vector<std::shared_ptr<ColumnVector>>> eval_columns;
-    eval_columns.reserve(data_block_array.size());
-    const u32 sort_expr_count = expressions.size();
-    for (auto &data_block_ptr : data_block_array) {
-        std::vector<std::shared_ptr<ColumnVector>> results;
-        ExpressionEvaluator expr_evaluator;
-        expr_evaluator.Init(data_block_ptr.get());
-        results.reserve(sort_expr_count);
-        for (u32 expr_id = 0; expr_id < sort_expr_count; ++expr_id) {
-            auto &expr = expressions[expr_id];
-            std::shared_ptr<ColumnVector> result_vector;
-            if (expr->type() != ExpressionType::kReference) {
-                // need to initialize the result vector
-                result_vector = std::make_shared<ColumnVector>(std::make_shared<DataType>(expr->Type()));
-                result_vector->Initialize();
-            }
-            expr_evaluator.Execute(expr, expr_states[expr_id], result_vector);
-            results.emplace_back(std::move(result_vector));
-        }
-        eval_columns.emplace_back(std::move(results));
-    }
-    return eval_columns;
+    return false;
 }
 
 } // namespace infinity

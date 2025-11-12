@@ -71,7 +71,7 @@ public:
 
     Status InitSet();
 
-    Status UninitSet(UsageFlag usage_flag);
+    // Status UninitSet(UsageFlag usage_flag);
 
     Status UninitSet(UsageFlag usage_flag, TxnTimeStamp begin_ts);
 
@@ -82,8 +82,6 @@ public:
     Status AddBlockWithID(TxnTimeStamp commit_ts, BlockID block_id);
 
     Status CommitBlock(BlockID block_id, TxnTimeStamp commit_ts);
-
-    std::tuple<std::shared_ptr<std::string>, Status> GetSegmentDir();
 
     std::tuple<std::vector<BlockID> *, Status> GetBlockIDs1();
     std::tuple<std::vector<BlockID> *, Status> GetBlockIDs1(TxnTimeStamp commit_ts);

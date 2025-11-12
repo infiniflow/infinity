@@ -87,8 +87,11 @@ Status CleanupTask::Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_clea
     return Status::OK();
 }
 
-NewCompactTask::NewCompactTask(NewTxn *new_txn, std::string db_name, std::string table_name)
-    : BGTask(BGTaskType::kCompact, false), new_txn_(new_txn), db_name_(db_name), table_name_(table_name) {}
+ManualCompactTask::ManualCompactTask(NewTxn *new_txn, std::string db_name, std::string table_name)
+    : BGTask(BGTaskType::kManualCompact, false), new_txn_(new_txn), db_name_(db_name), table_name_(table_name) {}
+
+ManualOptimizeTask::ManualOptimizeTask(NewTxn *new_txn, std::string db_name, std::string table_name)
+    : BGTask(BGTaskType::kManualOptimize, false), new_txn_(new_txn), db_name_(db_name), table_name_(table_name) {}
 
 DumpMemIndexTask::DumpMemIndexTask(const std::string &db_name,
                                    const std::string &table_name,
@@ -114,9 +117,6 @@ void AppendMemIndexBatch::WaitForCompletion() {
     std::unique_lock<std::mutex> lock(mtx_);
     cv_.wait(lock, [this] { return task_count_ == 0; });
 }
-
-TestCommandTask::TestCommandTask(std::string command_content)
-    : BGTask(BGTaskType::kTestCommand, true), command_content_(std::move(command_content)) {}
 
 BGTaskInfo::BGTaskInfo(BGTaskType type) : type_(type), task_time_(std::chrono::system_clock::now()) {}
 

@@ -310,24 +310,23 @@ Status Storage::AdminToWriter() {
     }
     bg_processor_ = std::make_unique<BGTaskProcessor>();
 
-    i64 compact_interval = std::max(config_ptr_->CompactInterval(), {0});
     BuiltinFunctions builtin_functions(new_catalog_.get());
     builtin_functions.Init();
     // Catalog finish init here.
 
     bg_processor_->Start();
 
-    // Compact processor will do in WRITABLE MODE:
-    // 1. Compact segments into a big one
-    // 2. Scan which segments should be merged into one
-    // 3. Save the dumped mem index in catalog
-
     if (compact_processor_ != nullptr) {
         UnrecoverableError("compact processor was initialized before.");
     }
-
     compact_processor_ = std::make_unique<CompactionProcessor>();
     compact_processor_->Start();
+
+    if (optimize_processor_ != nullptr) {
+        UnrecoverableError("optimize processor was initialized before.");
+    }
+    optimize_processor_ = std::make_unique<OptimizationProcessor>();
+    optimize_processor_->Start();
 
     if (dump_index_processor_ != nullptr) {
         UnrecoverableError("dump index processor was initialized before.");
@@ -364,11 +363,12 @@ Status Storage::AdminToWriter() {
     periodic_trigger_thread_->new_cleanup_trigger_ = std::make_shared<CleanupPeriodicTrigger>(cleanup_interval);
 
     i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
-    periodic_trigger_thread_->optimize_index_trigger_ = std::make_shared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
+    periodic_trigger_thread_->optimize_index_trigger_ = std::make_shared<OptimizeIndexPeriodicTrigger>(optimize_interval, optimize_processor_.get());
 
     i64 checkpoint_interval_sec = config_ptr_->CheckpointInterval() > 0 ? config_ptr_->CheckpointInterval() : 0;
     periodic_trigger_thread_->checkpoint_trigger_ = std::make_shared<CheckpointPeriodicTrigger>(checkpoint_interval_sec);
 
+    i64 compact_interval = std::max(config_ptr_->CompactInterval(), {0});
     periodic_trigger_thread_->compact_trigger_ = std::make_shared<CompactPeriodicTrigger>(compact_interval, compact_processor_.get());
 
     periodic_trigger_thread_->Start();
@@ -478,9 +478,14 @@ Status Storage::ReaderToWriter() {
     if (compact_processor_ != nullptr) {
         UnrecoverableError("compact processor was initialized before.");
     }
-
     compact_processor_ = std::make_unique<CompactionProcessor>();
     compact_processor_->Start();
+
+    if (optimize_processor_ != nullptr) {
+        UnrecoverableError("optimize processor was initialized before.");
+    }
+    optimize_processor_ = std::make_unique<OptimizationProcessor>();
+    optimize_processor_->Start();
 
     if (dump_index_processor_ != nullptr) {
         UnrecoverableError("dump index processor was initialized before.");
@@ -501,7 +506,7 @@ Status Storage::ReaderToWriter() {
     i64 checkpoint_interval_sec = config_ptr_->CheckpointInterval() > 0 ? config_ptr_->CheckpointInterval() : 0;
     periodic_trigger_thread_->checkpoint_trigger_ = std::make_shared<CheckpointPeriodicTrigger>(checkpoint_interval_sec);
     periodic_trigger_thread_->compact_trigger_ = std::make_shared<CompactPeriodicTrigger>(compact_interval, compact_processor_.get());
-    periodic_trigger_thread_->optimize_index_trigger_ = std::make_shared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
+    periodic_trigger_thread_->optimize_index_trigger_ = std::make_shared<OptimizeIndexPeriodicTrigger>(optimize_interval, optimize_processor_.get());
     periodic_trigger_thread_->Start();
 
     std::unique_lock<std::mutex> lock(mutex_);
@@ -518,6 +523,11 @@ Status Storage::WriterToAdmin() {
     if (compact_processor_ != nullptr) {
         compact_processor_->Stop(); // Different from Readable
         compact_processor_.reset(); // Different from Readable
+    }
+
+    if (optimize_processor_ != nullptr) {
+        optimize_processor_->Stop(); // Different from Readable
+        optimize_processor_.reset(); // Different from Readable
     }
 
     if (dump_index_processor_ != nullptr) {
@@ -585,6 +595,11 @@ Status Storage::WriterToReader() {
         compact_processor_.reset(); // Different from Readable
     }
 
+    if (optimize_processor_ != nullptr) {
+        optimize_processor_->Stop(); // Different from Readable
+        optimize_processor_.reset(); // Different from Readable
+    }
+
     if (dump_index_processor_ != nullptr) {
         dump_index_processor_->Stop();
         dump_index_processor_.reset();
@@ -616,6 +631,11 @@ Status Storage::UnInitFromWriter() {
     if (compact_processor_ != nullptr) {
         compact_processor_->Stop(); // Different from Readable
         compact_processor_.reset(); // Different from Readable
+    }
+
+    if (optimize_processor_ != nullptr) {
+        optimize_processor_->Stop(); // Different from Readable
+        optimize_processor_.reset(); // Different from Readable
     }
 
     if (dump_index_processor_ != nullptr) {

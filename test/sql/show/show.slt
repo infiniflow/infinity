@@ -71,6 +71,9 @@ INSERT INTO tb1 VALUES (
 );
 
 statement ok
+FLUSH DATA;
+
+statement ok
 SHOW TABLE tb1 COLUMNS;
 
 statement ok
@@ -189,6 +192,9 @@ SHOW IMPORT
 
 statement ok
 SHOW CLEAN
+
+statement ok
+SHOW TASKS
 
 statement ok
 CHECK SYSTEM;

@@ -82,8 +82,6 @@ public:
     virtual void TriggerDump(std::shared_ptr<DumpMemIndexTask> task) = 0;
 
 protected:
-    virtual NewTxn *GetTxn() = 0;
-
     virtual std::vector<std::shared_ptr<MemIndexDetail>> GetAllMemIndexes(NewTxn *new_txn) = 0;
 
     using MemIndexMapIter = std::unordered_set<BaseMemIndex *>::iterator;
@@ -135,8 +133,6 @@ public:
     void TriggerDump(std::shared_ptr<DumpMemIndexTask> task) override;
 
 protected:
-    NewTxn *GetTxn() override;
-
     std::vector<std::shared_ptr<MemIndexDetail>> GetAllMemIndexes(NewTxn *new_txn) override;
 
 private:

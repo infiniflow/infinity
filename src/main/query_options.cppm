@@ -69,7 +69,7 @@ public:
     CopyFileType copy_file_type_{CopyFileType::kInvalid};
 };
 
-export class OptimizeOptions {
+export class AlterIndexOptions {
 public:
     std::string index_name_{};
     std::vector<InitParameter *> opt_params_{};

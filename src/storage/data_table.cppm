@@ -57,11 +57,11 @@ public:
 public:
     [[nodiscard]] size_t ColumnCount() const;
 
-    [[nodiscard]] std::shared_ptr<std::string> TableName() const;
+    [[nodiscard]] std::shared_ptr<std::string> TableName() const { return definition_ptr_->table_name(); }
 
-    [[nodiscard]] const std::shared_ptr<std::string> &SchemaName() const;
+    [[nodiscard]] const std::shared_ptr<std::string> &SchemaName() const { return definition_ptr_->schema_name(); }
 
-    size_t GetColumnIdByName(const std::string &column_name);
+    size_t GetColumnIdByName(const std::string &column_name) const { return definition_ptr_->GetColIdByName(column_name); }
 
     [[nodiscard]] size_t row_count() const { return row_count_; }
 

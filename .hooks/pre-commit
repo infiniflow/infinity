@@ -2,9 +2,12 @@
 
 import subprocess
 
+
 def get_files():
     return subprocess.check_output(['git', 'diff-index', '--cached',
                                     '--name-only', 'HEAD']).split()
+
+
 def apply_code_style():
     files = filter(lambda x: x.find(b'third_party') == -1, get_files())
 
@@ -12,14 +15,22 @@ def apply_code_style():
                              x.endswith(b'.h') or
                              x.endswith(b'.hpp') or
                              x.endswith(b'.cpp') or
-                             x.endswith(b'.cppm'),files)
+                             x.endswith(b'.cppm'), files)
     for f in files:
         print("Apply code style to: " + str(f))
-        subprocess.check_output(['clang-format-20', '-i', f])
-        subprocess.check_output(['git', 'add', f])
+        try:
+            subprocess.check_output(['clang-format-20', '-i', f])
+        except subprocess.CalledProcessError as e:
+            print(f"⚠️ clang-format failed for {f}: {e}")
+        try:
+            subprocess.check_output(['git', 'add', f])
+        except subprocess.CalledProcessError as e:
+            print(f"⚠️ git add failed for {f}: {e}")
+
 
 def main():
     apply_code_style()
+
 
 if (__name__ == '__main__'):
     main()

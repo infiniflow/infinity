@@ -116,8 +116,15 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         else:
             raise InfinityException(res.error_code, res.error_msg)
 
-    def optimize(self, db_name: str, table_name: str, optimize_opt: ttypes.OptimizeOptions):
-        res = self._client.optimize(db_name, table_name, optimize_opt)
+    def optimize(self, db_name: str, table_name: str):
+        res = self._client.optimize(db_name, table_name)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+
+    def alter_index(self, db_name: str, table_name: str, alter_index_opt: ttypes.AlterIndexOptions):
+        res = self._client.alter_index(db_name, table_name, alter_index_opt)
         if res.error_code == ErrorCode.OK:
             return res
         else:

@@ -62,7 +62,7 @@ struct ClientVersions {
 export class InfinityThriftService final : public infinity_thrift_rpc::InfinityServiceIf {
 private:
     static constexpr std::string_view ErrorMsgHeader = "[THRIFT ERROR]";
-    static constexpr i64 current_version_index_{32}; // 0.6.2
+    static constexpr i64 current_version_index_{32}; // 0.6.5
 
     static std::mutex infinity_session_map_mutex_;
     static std::unordered_map<u64, std::shared_ptr<Infinity>> infinity_session_map_;
@@ -115,6 +115,8 @@ public:
     void Update(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::UpdateRequest &request) final;
 
     void Optimize(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::OptimizeRequest &request) final;
+
+    void AlterIndex(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::AlterIndexRequest &request) final;
 
     void AddColumns(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::AddColumnsRequest &request) final;
 
@@ -236,7 +238,7 @@ private:
 
     static std::tuple<UpdateExpr *, Status> GetUpdateExprFromProto(const infinity_thrift_rpc::UpdateExpr &update_expr);
 
-    static OptimizeOptions GetParsedOptimizeOptionFromProto(const infinity_thrift_rpc::OptimizeOptions &options);
+    static AlterIndexOptions GetParsedAlterIndexOptionFromProto(const infinity_thrift_rpc::AlterIndexOptions &options);
 
     static infinity_thrift_rpc::ColumnType::type DataTypeToProtoColumnType(const std::shared_ptr<DataType> &data_type);
 

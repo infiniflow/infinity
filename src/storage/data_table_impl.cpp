@@ -141,12 +141,6 @@ DataTable::DataTable(std::shared_ptr<TableDef> table_def_ptr, TableType type)
 
 size_t DataTable::ColumnCount() const { return definition_ptr_->column_count(); }
 
-std::shared_ptr<std::string> DataTable::TableName() const { return definition_ptr_->table_name(); }
-
-const std::shared_ptr<std::string> &DataTable::SchemaName() const { return definition_ptr_->schema_name(); }
-
-size_t DataTable::GetColumnIdByName(const std::string &column_name) { return definition_ptr_->GetColIdByName(column_name); }
-
 const std::string &DataTable::GetColumnNameById(size_t idx) const { return definition_ptr_->columns()[idx]->name(); }
 
 std::shared_ptr<DataType> DataTable::GetColumnTypeById(size_t idx) const { return definition_ptr_->columns()[idx]->type(); }

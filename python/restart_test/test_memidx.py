@@ -99,7 +99,7 @@ class TestMemIdx:
                 assert data_dict["count(star)"] == [13]
 
             check()
-            infinity_obj.optimize("default_db", "test_memidx1", optimize_opt=None)
+            table_obj.optimize()
             check()
 
             db_obj.drop_table("test_memidx1")
@@ -249,7 +249,7 @@ class TestMemIdx:
                 assert data_dict["count(star)"] == [59]
 
             check()
-            infinity_obj.optimize("default_db", "test_mem_ivf", optimize_opt=None)
+            table_obj.optimize()
             check()
 
             db_obj.drop_table("test_mem_ivf")
@@ -467,7 +467,7 @@ class TestMemIdx:
                 assert data_dict["count(star)"] == [50]
 
             check()
-            infinity_obj.optimize("default_db", "test_mem_bmp", optimize_opt=None)
+            table_obj.optimize()
             check()
 
             db_obj.drop_table("test_mem_bmp")
@@ -539,7 +539,7 @@ class TestMemIdx:
             table_obj2.insert([{"c1": 4, "c2": [0.2, 0.1, 0.3, 0.4]} for i in range(6)])
 
             # wait for mem index dump
-            time.sleep(3)
+            time.sleep(5)
 
             # 2 chunk indexes for each index
             db1_dir = tmp_dir + "/db_2"

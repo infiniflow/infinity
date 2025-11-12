@@ -29,6 +29,7 @@ class KVStore;
 class KVInstance;
 class PeriodicTriggerThread;
 class CompactionProcessor;
+class OptimizationProcessor;
 class DumpIndexProcessor;
 class MemIndexAppender;
 class BGTaskProcessor;
@@ -69,6 +70,8 @@ public:
     [[nodiscard]] inline PeriodicTriggerThread *periodic_trigger_thread() const noexcept { return periodic_trigger_thread_.get(); }
 
     [[nodiscard]] inline CompactionProcessor *compaction_processor() const noexcept { return compact_processor_.get(); }
+
+    [[nodiscard]] inline OptimizationProcessor *optimization_processor() const noexcept { return optimize_processor_.get(); }
 
     [[nodiscard]] inline DumpIndexProcessor *dump_index_processor() const noexcept { return dump_index_processor_.get(); }
 
@@ -124,6 +127,7 @@ private:
     std::unique_ptr<NewTxnManager> new_txn_mgr_{};
     std::unique_ptr<BGTaskProcessor> bg_processor_{};
     std::unique_ptr<CompactionProcessor> compact_processor_{};
+    std::unique_ptr<OptimizationProcessor> optimize_processor_{};
     std::unique_ptr<DumpIndexProcessor> dump_index_processor_{};
     std::unique_ptr<MemIndexAppender> mem_index_appender_{};
     std::unique_ptr<PeriodicTriggerThread> periodic_trigger_thread_{};

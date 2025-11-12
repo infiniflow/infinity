@@ -38,14 +38,12 @@ public:
     u64 RunningTaskCount() const { return task_count_; }
 
 private:
-    void NewScanAndOptimize();
-
     void DoDump(DumpMemIndexTask *dump_task);
 
     void Process();
 
 private:
-    BlockingQueue<std::shared_ptr<BGTask>> task_queue_{"DumpIndexProcessor"};
+    BlockingQueue<std::shared_ptr<BGTask>> task_queue_{"DumpIndexProcessor", 1024 * 1024};
 
     std::thread processor_thread_{};
 

@@ -316,42 +316,10 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
         }
     }
 
-    // Get all block column / block tag and attach to blocks
+    // Get all block tag and attach to blocks
     for (size_t idx = 0; idx < meta_count; ++idx) {
         const std::shared_ptr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
-            case MetaType::kBlockColumn: {
-                auto block_key = static_cast<BlockMetaKey *>(meta_key.get());
-                auto db_iter = meta_tree->db_map_.find(block_key->db_id_str_);
-                if (db_iter == meta_tree->db_map_.end()) {
-                    std::string error_msg = fmt::format("DB not found: {}, idx: {}", block_key->ToString(), idx);
-                    LOG_WARN(error_msg);
-                    // DB is dropped
-                    continue;
-                }
-
-                auto &table_map = db_iter->second->table_map_;
-                auto table_iter = table_map.find(block_key->table_id_str_);
-                if (table_iter == table_map.end()) {
-                    std::string error_msg = fmt::format("Table not found: {}, idx: {}", block_key->ToString(), idx);
-                    LOG_WARN(error_msg);
-                    // The Table is dropped
-                    continue;
-                }
-
-                auto *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
-                auto &segment_map = table_object->segment_map_;
-                auto segment_iter = segment_map.find(block_key->segment_id_);
-                if (segment_iter == segment_map.end()) {
-                    UnrecoverableError(fmt::format("Segment not found: {}, idx: {}", block_key->ToString(), idx));
-                }
-
-                auto *segment_object = static_cast<MetaSegmentObject *>(segment_iter->second.get());
-                auto block_object = std::make_shared<MetaBlockObject>(meta_key);
-                auto &block_map = segment_object->block_map_;
-                block_map.emplace(block_key->block_id_, block_object);
-                break;
-            }
             case MetaType::kBlockTag: {
                 auto block_tag = static_cast<BlockTagMetaKey *>(meta_key.get());
                 auto db_iter = meta_tree->db_map_.find(block_tag->db_id_str_);
@@ -592,15 +560,15 @@ nlohmann::json MetaTree::ToJson() const {
     return json_res;
 }
 
-std::vector<MetaTableObject *> MetaTree::ListTables() const {
-    std::vector<MetaTableObject *> tables;
-    for (const auto &db_pair : db_map_) {
-        for (const auto &table_pair : db_pair.second->table_map_) {
-            tables.push_back(static_cast<MetaTableObject *>(table_pair.second.get()));
-        }
-    }
-    return tables;
-};
+// std::vector<MetaTableObject *> MetaTree::ListTables() const {
+//     std::vector<MetaTableObject *> tables;
+//     for (const auto &db_pair : db_map_) {
+//         for (const auto &table_pair : db_pair.second->table_map_) {
+//             tables.push_back(static_cast<MetaTableObject *>(table_pair.second.get()));
+//         }
+//     }
+//     return tables;
+// };
 
 std::unique_ptr<SystemCache> MetaTree::RestoreSystemCache(Storage *storage_ptr) const {
     u64 next_db_id{0};
@@ -672,10 +640,10 @@ nlohmann::json MetaTableObject::ToJson() const {
     return json_res;
 }
 
-const std::string &MetaTableObject::GetTableName() const {
-    TableMetaKey *table_meta_key = static_cast<TableMetaKey *>(meta_key_.get());
-    return table_meta_key->table_name_;
-}
+// const std::string &MetaTableObject::GetTableName() const {
+//     TableMetaKey *table_meta_key = static_cast<TableMetaKey *>(meta_key_.get());
+//     return table_meta_key->table_name_;
+// }
 
 SegmentID MetaTableObject::GetNextSegmentID() const {
     std::vector<SegmentID> segments;
