@@ -75,6 +75,13 @@ try:
         infinity.common.ConflictType.Error,
     )
 
+    res = table_instance.create_index(
+        "my_index2",
+        infinity.index.IndexInfo("body", infinity.index.IndexType.FullText, {"analyzer": "rag"}),
+        infinity.common.ConflictType.Error,
+    )
+
+    field_indexes = ["body", "body@my_index,body@my_index2^2"]
     questions = [
         r"blooms",  # single term
         r"Bloom filter",  # OR multiple terms
@@ -84,16 +91,17 @@ try:
         r'"space\:efficient"',  # phrase and escape reserved character, equivalent to: `"space efficient"`
         r'"harmful chemical"~10',  # sloppy phrase, refers to https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query-phrase.html
     ]
-    for question in questions:
-        qb_result, extra_result = (
-            table_instance.output(["num", "body", "_score"]).highlight(["body"])
-            .match_text("body", question, 10)
-            .to_pl()
-        )
-        print(f"question: {question}")
-        print(qb_result)
-        if extra_result is not None:
-            print(extra_result)
+    for field_index in field_indexes:
+        for question in questions:
+            qb_result, extra_result = (
+                table_instance.output(["num", "body", "_score"]).highlight(["body"])
+                .match_text(field_index, question, 10)
+                .to_pl()
+            )
+            print(f"field_index: {field_index}, question: {question}")
+            print(qb_result)
+            if extra_result is not None:
+                print(extra_result)
 
     infinity_instance.disconnect()
 

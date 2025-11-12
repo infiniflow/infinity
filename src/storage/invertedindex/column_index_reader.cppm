@@ -57,9 +57,11 @@ public:
 
     void InvalidateChunk(SegmentID segment_id, ChunkID chunk_id);
 
-    inline std::string GetAnalyzer() const { return analyzer_; }
-
     inline std::string GetColumnName() const { return column_name_; }
+
+    inline std::string GetIndexName() const { return index_name_; }
+
+    inline std::string GetAnalyzer() const { return analyzer_; }
 
 private:
     std::mutex mutex_;
@@ -69,6 +71,7 @@ private:
 
 public:
     std::string column_name_;
+    std::string index_name_;
     std::string analyzer_;
     // for loading column length files
     std::string index_dir_;
@@ -88,37 +91,47 @@ export struct IndexReader {
     // Get a index reader on a column based on hints.
     // If no such column exists, return nullptr.
     // If column exists, but no index with a hint name is found, return a random one.
-    ColumnIndexReader *GetColumnIndexReader(u64 column_id, const std::vector<std::string> &hints) const {
-        const auto &column_index_map = column_index_readers_->find(column_id);
+    ColumnIndexReader *GetColumnIndexReader(const std::string &column_name, const std::string &index_name = "") const {
+        const auto &column_index_map = column_index_readers_.find(column_name);
         // if no fulltext index exists, or the map is empty.
-        if (column_index_map == column_index_readers_->end() || column_index_map->second->size() == 0) {
+        if (column_index_map == column_index_readers_.end() || column_index_map->second.empty()) {
             return nullptr;
         }
 
-        auto indices_map = column_index_map->second;
-        for (size_t i = 0; i < hints.size(); i++) {
-            if (auto it = indices_map->find(hints[i]); it != indices_map->end()) {
-                return indices_map->at(hints[i]).get();
-            }
+        auto &indices_map = column_index_map->second;
+        if (indices_map.empty()) {
+            return nullptr;
         }
-        return indices_map->begin()->second.get();
+        if (index_name.length() == 0) {
+            auto it = indices_map.begin();
+            return it->second.get();
+        } else {
+            auto it = indices_map.find(index_name);
+            if (it != indices_map.end()) {
+                return it->second.get();
+            }
+            return nullptr;
+        }
     }
 
-    // return map: column_name -> analyzer_name based on hints.
-    std::map<std::string, std::string> GetColumn2Analyzer(const std::vector<std::string> &hints) const {
-        std::map<std::string, std::string> rst;
-        for (const auto &id_index_map : *column_index_readers_) {
-            ColumnIndexReader *column_index_reader = GetColumnIndexReader(id_index_map.first, hints);
-            if (column_index_reader != nullptr) {
-                rst[column_index_reader->GetColumnName()] = column_index_reader->GetAnalyzer();
+    // column_name -> [index_name -> analyzer]
+    std::map<std::string, std::map<std::string, std::string>> GetColumn2Analyzer() const {
+        std::map<std::string, std::map<std::string, std::string>> rst;
+        for (const auto &column_index_map : column_index_readers_) {
+            const std::string &column_name = column_index_map.first;
+            std::map<std::string, std::string> index2Analyzer;
+            for (const auto &column_index_reader : column_index_map.second) {
+                const std::string &index_name = column_index_reader.first;
+                const std::string &analyzer = column_index_reader.second->GetAnalyzer();
+                index2Analyzer[index_name] = analyzer;
             }
+            rst.emplace(column_name, index2Analyzer);
         }
         return rst;
     }
 
-    // column_id -> [index_name -> column_index_reader]
-    std::shared_ptr<FlatHashMap<u64, std::shared_ptr<std::map<std::string, std::shared_ptr<ColumnIndexReader>>>, detail::Hash<u64>>>
-        column_index_readers_;
+    // column_name -> [index_name -> column_index_reader]
+    std::map<std::string, std::map<std::string, std::shared_ptr<ColumnIndexReader>>> column_index_readers_;
 };
 
 export class TableIndexReaderCache {
@@ -138,8 +151,7 @@ private:
     std::string table_name_;
 
     TxnTimeStamp cache_ts_ = UNCOMMIT_TS;
-    std::shared_ptr<FlatHashMap<u64, std::shared_ptr<std::map<std::string, std::shared_ptr<ColumnIndexReader>>>, detail::Hash<u64>>>
-        cache_column_readers_;
+    std::map<std::string, std::map<std::string, std::shared_ptr<ColumnIndexReader>>> cache_column_readers_;
 };
 
 } // namespace infinity

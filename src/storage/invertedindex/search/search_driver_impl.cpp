@@ -148,10 +148,18 @@ inline TermList GetTermListFromAnalyzer(const std::string &analyzer_name, Analyz
     return result;
 }
 
-inline std::string GetAnalyzerName(const std::string &field, const std::map<std::string, std::string> &field2analyzer) {
+inline std::string
+GetAnalyzerName(const std::string &field, const std::string &index, const std::map<std::string, std::map<std::string, std::string>> &field2analyzer) {
     if (!field.empty()) {
         if (const auto it = field2analyzer.find(field); it != field2analyzer.end()) {
-            return it->second;
+            const auto &index2analyzer = it->second;
+            if (index2analyzer.empty())
+                return "standard";
+            const auto it2 = index2analyzer.find(index);
+            if (it2 != index2analyzer.end()) {
+                return it2->second;
+            }
+            return "standard";
         }
     }
     return "standard";
@@ -168,7 +176,7 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
         default_field_ptr = &default_field_;
     }
     const auto &default_field = *default_field_ptr;
-    const auto default_analyzer_name = GetAnalyzerName(default_field, field2analyzer_);
+    const auto default_analyzer_name = GetAnalyzerName(default_field, "", field2analyzer_);
     if (const auto default_analyzer_name_int = AnalyzerPool::AnalyzerNameToInt(default_analyzer_name.c_str());
         default_analyzer_name_int != keyword_analyzer_name_int && operator_option_ == FulltextQueryOperatorOption::kInfinitySyntax) {
         // use parser
@@ -213,15 +221,25 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
     }
 }
 
-std::unique_ptr<QueryNode>
-SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, const std::string &text, const bool from_quoted, const unsigned long slop) const {
+std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field_index,
+                                                                  const std::string &text,
+                                                                  const bool from_quoted,
+                                                                  const unsigned long slop) const {
     assert(operator_option_ == FulltextQueryOperatorOption::kInfinitySyntax);
     if (text.empty()) {
         LOG_TRACE(std::format("{} : Empty query text: {}", __func__, text));
         return nullptr;
     }
     // 1. analyze
-    const auto analyzer_name = GetAnalyzerName(field, field2analyzer_);
+    std::string field, index;
+    auto alt_idx = field_index.find('@');
+    if (alt_idx == std::string::npos) {
+        field = field_index;
+    } else {
+        field = field_index.substr(0, alt_idx);
+        index = field_index.substr(alt_idx + 1, field_index.length() - alt_idx - 1);
+    }
+    const auto analyzer_name = GetAnalyzerName(field, index, field2analyzer_);
     auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(analyzer_name);
     if (!status.ok()) {
         RecoverableError(std::move(status));
@@ -236,6 +254,7 @@ SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, const std::stri
             auto subquery = std::make_unique<TermQueryNode>();
             subquery->term_ = term.text_;
             subquery->column_ = field;
+            subquery->index_ = index;
             result->Add(std::move(subquery));
         }
         return result;
@@ -246,11 +265,13 @@ SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, const std::stri
         auto result = std::make_unique<TermQueryNode>();
         result->term_ = text;
         result->column_ = field;
+        result->index_ = index;
         return result;
     } else if (terms.size() == 1) {
         auto result = std::make_unique<TermQueryNode>();
         result->term_ = terms.front().text_;
         result->column_ = field;
+        result->index_ = index;
         return result;
     } else {
         if (from_quoted) {
@@ -259,6 +280,7 @@ SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, const std::stri
                 result->AddTerm(term.text_);
             }
             result->column_ = field;
+            result->index_ = index;
             result->slop_ = slop;
             return result;
         } else {
@@ -267,6 +289,7 @@ SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, const std::stri
                 auto subquery = std::make_unique<TermQueryNode>();
                 subquery->term_ = term.text_;
                 subquery->column_ = field;
+                subquery->index_ = index;
                 result->Add(std::move(subquery));
             }
             return result;

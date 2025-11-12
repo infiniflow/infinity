@@ -500,20 +500,15 @@ struct SQL_LTYPE {
 
 %left       OR
 %left       AND
-%left       BETWEEN CASE WHEN THEN ELSE
 %right      NOT
 
 %nonassoc   '=' EQUAL NOT_EQ LIKE
 %nonassoc   '<' '>' LESS_EQ GREATER_EQ
 
-%nonassoc   IS
+%precedence   IS
 %left       '+' '-'
 %left       '*' '/' '%'
 
-%left       '[' ']'
-%left       '(' ')'
-%left       '.'
-%left       JOIN
 
 %%
 
@@ -1075,7 +1070,7 @@ column_constraint : PRIMARY KEY {
 default_expr : DEFAULT constant_expr {
     $$ = $2;
 }
-| /* empty default value */ {
+| %empty /* empty default value */ {
     $$ = nullptr;
 };
 
@@ -1181,7 +1176,7 @@ insert_statement: INSERT INTO table_name optional_identifier_array VALUES insert
 optional_identifier_array: '(' identifier_array ')' {
     $$ = $2;
 }
-| {
+| %empty {
     $$ = nullptr;
 }
 
@@ -1581,7 +1576,7 @@ SELECT distinct expr_array highlight_clause from_clause search_clause where_clau
 order_by_clause : ORDER BY order_by_expr_list {
     $$ = $3;
 }
-| /* empty order by */ {
+| %empty /* empty order by */ {
     $$ = nullptr;
 };
 
@@ -1606,40 +1601,40 @@ order_by_type: ASC {
 | DESC {
     $$ = infinity::kDesc;
 }
-| {
+| %empty {
     $$ = infinity::kAsc;
 }
 
 limit_expr: LIMIT expr {
     $$ = $2;
 }
-| /* empty limit expression */
+| %empty /* empty limit expression */
 {   $$ = nullptr; };
 
 offset_expr: OFFSET expr {
     $$ = $2;
 }
-| /* empty offset expression */
+| %empty /* empty offset expression */
 {   $$ = nullptr; };
 
 distinct : DISTINCT {
     $$ = true;
 }
-| {
+| %empty {
     $$ = false;
 }
 
 highlight_clause: HIGHLIGHT expr_array {
     $$ = $2;
 }
-| {
+| %empty {
     $$ = nullptr;
 }
 
 from_clause: FROM table_reference {
     $$ = $2;
 }
-| /* no from clause */ {
+| %empty /* no from clause */ {
     $$ = nullptr;
 }
 
@@ -1648,35 +1643,35 @@ search_clause: SEARCH sub_search_array {
     search_expr->SetExprs($2);
     $$ = search_expr;
 }
-| /* no search clause */ {
+| %empty /* no search clause */ {
     $$ = nullptr;
 }
 
 optional_search_filter_expr: ',' WHERE expr {
     $$ = $3;
 }
-| /* no where clause */ {
+| %empty /* no where clause */ {
     $$ = nullptr;
 }
 
 where_clause: WHERE expr {
     $$ = $2;
 }
-| /* no where clause */ {
+| %empty /* no where clause */ {
     $$ = nullptr;
 }
 
 having_clause: HAVING expr {
     $$ = $2;
 }
-| /* no where clause */ {
+| %empty /* no where clause */ {
     $$ = nullptr;
 }
 
 group_by_clause: GROUP BY expr_array {
     $$ = $3;
 }
-| {
+| %empty {
     $$ = nullptr;
 }
 
@@ -1770,7 +1765,7 @@ table_alias : AS IDENTIFIER {
     $$->alias_ = $2;
     $$->column_alias_array_ = $4;
 }
-| {
+| %empty {
     $$ = nullptr;
 }
 
@@ -1780,7 +1775,7 @@ table_alias : AS IDENTIFIER {
 with_clause : WITH with_expr_list {
     $$ = $2;
 }
-| /* empty with clause */ {
+| %empty /* empty with clause */ {
     $$ = nullptr;
 }
 
@@ -1843,7 +1838,8 @@ join_type : INNER {
 | CROSS {
     $$ = infinity::JoinType::kCross;
 }
-| /* default */ {
+| %empty /* default */ {
+    $$ = infinity::JoinType::kInner;
 };
 
 /*
@@ -3236,30 +3232,6 @@ match_text_expr : MATCH TEXT '(' STRING ',' STRING optional_search_filter_expr '
     free($8);
     $$ = match_text_expr;
 }
-| MATCH TEXT '(' STRING ',' STRING optional_search_filter_expr ')' USING INDEXES '(' STRING ')' {
-    infinity::MatchExpr* match_text_expr = new infinity::MatchExpr();
-    match_text_expr->fields_ = std::string($4);
-    match_text_expr->matching_text_ = std::string($6);
-    match_text_expr->filter_expr_.reset($7);
-    match_text_expr->index_names_ = std::string($12);
-    free($4);
-    free($6);
-    free($12);
-    $$ = match_text_expr;
-}
-| MATCH TEXT '(' STRING ',' STRING ',' STRING optional_search_filter_expr ')' USING INDEXES '(' STRING ')' {
-    infinity::MatchExpr* match_text_expr = new infinity::MatchExpr();
-    match_text_expr->fields_ = std::string($4);
-    match_text_expr->matching_text_ = std::string($6);
-    match_text_expr->options_text_ = std::string($8);
-    match_text_expr->filter_expr_.reset($9);
-    match_text_expr->index_names_ = std::string($14);
-    free($4);
-    free($6);
-    free($8);
-    free($14);
-    $$ = match_text_expr;
-}
 
 query_expr : QUERY '(' STRING optional_search_filter_expr ')' {
     infinity::MatchExpr* match_text_expr = new infinity::MatchExpr();
@@ -4071,13 +4043,13 @@ file_path : STRING {
 };
 
 if_exists: IF EXISTS { $$ = true; }
-| { $$ = false; };
+| %empty { $$ = false; };
 
 if_not_exists : IF NOT EXISTS { $$ = true; }
-| { $$ = false; };
+| %empty { $$ = false; };
 
 semicolon : ';'
-| /* nothing */
+| %empty
 ;
 
 /* if_exists_info : if_exists IDENTIFIER {
@@ -4097,21 +4069,21 @@ if_not_exists_info : if_not_exists IDENTIFIER {
     $$->info_ = $2;
     free($2);
 }
-| {
+| %empty {
     $$ = new infinity::IfNotExistsInfo();
 }
 
 with_index_param_list : WITH '(' index_param_list ')' {
     $$ = $3;
 }
-| {
+| %empty {
     $$ = new std::vector<infinity::InitParameter*>();
 }
 
 optional_table_properties_list : PROPERTIES '(' index_param_list ')' {
     $$ = $3;
 }
-| {
+| %empty {
     $$ = nullptr;
 }
 

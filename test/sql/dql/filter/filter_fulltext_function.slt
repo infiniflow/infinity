@@ -94,13 +94,7 @@ SELECT * FROM ft_in_filter SEARCH MATCH TEXT('doc', 'first second third', WHERE 
 3 third text many words
 
 query I
-SELECT * FROM ft_in_filter SEARCH MATCH TEXT('doc', 'first second third', WHERE filter_text('doc', 'second') OR num > 2) USING INDEXES ('ft_index');
-----
-2 second text multiple
-3 third text many words
-
-query I
-SELECT * FROM ft_in_filter SEARCH MATCH TEXT('doc', 'first second third', WHERE filter_text('doc', 'second', 'indexes=ft_index') OR num > 2) USING INDEXES ('ft_index');
+SELECT * FROM ft_in_filter SEARCH MATCH TEXT('doc', 'first second third', WHERE filter_text('doc', 'second', 'indexes=ft_index') OR num > 2);
 ----
 2 second text multiple
 3 third text many words

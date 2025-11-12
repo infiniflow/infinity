@@ -414,10 +414,9 @@ std::unique_ptr<QueryNode> KeywordQueryNode::InnerGetNewOptimizedQueryTree() {
 
 // create search iterator
 std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
-    ColumnID column_id = params.table_info->GetColumnIdByName(column_);
-    ColumnIndexReader *column_index_reader = params.index_reader->GetColumnIndexReader(column_id, params.index_names_);
+    ColumnIndexReader *column_index_reader = params.index_reader->GetColumnIndexReader(column_, index_);
     if (!column_index_reader) {
-        RecoverableError(Status::SyntaxError(fmt::format(R"(Invalid query statement: Column "{}" has no fulltext index)", column_)));
+        RecoverableError(Status::SyntaxError(fmt::format(R"(Invalid query statement: Column "{}" index "{}" doesn't exist)", column_, index_)));
         return nullptr;
     }
 
@@ -430,9 +429,8 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const CreateSearchParam
     if (!posting_iterator) {
         return nullptr;
     }
-    auto search = std::make_unique<TermDocIterator>(std::move(posting_iterator), column_id, GetWeight(), params.ft_similarity);
+    auto search = std::make_unique<TermDocIterator>(std::move(posting_iterator), column_, GetWeight(), params.ft_similarity);
     search->term_ptr_ = &term_;
-    search->column_name_ptr_ = &column_;
     auto column_length_reader = std::make_unique<FullTextColumnLengthReader>(column_index_reader);
     auto [doc_cnt, term_cnt] = column_length_reader->GetDocTermCount();
     if (doc_cnt <= 0 || term_cnt <= 0) {
@@ -444,10 +442,9 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const CreateSearchParam
 }
 
 std::unique_ptr<DocIterator> RankFeatureQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
-    ColumnID column_id = params.table_info->GetColumnIdByName(column_);
-    ColumnIndexReader *column_index_reader = params.index_reader->GetColumnIndexReader(column_id, params.index_names_);
+    ColumnIndexReader *column_index_reader = params.index_reader->GetColumnIndexReader(column_, index_);
     if (!column_index_reader) {
-        RecoverableError(Status::SyntaxError(fmt::format(R"(Invalid query statement: Column "{}" has no fulltext index)", column_)));
+        RecoverableError(Status::SyntaxError(fmt::format(R"(Invalid query statement: Column "{}" index "{}" doesn't exist)", column_, index_)));
         return nullptr;
     }
 
@@ -456,17 +453,15 @@ std::unique_ptr<DocIterator> RankFeatureQueryNode::CreateSearch(const CreateSear
     if (!posting_iterator) {
         return nullptr;
     }
-    auto search = std::make_unique<RankFeatureDocIterator>(std::move(posting_iterator), column_id, boost_);
+    auto search = std::make_unique<RankFeatureDocIterator>(std::move(posting_iterator), column_, boost_);
     search->term_ptr_ = &term_;
-    search->column_name_ptr_ = &column_;
     return search;
 }
 
 std::unique_ptr<DocIterator> PhraseQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
-    ColumnID column_id = params.table_info->GetColumnIdByName(column_);
-    ColumnIndexReader *column_index_reader = params.index_reader->GetColumnIndexReader(column_id, params.index_names_);
+    ColumnIndexReader *column_index_reader = params.index_reader->GetColumnIndexReader(column_, index_);
     if (!column_index_reader) {
-        RecoverableError(Status::SyntaxError(fmt::format(R"(Invalid query statement: Column "{}" has no fulltext index)", column_)));
+        RecoverableError(Status::SyntaxError(fmt::format(R"(Invalid query statement: Column "{}" index "{}" doesn't exist)", column_, index_)));
         return nullptr;
     }
     bool fetch_position = false;
@@ -484,7 +479,7 @@ std::unique_ptr<DocIterator> PhraseQueryNode::CreateSearch(const CreateSearchPar
     }
     auto search = std::make_unique<PhraseDocIterator>(std::move(posting_iterators), GetWeight(), slop_, params.ft_similarity);
     search->terms_ptr_ = &terms_;
-    search->column_name_ptr_ = &column_;
+    search->column_name_ = column_;
     auto column_length_reader = std::make_unique<FullTextColumnLengthReader>(column_index_reader);
     search->InitBM25Info(std::move(column_length_reader), params.bm25_params.delta_phrase, params.bm25_params.k1, params.bm25_params.b);
     return search;
