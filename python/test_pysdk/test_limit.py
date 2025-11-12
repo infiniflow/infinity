@@ -158,6 +158,8 @@ class TestInfinity:
             )
             .to_df()
         )
+        assert extra_result['total_hits_count'] == 8192
+
         gt = pd.DataFrame(
             {"doc_id": ["f294ba5cd48711efaaa610ffe02aa993" for i in range(30)]}
         ).astype({"doc_id": dtype("object")})
