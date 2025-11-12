@@ -638,7 +638,7 @@ TEST_P(TestTxnCleanup, cleanup_and_optimize_index) {
             }
 
             FileWorker *file_worker = nullptr;
-            status = chunk_index_meta.GetIndexBuffer(file_worker);
+            status = chunk_index_meta.GetFileWorker(file_worker);
             EXPECT_TRUE(status.ok());
 
             status = new_txn_mgr_->CommitTxn(txn);
@@ -897,7 +897,7 @@ TEST_P(TestTxnCleanup, cleanup_and_dump_index) {
             }
 
             FileWorker *file_worker = nullptr;
-            status = chunk_index_meta.GetIndexBuffer(file_worker);
+            status = chunk_index_meta.GetFileWorker(file_worker);
             EXPECT_TRUE(status.ok());
 
             status = new_txn_mgr_->CommitTxn(txn);

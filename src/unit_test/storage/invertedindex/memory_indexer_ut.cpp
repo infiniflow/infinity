@@ -189,13 +189,13 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(MemoryIndexerTest, Chunk) {
-    auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto db_name = std::make_shared<std::string>("db1");
     auto table_name = std::make_shared<std::string>("tb1");
     std::vector<std::shared_ptr<DataBlock>> blocks = {MakeInputBlock(wiki_paragraphs_)};
 
     auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kImport);
-    Status status = txn->Import(*db_name, *table_name, blocks);
+    auto status = txn->Import(*db_name, *table_name, blocks);
     EXPECT_TRUE(status.ok());
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
@@ -203,7 +203,7 @@ TEST_P(MemoryIndexerTest, Chunk) {
 }
 
 TEST_P(MemoryIndexerTest, SLOW_Memory) {
-    auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto db_name = std::make_shared<std::string>("db1");
     auto table_name = std::make_shared<std::string>("tb1");
     auto index_name = std::make_shared<std::string>("idx1");
@@ -218,7 +218,7 @@ TEST_P(MemoryIndexerTest, SLOW_Memory) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    std::this_thread::sleep_for(std::chrono::seconds(5));
+    std::this_thread::sleep_for(5s);
     Check();
 }
 
@@ -270,7 +270,7 @@ TEST_P(MemoryIndexerTest, SLOW_SeekPosition) {
     MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
     indexer1.Insert(column, 0, 8192);
     while (indexer1.GetInflightTasks() > 0) {
-        sleep(1);
+        std::this_thread::sleep_for(1s);
         indexer1.CommitSync();
     }
 

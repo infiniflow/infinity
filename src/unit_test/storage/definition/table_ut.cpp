@@ -77,9 +77,9 @@ TEST_F(TableTest, test1) {
         // Column 1 & 2
         for (i64 row_id = 0; row_id < row_count; ++row_id) {
             Value v1 = Value::MakeBool(row_id % 2 == 0);
-            data_block->column_vectors[0]->AppendValue(v1);
+            data_block->column_vectors_[0]->AppendValue(v1);
             Value v2 = Value::MakeBigInt(row_id);
-            data_block->column_vectors[1]->AppendValue(v2);
+            data_block->column_vectors_[1]->AppendValue(v2);
         }
         data_block->Finalize();
         order_by_table->Append(data_block);
@@ -89,17 +89,17 @@ TEST_F(TableTest, test1) {
     EXPECT_EQ(offset_column_vector->size(), block_count * DEFAULT_VECTOR_SIZE);
     for (size_t block_id = 0; block_id < block_count; ++block_id) {
         // Check Column1 data
-        std::shared_ptr<ColumnVector> column1 = order_by_table->GetDataBlockById(block_id)->column_vectors[0];
+        std::shared_ptr<ColumnVector> column1 = order_by_table->GetDataBlockById(block_id)->column_vectors_[0];
         EXPECT_EQ(column1->data_type()->type(), LogicalType::kBoolean);
         for (i64 row_id = 0; row_id < row_count; ++row_id) {
             EXPECT_EQ(column1->buffer_->GetCompactBit(row_id), row_id % 2 == 0);
         }
 
         // Check Column2 data
-        std::shared_ptr<ColumnVector> column2 = order_by_table->GetDataBlockById(block_id)->column_vectors[1];
+        std::shared_ptr<ColumnVector> column2 = order_by_table->GetDataBlockById(block_id)->column_vectors_[1];
         EXPECT_EQ(column2->data_type()->type(), LogicalType::kBigInt);
         for (i64 row_id = 0; row_id < row_count; ++row_id) {
-            EXPECT_EQ(((BigIntT *)column2->data())[row_id], row_id);
+            EXPECT_EQ(((BigIntT *)column2->data().get())[row_id], row_id);
         }
 
         // Check offset

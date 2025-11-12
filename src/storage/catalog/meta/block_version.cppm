@@ -19,7 +19,7 @@ import :status;
 
 namespace infinity {
 
-struct ColumnVector;
+export struct ColumnVector;
 
 struct CreateField {
     TxnTimeStamp create_ts_{};
@@ -32,6 +32,8 @@ struct CreateField {
     void SaveToFile(LocalFileHandle *file_handle) const;
     static CreateField LoadFromFile(LocalFileHandle *file_handle);
 };
+
+std::atomic_int cnt{};
 
 export struct BlockVersion {
     constexpr static std::string_view PATH = "version";
@@ -50,7 +52,7 @@ export struct BlockVersion {
 
     bool SaveToFile(void *&mmap, size_t &mmap_size, const std::string &rel_path, TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
 
-    static void LoadFromFile(void *&data, size_t &mmap_size, void *&mmap, LocalFileHandle *file_handle);
+    static void LoadFromFile(std::shared_ptr<BlockVersion> &data, size_t &mmap_size, void *&mmap, LocalFileHandle *file_handle);
 
     void GetCreateTS(size_t offset, size_t size, ColumnVector &res) const;
 

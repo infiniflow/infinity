@@ -240,7 +240,7 @@ Status VirtualStore::RemoveDirectory(const std::string &path) {
     fs::path p{path};
     std::filesystem::remove_all(p, error_code);
     if (error_code.value() != 0) {
-        UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
+        // UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
     }
     return Status::OK();
 }

@@ -29,7 +29,7 @@ import data_type;
 namespace infinity {
 
 std::shared_ptr<VectorBuffer> VectorBuffer::Make(const size_t data_type_size, const size_t capacity, VectorBufferType buffer_type) {
-    std::shared_ptr<VectorBuffer> buffer_ptr = std::make_shared<VectorBuffer>();
+    auto buffer_ptr = std::make_shared<VectorBuffer>();
     buffer_ptr->buffer_type_ = buffer_type;
     switch (buffer_type) {
         case VectorBufferType::kCompactBit: {
@@ -45,16 +45,16 @@ std::shared_ptr<VectorBuffer> VectorBuffer::Make(const size_t data_type_size, co
 }
 
 std::shared_ptr<VectorBuffer>
-VectorBuffer::Make(FileWorker *file_worker, FileWorker *var_file_worker, size_t data_type_size, size_t capacity, VectorBufferType buffer_type) {
-    std::shared_ptr<VectorBuffer> buffer_ptr = std::make_shared<VectorBuffer>();
+VectorBuffer::Make(FileWorker *data_file_worker, FileWorker *var_file_worker, size_t data_type_size, size_t capacity, VectorBufferType buffer_type) {
+    auto buffer_ptr = std::make_shared<VectorBuffer>();
     buffer_ptr->buffer_type_ = buffer_type;
     switch (buffer_type) {
         case VectorBufferType::kCompactBit: {
-            buffer_ptr->InitializeCompactBit(file_worker, capacity);
+            buffer_ptr->InitializeCompactBit(data_file_worker, capacity);
             break;
         }
         default: {
-            buffer_ptr->Initialize(file_worker, var_file_worker, data_type_size, capacity);
+            buffer_ptr->Initialize(data_file_worker, var_file_worker, data_type_size, capacity);
             break;
         }
     }
@@ -67,7 +67,7 @@ void VectorBuffer::InitializeCompactBit(size_t capacity) {
     }
     size_t data_size = (capacity + 7) / 8;
     if (data_size > 0) {
-        ptr_ = std::make_unique_for_overwrite<char[]>(data_size);
+        ptr_ = std::make_shared<char[]>(data_size);
     }
     initialized_ = true;
     data_size_ = data_size;
@@ -80,7 +80,7 @@ void VectorBuffer::Initialize(size_t type_size, size_t capacity) {
     }
     size_t data_size = type_size * capacity;
     if (data_size > 0) {
-        ptr_ = std::make_unique_for_overwrite<char[]>(data_size);
+        ptr_ = std::make_shared_for_overwrite<char[]>(data_size);
     }
     if (buffer_type_ == VectorBufferType::kVarBuffer) {
         var_buffer_mgr_ = std::make_unique<VarBufferManager>();
@@ -108,19 +108,19 @@ void VectorBuffer::InitializeCompactBit(FileWorker *file_worker, size_t capacity
     capacity_ = capacity;
 }
 
-void VectorBuffer::Initialize(FileWorker *file_worker, FileWorker *var_file_worker, size_t type_size, size_t capacity) {
+void VectorBuffer::Initialize(FileWorker *data_file_worker, FileWorker *var_file_worker, size_t type_size, size_t capacity) {
     if (initialized_) {
         UnrecoverableError("std::vector buffer is already initialized.");
     }
     size_t data_size = type_size * capacity;
-    if (file_worker == nullptr) {
+    if (data_file_worker == nullptr) {
         UnrecoverableError("Buffer object is nullptr.");
     }
     // if (file_worker->GetBufferSize() != data_size) {
     //     UnrecoverableError("Buffer object size is not equal to data size.");
     // }
     // ptr_ = file_worker->Load();
-    ptr_ = file_worker;
+    ptr_ = data_file_worker;
     if (buffer_type_ == VectorBufferType::kVarBuffer) {
         var_buffer_mgr_ = std::make_unique<VarBufferManager>(var_file_worker);
     }
@@ -129,16 +129,18 @@ void VectorBuffer::Initialize(FileWorker *file_worker, FileWorker *var_file_work
     capacity_ = capacity;
 }
 
-void VectorBuffer::SetToCatalog(FileWorker *file_worker, FileWorker *var_file_worker) {
-    if (!std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
+void VectorBuffer::SetToCatalog(FileWorker *data_file_worker, FileWorker *var_file_worker) {
+    if (!std::holds_alternative<std::shared_ptr<char[]>>(ptr_)) {
         UnrecoverableError("Cannot convert to new catalog");
     }
 
-    void *src_ptr = std::get<std::unique_ptr<char[]>>(ptr_).release();
-    file_worker->SetData(src_ptr);
+    auto src_ptr = std::move(std::get<std::shared_ptr<char[]>>(ptr_));
+    data_file_worker->Write(std::span{src_ptr.get(), data_size_});
+
+    src_ptr.reset();
 
     // ptr_ = file_worker->Load();
-    ptr_ = file_worker;
+    ptr_ = data_file_worker;
     if (buffer_type_ == VectorBufferType::kVarBuffer) {
         var_buffer_mgr_->SetToCatalog(var_file_worker);
     }
@@ -161,7 +163,9 @@ void VectorBuffer::Copy(char *input, size_t size) {
         UnrecoverableError("Attempt to copy an amount of data that cannot currently be accommodated");
     }
     // std::memcpy(data_.get(), input, size);
-    std::memcpy(GetData(), input, size);
+    std::shared_ptr<char[]> some_ptr;
+    GetData(some_ptr);
+    std::memcpy(some_ptr.get(), input, size);
 }
 
 bool VectorBuffer::RawPointerGetCompactBit(const u8 *src_ptr_u8, size_t idx) {
@@ -174,7 +178,9 @@ bool VectorBuffer::GetCompactBit(size_t idx) const {
     if (idx >= capacity_) {
         UnrecoverableError("Index out of range.");
     }
-    return VectorBuffer::RawPointerGetCompactBit(reinterpret_cast<const u8 *>(GetData()), idx);
+    std::shared_ptr<char[]> some_ptr;
+    GetData(some_ptr);
+    return RawPointerGetCompactBit(reinterpret_cast<const u8 *>(some_ptr.get()), idx);
 }
 
 void VectorBuffer::RawPointerSetCompactBit(u8 *dst_ptr_u8, size_t idx, bool val) {
@@ -187,11 +193,21 @@ void VectorBuffer::RawPointerSetCompactBit(u8 *dst_ptr_u8, size_t idx, bool val)
     }
 }
 
+void VectorBuffer::SetCompactBit(std::shared_ptr<char[]> &some_ptr, size_t idx, bool val) {
+    if (idx >= capacity_) {
+        UnrecoverableError("Index out of range.");
+    }
+    GetData(some_ptr);
+    RawPointerSetCompactBit(reinterpret_cast<u8 *>(some_ptr.get()), idx, val);
+}
+
 void VectorBuffer::SetCompactBit(size_t idx, bool val) {
     if (idx >= capacity_) {
         UnrecoverableError("Index out of range.");
     }
-    VectorBuffer::RawPointerSetCompactBit(reinterpret_cast<u8 *>(GetData()), idx, val);
+    std::shared_ptr<char[]> some_ptr;
+    GetData(some_ptr);
+    RawPointerSetCompactBit(reinterpret_cast<u8 *>(some_ptr.get()), idx, val);
 }
 
 bool VectorBuffer::CompactBitIsSame(const std::shared_ptr<VectorBuffer> &lhs,
@@ -206,8 +222,14 @@ bool VectorBuffer::CompactBitIsSame(const std::shared_ptr<VectorBuffer> &lhs,
     }
     size_t full_byte_cnt = lhs_cnt / 8;
     size_t last_byte_cnt = lhs_cnt % 8;
-    auto lhs_data = reinterpret_cast<const u8 *>(lhs->GetData());
-    auto rhs_data = reinterpret_cast<const u8 *>(rhs->GetData());
+    std::shared_ptr<char[]> l_some_ptr;
+    lhs->GetData(l_some_ptr);
+
+    std::shared_ptr<char[]> r_some_ptr;
+    rhs->GetData(r_some_ptr);
+
+    auto lhs_data = reinterpret_cast<const u8 *>(l_some_ptr.get());
+    auto rhs_data = reinterpret_cast<const u8 *>(r_some_ptr.get());
     for (size_t idx = 0; idx < full_byte_cnt; ++idx) {
         if (lhs_data[idx] != rhs_data[idx]) {
             return false;

@@ -93,14 +93,14 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeta &table_index_me
                                                                                                               flag);
             segment_readers_.push_back(std::move(segment_reader));
 
-            FileWorker *index_buffer = nullptr;
-            status = chunk_index_meta.GetIndexBuffer(index_buffer);
+            FileWorker *index_file_worker = nullptr;
+            status = chunk_index_meta.GetFileWorker(index_file_worker);
             if (!status.ok()) {
                 return status;
             }
 
             exp_begin_row_id = chunk_info_ptr->base_row_id_ + chunk_info_ptr->row_cnt_;
-            chunk_index_meta_infos_.emplace_back(ColumnReaderChunkInfo{index_buffer,
+            chunk_index_meta_infos_.emplace_back(ColumnReaderChunkInfo{index_file_worker,
                                                                        chunk_info_ptr->base_row_id_,
                                                                        chunk_info_ptr->row_cnt_,
                                                                        chunk_info_ptr->term_cnt_,

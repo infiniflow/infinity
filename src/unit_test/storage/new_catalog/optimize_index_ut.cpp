@@ -218,7 +218,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_rollback) {
             for (const auto chunk_id : my_chunk_ids) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
                 FileWorker *file_worker = nullptr;
-                status = chunk_index_meta.GetIndexBuffer(file_worker);
+                status = chunk_index_meta.GetFileWorker(file_worker);
                 EXPECT_TRUE(status.ok());
             }
             status = new_txn_mgr->CommitTxn(txn);

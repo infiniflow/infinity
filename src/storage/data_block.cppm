@@ -50,7 +50,7 @@ public:
 
     // void UnInit();
 
-    [[nodiscard]] bool Initialized() const { return initialized; }
+    [[nodiscard]] bool Initialized() const { return initialized_; }
 
     // Reset to just initialized state.
     void Reset();
@@ -72,7 +72,7 @@ public:
 
     [[nodiscard]] std::string ToBriefString() const;
 
-    [[nodiscard]] bool Finalized() const { return finalized; }
+    [[nodiscard]] bool Finalized() const { return finalized_; }
 
     void FillRowIDVector(std::shared_ptr<std::vector<RowID>> &row_ids, u32 block_id) const;
 
@@ -90,7 +90,7 @@ public:
     [[nodiscard]] size_t column_count() const { return column_count_; }
 
     [[nodiscard]] u16 row_count() const {
-        if (!finalized) {
+        if (!finalized_) {
             if (row_count_ == 0) {
                 return 0;
             }
@@ -103,8 +103,8 @@ public:
         std::vector<std::shared_ptr<DataType>> types;
 
         types.reserve(column_count());
-        for (size_t colum_idx = 0; colum_idx < column_vectors.size(); ++colum_idx) {
-            types.push_back(column_vectors[colum_idx]->data_type());
+        for (size_t colum_idx = 0; colum_idx < column_vectors_.size(); ++colum_idx) {
+            types.push_back(column_vectors_[colum_idx]->data_type());
         }
         return types;
     }
@@ -122,13 +122,13 @@ public:
     // Read from a serialized version
     static std::shared_ptr<DataBlock> ReadAdv(const char *&ptr, i32 maxbytes);
 
-    std::vector<std::shared_ptr<ColumnVector>> column_vectors;
+    std::vector<std::shared_ptr<ColumnVector>> column_vectors_;
 
 private:
-    u16 row_count_{0};
-    size_t column_count_{0};
-    size_t capacity_{0};
-    bool initialized = false;
-    bool finalized = false;
+    u16 row_count_{};
+    size_t column_count_{};
+    size_t capacity_{};
+    bool initialized_{};
+    bool finalized_{};
 };
 } // namespace infinity

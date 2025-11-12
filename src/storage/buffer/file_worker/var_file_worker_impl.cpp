@@ -31,40 +31,30 @@ import third_party;
 
 namespace infinity {
 
-VarFileWorker::VarFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_size) : FileWorker(std::move(file_path)) {
-    VarFileWorker::AllocateInMemory();
-}
+VarFileWorker::VarFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_size) : FileWorker(std::move(file_path)) {}
 
 VarFileWorker::~VarFileWorker() {
-    VarFileWorker::FreeInMemory();
+    madvise(mmap_, mmap_size_, MADV_FREE);
     munmap(mmap_, mmap_size_);
     mmap_ = nullptr;
 }
 
-void VarFileWorker::AllocateInMemory() {
-    auto *buffer = new VarBuffer(this);
-    data_ = static_cast<void *>(buffer);
-}
-
-// int cnt;
-
-void VarFileWorker::FreeInMemory() {
-    // --cnt;
-    // std::println("aaa: {}", cnt);
-    auto *buffer = static_cast<VarBuffer *>(data_);
-    delete buffer;
-    data_ = nullptr;
-}
-
-bool VarFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-    const auto *buffer = static_cast<const VarBuffer *>(data_);
+bool VarFileWorker::Write(std::span<VarBuffer> data,
+                          std::unique_ptr<LocalFileHandle> &file_handle,
+                          bool &prepare_success,
+                          const FileWorkerSaveCtx &ctx) {
+    const auto *buffer = data.data();
     auto old_mmap_size = mmap_size_;
     mmap_size_ = buffer->TotalSize();
+    if (!mmap_size_) {
+        VirtualStore::DeleteFile(file_handle->Path());
+        return true;
+    }
     auto buffer_data = std::make_unique<char[]>(mmap_size_);
     char *ptr = buffer_data.get();
     buffer->Write(ptr);
 
-    auto fd = file_handle_->fd();
+    auto fd = file_handle->fd();
     ftruncate(fd, mmap_size_);
 
     if (mmap_ == nullptr) {
@@ -84,40 +74,45 @@ bool VarFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     return true;
 }
 
-void VarFileWorker::Read(size_t file_size, bool other) {
-    // std::println("R var");
+void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
+    data = std::make_shared<VarBuffer>(this);
+    if (!file_handle) {
+        return;
+    }
+    size_t buffer_size = file_size;
+    if (buffer_size == 0) {
+        return;
+    }
     if (!mmap_) {
         // if (file_size < buffer_size_) {
         //     UnrecoverableError(fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_));
         // } else {
-        size_t buffer_size = file_size;
+
         // }
-        if (buffer_size == 0) {
-            return;
-        }
 
         auto buffer = std::make_unique<char[]>(buffer_size);
 
-        auto [nbytes, status] = file_handle_->Read(buffer.get(), buffer_size);
+        auto [nbytes, status] = file_handle->Read(buffer.get(), buffer_size);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
         // if (nbytes != buffer_size_) {
         //     UnrecoverableError(fmt::format("Read {} bytes from file failed, only {} bytes read.", buffer_size_, nbytes));
         // }
-        FreeInMemory();
-        // ++cnt;
-        // std::println("bbb: {}", cnt);
-        auto *var_buffer = new VarBuffer(this, std::move(buffer), buffer_size);
-        data_ = static_cast<void *>(var_buffer);
 
-        auto fd = file_handle_->fd();
+        data = std::make_shared<VarBuffer>(this, std::move(buffer), buffer_size);
+
+        auto fd = file_handle->fd();
         mmap_size_ = buffer_size;
         mmap_ = mmap(nullptr, mmap_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 /*align_offset*/);
         if (mmap_ == MAP_FAILED) {
             std::println("that code var: {}", mmap_size_);
             mmap_ = nullptr;
         }
+    } else {
+        auto buffer = std::make_unique<char[]>(buffer_size);
+        std::memcpy(buffer.get(), mmap_, buffer_size);
+        data = std::make_shared<VarBuffer>(this, std::move(buffer), buffer_size);
     }
 }
 

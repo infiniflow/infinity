@@ -10,6 +10,7 @@ def get_files():
 
 def apply_code_style():
     files = filter(lambda x: x.find(b'third_party') == -1, get_files())
+    files = filter(lambda x: x.find(b'src/networker/third_party/infinity_thrift') == -1, files)
 
     files = filter(lambda x: x.endswith(b'.c') or
                              x.endswith(b'.h') or

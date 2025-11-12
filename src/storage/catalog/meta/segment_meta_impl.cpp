@@ -223,16 +223,14 @@ Status SegmentMeta::CommitBlock(BlockID block_id, TxnTimeStamp commit_ts) {
 std::tuple<std::vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1() {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!block_ids1_) {
-        block_ids1_ =
-            infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts_);
+        block_ids1_ = GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts_);
     }
     return {&*block_ids1_, Status::OK()};
 }
 
 std::tuple<std::vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1(TxnTimeStamp commit_ts) {
     if (!block_ids1_) {
-        block_ids1_ =
-            infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts);
+        block_ids1_ = GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts);
     }
     return {&*block_ids1_, Status::OK()};
 }
@@ -245,7 +243,7 @@ std::tuple<size_t, Status> SegmentMeta::GetRowCnt1() {
 
     Status status;
 #if 1
-    row_cnt_ = infinity::GetSegmentRowCount(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts_);
+    row_cnt_ = GetSegmentRowCount(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts_);
 
     return {*row_cnt_, Status::OK()};
 #else
@@ -287,11 +285,9 @@ Status SegmentMeta::GetFirstDeleteTS(TxnTimeStamp &first_delete_ts) {
 
 std::tuple<std::shared_ptr<SegmentInfo>, Status> SegmentMeta::GetSegmentInfo() {
     auto segment_info = std::make_shared<SegmentInfo>();
-    std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs = nullptr;
     i64 column_count = 0;
     SegmentID unsealed_segment_id = 0;
-    Status status;
-    std::tie(column_defs, status) = table_meta_.GetColumnDefs();
+    auto [column_defs, status] = table_meta_.GetColumnDefs();
     if (!status.ok()) {
         return {nullptr, status};
     }
@@ -303,11 +299,11 @@ std::tuple<std::shared_ptr<SegmentInfo>, Status> SegmentMeta::GetSegmentInfo() {
 
     segment_info->segment_id_ = segment_id_;
     segment_info->status_ =
-        (segment_id_ == unsealed_segment_id) ? SegmentStatus::kUnsealed : SegmentStatus::kSealed; // TODO: How to determine other status?
+        segment_id_ == unsealed_segment_id ? SegmentStatus::kUnsealed : SegmentStatus::kSealed; // TODO: How to determine other status?
     segment_info->column_count_ = column_count;
     segment_info->row_capacity_ = segment_capacity();
     segment_info->storage_size_ = 0; // TODO: How to determine storage size?
-    std::vector<BlockID> *block_ids_ptr = nullptr;
+    std::vector<BlockID> *block_ids_ptr{};
     std::tie(block_ids_ptr, status) = GetBlockIDs1();
     if (!status.ok()) {
         return {nullptr, status};

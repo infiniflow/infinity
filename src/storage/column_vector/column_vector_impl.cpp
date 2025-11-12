@@ -152,7 +152,6 @@ void ColumnVector::AppendValue(const Value &value) {
         UnrecoverableError(fmt::format("Exceed the column vector capacity.({}/{})", tail_index, capacity_));
     }
     SetValueByIndex(tail_index, value);
-    // LOG_TRACE(fmt::format("ColumnVector::AppendValue: data_ptr_ {:p}, tail_index {}, value {}", data_ptr_, tail_index, value.ToString()));
 }
 
 void ColumnVector::SetVectorType(ColumnVectorType vector_type) {
@@ -240,14 +239,14 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, size_t capacity) {
             buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
             nulls_ptr_ = Bitmask::MakeSharedAllTrue(capacity_);
         }
-        data_ptr_ = buffer_->GetData();
+        buffer_->GetData(data_ptr_);
     } else {
         // Initialize after reset will come to this branch
         buffer_->ResetToInit(vector_buffer_type);
     }
 }
 
-void ColumnVector::Initialize(FileWorker *file_worker,
+void ColumnVector::Initialize(FileWorker *data_file_worker,
                               FileWorker *var_file_worker,
                               size_t current_row_count,
                               ColumnVectorMode vector_tipe,
@@ -260,17 +259,17 @@ void ColumnVector::Initialize(FileWorker *file_worker,
     }
 
     if (vector_type_ == ColumnVectorType::kConstant) {
-        buffer_ = VectorBuffer::Make(file_worker, var_file_worker, data_type_size_, 1, vector_buffer_type);
+        buffer_ = VectorBuffer::Make(data_file_worker, var_file_worker, data_type_size_, 1, vector_buffer_type);
         nulls_ptr_ = Bitmask::MakeSharedAllTrue(1);
     } else {
-        buffer_ = VectorBuffer::Make(file_worker, var_file_worker, data_type_size_, capacity_, vector_buffer_type);
+        buffer_ = VectorBuffer::Make(data_file_worker, var_file_worker, data_type_size_, capacity_, vector_buffer_type);
         nulls_ptr_ = Bitmask::MakeSharedAllTrue(capacity_);
     }
     switch (vector_tipe) {
         case ColumnVectorMode::kReadWrite:
             [[fallthrough]];
         case ColumnVectorMode::kReadOnly: {
-            data_ptr_ = buffer_->GetData();
+            buffer_->GetData(data_ptr_);
             break;
         }
     }
@@ -288,12 +287,10 @@ void ColumnVector::SetToCatalog(FileWorker *file_worker, FileWorker *var_file_wo
         buffer_->SetToCatalog(file_worker, var_file_worker);
     }
     switch (vector_tipe) {
-        case ColumnVectorMode::kReadWrite: {
-            data_ptr_ = buffer_->GetData();
-            break;
-        }
+        case ColumnVectorMode::kReadWrite:
+            [[fallthrough]];
         case ColumnVectorMode::kReadOnly: {
-            data_ptr_ = const_cast<char *>(buffer_->GetData());
+            buffer_->GetData(data_ptr_);
             break;
         }
     }
@@ -839,44 +836,44 @@ std::string ColumnVector::ToString(size_t row_index) const {
             return buffer_->GetCompactBit(row_index) ? "true" : "false";
         }
         case LogicalType::kTinyInt: {
-            return std::to_string(((TinyIntT *)data_ptr_)[row_index]);
+            return std::to_string(((TinyIntT *)data_ptr_.get())[row_index]);
         }
         case LogicalType::kSmallInt: {
-            return std::to_string(((SmallIntT *)data_ptr_)[row_index]);
+            return std::to_string(((SmallIntT *)data_ptr_.get())[row_index]);
         }
         case LogicalType::kInteger: {
-            return std::to_string(((IntegerT *)data_ptr_)[row_index]);
+            return std::to_string(((IntegerT *)data_ptr_.get())[row_index]);
         }
         case LogicalType::kBigInt: {
-            return std::to_string(((BigIntT *)data_ptr_)[row_index]);
+            return std::to_string(((BigIntT *)data_ptr_.get())[row_index]);
         }
         case LogicalType::kFloat: {
-            return std::to_string(((FloatT *)data_ptr_)[row_index]);
+            return std::to_string(((FloatT *)data_ptr_.get())[row_index]);
         }
         case LogicalType::kDouble: {
-            return std::to_string(((DoubleT *)data_ptr_)[row_index]);
+            return std::to_string(((DoubleT *)data_ptr_.get())[row_index]);
         }
         case LogicalType::kFloat16: {
-            return std::to_string(static_cast<float>(((Float16T *)data_ptr_)[row_index]));
+            return std::to_string(static_cast<float>(((Float16T *)data_ptr_.get())[row_index]));
         }
         case LogicalType::kBFloat16: {
-            return std::to_string(static_cast<float>(((BFloat16T *)data_ptr_)[row_index]));
+            return std::to_string(static_cast<float>(((BFloat16T *)data_ptr_.get())[row_index]));
         }
         case LogicalType::kVarchar: {
             std::span<const char> data = this->GetVarchar(row_index);
             return {data.data(), data.size()};
         }
         case LogicalType::kDate: {
-            return ((DateT *)data_ptr_)[row_index].ToString();
+            return ((DateT *)data_ptr_.get())[row_index].ToString();
         }
         case LogicalType::kTime: {
-            return ((TimeT *)data_ptr_)[row_index].ToString();
+            return ((TimeT *)data_ptr_.get())[row_index].ToString();
         }
         case LogicalType::kDateTime: {
-            return ((DateTimeT *)data_ptr_)[row_index].ToString();
+            return ((DateTimeT *)data_ptr_.get())[row_index].ToString();
         }
         case LogicalType::kTimestamp: {
-            return ((TimestampT *)data_ptr_)[row_index].ToString();
+            return ((TimestampT *)data_ptr_.get())[row_index].ToString();
         }
         case LogicalType::kInterval:
             [[fallthrough]];
@@ -916,7 +913,7 @@ std::string ColumnVector::ToString(size_t row_index) const {
             }
             auto *embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             EmbeddingT embedding_element(nullptr, false);
-            embedding_element.ptr = (data_ptr_ + row_index * data_type_->type_info()->Size());
+            embedding_element.ptr = (data_ptr_.get() + row_index * data_type_->type_info()->Size());
             std::string embedding_str = EmbeddingT::Embedding2String(embedding_element, embedding_info->Type(), embedding_info->Dimension());
             embedding_element.SetNull();
             return embedding_str;
@@ -959,7 +956,7 @@ std::string ColumnVector::ToString(size_t row_index) const {
             return array_value.ToString();
         }
         case LogicalType::kRowID: {
-            return (((RowID *)data_ptr_)[row_index]).ToString();
+            return (((RowID *)data_ptr_.get())[row_index]).ToString();
         }
         case LogicalType::kNull:
             [[fallthrough]];
@@ -980,7 +977,6 @@ Value ColumnVector::GetValueByIndex(size_t index) const {
         UnrecoverableError("Column vector isn't initialized.");
     }
     size_t tail_index = tail_index_.load();
-    // std::println("tail_index: {}", tail_index);
     if (index >= tail_index) {
         UnrecoverableError(fmt::format("Attempt to access an invalid index of column vector: {}, current tail index: {}", index, tail_index));
     }
@@ -994,7 +990,7 @@ Value ColumnVector::GetValueByIndex(size_t index) const {
         // special case for boolean
         return Value::MakeBool(buffer_->GetCompactBit(index));
     }
-    return GetArrayValueRecursively(*data_type_, data_ptr_ + index * data_type_->Size());
+    return GetArrayValueRecursively(*data_type_, data_ptr_.get() + index * data_type_->Size());
 }
 
 Value ColumnVector::GetArrayValueRecursively(const DataType &data_type, const char *data_ptr) const {
@@ -1160,7 +1156,7 @@ void ColumnVector::SetValueByIndex(size_t index, const Value &value) {
     if (data_type_->type() == LogicalType::kBoolean) {
         buffer_->SetCompactBit(index, value.GetValue<BooleanT>());
     } else {
-        SetArrayValueRecursively(value, data_ptr_ + index * data_type_->Size());
+        SetArrayValueRecursively(value, data_ptr_.get() + index * data_type_->Size());
     }
 }
 
@@ -1331,7 +1327,7 @@ void ColumnVector::SetArrayValueRecursively(const Value &value, char *dst_ptr) {
             const auto &elem_type = array_info->ElemType();
             const auto elem_size = array_info->ElemSize();
             const auto element_num = array_elements.size();
-            const auto element_dst_ptr = std::make_unique_for_overwrite<char[]>(element_num * elem_size);
+            const auto element_dst_ptr = std::make_shared_for_overwrite<char[]>(element_num * elem_size);
             for (size_t i = 0; i < element_num; ++i) {
                 const auto &element_value = array_elements[i];
                 if (element_value.type() != elem_type) {
@@ -1370,7 +1366,7 @@ void ColumnVector::Finalize(size_t index) {
     tail_index_.store(index);
 }
 
-char *ColumnVector::GetRawPtr(size_t index) { return data_ptr_ + index * data_type_->Size(); }
+char *ColumnVector::GetRawPtr(size_t index) { return data_ptr_.get() + index * data_type_->Size(); }
 
 void ColumnVector::SetByRawPtr(size_t index, const char *raw_ptr) {
     if (!initialized_) {
@@ -1396,66 +1392,66 @@ void ColumnVector::SetByRawPtr(size_t index, const char *raw_ptr) {
             break;
         }
         case LogicalType::kTinyInt: {
-            ((TinyIntT *)data_ptr_)[index] = *(TinyIntT *)(raw_ptr);
+            ((TinyIntT *)data_ptr_.get())[index] = *(TinyIntT *)(raw_ptr);
             break;
         }
         case LogicalType::kSmallInt: {
-            ((SmallIntT *)data_ptr_)[index] = *(SmallIntT *)(raw_ptr);
+            ((SmallIntT *)data_ptr_.get())[index] = *(SmallIntT *)(raw_ptr);
             break;
         }
         case LogicalType::kInteger: {
-            ((IntegerT *)data_ptr_)[index] = *(IntegerT *)(raw_ptr);
+            ((IntegerT *)data_ptr_.get())[index] = *(IntegerT *)(raw_ptr);
             break;
         }
         case LogicalType::kBigInt: {
-            ((BigIntT *)data_ptr_)[index] = *(BigIntT *)(raw_ptr);
+            ((BigIntT *)data_ptr_.get())[index] = *(BigIntT *)(raw_ptr);
             break;
         }
         case LogicalType::kHugeInt: {
-            ((HugeIntT *)data_ptr_)[index] = *(HugeIntT *)(raw_ptr);
+            ((HugeIntT *)data_ptr_.get())[index] = *(HugeIntT *)(raw_ptr);
             break;
         }
         case LogicalType::kFloat: {
-            ((FloatT *)data_ptr_)[index] = *(FloatT *)(raw_ptr);
+            ((FloatT *)data_ptr_.get())[index] = *(FloatT *)(raw_ptr);
             break;
         }
         case LogicalType::kFloat16: {
-            ((Float16T *)data_ptr_)[index] = *(Float16T *)(raw_ptr);
+            ((Float16T *)data_ptr_.get())[index] = *(Float16T *)(raw_ptr);
             break;
         }
         case LogicalType::kBFloat16: {
-            ((BFloat16T *)data_ptr_)[index] = *(BFloat16T *)(raw_ptr);
+            ((BFloat16T *)data_ptr_.get())[index] = *(BFloat16T *)(raw_ptr);
             break;
         }
         case LogicalType::kDouble: {
-            ((DoubleT *)data_ptr_)[index] = *(DoubleT *)(raw_ptr);
+            ((DoubleT *)data_ptr_.get())[index] = *(DoubleT *)(raw_ptr);
             break;
         }
         case LogicalType::kDecimal: {
-            ((DecimalT *)data_ptr_)[index] = *(DecimalT *)(raw_ptr);
+            ((DecimalT *)data_ptr_.get())[index] = *(DecimalT *)(raw_ptr);
             break;
         }
         case LogicalType::kVarchar: {
             UnrecoverableError("Cannot SetByRawPtr to Varchar.");
         }
         case LogicalType::kDate: {
-            ((DateT *)data_ptr_)[index] = *(DateT *)(raw_ptr);
+            ((DateT *)data_ptr_.get())[index] = *(DateT *)(raw_ptr);
             break;
         }
         case LogicalType::kTime: {
-            ((TimeT *)data_ptr_)[index] = *(TimeT *)(raw_ptr);
+            ((TimeT *)data_ptr_.get())[index] = *(TimeT *)(raw_ptr);
             break;
         }
         case LogicalType::kDateTime: {
-            ((DateTimeT *)data_ptr_)[index] = *(DateTimeT *)(raw_ptr);
+            ((DateTimeT *)data_ptr_.get())[index] = *(DateTimeT *)(raw_ptr);
             break;
         }
         case LogicalType::kTimestamp: {
-            ((TimestampT *)data_ptr_)[index] = *(TimestampT *)(raw_ptr);
+            ((TimestampT *)data_ptr_.get())[index] = *(TimestampT *)(raw_ptr);
             break;
         }
         case LogicalType::kInterval: {
-            ((IntervalT *)data_ptr_)[index] = *(IntervalT *)(raw_ptr);
+            ((IntervalT *)data_ptr_.get())[index] = *(IntervalT *)(raw_ptr);
             break;
         }
         case LogicalType::kArray: {
@@ -1466,19 +1462,19 @@ void ColumnVector::SetByRawPtr(size_t index, const char *raw_ptr) {
             UnrecoverableError("Shouldn't store tuple directly, a tuple is flatten as many columns");
         }
         case LogicalType::kPoint: {
-            ((PointT *)data_ptr_)[index] = *(PointT *)(raw_ptr);
+            ((PointT *)data_ptr_.get())[index] = *(PointT *)(raw_ptr);
             break;
         }
         case LogicalType::kLine: {
-            ((LineT *)data_ptr_)[index] = *(LineT *)(raw_ptr);
+            ((LineT *)data_ptr_.get())[index] = *(LineT *)(raw_ptr);
             break;
         }
         case LogicalType::kLineSeg: {
-            ((LineSegT *)data_ptr_)[index] = *(LineSegT *)(raw_ptr);
+            ((LineSegT *)data_ptr_.get())[index] = *(LineSegT *)(raw_ptr);
             break;
         }
         case LogicalType::kBox: {
-            ((BoxT *)data_ptr_)[index] = *(BoxT *)(raw_ptr);
+            ((BoxT *)data_ptr_.get())[index] = *(BoxT *)(raw_ptr);
             break;
         }
             //        case kPath: {
@@ -1486,13 +1482,13 @@ void ColumnVector::SetByRawPtr(size_t index, const char *raw_ptr) {
             //        case kPolygon: {
             //        }
         case LogicalType::kCircle: {
-            ((CircleT *)data_ptr_)[index] = *(CircleT *)(raw_ptr);
+            ((CircleT *)data_ptr_.get())[index] = *(CircleT *)(raw_ptr);
             break;
         }
             //        case kBitmap: {
             //        }
         case LogicalType::kUuid: {
-            ((UuidT *)data_ptr_)[index] = *(UuidT *)(raw_ptr);
+            ((UuidT *)data_ptr_.get())[index] = *(UuidT *)(raw_ptr);
             break;
         }
             //        case kBlob: {
@@ -1511,16 +1507,16 @@ void ColumnVector::SetByRawPtr(size_t index, const char *raw_ptr) {
         }
         case LogicalType::kEmbedding: {
             //            auto *embedding_ptr = (EmbeddingT *)(value_ptr);
-            char *ptr = data_ptr_ + index * data_type_->Size();
+            char *ptr = data_ptr_.get() + index * data_type_->Size();
             std::memcpy(ptr, raw_ptr, data_type_->Size());
             break;
         }
         case LogicalType::kRowID: {
-            ((RowID *)data_ptr_)[index] = *(RowID *)(raw_ptr);
+            ((RowID *)data_ptr_.get())[index] = *(RowID *)(raw_ptr);
             break;
         }
         case LogicalType::kMixed: {
-            ((MixedT *)data_ptr_)[index] = *(MixedT *)(raw_ptr);
+            ((MixedT *)data_ptr_.get())[index] = *(MixedT *)(raw_ptr);
             break;
         }
         case LogicalType::kNull:
@@ -1670,51 +1666,51 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             break;
         }
         case LogicalType::kTinyInt: {
-            ((TinyIntT *)data_ptr_)[index] = DataType::StringToValue<TinyIntT>(sv);
+            ((TinyIntT *)data_ptr_.get())[index] = DataType::StringToValue<TinyIntT>(sv);
             break;
         }
         case LogicalType::kSmallInt: {
-            ((SmallIntT *)data_ptr_)[index] = DataType::StringToValue<SmallIntT>(sv);
+            ((SmallIntT *)data_ptr_.get())[index] = DataType::StringToValue<SmallIntT>(sv);
             break;
         }
         case LogicalType::kInteger: {
-            ((IntegerT *)data_ptr_)[index] = DataType::StringToValue<IntegerT>(sv);
+            ((IntegerT *)data_ptr_.get())[index] = DataType::StringToValue<IntegerT>(sv);
             break;
         }
         case LogicalType::kBigInt: {
-            ((BigIntT *)data_ptr_)[index] = DataType::StringToValue<BigIntT>(sv);
+            ((BigIntT *)data_ptr_.get())[index] = DataType::StringToValue<BigIntT>(sv);
             break;
         }
         case LogicalType::kFloat: {
-            ((FloatT *)data_ptr_)[index] = DataType::StringToValue<FloatT>(sv);
+            ((FloatT *)data_ptr_.get())[index] = DataType::StringToValue<FloatT>(sv);
             break;
         }
         case LogicalType::kDouble: {
-            ((DoubleT *)data_ptr_)[index] = DataType::StringToValue<DoubleT>(sv);
+            ((DoubleT *)data_ptr_.get())[index] = DataType::StringToValue<DoubleT>(sv);
             break;
         }
         case LogicalType::kFloat16: {
-            ((Float16T *)data_ptr_)[index] = DataType::StringToValue<Float16T>(sv);
+            ((Float16T *)data_ptr_.get())[index] = DataType::StringToValue<Float16T>(sv);
             break;
         }
         case LogicalType::kBFloat16: {
-            ((BFloat16T *)data_ptr_)[index] = DataType::StringToValue<BFloat16T>(sv);
+            ((BFloat16T *)data_ptr_.get())[index] = DataType::StringToValue<BFloat16T>(sv);
             break;
         }
         case LogicalType::kDate: {
-            ((DateT *)data_ptr_)[index].FromString(sv);
+            ((DateT *)data_ptr_.get())[index].FromString(sv);
             break;
         }
         case LogicalType::kTime: {
-            ((TimeT *)data_ptr_)[index].FromString(sv);
+            ((TimeT *)data_ptr_.get())[index].FromString(sv);
             break;
         }
         case LogicalType::kDateTime: {
-            ((DateTimeT *)data_ptr_)[index].FromString(sv);
+            ((DateTimeT *)data_ptr_.get())[index].FromString(sv);
             break;
         }
         case LogicalType::kTimestamp: {
-            ((TimestampT *)data_ptr_)[index].FromString(sv);
+            ((TimestampT *)data_ptr_.get())[index].FromString(sv);
             break;
         }
         case LogicalType::kEmbedding: {
@@ -2131,8 +2127,9 @@ void ColumnVector::AppendWith(const ColumnVector &other, size_t from, size_t cou
         }
         case LogicalType::kVarchar: {
             // Copy string
-            auto *base_src_ptr = (VarcharT *)(other.data_ptr_);
-            VarcharT *base_dst_ptr = &((VarcharT *)(data_ptr_))[tail_index_.load()];
+            auto *base_src_ptr = (VarcharT *)(other.data_ptr_.get());
+            VarcharT *base_dst_ptr = &((VarcharT *)(data_ptr_.get()))[tail_index_.load()];
+
             for (size_t idx = 0; idx < count; ++idx) {
                 VarcharT &src_ref = base_src_ptr[from + idx];
                 VarcharT &dst_ref = base_dst_ptr[idx];
@@ -2141,8 +2138,8 @@ void ColumnVector::AppendWith(const ColumnVector &other, size_t from, size_t cou
             break;
         }
         case LogicalType::kMultiVector: {
-            auto *base_src_ptr = (MultiVectorT *)(other.data_ptr_);
-            MultiVectorT *base_dst_ptr = ((MultiVectorT *)(data_ptr_)) + tail_index_.load();
+            auto *base_src_ptr = (MultiVectorT *)(other.data_ptr_.get());
+            MultiVectorT *base_dst_ptr = ((MultiVectorT *)(data_ptr_.get())) + tail_index_.load();
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
             for (size_t idx = 0; idx < count; ++idx) {
                 const MultiVectorT &src_ref = base_src_ptr[from + idx];
@@ -2152,8 +2149,8 @@ void ColumnVector::AppendWith(const ColumnVector &other, size_t from, size_t cou
             break;
         }
         case LogicalType::kTensor: {
-            auto *base_src_ptr = (TensorT *)(other.data_ptr_);
-            TensorT *base_dst_ptr = ((TensorT *)(data_ptr_)) + tail_index_.load();
+            auto *base_src_ptr = (TensorT *)(other.data_ptr_.get());
+            TensorT *base_dst_ptr = ((TensorT *)(data_ptr_.get())) + tail_index_.load();
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
             for (size_t idx = 0; idx < count; ++idx) {
                 const TensorT &src_ref = base_src_ptr[from + idx];
@@ -2163,8 +2160,8 @@ void ColumnVector::AppendWith(const ColumnVector &other, size_t from, size_t cou
             break;
         }
         case LogicalType::kTensorArray: {
-            auto *base_src_ptr = (TensorArrayT *)(other.data_ptr_);
-            TensorArrayT *base_dst_ptr = ((TensorArrayT *)(data_ptr_)) + tail_index_.load();
+            auto *base_src_ptr = (TensorArrayT *)(other.data_ptr_.get());
+            TensorArrayT *base_dst_ptr = ((TensorArrayT *)(data_ptr_.get())) + tail_index_.load();
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
             for (size_t idx = 0; idx < count; ++idx) {
                 const TensorArrayT &src_ref = base_src_ptr[from + idx];
@@ -2174,8 +2171,8 @@ void ColumnVector::AppendWith(const ColumnVector &other, size_t from, size_t cou
             break;
         }
         case LogicalType::kSparse: {
-            const auto *base_src_ptr = reinterpret_cast<const SparseT *>(other.data_ptr_);
-            auto *base_dst_ptr = reinterpret_cast<SparseT *>(data_ptr_) + tail_index_.load();
+            const auto *base_src_ptr = reinterpret_cast<const SparseT *>(other.data_ptr_.get());
+            auto *base_dst_ptr = reinterpret_cast<SparseT *>(data_ptr_.get()) + tail_index_.load();
             const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
             for (size_t idx = 0; idx < count; ++idx) {
                 const SparseT &src_sparse = base_src_ptr[from + idx];
@@ -2185,8 +2182,8 @@ void ColumnVector::AppendWith(const ColumnVector &other, size_t from, size_t cou
             break;
         }
         case LogicalType::kArray: {
-            const auto *base_src_ptr = reinterpret_cast<const ArrayT *>(other.data_ptr_);
-            auto *base_dst_ptr = reinterpret_cast<ArrayT *>(data_ptr_) + tail_index_.load();
+            const auto *base_src_ptr = reinterpret_cast<const ArrayT *>(other.data_ptr_.get());
+            auto *base_dst_ptr = reinterpret_cast<ArrayT *>(data_ptr_.get()) + tail_index_.load();
             const auto *array_info = static_cast<const ArrayInfo *>(data_type_->type_info().get());
             for (size_t idx = 0; idx < count; ++idx) {
                 const ArrayT &src_array = base_src_ptr[from + idx];
@@ -2251,8 +2248,8 @@ void ColumnVector::AppendWith(const ColumnVector &other, size_t from, size_t cou
             //        }
         case LogicalType::kEmbedding: {
             //            auto *base_src_ptr = (EmbeddingT *)(other.data_ptr_);
-            auto *base_src_ptr = other.data_ptr_;
-            char *base_dst_ptr = data_ptr_ + tail_index_.load() * data_type_->Size();
+            auto *base_src_ptr = other.data_ptr_.get();
+            char *base_dst_ptr = data_ptr_.get() + tail_index_.load() * data_type_->Size();
             for (size_t idx = 0; idx < count; ++idx) {
                 char *src_ptr = base_src_ptr + (from + idx) * data_type_->Size();
                 char *dst_ptr = base_dst_ptr + idx * data_type_->Size();
@@ -2298,7 +2295,7 @@ size_t ColumnVector::AppendWith(RowID from, size_t row_count) {
         appended_rows = capacity_ - tail_index;
     }
 
-    char *dst_ptr = data_ptr_ + tail_index * data_type_size_;
+    char *dst_ptr = data_ptr_.get() + tail_index * data_type_size_;
     for (size_t i = 0; i < row_count; i++) {
         *(RowID *)dst_ptr = RowID(from.segment_id_, from.segment_offset_ + i);
         dst_ptr += data_type_size_;
@@ -2343,7 +2340,7 @@ void ColumnVector::Reset() {
         // So, when ColumnVector is destructed, this part need to free here.
         // TODO: we are going to manage the nested object in ColumnVector.
         for (size_t idx = 0; idx < tail_index_.load(); ++idx) {
-            ((MixedT *)data_ptr_)[idx].Reset();
+            ((MixedT *)data_ptr_.get())[idx].Reset();
         }
     }
 
@@ -2386,7 +2383,7 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
         return other.data_type_->type() == LogicalType::kBoolean &&
                VectorBuffer::CompactBitIsSame(this->buffer_, this->tail_index_.load(), other.buffer_, other.tail_index_.load());
     } else {
-        return 0 == std::memcmp(this->data_ptr_, other.data_ptr_, this->tail_index_.load() * this->data_type_size_);
+        return 0 == std::memcmp(this->data_ptr_.get(), other.data_ptr_.get(), this->tail_index_.load() * this->data_type_size_);
     }
     return true;
 }
@@ -2427,10 +2424,10 @@ void ColumnVector::WriteAdv(char *&ptr) const {
     WriteBufAdv<i32>(ptr, tail_index_.load());
     if (vector_type_ == ColumnVectorType::kCompactBit) {
         size_t byte_size = (this->tail_index_.load() + 7) / 8;
-        std::memcpy(ptr, this->data_ptr_, byte_size);
+        std::memcpy(ptr, this->data_ptr_.get(), byte_size);
         ptr += byte_size;
     } else {
-        std::memcpy(ptr, this->data_ptr_, this->tail_index_.load() * this->data_type_size_);
+        std::memcpy(ptr, this->data_ptr_.get(), this->tail_index_.load() * this->data_type_size_);
         ptr += this->tail_index_.load() * this->data_type_size_;
     }
     // write variable part
@@ -2450,11 +2447,11 @@ std::shared_ptr<ColumnVector> ColumnVector::ReadAdv(const char *&ptr, i32 maxbyt
     column_vector->tail_index_.store(tail_index);
     if (vector_type == ColumnVectorType::kCompactBit) {
         size_t byte_size = (tail_index + 7) / 8;
-        std::memcpy((void *)column_vector->data_ptr_, ptr, byte_size);
+        std::memcpy((void *)column_vector->data_ptr_.get(), ptr, byte_size);
         ptr += byte_size;
     } else {
         i32 data_type_size = data_type->Size();
-        std::memcpy((void *)column_vector->data_ptr_, ptr, tail_index * data_type_size);
+        std::memcpy((void *)column_vector->data_ptr_.get(), ptr, tail_index * data_type_size);
         ptr += tail_index * data_type_size;
     }
     // read variable part
@@ -2559,20 +2556,20 @@ ColumnVector::GetArray(const ArrayT &src_array, const VectorBuffer *src_buffer, 
 
 std::pair<std::span<const char>, size_t> ColumnVector::GetMultiVectorRaw(size_t idx) const {
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
-    const MultiVectorT &src_multi_vec = reinterpret_cast<const MultiVectorT *>(data_ptr_)[idx];
-    return ColumnVector::GetMultiVector(src_multi_vec, buffer_.get(), embedding_info);
+    const auto &src_multi_vec = reinterpret_cast<const MultiVectorT *>(data_ptr_.get())[idx];
+    return GetMultiVector(src_multi_vec, buffer_.get(), embedding_info);
 }
 
 std::pair<std::span<const char>, size_t> ColumnVector::GetTensorRaw(size_t idx) const {
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
-    const TensorT &src_tensor = reinterpret_cast<const TensorT *>(data_ptr_)[idx];
-    return ColumnVector::GetTensor(src_tensor, buffer_.get(), embedding_info);
+    const auto &src_tensor = reinterpret_cast<const TensorT *>(data_ptr_.get())[idx];
+    return GetTensor(src_tensor, buffer_.get(), embedding_info);
 }
 
 std::vector<std::pair<std::span<const char>, size_t>> ColumnVector::GetTensorArrayRaw(size_t idx) const {
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
-    const TensorArrayT &src_tensor_array = reinterpret_cast<const TensorArrayT *>(data_ptr_)[idx];
-    return ColumnVector::GetTensorArray(src_tensor_array, buffer_.get(), embedding_info);
+    const auto &src_tensor_array = reinterpret_cast<const TensorArrayT *>(data_ptr_.get())[idx];
+    return GetTensorArray(src_tensor_array, buffer_.get(), embedding_info);
 }
 
 Value ColumnVector::GetArrayValue(const ArrayT &source) const {
@@ -2598,7 +2595,7 @@ bool ColumnVector::AppendUnnestArray(const ColumnVector &other, size_t offset, s
         UnrecoverableError("Attempt to unnest array with different element type");
     }
 
-    ArrayT &array_val = reinterpret_cast<ArrayT *>(other.data_ptr_)[offset];
+    auto &array_val = reinterpret_cast<ArrayT *>(other.data_ptr_.get())[offset];
     const auto &[span_data, array_size] = other.GetArray(array_val, other.buffer_.get(), array_info);
     const auto *raw_data = span_data.data();
 
@@ -2670,7 +2667,7 @@ bool ColumnVector::AppendUnnestArray(const ColumnVector &other, size_t offset, s
 //////////////////////////////tensor end////////////////////////////////////
 
 void ColumnVector::AppendSparseRaw(const char *raw_data_ptr, const char *raw_index_ptr, size_t nnz, size_t dst_off) {
-    auto &sparse = reinterpret_cast<SparseT *>(data_ptr_)[dst_off];
+    auto &sparse = reinterpret_cast<SparseT *>(data_ptr_.get())[dst_off];
     sparse.nnz_ = nnz;
     if (nnz == 0) {
         sparse.file_offset_ = -1;
@@ -2681,7 +2678,7 @@ void ColumnVector::AppendSparseRaw(const char *raw_data_ptr, const char *raw_ind
 }
 
 std::tuple<std::span<const char>, std::span<const char>, size_t> ColumnVector::GetSparseRaw(size_t index) const {
-    const auto &sparse = reinterpret_cast<const SparseT *>(data_ptr_)[index];
+    const auto &sparse = reinterpret_cast<const SparseT *>(data_ptr_.get())[index];
     size_t nnz = sparse.nnz_;
     if (nnz == 0) {
         return {std::span<const char>(), std::span<const char>(), 0};
@@ -2703,7 +2700,7 @@ void ColumnVector::AppendVarcharInner(std::span<const char> data, VarcharT &varc
 }
 
 void ColumnVector::AppendVarcharInner(std::span<const char> data, size_t dst_off) {
-    auto &varchar = reinterpret_cast<VarcharT *>(data_ptr_)[dst_off];
+    auto &varchar = reinterpret_cast<VarcharT *>(data_ptr_.get())[dst_off];
     AppendVarcharInner(data, varchar);
 }
 
@@ -2714,7 +2711,7 @@ void ColumnVector::AppendVarchar(std::span<const char> data) {
 
 std::span<const char> ColumnVector::GetVarcharInner(const VarcharT &varchar) const {
     i32 length = varchar.length_;
-    const char *data = nullptr;
+    const char *data{};
     if (varchar.IsInlined()) {
         data = varchar.short_.data_;
     } else {
@@ -2724,7 +2721,7 @@ std::span<const char> ColumnVector::GetVarcharInner(const VarcharT &varchar) con
 }
 
 std::span<const char> ColumnVector::GetVarchar(size_t index) const {
-    const auto &varchar = reinterpret_cast<const VarcharT *>(data_ptr_)[index];
+    const auto &varchar = reinterpret_cast<const VarcharT *>(data_ptr_.get())[index];
     return GetVarcharInner(varchar);
 }
 
@@ -2816,7 +2813,7 @@ void CopyArray(ArrayT &dst_array,
     auto loop_copy = [&]<typename T>() {
         const auto elem_size = array_info->ElemSize();
         assert(raw_data.size() == element_num * elem_size);
-        const auto dst_array_data = std::make_unique_for_overwrite<char[]>(raw_data.size());
+        const auto dst_array_data = std::make_shared_for_overwrite<char[]>(raw_data.size());
         const auto *elem_type_info = elem_type.type_info().get();
         for (size_t i = 0; i < element_num; ++i) {
             T src_v{}, dst_v{};

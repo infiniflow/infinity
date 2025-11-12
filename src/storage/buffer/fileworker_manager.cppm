@@ -49,9 +49,15 @@ public:
 
     Status RemoveCleanList(KVInstance *kv_instance);
 
+    void RemoveImport(TransactionID txn_id);
+
     inline PersistenceManager *persistence_manager() const { return persistence_manager_; }
 
     void AddToCleanList(FileWorker *file_worker);
+
+    void MoveFiles();
+
+    std::unordered_map<std::string, std::shared_ptr<BlockVersion>> some_map_;
 
 private:
     std::shared_ptr<std::string> data_dir_;

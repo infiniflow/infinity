@@ -987,7 +987,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
         {
             Value value = Value::MakeVarchar("database_name");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -996,7 +996,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
             const std::string *table_name = database_info->db_name_.get();
             Value value = Value::MakeVarchar(*table_name);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1005,7 +1005,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
         {
             Value value = Value::MakeVarchar("storage_directory");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -1013,7 +1013,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
             // Append database storage directory to the 1 column
             Value value = Value::MakeVarchar(database_info->absolute_db_path_ ? *database_info->absolute_db_path_ : "N/A");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1022,7 +1022,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
         {
             Value value = Value::MakeVarchar("table_count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -1030,7 +1030,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
             // Append database storage directory to the 1 column
             Value value = Value::MakeVarchar(std::to_string(database_info->table_count_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1039,14 +1039,14 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
         {
             Value value = Value::MakeVarchar("comment");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(*(database_info->db_comment_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1075,14 +1075,14 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("database_name");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(db_name_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1091,7 +1091,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("table_name");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -1099,7 +1099,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
             const std::string *table_name = table_info->table_name_.get();
             Value value = Value::MakeVarchar(*table_name);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1108,14 +1108,14 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("table_comment");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(*table_info->table_comment_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1124,14 +1124,14 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("storage_directory");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(*table_info->table_full_dir_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1140,14 +1140,14 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("column_count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(table_info->column_count_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1156,14 +1156,14 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("segment_count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(table_info->segment_count_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1193,14 +1193,14 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("database_name");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(db_name_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1209,14 +1209,14 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("table_name");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(*object_name_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1225,14 +1225,14 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("index_name");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(index_name_.value());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
     {
@@ -1240,14 +1240,14 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("index_comment");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(*(table_index_info->index_comment_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
     {
@@ -1255,14 +1255,14 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("index_type");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(*table_index_info->index_type_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1271,14 +1271,14 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("index_column_names");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(*table_index_info->index_column_names_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1287,14 +1287,14 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("index_column_ids");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(*table_index_info->index_column_ids_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1303,14 +1303,14 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("other_parameters");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(*table_index_info->index_other_params_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
     {
@@ -1318,7 +1318,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("storage_directory");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -1326,7 +1326,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
             const std::string *table_dir = table_index_info->index_entry_dir_.get();
             Value value = Value::MakeVarchar(*table_dir);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
     //    {
@@ -1365,14 +1365,14 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("segment_index_count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(table_index_info->segment_index_count_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1402,14 +1402,14 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
         {
             Value value = Value::MakeVarchar("segment_id");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(segment_id_.value()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1419,14 +1419,14 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
         {
             Value value = Value::MakeVarchar("storage_path");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(full_segment_index_dir);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1435,7 +1435,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
         {
             Value value = Value::MakeVarchar("index_segment_size");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -1458,7 +1458,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
 
             Value value = Value::MakeVarchar(index_size_str);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1467,14 +1467,14 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
         {
             Value value = Value::MakeVarchar("chunk_count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(segment_index_info->chunk_count_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1498,21 +1498,21 @@ void PhysicalShow::ExecuteShowIndexChunks(QueryContext *query_context, ShowOpera
         {
             Value value = Value::MakeBigInt(chunk_index_info.first);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(chunk_index_info.second->base_name_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeBigInt(chunk_index_info.second->row_cnt_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1548,14 +1548,14 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
         {
             Value value = Value::MakeVarchar("file_name");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(base_name);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1564,14 +1564,14 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
         {
             Value value = Value::MakeVarchar("start_row");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(base_row_id.ToString());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1580,14 +1580,14 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
         {
             Value value = Value::MakeVarchar("row_count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(row_cnt));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1596,14 +1596,14 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
         {
             Value value = Value::MakeVarchar("deprecate_timestamp");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(deprecate_ts));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -1620,7 +1620,7 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
 void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     // Get tables from catalog
     std::vector<DatabaseDetail> databases_detail;
-    NewTxn *txn = query_context->GetNewTxn();
+    auto *txn = query_context->GetNewTxn();
     std::vector<std::string> db_names;
     Status status = txn->ListDatabase(db_names);
     if (!status.ok()) {
@@ -1641,7 +1641,7 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
     }
 
     // Prepare the output data block
-    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    auto output_block_ptr = DataBlock::MakeUniquePtr();
     size_t row_count = 0;
     output_block_ptr->Init(*output_types_);
 
@@ -1657,7 +1657,7 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
             const std::string *db_name = database_detail.db_name_.get();
             Value value = Value::MakeVarchar(*db_name);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -1666,7 +1666,7 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
             const std::string *db_entry_dir = database_detail.db_entry_dir_.get();
             Value value = Value::MakeVarchar(*db_entry_dir);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -1675,7 +1675,7 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
             const std::string *db_comment = database_detail.db_comment_.get();
             Value value = Value::MakeVarchar(*db_comment);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         if (++row_count == output_block_ptr->capacity()) {
@@ -1728,7 +1728,7 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
             const std::string *db_name = table_detail_ptr->db_name_.get();
             Value value = Value::MakeVarchar(*db_name);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -1736,7 +1736,7 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
             const std::string *table_name = table_detail_ptr->table_name_.get();
             Value value = Value::MakeVarchar(*table_name);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -1744,42 +1744,42 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
             const std::string *table_id = table_detail_ptr->table_id_.get();
             Value value = Value::MakeVarchar(*table_id);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeBigInt(static_cast<i64>(table_detail_ptr->column_count_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeBigInt(static_cast<i64>(table_detail_ptr->segment_count_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeBigInt(static_cast<i64>(table_detail_ptr->block_count_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeBigInt(static_cast<i64>(table_detail_ptr->create_ts_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(*table_detail_ptr->table_comment_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         if (++row_count == output_block_ptr->capacity()) {
@@ -1821,21 +1821,21 @@ void PhysicalShow::ExecuteShowTasks(QueryContext *query_context, ShowOperatorSta
                 oss << std::put_time(task_tm, "%Y-%m-%d %H:%M:%S");
                 Value value = Value::MakeVarchar(oss.str());
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
 
             ++column_id;
             {
                 Value value = Value::MakeVarchar(ToString(bg_task_info_ptr->type_));
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
 
             ++column_id;
             {
                 Value value = Value::MakeVarchar(bg_task_info_ptr->status_list_[j]);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
 
             ++column_id;
@@ -1843,7 +1843,7 @@ void PhysicalShow::ExecuteShowTasks(QueryContext *query_context, ShowOperatorSta
                 std::string task_text = bg_task_info_ptr->task_info_list_[j];
                 Value value = Value::MakeVarchar(task_text);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
 
             if (++row_count == output_block_ptr->capacity()) {
@@ -1878,7 +1878,7 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
 
         // Output record no
         ValueExpression record_no_expr(Value::MakeVarchar(fmt::format("{}", i)));
-        record_no_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        record_no_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
 
         // Output each query phase
         i64 total_cost{};
@@ -1889,13 +1889,13 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
 
             std::chrono::nanoseconds duration(this_time);
             ValueExpression phase_cost_expr(Value::MakeVarchar(BaseProfiler::ElapsedToString(duration)));
-            phase_cost_expr.AppendToChunk(output_block_ptr->column_vectors[j + 1]);
+            phase_cost_expr.AppendToChunk(output_block_ptr->column_vectors_[j + 1]);
         }
 
         // Output total query duration
         std::chrono::nanoseconds total_duration(total_cost);
         ValueExpression phase_cost_expr(Value::MakeVarchar(BaseProfiler::ElapsedToString(total_duration)));
-        phase_cost_expr.AppendToChunk(output_block_ptr->column_vectors.back());
+        phase_cost_expr.AppendToChunk(output_block_ptr->column_vectors_.back());
 
         if (++row_count == output_block_ptr->capacity()) {
             output_block_ptr->Finalize();
@@ -1947,7 +1947,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
             // Append column name to the 1st column
             Value value = Value::MakeVarchar(column->name());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[output_column_idx]);
         }
 
         ++output_column_idx;
@@ -1956,7 +1956,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
             std::string column_type = column->type()->ToString();
             Value value = Value::MakeVarchar(column_type);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[output_column_idx]);
         }
 
         ++output_column_idx;
@@ -1965,7 +1965,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
             std::string column_default = column->default_expr_->ToString();
             Value value = Value::MakeVarchar(column_default);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[output_column_idx]);
         }
 
         ++output_column_idx;
@@ -1973,7 +1973,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
             // Append column comment to the 4th column
             Value value = Value::MakeVarchar(column->comment());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[output_column_idx]);
         }
 
         if (++row_count == output_block_ptr->capacity()) {
@@ -2015,7 +2015,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
         {
             Value value = Value::MakeBigInt(segment_info->segment_id_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -2023,7 +2023,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
             //            SegmentEntry::SegmentStatusToString(segment_info->status_)
             Value value = Value::MakeVarchar("No value");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -2047,7 +2047,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
             //            }
             Value value = Value::MakeVarchar(segment_size_str);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         if (++row_count == output_block_ptr->capacity()) {
@@ -2082,14 +2082,14 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
         {
             Value value = Value::MakeVarchar("id");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(segment_info->segment_id_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2098,7 +2098,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
         {
             Value value = Value::MakeVarchar("status");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -2106,7 +2106,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
             // SegmentEntry::SegmentStatusToString(segment_info->status_)
             Value value = Value::MakeVarchar("No value");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2115,7 +2115,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
         {
             Value value = Value::MakeVarchar("path");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -2123,7 +2123,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
             //            Value value = Value::MakeVarchar(*segment_info->segment_dir_);
             Value value = Value::MakeVarchar("TODO");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2132,7 +2132,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
         {
             Value value = Value::MakeVarchar("storage_size");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -2141,7 +2141,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
             segment_size_str = Utility::FormatByteSize(segment_info->storage_size_);
             Value value = Value::MakeVarchar(segment_size_str);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2150,14 +2150,14 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
         {
             Value value = Value::MakeVarchar("block_count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(segment_info->block_count_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2166,14 +2166,14 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
         {
             Value value = Value::MakeVarchar("row_capacity");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(segment_info->row_capacity_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2182,14 +2182,14 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
         {
             Value value = Value::MakeVarchar("row_count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(segment_info->row_count_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2198,14 +2198,14 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
         {
             Value value = Value::MakeVarchar("actual_row_count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(segment_info->actual_row_count_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2214,14 +2214,14 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
         {
             Value value = Value::MakeVarchar("room");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(segment_info->row_capacity_ - segment_info->row_count_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2230,14 +2230,14 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
         {
             Value value = Value::MakeVarchar("column_count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(segment_info->column_count_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2270,7 +2270,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
         {
             Value value = Value::MakeBigInt(block_info->block_id_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
         ++column_id;
         {
@@ -2316,14 +2316,14 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
             std::string block_size_str = Utility::FormatByteSize(block_size);
             Value value = Value::MakeVarchar(block_size_str);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeBigInt(block_info->row_count_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         if (++row_count == output_block_ptr->capacity()) {
@@ -2359,14 +2359,14 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
         {
             Value value = Value::MakeVarchar("id");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(block_info->block_id_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2375,7 +2375,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
         {
             Value value = Value::MakeVarchar("path");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -2383,7 +2383,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
             std::string full_block_dir = std::filesystem::path(InfinityContext::instance().config()->DataDir()) / *block_info->block_dir_;
             Value value = Value::MakeVarchar(full_block_dir);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2392,7 +2392,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
         {
             Value value = Value::MakeVarchar("storage_size");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -2401,7 +2401,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
             std::string block_storage_size_str = Utility::FormatByteSize(block_storage_size);
             Value value = Value::MakeVarchar(block_storage_size_str);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2410,7 +2410,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
         {
             Value value = Value::MakeVarchar("row_capacity");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -2418,7 +2418,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
             size_t row_capacity = block_info->row_capacity_;
             Value value = Value::MakeVarchar(std::to_string(row_capacity));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2427,7 +2427,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
         {
             Value value = Value::MakeVarchar("row_count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -2435,7 +2435,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
             size_t row_count = block_info->row_count_;
             Value value = Value::MakeVarchar(std::to_string(row_count));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2444,7 +2444,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
         {
             Value value = Value::MakeVarchar("checkpoint_row_count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -2452,7 +2452,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
             size_t checkpoint_row_count = block_info->checkpoint_row_count_;
             Value value = Value::MakeVarchar(std::to_string(checkpoint_row_count));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2461,7 +2461,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
         {
             Value value = Value::MakeVarchar("column_count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -2469,7 +2469,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
             size_t column_count = block_info->column_count_;
             Value value = Value::MakeVarchar(std::to_string(column_count));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2478,7 +2478,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
         {
             Value value = Value::MakeVarchar("checkpoint_ts");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -2486,7 +2486,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
             size_t checkpoint_ts = block_info->checkpoint_ts_;
             Value value = Value::MakeVarchar(std::to_string(checkpoint_ts));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2513,14 +2513,14 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
         {
             Value value = Value::MakeVarchar("column_id");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(block_column_info->column_id_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2529,14 +2529,14 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
         {
             Value value = Value::MakeVarchar("data_type");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(block_column_info->data_type_->ToString());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2545,7 +2545,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
         {
             Value value = Value::MakeVarchar("storage_path");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -2553,7 +2553,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
             Value value = Value::MakeVarchar("TODO");
             //            Value value = Value::MakeVarchar(*block_column_info->filename_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2562,14 +2562,14 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
         {
             Value value = Value::MakeVarchar("extra_file_count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(block_column_info->extra_file_count_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2578,7 +2578,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
         {
             Value value = Value::MakeVarchar("storage_size");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -2586,7 +2586,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
             std::string storage_size_str = Utility::FormatByteSize(block_column_info->storage_size_);
             Value value = Value::MakeVarchar(storage_size_str);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2595,7 +2595,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
         {
             Value value = Value::MakeVarchar("extra_file_name");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -2608,7 +2608,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
 
             Value value = Value::MakeVarchar(outline_storage);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -2629,20 +2629,20 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
         {
             Value value = Value::MakeVarchar(VERSION_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
 
         {
             // option value
             Value value = Value::MakeVarchar(global_config->Version());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option description
             Value value = Value::MakeVarchar("Infinity version.");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -2650,7 +2650,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
         { // option name
             Value value = Value::MakeVarchar(TIME_ZONE_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
@@ -2658,18 +2658,18 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             if (time_zone_bias >= 0) {
                 Value value = Value::MakeVarchar(fmt::format("{}+{}", global_config->TimeZone(), time_zone_bias));
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
             } else {
                 Value value = Value::MakeVarchar(fmt::format("{}{}", global_config->TimeZone(), time_zone_bias));
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
             }
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Time zone information.");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -2678,19 +2678,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(CPU_LIMIT_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->CPULimit()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("CPU number used by infinity executor.");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -2699,19 +2699,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(RECORD_RUNNING_QUERY_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = global_config->RecordRunningQuery() ? Value::MakeVarchar("true") : Value::MakeVarchar("false");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("To record running query");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -2720,19 +2720,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(SERVER_ADDRESS_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(global_config->ServerAddress());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Infinity server ip");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -2741,19 +2741,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(PEER_SERVER_IP_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(global_config->PeerServerIP());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Infinity peer server ip");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -2762,19 +2762,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(PEER_SERVER_PORT_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->PeerServerPort()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Infinity peer server port");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -2783,19 +2783,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(POSTGRES_PORT_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->PostgresPort()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Postgres port");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -2804,19 +2804,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(HTTP_PORT_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->HTTPPort()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("HTTP port");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -2825,19 +2825,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(CLIENT_PORT_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->ClientPort()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Thrift RPC port");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -2846,19 +2846,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(CONNECTION_POOL_SIZE_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->ConnectionPoolSize()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Connection pool capacity.");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -2867,19 +2867,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(PEER_SERVER_CONNECTION_POOL_SIZE_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->PeerServerConnectionPoolSize()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Connection pool capacity.");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -2888,19 +2888,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(LOG_FILENAME_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(global_config->LogFileName());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Log file name");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -2909,19 +2909,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(LOG_DIR_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(global_config->LogDir());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Log directory");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -2930,19 +2930,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(LOG_TO_STDOUT_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = global_config->LogToStdout() ? Value::MakeVarchar("true") : Value::MakeVarchar("false");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("If log is also output to standard output");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -2951,19 +2951,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(LOG_FILE_MAX_SIZE_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->LogFileMaxSize()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Max log file size");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -2972,19 +2972,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(LOG_FILE_ROTATE_COUNT_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->LogFileRotateCount()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Log files rotation limitation");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -2993,19 +2993,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(LOG_LEVEL_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(LogLevel2Str(global_config->GetLogLevel()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Log level");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3015,19 +3015,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
                 // option name
                 Value value = Value::MakeVarchar(PERSISTENCE_DIR_OPTION_NAME);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             }
             {
                 // option name type
                 Value value = Value::MakeVarchar(global_config->PersistenceDir());
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
             }
             {
                 // option name type
                 Value value = Value::MakeVarchar("Virtual filesystem directory");
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
             }
         }
 
@@ -3036,19 +3036,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
                 // option name
                 Value value = Value::MakeVarchar(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             }
             {
                 // option name type
                 Value value = Value::MakeVarchar(std::to_string(global_config->PersistenceObjectSizeLimit()));
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
             }
             {
                 // option name type
                 Value value = Value::MakeVarchar("Virtual file limitation");
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
             }
         }
     } else {
@@ -3057,19 +3057,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
                 // option name
                 Value value = Value::MakeVarchar(DATA_DIR_OPTION_NAME);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             }
             {
                 // option name type
                 Value value = Value::MakeVarchar(global_config->DataDir());
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
             }
             {
                 // option name type
                 Value value = Value::MakeVarchar("Data directory");
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
             }
         }
     }
@@ -3079,19 +3079,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(CATALOG_DIR_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(global_config->CatalogDir());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Catalog directory");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3100,19 +3100,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(SNAPSHOT_DIR_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(global_config->SnapshotDir());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Snapshot directory");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3121,19 +3121,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(CLEANUP_INTERVAL_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->CleanupInterval()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Cleanup period interval");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3142,19 +3142,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(COMPACT_INTERVAL_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->CompactInterval()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Compact period interval");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3163,19 +3163,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(OPTIMIZE_INTERVAL_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->OptimizeIndexInterval()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Optimize memory index period interval");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3184,19 +3184,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(MEM_INDEX_CAPACITY_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->MemIndexCapacity()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Real-time index building row capacity");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3205,19 +3205,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(SNAPSHOT_DIR_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(global_config->SnapshotDir());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Snapshot storage directory");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3226,19 +3226,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(DENSE_INDEX_BUILDING_WORKER_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->DenseIndexBuildingWorker()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Dense vector index building worker count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3247,19 +3247,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(SPARSE_INDEX_BUILDING_WORKER_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->SparseIndexBuildingWorker()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Sparse vector index building worker count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3268,19 +3268,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(FULLTEXT_INDEX_BUILDING_WORKER_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->FulltextIndexBuildingWorker()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Full-text index building worker count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3289,19 +3289,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(BUFFER_MANAGER_SIZE_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->BufferManagerSize()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Buffer manager memory size");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3310,19 +3310,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(TEMP_DIR_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(global_config->TempDir());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Temporary data directory");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3331,19 +3331,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(WAL_DIR_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(global_config->WALDir());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Write ahead log data directory");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3352,19 +3352,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(WAL_COMPACT_THRESHOLD_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->WALCompactThreshold()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Write ahead log compact triggering threshold");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3373,19 +3373,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(CHECKPOINT_INTERVAL_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->CheckpointInterval()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Checkpoint period interval");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3394,19 +3394,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(WAL_FLUSH_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(FlushOptionTypeToString(global_config->FlushMethodAtCommit()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Write ahead log flush method");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3415,19 +3415,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(RESOURCE_DIR_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(global_config->ResourcePath());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Infinity resource directory");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3436,19 +3436,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(PEER_RETRY_DELAY_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->PeerRetryDelay()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Peer retry delay");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3457,19 +3457,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(PEER_RETRY_COUNT_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->PeerRetryCount()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Peer retry count");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
     {
@@ -3477,19 +3477,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(PEER_CONNECT_TIMEOUT_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->PeerConnectTimeout()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Peer connect timeout");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
     {
@@ -3497,19 +3497,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(PEER_RECV_TIMEOUT_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->PeerRecvTimeout()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Peer receive timeout");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
     {
@@ -3517,19 +3517,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             // option name
             Value value = Value::MakeVarchar(PEER_SEND_TIMEOUT_OPTION_NAME);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->PeerSendTimeout()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // option name type
             Value value = Value::MakeVarchar("Peer send timeout");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
     }
 
@@ -3572,7 +3572,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
                 // Append index name to the first column
                 Value value = Value::MakeVarchar(*table_index_info->index_name_);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
             ++column_id;
             {
@@ -3580,35 +3580,35 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
                 std::string comment = *table_index_info->index_comment_;
                 Value value = Value::MakeVarchar(comment);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
             ++column_id;
             {
                 // Append index method type to the second column
                 Value value = Value::MakeVarchar(*table_index_info->index_type_);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
             ++column_id;
             {
                 // Append index column id
                 Value value = Value::MakeVarchar(*table_index_info->index_column_ids_);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
             ++column_id;
             {
                 // Append index column names to the third column
                 Value value = Value::MakeVarchar(*table_index_info->index_column_names_);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
             ++column_id;
             {
                 // Append index path
                 Value value = Value::MakeVarchar(*table_index_info->index_entry_dir_);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
             ++column_id;
             {
@@ -3617,14 +3617,14 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
                 std::string result_value = fmt::format("{}", segment_index_count);
                 Value value = Value::MakeVarchar(result_value);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
             ++column_id;
             {
                 // Append index other parameters to the fourth column
                 Value value = Value::MakeVarchar(*table_index_info->index_other_params_);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
             }
 
             if (++row_count == output_block_ptr->capacity()) {
@@ -3668,7 +3668,7 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
 
             Value value = Value::MakeBigInt(session_ptr->query_count());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case SessionVariable::kTotalCommitCount: {
@@ -3688,7 +3688,7 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
 
             Value value = Value::MakeBigInt(session_ptr->committed_txn_count());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case SessionVariable::kTotalRollbackCount: {
@@ -3708,7 +3708,7 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
 
             Value value = Value::MakeBigInt(session_ptr->rollbacked_txn_count());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case SessionVariable::kConnectedTime: {
@@ -3728,7 +3728,7 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
 
             Value value = Value::MakeVarchar(session_ptr->ConnectedTimeToStr());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         default: {
@@ -3758,19 +3758,19 @@ void PhysicalShow::ExecuteShowSessionVariables(QueryContext *query_context, Show
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     Value value = Value::MakeVarchar(std::to_string(session_ptr->query_count()));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Accomplished query count in this session");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -3779,19 +3779,19 @@ void PhysicalShow::ExecuteShowSessionVariables(QueryContext *query_context, Show
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     Value value = Value::MakeVarchar(std::to_string(session_ptr->query_count()));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Committed count in this session");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -3800,19 +3800,19 @@ void PhysicalShow::ExecuteShowSessionVariables(QueryContext *query_context, Show
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     Value value = Value::MakeVarchar(std::to_string(session_ptr->query_count()));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Rollbacked transaction count in this session");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -3821,19 +3821,19 @@ void PhysicalShow::ExecuteShowSessionVariables(QueryContext *query_context, Show
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     Value value = Value::MakeVarchar(session_ptr->ConnectedTimeToStr());
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Connected timestamp of this session");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -3876,7 +3876,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             output_block_ptr->Init(output_column_types);
             Value value = Value::MakeVarchar(config->ResultCache());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kCacheResultCapacity: {
@@ -3902,7 +3902,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             output_block_ptr->Init(output_column_types);
             Value value = Value::MakeBigInt(cache_mgr->cache_num_capacity());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kCacheResultNum: {
@@ -3928,7 +3928,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             output_block_ptr->Init(output_column_types);
             Value value = Value::MakeBigInt(cache_mgr->cache_num_used());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kMemoryCacheMiss: {
@@ -3951,7 +3951,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             output_block_ptr->Init(output_column_types);
             Value value = Value::MakeVarchar(fmt::format("{}/{}", cache_miss_count, total_request_count));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kDiskCacheMiss: {
@@ -3970,7 +3970,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             output_block_ptr->Init(output_column_types);
             Value value = Value::MakeVarchar(fmt::format("{}/{}", VirtualStore::CacheMissCount(), VirtualStore::TotalRequestCount()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kQueryCount: {
@@ -3989,7 +3989,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             output_block_ptr->Init(output_column_types);
             Value value = Value::MakeBigInt(query_context->session_manager()->total_query_count());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kSessionCount: {
@@ -4011,7 +4011,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             u64 session_count = session_manager->GetSessionCount();
             Value value = Value::MakeBigInt(session_count);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         // case GlobalVariable::kBufferPoolUsage: {
@@ -4055,7 +4055,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             Value value = Value::MakeVarchar("round robin");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kNextTxnID: {
@@ -4076,7 +4076,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             auto *new_txn_mgr = query_context->storage()->new_txn_manager();
             Value value = Value::MakeBigInt(new_txn_mgr->current_transaction_id());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kBufferedObjectCount: {
@@ -4097,7 +4097,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             FileWorkerManager *buffer_manager = query_context->storage()->fileworker_manager();
             Value value = Value::MakeBigInt(buffer_manager->BufferedObjectCount());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         // case GlobalVariable::kUnusedBufferObjectCount: {
@@ -4145,7 +4145,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             Value value = Value::MakeBigInt(active_txn_count);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kCurrentTs: {
@@ -4169,7 +4169,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             Value value = Value::MakeBigInt(current_ts);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kTotalCommitCount: {
@@ -4193,7 +4193,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             Value value = Value::MakeBigInt(total_committed_txn_count);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kTotalRollbackCount: {
@@ -4217,7 +4217,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             Value value = Value::MakeBigInt(total_rollbacked_txn_count);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kActiveWALFilename: {
@@ -4238,7 +4238,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             WalManager *wal_manager = query_context->storage()->wal_manager();
             Value value = Value::MakeVarchar(wal_manager->GetWalFilename());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kProfileRecordCapacity: {
@@ -4259,7 +4259,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             auto *catalog_ptr = query_context->storage()->new_catalog();
             Value value = Value::MakeBigInt(catalog_ptr->ProfileHistorySize());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kBackgroundTaskCount: {
@@ -4281,7 +4281,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             size_t running_task_count = bg_processor->RunningTaskCount();
             Value value = Value::MakeBigInt(running_task_count);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kRunningBGTask: {
@@ -4302,7 +4302,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             BGTaskProcessor *bg_processor = query_context->storage()->bg_processor();
             Value value = Value::MakeVarchar(bg_processor->RunningTaskText());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kRunningCompactTask: {
@@ -4323,7 +4323,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             CompactionProcessor *compaction_processor = query_context->storage()->compaction_processor();
             Value value = Value::MakeBigInt(compaction_processor->RunningTaskCount());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kRunningOptimizeTask: {
@@ -4344,7 +4344,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             OptimizationProcessor *optimize_processor = query_context->storage()->optimization_processor();
             Value value = Value::MakeBigInt(optimize_processor->RunningTaskCount());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kSystemMemoryUsage: {
@@ -4365,7 +4365,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             i64 memory_usage = SystemInfo::MemoryUsage();
             Value value = Value::MakeBigInt(memory_usage);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kOpenFileCount: {
@@ -4386,7 +4386,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             i64 open_file_count = SystemInfo::OpenFileCount();
             Value value = Value::MakeBigInt(open_file_count);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kCPUUsage: {
@@ -4407,7 +4407,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             f64 cpu_usage = SystemInfo::CPUUsage();
             Value value = Value::MakeDouble(cpu_usage * 100);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kJeProf: {
@@ -4424,7 +4424,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             Value value = Value::MakeVarchar("on");
 #endif
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case GlobalVariable::kFollowerNum: {
@@ -4449,7 +4449,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 i64 follower_number = InfinityContext::instance().cluster_manager()->GetFollowerLimit();
                 Value value = Value::MakeBigInt(follower_number);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             } else {
                 operator_state->status_ = Status::NotSupport(fmt::format("follower_number isn't supported in non-leader node of cluster deployment"));
                 RecoverableError(operator_state->status_);
@@ -4473,7 +4473,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             Value value = Value::MakeBool(InfinityContext::instance().storage()->new_catalog()->GetProfile());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         default: {
@@ -4504,19 +4504,19 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     Value value = Value::MakeVarchar(result_cache_status);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Result cache num");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4531,19 +4531,19 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     Value value = Value::MakeVarchar(std::to_string(cache_num_capacity));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Result cache capacity");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4558,19 +4558,19 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     Value value = Value::MakeVarchar(std::to_string(cache_num_used));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Result cache num");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4582,19 +4582,19 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     Value value = Value::MakeVarchar(fmt::format("{}/{}", cache_miss_count, total_request_count));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Memory cache miss");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4603,19 +4603,19 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     Value value = Value::MakeVarchar(fmt::format("{}/{}", VirtualStore::CacheMissCount(), VirtualStore::TotalRequestCount()));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Disk cache miss");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4624,19 +4624,19 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     Value value = Value::MakeVarchar(std::to_string(query_context->session_manager()->total_query_count()));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Query count in total");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4645,7 +4645,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
@@ -4653,13 +4653,13 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     u64 session_count = session_manager->GetSessionCount();
                     Value value = Value::MakeVarchar(std::to_string(session_count));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Session count in total");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4693,19 +4693,19 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     Value value = Value::MakeVarchar("round robin");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Task scheduling policy");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4714,20 +4714,20 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     auto *new_txn_mgr = query_context->storage()->new_txn_manager();
                     Value value = Value::MakeVarchar(std::to_string(new_txn_mgr->current_transaction_id()));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Next transaction id of system");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4736,20 +4736,20 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     FileWorkerManager *buffer_manager = query_context->storage()->fileworker_manager();
                     Value value = Value::MakeVarchar(std::to_string(buffer_manager->BufferedObjectCount()));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Buffered object count in buffer manager");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4782,7 +4782,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
@@ -4792,13 +4792,13 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
 
                     Value value = Value::MakeVarchar(std::to_string(active_txn_count));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Active transaction count");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4807,7 +4807,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
@@ -4817,13 +4817,13 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
 
                     Value value = Value::MakeVarchar(std::to_string(current_ts));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Current timestamp");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4832,7 +4832,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
@@ -4842,13 +4842,13 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
 
                     Value value = Value::MakeVarchar(std::to_string(total_committed_txn_count));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Global committed transaction count");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4857,7 +4857,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
@@ -4867,13 +4867,13 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
 
                     Value value = Value::MakeVarchar(std::to_string(total_rollbacked_txn_count));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Global rolled back transaction count");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4882,20 +4882,20 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     WalManager *wal_manager = query_context->storage()->wal_manager();
                     Value value = Value::MakeVarchar(wal_manager->GetWalFilename());
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Write ahead log filename");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4904,20 +4904,20 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     auto *catalog_ptr = query_context->storage()->new_catalog();
                     Value value = Value::MakeVarchar(std::to_string(catalog_ptr->ProfileHistorySize()));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Profile record history capacity");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4926,7 +4926,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
@@ -4934,13 +4934,13 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     size_t running_task_count = bg_processor->RunningTaskCount();
                     Value value = Value::MakeVarchar(std::to_string(running_task_count));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Background tasks count");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4949,20 +4949,20 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     BGTaskProcessor *bg_processor = query_context->storage()->bg_processor();
                     Value value = Value::MakeVarchar(bg_processor->RunningTaskText());
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Current running background task");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4971,7 +4971,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
@@ -4982,13 +4982,13 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     }
                     Value value = Value::MakeVarchar(task_count);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Current running background task");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -4997,20 +4997,20 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     i64 memory_usage = SystemInfo::MemoryUsage();
                     Value value = Value::MakeVarchar(std::to_string(memory_usage));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Infinity system memory usage.");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -5019,20 +5019,20 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     i64 open_file_count = SystemInfo::OpenFileCount();
                     Value value = Value::MakeVarchar(std::to_string(open_file_count));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("File description opened count by Infinity.");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -5041,20 +5041,20 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
                     f64 cpu_usage = SystemInfo::CPUUsage();
                     Value value = Value::MakeVarchar(fmt::format("{:.{}f}", cpu_usage * 100, 2));
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Infinity system CPU usage.");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -5063,7 +5063,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
 #ifdef ENABLE_JEMALLOC_PROF
@@ -5073,13 +5073,13 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     Value value = Value::MakeVarchar("on");
 #endif
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Use jemalloc to profile Infinity");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -5091,20 +5091,20 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                             // option name
                             Value value = Value::MakeVarchar(var_name);
                             ValueExpression value_expr(value);
-                            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                         }
                         {
                             // option value
                             size_t follower_count = InfinityContext::instance().cluster_manager()->GetFollowerLimit();
                             Value value = Value::MakeVarchar(std::to_string(follower_count));
                             ValueExpression value_expr(value);
-                            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                         }
                         {
                             // option description
                             Value value = Value::MakeVarchar("Follower number for Infinity cluster");
                             ValueExpression value_expr(value);
-                            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                         }
                     }
                 }
@@ -5115,7 +5115,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option name
                     Value value = Value::MakeVarchar(var_name);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // option value
@@ -5123,13 +5123,13 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     std::string enable_profile_condition = enable_profile ? "true" : "false";
                     Value value = Value::MakeVarchar(enable_profile_condition);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
                 {
                     // option description
                     Value value = Value::MakeVarchar("Enable profile");
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
                 }
                 break;
             }
@@ -5173,7 +5173,7 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
             IntegerOption *integer_option = static_cast<IntegerOption *>(base_option);
             Value value = Value::MakeBigInt(integer_option->value_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case BaseOptionDataType::kFloat: {
@@ -5185,7 +5185,7 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
             FloatOption *float_option = static_cast<FloatOption *>(base_option);
             Value value = Value::MakeDouble(float_option->value_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case BaseOptionDataType::kString: {
@@ -5210,7 +5210,7 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
             }
             Value value = Value::MakeVarchar(value_str);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case BaseOptionDataType::kBoolean: {
@@ -5222,7 +5222,7 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
             BooleanOption *boolean_option = static_cast<BooleanOption *>(base_option);
             Value value = Value::MakeBool(boolean_option->value_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case BaseOptionDataType::kLogLevel: {
@@ -5234,7 +5234,7 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
             LogLevelOption *loglevel_option = static_cast<LogLevelOption *>(base_option);
             Value value = Value::MakeVarchar(LogLevel2Str(loglevel_option->value_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         case BaseOptionDataType::kFlush: {
@@ -5246,7 +5246,7 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
             FlushOption *flush_option = static_cast<FlushOption *>(base_option);
             Value value = Value::MakeVarchar(FlushOptionTypeToString(flush_option->value_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
         default: {
@@ -5352,31 +5352,31 @@ void PhysicalShow::ExecuteShowQueries(QueryContext *query_context, ShowOperatorS
             // session_id
             Value value = Value::MakeBigInt(session_id);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // query_id
             Value value = Value::MakeBigInt(query_info.query_id_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // query_kind
             Value value = Value::MakeVarchar(query_info.query_kind_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
         {
             // start_time
             Value value = Value::MakeVarchar(query_info.profiler_.BeginTime());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[3]);
         }
         {
             // time_consumption
             Value value = Value::MakeVarchar(query_info.profiler_.ElapsedToString());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[4]);
         }
 
         ++row_count;
@@ -5409,14 +5409,14 @@ void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("session_id");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(*session_id_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -5425,14 +5425,14 @@ void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("query_id");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(query_info_ptr->query_id_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -5441,14 +5441,14 @@ void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("start_time");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(query_info_ptr->profiler_.BeginTime());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -5457,14 +5457,14 @@ void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("time_consumption");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(query_info_ptr->profiler_.ElapsedToString());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -5473,14 +5473,14 @@ void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorSta
         {
             Value value = Value::MakeVarchar("query_text");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(query_info_ptr->query_text_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -5509,7 +5509,7 @@ void PhysicalShow::ExecuteShowTransactions(QueryContext *query_context, ShowOper
             // txn_id
             Value value = Value::MakeBigInt(txn_info.txn_id_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // txn_text
@@ -5519,7 +5519,7 @@ void PhysicalShow::ExecuteShowTransactions(QueryContext *query_context, ShowOper
             }
             Value value = Value::MakeVarchar(txn_string);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
 
         ++row_count;
@@ -5554,14 +5554,14 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
         {
             Value value = Value::MakeVarchar("transaction_id");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(*txn_id_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -5570,14 +5570,14 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
         {
             Value value = Value::MakeVarchar("session_id");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(*session_id_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -5586,7 +5586,7 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
         {
             Value value = Value::MakeVarchar("transaction_text");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -5597,7 +5597,7 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
             }
             Value value = Value::MakeVarchar(txn_string);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -5633,7 +5633,7 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
             }
             Value value = Value::MakeVarchar(txn_id_str);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
 
         {
@@ -5644,28 +5644,28 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
             }
             Value value = Value::MakeVarchar(txn_text);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
 
         {
             // txn begin_ts
             Value value = Value::MakeBigInt(txn_context->begin_ts_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
 
         {
             // txn commit_ts
             Value value = Value::MakeBigInt(txn_context->commit_ts_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[3]);
         }
 
         {
             // txn state
             Value value = Value::MakeVarchar(TxnState2Str(txn_context->state_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[4]);
         }
 
         {
@@ -5676,7 +5676,7 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
             }
             Value value = Value::MakeVarchar(transaction_type_str);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[5]);
         }
 
         {
@@ -5688,7 +5688,7 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
             }
             Value value = Value::MakeVarchar(ss.str());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[6]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[6]);
         }
 
         ++row_count;
@@ -5725,14 +5725,14 @@ void PhysicalShow::ExecuteShowLogs(QueryContext *query_context, ShowOperatorStat
                 // transaction_id
                 Value value = Value::MakeBigInt(wal_entry_ref->txn_id_);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             }
 
             {
                 // commit_ts
                 Value value = Value::MakeBigInt(wal_entry_ref->commit_ts_);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
             }
 
             {
@@ -5740,7 +5740,7 @@ void PhysicalShow::ExecuteShowLogs(QueryContext *query_context, ShowOperatorStat
                 std::string command_type = WalCmd::WalCommandTypeToString(cmd_ref->GetType());
                 Value value = Value::MakeVarchar(command_type);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
             }
 
             {
@@ -5748,7 +5748,7 @@ void PhysicalShow::ExecuteShowLogs(QueryContext *query_context, ShowOperatorStat
                 std::string command_text = cmd_ref->ToString();
                 Value value = Value::MakeVarchar(command_text);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[3]);
             }
 
             ++row_count;
@@ -5780,7 +5780,7 @@ void PhysicalShow::ExecuteShowCatalog(QueryContext *query_context, ShowOperatorS
     {
         Value value = Value::MakeVarchar(meta_str);
         ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
     }
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
@@ -5807,13 +5807,13 @@ void PhysicalShow::ExecuteListCatalogKey(QueryContext *query_context, ShowOperat
                 // key
                 Value value = Value::MakeVarchar(meta_pair.first);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             }
             {
                 // value
                 Value value = Value::MakeVarchar(meta_pair.second);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
             }
 
             ++row_count;
@@ -5840,13 +5840,13 @@ void PhysicalShow::ExecuteListCatalogKey(QueryContext *query_context, ShowOperat
                     // key
                     Value value = Value::MakeVarchar(meta_pair.first);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
                 }
                 {
                     // value
                     Value value = Value::MakeVarchar(meta_pair.second);
                     ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }
 
                 ++row_count;
@@ -5892,7 +5892,7 @@ void PhysicalShow::ExecuteShowCatalogToFile(QueryContext *query_context, ShowOpe
     {
         Value value = Value::MakeVarchar(status_message);
         ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
     }
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
@@ -5920,25 +5920,25 @@ void PhysicalShow::ExecuteShowPersistenceFiles(QueryContext *query_context, Show
             // file_name
             Value value = Value::MakeVarchar(file_pair.first);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // object_name
             Value value = Value::MakeVarchar(file_pair.second.obj_key_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // file offset
             Value value = Value::MakeBigInt(file_pair.second.part_offset_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
         {
             // file size
             Value value = Value::MakeBigInt(file_pair.second.part_size_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[3]);
         }
 
         ++row_count;
@@ -5976,25 +5976,25 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
             // name
             Value value = Value::MakeVarchar(object_pair.first);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // reference count
             Value value = Value::MakeBigInt(object_pair.second->ref_count_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
         {
             // size
             Value value = Value::MakeBigInt(object_pair.second->obj_size_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
         {
             // parts
             Value value = Value::MakeBigInt(object_pair.second->parts_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[3]);
         }
         {
             // deleted ranges
@@ -6005,7 +6005,7 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
             std::string deleted_ranges = oss.str();
             Value value = Value::MakeVarchar(deleted_ranges);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[4]);
         }
 
         ++row_count;
@@ -6049,13 +6049,13 @@ void PhysicalShow::ExecuteShowPersistenceObject(QueryContext *query_context, Sho
             // start
             Value value = Value::MakeBigInt(range.start_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
         {
             // end
             Value value = Value::MakeBigInt(range.end_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
 
         ++row_count;
@@ -6081,14 +6081,14 @@ void PhysicalShow::ExecuteShowMemory(QueryContext *query_context, ShowOperatorSt
         {
             Value value = Value::MakeVarchar("memory_objects");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(GlobalResourceUsage::GetObjectCountInfo());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -6097,14 +6097,14 @@ void PhysicalShow::ExecuteShowMemory(QueryContext *query_context, ShowOperatorSt
         {
             Value value = Value::MakeVarchar("memory_allocation");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(GlobalResourceUsage::GetRawMemoryInfo());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -6131,13 +6131,13 @@ void PhysicalShow::ExecuteShowMemoryObjects(QueryContext *query_context, ShowOpe
                 // object_name
                 Value value = Value::MakeVarchar(object_pair.first);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             }
             {
                 // object_count
                 Value value = Value::MakeBigInt(object_pair.second);
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
             }
 
             ++row_count;
@@ -6172,14 +6172,14 @@ void PhysicalShow::ExecuteShowMemoryAllocation(QueryContext *query_context, Show
             // name
             Value value = Value::MakeVarchar(raw_memory_pair.first);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
 
         {
             // total_memory
             Value value = Value::MakeBigInt(raw_memory_pair.second);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
 
         ++row_count;
@@ -6210,7 +6210,7 @@ void PhysicalShow::ExecuteShowFunction(QueryContext *query_context, ShowOperator
             // name
             Value value = Value::MakeVarchar(version_info);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
 
         fmt::print("Release: {}.{}.{} build on {} with {} mode from branch: {}, commit-id: {}\n",
@@ -6250,7 +6250,7 @@ void PhysicalShow::ExecuteListSnapshots(QueryContext *query_context, ShowOperato
             // snapshot name
             Value value = Value::MakeVarchar(snapshot_brief.snapshot_name_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
 
         {
@@ -6280,21 +6280,21 @@ void PhysicalShow::ExecuteListSnapshots(QueryContext *query_context, ShowOperato
             }
             Value value = Value::MakeVarchar(scope_str);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
 
         {
             // snapshot create time
             Value value = Value::MakeVarchar(snapshot_brief.create_time_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
 
         {
             // snapshot commit ts
             Value value = Value::MakeBigInt(snapshot_brief.commit_ts_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[3]);
         }
 
         {
@@ -6302,7 +6302,7 @@ void PhysicalShow::ExecuteListSnapshots(QueryContext *query_context, ShowOperato
             std::string snapshot_size_str = Utility::FormatByteSize(snapshot_brief.size_);
             Value value = Value::MakeVarchar(snapshot_size_str);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[4]);
         }
 
         ++row_count;
@@ -6343,14 +6343,14 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
         {
             Value value = Value::MakeVarchar("snapshot_name");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(snapshot_brief.snapshot_name_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -6359,7 +6359,7 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
         {
             Value value = Value::MakeVarchar("snapshot_scope");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -6390,7 +6390,7 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
 
             Value value = Value::MakeVarchar(scope_str);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -6399,14 +6399,14 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
         {
             Value value = Value::MakeVarchar("create_time");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(snapshot_brief.create_time_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -6415,14 +6415,14 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
         {
             Value value = Value::MakeVarchar("commit_timestamp");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(snapshot_brief.commit_ts_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -6431,7 +6431,7 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
         {
             Value value = Value::MakeVarchar("snapshot_size");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
 
         ++column_id;
@@ -6439,7 +6439,7 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
             std::string snapshot_size_str = Utility::FormatByteSize(snapshot_brief.size_);
             Value value = Value::MakeVarchar(snapshot_size_str);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
     }
 
@@ -6466,28 +6466,28 @@ void PhysicalShow::ExecuteListCaches(QueryContext *query_context, ShowOperatorSt
             // name
             Value value = Value::MakeVarchar(cache_item->name());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
 
         {
             // cache type
             Value value = Value::MakeVarchar(ToString(cache_item->type()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
 
         {
             // commit ts
             Value value = Value::MakeBigInt(cache_item->commit_ts());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
 
         {
             // detailed info
             Value value = Value::MakeVarchar(cache_item->detail());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[3]);
         }
 
         ++row_count;
@@ -6518,28 +6518,28 @@ void PhysicalShow::ExecuteShowCache(QueryContext *query_context, ShowOperatorSta
             // cache_type
             Value value = Value::MakeVarchar("database");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
 
         {
             // db cache number
             Value value = Value::MakeBigInt(db_cache_status.item_count_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
 
         {
             // hit count
             Value value = Value::MakeBigInt(db_cache_status.hit_count_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
 
         {
             // request count
             Value value = Value::MakeBigInt(db_cache_status.request_count_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[3]);
         }
 
         {
@@ -6550,7 +6550,7 @@ void PhysicalShow::ExecuteShowCache(QueryContext *query_context, ShowOperatorSta
             }
             Value value = Value::MakeDouble(hit_rate);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[4]);
         }
     }
 
@@ -6561,28 +6561,28 @@ void PhysicalShow::ExecuteShowCache(QueryContext *query_context, ShowOperatorSta
             // cache_type
             Value value = Value::MakeVarchar("table");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
 
         {
             // db cache number
             Value value = Value::MakeBigInt(table_cache_status.item_count_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
 
         {
             // hit count
             Value value = Value::MakeBigInt(table_cache_status.hit_count_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
 
         {
             // request count
             Value value = Value::MakeBigInt(table_cache_status.request_count_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[3]);
         }
 
         {
@@ -6593,7 +6593,7 @@ void PhysicalShow::ExecuteShowCache(QueryContext *query_context, ShowOperatorSta
             }
             Value value = Value::MakeDouble(hit_rate);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[4]);
         }
     }
 
@@ -6604,28 +6604,28 @@ void PhysicalShow::ExecuteShowCache(QueryContext *query_context, ShowOperatorSta
             // cache_type
             Value value = Value::MakeVarchar("index");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
 
         {
             // db cache number
             Value value = Value::MakeBigInt(index_cache_status.item_count_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
 
         {
             // hit count
             Value value = Value::MakeBigInt(index_cache_status.hit_count_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
 
         {
             // request count
             Value value = Value::MakeBigInt(index_cache_status.request_count_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[3]);
         }
 
         {
@@ -6637,7 +6637,7 @@ void PhysicalShow::ExecuteShowCache(QueryContext *query_context, ShowOperatorSta
 
             Value value = Value::MakeDouble(hit_rate);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[4]);
         }
     }
 
@@ -6668,28 +6668,28 @@ void PhysicalShow::ExecuteListCompact(QueryContext *query_context, ShowOperatorS
             // txn
             Value value = Value::MakeBigInt(txn_compact_info->txn_id_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
 
         {
             // begin ts
             Value value = Value::MakeBigInt(txn_compact_info->begin_ts_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
 
         {
             // commit ts
             Value value = Value::MakeBigInt(txn_compact_info->commit_ts_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
 
         {
             // committed
             Value value = Value::MakeBool(txn_compact_info->committed_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[3]);
         }
 
         {
@@ -6697,7 +6697,7 @@ void PhysicalShow::ExecuteListCompact(QueryContext *query_context, ShowOperatorS
             if (txn_compact_info->deprecated_segment_ids_.empty()) {
                 Value value = Value::MakeVarchar("null");
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[4]);
             } else {
                 Value value = Value::MakeVarchar(fmt::format("{}({}).{}({}), [{}]->[{}]",
                                                              txn_compact_info->db_name_,
@@ -6707,7 +6707,7 @@ void PhysicalShow::ExecuteListCompact(QueryContext *query_context, ShowOperatorS
                                                              fmt::join(txn_compact_info->deprecated_segment_ids_, ","),
                                                              txn_compact_info->new_segment_id_));
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[4]);
             }
         }
 
@@ -6747,42 +6747,42 @@ void PhysicalShow::ExecuteListCheckpoint(QueryContext *query_context, ShowOperat
             // txn
             Value value = Value::MakeBigInt(txn_checkpoint_info->txn_id_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
 
         {
             // begin ts
             Value value = Value::MakeBigInt(txn_checkpoint_info->begin_ts_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
 
         {
             // commit ts
             Value value = Value::MakeBigInt(txn_checkpoint_info->commit_ts_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
 
         {
             // committed
             Value value = Value::MakeBool(txn_checkpoint_info->committed_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[3]);
         }
 
         {
             // checkpoint ts
             Value value = Value::MakeBigInt(txn_checkpoint_info->checkpoint_ts_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[4]);
         }
 
         {
             // checkpoint type
             Value value = Value::MakeVarchar(txn_checkpoint_info->auto_flush_ ? "auto" : "manual");
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[5]);
         }
 
         {
@@ -6790,11 +6790,11 @@ void PhysicalShow::ExecuteListCheckpoint(QueryContext *query_context, ShowOperat
             if (txn_checkpoint_info->entries_.empty()) {
                 Value value = Value::MakeVarchar("null");
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[6]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[6]);
             } else {
                 Value value = Value::MakeVarchar(fmt::format("entries: {}", txn_checkpoint_info->entries_.size()));
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[6]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[6]);
             }
         }
 
@@ -6841,7 +6841,7 @@ void PhysicalShow::ExecuteShowCheckpoint(QueryContext *query_context, ShowOperat
 
             Value value = Value::MakeVarchar(meta_str);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
     }
@@ -6873,28 +6873,28 @@ void PhysicalShow::ExecuteListOptimize(QueryContext *query_context, ShowOperator
             // txn
             Value value = Value::MakeBigInt(txn_optimize_info->txn_id_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
 
         {
             // begin ts
             Value value = Value::MakeBigInt(txn_optimize_info->begin_ts_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
 
         {
             // commit ts
             Value value = Value::MakeBigInt(txn_optimize_info->commit_ts_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
 
         {
             // committed
             Value value = Value::MakeBool(txn_optimize_info->committed_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[3]);
         }
 
         {
@@ -6902,7 +6902,7 @@ void PhysicalShow::ExecuteListOptimize(QueryContext *query_context, ShowOperator
             if (txn_optimize_info->deprecated_chunk_ids_.empty()) {
                 Value value = Value::MakeVarchar("null");
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[4]);
             } else {
                 Value value = Value::MakeVarchar(fmt::format("{}({}).{}({}).{}({}).{}, [{}]->[{}]",
                                                              txn_optimize_info->db_name_,
@@ -6915,7 +6915,7 @@ void PhysicalShow::ExecuteListOptimize(QueryContext *query_context, ShowOperator
                                                              fmt::join(txn_optimize_info->deprecated_chunk_ids_, ","),
                                                              txn_optimize_info->new_chunk_id_));
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[4]);
             }
         }
 
@@ -6949,28 +6949,28 @@ void PhysicalShow::ExecuteListImport(QueryContext *query_context, ShowOperatorSt
             // txn
             Value value = Value::MakeBigInt(txn_import_info->txn_id_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
 
         {
             // begin ts
             Value value = Value::MakeBigInt(txn_import_info->begin_ts_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
 
         {
             // commit ts
             Value value = Value::MakeBigInt(txn_import_info->commit_ts_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
 
         {
             // committed
             Value value = Value::MakeBool(txn_import_info->committed_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[3]);
         }
 
         {
@@ -6984,7 +6984,7 @@ void PhysicalShow::ExecuteListImport(QueryContext *query_context, ShowOperatorSt
                                              txn_import_info->row_count_);
             Value value = Value::MakeVarchar(detail);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[4]);
         }
 
         ++row_count;
@@ -7023,28 +7023,28 @@ void PhysicalShow::ExecuteListClean(QueryContext *query_context, ShowOperatorSta
             // txn
             Value value = Value::MakeBigInt(txn_clean_info->txn_id_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
 
         {
             // begin ts
             Value value = Value::MakeBigInt(txn_clean_info->begin_ts_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
         }
 
         {
             // commit ts
             Value value = Value::MakeBigInt(txn_clean_info->commit_ts_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
         }
 
         {
             // committed
             Value value = Value::MakeBool(txn_clean_info->committed_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[3]);
         }
 
         {
@@ -7052,12 +7052,12 @@ void PhysicalShow::ExecuteListClean(QueryContext *query_context, ShowOperatorSta
             if (txn_clean_info->dropped_keys_.empty() && txn_clean_info->metas_.empty()) {
                 Value value = Value::MakeVarchar("null");
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[4]);
             } else {
                 Value value = Value::MakeVarchar(
                     fmt::format("dropped_key: {}, dropped_meta: {}", txn_clean_info->dropped_keys_.size(), txn_clean_info->metas_.size()));
                 ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors_[4]);
             }
         }
 
@@ -7100,7 +7100,7 @@ void PhysicalShow::ExecuteShowClean(QueryContext *query_context, ShowOperatorSta
 
             Value value = Value::MakeVarchar(meta_str);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
         }
     }

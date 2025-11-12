@@ -205,7 +205,7 @@ TEST_P(TestTxnIndexInternal, test_index0) {
         }
 
         FileWorker *file_worker = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(file_worker);
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -264,7 +264,7 @@ TEST_P(TestTxnIndexInternal, test_index0) {
         }
 
         FileWorker *file_worker = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(file_worker);
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -291,9 +291,9 @@ TEST_P(TestTxnIndexInternal, test_index0) {
 TEST_P(TestTxnIndexInternal, SLOW_test_index) {
     using namespace infinity;
 
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto column3_type_info = std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 4);
@@ -529,7 +529,7 @@ TEST_P(TestTxnIndexInternal, SLOW_test_index) {
         }
 
         FileWorker *file_worker = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(file_worker);
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         // {
@@ -629,7 +629,7 @@ TEST_P(TestTxnIndexInternal, SLOW_test_index) {
         // int32_t end_val = 3;
 
         FileWorker *file_worker = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(file_worker);
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         // {
@@ -704,9 +704,9 @@ TEST_P(TestTxnIndexInternal, SLOW_test_index) {
 TEST_P(TestTxnIndexInternal, test_populate_index0) {
     using namespace infinity;
 
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
@@ -731,31 +731,31 @@ TEST_P(TestTxnIndexInternal, test_populate_index0) {
         EXPECT_TRUE(status.ok());
     }
     u32 block_row_cnt = 8192;
-    auto make_input_block = [&]() {
-        auto input_block = std::make_shared<DataBlock>();
-        auto append_to_col = [&](ColumnVector &col, Value v1, Value v2) {
-            for (u32 i = 0; i < block_row_cnt; i += 2) {
-                col.AppendValue(v1);
-                col.AppendValue(v2);
-            }
-        };
-        // Initialize input block
-        {
-            auto col1 = ColumnVector::Make(column_def1->type());
-            col1->Initialize();
-            append_to_col(*col1, Value::MakeInt(1), Value::MakeInt(2));
-            input_block->InsertVector(col1, 0);
-        }
-        {
-            auto col2 = ColumnVector::Make(column_def2->type());
-            col2->Initialize();
-            append_to_col(*col2, Value::MakeVarchar("abc"), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-            input_block->InsertVector(col2, 1);
-        }
-        input_block->Finalize();
-        return input_block;
-    };
     {
+        auto make_input_block = [&]() {
+            auto input_block = std::make_shared<DataBlock>();
+            auto append_to_col = [&](ColumnVector &col, Value v1, Value v2) {
+                for (u32 i = 0; i < block_row_cnt; i += 2) {
+                    col.AppendValue(v1);
+                    col.AppendValue(v2);
+                }
+            };
+            // Initialize input block
+            {
+                auto col1 = ColumnVector::Make(column_def1->type());
+                col1->Initialize();
+                append_to_col(*col1, Value::MakeInt(1), Value::MakeInt(2));
+                input_block->InsertVector(col1, 0);
+            }
+            {
+                auto col2 = ColumnVector::Make(column_def2->type());
+                col2->Initialize();
+                append_to_col(*col2, Value::MakeVarchar("abc"), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+                input_block->InsertVector(col2, 1);
+            }
+            input_block->Finalize();
+            return input_block;
+        };
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("import"), TransactionType::kImport);
         std::vector<std::shared_ptr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
         Status status = txn->Import(*db_name, *table_name, input_blocks);
@@ -815,7 +815,7 @@ TEST_P(TestTxnIndexInternal, test_populate_index0) {
         }
 
         FileWorker *file_worker = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(file_worker);
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -838,9 +838,9 @@ TEST_P(TestTxnIndexInternal, test_populate_index0) {
 TEST_P(TestTxnIndexInternal, SLOW_test_populate_index) {
     using namespace infinity;
 
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto column3_type_info = std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 4);
@@ -1056,7 +1056,7 @@ TEST_P(TestTxnIndexInternal, SLOW_test_populate_index) {
         }
 
         FileWorker *file_worker = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(file_worker);
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);

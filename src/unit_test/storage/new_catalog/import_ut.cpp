@@ -317,7 +317,7 @@ TEST_P(TestTxnImport, test_import_with_index) {
             }
 
             FileWorker *file_worker = nullptr;
-            status = chunk_index_meta.GetIndexBuffer(file_worker);
+            status = chunk_index_meta.GetFileWorker(file_worker);
             EXPECT_TRUE(status.ok());
         };
         {
@@ -548,7 +548,7 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
             }
 
             FileWorker *file_worker = nullptr;
-            status = chunk_index_meta.GetIndexBuffer(file_worker);
+            status = chunk_index_meta.GetFileWorker(file_worker);
             EXPECT_TRUE(status.ok());
         };
         {

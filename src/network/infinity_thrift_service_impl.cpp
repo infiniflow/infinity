@@ -2930,7 +2930,7 @@ Status InfinityThriftService::ProcessColumns(const std::shared_ptr<DataBlock> &d
                                              std::vector<infinity_thrift_rpc::ColumnField> &columns) {
     auto row_count = data_block->row_count();
     for (size_t col_index = 0; col_index < column_count; ++col_index) {
-        auto &result_column_vector = data_block->column_vectors[col_index];
+        auto &result_column_vector = data_block->column_vectors_[col_index];
         infinity_thrift_rpc::ColumnField &output_column_field = columns[col_index];
         output_column_field.__set_column_type(DataTypeToProtoColumnType(result_column_vector->data_type()));
         Status status = ProcessColumnFieldType(output_column_field, row_count, result_column_vector);
@@ -3036,7 +3036,7 @@ void InfinityThriftService::HandleTimeRelatedTypes(infinity_thrift_rpc::ColumnFi
     auto size = column_vector->data_type()->Size() * row_count;
     std::string dst;
     dst.resize(size);
-    std::memcpy(dst.data(), column_vector->data(), size);
+    std::memcpy(dst.data(), column_vector->data().get(), size);
     output_column_field.column_vectors.emplace_back(std::move(dst));
 }
 
@@ -3058,7 +3058,7 @@ void InfinityThriftService::HandlePodType(infinity_thrift_rpc::ColumnField &outp
     auto size = column_vector->data_type()->Size() * row_count;
     std::string dst;
     dst.resize(size);
-    std::memcpy(dst.data(), column_vector->data(), size);
+    std::memcpy(dst.data(), column_vector->data().get(), size);
     output_column_field.column_vectors.emplace_back(std::move(dst));
 }
 
@@ -3168,7 +3168,7 @@ void InfinityThriftService::HandleArrayType(infinity_thrift_rpc::ColumnField &ou
     if (column_data_type.type() != LogicalType::kArray) {
         UnrecoverableError(fmt::format("{}: Unexpected data type: {}, expect Array!", __func__, column_vector->data_type()->ToString()));
     }
-    auto *array_data_ptr = reinterpret_cast<const ArrayT *>(column_vector->data());
+    auto *array_data_ptr = reinterpret_cast<const ArrayT *>(column_vector->data().get());
     std::string dst;
     for (size_t index = 0; index < row_count; ++index) {
         HandleArrayTypeRecursively(dst, column_data_type, array_data_ptr[index], column_vector);
@@ -3192,7 +3192,7 @@ void InfinityThriftService::HandleVarcharType(infinity_thrift_rpc::ColumnField &
                                               size_t row_count,
                                               const std::shared_ptr<ColumnVector> &column_vector) {
     std::string dst;
-    const auto varchar_ptr = reinterpret_cast<const VarcharT *>(column_vector->data());
+    const auto varchar_ptr = reinterpret_cast<const VarcharT *>(column_vector->data().get());
     const auto &varchar_type = *column_vector->data_type();
     for (size_t i = 0; i < row_count; ++i) {
         HandleArrayTypeRecursively(dst, varchar_type, varchar_ptr[i], column_vector);
@@ -3207,7 +3207,7 @@ void InfinityThriftService::HandleEmbeddingType(infinity_thrift_rpc::ColumnField
     auto size = column_vector->data_type()->Size() * row_count;
     std::string dst;
     dst.resize(size);
-    std::memcpy(dst.data(), column_vector->data(), size);
+    std::memcpy(dst.data(), column_vector->data().get(), size);
     output_column_field.column_vectors.emplace_back(std::move(dst));
     output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
 }
@@ -3228,7 +3228,7 @@ void InfinityThriftService::HandleMultiVectorType(infinity_thrift_rpc::ColumnFie
                                                   size_t row_count,
                                                   const std::shared_ptr<ColumnVector> &column_vector) {
     std::string dst;
-    const auto mv_ptr = reinterpret_cast<const MultiVectorT *>(column_vector->data());
+    const auto mv_ptr = reinterpret_cast<const MultiVectorT *>(column_vector->data().get());
     const auto &mv_type = *column_vector->data_type();
     for (size_t i = 0; i < row_count; ++i) {
         HandleArrayTypeRecursively(dst, mv_type, mv_ptr[i], column_vector);
@@ -3253,7 +3253,7 @@ void InfinityThriftService::HandleTensorType(infinity_thrift_rpc::ColumnField &o
                                              size_t row_count,
                                              const std::shared_ptr<ColumnVector> &column_vector) {
     std::string dst;
-    const auto tensor_ptr = reinterpret_cast<const TensorT *>(column_vector->data());
+    const auto tensor_ptr = reinterpret_cast<const TensorT *>(column_vector->data().get());
     const auto &tensor_type = *column_vector->data_type();
     for (size_t i = 0; i < row_count; ++i) {
         HandleArrayTypeRecursively(dst, tensor_type, tensor_ptr[i], column_vector);
@@ -3283,7 +3283,7 @@ void InfinityThriftService::HandleTensorArrayType(infinity_thrift_rpc::ColumnFie
                                                   size_t row_count,
                                                   const std::shared_ptr<ColumnVector> &column_vector) {
     std::string dst;
-    const auto tensor_array_ptr = reinterpret_cast<const TensorArrayT *>(column_vector->data());
+    const auto tensor_array_ptr = reinterpret_cast<const TensorArrayT *>(column_vector->data().get());
     const auto &tensor_array_type = *column_vector->data_type();
     for (size_t i = 0; i < row_count; ++i) {
         HandleArrayTypeRecursively(dst, tensor_array_type, tensor_array_ptr[i], column_vector);
@@ -3317,7 +3317,7 @@ void InfinityThriftService::HandleSparseType(infinity_thrift_rpc::ColumnField &o
                                              size_t row_count,
                                              const std::shared_ptr<ColumnVector> &column_vector) {
     std::string dst;
-    const auto sparse_ptr = reinterpret_cast<const SparseT *>(column_vector->data());
+    const auto sparse_ptr = reinterpret_cast<const SparseT *>(column_vector->data().get());
     const auto &sparse_type = *column_vector->data_type();
     for (size_t i = 0; i < row_count; ++i) {
         HandleArrayTypeRecursively(dst, sparse_type, sparse_ptr[i], column_vector);
@@ -3332,7 +3332,7 @@ void InfinityThriftService::HandleRowIDType(infinity_thrift_rpc::ColumnField &ou
     auto size = column_vector->data_type()->Size() * row_count;
     std::string dst;
     dst.resize(size);
-    std::memcpy(dst.data(), column_vector->data(), size);
+    std::memcpy(dst.data(), column_vector->data().get(), size);
     output_column_field.column_vectors.emplace_back(std::move(dst));
     output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
 }
@@ -3637,8 +3637,8 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowSnapshot
             for (size_t row_idx = 0; row_idx < row_count; row_idx += 2) {
                 // Each pair consists of a key row and a value row
                 if (row_idx + 1 < row_count) {
-                    auto &key_column = data_block->column_vectors[0];
-                    auto &value_column = data_block->column_vectors[1];
+                    auto &key_column = data_block->column_vectors_[0];
+                    auto &value_column = data_block->column_vectors_[1];
 
                     if (key_column->data_type()->type() == LogicalType::kVarchar && value_column->data_type()->type() == LogicalType::kVarchar) {
 
@@ -3697,35 +3697,35 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListSnapshot
                 infinity_thrift_rpc::SnapshotInfo snapshot_info;
 
                 // Extract snapshot name (column 0)
-                auto &name_column = data_block->column_vectors[0];
+                auto &name_column = data_block->column_vectors_[0];
                 if (name_column->data_type()->type() == LogicalType::kVarchar) {
                     auto varchar_value = name_column->GetValueByIndex(row_idx);
                     snapshot_info.__set_name(varchar_value.GetVarchar());
                 }
 
                 // Extract scope (column 1)
-                auto &scope_column = data_block->column_vectors[1];
+                auto &scope_column = data_block->column_vectors_[1];
                 if (scope_column->data_type()->type() == LogicalType::kVarchar) {
                     auto scope_value = scope_column->GetValueByIndex(row_idx);
                     snapshot_info.__set_scope(scope_value.GetVarchar());
                 }
 
                 // Extract create time (column 2)
-                auto &time_column = data_block->column_vectors[2];
+                auto &time_column = data_block->column_vectors_[2];
                 if (time_column->data_type()->type() == LogicalType::kVarchar) {
                     auto time_value = time_column->GetValueByIndex(row_idx);
                     snapshot_info.__set_time(time_value.GetVarchar());
                 }
 
                 // Extract commit timestamp (column 3)
-                auto &commit_column = data_block->column_vectors[3];
+                auto &commit_column = data_block->column_vectors_[3];
                 if (commit_column->data_type()->type() == LogicalType::kBigInt) {
                     auto commit_value = commit_column->GetValueByIndex(row_idx);
                     snapshot_info.__set_commit(commit_value.GetValue<BigIntT>());
                 }
 
                 // Extract size (column 4)
-                auto &size_column = data_block->column_vectors[4];
+                auto &size_column = data_block->column_vectors_[4];
                 if (size_column->data_type()->type() == LogicalType::kVarchar) {
                     auto size_value = size_column->GetValueByIndex(row_idx);
                     snapshot_info.__set_size(size_value.GetVarchar());

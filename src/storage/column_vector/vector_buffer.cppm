@@ -37,7 +37,7 @@ public:
     static std::shared_ptr<VectorBuffer> Make(size_t data_type_size, size_t capacity, VectorBufferType buffer_type);
 
     static std::shared_ptr<VectorBuffer>
-    Make(FileWorker *file_worker, FileWorker *var_file_worker, size_t data_type_size, size_t capacity, VectorBufferType buffer_type);
+    Make(FileWorker *data_file_worker, FileWorker *var_file_worker, size_t data_type_size, size_t capacity, VectorBufferType buffer_type);
 
 public:
     explicit VectorBuffer() {}
@@ -50,24 +50,25 @@ public:
 
     void InitializeCompactBit(FileWorker *file_worker, size_t capacity);
 
-    void Initialize(FileWorker *file_worker, FileWorker *var_file_worker, size_t type_size, size_t capacity);
+    void Initialize(FileWorker *data_file_worker, FileWorker *var_file_worker, size_t type_size, size_t capacity);
 
-    void SetToCatalog(FileWorker *file_worker, FileWorker *var_file_worker);
+    void SetToCatalog(FileWorker *data_file_worker, FileWorker *var_file_worker);
 
     void ResetToInit(VectorBufferType type);
 
     void Copy(char *input, size_t size);
 
-    [[nodiscard]] char *GetData() const {
-        if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
-            return std::get<std::unique_ptr<char[]>>(ptr_).get();
+    void GetData(std::shared_ptr<char[]> &data) const {
+        if (std::holds_alternative<std::shared_ptr<char[]>>(ptr_)) {
+            data = std::get<std::shared_ptr<char[]>>(ptr_);
+            return;
         }
-        void *data{};
         std::get<FileWorker *>(ptr_)->Read(data);
-        return static_cast<char *>(data);
     }
 
     [[nodiscard]] bool GetCompactBit(size_t idx) const;
+
+    void SetCompactBit(std::shared_ptr<char[]> &some_ptr, size_t idx, bool val);
 
     void SetCompactBit(size_t idx, bool val);
 
@@ -79,13 +80,13 @@ public:
 
     static void CopyCompactBits(u8 *dst, const u8 *src, size_t dst_start_id, size_t src_start_id, size_t count);
 
+    std::variant<std::shared_ptr<char[]>, FileWorker *> ptr_;
+
 private:
-    bool initialized_{false};
+    bool initialized_{};
 
-    std::variant<std::unique_ptr<char[]>, FileWorker *> ptr_;
-
-    size_t data_size_{0};
-    size_t capacity_{0};
+    size_t data_size_{};
+    size_t capacity_{};
 
 public:
     VectorBufferType buffer_type_{VectorBufferType::kInvalid};
@@ -132,7 +133,7 @@ public:
     VarBufferManager *var_buffer_mgr() const { return var_buffer_mgr_.get(); }
 
 private:
-    std::unique_ptr<VarBufferManager> var_buffer_mgr_{nullptr};
+    std::unique_ptr<VarBufferManager> var_buffer_mgr_;
 };
 
 template <typename DataType, typename IdxType>

@@ -1188,7 +1188,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_dump_index) {
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(0, chunk_id * block_row_cnt));
 
                 FileWorker *file_worker{};
-                status = chunk_index_meta.GetIndexBuffer(file_worker);
+                status = chunk_index_meta.GetFileWorker(file_worker);
                 EXPECT_TRUE(status.ok());
             }
         }
@@ -1334,7 +1334,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_optimize_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
 
             FileWorker *file_worker{};
-            status = chunk_index_meta.GetIndexBuffer(file_worker);
+            status = chunk_index_meta.GetFileWorker(file_worker);
             EXPECT_TRUE(status.ok());
         }
 

@@ -53,7 +53,7 @@ public:
 
     std::tuple<size_t, Status> GetRowCnt1();
 
-    std::tuple<FileWorker *, Status> GetVersionBuffer();
+    std::tuple<FileWorker *, Status> GetVersionFileWorker();
 
     std::vector<std::string> FilePaths();
 

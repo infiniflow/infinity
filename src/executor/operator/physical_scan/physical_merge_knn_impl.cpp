@@ -98,11 +98,11 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
         UnrecoverableError("Input data block is invalid");
     }
 
-    auto &dist_column = *input_data.column_vectors[column_n];
-    auto &row_id_column = *input_data.column_vectors[column_n + 1];
+    auto &dist_column = *input_data.column_vectors_[column_n];
+    auto &row_id_column = *input_data.column_vectors_[column_n + 1];
 
-    auto dists = reinterpret_cast<DataType *>(dist_column.data());
-    auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
+    auto dists = reinterpret_cast<DataType *>(dist_column.data().get());
+    auto row_ids = reinterpret_cast<RowID *>(row_id_column.data().get());
     size_t row_n = input_data.row_count();
     merge_knn->Search(dists, row_ids, row_n);
 

@@ -175,12 +175,11 @@ bool BlockVersion::SaveToFile(void *&mmap_p,
     return !is_modified;
 }
 
-void BlockVersion::LoadFromFile(void *&data, size_t &mmap_size, void *&mmap_p, LocalFileHandle *file_handle) {
+void BlockVersion::LoadFromFile(std::shared_ptr<BlockVersion> &data, size_t &mmap_size, void *&mmap_p, LocalFileHandle *file_handle) {
     // std::unique_lock<std::shared_mutex> lock(rw_mutex_);
-    // auto *block_version = static_cast<BlockVersion *>(data);
+    // this will waste a lot of memory....
+    auto block_version = std::make_unique<BlockVersion>(8192);
     if (!mmap_p) {
-        auto block_version = std::make_unique<BlockVersion>();
-
         BlockOffset create_size;
         file_handle->Read(&create_size, sizeof(create_size));
         block_version->created_.reserve(create_size);
@@ -202,9 +201,37 @@ void BlockVersion::LoadFromFile(void *&data, size_t &mmap_size, void *&mmap_p, L
             std::println("that code version: {}", mmap_size);
             mmap_p = nullptr;
         }
-        delete static_cast<BlockVersion *>(data);
-        data = block_version.release();
+    } else {
+        size_t offset{};
+
+        BlockOffset create_size{};
+
+        std::memcpy(&create_size, (char *)mmap_p + offset, sizeof(create_size));
+        offset += sizeof(create_size);
+
+        auto &created = block_version->created_;
+        created.resize(create_size);
+
+        for (size_t j = 0; j < create_size; ++j) {
+            std::memcpy(&created[j].create_ts_, (char *)mmap_p + offset, sizeof(TxnTimeStamp));
+            offset += sizeof(TxnTimeStamp);
+
+            std::memcpy(&created[j].row_count_, (char *)mmap_p + offset, sizeof(TxnTimeStamp));
+            offset += sizeof(TxnTimeStamp);
+        }
+
+        auto &deleted = block_version->deleted_;
+
+        BlockOffset capacity{};
+        std::memcpy(&capacity, (char *)mmap_p + offset, sizeof(capacity));
+        offset += sizeof(capacity);
+
+        for (auto &ts : deleted) {
+            std::memcpy(&ts, (char *)mmap_p + offset, sizeof(ts));
+            offset += sizeof(ts);
+        }
     }
+    data = std::move(block_version);
 }
 
 void BlockVersion::GetCreateTS(size_t offset, size_t size, ColumnVector &res) const {

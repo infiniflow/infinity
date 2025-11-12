@@ -1266,7 +1266,7 @@ std::tuple<std::shared_ptr<ChunkIndexMetaInfo>, Status> NewTxn::GetChunkIndexInf
 
 std::tuple<std::shared_ptr<SegmentInfo>, Status>
 NewTxn::GetSegmentInfo(const std::string &db_name, const std::string &table_name, SegmentID segment_id) {
-    std::shared_ptr<SegmentInfo> segment_info = std::make_shared<SegmentInfo>();
+    auto segment_info = std::make_shared<SegmentInfo>();
     std::shared_ptr<DBMeta> db_meta;
     std::shared_ptr<TableMeta> table_meta;
     TxnTimeStamp create_timestamp;
@@ -1645,10 +1645,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
     base_txn_store_ = std::make_shared<CheckpointTxnStore>(checkpoint_ts, auto_checkpoint);
     // auto *txn_store = static_cast<CheckpointTxnStore *>(base_txn_store_.get());
 
-    status = CheckpointInner();
-    if (!status.ok()) {
-        return status;
-    }
+    fileworker_mgr_->MoveFiles();
 
     auto *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
@@ -1665,7 +1662,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
     return Status::OK();
 }
 
-Status NewTxn::ReplayCheckpoint(WalCmdCheckpointV2 *optimize_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
+// Status NewTxn::ReplayCheckpoint(WalCmdCheckpointV2 *optimize_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
 
 void NewTxn::AddMetaKeyForCommit(const std::string &key) { keys_wait_for_commit_.push_back(key); }
 
@@ -2418,8 +2415,8 @@ Status NewTxn::PrepareCommitRenameTable(const WalCmdRenameTableV2 *rename_table_
 }
 
 Status NewTxn::PrepareCommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd) {
-    const std::string &db_name = add_columns_cmd->db_name_;
-    const std::string &table_name = add_columns_cmd->table_name_;
+    const auto &db_name = add_columns_cmd->db_name_;
+    const auto &table_name = add_columns_cmd->table_name_;
 
     std::shared_ptr<DBMeta> db_meta;
     std::shared_ptr<TableMeta> table_meta;
@@ -4694,6 +4691,7 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
     auto data_dir = static_cast<std::filesystem::path>(*data_dir_str);
     // Delete empty dir
     VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
+    VirtualStore::RecursiveCleanupAllEmptyDir("/var/infinity/tmp");
 
     return status;
 }
@@ -5355,10 +5353,7 @@ Status NewTxn::CheckpointForSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
         return status;
     }
 
-    status = CheckpointInner();
-    if (!status.ok()) {
-        return status;
-    }
+    fileworker_mgr_->MoveFiles();
 
     auto *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {

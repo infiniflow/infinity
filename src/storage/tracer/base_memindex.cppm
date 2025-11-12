@@ -93,7 +93,7 @@ public:
     std::string table_name_;
     std::string index_name_;
     SegmentID segment_id_{};
-    MemIndexTracer *tracer_{nullptr};
+    MemIndexTracer *tracer_{};
 
     mutable std::mutex mtx_; // protect row_cnt_, mem_used_;
     size_t row_cnt_{};

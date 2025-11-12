@@ -217,9 +217,9 @@ public:
                 result_null->SetAllTrue();
                 size_t count_bytes = count / 8;
                 size_t count_tail = count % 8;
-                auto left_u8 = reinterpret_cast<const u8 *>(left->data());
-                auto right_u8 = reinterpret_cast<const u8 *>(right->data());
-                auto result_u8 = reinterpret_cast<u8 *>(result->data());
+                auto left_u8 = reinterpret_cast<const u8 *>(left->data().get());
+                auto right_u8 = reinterpret_cast<const u8 *>(right->data().get());
+                auto result_u8 = reinterpret_cast<u8 *>(result->data().get());
                 for (size_t i = 0; i < count_bytes; ++i) {
                     Operator::Execute(left_u8[i], right_u8[i], result_u8[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
@@ -243,8 +243,8 @@ public:
                 result_null->SetAllTrue();
                 size_t count_bytes = count / 8;
                 size_t count_tail = count % 8;
-                auto right_u8 = reinterpret_cast<const u8 *>(right->data());
-                auto result_u8 = reinterpret_cast<u8 *>(result->data());
+                auto right_u8 = reinterpret_cast<const u8 *>(right->data().get());
+                auto result_u8 = reinterpret_cast<u8 *>(result->data().get());
                 for (size_t i = 0; i < count_bytes; ++i) {
                     Operator::Execute(left_u8, right_u8[i], result_u8[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
@@ -268,8 +268,8 @@ public:
                 result_null->SetAllTrue();
                 size_t count_bytes = count / 8;
                 size_t count_tail = count % 8;
-                auto left_u8 = reinterpret_cast<const u8 *>(left->data());
-                auto result_u8 = reinterpret_cast<u8 *>(result->data());
+                auto left_u8 = reinterpret_cast<const u8 *>(left->data().get());
+                auto result_u8 = reinterpret_cast<u8 *>(result->data().get());
                 for (size_t i = 0; i < count_bytes; ++i) {
                     Operator::Execute(left_u8[i], right_u8, result_u8[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
@@ -619,9 +619,9 @@ private:
                                        void *state_ptr,
                                        bool nullable) {
 
-        const auto *left_ptr = (const LeftType *)(left->data());
-        const auto *right_ptr = (const RightType *)(right->data());
-        auto *result_ptr = (ResultType *)(result->data());
+        const auto *left_ptr = (const LeftType *)(left->data().get());
+        const auto *right_ptr = (const RightType *)(right->data().get());
+        auto *result_ptr = (ResultType *)(result->data().get());
         auto &result_null = result->nulls_ptr_;
         if (nullable) {
             ExecuteFlatFlatWithNull<LeftType, RightType, ResultType, Operator>(left_ptr,
@@ -688,9 +688,9 @@ private:
                                            void *state_ptr_right,
                                            void *state_ptr,
                                            bool nullable) {
-        const auto *left_ptr = (const LeftType *)(left->data());
-        const auto *right_ptr = (const RightType *)(right->data());
-        auto *result_ptr = (ResultType *)(result->data());
+        const auto *left_ptr = (const LeftType *)(left->data().get());
+        const auto *right_ptr = (const RightType *)(right->data().get());
+        auto *result_ptr = (ResultType *)(result->data().get());
         auto &result_null = result->nulls_ptr_;
         if (nullable) {
             ExecuteFlatConstantWithNull<LeftType, RightType, ResultType, Operator>(left_ptr,
@@ -775,9 +775,9 @@ private:
                                            void *state_ptr,
                                            bool nullable) {
 
-        const auto *left_ptr = (const LeftType *)(left->data());
-        const auto *right_ptr = (const RightType *)(right->data());
-        auto *result_ptr = (ResultType *)(result->data());
+        const auto *left_ptr = (const LeftType *)(left->data().get());
+        const auto *right_ptr = (const RightType *)(right->data().get());
+        auto *result_ptr = (ResultType *)(result->data().get());
         auto &result_null = result->nulls_ptr_;
         if (nullable) {
             ExecuteConstantFlatWithNull<LeftType, RightType, ResultType, Operator>(left_ptr,
@@ -848,9 +848,9 @@ private:
                                                void *state_ptr_right,
                                                void *state_ptr,
                                                bool nullable) {
-        const auto *left_ptr = (const LeftType *)(left->data());
-        const auto *right_ptr = (const RightType *)(right->data());
-        auto *result_ptr = (ResultType *)(result->data());
+        const auto *left_ptr = (const LeftType *)(left->data().get());
+        const auto *right_ptr = (const RightType *)(right->data().get());
+        auto *result_ptr = (ResultType *)(result->data().get());
         auto &result_null = result->nulls_ptr_;
         if (nullable && !(left->nulls_ptr_->IsAllTrue() && right->nulls_ptr_->IsAllTrue())) {
             result_null->SetAllFalse();

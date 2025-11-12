@@ -58,7 +58,7 @@ public:
 };
 
 std::tuple<size_t, Status> TestTxnAppend::GetTableRowCount(const std::string &db_name, const std::string &table_name) {
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("get row count"), TransactionType::kRead);
     TxnTimeStamp begin_ts = txn->BeginTS();
     TxnTimeStamp commit_ts = txn->CommitTS();
@@ -82,7 +82,7 @@ std::tuple<size_t, Status> TestTxnAppend::GetTableRowCount(const std::string &db
         if (!status.ok()) {
             return {0, status};
         }
-        std::vector<BlockID> *block_ids_ptr = nullptr;
+        std::vector<BlockID> *block_ids_ptr{};
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         if (!status.ok()) {
             return {0, status};
@@ -113,9 +113,9 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 TEST_P(TestTxnAppend, test_append0) {
     using namespace infinity;
 
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
@@ -188,9 +188,9 @@ TEST_P(TestTxnAppend, test_append0) {
 TEST_P(TestTxnAppend, test_append1) {
     using namespace infinity;
 
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
@@ -348,23 +348,23 @@ TEST_P(TestTxnAppend, test_append1) {
 TEST_P(TestTxnAppend, test_append2) {
     using namespace infinity;
 
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
-        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
+        auto status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
-        Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -379,7 +379,7 @@ TEST_P(TestTxnAppend, test_append2) {
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
         auto input_block1 = MakeInputBlock1(insert_row);
-        Status status = txn->Append(*db_name, *table_name, input_block1);
+        auto status = txn->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -387,7 +387,7 @@ TEST_P(TestTxnAppend, test_append2) {
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append again"), TransactionType::kAppend);
         auto input_block2 = MakeInputBlock2(insert_row);
-        Status status = txn->Append(*db_name, *table_name, input_block2);
+        auto status = txn->Append(*db_name, *table_name, input_block2);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -402,9 +402,9 @@ TEST_P(TestTxnAppend, test_append2) {
         auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("concurrent append 2"), TransactionType::kAppend);
         auto input_block1 = MakeInputBlock1(8192);
         auto input_block2 = MakeInputBlock2(8192);
-        Status status1 = txn->Append(*db_name, *table_name, input_block1);
+        auto status1 = txn->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status1.ok());
-        Status status2 = txn2->Append(*db_name, *table_name, input_block2);
+        auto status2 = txn2->Append(*db_name, *table_name, input_block2);
         EXPECT_TRUE(status2.ok());
 
         status1 = new_txn_mgr->CommitTxn(txn);
@@ -417,13 +417,13 @@ TEST_P(TestTxnAppend, test_append2) {
     // Check the appended data.
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        TxnTimeStamp commit_ts = txn->CommitTS();
+        auto begin_ts = txn->BeginTS();
+        auto commit_ts = txn->CommitTS();
 
         std::shared_ptr<DBMeta> db_meta;
         std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
+        auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
         auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
@@ -433,7 +433,7 @@ TEST_P(TestTxnAppend, test_append2) {
         EXPECT_EQ(segment_id, 0);
         SegmentMeta segment_meta(segment_id, *table_meta);
 
-        std::vector<BlockID> *block_ids_ptr = nullptr;
+        std::vector<BlockID> *block_ids_ptr{};
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
         EXPECT_TRUE(status.ok());
@@ -511,9 +511,9 @@ TEST_P(TestTxnAppend, test_append2) {
 TEST_P(TestTxnAppend, test_append_mismatch) {
     using namespace infinity;
 
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");

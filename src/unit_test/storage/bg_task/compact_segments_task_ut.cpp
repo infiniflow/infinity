@@ -72,7 +72,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ::testing::Values(BaseTestParamStr::NEW_BG_ON_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_BG_ON_CONFIG_PATH));
 
 TEST_P(CompactTaskTest, SLOW_bg_compact) {
-    auto *storage = infinity::InfinityContext::instance().storage();
+    auto *storage = InfinityContext::instance().storage();
     auto *txn_mgr = storage->new_txn_manager();
 
     auto db_name = std::make_shared<std::string>("default_db");
@@ -92,7 +92,7 @@ TEST_P(CompactTaskTest, SLOW_bg_compact) {
     }
     std::vector<size_t> segment_sizes{1, 10};
     size_t segment_count = std::accumulate(segment_sizes.begin(), segment_sizes.end(), 0);
-    this->AddSegments(txn_mgr, *table_name, segment_sizes);
+    AddSegments(txn_mgr, *table_name, segment_sizes);
 
     i64 compact_interval = InfinityContext::instance().storage()->config()->CompactInterval();
     LOG_INFO(fmt::format("compact_interval: {} seconds", compact_interval));
@@ -110,7 +110,7 @@ TEST_P(CompactTaskTest, SLOW_bg_compact) {
     auto status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
     EXPECT_TRUE(status.ok());
 
-    std::vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::vector<SegmentID> *segment_ids_ptr{};
     std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
     EXPECT_TRUE(status.ok());
     EXPECT_LT(segment_ids_ptr->size(), last_seg_count);

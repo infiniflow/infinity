@@ -46,7 +46,7 @@ import internal_types;
 namespace infinity {
 
 std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_ptr<MetaKey>> &meta_keys) {
-    std::shared_ptr<MetaTree> meta_tree = std::make_shared<MetaTree>();
+    auto meta_tree = std::make_shared<MetaTree>();
     meta_tree->metas_ = std::move(meta_keys);
     auto &meta_keys_ref = meta_tree->metas_;
     size_t meta_count = meta_keys_ref.size();
@@ -611,7 +611,7 @@ std::shared_ptr<DbCache> MetaDBObject::RestoreDbCache(Storage *storage_ptr) cons
     } catch (const std::exception &e) {
         UnrecoverableError(fmt::format("DB id is invalid: {}, cause: {}", db_key->db_id_str_, e.what()));
     }
-    std::shared_ptr<DbCache> db_cache = std::make_shared<DbCache>(db_id, db_key->db_name_, 0);
+    auto db_cache = std::make_shared<DbCache>(db_id, db_key->db_name_, 0);
     for (const auto &table_pair : table_map_) {
         MetaTableObject *meta_table_object = static_cast<MetaTableObject *>(table_pair.second.get());
         std::shared_ptr<TableCache> table_cache = meta_table_object->RestoreTableCache(storage_ptr);
@@ -706,7 +706,7 @@ size_t MetaTableObject::GetCurrentSegmentRowCount(Storage *storage_ptr) const {
     if (version_file_worker == nullptr) {
         UnrecoverableError(fmt::format("Can't get version from: {}", rel_version_path));
     }
-    const BlockVersion *block_version{};
+    std::shared_ptr<BlockVersion> block_version;
     version_file_worker->Read(block_version);
     size_t row_cnt = 0;
     {

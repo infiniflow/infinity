@@ -169,7 +169,9 @@ TEST_F(VarcharCastTest, varchar_cast1) {
         Value v = Value::MakeVarchar(s1);
         input_column_vector->AppendValue(v);
 
-        VarcharT *varchar_ptr = (VarcharT *)(input_column_vector->buffer_.get()->GetData());
+        std::shared_ptr<char[]> some_ptr;
+        input_column_vector->buffer_.get()->GetData(some_ptr);
+        auto *varchar_ptr = (VarcharT *)(some_ptr.get());
 
         BigIntT target{0};
         bool result = TryCastVarcharVector::Run(varchar_ptr[0], input_column_vector.get(), target);
@@ -217,7 +219,10 @@ TEST_F(VarcharCastTest, varchar_cast1) {
         Value v = Value::MakeVarchar(s1);
         input_column_vector->AppendValue(v);
 
-        VarcharT *varchar_ptr = (VarcharT *)(input_column_vector->buffer_.get()->GetData());
+        std::shared_ptr<char[]> some_ptr;
+        input_column_vector->buffer_.get()->GetData(some_ptr);
+
+        auto *varchar_ptr = (VarcharT *)(some_ptr.get());
 
         FloatT target{0};
         bool result = TryCastVarcharVector::Run(varchar_ptr[0], input_column_vector.get(), target);
@@ -265,7 +270,10 @@ TEST_F(VarcharCastTest, varchar_cast1) {
         Value v = Value::MakeVarchar(s1);
         input_column_vector->AppendValue(v);
 
-        VarcharT *varchar_ptr = (VarcharT *)(input_column_vector->buffer_.get()->GetData());
+        std::shared_ptr<char[]> some_ptr;
+        input_column_vector->buffer_.get()->GetData(some_ptr);
+
+        auto *varchar_ptr = (VarcharT *)(some_ptr.get());
 
         DoubleT target{0};
         bool result = TryCastVarcharVector::Run(varchar_ptr[0], input_column_vector.get(), target);

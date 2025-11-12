@@ -563,6 +563,7 @@ HnswIndexInMem::~HnswIndexInMem() {
     if (own_memory_ && hnsw_handler_ != nullptr) {
         delete hnsw_handler_;
     }
+    // delete hnsw_handler_;
 
     auto *storage = InfinityContext::instance().storage();
     if (storage == nullptr) {
@@ -620,17 +621,20 @@ void HnswIndexInMem::InsertVecs(SegmentOffset block_offset,
     IncreaseMemoryUsageBase(mem_usage);
 }
 
-void HnswIndexInMem::Dump(FileWorker *file_worker, size_t *dump_size_ptr) {
+void HnswIndexInMem::Dump(FileWorker *index_file_worker, size_t *dump_size_ptr) {
     if (dump_size_ptr != nullptr) {
         size_t dump_size = hnsw_handler_->MemUsage();
         *dump_size_ptr = dump_size;
     }
 
-    HnswHandlerPtr *data_ptr{};
-    file_worker->Read(data_ptr);
-    *data_ptr = hnsw_handler_;
-    own_memory_ = false;
-    chunk_obj_ = std::move(file_worker);
+    // std::shared_ptr<HnswHandlerPtr> data_ptr;
+    // index_file_worker->Read(data_ptr);
+    // delete *data_ptr;
+    // auto some = new HnswHandlerPtr();
+    // *data_ptr = hnsw_handler_;
+    // own_memory_ = false;
+    index_file_worker_ = std::move(index_file_worker);
+    index_file_worker_->Write(std::span{&hnsw_handler_, 1});
 }
 
 size_t

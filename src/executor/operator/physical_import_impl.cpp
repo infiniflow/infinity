@@ -100,10 +100,10 @@ public:
 
     ColumnVector &GetColumnVector(size_t column_idx) {
         assert(column_idx < column_defs_.size());
-        return *cur_block_->column_vectors[column_idx];
+        return *cur_block_->column_vectors_[column_idx];
     }
 
-    std::vector<std::shared_ptr<ColumnVector>> &GetColumnVectors() { return cur_block_->column_vectors; }
+    std::vector<std::shared_ptr<ColumnVector>> &GetColumnVectors() { return cur_block_->column_vectors_; }
 
     std::string GetDBName() const { return db_name_; }
     std::string GetTableName() const { return table_name_; }
@@ -127,7 +127,7 @@ public:
         block_row_cnts_.push_back(row_cnt);
         FinalizeBlock();
 
-        std::vector<std::string> object_paths{};
+        std::vector<std::string> object_paths;
         if (txn_ == nullptr) {
             UnrecoverableError("Txn is nullptr");
         }
@@ -135,21 +135,21 @@ public:
     }
 
 private:
-    NewTxn *txn_ = nullptr;
+    NewTxn *txn_{};
 
-    size_t block_capacity_ = 0;
-    size_t row_count_ = 0;
+    size_t block_capacity_{};
+    size_t row_count_{};
     std::string db_name_{};
     std::string table_name_{};
     std::vector<std::shared_ptr<ColumnDef>> column_defs_;
     std::vector<std::shared_ptr<DataType>> column_types_;
 
     std::shared_ptr<DataBlock> data_block_{};
-    std::vector<size_t> block_row_cnts_{};
+    std::vector<size_t> block_row_cnts_;
 
-    DataBlock *cur_block_ = nullptr;
-    size_t cur_block_row_count_ = 0;
-    size_t block_idx_ = 0;
+    DataBlock *cur_block_{};
+    size_t cur_block_row_count_{};
+    size_t block_idx_{};
 };
 
 class NewZxvParserCtx : public NewImportCtx {
@@ -647,19 +647,18 @@ void PhysicalImport::NewCSVRowHandler(void *context_raw_ptr) {
     size_t column_count = parser_context->parser_.CellCount();
     size_t table_column_count = parser_context->GetColumnCount();
     if (column_count > table_column_count) {
-        Status status = Status::ColumnCountMismatch(
+        RecoverableError(Status::ColumnCountMismatch(
             fmt::format("CSV file column count isn't match with table schema, row id: {}, column_count: {}, table_entry->ColumnCount: {}.",
                         parser_context->GetRowCount(),
                         column_count,
-                        table_column_count));
-        RecoverableError(status);
+                        table_column_count)));
     }
 
     std::vector<std::string> parsed_cell;
     parsed_cell.reserve(column_count);
 
     for (size_t column_idx = 0; column_idx < table_column_count; ++column_idx) {
-        ColumnVector &column_vector = parser_context->GetColumnVector(column_idx);
+        auto &column_vector = parser_context->GetColumnVector(column_idx);
 
         if (column_idx < column_count) {
             ZsvCell cell = parser_context->parser_.GetCell(column_idx);
@@ -674,9 +673,8 @@ void PhysicalImport::NewCSVRowHandler(void *context_raw_ptr) {
             auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
             column_vector.AppendByConstantExpr(const_expr);
         } else {
-            Status status = Status::ImportFileFormatError(
-                fmt::format("No value in column {} in CSV of row number: {}", column_def->name_, parser_context->GetRowCount()));
-            RecoverableError(status);
+            RecoverableError(Status::ImportFileFormatError(
+                fmt::format("No value in column {} in CSV of row number: {}", column_def->name_, parser_context->GetRowCount())));
         }
     }
     parser_context->AddRowCnt();

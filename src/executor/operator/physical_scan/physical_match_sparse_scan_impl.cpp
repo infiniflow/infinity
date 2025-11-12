@@ -83,7 +83,7 @@ PhysicalMatchSparseScan::PhysicalMatchSparseScan(u64 id,
 void PhysicalMatchSparseScan::Init(QueryContext *query_context) { search_column_id_ = match_sparse_expr_->column_expr_->binding().column_idx; }
 
 std::shared_ptr<std::vector<std::string>> PhysicalMatchSparseScan::GetOutputNames() const {
-    std::shared_ptr<std::vector<std::string>> result_names = std::make_shared<std::vector<std::string>>();
+    auto result_names = std::make_shared<std::vector<std::string>>();
     const std::vector<std::string> &column_names = *base_table_ref_->column_names_;
     result_names->reserve(column_names.size() + 2);
     for (const auto &name : column_names) {
@@ -95,7 +95,7 @@ std::shared_ptr<std::vector<std::string>> PhysicalMatchSparseScan::GetOutputName
 }
 
 std::shared_ptr<std::vector<std::shared_ptr<DataType>>> PhysicalMatchSparseScan::GetOutputTypes() const {
-    std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result_types = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+    auto result_types = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
     const std::vector<std::shared_ptr<DataType>> &column_types = *base_table_ref_->column_types_;
     result_types->reserve(column_types.size() + 2);
     for (const auto &type : column_types) {
@@ -235,7 +235,7 @@ bool PhysicalMatchSparseScan::Execute(QueryContext *query_context, OperatorState
         output_types.push_back(std::make_shared<DataType>(query_expr->Type()));
         query_data->Init(output_types);
         std::shared_ptr<ExpressionState> expr_state = ExpressionState::CreateState(query_expr);
-        evaluator.Execute(query_expr, expr_state, query_data->column_vectors[0]);
+        evaluator.Execute(query_expr, expr_state, query_data->column_vectors_[0]);
 
         function_data.evaluated_ = true;
     }
@@ -412,10 +412,10 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
     auto &block_ids_idx = function_data.current_block_ids_idx_;
     auto &segment_ids_idx = function_data.current_segment_ids_idx_;
 
-    const ColumnVector &query_vector = *function_data.query_data_->column_vectors[0];
+    const ColumnVector &query_vector = *function_data.query_data_->column_vectors_[0];
 
     auto get_ele = [](const ColumnVector &column_vector, size_t idx) -> SparseVecRef<typename DistFunc::DataT, typename DistFunc::IndexT> {
-        const auto *ele = reinterpret_cast<const SparseT *>(column_vector.data()) + idx;
+        const auto *ele = reinterpret_cast<const SparseT *>(column_vector.data().get()) + idx;
         const auto &[nnz, file_offset] = *ele;
         return column_vector.buffer_->template GetSparse<typename DistFunc::DataT, typename DistFunc::IndexT>(file_offset, nnz);
     };
@@ -519,13 +519,13 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
             }
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
-                FileWorker *index_buffer{};
-                status = chunk_index_meta.GetIndexBuffer(index_buffer);
+                FileWorker *index_file_worker{};
+                status = chunk_index_meta.GetFileWorker(index_file_worker);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }
-                const BMPHandlerPtr *bmp_handler{};
-                index_buffer->Read(bmp_handler);
+                std::shared_ptr<BMPHandlerPtr> bmp_handler;
+                index_file_worker->Read(bmp_handler);
                 bmp_search(*bmp_handler, 0, false, filter);
             }
             if (auto mem_index = segment_index_meta->GetMemIndex()) {

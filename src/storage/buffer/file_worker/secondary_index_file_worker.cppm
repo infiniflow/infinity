@@ -21,34 +21,38 @@ import :infinity_exception;
 import :default_values;
 import :file_worker_type;
 import :persistence_manager;
+import :secondary_index_data;
 
 import column_def;
 
 namespace infinity {
 
 // pgm index
-export class SecondaryIndexFileWorker final : public IndexFileWorker {
+export class SecondaryIndexFileWorker : public IndexFileWorker {
 public:
     explicit SecondaryIndexFileWorker(std::shared_ptr<std::string> file_path,
                                       std::shared_ptr<IndexBase> index_base,
                                       std::shared_ptr<ColumnDef> column_def,
                                       u32 row_count)
-        : IndexFileWorker(std::move(file_path), std::move(index_base), std::move(column_def)), row_count_(row_count) {
-        AllocateInMemory();
-    }
+        : IndexFileWorker(std::move(file_path), std::move(index_base), std::move(column_def)), row_count_(row_count) {}
 
     ~SecondaryIndexFileWorker() override;
-
-    void AllocateInMemory() override;
-
-    void FreeInMemory() override;
 
     FileWorkerType Type() const override { return FileWorkerType::kSecondaryIndexFile; }
 
 protected:
-    bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(SecondaryIndexDataBase<HighCardinalityTag> *data,
+               std::unique_ptr<LocalFileHandle> &file_handle,
+               bool &prepare_success,
+               const FileWorkerSaveCtx &ctx) override;
+    bool Write(SecondaryIndexDataBase<LowCardinalityTag> *data,
+               std::unique_ptr<LocalFileHandle> &file_handle,
+               bool &prepare_success,
+               const FileWorkerSaveCtx &ctx) override;
 
-    void Read(size_t file_size, bool other) override;
+    void Read(SecondaryIndexDataBase<HighCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+    void
+    Read(std::shared_ptr<SecondaryIndexDataBase<LowCardinalityTag>> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
 
     const u32 row_count_{};
 };

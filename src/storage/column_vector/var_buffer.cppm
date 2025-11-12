@@ -90,16 +90,19 @@ public:
 
     void SetToCatalog(FileWorker *var_file_worker);
 
-private:
-    VarBuffer *GetInnerNoLock();
-
     enum class BufferType {
         kBuffer,
         kNewCatalog,
     } type_;
 
-    std::unique_ptr<VarBuffer> mem_buffer_;
-    FileWorker *file_worker_{};
+    std::shared_ptr<VarBuffer> mem_buffer_;
+
+    std::shared_ptr<VarBuffer> my_var_buffer_;
+
+private:
+    std::shared_ptr<VarBuffer> GetInnerNoLock();
+
+    FileWorker *data_file_worker_{};
     FileWorker *var_fileworker_{};
 
     mutable std::mutex mutex_;

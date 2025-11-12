@@ -336,7 +336,7 @@ public:
         IncreaseMemoryUsageBase(mem_usage);
     }
 
-    void Dump(FileWorker *file_worker, size_t *dump_size_ptr = nullptr);
+    void Dump(FileWorker *index_file_worker, size_t *dump_size_ptr = nullptr);
 
 public:
     // LSG setting
@@ -369,11 +369,11 @@ protected:
 private:
     static constexpr size_t kBuildBucketSize = 1024;
 
-    RowID begin_row_id_ = {};
-    size_t row_count_ = 0;
-    HnswHandlerPtr hnsw_handler_;
+    RowID begin_row_id_{};
+    size_t row_count_{};
+    HnswHandlerPtr hnsw_handler_{};
     bool own_memory_{};
-    FileWorker *chunk_obj_{};
+    FileWorker *index_file_worker_{};
 };
 
 } // namespace infinity

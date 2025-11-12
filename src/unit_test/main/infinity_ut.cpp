@@ -114,7 +114,7 @@ TEST_F(InfinityTest, test1) {
         std::vector<ColumnDef *> column_defs;
         column_defs.reserve(column_count);
 
-        std::shared_ptr<DataType> col_type = std::make_shared<DataType>(LogicalType::kBoolean);
+        auto col_type = std::make_shared<DataType>(LogicalType::kBoolean);
         std::string col_name = "col1";
         auto col_def = new ColumnDef(0, col_type, col_name, std::set<ConstraintType>());
         column_defs.emplace_back(col_def);
@@ -158,7 +158,7 @@ TEST_F(InfinityTest, test1) {
         std::vector<ColumnDef *> column_defs;
         column_defs.reserve(column_count);
 
-        std::shared_ptr<DataType> col_type = std::make_shared<DataType>(LogicalType::kBigInt);
+        auto col_type = std::make_shared<DataType>(LogicalType::kBigInt);
         std::string col1_name = "col1";
         auto col_def = new ColumnDef(0, col_type, col1_name, std::set<ConstraintType>());
         column_defs.emplace_back(col_def);
@@ -187,8 +187,9 @@ TEST_F(InfinityTest, test1) {
         auto insert_row = new InsertRowExpr();
         insert_row->columns_ = std::move(columns);
         insert_row->values_ = std::move(values);
-        std::vector<InsertRowExpr *> *insert_rows = new std::vector<InsertRowExpr *>();
+        auto *insert_rows = new std::vector<InsertRowExpr *>();
         insert_rows->emplace_back(insert_row);
+
         infinity->Insert("default_db", "table1", insert_rows);
 
         //        QueryResult Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &vector_expr,
@@ -198,12 +199,12 @@ TEST_F(InfinityTest, test1) {
         //                           ParsedExpr *offset,
         //                           ParsedExpr *limit);
 
-        std::vector<ParsedExpr *> *output_columns = new std::vector<ParsedExpr *>();
-        ColumnExpr *col1 = new ColumnExpr();
+        auto output_columns = new std::vector<ParsedExpr *>();
+        auto col1 = new ColumnExpr();
         col1->names_.emplace_back(col1_name);
         output_columns->emplace_back(col1);
 
-        ColumnExpr *col2 = new ColumnExpr();
+        auto col2 = new ColumnExpr();
         col2->names_.emplace_back(col2_name);
         output_columns->emplace_back(col2);
 
@@ -212,7 +213,7 @@ TEST_F(InfinityTest, test1) {
         result =
             infinity
                 ->Search("default_db", "table1", search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr, nullptr, false);
-        std::shared_ptr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+        auto data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         Value value = data_block->GetValue(0, 0);
         EXPECT_EQ(value.type().type(), LogicalType::kBigInt);

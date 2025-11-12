@@ -35,7 +35,7 @@ class TableIndexMeta;
 struct SegmentIndexFtInfo;
 
 struct ColumnReaderChunkInfo {
-    FileWorker *index_buffer_{};
+    FileWorker *index_file_worker_{};
     RowID base_rowid_{};
     size_t row_cnt_{};
     size_t term_cnt_{};

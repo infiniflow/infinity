@@ -220,7 +220,7 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
         }
 
         FileWorker *file_worker{};
-        status = chunk_index_meta.GetIndexBuffer(file_worker);
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = txn_mgr->CommitTxn(txn);

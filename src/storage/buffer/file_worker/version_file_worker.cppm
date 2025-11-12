@@ -17,10 +17,11 @@ export module infinity_core:version_file_worker;
 import :file_worker;
 import :file_worker_type;
 import :persistence_manager;
+import :block_version;
 
 namespace infinity {
 
-export struct VersionFileWorkerSaveCtx final : public FileWorkerSaveCtx {
+export struct VersionFileWorkerSaveCtx : public FileWorkerSaveCtx {
     VersionFileWorkerSaveCtx(TxnTimeStamp checkpoint_ts) : checkpoint_ts_(checkpoint_ts) {}
 
     TxnTimeStamp checkpoint_ts_{};
@@ -32,16 +33,14 @@ public:
 
     virtual ~VersionFileWorker() override;
 
-public:
-    void AllocateInMemory() override;
-
-    void FreeInMemory() override;
-
     FileWorkerType Type() const override { return FileWorkerType::kVersionDataFile; }
 
-    bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool
+    Write(std::span<BlockVersion> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void Read(size_t file_size, bool other) override;
+    void Read(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+
+    BlockVersion *data_;
 
 private:
     size_t capacity_{};

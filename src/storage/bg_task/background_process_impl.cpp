@@ -45,7 +45,7 @@ void BGTaskProcessor::Start() {
 
 void BGTaskProcessor::Stop() {
     LOG_INFO("Background processor is stopping.");
-    std::shared_ptr<StopProcessorTask> stop_task = std::make_shared<StopProcessorTask>();
+    auto stop_task = std::make_shared<StopProcessorTask>();
     task_queue_.Enqueue(stop_task);
     stop_task->Wait();
     processor_thread_.join();

@@ -425,13 +425,13 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             // 2. chunk index
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-                FileWorker *index_buffer{};
-                Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
+                FileWorker *index_file_worker{};
+                Status status = chunk_index_meta.GetFileWorker(index_file_worker);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }
-                const EMVBIndex *emvb_index{};
-                index_buffer->Read(emvb_index);
+                std::shared_ptr<EMVBIndex> emvb_index;
+                index_file_worker->Read(emvb_index);
 
                 const auto [result_num, score_ptr, row_id_ptr] =
                     emvb_index->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),

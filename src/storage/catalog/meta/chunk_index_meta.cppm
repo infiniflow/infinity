@@ -53,7 +53,7 @@ public:
 
     Status GetChunkInfo(ChunkIndexMetaInfo *&chunk_info);
 
-    Status GetIndexBuffer(FileWorker *&index_buffer);
+    Status GetFileWorker(FileWorker *&index_file_worker);
 
     Status InitSet(const ChunkIndexMetaInfo &chunk_info);
 
@@ -72,7 +72,7 @@ public:
 private:
     Status LoadChunkInfo();
 
-    Status LoadIndexBuffer();
+    Status LoadIndexFileWorker();
 
     std::string GetChunkIndexTag(const std::string &tag) const;
 
@@ -85,7 +85,7 @@ private:
 
     std::optional<ChunkIndexMetaInfo> chunk_info_;
 
-    FileWorker *index_buffer_{};
+    FileWorker *index_file_worker_{};
 };
 
 } // namespace infinity

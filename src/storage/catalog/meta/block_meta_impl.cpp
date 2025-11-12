@@ -69,8 +69,8 @@ TxnTimeStamp BlockMeta::GetCreateTimestampFromKV() const {
 }
 
 Status BlockMeta::InitOrLoadSet(TxnTimeStamp checkpoint_ts) {
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     {
+        auto *new_catalog = InfinityContext::instance().storage()->new_catalog();
         std::string block_lock_key = GetBlockTag("lock");
         Status status;
         if (checkpoint_ts == 0) {
@@ -86,6 +86,8 @@ Status BlockMeta::InitOrLoadSet(TxnTimeStamp checkpoint_ts) {
     std::shared_ptr<std::string> block_dir_ptr = GetBlockDir();
     auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
     auto version_file_worker = std::make_unique<VersionFileWorker>(rel_file_path, block_capacity());
+    // auto some_version = std::make_shared<BlockVersion>(block_capacity());
+    // fileworker_mgr->some_map_.emplace(*rel_file_path, some_version);
     version_file_worker_ = fileworker_mgr->EmplaceFileWorker(std::move(version_file_worker));
     return Status::OK();
 }
@@ -108,7 +110,7 @@ Status BlockMeta::RestoreSetFromSnapshot() {
         return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
     }
 
-    BlockVersion *block_version{};
+    std::shared_ptr<BlockVersion> block_version;
     version_file_worker_->Read(block_version);
     block_version->RestoreFromSnapshot(commit_ts_);
 
@@ -137,7 +139,7 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
     }
 
     if (usage_flag == UsageFlag::kOther) {
-        auto [version_buffer, status] = GetVersionBuffer();
+        auto [version_buffer, status] = GetVersionFileWorker();
         if (!status.ok()) {
             return status;
         }
@@ -146,7 +148,7 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
     return Status::OK();
 }
 
-std::tuple<FileWorker *, Status> BlockMeta::GetVersionBuffer() {
+std::tuple<FileWorker *, Status> BlockMeta::GetVersionFileWorker() {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!version_file_worker_) {
         auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
@@ -219,7 +221,7 @@ std::tuple<size_t, Status> BlockMeta::GetRowCnt1() {
         return {0, status};
     }
     FileWorker *version_buffer;
-    std::tie(version_buffer, status) = this->GetVersionBuffer();
+    std::tie(version_buffer, status) = this->GetVersionFileWorker();
     if (!status.ok()) {
         return {0, status};
     }
@@ -237,7 +239,7 @@ std::tuple<size_t, Status> BlockMeta::GetRowCnt1() {
 }
 
 std::tuple<std::shared_ptr<BlockInfo>, Status> BlockMeta::GetBlockInfo() {
-    std::shared_ptr<BlockInfo> block_info = std::make_shared<BlockInfo>();
+    auto block_info = std::make_shared<BlockInfo>();
     auto [row_count, status] = this->GetRowCnt1();
     if (!status.ok()) {
         return {nullptr, status};

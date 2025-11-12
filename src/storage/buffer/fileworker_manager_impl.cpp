@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <sys/mman.h>
+
 module infinity_core:fileworker_manager.impl;
 
 import :fileworker_manager;
@@ -88,11 +92,15 @@ Status FileWorkerManager::RemoveCleanList(KVInstance *kv_instance) {
         std::unique_lock lock(w_locker_);
         for (auto *file_worker : clean_list) {
             auto fileworker_key = *(file_worker->rel_file_path_);
+            // if (fileworker_key.find("version") !=std::string::npos) {
+            //     some_map_.erase(fileworker_key);
+            // }
             [[maybe_unused]] size_t remove_n = fileworker_map_.erase(fileworker_key);
             // if (remove_n != 1) {
             //     UnrecoverableError(fmt::format("FileWorkerManager::RemoveClean: file {} not found.", file_path.c_str()));
             // }
         }
+        // some_map_.rehash(some_map_.size());
         fileworker_map_.rehash(fileworker_map_.size());
     }
     return Status::OK();
@@ -101,6 +109,32 @@ Status FileWorkerManager::RemoveCleanList(KVInstance *kv_instance) {
 void FileWorkerManager::AddToCleanList(FileWorker *file_worker) {
     std::unique_lock lock(clean_locker_);
     clean_list_.emplace_back(file_worker);
+}
+
+void FileWorkerManager::RemoveImport(TransactionID txn_id) {
+    std::unique_lock lock(w_locker_);
+    for (auto it = fileworker_map_.begin(); it != fileworker_map_.end();) {
+        auto pat = fmt::format("import{}", txn_id);
+        if (it->first.find(pat) != std::string::npos) {
+            it = fileworker_map_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+void FileWorkerManager::MoveFiles() {
+    std::unique_lock lock(w_locker_);
+    for (auto it = fileworker_map_.begin(); it != fileworker_map_.end();) {
+        const auto &ptr = it->second;
+        if (ptr->rel_file_path_->find("import") != std::string::npos) {
+            ++it;
+            continue;
+        }
+        msync(ptr->mmap_, ptr->mmap_size_, MS_SYNC);
+        ptr->MoveFile();
+        ++it;
+    }
 }
 
 } // namespace infinity

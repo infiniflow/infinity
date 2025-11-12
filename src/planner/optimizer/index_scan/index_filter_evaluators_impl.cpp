@@ -625,14 +625,15 @@ template <typename ColumnValueType, typename CardinalityTag>
 struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
     using KeyType = typename TrunkReader<ColumnValueType, CardinalityTag>::SecondaryIndexOrderedT;
     const u32 segment_row_count_;
-    FileWorker *index_buffer_ = nullptr;
+    FileWorker *index_file_worker_{};
     const SecondaryIndexDataBase<CardinalityTag> *index_ = nullptr;
     u32 begin_pos_ = 0;
     u32 end_pos_ = 0;
     // For LowCardinality: store the range for processing
     std::pair<KeyType, KeyType> current_range_;
 
-    TrunkReaderT(const u32 segment_row_count, FileWorker *index_buffer) : segment_row_count_(segment_row_count), index_buffer_(index_buffer) {}
+    TrunkReaderT(const u32 segment_row_count, FileWorker *index_file_worker)
+        : segment_row_count_(segment_row_count), index_file_worker_(index_file_worker) {}
     TrunkReaderT(const u32 segment_row_count, const SecondaryIndexDataBase<CardinalityTag> *index)
         : segment_row_count_(segment_row_count), index_(index) {}
 
@@ -644,8 +645,8 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
             // High cardinality: use traditional approach
             const u32 begin_pos = begin_pos_;
             const u32 end_pos = end_pos_;
-            const SecondaryIndexDataBase<CardinalityTag> *index{};
-            index_buffer_->Read(index);
+            std::shared_ptr<SecondaryIndexDataBase<CardinalityTag>> index;
+            index_file_worker_->Read(index);
             const auto [key_ptr, offset_ptr] = index->GetKeyOffsetPointer();
             // output result
             for (u32 i = begin_pos; i < end_pos; ++i) {
@@ -654,8 +655,9 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
         } else {
             // Low cardinality: use RoaringBitmap approach
             const auto [begin_val, end_val] = current_range_;
-            const SecondaryIndexDataBase<CardinalityTag> *index{};
-            index_buffer_->Read(index);
+            // const SecondaryIndexDataBase<CardinalityTag> *index{};
+            std::shared_ptr<SecondaryIndexDataBase<CardinalityTag>> index;
+            index_file_worker_->Read(index);
 
             // Get unique keys count and pointer through base class interface
             u32 unique_key_count = index->GetUniqueKeyCount();
@@ -687,18 +689,22 @@ template <typename ColumnValueType>
 struct TrunkReaderT<ColumnValueType, HighCardinalityTag> final : TrunkReader<ColumnValueType, HighCardinalityTag> {
     using KeyType = typename TrunkReader<ColumnValueType, HighCardinalityTag>::SecondaryIndexOrderedT;
     const u32 segment_row_count_;
-    FileWorker *index_buffer_ = nullptr;
+    FileWorker *index_file_worker_ = nullptr;
     const SecondaryIndexDataBase<HighCardinalityTag> *index_ = nullptr;
     u32 begin_pos_ = 0;
     u32 end_pos_ = 0;
-    TrunkReaderT(const u32 segment_row_count, FileWorker *index_buffer) : segment_row_count_(segment_row_count), index_buffer_(index_buffer) {}
+    TrunkReaderT(const u32 segment_row_count, FileWorker *index_file_worker)
+        : segment_row_count_(segment_row_count), index_file_worker_(index_file_worker) {}
     TrunkReaderT(const u32 segment_row_count, const SecondaryIndexDataBase<HighCardinalityTag> *index)
         : segment_row_count_(segment_row_count), index_(index) {}
 
     u32 GetResultCnt(const std::pair<KeyType, KeyType> interval_range) override {
-        const SecondaryIndexDataBase<HighCardinalityTag> *index{};
-        if (index_buffer_) {
-            index_buffer_->Read(index);
+        const SecondaryIndexDataBase<HighCardinalityTag> *index;
+        // std::shared_ptr<SecondaryIndexDataBase<HighCardinalityTag>> index1;
+        SecondaryIndexDataBase<HighCardinalityTag> *index1;
+        if (index_file_worker_) {
+            index_file_worker_->Read(index1);
+            index = index1;
         } else {
             index = index_;
         }
@@ -781,8 +787,9 @@ struct TrunkReaderT<ColumnValueType, HighCardinalityTag> final : TrunkReader<Col
     void OutPut(Bitmask &selected_rows) override {
         const u32 begin_pos = begin_pos_;
         const u32 end_pos = end_pos_;
-        const SecondaryIndexDataBase<HighCardinalityTag> *index{};
-        index_buffer_->Read(index);
+        // std::shared_ptr<SecondaryIndexDataBase<HighCardinalityTag>> index;
+        SecondaryIndexDataBase<HighCardinalityTag> *index;
+        index_file_worker_->Read(index);
         const auto [key_ptr, offset_ptr] = index->GetKeyOffsetPointer();
         // output result
         for (u32 i = begin_pos; i < end_pos; ++i) {
@@ -832,12 +839,12 @@ ExecuteSingleRangeHighCardinalityT(const std::pair<ConvertToOrderedType<ColumnVa
     }
     for (ChunkID chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, *index_meta);
-        FileWorker *index_buffer = nullptr;
-        Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
+        FileWorker *index_file_worker = nullptr;
+        Status status = chunk_index_meta.GetFileWorker(index_file_worker);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        trunk_readers.emplace_back(std::make_unique<TrunkReaderT<ColumnValueType, HighCardinalityTag>>(segment_row_count, index_buffer));
+        trunk_readers.emplace_back(std::make_unique<TrunkReaderT<ColumnValueType, HighCardinalityTag>>(segment_row_count, index_file_worker));
     }
     std::shared_ptr<MemIndex> mem_index = index_meta->GetMemIndex();
     if (mem_index) {
@@ -872,12 +879,12 @@ ExecuteSingleRangeLowCardinalityT(const std::pair<ConvertToOrderedType<ColumnVal
     }
     for (ChunkID chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, *index_meta);
-        FileWorker *index_buffer = nullptr;
-        Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
+        FileWorker *index_file_worker = nullptr;
+        Status status = chunk_index_meta.GetFileWorker(index_file_worker);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        trunk_readers.emplace_back(std::make_unique<TrunkReaderT<ColumnValueType, LowCardinalityTag>>(segment_row_count, index_buffer));
+        trunk_readers.emplace_back(std::make_unique<TrunkReaderT<ColumnValueType, LowCardinalityTag>>(segment_row_count, index_file_worker));
     }
     std::shared_ptr<MemIndex> mem_index = index_meta->GetMemIndex();
     if (mem_index) {

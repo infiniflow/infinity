@@ -57,11 +57,11 @@ u32 FullTextColumnLengthReader::SeekFile(RowID row_id) {
     }
 
     // Load the column-length file of the chunk index
-    current_chunk_buffer_obj_ = chunk_index_meta_infos_[current_chunk].index_buffer_;
+    current_chunk_buffer_obj_ = chunk_index_meta_infos_[current_chunk].index_file_worker_;
     current_chunk_buffer_obj_->Read(column_lengths_);
     current_chunk_base_rowid_ = chunk_index_meta_infos_[current_chunk].base_rowid_;
     current_chunk_row_count_ = chunk_index_meta_infos_[current_chunk].row_cnt_;
-    return column_lengths_[row_id - current_chunk_base_rowid_];
+    return reinterpret_cast<u32 *>(column_lengths_.get())[row_id - current_chunk_base_rowid_];
 }
 
 std::pair<size_t, size_t> FullTextColumnLengthReader::GetDocTermCount() const {

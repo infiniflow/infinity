@@ -145,7 +145,7 @@ Status ClusterManager::UnregisterToLeaderNoLock() {
     if (current_node_role_ == NodeRole::kFollower or current_node_role_ == NodeRole::kLearner) {
         if (leader_node_->node_status() == NodeStatus::kAlive) {
             // Leader is alive, need to unregister
-            std::shared_ptr<UnregisterPeerTask> unregister_task = std::make_shared<UnregisterPeerTask>(this_node_->node_name());
+            auto unregister_task = std::make_shared<UnregisterPeerTask>(this_node_->node_name());
             client_to_leader_->Send(unregister_task);
             unregister_task->Wait();
             if (unregister_task->error_code_ != 0) {

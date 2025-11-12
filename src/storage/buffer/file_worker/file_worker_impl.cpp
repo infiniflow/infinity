@@ -46,28 +46,25 @@ FileWorker::FileWorker(std::shared_ptr<std::string> rel_file_path) : rel_file_pa
     file_worker_manager_ = InfinityContext::instance().storage()->fileworker_manager();
 }
 
-bool FileWorker::Write(const FileWorkerSaveCtx &ctx) {
-    std::lock_guard l(l_);
-    if (data_ == nullptr) {
-        UnrecoverableError("No data will be written.");
-    }
-
-    [[maybe_unused]] auto tmp = GetFilePathTemp();
-    auto [file_handle, status] = VirtualStore::Open(GetFilePathTemp(), FileAccessMode::kWrite);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
-    file_handle_ = std::move(file_handle);
-
-    bool prepare_success = false;
-
-    bool all_save = Write(prepare_success, ctx);
-    // if (prepare_success) {
-    //     file_handle_->Sync();
-    // }
-    close(file_handle_->fd());
-    return all_save;
-}
+// bool FileWorker::Write(auto &data, const FileWorkerSaveCtx &ctx) {
+//     std::lock_guard l(l_);
+//
+//     [[maybe_unused]] auto tmp = GetFilePathTemp();
+//     auto [file_handle, status] = VirtualStore::Open(GetFilePathTemp(), FileAccessMode::kWrite);
+//     if (!status.ok()) {
+//         UnrecoverableError(status.message());
+//     }
+//     file_handle_ = std::move(file_handle);
+//
+//     bool prepare_success = false;
+//
+//     bool all_save = Write(prepare_success, ctx);
+//     if (prepare_success) {
+//         file_handle_->Sync();
+//     }
+//     close(file_handle_->fd());
+//     return all_save;
+// }
 
 // template<typename T>
 // void FileWorker::Read(T *&data) {
@@ -112,6 +109,7 @@ void FileWorker::PickForCleanup() {
 }
 
 void FileWorker::MoveFile() {
+    std::unique_lock l(rw_mutex_);
     auto temp_path = GetFilePathTemp();
     auto data_path = GetFilePath();
     if (persistence_manager_ == nullptr) {
@@ -122,12 +120,9 @@ void FileWorker::MoveFile() {
         if (!VirtualStore::Exists(data_path_parent)) {
             VirtualStore::MakeDirectory(data_path_parent);
         }
-        VirtualStore::Copy(data_path, temp_path); // sys call, may need copy
+        VirtualStore::Copy(data_path, temp_path);
     } else {
         PersistResultHandler handler(persistence_manager_);
-        if (temp_path.find("/var/infinity/tmp/import") != std::string::npos) {
-            return;
-        }
         if (!VirtualStore::Exists(temp_path)) {
             return;
         }
@@ -137,13 +132,6 @@ void FileWorker::MoveFile() {
         obj_addr_ = persist_result.obj_addr_;
     }
 }
-
-void FileWorker::SetData(void *data) {
-    data_ = data;
-    [[maybe_unused]] auto foo = Write();
-}
-
-void FileWorker::SetDataSize(size_t size) { UnrecoverableError("Not implemented"); }
 
 // Get absolute file path. As key of buffer handle.
 std::string FileWorker::GetFilePath() const { return fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *rel_file_path_); }

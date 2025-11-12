@@ -153,9 +153,8 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
                 FragmentTask *task = plan_fragment->GetContext()->Tasks()[0].get();
                 RunTask(task);
                 return;
-            } else {
-                UnrecoverableError("Oops! None select and create idnex statement has multiple fragments.");
             }
+            UnrecoverableError("Oops! None select and create idnex statement has multiple fragments.");
         } else {
             UnrecoverableError("None select statement has multiple fragments.");
         }

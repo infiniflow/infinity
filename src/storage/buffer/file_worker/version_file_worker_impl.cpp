@@ -32,34 +32,21 @@ import third_party;
 namespace infinity {
 
 VersionFileWorker::VersionFileWorker(std::shared_ptr<std::string> file_path, size_t capacity)
-    : FileWorker(std::move(file_path)), capacity_(capacity) {
-    VersionFileWorker::AllocateInMemory();
-    // ReadFromFile(true);
-}
+    : FileWorker(std::move(file_path)), capacity_(capacity) {}
 
 VersionFileWorker::~VersionFileWorker() {
-    VersionFileWorker::FreeInMemory();
+    madvise(mmap_, mmap_size_, MADV_FREE);
     munmap(mmap_, mmap_size_);
     mmap_ = nullptr;
 }
 
-void VersionFileWorker::AllocateInMemory() {
-    auto *data = new BlockVersion(capacity_);
-    data_ = static_cast<void *>(data);
-}
-
-void VersionFileWorker::FreeInMemory() {
-    auto *data = static_cast<BlockVersion *>(data_);
-    delete data;
-    data_ = nullptr;
-}
-
-bool VersionFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &base_ctx) {
-    auto *data = static_cast<BlockVersion *>(data_);
-
+bool VersionFileWorker::Write(std::span<BlockVersion> data,
+                              std::unique_ptr<LocalFileHandle> &file_handle,
+                              bool &prepare_success,
+                              const FileWorkerSaveCtx &base_ctx) {
     const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
     TxnTimeStamp ckp_ts = ctx.checkpoint_ts_;
-    bool is_full = data->SaveToFile(mmap_, mmap_size_, *rel_file_path_, ckp_ts, *file_handle_);
+    bool is_full = data.data()->SaveToFile(mmap_, mmap_size_, *rel_file_path_, ckp_ts, *file_handle);
     if (is_full) {
         LOG_TRACE(fmt::format("Version file is full: {}", GetFilePath()));
         // if the version file is full, return true to spill to file
@@ -68,9 +55,12 @@ bool VersionFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ba
     return false;
 }
 
-void VersionFileWorker::Read(size_t file_size, bool other) {
-    // FreeInMemory();
-    BlockVersion::LoadFromFile(data_, mmap_size_, mmap_, file_handle_.get());
+void VersionFileWorker::Read(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
+    if (!file_handle) {
+        data = std::make_shared<BlockVersion>(8192);
+        return;
+    }
+    BlockVersion::LoadFromFile(data, mmap_size_, mmap_, file_handle.get());
 }
 
 } // namespace infinity

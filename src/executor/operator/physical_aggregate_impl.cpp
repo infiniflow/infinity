@@ -104,7 +104,7 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
         groupby_executor.Init(input_data_block);
 
         for (size_t expr_idx = 0; expr_idx < group_count; ++expr_idx) {
-            groupby_executor.Execute(groups_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors[expr_idx]);
+            groupby_executor.Execute(groups_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors_[expr_idx]);
         }
         output_data_block->Finalize();
     }
@@ -118,7 +118,7 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
     size_t block_count = groupby_table->DataBlockCount();
     for (size_t block_id = 0; block_id < block_count; ++block_id) {
         const std::shared_ptr<DataBlock> &block_ptr = groupby_table->GetDataBlockById(block_id);
-        hash_table.Append(block_ptr->column_vectors, block_id, block_ptr->row_count());
+        hash_table.Append(block_ptr->column_vectors_, block_id, block_ptr->row_count());
     }
 
     // 3. forlop each aggregates function on each group by bucket, to calculate the result according to the row list
@@ -182,12 +182,12 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
             ExpressionEvaluator evaluator;
             evaluator.Init(input_block);
             for (size_t expr_idx = 0; expr_idx < aggregates_count; ++expr_idx) {
-                std::shared_ptr<ColumnVector> blocks_column = output_data_block->column_vectors[expr_idx];
+                std::shared_ptr<ColumnVector> blocks_column = output_data_block->column_vectors_[expr_idx];
                 evaluator.Execute(aggregates_[expr_idx], expr_states[expr_idx], blocks_column);
-                if (blocks_column.get() != output_data_block->column_vectors[expr_idx].get()) {
+                if (blocks_column.get() != output_data_block->column_vectors_[expr_idx].get()) {
                     // column vector in blocks column might be changed to the column vector from column reference.
                     // This check and assignment is to make sure the right column vector are assign to output_data_block
-                    output_data_block->column_vectors[expr_idx] = blocks_column;
+                    output_data_block->column_vectors_[expr_idx] = blocks_column;
                 }
             }
 
@@ -243,9 +243,9 @@ void PhysicalAggregate::GroupByInputTable(const std::vector<std::unique_ptr<Data
                 // Loop each row of same block
                 for (const auto input_offset : vec_pair.second) {
 
-                    output_datablock->column_vectors[column_id]->AppendWith(*input_datablocks[input_block_id]->column_vectors[column_id],
-                                                                            input_offset,
-                                                                            1);
+                    output_datablock->column_vectors_[column_id]->AppendWith(*input_datablocks[input_block_id]->column_vectors_[column_id],
+                                                                             input_offset,
+                                                                             1);
                     ++output_data_num;
                 }
             }
@@ -291,7 +291,7 @@ void PhysicalAggregate::GenerateGroupByResult(const std::shared_ptr<DataTable> &
 
         // Only the first position of the column vector has value.
         for (size_t column_id = 0; column_id < column_count; ++column_id) {
-            output_datablock->column_vectors[column_id]->AppendWith(*input_datablocks[input_block_id]->column_vectors[column_id], input_offset, 1);
+            output_datablock->column_vectors_[column_id]->AppendWith(*input_datablocks[input_block_id]->column_vectors_[column_id], input_offset, 1);
         }
 
         output_datablock->Finalize();
@@ -367,7 +367,7 @@ bool PhysicalAggregate::SimpleAggregateExecute(const std::vector<std::unique_ptr
         // calculate every columns value
         for (size_t expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
             LOG_TRACE("Physical aggregate Execute");
-            evaluator.Execute(aggregates_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors[expr_idx]);
+            evaluator.Execute(aggregates_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors_[expr_idx]);
         }
         if (task_completed) {
             // Finalize the output block (e.g. calculate the average value

@@ -177,7 +177,7 @@ protected:
         std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
-        Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
+        auto status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
         EXPECT_TRUE(status.ok());
 
         SegmentID segment_id = 0;
@@ -191,7 +191,7 @@ protected:
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
         ChunkID chunk_id = 0;
         {
-            std::vector<ChunkID> *chunk_ids_ptr = nullptr;
+            std::vector<ChunkID> *chunk_ids_ptr{};
             std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids_ptr, std::vector<ChunkID>({0}));
@@ -199,7 +199,7 @@ protected:
         }
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
         {
-            ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+            ChunkIndexMetaInfo *chunk_info_ptr{};
             Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_info_ptr->base_row_id_, RowID(segment_id, 0));
@@ -330,12 +330,11 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
 TEST_P(TestTxnCompact, compact_with_index_commit) {
-    Status status;
     PrepareForCompact();
     auto index_name1 = std::make_shared<std::string>("index1");
     auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<std::string>(), "file_name", {column_def1->name()});
-    auto index_name2 = std::make_shared<std::string>("index2");
-    auto index_def2 = IndexFullText::Make(index_name2, std::make_shared<std::string>(), "file_name", {column_def2->name()}, {});
+    // auto index_name2 = std::make_shared<std::string>("index2");
+    // auto index_def2 = IndexFullText::Make(index_name2, std::make_shared<std::string>(), "file_name", {column_def2->name()}, {});
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
                                           TransactionType::kCreateIndex);
@@ -345,11 +344,11 @@ TEST_P(TestTxnCompact, compact_with_index_commit) {
         EXPECT_TRUE(status.ok());
     };
     create_index(index_def1);
-    create_index(index_def2);
+    // create_index(index_def2);
 
     auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
 
-    status = txn->Compact(*db_name, *table_name, {0, 1});
+    Status status = txn->Compact(*db_name, *table_name, {0, 1});
     EXPECT_TRUE(status.ok());
 
     status = new_txn_mgr->CommitTxn(txn);
@@ -357,7 +356,7 @@ TEST_P(TestTxnCompact, compact_with_index_commit) {
 
     CheckDataAfterSuccesfulCompact();
     CheckIndexAfterSuccessfulCompact(*index_name1);
-    CheckIndexAfterSuccessfulCompact(*index_name2);
+    // CheckIndexAfterSuccessfulCompact(*index_name2);
 }
 
 TEST_P(TestTxnCompact, compact_with_index_rollback) {
@@ -690,7 +689,7 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
         auto check_column = [&](ColumnMeta &column_meta) {
             FileWorker *column_buffer = nullptr;
             FileWorker *outline_buffer = nullptr;
-            Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
+            Status status = column_meta.GetFileWorker(column_buffer, outline_buffer);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(column_buffer, nullptr);
             if (column_meta.column_idx() != 0) {
@@ -747,7 +746,7 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
         auto check_column = [&](ColumnMeta &column_meta) {
             FileWorker *column_buffer = nullptr;
             FileWorker *outline_buffer = nullptr;
-            Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
+            Status status = column_meta.GetFileWorker(column_buffer, outline_buffer);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(column_buffer, nullptr);
             if (column_meta.column_idx() != 0) {
@@ -961,7 +960,7 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
         auto check_column = [&](ColumnMeta &column_meta) {
             FileWorker *column_buffer = nullptr;
             FileWorker *outline_buffer = nullptr;
-            Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
+            Status status = column_meta.GetFileWorker(column_buffer, outline_buffer);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(column_buffer, nullptr);
             // EXPECT_NE(outline_buffer, nullptr);

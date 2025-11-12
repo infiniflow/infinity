@@ -1,8 +1,13 @@
 module;
 
-export module infinity_core:mmap_manager;
+// import :block_version;
 
-class mmap_manager {
+export module infinity_core:block_version_manager;
+// #include <memory>
+// #include <unordered_map>
+
+class BlockVersionManager {
 public:
+    // std::unordered_map<std::string, std::unique_ptr<BlockVersionManager>> as;
 private:
 };

@@ -70,14 +70,16 @@ public:
         IncreaseMemoryUsageBase(inserted_rows * MemoryCostOfEachRow());
     }
 
-    void Dump(FileWorker *file_worker) const override {
+    void Dump(FileWorker *index_file_worker) const override {
+        // std::shared_ptr<SecondaryIndexData> data_ptr;
         SecondaryIndexData *data_ptr{};
-        file_worker->Read(data_ptr);
+        index_file_worker->Read(data_ptr);
 
         std::multimap<KeyType, u32> temp_map;
         const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
 
         data_ptr->InsertData(&temp_map);
+        index_file_worker->Write(data_ptr);
     }
     std::pair<u32, Bitmask> RangeQuery(const void *input) const override {
         const auto &[segment_row_count, b, e] = *static_cast<const std::tuple<u32, KeyType, KeyType> *>(input);

@@ -447,7 +447,8 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
         }
 
         // Optimize Index Interval
-        i64 optimize_index_interval = DEFAULT_OPTIMIZE_INTERVAL_SEC;
+        // i64 optimize_index_interval = DEFAULT_OPTIMIZE_INTERVAL_SEC;
+        i64 optimize_index_interval = 0;
         auto optimize_interval_option = std::make_unique<IntegerOption>(OPTIMIZE_INTERVAL_OPTION_NAME,
                                                                         optimize_index_interval,
                                                                         MAX_COMPACT_INTERVAL_SEC,

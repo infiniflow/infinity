@@ -84,8 +84,8 @@ MemoryIndexer::MemoryIndexer(const std::string &index_dir,
                              optionflag_t flag,
                              const std::string &analyzer)
     : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), posting_format_(PostingFormatOption(flag_)),
-      analyzer_(analyzer), inverting_thread_pool_(infinity::InfinityContext::instance().GetFulltextInvertingThreadPool()),
-      commiting_thread_pool_(infinity::InfinityContext::instance().GetFulltextCommitingThreadPool()), ring_sorted_(13UL) {
+      analyzer_(analyzer), inverting_thread_pool_(InfinityContext::instance().GetFulltextInvertingThreadPool()),
+      commiting_thread_pool_(InfinityContext::instance().GetFulltextCommitingThreadPool()), ring_sorted_(13UL) {
     assert(std::filesystem::path(index_dir).is_absolute());
     posting_table_ = std::make_shared<PostingTable>();
     prepared_posting_ = std::make_shared<PostingWriter>(posting_format_, column_lengths_);

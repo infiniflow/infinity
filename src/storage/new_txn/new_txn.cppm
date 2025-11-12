@@ -538,8 +538,6 @@ private:
 
     Status DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id);
 
-    Status CheckpointInner();
-
     Status
     CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, std::vector<std::pair<RowID, u64>> &append_ranges);
 

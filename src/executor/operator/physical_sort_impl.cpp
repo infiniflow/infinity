@@ -133,10 +133,10 @@ void CopyWithIndexes(const std::vector<std::unique_ptr<DataBlock>> &input_blocks
     for (size_t index_idx = 0; index_idx < block_indexes.size(); ++index_idx) {
         auto &block_index = block_indexes[index_idx];
         const std::vector<std::shared_ptr<ColumnVector>> &output_column_vectors =
-            output_blocks[(index_idx / DEFAULT_BLOCK_CAPACITY) + start_block_index]->column_vectors;
+            output_blocks[(index_idx / DEFAULT_BLOCK_CAPACITY) + start_block_index]->column_vectors_;
 
         for (size_t column_id = 0; column_id < output_column_vectors.size(); ++column_id) {
-            output_column_vectors[column_id]->AppendWith(*input_blocks[block_index.block_idx_]->column_vectors[column_id].get(),
+            output_column_vectors[column_id]->AppendWith(*input_blocks[block_index.block_idx_]->column_vectors_[column_id].get(),
                                                          block_index.offset_,
                                                          1);
         }

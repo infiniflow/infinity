@@ -409,7 +409,7 @@ TEST_P(TestTxnReplayIndex, SLOW_test_replay_append_with_index) {
         // int32_t end_val = 3;
 
         FileWorker *file_worker{};
-        status = chunk_index_meta.GetIndexBuffer(file_worker);
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         // {
@@ -682,7 +682,7 @@ TEST_P(TestTxnReplayIndex, SLOW_test_populate_index) {
         }
 
         FileWorker *file_worker = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(file_worker);
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr_->CommitTxn(txn);

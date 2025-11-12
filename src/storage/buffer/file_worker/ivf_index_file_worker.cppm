@@ -25,25 +25,22 @@ import column_def;
 
 namespace infinity {
 
-export class IVFIndexFileWorker final : public IndexFileWorker {
+export class IVFIndexFileWorker : public IndexFileWorker {
 public:
     explicit IVFIndexFileWorker(std::shared_ptr<std::string> file_path, std::shared_ptr<IndexBase> index_base, std::shared_ptr<ColumnDef> column_def)
-        : IndexFileWorker(std::move(file_path), std::move(index_base), std::move(column_def)) {
-        IVFIndexFileWorker::AllocateInMemory();
-    }
+        : IndexFileWorker(std::move(file_path), std::move(index_base), std::move(column_def)) {}
 
     ~IVFIndexFileWorker() override;
-
-    void AllocateInMemory() override;
-
-    void FreeInMemory() override;
 
     FileWorkerType Type() const override { return FileWorkerType::kIVFIndexFile; }
 
 protected:
-    bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(std::span<IVFIndexInChunk> data,
+               std::unique_ptr<LocalFileHandle> &file_handle,
+               bool &prepare_success,
+               const FileWorkerSaveCtx &ctx) override;
 
-    void Read(size_t file_size, bool other) override;
+    void Read(IVFIndexInChunk *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
 };
 
 } // namespace infinity

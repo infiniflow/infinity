@@ -30,17 +30,12 @@ public:
 
     virtual ~RawFileWorker() override;
 
-public:
-    void AllocateInMemory() override;
-
-    void FreeInMemory() override;
-
     FileWorkerType Type() const override { return FileWorkerType::kRawFile; }
 
 protected:
-    bool Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(std::span<char> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void Read(size_t file_size, bool other) override;
+    void Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
 
 private:
     size_t buffer_size_;

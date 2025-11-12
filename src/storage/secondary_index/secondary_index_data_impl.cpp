@@ -42,12 +42,13 @@ struct SecondaryIndexChunkDataReader {
     FileWorker *handle_;
     u32 row_count_ = 0;
     u32 next_offset_ = 0;
-    const void *key_ptr_ = nullptr;
-    const SegmentOffset *offset_ptr_ = nullptr;
+    const void *key_ptr_{};
+    const SegmentOffset *offset_ptr_{};
     SecondaryIndexChunkDataReader(FileWorker *file_worker, u32 row_count) {
         handle_ = file_worker;
         row_count_ = row_count;
-        const SecondaryIndexDataBase<HighCardinalityTag> *index{};
+        // std::shared_ptr<SecondaryIndexDataBase<HighCardinalityTag>> index;
+        SecondaryIndexDataBase<HighCardinalityTag> *index;
         file_worker->Read(index);
         std::tie(key_ptr_, offset_ptr_) = index->GetKeyOffsetPointer();
         assert(index->GetChunkRowCount() == row_count_);
@@ -56,6 +57,10 @@ struct SecondaryIndexChunkDataReader {
         if (next_offset_ >= row_count_) {
             return false;
         }
+        std::println("adasdasdasd: {}", static_cast<const char *>(key_ptr_)[0]);
+        std::println("adasdasdasd: {}", static_cast<const char *>(key_ptr_)[1]);
+        std::println("adasdasdasd: {}", static_cast<const char *>(key_ptr_)[2]);
+        std::println("adasdasdasd: {}", static_cast<const char *>(key_ptr_)[3]);
         std::memcpy(&key, static_cast<const char *>(key_ptr_) + next_offset_ * sizeof(OrderedKeyType), sizeof(key));
         std::memcpy(&offset, offset_ptr_ + next_offset_, sizeof(offset));
         ++next_offset_;
@@ -71,9 +76,9 @@ struct SecondaryIndexChunkMerger {
                         std::vector<std::tuple<OrderedKeyType, u32, u32>>,
                         std::greater<std::tuple<OrderedKeyType, u32, u32>>>
         pq_;
-    explicit SecondaryIndexChunkMerger(const std::vector<std::pair<u32, FileWorker *>> &buffer_objs) {
-        readers_.reserve(buffer_objs.size());
-        for (const auto &[row_count, file_worker] : buffer_objs) {
+    explicit SecondaryIndexChunkMerger(const std::vector<std::pair<u32, FileWorker *>> &file_workers) {
+        readers_.reserve(file_workers.size());
+        for (const auto &[row_count, file_worker] : file_workers) {
             readers_.emplace_back(file_worker, row_count);
         }
         OrderedKeyType key = {};

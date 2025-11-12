@@ -33,43 +33,32 @@ import third_party;
 namespace infinity {
 
 IVFIndexFileWorker::~IVFIndexFileWorker() {
-    FreeInMemory();
-
     munmap(mmap_, mmap_size_);
     mmap_ = nullptr;
 }
 
-void IVFIndexFileWorker::AllocateInMemory() {
-    data_ = static_cast<void *>(IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get()));
-}
+bool IVFIndexFileWorker::Write(std::span<IVFIndexInChunk> data,
+                               std::unique_ptr<LocalFileHandle> &file_handle,
+                               bool &prepare_success,
+                               const FileWorkerSaveCtx &ctx) {
+    auto *index = data.data();
+    index->SaveIndexInner(*file_handle);
 
-void IVFIndexFileWorker::FreeInMemory() {
-    if (data_) {
-        auto index = static_cast<IVFIndexInChunk *>(data_);
-        delete index;
-        data_ = nullptr;
-        LOG_TRACE("Finished IVFIndexFileWorker::FreeInMemory(), deleted data_ ptr.");
-    }
-}
+    prepare_success = true;
+    file_handle->Sync();
+    LOG_TRACE("Finished WriteToFileImpl(bool &prepare_success).");
 
-bool IVFIndexFileWorker::Write(bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-    if (data_) {
-        auto index = static_cast<IVFIndexInChunk *>(data_);
-        index->SaveIndexInner(*file_handle_);
-
-        file_handle_->Sync();
-        prepare_success = true;
-        LOG_TRACE("Finished WriteToFileImpl(bool &prepare_success).");
-    } else {
-        UnrecoverableError("WriteToFileImpl: data_ is nullptr");
-    }
     return true;
 }
 
-void IVFIndexFileWorker::Read(size_t file_size, bool other) {
-    auto index = IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get());
-    index->ReadIndexInner(*file_handle_);
-    data_ = static_cast<void *>(index);
+void IVFIndexFileWorker::Read(IVFIndexInChunk *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
+    auto *index = IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get());
+    // data = std::shared_ptr<IVFIndexInChunk>(index);
+    data = index;
+    if (!file_handle) {
+        return;
+    }
+    data->ReadIndexInner(*file_handle);
     LOG_TRACE("Finished Read().");
 }
 

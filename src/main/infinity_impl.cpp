@@ -93,11 +93,11 @@ void Infinity::Hello() { fmt::print("hello infinity\n"); }
 
 void Infinity::LocalInit(const std::string &path, const std::string &config_path) {
     if (!config_path.empty() && VirtualStore::Exists(config_path)) {
-        std::shared_ptr<std::string> config_path_ptr = std::make_shared<std::string>(config_path);
+        auto config_path_ptr = std::make_shared<std::string>(config_path);
         InfinityContext::instance().InitPhase1(config_path_ptr);
     } else {
         LOG_WARN(fmt::format("Infinity::LocalInit cannot find config: {}", config_path));
-        std::unique_ptr<DefaultConfig> default_config = std::make_unique<DefaultConfig>();
+        auto default_config = std::make_unique<DefaultConfig>();
         default_config->default_log_dir_ = fmt::format("{}/log", path);
         default_config->default_data_dir_ = fmt::format("{}/data", path);
         default_config->default_catalog_dir_ = fmt::format("{}/catalog", path);
@@ -116,22 +116,22 @@ void Infinity::LocalInit(const std::string &path, const std::string &config_path
 void Infinity::LocalUnInit() { InfinityContext::instance().UnInit(); }
 
 std::shared_ptr<Infinity> Infinity::LocalConnect() {
-    std::shared_ptr<Infinity> infinity_ptr = std::make_shared<Infinity>();
+    auto infinity_ptr = std::make_shared<Infinity>();
 
-    SessionManager *session_mgr = InfinityContext::instance().session_manager();
+    auto *session_mgr = InfinityContext::instance().session_manager();
     infinity_ptr->session_ = session_mgr->CreateLocalSession();
     return infinity_ptr;
 }
 
 void Infinity::LocalDisconnect() {
-    SessionManager *session_mgr = InfinityContext::instance().session_manager();
+    auto *session_mgr = InfinityContext::instance().session_manager();
     session_mgr->RemoveSessionByID(session_->session_id());
     session_.reset();
 }
 
 std::shared_ptr<Infinity> Infinity::RemoteConnect() {
-    std::shared_ptr<Infinity> infinity_ptr = std::make_shared<Infinity>();
-    SessionManager *session_mgr = InfinityContext::instance().session_manager();
+    auto infinity_ptr = std::make_shared<Infinity>();
+    auto *session_mgr = InfinityContext::instance().session_manager();
     std::shared_ptr<RemoteSession> remote_session = session_mgr->CreateRemoteSession();
     if (remote_session == nullptr) {
         return nullptr;
@@ -149,8 +149,8 @@ void Infinity::RemoteDisconnect() {
 QueryResult Infinity::CreateDatabase(const std::string &schema_name, const CreateDatabaseOptions &create_db_options, const std::string &comment) {
     std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    std::unique_ptr<CreateStatement> create_statement = std::make_unique<CreateStatement>();
-    std::shared_ptr<CreateSchemaInfo> create_schema_info = std::make_shared<CreateSchemaInfo>();
+    auto create_statement = std::make_unique<CreateStatement>();
+    auto create_schema_info = std::make_shared<CreateSchemaInfo>();
 
     create_schema_info->schema_name_ = schema_name;
     ToLower(create_schema_info->schema_name_);
@@ -164,8 +164,8 @@ QueryResult Infinity::CreateDatabase(const std::string &schema_name, const Creat
 QueryResult Infinity::DropDatabase(const std::string &schema_name, const DropDatabaseOptions &drop_database_options) {
     std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    std::unique_ptr<DropStatement> drop_statement = std::make_unique<DropStatement>();
-    std::shared_ptr<DropSchemaInfo> drop_schema_info = std::make_shared<DropSchemaInfo>();
+    auto drop_statement = std::make_unique<DropStatement>();
+    auto drop_schema_info = std::make_shared<DropSchemaInfo>();
 
     drop_schema_info->schema_name_ = schema_name;
     ToLower(drop_schema_info->schema_name_);
@@ -179,7 +179,7 @@ QueryResult Infinity::DropDatabase(const std::string &schema_name, const DropDat
 QueryResult Infinity::ListDatabases() {
     std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    std::unique_ptr<ShowStatement> show_statement = std::make_unique<ShowStatement>();
+    auto show_statement = std::make_unique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kDatabases;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
@@ -399,8 +399,8 @@ QueryResult Infinity::CreateTable(const std::string &db_name,
 
     std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    std::unique_ptr<CreateStatement> create_statement = std::make_unique<CreateStatement>();
-    std::shared_ptr<CreateTableInfo> create_table_info = std::make_shared<CreateTableInfo>();
+    auto create_statement = std::make_unique<CreateStatement>();
+    auto create_table_info = std::make_shared<CreateTableInfo>();
     create_table_info->schema_name_ = db_name;
     ToLower(create_table_info->schema_name_);
 
@@ -426,8 +426,8 @@ QueryResult Infinity::CreateTable(const std::string &db_name,
 QueryResult Infinity::DropTable(const std::string &db_name, const std::string &table_name, const DropTableOptions &options) {
     std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    std::unique_ptr<DropStatement> drop_statement = std::make_unique<DropStatement>();
-    std::shared_ptr<DropTableInfo> drop_table_info = std::make_shared<DropTableInfo>();
+    auto drop_statement = std::make_unique<DropStatement>();
+    auto drop_table_info = std::make_shared<DropTableInfo>();
     drop_table_info->schema_name_ = db_name;
     ToLower(drop_table_info->schema_name_);
 
@@ -536,8 +536,8 @@ QueryResult Infinity::CreateIndex(const std::string &db_name,
     std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
 
-    std::unique_ptr<CreateStatement> create_statement = std::make_unique<CreateStatement>();
-    std::shared_ptr<CreateIndexInfo> create_index_info = std::make_shared<CreateIndexInfo>();
+    auto create_statement = std::make_unique<CreateStatement>();
+    auto create_index_info = std::make_shared<CreateIndexInfo>();
 
     create_index_info->schema_name_ = db_name;
     ToLower(create_index_info->schema_name_);
@@ -572,8 +572,8 @@ QueryResult Infinity::DropIndex(const std::string &db_name,
                                 const DropIndexOptions &drop_index_options) {
     std::unique_ptr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    std::unique_ptr<DropStatement> drop_statement = std::make_unique<DropStatement>();
-    std::shared_ptr<DropIndexInfo> drop_index_info = std::make_shared<DropIndexInfo>();
+    auto drop_statement = std::make_unique<DropStatement>();
+    auto drop_index_info = std::make_shared<DropIndexInfo>();
 
     drop_index_info->schema_name_ = db_name;
     ToLower(drop_index_info->schema_name_);

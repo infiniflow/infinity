@@ -88,7 +88,7 @@ void HashTableBase::GetHashKey(const std::vector<std::shared_ptr<ColumnVector>> 
             hash_key.append(text.begin(), text.end());
         } else {
             size_t type_size = types_[column_id]->Size();
-            std::span<const char> binary(reinterpret_cast<const char *>(columns[column_id]->data() + type_size * row_id), type_size);
+            std::span<const char> binary(reinterpret_cast<const char *>(columns[column_id]->data().get() + type_size * row_id), type_size);
             hash_key.append(binary.begin(), binary.end());
         }
         hash_key += '\0';

@@ -34,7 +34,7 @@ struct InlineVarchar {
 
 struct VectorVarchar {
     char prefix_[VARCHAR_PREFIX_LENGTH]{};
-    uint64_t file_offset_{0};
+    uint64_t file_offset_{};
 };
 
 struct Varchar {
