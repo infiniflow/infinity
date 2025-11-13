@@ -113,6 +113,8 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
     HashTable &hash_table = aggregate_operator_state->hash_table_;
     if (!hash_table.Initialized()) {
         hash_table.Init(groupby_types);
+    } else {
+        hash_table.Clear();
     }
 
     size_t block_count = groupby_table->DataBlockCount();
