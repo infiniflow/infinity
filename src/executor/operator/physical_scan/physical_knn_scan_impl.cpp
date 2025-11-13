@@ -955,9 +955,9 @@ void ExecuteHnswSearch(QueryContext *query_context,
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        std::shared_ptr<HnswHandlerPtr> hnsw_handler;
+        HnswHandlerPtr hnsw_handler{};
         index_file_worker->Read(hnsw_handler);
-        hnsw_search(*hnsw_handler, false);
+        hnsw_search(hnsw_handler, false);
     }
     if (mem_index) {
         auto memory_hnsw_index = mem_index->GetHnswIndex();

@@ -1650,15 +1650,15 @@ Status NewTxn::AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, c
                 if (!status.ok()) {
                     return status;
                 }
-                std::shared_ptr<HnswHandlerPtr> hnsw_handler;
+                HnswHandlerPtr hnsw_handler{};
                 index_file_worker->Read(hnsw_handler);
                 if (params->compress_to_lvq) {
-                    (*hnsw_handler)->CompressToLVQ();
+                    (hnsw_handler)->CompressToLVQ();
                 } else if (params->compress_to_rabitq) {
-                    (*hnsw_handler)->CompressToRabitq();
+                    (hnsw_handler)->CompressToRabitq();
                 }
                 if (params->lvq_avg) {
-                    (*hnsw_handler)->Optimize();
+                    (hnsw_handler)->Optimize();
                 }
             }
             if (mem_index) {

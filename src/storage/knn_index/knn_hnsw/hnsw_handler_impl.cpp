@@ -632,9 +632,9 @@ void HnswIndexInMem::Dump(FileWorker *index_file_worker, size_t *dump_size_ptr) 
     // delete *data_ptr;
     // auto some = new HnswHandlerPtr();
     // *data_ptr = hnsw_handler_;
-    // own_memory_ = false;
+    own_memory_ = false;
     index_file_worker_ = std::move(index_file_worker);
-    index_file_worker_->Write(std::span{&hnsw_handler_, 1});
+    index_file_worker_->Write(hnsw_handler_);
 }
 
 size_t

@@ -4494,6 +4494,7 @@ Status NewTxn::Cleanup() {
         auto data_dir = static_cast<std::filesystem::path>(*data_dir_str);
         // Delete empty dir
         VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
+        VirtualStore::RecursiveCleanupAllEmptyDir("/var/infinity/tmp");
         return Status::OK();
     }
 
@@ -4504,6 +4505,10 @@ Status NewTxn::Cleanup() {
 
     txn_store->dropped_keys_ = dropped_keys;
     txn_store->metas_ = metas;
+
+    // Delete empty dir
+    VirtualStore::RecursiveCleanupAllEmptyDir("/var/infinity/data");
+    VirtualStore::RecursiveCleanupAllEmptyDir("/var/infinity/tmp");
 
     return Status::OK();
 }
@@ -4686,12 +4691,6 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
     }
 
     Status status = fileworker_mgr->RemoveCleanList(kv_instance_.get());
-
-    auto data_dir_str = fileworker_mgr->GetFullDataDir();
-    auto data_dir = static_cast<std::filesystem::path>(*data_dir_str);
-    // Delete empty dir
-    VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
-    VirtualStore::RecursiveCleanupAllEmptyDir("/var/infinity/tmp");
 
     return status;
 }

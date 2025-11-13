@@ -41,15 +41,13 @@ public:
     FileWorkerType Type() const override { return FileWorkerType::kHNSWIndexFile; }
 
 protected:
-    bool Write(std::span<HnswHandlerPtr> data,
-               std::unique_ptr<LocalFileHandle> &file_handle,
-               bool &prepare_success,
-               const FileWorkerSaveCtx &ctx) override;
+    bool Write(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void Read(std::shared_ptr<HnswHandlerPtr> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
-    std::shared_ptr<HnswHandlerPtr> data_;
+    void Read(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+    HnswHandlerPtr data_{};
 
 private:
+    mutable std::mutex mutex_;
     size_t index_size_{};
 };
 

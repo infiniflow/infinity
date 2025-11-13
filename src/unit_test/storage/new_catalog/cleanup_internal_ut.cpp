@@ -537,16 +537,6 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_compact) {
         EXPECT_TRUE(status.ok());
     }
 
-    size_t cnt{};
-    std::println("{}", ++cnt);
-    new_txn_mgr_->PrintAllKeyValue();
-    create_index(*db_name, *table_name, index_def1);
-    std::println("{}", ++cnt);
-    new_txn_mgr_->PrintAllKeyValue();
-    // create_index(*db_name, *table_name, index_def2);
-    std::println("{}", ++cnt);
-    new_txn_mgr_->PrintAllKeyValue();
-
     size_t block_row_cnt = 8192;
     auto make_input_block = [&](const Value &v1, const Value &v2) {
         auto input_block = std::make_shared<DataBlock>();

@@ -57,10 +57,6 @@ struct SecondaryIndexChunkDataReader {
         if (next_offset_ >= row_count_) {
             return false;
         }
-        std::println("adasdasdasd: {}", static_cast<const char *>(key_ptr_)[0]);
-        std::println("adasdasdasd: {}", static_cast<const char *>(key_ptr_)[1]);
-        std::println("adasdasdasd: {}", static_cast<const char *>(key_ptr_)[2]);
-        std::println("adasdasdasd: {}", static_cast<const char *>(key_ptr_)[3]);
         std::memcpy(&key, static_cast<const char *>(key_ptr_) + next_offset_ * sizeof(OrderedKeyType), sizeof(key));
         std::memcpy(&offset, offset_ptr_ + next_offset_, sizeof(offset));
         ++next_offset_;

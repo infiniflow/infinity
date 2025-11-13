@@ -118,8 +118,11 @@ void FileWorker::MoveFile() {
         }
         auto data_path_parent = VirtualStore::GetParentPath(data_path);
         if (!VirtualStore::Exists(data_path_parent)) {
-            VirtualStore::MakeDirectory(data_path_parent);
+
+        } else {
+            VirtualStore::DeleteFile(data_path);
         }
+        VirtualStore::MakeDirectory(data_path_parent);
         VirtualStore::Copy(data_path, temp_path);
     } else {
         PersistResultHandler handler(persistence_manager_);

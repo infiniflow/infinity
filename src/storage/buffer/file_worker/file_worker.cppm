@@ -201,12 +201,11 @@ protected:
 
     virtual void Read(std::shared_ptr<EMVBIndex> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
 
-    virtual bool
-    Write(std::span<HnswHandlerPtr> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+    virtual bool Write(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
         return false;
     }
 
-    virtual void Read(std::shared_ptr<HnswHandlerPtr> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
+    virtual void Read(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
 
     virtual bool
     Write(std::span<IVFIndexInChunk> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
