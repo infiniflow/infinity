@@ -155,6 +155,9 @@ GetAnalyzerName(const std::string &field, const std::string &index, const std::m
             const auto &index2analyzer = it->second;
             if (index2analyzer.empty())
                 return "standard";
+            if (index.length() == 0) {
+                return index2analyzer.begin()->second;
+            }
             const auto it2 = index2analyzer.find(index);
             if (it2 != index2analyzer.end()) {
                 return it2->second;
