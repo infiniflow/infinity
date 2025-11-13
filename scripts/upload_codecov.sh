@@ -7,24 +7,18 @@ upload_file() {
   echo "Uploading report with flag $flag..."
 
   if [ ! -f "$file" ]; then
-    echo "$file does not exist"
-    return 1
-  fi
-
-  upload_cmd="codecov upload-process --disable-search --fail-on-error -t $CODECOV_TOKEN -n $name -F $flag -f $file -C $CODECOV_COMMIT_SHA --branch $GITHUB_REF_NAME"
-
-  if [ -n "$PR_NUMBER" ] ; then
-    upload_cmd="$upload_cmd --pr $PR_NUMBER"
+      echo "$file does not exist"
+      return 1
   fi
 
   RETRY_COUNT=0
   while [ $RETRY_COUNT -lt 5 ]; do
-    if eval $upload_cmd; then
+    if codecov upload-process --disable-search --fail-on-error -t "$CODECOV_TOKEN" -n "$name" -F "$flag" -f "$file" -C "$CODECOV_COMMIT_SHA"; then
       echo "Upload successful for $flag"
       return 0
     fi
     RETRY_COUNT=$((RETRY_COUNT+1))
-    sleep 10
+    sleep 10s
   done
   if [ $RETRY_COUNT -eq 5 ]; then
     echo "Upload failed for $flag"
