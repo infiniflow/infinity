@@ -217,8 +217,7 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                         UnrecoverableError(fmt::format("Get full text index reader error: {}", status.message()));
                     }
 
-                    std::map<std::string, std::string> column2analyzer =
-                        match_node->index_reader_->GetColumn2Analyzer(match_node->match_expr_->index_names_);
+                    std::map<std::string, std::map<std::string, std::string>> column2analyzer = match_node->index_reader_->GetColumn2Analyzer();
                     SearchOptions search_ops(match_node->match_expr_->options_text_);
 
                     // option: begin_threshold
@@ -339,7 +338,7 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                         match_node->bm25_params_.delta_phrase = delta_phrase_v;
                     }
 
-                    SearchDriver search_driver(column2analyzer, default_field, query_operator_option);
+                    SearchDriver search_driver(std::move(column2analyzer), default_field, query_operator_option);
                     std::unique_ptr<QueryNode> query_tree =
                         search_driver.ParseSingleWithFields(match_node->match_expr_->fields_, match_node->match_expr_->matching_text_);
                     if (query_tree.get() == nullptr) {
@@ -360,12 +359,7 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                             for (auto &[highlight_column_id, highlight_info] : highlight_columns_) {
                                 if (column_name == projection_expressions_[highlight_column_id]->Name()) {
                                     highlight_info->query_terms_.insert(highlight_info->query_terms_.end(), terms.begin(), terms.end());
-                                    const auto &it = column2analyzer.find(column_name);
-                                    if (it == column2analyzer.end()) {
-                                        highlight_info->analyzer_ = "standard";
-                                    } else {
-                                        highlight_info->analyzer_ = it->second;
-                                    }
+                                    highlight_info->analyzer_ = "rag-coarse";
                                 }
                             }
                         }

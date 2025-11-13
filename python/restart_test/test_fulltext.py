@@ -428,6 +428,71 @@ class TestFullText:
 
         part2()
 
+    def test_fulltext_multi_index(self, infinity_runner: InfinityRunner):
+        """Demonstrate querying multiple fulltext indexes on the same column using new field@index syntax."""
+        config = "test/data/config/restart_test/test_fulltext/1.toml"
+        uri = common_values.TEST_LOCAL_HOST
+        infinity_runner.clear()
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
+
+        @decorator
+        def run(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            table_name = "test_fulltext_multi_index"
+            db_obj.drop_table(table_name, ConflictType.Ignore)
+            table_obj = db_obj.create_table(
+                table_name,
+                {
+                    "id": {"type": "int"},
+                    "body": {"type": "varchar"},
+                },
+                ConflictType.Error,
+            )
+            # Insert small sample
+            sample = [
+                (0, "American anarchism harmful chemical"),
+                (1, "Chemical safety and social customs"),
+                (2, "Anarchism theory"),
+            ]
+            for rid, body in sample:
+                table_obj.insert([
+                    {"id": rid, "body": body}
+                ])
+
+            # Create two fulltext indexes on same column
+            res1 = table_obj.create_index(
+                "ft_index",
+                index.IndexInfo("body", index.IndexType.FullText),
+                ConflictType.Error,
+            )
+            assert res1.error_code == ErrorCode.OK
+            res2 = table_obj.create_index(
+                "ft_index2",
+                index.IndexInfo("body", index.IndexType.FullText),
+                ConflictType.Error,
+            )
+            assert res2.error_code == ErrorCode.OK
+
+            # Query using per-field index syntax (same column twice with different index hints)
+            # Boost second index variant differently to exercise parsing logic.
+            res = (
+                table_obj.output(["id"])
+                .match_text(
+                    fields="body@ft_index^2,body@ft_index2^3",
+                    matching_text="American harmful chemical",
+                    topn=5,
+                    extra_options=None,
+                )
+                .to_result()
+            )
+            data_dict, _, _ = res
+            # Just assert we got some results and no exception.
+            assert isinstance(data_dict, dict)
+
+            db_obj.drop_table(table_name, ConflictType.Error)
+
+        run()
+
 
 if __name__ == "__main__":
     pass

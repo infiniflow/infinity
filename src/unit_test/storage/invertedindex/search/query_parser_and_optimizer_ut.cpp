@@ -136,9 +136,9 @@ sda:rtw AND ((NOT name:god^2 AND NOT kddd:ss^4) AND NOT ee:ff^1.2)
 sda:rtw AND ((NOT name:god^2 OR NOT kddd:ss^4) OR NOT ee:ff^1.2)
     )##";
 
-    std::map<std::string, std::string> column2analyzer;
+    std::map<std::string, std::map<std::string, std::string>> column2analyzer;
     std::string default_field("body");
-    SearchDriver driver(column2analyzer, default_field);
+    SearchDriver driver(std::move(column2analyzer), default_field);
     std::istringstream iss(row_quires);
     int rc = ParseAndOptimizeFromStream(driver, iss);
     EXPECT_EQ(rc, 0);
@@ -170,12 +170,13 @@ sda:rtw AND ((NOT name:god^2 AND NOT kddd:ss^4) AND NOT ee:ff^1.2)
 sda:rtw AND ((NOT name:god^2 OR NOT kddd:ss^4) OR NOT ee:ff^1.2)
     )##";
 
-    const std::map<std::string, std::string> column2analyzer;
+    std::map<std::string, std::map<std::string, std::string>> column2analyzer;
     const std::string default_field("body");
     for (size_t i = 0; i < std::size(ops); ++i) {
         const auto op = ops[i];
         LOG_DEBUG(fmt::format("Test With Operator Option: {}", ops_chars[i]));
-        SearchDriver driver(column2analyzer, default_field, op);
+        auto column2analyzer_clone = column2analyzer;
+        SearchDriver driver(std::move(column2analyzer_clone), default_field, op);
         std::istringstream iss(row_quires);
         int rc = ParseAndOptimizeFromStream(driver, iss);
         EXPECT_EQ(rc, 0);
@@ -205,13 +206,14 @@ nanjing吉祥物"羽宝"头部head "DS-K3AJ303/Dm140"
 graphic cards
     )##";
 
-    std::map<std::string, std::string> column2analyzer;
-    column2analyzer["body"] = "chinese";
+    std::map<std::string, std::map<std::string, std::string>> column2analyzer;
+    column2analyzer["body"] = std::map<std::string, std::string>{{"ft_index", "chinese"}};
     const std::string default_field("body");
     for (size_t i = 0; i < std::size(ops); ++i) {
         const auto op = ops[i];
         LOG_DEBUG(fmt::format("Test With Operator Option: {}", ops_chars[i]));
-        SearchDriver driver(column2analyzer, default_field, op);
+        auto column2analyzer_clone = column2analyzer;
+        SearchDriver driver(std::move(column2analyzer_clone), default_field, op);
         std::istringstream iss(row_quires);
         try {
             int rc = ParseAndOptimizeFromStream(driver, iss);

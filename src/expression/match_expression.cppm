@@ -24,7 +24,7 @@ namespace infinity {
 
 export class MatchExpression : public BaseExpression {
 public:
-    MatchExpression(const std::string &fields, const std::string &matching_text, const std::string &options_text, const std::string &index_names);
+    MatchExpression(const std::string &fields, const std::string &matching_text, const std::string &options_text);
 
     inline DataType Type() const override { return DataType(LogicalType::kFloat); }
 
@@ -38,7 +38,6 @@ public:
     std::string fields_;
     std::string matching_text_;
     std::string options_text_;
-    std::vector<std::string> index_names_;
     std::shared_ptr<BaseExpression> optional_filter_;
 };
 
