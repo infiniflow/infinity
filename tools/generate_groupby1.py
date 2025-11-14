@@ -30,7 +30,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         )
         return
 
-    row_n = 9000
+    row_n = 100000
     group_n1 = 150
     group_n2 = 100
     groupby_c1 = defaultdict(list)
