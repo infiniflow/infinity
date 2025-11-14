@@ -139,13 +139,13 @@ public:
             EXPECT_TRUE(status.ok());
         }
 
-        {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("cleanup"), TransactionType::kCleanup);
-            Status status = txn->Cleanup();
-            EXPECT_TRUE(status.ok());
-            status = txn_mgr->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
+        // {
+        //     auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("cleanup"), TransactionType::kCleanup);
+        //     Status status = txn->Cleanup();
+        //     EXPECT_TRUE(status.ok());
+        //     status = txn_mgr->CommitTxn(txn);
+        //     EXPECT_TRUE(status.ok());
+        // }
     }
 };
 

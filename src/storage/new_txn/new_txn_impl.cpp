@@ -3965,15 +3965,6 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableSnapshotTxnStore &txn_store,
 bool NewTxn::CheckConflictTxnStore(const CleanupTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     // retry_query = true;
     bool conflict = false;
-    switch (previous_txn->base_txn_store_->type_) {
-        case TransactionType::kCreateTableSnapshot: {
-            retry_query = true;
-            conflict = true;
-            break;
-        }
-        default: {
-        }
-    }
     if (conflict) {
         cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
         return true;
