@@ -2403,17 +2403,9 @@ void WalListIterator::PurgeBadEntriesAfterLatestCheckpoint() {
         while (iter_->HasNext()) {
             auto entry = iter_->Next();
             if (entry.get() != nullptr) {
-                {
-                    WalCmd *cmd = nullptr;
-                    if (entry->IsCheckPointOrSnapshot(cmd)) {
-                        found_checkpoint = true;
-                    }
-                }
-                {
-                    WalCmdCheckpoint *checkpoint_cmd = nullptr;
-                    if (entry->IsCheckPoint(checkpoint_cmd)) {
-                        found_checkpoint = true;
-                    }
+                WalCmdCheckpoint *checkpoint_cmd = nullptr;
+                if (entry->IsCheckPoint(checkpoint_cmd)) {
+                    found_checkpoint = true;
                 }
             } else {
                 bad_offset = iter_->GetOffset();
