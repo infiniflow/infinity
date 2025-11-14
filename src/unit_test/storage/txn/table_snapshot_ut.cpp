@@ -104,9 +104,9 @@ public:
             EXPECT_TRUE(ok);
         }
 
-        for (IntegerT i = 1; i < 20; ++i) {
+        for (IntegerT i = 0; i < 20; ++i) {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
-            auto input_block = MakeInputBlock(Value::MakeInt(i), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 1000);
+            auto input_block = MakeInputBlock(Value::MakeInt(i), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 5000);
             auto status = txn->Append(*db_name, *table_name, input_block);
             EXPECT_TRUE(status.ok());
             status = txn_mgr->CommitTxn(txn);
@@ -139,13 +139,13 @@ public:
             EXPECT_TRUE(status.ok());
         }
 
-        // {
-        //     auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("cleanup"), TransactionType::kCleanup);
-        //     Status status = txn->Cleanup();
-        //     EXPECT_TRUE(status.ok());
-        //     status = txn_mgr->CommitTxn(txn);
-        //     EXPECT_TRUE(status.ok());
-        // }
+        {
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("cleanup"), TransactionType::kCleanup);
+            Status status = txn->Cleanup();
+            EXPECT_TRUE(status.ok());
+            status = txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
     }
 };
 

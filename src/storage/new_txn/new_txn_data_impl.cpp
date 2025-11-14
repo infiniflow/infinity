@@ -1438,8 +1438,6 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
     std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     std::string snapshot_name = table_snapshot_info->snapshot_name_;
 
-    [[maybe_unused]] auto CreateSnapshotByMapping = [&](const std::string &file) -> Status { return Status::OK(); };
-
     auto data_start_time = std::chrono::high_resolution_clock::now();
 
     std::vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -1620,6 +1618,11 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
         std::string json_string = json_res.dump();
 
         std::string meta_path = fmt::format("{}/{}/{}.json", snapshot_dir, table_snapshot_info->snapshot_name_, table_snapshot_info->snapshot_name_);
+        std::string meta_path_dir = VirtualStore::GetParentPath(meta_path);
+        if (!VirtualStore::Exists(meta_path_dir)) {
+            VirtualStore::MakeDirectory(meta_path_dir);
+        }
+
         auto [snapshot_file_handle, meta_status] = VirtualStore::Open(meta_path, FileAccessMode::kWrite);
         if (!meta_status.ok()) {
             UnrecoverableError(status.message());
