@@ -24,10 +24,11 @@ import :vec_store_type;
 import :hnsw_common;
 import :sparse_util;
 import :infinity_exception;
-import third_party;
 import :sparse_test_util;
 import :virtual_store;
 import :local_file_handle;
+
+import third_party;
 
 import compilation_config;
 
@@ -66,7 +67,7 @@ protected:
                 std::filesystem::path dump_path = std::filesystem::path(tmp_path) / "dump.txt";
                 std::fstream ss(dump_path, std::fstream::out);
                 if (!ss.is_open()) {
-                    UnrecoverableError(fmt::format("Failed to open file: {}", dump_path));
+                    UnrecoverableError(fmt::format("Failed to open file: {}", dump_path.string()));
                 }
                 hnsw_index->Dump(ss);
                 hnsw_index->Check();
