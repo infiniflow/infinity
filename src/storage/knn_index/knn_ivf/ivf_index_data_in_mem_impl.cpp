@@ -16,7 +16,7 @@ module infinity_core:ivf_index_data_in_mem.impl;
 
 import :ivf_index_data_in_mem;
 import :ivf_index_storage;
-import :fileworker_manager;
+
 import :index_base;
 import :index_ivf;
 import :infinity_exception;

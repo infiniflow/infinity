@@ -25,9 +25,7 @@ import :kv_store;
 import :default_values;
 import :infinity_exception;
 import :infinity_context;
-import :data_file_worker;
-import :var_file_worker;
-import :version_file_worker;
+// import :data_file_worker;
 import :block_version;
 import :vector_buffer;
 import :logger;
@@ -127,8 +125,8 @@ struct NewTxnCompactState {
             segment_row_cnt_ += cur_block_row_cnt_;
             for (ColumnID i = 0; i < column_cnt_; ++i) {
                 ColumnMeta column_meta(i, *block_meta_);
-                FileWorker *data_file_worker{};
-                FileWorker *var_file_worker{};
+                DataFileWorker *data_file_worker{};
+                VarFileWorker *var_file_worker{};
 
                 Status status = column_meta.GetFileWorker(data_file_worker, var_file_worker);
                 if (!status.ok()) {
@@ -141,13 +139,13 @@ struct NewTxnCompactState {
                 }
 
                 // data_file_worker->Write(std::span{column_vectors_[i].data().get(), column_vectors_[i].Size()});
-                data_file_worker->Write(std::span{column_vectors_[i].data().get(), data_size});
+                static_cast<FileWorker *>(data_file_worker)->Write(std::span{column_vectors_[i].data().get(), data_size});
                 if (var_file_worker) {
                     if ((column_vectors_[i].buffer_->var_buffer_mgr()->my_var_buffer_ || column_vectors_[i].buffer_->var_buffer_mgr()->mem_buffer_) &&
                         std::holds_alternative<std::vector<std::unique_ptr<char[]>>>(
                             column_vectors_[i].buffer_->var_buffer_mgr()->my_var_buffer_->buffers_)) {
                         auto data = column_vectors_[i].buffer_->var_buffer_mgr()->my_var_buffer_;
-                        var_file_worker->Write(std::span{data.get(), 1});
+                        static_cast<FileWorker *>(var_file_worker)->Write(std::span{data.get(), 1});
                     }
                 }
             }
@@ -913,10 +911,10 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
 
         // append in version file.
         std::shared_ptr<BlockVersion> block_version;
-        version_file_worker->Read(block_version);
+        static_cast<FileWorker *>(version_file_worker)->Read(block_version);
         block_version->Append(commit_ts, block_offset + append_rows);
         VersionFileWorkerSaveCtx version_file_worker_save_ctx{commit_ts};
-        version_file_worker->Write(std::span{block_version.get(), 1}, version_file_worker_save_ctx);
+        static_cast<FileWorker *>(version_file_worker)->Write(std::span{block_version.get(), 1}, version_file_worker_save_ctx);
     }
     return Status::OK();
 }
@@ -933,8 +931,8 @@ NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t appen
     }
     dest_vec.AppendWith(column_vector, source_offset, append_rows);
 
-    FileWorker *data_file_worker{};
-    FileWorker *var_file_worker{};
+    DataFileWorker *data_file_worker{};
+    VarFileWorker *var_file_worker{};
     Status status = column_meta.GetFileWorker(data_file_worker, var_file_worker);
     if (!status.ok()) {
         return status;
@@ -948,12 +946,12 @@ NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t appen
     // dest_vec.SetToCatalog(data_file_worker, var_file_worker, ColumnVectorMode::kReadWrite);
 
     // data_file_worker->Write(std::span{dest_vec.data().get(), dest_vec.Size()});
-    data_file_worker->Write(std::span{dest_vec.data().get(), data_size});
+    static_cast<FileWorker *>(data_file_worker)->Write(std::span{dest_vec.data().get(), data_size});
     if (var_file_worker) {
         if (dest_vec.buffer_->var_buffer_mgr()->my_var_buffer_ &&
             std::holds_alternative<std::vector<std::unique_ptr<char[]>>>(dest_vec.buffer_->var_buffer_mgr()->my_var_buffer_->buffers_)) {
             auto data = dest_vec.buffer_->var_buffer_mgr()->my_var_buffer_;
-            var_file_worker->Write(std::span{data.get(), 1});
+            static_cast<FileWorker *>(var_file_worker)->Write(std::span{data.get(), 1});
         }
     }
     // }
@@ -1007,7 +1005,7 @@ Status NewTxn::RollbackDeleteInBlock(BlockMeta &block_meta, const std::vector<Bl
     {
         auto version_filepath = fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH);
         auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
-        version_buffer = fileworker_mgr->GetFileWorker(version_filepath);
+        version_buffer = fileworker_mgr->version_map_.GetFileWorker(version_filepath);
         if (version_buffer == nullptr) {
             return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
         }
@@ -1240,8 +1238,8 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
             column_vector.AppendValue(default_value);
         }
 
-        FileWorker *data_file_worker{};
-        FileWorker *var_file_worker{};
+        DataFileWorker *data_file_worker{};
+        VarFileWorker *var_file_worker{};
         status = column_meta->GetFileWorker(data_file_worker, var_file_worker);
         if (!status.ok()) {
             return status;
@@ -1254,12 +1252,12 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
 
         // // XXX
         // data_file_worker->Write(std::span{column_vector.data().get(), column_vector.Size()});
-        data_file_worker->Write(std::span{column_vector.data().get(), data_size});
+        static_cast<FileWorker *>(data_file_worker)->Write(std::span{column_vector.data().get(), data_size});
         if (var_file_worker) {
             if (column_vector.buffer_->var_buffer_mgr()->my_var_buffer_ &&
                 std::holds_alternative<std::vector<std::unique_ptr<char[]>>>(column_vector.buffer_->var_buffer_mgr()->my_var_buffer_->buffers_)) {
                 auto data = column_vector.buffer_->var_buffer_mgr()->my_var_buffer_;
-                var_file_worker->Write(std::span{data.get(), 1});
+                static_cast<FileWorker *>(var_file_worker)->Write(std::span{data.get(), 1});
             }
         }
 
@@ -1775,10 +1773,10 @@ Status NewTxn::AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segm
             return status;
         }
         std::shared_ptr<BlockVersion> block_version;
-        version_file_worker->Read(block_version);
+        static_cast<FileWorker *>(version_file_worker)->Read(block_version);
 
         block_version->Append(save_ts, block_info.row_count_);
-        version_file_worker->Write(std::span{block_version.get(), 1}, VersionFileWorkerSaveCtx{static_cast<u64>(-1)});
+        static_cast<FileWorker *>(version_file_worker)->Write(std::span{block_version.get(), 1}, VersionFileWorkerSaveCtx{static_cast<u64>(-1)});
     }
     return Status::OK();
 }
@@ -1795,10 +1793,10 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
             return status;
         }
         auto block_version = std::make_shared<BlockVersion>(block_meta.block_capacity());
-        version_buffer->Read(block_version);
+        static_cast<FileWorker *>(version_buffer)->Read(block_version);
 
         block_version->CommitAppend(save_ts, commit_ts);
-        version_buffer->Write(std::span{block_version.get(), 1}, VersionFileWorkerSaveCtx(commit_ts));
+        static_cast<FileWorker *>(version_buffer)->Write(std::span{block_version.get(), 1}, VersionFileWorkerSaveCtx(commit_ts));
 
         std::shared_ptr<BlockLock> block_lock;
         status = block_meta.GetBlockLock(block_lock);
@@ -1824,7 +1822,7 @@ Status NewTxn::FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts) {
     FileWorker *version_buffer = nullptr;
     {
         std::string version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + std::string(BlockVersion::PATH);
-        version_buffer = fileworker_mgr->GetFileWorker(version_filepath);
+        version_buffer = fileworker_mgr->version_map_.GetFileWorker(version_filepath);
         if (version_buffer == nullptr) {
             return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
         }
@@ -1846,8 +1844,8 @@ Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
     LOG_TRACE("NewTxn::FlushColumnFiles begin");
     for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
         ColumnMeta column_meta(column_idx, block_meta);
-        FileWorker *file_worker{};
-        FileWorker *var_file_worker{};
+        DataFileWorker *file_worker{};
+        VarFileWorker *var_file_worker{};
 
         status = column_meta.GetFileWorker(file_worker, var_file_worker);
         if (!status.ok()) {
@@ -1904,8 +1902,8 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
         auto col = input_block->column_vectors_[i];
         auto col_def = table_info->column_defs_[i];
 
-        FileWorker *data_file_worker{};
-        FileWorker *var_file_worker{};
+        DataFileWorker *data_file_worker{};
+        VarFileWorker *var_file_worker{};
         ColumnID column_id = col_def->id();
         auto file_name = fmt::format("{}.col", column_id);
 
@@ -1925,7 +1923,7 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
             file_worker_paths->push_back(*rel_file_path);
         }
 
-        data_file_worker = fileworker_mgr->EmplaceFileWorker(std::move(file_worker1));
+        data_file_worker = fileworker_mgr->data_map_.EmplaceFileWorker(std::move(file_worker1));
 
         VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
         if (buffer_type == VectorBufferType::kVarBuffer) {
@@ -1936,7 +1934,7 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
             if (file_worker_paths != nullptr) {
                 file_worker_paths->push_back(*var_rel_file_path);
             }
-            var_file_worker = fileworker_mgr->EmplaceFileWorker(std::move(file_worker2));
+            var_file_worker = fileworker_mgr->var_map_.EmplaceFileWorker(std::move(file_worker2));
         }
 
         col->SetToCatalog(data_file_worker, var_file_worker, ColumnVectorMode::kReadWrite);

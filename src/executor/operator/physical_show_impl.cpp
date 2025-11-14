@@ -38,7 +38,7 @@ import :options;
 import :status;
 import :virtual_store;
 import :utility;
-import :fileworker_manager;
+
 import :session_manager;
 import :variables;
 import :default_values;
@@ -2276,20 +2276,20 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
         {
             size_t block_size = 0;
             std::vector<std::string> &paths = block_info->files_;
-            bool check_buffer_obj = false;
+            // bool check_buffer_obj = false;
             if (query_context->persistence_manager() == nullptr) {
                 std::string full_block_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *block_info->block_dir_);
                 if (std::filesystem::exists(full_block_dir)) {
                     block_size = VirtualStore::GetDirectorySize(full_block_dir);
                 } else {
-                    check_buffer_obj = true;
+                    // check_buffer_obj = true;
                 }
             } else {
                 block_size = 0;
                 for (const std::string &path : paths) {
                     auto [file_size, status2] = query_context->persistence_manager()->GetFileSize(path);
                     if (!status2.ok()) {
-                        check_buffer_obj = true;
+                        // check_buffer_obj = true;
                         break;
                     }
                     block_size += file_size;
@@ -2297,21 +2297,21 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
             }
 
             // If block files are not found, try to get the buffer object from buffer manager.
-            if (check_buffer_obj) {
-                block_size = 0;
-                FileWorker *file_worker{};
-                auto *buffer_manager = query_context->storage()->fileworker_manager();
-
-                for (const auto &path : paths) {
-                    file_worker = buffer_manager->GetFileWorker(path);
-                    if (file_worker != nullptr) {
-                        // auto file_size = file_worker->GetBufferSize();
-                        // block_size += file_size;
-                    } else {
-                        RecoverableError(status);
-                    }
-                }
-            }
+            // if (check_buffer_obj) {
+            //     block_size = 0;
+            //     FileWorker *file_worker{};
+            //     auto *file_worker_manager = query_context->storage()->fileworker_manager();
+            //
+            //     for (const auto &path : paths) {
+            //         file_worker = file_worker_manager->GetFileWorker(path);
+            //         if (file_worker != nullptr) {
+            //             // auto file_size = file_worker->GetBufferSize();
+            //             // block_size += file_size;
+            //         } else {
+            //             RecoverableError(status);
+            //         }
+            //     }
+            // }
 
             std::string block_size_str = Utility::FormatByteSize(block_size);
             Value value = Value::MakeVarchar(block_size_str);
@@ -4095,7 +4095,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             output_block_ptr->Init(output_column_types);
 
             FileWorkerManager *buffer_manager = query_context->storage()->fileworker_manager();
-            Value value = Value::MakeBigInt(buffer_manager->BufferedObjectCount());
+            Value value = Value::MakeBigInt(buffer_manager->FileWorkerCount());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
             break;
@@ -4741,7 +4741,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 {
                     // option value
                     FileWorkerManager *buffer_manager = query_context->storage()->fileworker_manager();
-                    Value value = Value::MakeVarchar(std::to_string(buffer_manager->BufferedObjectCount()));
+                    Value value = Value::MakeVarchar(std::to_string(buffer_manager->FileWorkerCount()));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
                 }

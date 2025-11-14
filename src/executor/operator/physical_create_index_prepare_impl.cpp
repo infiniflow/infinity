@@ -25,7 +25,7 @@ import :status;
 import :infinity_exception;
 import :index_base;
 import :index_file_worker;
-import :fileworker_manager;
+
 import :index_hnsw;
 import :default_values;
 import :base_table_ref;

@@ -27,6 +27,7 @@ import internal_types;
 namespace infinity {
 class FileSystem;
 struct ColumnReaderChunkInfo;
+class RawFileWorker;
 
 export class FullTextColumnLengthReader {
 public:
@@ -62,7 +63,7 @@ private:
     std::shared_ptr<char[]> column_lengths_;
     RowID current_chunk_base_rowid_{(u64)0};
     u32 current_chunk_row_count_{};
-    FileWorker *current_chunk_buffer_obj_{};
+    IndexFileWorker *current_chunk_file_worker_{};
 };
 
 } // namespace infinity

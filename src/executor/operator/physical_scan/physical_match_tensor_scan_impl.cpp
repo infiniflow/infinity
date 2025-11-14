@@ -42,7 +42,7 @@ import :emvb_index;
 import :knn_filter;
 import :global_block_id;
 import :block_index;
-import :fileworker_manager;
+
 import :match_tensor_scan_function_data;
 import :mlas_matrix_multiply;
 import :physical_fusion;
@@ -63,6 +63,7 @@ import :new_catalog;
 import :index_base;
 import :column_meta;
 import :mem_index;
+import :index_file_worker;
 
 import std.compat;
 import third_party;
@@ -425,7 +426,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             // 2. chunk index
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-                FileWorker *index_file_worker{};
+                IndexFileWorker *index_file_worker{};
                 Status status = chunk_index_meta.GetFileWorker(index_file_worker);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());

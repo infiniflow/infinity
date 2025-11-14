@@ -35,7 +35,7 @@ namespace infinity {
 
 class LocalFileHandle;
 class Status;
-export class FileWorkerManager;
+// export class FileWorkerManager;
 export class BMPHandler;
 using BMPHandlerPtr = BMPHandler *;
 
@@ -48,6 +48,7 @@ export struct HighCardinalityTag;
 export struct LowCardinalityTag;
 export template <typename CardinalityTag>
 class SecondaryIndexDataBase;
+export class FileWorkerManager;
 
 export class IVFIndexInChunk;
 
@@ -55,7 +56,7 @@ export class VarBuffer;
 
 export struct FileWorkerSaveCtx {};
 
-export enum class FileWorkerTag {
+export enum class FileWorkerTag1 {
     kBmp,
     kData,
     kEmvb,
@@ -66,6 +67,14 @@ export enum class FileWorkerTag {
     kVar,
     kVersion,
 };
+
+// export struct FileWorkerTag {};
+//
+// export template <typename FileWorkerT>
+// concept FileWorkerConcept = std::derived_from<FileWorkerT, FileWorkerTag> && requires(FileWorkerT file_worker) {
+//     file_worker.Read();
+//     file_worker.Write();
+// };
 
 export class FileWorker {
 public:
@@ -167,7 +176,7 @@ public:
         }
     }
 
-    void PickForCleanup();
+    // void PickForCleanup();
 
     void MoveFile();
 
@@ -249,7 +258,7 @@ public:
     std::shared_mutex rw_mutex_;
     std::shared_ptr<std::string> rel_file_path_;
     PersistenceManager *persistence_manager_{};
-    FileWorkerManager *file_worker_manager_;
+    FileWorkerManager *file_worker_manager_{};
     ObjAddr obj_addr_;
     void *mmap_{};
     size_t mmap_size_{};

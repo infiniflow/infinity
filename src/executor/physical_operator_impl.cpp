@@ -31,7 +31,7 @@ import :result_cache_manager;
 import :logger;
 import :data_block;
 import :cached_match;
-import :fileworker_manager;
+
 import :block_index;
 import :block_meta;
 import :column_meta;

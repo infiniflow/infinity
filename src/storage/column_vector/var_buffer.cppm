@@ -18,6 +18,9 @@ import :file_worker;
 
 namespace infinity {
 
+class DataFileWorker;
+export class VarFileWorker;
+
 export class VarBuffer {
     friend class VarFileWorker;
 
@@ -74,7 +77,7 @@ export class VarBufferManager {
 public:
     VarBufferManager() : type_(BufferType::kBuffer), mem_buffer_(nullptr) {}
 
-    VarBufferManager(FileWorker *var_file_worker);
+    VarBufferManager(VarFileWorker *var_file_worker);
 
     size_t Append(std::unique_ptr<char[]> buffer, size_t size);
 
@@ -88,7 +91,7 @@ public:
 
     size_t TotalSize();
 
-    void SetToCatalog(FileWorker *var_file_worker);
+    void SetToCatalog(VarFileWorker *var_file_worker);
 
     enum class BufferType {
         kBuffer,
@@ -102,8 +105,8 @@ public:
 private:
     std::shared_ptr<VarBuffer> GetInnerNoLock();
 
-    FileWorker *data_file_worker_{};
-    FileWorker *var_fileworker_{};
+    DataFileWorker *data_file_worker_{};
+    VarFileWorker *var_fileworker_{};
 
     mutable std::mutex mutex_;
 };

@@ -38,6 +38,9 @@ import global_resource_usage;
 
 namespace infinity {
 
+class DataFileWorker;
+class VarFileWorker;
+
 export enum class ColumnVectorMode : i8 {
     kReadWrite,
     kReadOnly,
@@ -123,14 +126,14 @@ private:
 public:
     void Initialize(ColumnVectorType vector_type = ColumnVectorType::kFlat, size_t capacity = DEFAULT_VECTOR_SIZE);
 
-    void Initialize(FileWorker *data_file_worker,
-                    FileWorker *var_file_worker,
+    void Initialize(DataFileWorker *data_file_worker,
+                    VarFileWorker *var_file_worker,
                     size_t current_row_count,
                     ColumnVectorMode vector_tipe = ColumnVectorMode::kReadWrite,
                     ColumnVectorType vector_type = ColumnVectorType::kFlat,
                     size_t capacity = DEFAULT_VECTOR_SIZE);
 
-    void SetToCatalog(FileWorker *data_file_worker, FileWorker *var_file_worker, ColumnVectorMode vector_tipe);
+    void SetToCatalog(DataFileWorker *data_file_worker, VarFileWorker *var_file_worker, ColumnVectorMode vector_tipe);
 
     void Initialize(const ColumnVector &other, const Selection &input_select);
 

@@ -25,6 +25,12 @@ namespace infinity {
 export struct ChunkIndexSnapshotInfo;
 class KVInstance;
 class SegmentIndexMeta;
+// class BMPIndexFileWorker;
+// class EMVBIndexFileWorker;
+// class HnswFileWorker;
+// class IVFIndexFileWorker;
+// class SecondaryIndexFileWorker;
+class IndexFileWorker;
 
 export struct ChunkIndexMetaInfo {
     ChunkIndexMetaInfo() = default;
@@ -53,7 +59,7 @@ public:
 
     Status GetChunkInfo(ChunkIndexMetaInfo *&chunk_info);
 
-    Status GetFileWorker(FileWorker *&index_file_worker);
+    Status GetFileWorker(IndexFileWorker *&index_file_worker);
 
     Status InitSet(const ChunkIndexMetaInfo &chunk_info);
 
@@ -85,7 +91,7 @@ private:
 
     std::optional<ChunkIndexMetaInfo> chunk_info_;
 
-    FileWorker *index_file_worker_{};
+    IndexFileWorker *index_file_worker_{};
 };
 
 } // namespace infinity

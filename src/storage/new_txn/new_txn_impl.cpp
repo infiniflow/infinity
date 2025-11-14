@@ -18,7 +18,7 @@ import :new_txn;
 import :new_catalog;
 import :infinity_exception;
 import :new_txn_manager;
-import :fileworker_manager;
+
 import :wal_entry;
 import :logger;
 import :data_block;
@@ -44,8 +44,7 @@ import :snapshot_info;
 import :kv_store;
 import :random;
 import :kv_code;
-import :data_file_worker;
-import :version_file_worker;
+// import :data_file_worker;
 import :block_version;
 import :catalog_meta;
 import :db_meta;
@@ -4690,7 +4689,7 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
         }
     }
 
-    Status status = fileworker_mgr->RemoveCleanList(kv_instance_.get());
+    Status status = fileworker_mgr->RemoveCleanList();
 
     return status;
 }

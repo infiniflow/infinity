@@ -14,7 +14,6 @@
 
 export module infinity_core:block_column_iter;
 
-import :fileworker_manager;
 import :column_vector;
 import :sparse_util;
 import :multivector_util;

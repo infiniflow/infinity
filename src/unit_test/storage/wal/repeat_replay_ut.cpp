@@ -34,7 +34,7 @@ import :column_vector;
 import :table_def;
 import :data_block;
 import :value;
-import :fileworker_manager;
+
 import :physical_import;
 import :txn_state;
 import :new_txn;

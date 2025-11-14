@@ -17,7 +17,6 @@ export module infinity_core:physical_operator;
 import :physical_operator_type;
 import :base_table_ref;
 import :infinity_type;
-import :fileworker_manager;
 
 import std;
 
@@ -29,6 +28,7 @@ class DataTable;
 class OperatorState;
 class QueryContext;
 struct LoadMeta;
+class FileWorkerManager;
 
 export class PhysicalOperator : public std::enable_shared_from_this<PhysicalOperator> {
 

@@ -25,7 +25,7 @@ import :status;
 import :logger;
 import :infinity_exception;
 import :column_vector;
-import :fileworker_manager;
+
 import :default_values;
 import :block_index;
 import :new_catalog;

@@ -14,61 +14,81 @@
 
 export module infinity_core:fileworker_manager;
 
-import :file_worker;
-import :default_values;
+import :bmp_index_file_worker;
+import :data_file_worker;
+import :emvb_index_file_worker;
+import :hnsw_file_worker;
+import :ivf_index_file_worker;
+import :raw_file_worker;
+import :secondary_index_file_worker;
+import :var_file_worker;
+import :version_file_worker;
 
 import std;
 
 namespace infinity {
 
-class KVInstance;
-class PersistenceManager;
-struct ObjAddr;
-class Status;
+export template <typename FileWorkerT>
+struct FileWorkerMap {
+    FileWorkerT *EmplaceFileWorker(std::unique_ptr<FileWorkerT> file_worker);
+
+    void RemoveImport(TransactionID txn_id);
+
+    FileWorkerT *GetFileWorker(const std::string &rel_file_path);
+
+    void AddToCleanList(FileWorkerT *file_worker);
+
+    void ClearCleans();
+
+    void MoveFiles();
+
+    mutable std::shared_mutex rw_mtx_;
+    std::unordered_map<std::string, std::unique_ptr<FileWorkerT>> map_;
+
+    mutable std::shared_mutex rw_clean_mtx_;
+    std::vector<FileWorkerT *> cleans_;
+};
 
 export class FileWorkerManager {
 public:
     explicit FileWorkerManager(std::shared_ptr<std::string> data_dir, std::shared_ptr<std::string> temp_dir);
 
-public:
     void Start();
     void Stop();
 
-    auto &fileworker_map() { return fileworker_map_; }
-
-    // Create a new BufferHandle, or in replay process. (read data block from wal)
-    FileWorker *EmplaceFileWorker(std::unique_ptr<FileWorker> file_worker);
-
-    FileWorker *GetFileWorker(const std::string &rel_file_path);
+    // auto &fileworker_map() { return fileworker_map_; }
 
     std::shared_ptr<std::string> GetFullDataDir() const { return data_dir_; }
 
     std::shared_ptr<std::string> GetTempDir() const { return temp_dir_; }
 
-    size_t BufferedObjectCount();
+    size_t FileWorkerCount();
 
-    Status RemoveCleanList(KVInstance *kv_instance);
+    Status RemoveCleanList();
 
     void RemoveImport(TransactionID txn_id);
 
     inline PersistenceManager *persistence_manager() const { return persistence_manager_; }
 
-    void AddToCleanList(FileWorker *file_worker);
-
     void MoveFiles();
 
-    std::unordered_map<std::string, std::shared_ptr<BlockVersion>> some_map_;
+    FileWorkerMap<BMPIndexFileWorker> bmp_map_;
+    FileWorkerMap<DataFileWorker> data_map_;
+    FileWorkerMap<EMVBIndexFileWorker> emvb_map_;
+    FileWorkerMap<HnswFileWorker> hnsw_map_;
+    FileWorkerMap<IVFIndexFileWorker> ivf_map_;
+    FileWorkerMap<RawFileWorker> raw_map_;
+    FileWorkerMap<SecondaryIndexFileWorker> secondary_map_;
+    FileWorkerMap<VarFileWorker> var_map_;
+    FileWorkerMap<VersionFileWorker> version_map_;
 
-private:
+    // private:
     std::shared_ptr<std::string> data_dir_;
     std::shared_ptr<std::string> temp_dir_;
     PersistenceManager *persistence_manager_{};
 
-    std::mutex w_locker_;
-    std::unordered_map<std::string, std::unique_ptr<FileWorker>> fileworker_map_;
-
-    std::mutex clean_locker_;
-    std::vector<FileWorker *> clean_list_{};
+    // std::shared_mutex w_locker_;
+    // std::unordered_map<std::string, std::unique_ptr<FileWorker>> fileworker_map_;
 };
 
 } // namespace infinity

@@ -24,7 +24,7 @@ import :infinity_context;
 import :table_def;
 import :data_block;
 import :value;
-import :fileworker_manager;
+
 import :wal_entry;
 import :infinity_exception;
 import :status;

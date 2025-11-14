@@ -22,7 +22,7 @@ import :column_vector;
 import :value;
 import :virtual_store;
 import :status;
-import :fileworker_manager;
+
 import :default_values;
 import :virtual_store;
 import :local_file_handle;

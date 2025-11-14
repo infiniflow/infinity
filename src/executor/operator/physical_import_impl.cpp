@@ -30,7 +30,7 @@ import :expression_state;
 import :data_block;
 import :logger;
 import :defer_op;
-import :data_file_worker;
+// import :data_file_worker;
 import :infinity_exception;
 import :zsv;
 import :status;

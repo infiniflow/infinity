@@ -17,6 +17,7 @@ export module infinity_core:raw_file_worker;
 import :file_worker;
 import :file_worker_type;
 import :persistence_manager;
+import :index_file_worker;
 
 namespace infinity {
 
@@ -24,7 +25,7 @@ namespace infinity {
 // - There's no file header nor footer.
 // - The buffer size is just the file size.
 // - The file size is consistant since creation.
-export class RawFileWorker : public FileWorker {
+export class RawFileWorker : public IndexFileWorker {
 public:
     explicit RawFileWorker(std::shared_ptr<std::string> file_path, u32 file_size);
 

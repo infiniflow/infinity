@@ -15,7 +15,7 @@
 module infinity_core:bmp_handler.impl;
 
 import :bmp_handler;
-import :fileworker_manager;
+
 import :block_column_iter;
 import :sparse_util;
 import :logger;

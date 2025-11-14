@@ -24,14 +24,14 @@ import :raw_file_worker;
 import :infinity_exception;
 import :local_file_handle;
 import :status;
-import :raw_file_worker;
 
 import std;
 import third_party;
 
 namespace infinity {
 
-RawFileWorker::RawFileWorker(std::shared_ptr<std::string> file_path, u32 file_size) : FileWorker(std::move(file_path)), buffer_size_(file_size) {}
+RawFileWorker::RawFileWorker(std::shared_ptr<std::string> file_path, u32 file_size)
+    : IndexFileWorker(std::move(file_path), {}, {}), buffer_size_(file_size) {}
 
 RawFileWorker::~RawFileWorker() {
     munmap(mmap_, mmap_size_);

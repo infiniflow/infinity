@@ -15,11 +15,11 @@
 export module infinity_core:bmp_index_file_worker;
 
 import :index_file_worker;
-import :file_worker;
-import :index_base;
-import :file_worker_type;
-import :persistence_manager;
-import :bmp_handler;
+// // import :file_worker;
+// import :index_base;
+// import :file_worker_type;
+// import :persistence_manager;
+// import :bmp_handler;
 
 import std.compat;
 

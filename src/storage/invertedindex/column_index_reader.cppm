@@ -33,9 +33,10 @@ class NewTxn;
 class MemoryIndexer;
 class TableIndexMeta;
 struct SegmentIndexFtInfo;
+class IndexFileWorker;
 
 struct ColumnReaderChunkInfo {
-    FileWorker *index_file_worker_{};
+    IndexFileWorker *index_file_worker_{};
     RowID base_rowid_{};
     size_t row_cnt_{};
     size_t term_cnt_{};

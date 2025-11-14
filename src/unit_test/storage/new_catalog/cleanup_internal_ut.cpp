@@ -565,7 +565,6 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_compact) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-        std::println("{}", ++cnt);
         new_txn_mgr_->PrintAllKeyValue();
     };
     // new_txn_mgr_->PrintAllKeyValue();
@@ -585,11 +584,9 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_compact) {
     // }
 
     Checkpoint();
-    std::println("{}", ++cnt);
     new_txn_mgr_->PrintAllKeyValue();
     Cleanup();
 
-    std::println("{}", ++cnt);
     new_txn_mgr_->PrintAllKeyValue();
 
     CheckFilePaths(delete_file_paths_, exist_file_paths_);
@@ -605,12 +602,10 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_compact) {
 
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-        std::println("{}", ++cnt);
         new_txn_mgr_->PrintAllKeyValue();
     }
     Checkpoint();
     Cleanup();
-    std::println("{}", ++cnt);
     new_txn_mgr_->PrintAllKeyValue();
     CheckFilePaths(delete_file_paths_, exist_file_paths_);
 }

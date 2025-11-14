@@ -32,7 +32,7 @@ import :block_meta;
 import :column_meta;
 import :logger;
 import :infinity_context;
-import :fileworker_manager;
+
 import :infinity_exception;
 import :mem_index;
 import :wal_entry;
@@ -387,7 +387,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     }
 
     std::optional<ChunkIndexMeta> chunk_index_meta;
-    FileWorker *index_file_worker{};
+    IndexFileWorker *index_file_worker{};
     {
         status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
                                                this,
@@ -414,7 +414,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                 ChunkID old_chunk_id = deprecate_ids[i];
                 ChunkIndexMeta old_chunk_meta(old_chunk_id, segment_index_meta);
 
-                FileWorker *index_file_worker{};
+                IndexFileWorker *index_file_worker{};
                 {
                     // Status status = NewCatalog::GetChunkIndex(old_chunk_meta, file_worker);
                     status = old_chunk_meta.GetFileWorker(index_file_worker);
@@ -1366,7 +1366,7 @@ Status NewTxn::PopulateIvfIndexInner(std::shared_ptr<IndexBase> index_base,
     }
     new_chunk_ids.push_back(chunk_id);
     std::optional<ChunkIndexMeta> chunk_index_meta;
-    FileWorker *index_file_worker{};
+    IndexFileWorker *index_file_worker{};
     {
         Status status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
                                                       this,
@@ -1415,7 +1415,7 @@ Status NewTxn::PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
         return status;
     }
     new_chunk_ids.push_back(chunk_id);
-    FileWorker *index_file_worker{};
+    IndexFileWorker *index_file_worker{};
     {
         std::optional<ChunkIndexMeta> chunk_index_meta;
         Status status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
@@ -1620,7 +1620,7 @@ Status NewTxn::AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, c
 
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-                FileWorker *index_file_worker = nullptr;
+                IndexFileWorker *index_file_worker{};
                 status = chunk_index_meta.GetFileWorker(index_file_worker);
                 if (!status.ok()) {
                     return status;
@@ -1645,7 +1645,7 @@ Status NewTxn::AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, c
             }
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-                FileWorker *index_file_worker = nullptr;
+                IndexFileWorker *index_file_worker{};
                 status = chunk_index_meta.GetFileWorker(index_file_worker);
                 if (!status.ok()) {
                     return status;
@@ -1775,7 +1775,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         UnrecoverableError("Invalid mem index");
     }
 
-    FileWorker *index_file_worker{};
+    IndexFileWorker *index_file_worker{};
     {
         std::optional<ChunkIndexMeta> chunk_index_meta;
         Status status = NewCatalog::AddNewChunkIndex1(segment_index_meta,

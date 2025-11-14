@@ -492,7 +492,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(segment_id, 0));
         }
 
-        FileWorker *file_worker{};
+        IndexFileWorker *file_worker{};
         status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 

@@ -20,18 +20,21 @@ module;
 module infinity_core:file_worker.impl;
 
 import :file_worker;
-import :utility;
-import :infinity_exception;
-import :local_file_handle;
-import :defer_op;
-import :status;
-import :virtual_store;
-import :persistence_manager;
 import :infinity_context;
-import :logger;
+import :fileworker_manager;
 import :persist_result_handler;
-import :kv_code;
-import :kv_store;
+// import :utility;
+// import :infinity_exception;
+// import :local_file_handle;
+// import :defer_op;
+// import :status;
+// import :virtual_store;
+// import :persistence_manager;
+// import :infinity_context;
+// import :logger;
+// import :persist_result_handler;
+// import :kv_code;
+// import :kv_store;
 
 import std.compat;
 import third_party;
@@ -102,11 +105,6 @@ FileWorker::FileWorker(std::shared_ptr<std::string> rel_file_path) : rel_file_pa
 //     Read(file_size);
 //     data = data_;
 // }
-
-void FileWorker::PickForCleanup() {
-    // // std::unique_lock<std::mutex> locker(l_);
-    file_worker_manager_->AddToCleanList(this);
-}
 
 void FileWorker::MoveFile() {
     std::unique_lock l(rw_mutex_);

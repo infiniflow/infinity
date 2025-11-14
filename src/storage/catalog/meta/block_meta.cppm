@@ -26,6 +26,7 @@ class KVInstance;
 class SegmentMeta;
 // struct BlockLock;
 class FastRoughFilter;
+class VersionFileWorker;
 
 export class BlockMeta {
 public:
@@ -53,7 +54,7 @@ public:
 
     std::tuple<size_t, Status> GetRowCnt1();
 
-    std::tuple<FileWorker *, Status> GetVersionFileWorker();
+    std::tuple<VersionFileWorker *, Status> GetVersionFileWorker();
 
     std::vector<std::string> FilePaths();
 
@@ -83,7 +84,7 @@ private:
     std::shared_ptr<std::string> block_dir_;
     std::optional<size_t> row_cnt_; // stored in the block version file
 
-    FileWorker *version_file_worker_ = nullptr;
+    VersionFileWorker *version_file_worker_{};
     std::shared_ptr<FastRoughFilter> fast_rough_filter_;
 };
 

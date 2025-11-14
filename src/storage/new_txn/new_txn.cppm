@@ -23,7 +23,6 @@ import :snapshot_info;
 import :column_vector;
 import :fast_rough_filter;
 import :txn_context;
-import :fileworker_manager;
 
 import std;
 

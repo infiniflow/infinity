@@ -16,6 +16,7 @@ export module infinity_core:vector_buffer;
 
 import :var_buffer;
 import :sparse_util;
+import :data_file_worker;
 
 import sparse_info;
 import internal_types;
@@ -23,6 +24,8 @@ import data_type;
 import global_resource_usage;
 
 namespace infinity {
+class DataFileWorker;
+class VarFileWorker;
 
 export enum class VectorBufferType {
     kInvalid,
@@ -37,7 +40,7 @@ public:
     static std::shared_ptr<VectorBuffer> Make(size_t data_type_size, size_t capacity, VectorBufferType buffer_type);
 
     static std::shared_ptr<VectorBuffer>
-    Make(FileWorker *data_file_worker, FileWorker *var_file_worker, size_t data_type_size, size_t capacity, VectorBufferType buffer_type);
+    Make(DataFileWorker *data_file_worker, VarFileWorker *var_file_worker, size_t data_type_size, size_t capacity, VectorBufferType buffer_type);
 
 public:
     explicit VectorBuffer() {}
@@ -48,11 +51,11 @@ public:
 
     void InitializeCompactBit(size_t capacity);
 
-    void InitializeCompactBit(FileWorker *file_worker, size_t capacity);
+    void InitializeCompactBit(DataFileWorker *file_worker, size_t capacity);
 
-    void Initialize(FileWorker *data_file_worker, FileWorker *var_file_worker, size_t type_size, size_t capacity);
+    void Initialize(DataFileWorker *data_file_worker, VarFileWorker *var_file_worker, size_t type_size, size_t capacity);
 
-    void SetToCatalog(FileWorker *data_file_worker, FileWorker *var_file_worker);
+    void SetToCatalog(DataFileWorker *data_file_worker, VarFileWorker *var_file_worker);
 
     void ResetToInit(VectorBufferType type);
 
@@ -63,7 +66,7 @@ public:
             data = std::get<std::shared_ptr<char[]>>(ptr_);
             return;
         }
-        std::get<FileWorker *>(ptr_)->Read(data);
+        static_cast<FileWorker *>(std::get<DataFileWorker *>(ptr_))->Read(data);
     }
 
     [[nodiscard]] bool GetCompactBit(size_t idx) const;
@@ -80,7 +83,7 @@ public:
 
     static void CopyCompactBits(u8 *dst, const u8 *src, size_t dst_start_id, size_t src_start_id, size_t count);
 
-    std::variant<std::shared_ptr<char[]>, FileWorker *> ptr_;
+    std::variant<std::shared_ptr<char[]>, DataFileWorker *> ptr_;
 
 private:
     bool initialized_{};

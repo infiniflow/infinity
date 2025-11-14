@@ -30,7 +30,7 @@ import :index_secondary;
 import :infinity_exception;
 import :bg_task;
 import :wal_manager;
-import :fileworker_manager;
+
 import :background_process;
 import :txn_state;
 import :new_txn_manager;
@@ -219,7 +219,7 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        FileWorker *file_worker{};
+        IndexFileWorker *file_worker{};
         status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 

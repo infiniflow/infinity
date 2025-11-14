@@ -58,6 +58,7 @@ class SystemCache;
 class FunctionSet;
 class SpecialFunction;
 class MetaCache;
+class VersionFileWorker;
 
 enum class ColumnVectorMode;
 
@@ -97,7 +98,7 @@ export class NewTxnGetVisibleRangeState {
 public:
     NewTxnGetVisibleRangeState() = default;
 
-    void Init(std::shared_ptr<BlockLock> block_lock, FileWorker *version_file_worker, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts_);
+    void Init(std::shared_ptr<BlockLock> block_lock, VersionFileWorker *version_file_worker, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts_);
 
     bool Next(BlockOffset block_offset_begin, std::pair<BlockOffset, BlockOffset> &visible_range);
 
@@ -111,7 +112,7 @@ public:
 
 private:
     std::shared_ptr<BlockLock> block_lock_;
-    FileWorker *version_file_worker_{};
+    VersionFileWorker *version_file_worker_{};
     TxnTimeStamp begin_ts_ = 0;
     TxnTimeStamp commit_ts_ = 0;
     BlockOffset block_offset_begin_ = 0;

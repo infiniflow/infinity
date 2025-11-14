@@ -25,7 +25,7 @@ import :default_values;
 import :logger;
 import :storage;
 import :config;
-import :fileworker_manager;
+
 import :block_version;
 import :new_catalog;
 import :status;
@@ -702,12 +702,12 @@ size_t MetaTableObject::GetCurrentSegmentRowCount(Storage *storage_ptr) const {
                                         unsealed_segment_id,
                                         current_block_id,
                                         BlockVersion::PATH);
-    auto *version_file_worker = file_worker_mgr->GetFileWorker(rel_version_path);
+    auto *version_file_worker = file_worker_mgr->version_map_.GetFileWorker(rel_version_path);
     if (version_file_worker == nullptr) {
         UnrecoverableError(fmt::format("Can't get version from: {}", rel_version_path));
     }
     std::shared_ptr<BlockVersion> block_version;
-    version_file_worker->Read(block_version);
+    static_cast<FileWorker *>(version_file_worker)->Read(block_version);
     size_t row_cnt = 0;
     {
         std::shared_ptr<BlockLock> block_lock{};

@@ -22,7 +22,7 @@ import :ut.base_test;
 import :storage;
 import :infinity_context;
 import :status;
-import :fileworker_manager;
+
 import :column_vector;
 import :table_def;
 import :value;

@@ -93,7 +93,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeta &table_index_me
                                                                                                               flag);
             segment_readers_.push_back(std::move(segment_reader));
 
-            FileWorker *index_file_worker = nullptr;
+            IndexFileWorker *index_file_worker{};
             status = chunk_index_meta.GetFileWorker(index_file_worker);
             if (!status.ok()) {
                 return status;

@@ -217,7 +217,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_rollback) {
             }
             for (const auto chunk_id : my_chunk_ids) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-                FileWorker *file_worker = nullptr;
+                IndexFileWorker *file_worker{};
                 status = chunk_index_meta.GetFileWorker(file_worker);
                 EXPECT_TRUE(status.ok());
             }

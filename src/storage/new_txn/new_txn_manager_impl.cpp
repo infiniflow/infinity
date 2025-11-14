@@ -20,7 +20,7 @@ import :txn_state;
 import :wal_entry;
 import :infinity_exception;
 import :logger;
-import :fileworker_manager;
+
 import :default_values;
 import :wal_manager;
 import :defer_op;

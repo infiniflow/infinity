@@ -15,7 +15,7 @@
 module infinity_core:vector_buffer.impl;
 
 import :vector_buffer;
-import :fileworker_manager;
+
 import :infinity_exception;
 import :default_values;
 
@@ -44,8 +44,11 @@ std::shared_ptr<VectorBuffer> VectorBuffer::Make(const size_t data_type_size, co
     return buffer_ptr;
 }
 
-std::shared_ptr<VectorBuffer>
-VectorBuffer::Make(FileWorker *data_file_worker, FileWorker *var_file_worker, size_t data_type_size, size_t capacity, VectorBufferType buffer_type) {
+std::shared_ptr<VectorBuffer> VectorBuffer::Make(DataFileWorker *data_file_worker,
+                                                 VarFileWorker *var_file_worker,
+                                                 size_t data_type_size,
+                                                 size_t capacity,
+                                                 VectorBufferType buffer_type) {
     auto buffer_ptr = std::make_shared<VectorBuffer>();
     buffer_ptr->buffer_type_ = buffer_type;
     switch (buffer_type) {
@@ -90,7 +93,7 @@ void VectorBuffer::Initialize(size_t type_size, size_t capacity) {
     capacity_ = capacity;
 }
 
-void VectorBuffer::InitializeCompactBit(FileWorker *file_worker, size_t capacity) {
+void VectorBuffer::InitializeCompactBit(DataFileWorker *file_worker, size_t capacity) {
     if (initialized_) {
         UnrecoverableError("std::vector buffer is already initialized.");
     }
@@ -108,7 +111,7 @@ void VectorBuffer::InitializeCompactBit(FileWorker *file_worker, size_t capacity
     capacity_ = capacity;
 }
 
-void VectorBuffer::Initialize(FileWorker *data_file_worker, FileWorker *var_file_worker, size_t type_size, size_t capacity) {
+void VectorBuffer::Initialize(DataFileWorker *data_file_worker, VarFileWorker *var_file_worker, size_t type_size, size_t capacity) {
     if (initialized_) {
         UnrecoverableError("std::vector buffer is already initialized.");
     }
@@ -129,13 +132,13 @@ void VectorBuffer::Initialize(FileWorker *data_file_worker, FileWorker *var_file
     capacity_ = capacity;
 }
 
-void VectorBuffer::SetToCatalog(FileWorker *data_file_worker, FileWorker *var_file_worker) {
+void VectorBuffer::SetToCatalog(DataFileWorker *data_file_worker, VarFileWorker *var_file_worker) {
     if (!std::holds_alternative<std::shared_ptr<char[]>>(ptr_)) {
         UnrecoverableError("Cannot convert to new catalog");
     }
 
     auto src_ptr = std::move(std::get<std::shared_ptr<char[]>>(ptr_));
-    data_file_worker->Write(std::span{src_ptr.get(), data_size_});
+    static_cast<FileWorker *>(data_file_worker)->Write(std::span{src_ptr.get(), data_size_});
 
     src_ptr.reset();
 

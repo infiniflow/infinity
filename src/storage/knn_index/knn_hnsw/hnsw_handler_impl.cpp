@@ -7,7 +7,7 @@ module;
 module infinity_core:hnsw_handler.impl;
 
 import :hnsw_handler;
-import :fileworker_manager;
+
 import :block_column_iter;
 import :memindex_tracer;
 import :default_values;

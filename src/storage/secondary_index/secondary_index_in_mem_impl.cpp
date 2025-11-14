@@ -20,7 +20,7 @@ module infinity_core:secondary_index_in_mem.impl;
 
 import :secondary_index_in_mem;
 import :default_values;
-import :fileworker_manager;
+
 import :block_column_iter;
 import :infinity_exception;
 import :secondary_index_data;
@@ -29,6 +29,7 @@ import :base_memindex;
 import :memindex_tracer;
 import :column_vector;
 import :rcu_multimap;
+import :secondary_index_file_worker;
 
 import std;
 
@@ -44,6 +45,7 @@ constexpr u32 map_memory_bloat_factor = 3;
 
 template <typename RawValueType>
 class SecondaryIndexInMemT final : public SecondaryIndexInMem {
+
     using KeyType = ConvertToOrderedType<RawValueType>;
     const RowID begin_row_id_;
     // Replaced std::multimap + mutex with RcuMultiMap for better concurrent performance
@@ -70,7 +72,7 @@ public:
         IncreaseMemoryUsageBase(inserted_rows * MemoryCostOfEachRow());
     }
 
-    void Dump(FileWorker *index_file_worker) const override {
+    void Dump(IndexFileWorker *index_file_worker) const override {
         // std::shared_ptr<SecondaryIndexData> data_ptr;
         SecondaryIndexData *data_ptr{};
         index_file_worker->Read(data_ptr);

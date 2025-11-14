@@ -25,7 +25,7 @@ import :storage;
 import :table_def;
 import :column_vector;
 import :value;
-import :fileworker_manager;
+
 import :physical_import;
 import :status;
 import :bg_task;
@@ -56,7 +56,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 
 TEST_P(CleanupTaskTest, SLOW_test_delete_db_simple) {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    auto *wal_manager = infinity::InfinityContext::instance().storage()->wal_manager();
+    auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
     i64 cleanup_interval = InfinityContext::instance().storage()->config()->CleanupInterval();
 
     auto db_name = std::make_shared<std::string>("default_db");

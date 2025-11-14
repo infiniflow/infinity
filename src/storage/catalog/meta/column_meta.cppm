@@ -24,6 +24,8 @@ namespace infinity {
 
 class BlockMeta;
 class KVInstance;
+class DataFileWorker;
+class VarFileWorker;
 
 export class ColumnMeta {
 public:
@@ -43,7 +45,7 @@ public:
 
     Status UninitSet(const std::shared_ptr<ColumnDef> &column_def, UsageFlag usage_flag);
 
-    Status GetFileWorker(FileWorker *&data_file_worker, FileWorker *&var_file_worker);
+    Status GetFileWorker(DataFileWorker *&data_file_worker, VarFileWorker *&var_file_worker);
 
     std::tuple<size_t, Status> GetColumnSize(size_t row_cnt, const std::shared_ptr<ColumnDef> &col_def) const;
 
@@ -54,7 +56,7 @@ public:
     Status RestoreFromSnapshot(ColumnID column_id);
 
 private:
-    Status GetFileWorker(FileWorker *&data_file_worker, FileWorker *&var_file_worker, const std::shared_ptr<ColumnDef> &column_def);
+    Status GetFileWorker(DataFileWorker *&data_file_worker, VarFileWorker *&var_file_worker, const std::shared_ptr<ColumnDef> &column_def);
 
     Status LoadFileWorker(std::shared_ptr<ColumnDef> column_def);
 
@@ -65,8 +67,8 @@ private:
 
     std::optional<size_t> chunk_offset_;
 
-    FileWorker *data_file_worker_{};
-    FileWorker *var_file_worker_{};
+    DataFileWorker *data_file_worker_{};
+    VarFileWorker *var_file_worker_{};
 };
 
 } // namespace infinity

@@ -23,9 +23,8 @@ import :segment_meta;
 import :table_meta;
 import :new_catalog;
 import :infinity_context;
-import :fileworker_manager;
+
 import :block_version;
-import :version_file_worker;
 import :meta_info;
 import :column_meta;
 import :fast_rough_filter;
@@ -88,7 +87,7 @@ Status BlockMeta::InitOrLoadSet(TxnTimeStamp checkpoint_ts) {
     auto version_file_worker = std::make_unique<VersionFileWorker>(rel_file_path, block_capacity());
     // auto some_version = std::make_shared<BlockVersion>(block_capacity());
     // fileworker_mgr->some_map_.emplace(*rel_file_path, some_version);
-    version_file_worker_ = fileworker_mgr->EmplaceFileWorker(std::move(version_file_worker));
+    version_file_worker_ = fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
     return Status::OK();
 }
 
@@ -111,7 +110,7 @@ Status BlockMeta::RestoreSetFromSnapshot() {
     }
 
     std::shared_ptr<BlockVersion> block_version;
-    version_file_worker_->Read(block_version);
+    static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
     block_version->RestoreFromSnapshot(commit_ts_);
 
     return Status::OK();
@@ -143,12 +142,12 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
         if (!status.ok()) {
             return status;
         }
-        version_buffer->PickForCleanup();
+        InfinityContext::instance().storage()->fileworker_manager()->version_map_.AddToCleanList(version_buffer);
     }
     return Status::OK();
 }
 
-std::tuple<FileWorker *, Status> BlockMeta::GetVersionFileWorker() {
+std::tuple<VersionFileWorker *, Status> BlockMeta::GetVersionFileWorker() {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!version_file_worker_) {
         auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
@@ -160,7 +159,7 @@ std::tuple<FileWorker *, Status> BlockMeta::GetVersionFileWorker() {
                 fmt::format("db_{}/tbl_{}/seg_{}/blk_{}", table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_));
         }
         auto version_filepath = fmt::format("{}/{}", *block_dir_, BlockVersion::PATH);
-        version_file_worker_ = fileworker_mgr->GetFileWorker(version_filepath);
+        version_file_worker_ = fileworker_mgr->version_map_.GetFileWorker(version_filepath);
         if (version_file_worker_ == nullptr) {
             return {nullptr, Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath))};
         }

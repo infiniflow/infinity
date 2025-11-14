@@ -204,7 +204,7 @@ TEST_P(TestTxnIndexInternal, test_index0) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        FileWorker *file_worker = nullptr;
+        IndexFileWorker *file_worker{};
         status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
@@ -263,7 +263,7 @@ TEST_P(TestTxnIndexInternal, test_index0) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        FileWorker *file_worker = nullptr;
+        IndexFileWorker *file_worker{};
         status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
@@ -528,7 +528,7 @@ TEST_P(TestTxnIndexInternal, SLOW_test_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        FileWorker *file_worker = nullptr;
+        IndexFileWorker *file_worker{};
         status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
@@ -628,7 +628,7 @@ TEST_P(TestTxnIndexInternal, SLOW_test_index) {
         // int32_t begin_val = 2;
         // int32_t end_val = 3;
 
-        FileWorker *file_worker = nullptr;
+        IndexFileWorker *file_worker{};
         status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
@@ -814,7 +814,7 @@ TEST_P(TestTxnIndexInternal, test_populate_index0) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        FileWorker *file_worker = nullptr;
+        IndexFileWorker *file_worker{};
         status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
@@ -1055,7 +1055,7 @@ TEST_P(TestTxnIndexInternal, SLOW_test_populate_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        FileWorker *file_worker = nullptr;
+        IndexFileWorker *file_worker{};
         status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 

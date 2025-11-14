@@ -20,20 +20,20 @@ module;
 module infinity_core:bmp_index_file_worker.impl;
 
 import :bmp_index_file_worker;
-import :index_bmp;
-import :infinity_exception;
-import :bmp_util;
-import :bmp_alg;
+// import :index_bmp;
+// import :infinity_exception;
+// import :bmp_util;
+// import :bmp_alg;
 import :bmp_handler;
-import :virtual_store;
-import :persistence_manager;
-import :local_file_handle;
-
-import std.compat;
-import third_party;
-
-import column_def;
-import internal_types;
+// import :virtual_store;
+// import :persistence_manager;
+// import :local_file_handle;
+//
+// import std.compat;
+// import third_party;
+//
+// import column_def;
+// import internal_types;
 
 namespace infinity {
 

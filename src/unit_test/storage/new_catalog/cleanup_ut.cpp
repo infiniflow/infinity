@@ -637,7 +637,7 @@ TEST_P(TestTxnCleanup, cleanup_and_optimize_index) {
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
             }
 
-            FileWorker *file_worker = nullptr;
+            IndexFileWorker *file_worker{};
             status = chunk_index_meta.GetFileWorker(file_worker);
             EXPECT_TRUE(status.ok());
 
@@ -896,7 +896,7 @@ TEST_P(TestTxnCleanup, cleanup_and_dump_index) {
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(2, 0));
             }
 
-            FileWorker *file_worker = nullptr;
+            IndexFileWorker *file_worker{};
             status = chunk_index_meta.GetFileWorker(file_worker);
             EXPECT_TRUE(status.ok());
 

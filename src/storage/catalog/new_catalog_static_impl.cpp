@@ -42,6 +42,8 @@ import :scalar_function_set;
 import :special_function;
 import :meta_cache;
 import :utility;
+// import :file_worker;
+import :version_file_worker;
 
 import std;
 import third_party;
@@ -60,7 +62,7 @@ namespace infinity {
 // } // namespace
 
 void NewTxnGetVisibleRangeState::Init(std::shared_ptr<BlockLock> block_lock,
-                                      FileWorker *version_file_worker,
+                                      VersionFileWorker *version_file_worker,
                                       TxnTimeStamp begin_ts,
                                       TxnTimeStamp commit_ts) {
     block_lock_ = std::move(block_lock);
@@ -70,7 +72,7 @@ void NewTxnGetVisibleRangeState::Init(std::shared_ptr<BlockLock> block_lock,
     {
         std::shared_lock<std::shared_mutex> lock(block_lock_->mtx_);
         std::shared_ptr<BlockVersion> block_version;
-        version_file_worker_->Read(block_version);
+        static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
         block_offset_end_ = block_version->GetRowCount(begin_ts_);
     }
 }
@@ -81,7 +83,7 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, std::pair<
     }
 
     std::shared_ptr<BlockVersion> block_version;
-    version_file_worker_->Read(block_version);
+    static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
 
     if (block_offset_begin == block_offset_end_) {
         auto [offset, commit_cnt] = block_version->GetCommitRowCount(commit_ts_);
@@ -1066,8 +1068,8 @@ Status NewCatalog::GetColumnVector(ColumnMeta &column_meta,
                                    ColumnVector &column_vector) {
     std::shared_ptr<DataType> column_type = col_def->type();
 
-    FileWorker *data_file_worker{};
-    FileWorker *var_file_worker{};
+    DataFileWorker *data_file_worker{};
+    VarFileWorker *var_file_worker{};
     Status status = column_meta.GetFileWorker(data_file_worker, var_file_worker);
     if (!status.ok()) {
         return status;
@@ -1111,7 +1113,7 @@ Status NewCatalog::GetCreateTSVector(BlockMeta &block_meta, size_t offset, size_
     }
 
     std::shared_ptr<BlockVersion> block_version;
-    version_buffer->Read(block_version);
+    static_cast<FileWorker *>(version_buffer)->Read(block_version);
     {
         std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
         block_version->GetCreateTS(offset, size, column_vector);
@@ -1123,7 +1125,7 @@ Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, size_t offset, size_
     column_vector = ColumnVector(std::make_shared<DataType>(LogicalType::kBigInt));
     column_vector.Initialize(ColumnVectorType::kFlat, size);
 
-    auto [version_buffer, status] = block_meta.GetVersionFileWorker();
+    auto [version_file_worker, status] = block_meta.GetVersionFileWorker();
     if (!status.ok()) {
         return status;
     }
@@ -1134,7 +1136,7 @@ Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, size_t offset, size_
     }
 
     std::shared_ptr<BlockVersion> block_version;
-    version_buffer->Read(block_version);
+    static_cast<FileWorker *>(version_file_worker)->Read(block_version);
     {
         std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
         block_version->GetDeleteTS(offset, size, column_vector);

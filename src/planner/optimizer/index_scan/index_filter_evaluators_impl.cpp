@@ -34,6 +34,8 @@ import :table_index_meta;
 import :segment_index_meta;
 import :chunk_index_meta;
 import :mem_index;
+import :file_worker;
+import :index_file_worker;
 
 import std;
 import third_party;
@@ -625,14 +627,14 @@ template <typename ColumnValueType, typename CardinalityTag>
 struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
     using KeyType = typename TrunkReader<ColumnValueType, CardinalityTag>::SecondaryIndexOrderedT;
     const u32 segment_row_count_;
-    FileWorker *index_file_worker_{};
+    IndexFileWorker *index_file_worker_{};
     const SecondaryIndexDataBase<CardinalityTag> *index_ = nullptr;
     u32 begin_pos_ = 0;
     u32 end_pos_ = 0;
     // For LowCardinality: store the range for processing
     std::pair<KeyType, KeyType> current_range_;
 
-    TrunkReaderT(const u32 segment_row_count, FileWorker *index_file_worker)
+    TrunkReaderT(const u32 segment_row_count, IndexFileWorker *index_file_worker)
         : segment_row_count_(segment_row_count), index_file_worker_(index_file_worker) {}
     TrunkReaderT(const u32 segment_row_count, const SecondaryIndexDataBase<CardinalityTag> *index)
         : segment_row_count_(segment_row_count), index_(index) {}
@@ -646,7 +648,7 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
             const u32 begin_pos = begin_pos_;
             const u32 end_pos = end_pos_;
             std::shared_ptr<SecondaryIndexDataBase<CardinalityTag>> index;
-            index_file_worker_->Read(index);
+            dynamic_cast<FileWorker *>(index_file_worker_)->Read(index);
             const auto [key_ptr, offset_ptr] = index->GetKeyOffsetPointer();
             // output result
             for (u32 i = begin_pos; i < end_pos; ++i) {
@@ -839,7 +841,7 @@ ExecuteSingleRangeHighCardinalityT(const std::pair<ConvertToOrderedType<ColumnVa
     }
     for (ChunkID chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, *index_meta);
-        FileWorker *index_file_worker = nullptr;
+        IndexFileWorker *index_file_worker{};
         Status status = chunk_index_meta.GetFileWorker(index_file_worker);
         if (!status.ok()) {
             UnrecoverableError(status.message());
@@ -879,7 +881,7 @@ ExecuteSingleRangeLowCardinalityT(const std::pair<ConvertToOrderedType<ColumnVal
     }
     for (ChunkID chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, *index_meta);
-        FileWorker *index_file_worker = nullptr;
+        IndexFileWorker *index_file_worker{};
         Status status = chunk_index_meta.GetFileWorker(index_file_worker);
         if (!status.ok()) {
             UnrecoverableError(status.message());

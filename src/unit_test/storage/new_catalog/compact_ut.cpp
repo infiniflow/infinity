@@ -687,13 +687,13 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
         std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
     auto CheckTable = [&](std::vector<ColumnID> column_idxes) {
         auto check_column = [&](ColumnMeta &column_meta) {
-            FileWorker *column_buffer = nullptr;
-            FileWorker *outline_buffer = nullptr;
-            Status status = column_meta.GetFileWorker(column_buffer, outline_buffer);
+            DataFileWorker *data_file_worker{};
+            VarFileWorker *var_file_worker{};
+            Status status = column_meta.GetFileWorker(data_file_worker, var_file_worker);
             EXPECT_TRUE(status.ok());
-            EXPECT_NE(column_buffer, nullptr);
+            EXPECT_NE(data_file_worker, nullptr);
             if (column_meta.column_idx() != 0) {
-                EXPECT_NE(outline_buffer, nullptr);
+                EXPECT_NE(var_file_worker, nullptr);
             }
         };
 
@@ -744,13 +744,13 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
 
     auto CheckTable1 = [&](std::vector<ColumnID> column_idxes) {
         auto check_column = [&](ColumnMeta &column_meta) {
-            FileWorker *column_buffer = nullptr;
-            FileWorker *outline_buffer = nullptr;
-            Status status = column_meta.GetFileWorker(column_buffer, outline_buffer);
+            DataFileWorker *data_file_worker{};
+            VarFileWorker *var_file_worker{};
+            Status status = column_meta.GetFileWorker(data_file_worker, var_file_worker);
             EXPECT_TRUE(status.ok());
-            EXPECT_NE(column_buffer, nullptr);
+            EXPECT_NE(data_file_worker, nullptr);
             if (column_meta.column_idx() != 0) {
-                EXPECT_NE(outline_buffer, nullptr);
+                EXPECT_NE(var_file_worker, nullptr);
             }
         };
 
@@ -958,11 +958,11 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
 TEST_P(TestTxnCompact, compact_and_drop_columns) {
     auto CheckTable = [&](const std::vector<ColumnID> &column_idxes, const std::vector<SegmentID> &segment_ids) {
         auto check_column = [&](ColumnMeta &column_meta) {
-            FileWorker *column_buffer = nullptr;
-            FileWorker *outline_buffer = nullptr;
-            Status status = column_meta.GetFileWorker(column_buffer, outline_buffer);
+            DataFileWorker *data_file_worker{};
+            VarFileWorker *var_file_worker{};
+            Status status = column_meta.GetFileWorker(data_file_worker, var_file_worker);
             EXPECT_TRUE(status.ok());
-            EXPECT_NE(column_buffer, nullptr);
+            EXPECT_NE(data_file_worker, nullptr);
             // EXPECT_NE(outline_buffer, nullptr);
         };
 

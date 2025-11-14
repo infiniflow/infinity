@@ -19,21 +19,115 @@ module;
 module infinity_core:fileworker_manager.impl;
 
 import :fileworker_manager;
-import :file_worker;
-import :logger;
-import :infinity_exception;
-import :file_worker_type;
-import :var_file_worker;
-import :persistence_manager;
-import :virtual_store;
-import :kv_store;
-import :status;
-import :infinity_context;
-
-import std.compat;
-import third_party;
+// import :file_worker;
+// import :logger;
+// import :infinity_exception;
+// import :file_worker_type;
+// import :var_file_worker;
+// import :persistence_manager;
+// import :virtual_store;
+// import :kv_store;
+// import :status;
+// import :infinity_context;
+//
+// import std.compat;
+// import third_party;
 
 namespace infinity {
+
+template <typename FileWorkerT>
+FileWorkerT *FileWorkerMap<FileWorkerT>::EmplaceFileWorker(std::unique_ptr<FileWorkerT> file_worker) {
+    std::unique_lock lock(rw_mtx_);
+    auto rel_file_path = file_worker->rel_file_path_;
+    if (auto iter = map_.find(*rel_file_path); iter != map_.end()) {
+        return iter->second.get();
+    }
+    auto [iter, _] = map_.emplace(*rel_file_path, std::move(file_worker));
+    return iter->second.get();
+}
+
+template <typename FileWorkerT>
+void FileWorkerMap<FileWorkerT>::RemoveImport(TransactionID txn_id) {
+    std::unique_lock lock(rw_mtx_);
+    for (auto it = map_.begin(); it != map_.end();) {
+        auto pat = fmt::format("import{}", txn_id);
+        if (it->first.find(pat) != std::string::npos) {
+            it = map_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+template <typename FileWorkerT>
+FileWorkerT *FileWorkerMap<FileWorkerT>::GetFileWorker(const std::string &rel_file_path) {
+    {
+        std::shared_lock lock(rw_mtx_);
+        if (auto iter = map_.find(rel_file_path); iter != map_.end()) {
+            return iter->second.get();
+        }
+    }
+    LOG_TRACE(fmt::format("FileWorkerManager::GetFileWorker: file {} not found.", rel_file_path));
+    return nullptr;
+}
+
+template <typename FileWorkerT>
+void FileWorkerMap<FileWorkerT>::ClearCleans() {
+    decltype(cleans_) cleans;
+    {
+        std::unique_lock l(rw_clean_mtx_);
+        cleans_.swap(cleans);
+    }
+    for (auto *file_worker : cleans) {
+        auto status = file_worker->CleanupFile();
+        // if (!status.ok()) {
+        //     return status;
+        // }
+    }
+
+    {
+        std::unique_lock lock(rw_mtx_);
+        for (auto *file_worker : cleans) {
+            auto fileworker_key = *(file_worker->rel_file_path_);
+            [[maybe_unused]] size_t remove_n = map_.erase(fileworker_key);
+            // if (remove_n != 1) {
+            //     UnrecoverableError(fmt::format("FileWorkerManager::RemoveClean: file {} not found.", file_path.c_str()));
+            // }
+        }
+        map_.rehash(map_.size());
+    }
+}
+
+template <typename FileWorkerT>
+void FileWorkerMap<FileWorkerT>::AddToCleanList(FileWorkerT *file_worker) {
+    std::unique_lock lock(rw_clean_mtx_);
+    cleans_.emplace_back(file_worker);
+}
+
+template <typename FileWorkerT>
+void FileWorkerMap<FileWorkerT>::MoveFiles() {
+    std::shared_lock lock(rw_mtx_);
+    for (auto it = map_.begin(); it != map_.end();) {
+        const auto &ptr = it->second;
+        if (ptr->rel_file_path_->find("import") != std::string::npos) {
+            ++it;
+            continue;
+        }
+        msync(ptr->mmap_, ptr->mmap_size_, MS_SYNC);
+        ptr->MoveFile();
+        ++it;
+    }
+}
+
+template struct FileWorkerMap<BMPIndexFileWorker>;
+template struct FileWorkerMap<DataFileWorker>;
+template struct FileWorkerMap<EMVBIndexFileWorker>;
+template struct FileWorkerMap<HnswFileWorker>;
+template struct FileWorkerMap<IVFIndexFileWorker>;
+template struct FileWorkerMap<RawFileWorker>;
+template struct FileWorkerMap<SecondaryIndexFileWorker>;
+template struct FileWorkerMap<VarFileWorker>;
+template struct FileWorkerMap<VersionFileWorker>;
 
 FileWorkerManager::FileWorkerManager(std::shared_ptr<std::string> data_dir, std::shared_ptr<std::string> temp_dir)
     : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)) {
@@ -47,93 +141,66 @@ void FileWorkerManager::Start() {
 }
 
 void FileWorkerManager::Stop() {
-    RemoveCleanList(nullptr);
+    RemoveCleanList();
     LOG_INFO("FileWorker manager is stopped.");
 }
 
-FileWorker *FileWorkerManager::EmplaceFileWorker(std::unique_ptr<FileWorker> file_worker) {
-    std::unique_lock lock(w_locker_);
-    auto rel_file_path = file_worker->rel_file_path_;
-    if (auto iter = fileworker_map_.find(*rel_file_path); iter != fileworker_map_.end()) {
-        return iter->second.get();
-    }
-    auto [iter, _] = fileworker_map_.emplace(*rel_file_path, std::move(file_worker));
-    return iter->second.get();
+// Get size in concurrency environment is meaningless
+size_t FileWorkerManager::FileWorkerCount() {
+    // std::unique_lock lock(w_locker_);
+    return 0;
 }
 
-FileWorker *FileWorkerManager::GetFileWorker(const std::string &rel_file_path) {
-    std::unique_lock lock(w_locker_);
-    if (auto iter = fileworker_map_.find(rel_file_path); iter != fileworker_map_.end()) {
-        return iter->second.get();
-    }
-    LOG_TRACE(fmt::format("FileWorkerManager::GetFileWorker: file {} not found.", rel_file_path));
-    return nullptr;
-}
+Status FileWorkerManager::RemoveCleanList() {
+    std::vector<std::future<void>> futs;
 
-size_t FileWorkerManager::BufferedObjectCount() {
-    std::unique_lock lock(w_locker_);
-    return fileworker_map_.size();
-}
+    futs.emplace_back(std::async(&FileWorkerMap<BMPIndexFileWorker>::ClearCleans, &bmp_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<DataFileWorker>::ClearCleans, &data_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<EMVBIndexFileWorker>::ClearCleans, &emvb_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<HnswFileWorker>::ClearCleans, &hnsw_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<RawFileWorker>::ClearCleans, &raw_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<SecondaryIndexFileWorker>::ClearCleans, &secondary_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<VarFileWorker>::ClearCleans, &var_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<VersionFileWorker>::ClearCleans, &version_map_));
 
-Status FileWorkerManager::RemoveCleanList(KVInstance *kv_instance) {
-    LOG_TRACE(fmt::format("FileWorkerManager::RemoveClean, start to clean objects"));
-    std::vector<FileWorker *> clean_list;
-    {
-        std::unique_lock lock(clean_locker_);
-        clean_list.swap(clean_list_);
+    for (auto &fut : futs) {
+        fut.wait();
     }
-    for (auto *file_worker : clean_list) {
-        Status status = file_worker->CleanupFile();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        std::unique_lock lock(w_locker_);
-        for (auto *file_worker : clean_list) {
-            auto fileworker_key = *(file_worker->rel_file_path_);
-            // if (fileworker_key.find("version") !=std::string::npos) {
-            //     some_map_.erase(fileworker_key);
-            // }
-            [[maybe_unused]] size_t remove_n = fileworker_map_.erase(fileworker_key);
-            // if (remove_n != 1) {
-            //     UnrecoverableError(fmt::format("FileWorkerManager::RemoveClean: file {} not found.", file_path.c_str()));
-            // }
-        }
-        // some_map_.rehash(some_map_.size());
-        fileworker_map_.rehash(fileworker_map_.size());
-    }
+
     return Status::OK();
 }
 
-void FileWorkerManager::AddToCleanList(FileWorker *file_worker) {
-    std::unique_lock lock(clean_locker_);
-    clean_list_.emplace_back(file_worker);
-}
-
 void FileWorkerManager::RemoveImport(TransactionID txn_id) {
-    std::unique_lock lock(w_locker_);
-    for (auto it = fileworker_map_.begin(); it != fileworker_map_.end();) {
-        auto pat = fmt::format("import{}", txn_id);
-        if (it->first.find(pat) != std::string::npos) {
-            it = fileworker_map_.erase(it);
-        } else {
-            ++it;
-        }
+    std::vector<std::future<void>> futs;
+
+    futs.emplace_back(std::async(&FileWorkerMap<BMPIndexFileWorker>::RemoveImport, &bmp_map_, txn_id));
+    futs.emplace_back(std::async(&FileWorkerMap<DataFileWorker>::RemoveImport, &data_map_, txn_id));
+    futs.emplace_back(std::async(&FileWorkerMap<EMVBIndexFileWorker>::RemoveImport, &emvb_map_, txn_id));
+    futs.emplace_back(std::async(&FileWorkerMap<HnswFileWorker>::RemoveImport, &hnsw_map_, txn_id));
+    futs.emplace_back(std::async(&FileWorkerMap<RawFileWorker>::RemoveImport, &raw_map_, txn_id));
+    futs.emplace_back(std::async(&FileWorkerMap<SecondaryIndexFileWorker>::RemoveImport, &secondary_map_, txn_id));
+    futs.emplace_back(std::async(&FileWorkerMap<VarFileWorker>::RemoveImport, &var_map_, txn_id));
+    futs.emplace_back(std::async(&FileWorkerMap<VersionFileWorker>::RemoveImport, &version_map_, txn_id));
+
+    for (auto &fut : futs) {
+        fut.wait();
     }
 }
 
 void FileWorkerManager::MoveFiles() {
-    std::unique_lock lock(w_locker_);
-    for (auto it = fileworker_map_.begin(); it != fileworker_map_.end();) {
-        const auto &ptr = it->second;
-        if (ptr->rel_file_path_->find("import") != std::string::npos) {
-            ++it;
-            continue;
-        }
-        msync(ptr->mmap_, ptr->mmap_size_, MS_SYNC);
-        ptr->MoveFile();
-        ++it;
+    std::vector<std::future<void>> futs;
+
+    futs.emplace_back(std::async(&FileWorkerMap<BMPIndexFileWorker>::MoveFiles, &bmp_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<DataFileWorker>::MoveFiles, &data_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<EMVBIndexFileWorker>::MoveFiles, &emvb_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<HnswFileWorker>::MoveFiles, &hnsw_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<RawFileWorker>::MoveFiles, &raw_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<SecondaryIndexFileWorker>::MoveFiles, &secondary_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<VarFileWorker>::MoveFiles, &var_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<VersionFileWorker>::MoveFiles, &version_map_));
+
+    for (auto &fut : futs) {
+        fut.wait();
     }
 }
 

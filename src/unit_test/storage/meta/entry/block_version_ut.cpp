@@ -26,7 +26,7 @@ import third_party;
 import :infinity_context;
 import :block_version;
 import :virtual_store;
-import :fileworker_manager;
+
 import :version_file_worker;
 import :column_vector;
 import :persistence_manager;

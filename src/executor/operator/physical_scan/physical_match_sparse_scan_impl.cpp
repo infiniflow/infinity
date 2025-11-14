@@ -36,7 +36,7 @@ import :data_block;
 import :knn_result_handler;
 import :match_sparse_scan_function_data;
 import :global_block_id;
-import :bmp_index_file_worker;
+
 import :sparse_util;
 import :bmp_util;
 import :knn_filter;
@@ -53,6 +53,7 @@ import :new_txn;
 import :new_catalog;
 import :column_meta;
 import :mem_index;
+import :index_file_worker;
 
 import std;
 
@@ -519,7 +520,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
             }
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
-                FileWorker *index_file_worker{};
+                IndexFileWorker *index_file_worker{};
                 status = chunk_index_meta.GetFileWorker(index_file_worker);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());

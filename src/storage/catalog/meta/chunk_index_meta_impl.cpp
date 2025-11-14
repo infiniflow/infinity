@@ -25,19 +25,13 @@ import :segment_index_meta;
 import :index_base;
 import :index_defines;
 import :infinity_context;
-import :fileworker_manager;
-import :secondary_index_file_worker;
-import :ivf_index_file_worker;
-import :raw_file_worker;
-import :hnsw_file_worker;
-import :bmp_index_file_worker;
-import :emvb_index_file_worker;
 import :infinity_exception;
 import :persistence_manager;
 import :persist_result_handler;
 import :virtual_store;
 import :logger;
-import :file_worker;
+import :secondary_index_file_worker;
+import :fileworker_manager;
 
 import std;
 
@@ -46,6 +40,7 @@ import column_def;
 import create_index_info;
 
 namespace infinity {
+class IndexFileWorker;
 
 namespace {
 
@@ -87,7 +82,7 @@ Status ChunkIndexMeta::GetChunkInfo(ChunkIndexMetaInfo *&chunk_info) {
     return Status::OK();
 }
 
-Status ChunkIndexMeta::GetFileWorker(FileWorker *&index_file_worker) {
+Status ChunkIndexMeta::GetFileWorker(IndexFileWorker *&index_file_worker) {
     if (!index_file_worker_) {
         Status status = LoadIndexFileWorker();
         if (!status.ok()) {
@@ -134,35 +129,35 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
                 auto index_file_name = IndexFileName(chunk_id_);
                 auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
                 auto index_file_worker = std::make_unique<SecondaryIndexFileWorker>(rel_file_path, index_base, column_def, chunk_info.row_cnt_);
-                index_file_worker_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
+                index_file_worker_ = fileworker_mgr->secondary_map_.EmplaceFileWorker(std::move(index_file_worker));
                 break;
             }
             case IndexType::kFullText: {
                 auto column_length_file_name = fmt::format("{}{}", chunk_info.base_name_, LENGTH_SUFFIX);
                 auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(column_length_file_name)));
                 auto index_file_worker = std::make_unique<RawFileWorker>(rel_file_path, chunk_info.row_cnt_ * sizeof(u32));
-                index_file_worker_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
+                index_file_worker_ = fileworker_mgr->raw_map_.EmplaceFileWorker(std::move(index_file_worker));
                 break;
             }
             case IndexType::kIVF: {
                 auto index_file_name = IndexFileName(chunk_id_);
                 auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
                 auto index_file_worker = std::make_unique<IVFIndexFileWorker>(rel_file_path, index_base, column_def);
-                index_file_worker_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
+                index_file_worker_ = fileworker_mgr->ivf_map_.EmplaceFileWorker(std::move(index_file_worker));
                 break;
             }
             case IndexType::kHnsw: {
                 auto index_file_name = IndexFileName(chunk_id_);
                 auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
                 auto index_file_worker = std::make_unique<HnswFileWorker>(rel_file_path, index_base, column_def, chunk_info.index_size_);
-                index_file_worker_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
+                index_file_worker_ = fileworker_mgr->hnsw_map_.EmplaceFileWorker(std::move(index_file_worker));
                 break;
             }
             case IndexType::kBMP: {
                 auto index_file_name = IndexFileName(chunk_id_);
                 auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
                 auto index_file_worker = std::make_unique<BMPIndexFileWorker>(rel_file_path, index_base, column_def, chunk_info.index_size_);
-                index_file_worker_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
+                index_file_worker_ = fileworker_mgr->bmp_map_.EmplaceFileWorker(std::move(index_file_worker));
                 break;
             }
             case IndexType::kEMVB: {
@@ -170,7 +165,7 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
                 auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
                 const auto segment_start_offset = chunk_info.base_row_id_.segment_offset_;
                 auto index_file_worker = std::make_unique<EMVBIndexFileWorker>(rel_file_path, index_base, column_def, segment_start_offset);
-                index_file_worker_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
+                index_file_worker_ = fileworker_mgr->emvb_map_.EmplaceFileWorker(std::move(index_file_worker));
                 break;
             }
             case IndexType::kDiskAnn: {
@@ -218,35 +213,35 @@ Status ChunkIndexMeta::LoadSet() {
             auto index_file_name = IndexFileName(chunk_id_);
             auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
             auto index_file_worker = std::make_unique<SecondaryIndexFileWorker>(rel_file_path, index_base, column_def, row_count);
-            index_file_worker_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
+            index_file_worker_ = fileworker_mgr->secondary_map_.EmplaceFileWorker(std::move(index_file_worker));
             break;
         }
         case IndexType::kFullText: {
             auto column_length_file_name = fmt::format("{}{}", base_name, LENGTH_SUFFIX);
             auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(column_length_file_name)));
             auto index_file_worker = std::make_unique<RawFileWorker>(rel_file_path, row_count * sizeof(u32));
-            index_file_worker_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
+            index_file_worker_ = fileworker_mgr->raw_map_.EmplaceFileWorker(std::move(index_file_worker));
             break;
         }
         case IndexType::kIVF: {
             auto index_file_name = IndexFileName(chunk_id_);
             auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
             auto index_file_worker = std::make_unique<IVFIndexFileWorker>(rel_file_path, index_base, column_def);
-            index_file_worker_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
+            index_file_worker_ = fileworker_mgr->ivf_map_.EmplaceFileWorker(std::move(index_file_worker));
             break;
         }
         case IndexType::kHnsw: {
             auto index_file_name = IndexFileName(chunk_id_);
             auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
             auto index_file_worker = std::make_unique<HnswFileWorker>(rel_file_path, index_base, column_def, index_size);
-            index_file_worker_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
+            index_file_worker_ = fileworker_mgr->hnsw_map_.EmplaceFileWorker(std::move(index_file_worker));
             break;
         }
         case IndexType::kBMP: {
             auto index_file_name = IndexFileName(chunk_id_);
             auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
             auto index_file_worker = std::make_unique<BMPIndexFileWorker>(rel_file_path, index_base, column_def, index_size);
-            index_file_worker_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
+            index_file_worker_ = fileworker_mgr->bmp_map_.EmplaceFileWorker(std::move(index_file_worker));
             break;
         }
         case IndexType::kEMVB: {
@@ -254,7 +249,7 @@ Status ChunkIndexMeta::LoadSet() {
             auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
             const auto segment_start_offset = base_row_id.segment_offset_;
             auto index_file_worker = std::make_unique<EMVBIndexFileWorker>(rel_file_path, index_base, column_def, segment_start_offset);
-            index_file_worker_ = fileworker_mgr->EmplaceFileWorker(std::move(index_file_worker));
+            index_file_worker_ = fileworker_mgr->emvb_map_.EmplaceFileWorker(std::move(index_file_worker));
             break;
         }
         default: {
@@ -308,7 +303,40 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
     if (!status.ok()) {
         return status;
     }
-    index_file_worker_->PickForCleanup();
+    switch (index_file_worker_->Type()) {
+        case FileWorkerType::kBMPIndexFile: {
+            InfinityContext::instance().storage()->fileworker_manager()->bmp_map_.AddToCleanList(
+                dynamic_cast<BMPIndexFileWorker *>(index_file_worker_));
+            break;
+        }
+        case FileWorkerType::kEMVBIndexFile: {
+            InfinityContext::instance().storage()->fileworker_manager()->emvb_map_.AddToCleanList(
+                dynamic_cast<EMVBIndexFileWorker *>(index_file_worker_));
+            break;
+        }
+        case FileWorkerType::kHNSWIndexFile: {
+            InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.AddToCleanList(dynamic_cast<HnswFileWorker *>(index_file_worker_));
+            break;
+        }
+        case FileWorkerType::kIVFIndexFile: {
+            InfinityContext::instance().storage()->fileworker_manager()->ivf_map_.AddToCleanList(
+                dynamic_cast<IVFIndexFileWorker *>(index_file_worker_));
+            break;
+        }
+        case FileWorkerType::kRawFile: {
+            InfinityContext::instance().storage()->fileworker_manager()->raw_map_.AddToCleanList(dynamic_cast<RawFileWorker *>(index_file_worker_));
+            break;
+        }
+        case FileWorkerType::kSecondaryIndexFile: {
+            InfinityContext::instance().storage()->fileworker_manager()->secondary_map_.AddToCleanList(
+                dynamic_cast<SecondaryIndexFileWorker *>(index_file_worker_));
+            break;
+        }
+        default: {
+            UnrecoverableError("index_file_worker type mismatch in ChunKIndexMeta::UninitSet()");
+        }
+    }
+    // index_file_worker_->PickForCleanup();
 
     TableIndexMeta &table_index_meta = segment_index_meta_.table_index_meta();
     auto [index_def, index_status] = table_index_meta.GetIndexBase();
@@ -431,14 +459,46 @@ Status ChunkIndexMeta::LoadIndexFileWorker() {
         return index_status;
     }
     switch (index_def->index_type_) {
-        case IndexType::kSecondary:
-        case IndexType::kIVF:
-        case IndexType::kHnsw:
-        case IndexType::kBMP:
+        case IndexType::kSecondary: {
+            std::string index_file_name = IndexFileName(chunk_id_);
+            std::string index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
+            index_file_worker_ = fileworker_mgr->secondary_map_.GetFileWorker(index_filepath);
+            if (index_file_worker_ == nullptr) {
+                return Status::BufferManagerError(fmt::format("GetFileWorker failed: {}", index_filepath));
+            }
+            break;
+        }
+        case IndexType::kIVF: {
+            std::string index_file_name = IndexFileName(chunk_id_);
+            std::string index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
+            index_file_worker_ = fileworker_mgr->ivf_map_.GetFileWorker(index_filepath);
+            if (index_file_worker_ == nullptr) {
+                return Status::BufferManagerError(fmt::format("GetFileWorker failed: {}", index_filepath));
+            }
+            break;
+        }
+        case IndexType::kHnsw: {
+            std::string index_file_name = IndexFileName(chunk_id_);
+            std::string index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
+            index_file_worker_ = fileworker_mgr->hnsw_map_.GetFileWorker(index_filepath);
+            if (index_file_worker_ == nullptr) {
+                return Status::BufferManagerError(fmt::format("GetFileWorker failed: {}", index_filepath));
+            }
+            break;
+        }
+        case IndexType::kBMP: {
+            std::string index_file_name = IndexFileName(chunk_id_);
+            std::string index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
+            index_file_worker_ = fileworker_mgr->bmp_map_.GetFileWorker(index_filepath);
+            if (index_file_worker_ == nullptr) {
+                return Status::BufferManagerError(fmt::format("GetFileWorker failed: {}", index_filepath));
+            }
+            break;
+        }
         case IndexType::kEMVB: {
             std::string index_file_name = IndexFileName(chunk_id_);
             std::string index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
-            index_file_worker_ = fileworker_mgr->GetFileWorker(index_filepath);
+            index_file_worker_ = fileworker_mgr->emvb_map_.GetFileWorker(index_filepath);
             if (index_file_worker_ == nullptr) {
                 return Status::BufferManagerError(fmt::format("GetFileWorker failed: {}", index_filepath));
             }
@@ -454,7 +514,7 @@ Status ChunkIndexMeta::LoadIndexFileWorker() {
             }
             auto column_length_file_name = chunk_info_ptr->base_name_ + LENGTH_SUFFIX;
             std::string index_filepath = fmt::format("{}/{}", index_dir, column_length_file_name);
-            index_file_worker_ = fileworker_mgr->GetFileWorker(index_filepath);
+            index_file_worker_ = fileworker_mgr->raw_map_.GetFileWorker(index_filepath);
             if (index_file_worker_ == nullptr) {
                 return Status::BufferManagerError(fmt::format("GetFileWorker failed: {}", index_filepath));
             }

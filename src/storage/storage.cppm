@@ -17,14 +17,15 @@ export module infinity_core:storage;
 import :wal_manager;
 import :log_file;
 import :status;
-import :fileworker_manager;
+
 import :config;
 
 namespace infinity {
 
+class FileWorkerManager;
 class ResultCacheManager;
 export struct NewCatalog;
-class NewTxnManager;
+export class NewTxnManager;
 class KVStore;
 class KVInstance;
 class PeriodicTriggerThread;
@@ -53,7 +54,7 @@ public:
 
     [[nodiscard]] inline NewCatalog *new_catalog() noexcept { return new_catalog_.get(); }
 
-    [[nodiscard]] inline FileWorkerManager *fileworker_manager() noexcept { return buffer_mgr_.get(); }
+    [[nodiscard]] inline FileWorkerManager *fileworker_manager() noexcept { return file_worker_mgr_.get(); }
 
     [[nodiscard]] inline BGMemIndexTracer *memindex_tracer() noexcept { return memory_index_tracer_.get(); }
 
@@ -118,21 +119,21 @@ public:
 private:
     Config *config_ptr_{};
     std::unique_ptr<WalManager> wal_mgr_{};
-    std::unique_ptr<ObjectStorageProcess> object_storage_processor_{};
-    std::unique_ptr<PersistenceManager> persistence_manager_{};
-    std::unique_ptr<ResultCacheManager> result_cache_manager_{};
-    std::unique_ptr<FileWorkerManager> buffer_mgr_{};
-    std::unique_ptr<NewCatalog> new_catalog_{};
-    std::unique_ptr<BGMemIndexTracer> memory_index_tracer_{};
-    std::unique_ptr<NewTxnManager> new_txn_mgr_{};
-    std::unique_ptr<BGTaskProcessor> bg_processor_{};
-    std::unique_ptr<CompactionProcessor> compact_processor_{};
-    std::unique_ptr<OptimizationProcessor> optimize_processor_{};
-    std::unique_ptr<DumpIndexProcessor> dump_index_processor_{};
-    std::unique_ptr<MemIndexAppender> mem_index_appender_{};
-    std::unique_ptr<PeriodicTriggerThread> periodic_trigger_thread_{};
-    std::unique_ptr<KVStore> kv_store_{};
-    std::unique_ptr<MetaCache> meta_cache_{};
+    std::unique_ptr<ObjectStorageProcess> object_storage_processor_;
+    std::unique_ptr<PersistenceManager> persistence_manager_;
+    std::unique_ptr<ResultCacheManager> result_cache_manager_;
+    std::unique_ptr<FileWorkerManager> file_worker_mgr_;
+    std::unique_ptr<NewCatalog> new_catalog_;
+    std::unique_ptr<BGMemIndexTracer> memory_index_tracer_;
+    std::unique_ptr<NewTxnManager> new_txn_mgr_;
+    std::unique_ptr<BGTaskProcessor> bg_processor_;
+    std::unique_ptr<CompactionProcessor> compact_processor_;
+    std::unique_ptr<OptimizationProcessor> optimize_processor_;
+    std::unique_ptr<DumpIndexProcessor> dump_index_processor_;
+    std::unique_ptr<MemIndexAppender> mem_index_appender_;
+    std::unique_ptr<PeriodicTriggerThread> periodic_trigger_thread_;
+    std::unique_ptr<KVStore> kv_store_;
+    std::unique_ptr<MetaCache> meta_cache_;
 
     mutable std::mutex mutex_;
     StorageMode current_storage_mode_{StorageMode::kUnInitialized};

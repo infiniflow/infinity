@@ -17,7 +17,7 @@ module infinity_core:emvb_index_in_mem.impl;
 import :emvb_index_in_mem;
 import :roaring_bitmap;
 import :default_values;
-import :fileworker_manager;
+
 import :block_column_iter;
 import :infinity_exception;
 import :emvb_index;
