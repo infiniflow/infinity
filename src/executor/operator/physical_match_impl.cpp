@@ -244,12 +244,7 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
                           static_cast<TimeDurationType>(finish_init_query_builder_time - execute_start_time).count()));
 
     // 2 build query iterator
-    FullTextQueryContext full_text_query_context(ft_similarity_,
-                                                 bm25_params_,
-                                                 minimum_should_match_option_,
-                                                 rank_features_option_,
-                                                 top_n_,
-                                                 match_expr_->index_names_);
+    FullTextQueryContext full_text_query_context(ft_similarity_, bm25_params_, minimum_should_match_option_, rank_features_option_, top_n_);
     full_text_query_context.query_tree_ = std::make_unique<FilterQueryNode>(common_query_filter_.get(), std::move(query_tree_));
     const auto query_iterators = CreateQueryIterators(query_builder, full_text_query_context, early_term_algo_, begin_threshold_, score_threshold_);
     const auto finish_query_builder_time = std::chrono::high_resolution_clock::now();

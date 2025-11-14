@@ -269,8 +269,7 @@ void QueryMatchTest::QueryMatch(const std::string &db_name,
 
     QueryBuilder query_builder(table_info);
     query_builder.Init(index_reader);
-    std::vector<std::string> index_hints;
-    const std::map<std::string, std::string> &column2analyzer = query_builder.GetColumn2Analyzer(index_hints);
+    std::map<std::string, std::map<std::string, std::string>> column2analyzer = query_builder.GetColumn2Analyzer();
 
     auto match_expr = std::make_shared<MatchExpr>();
     match_expr->fields_ = fields;
@@ -279,19 +278,14 @@ void QueryMatchTest::QueryMatch(const std::string &db_name,
     SearchOptions search_ops(match_expr->options_text_);
     const std::string &default_field = search_ops.options_["default_field"];
 
-    SearchDriver driver(column2analyzer, default_field);
+    SearchDriver driver(std::move(column2analyzer), default_field);
 
     std::unique_ptr<QueryNode> query_tree = driver.ParseSingleWithFields(match_expr->fields_, match_expr->matching_text_);
     if (!query_tree) {
         Status status = Status::ParseMatchExprFailed(match_expr->fields_, match_expr->matching_text_);
         RecoverableError(status);
     }
-    FullTextQueryContext full_text_query_context(FulltextSimilarity::kBM25,
-                                                 BM25Params{},
-                                                 MinimumShouldMatchOption{},
-                                                 RankFeaturesOption{},
-                                                 10,
-                                                 index_hints);
+    FullTextQueryContext full_text_query_context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, RankFeaturesOption{}, 10);
     full_text_query_context.early_term_algo_ = EarlyTermAlgo::kNaive;
     full_text_query_context.query_tree_ = std::move(query_tree);
     std::unique_ptr<DocIterator> doc_iterator = query_builder.CreateSearch(full_text_query_context);

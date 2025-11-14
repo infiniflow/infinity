@@ -70,7 +70,7 @@ public:
 
     // debug info
     const std::vector<std::string> *terms_ptr_ = nullptr;
-    const std::string *column_name_ptr_ = nullptr;
+    std::string column_name_;
 
 private:
     bool GetPhraseMatchData() {

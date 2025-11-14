@@ -59,7 +59,6 @@ export struct CreateSearchParams {
     const BM25Params &bm25_params;
     uint32_t minimum_should_match;
     uint32_t topn;
-    const std::vector<std::string> &index_names_;
 
     [[nodiscard]] CreateSearchParams RemoveMSM() const {
         CreateSearchParams copy_value = *this;
@@ -110,6 +109,7 @@ export struct QueryNode {
 export struct TermQueryNode : public QueryNode {
     std::string term_;
     std::string column_;
+    std::string index_;
     bool position_{false};
 
     TermQueryNode() : QueryNode(QueryNodeType::TERM) {}
@@ -124,6 +124,7 @@ export struct TermQueryNode : public QueryNode {
 export struct RankFeatureQueryNode : public QueryNode {
     std::string term_;
     std::string column_;
+    std::string index_;
     float boost_;
 
     RankFeatureQueryNode() : QueryNode(QueryNodeType::TERM) {}
@@ -138,6 +139,7 @@ export struct RankFeatureQueryNode : public QueryNode {
 export struct PhraseQueryNode final : public QueryNode {
     std::vector<std::string> terms_;
     std::string column_;
+    std::string index_;
     uint32_t slop_;
 
     PhraseQueryNode() : QueryNode(QueryNodeType::PHRASE) {}

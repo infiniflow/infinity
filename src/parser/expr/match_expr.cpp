@@ -21,7 +21,6 @@ std::string MatchExpr::ToString() const {
     oss << fields_;
     oss << "', '" << matching_text_ << "'";
     oss << ", '" << options_text_ << "'";
-    oss << ", '" << index_names_ << "'";
     if (filter_expr_) {
         oss << ", WHERE " << filter_expr_->ToString();
     }

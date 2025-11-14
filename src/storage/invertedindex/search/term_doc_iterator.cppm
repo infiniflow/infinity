@@ -31,7 +31,7 @@ namespace infinity {
 
 export class TermDocIterator final : public BlockMaxLeafIterator {
 public:
-    TermDocIterator(std::unique_ptr<PostingIterator> &&iter, u64 column_id, float weight, FulltextSimilarity ft_similarity);
+    TermDocIterator(std::unique_ptr<PostingIterator> &&iter, const std::string &column_name, float weight, FulltextSimilarity ft_similarity);
 
     ~TermDocIterator() override;
 
@@ -91,13 +91,12 @@ public:
 
     // debug info
     const std::string *term_ptr_ = nullptr;
-    const std::string *column_name_ptr_ = nullptr;
 
 private:
     u32 doc_freq_ = 0;
     u64 total_df_ = 0;
 
-    u64 column_id_;
+    std::string column_name_;
     std::unique_ptr<PostingIterator> iter_;
     float weight_ = 1.0f; // changed in MultiplyWeight()
     u64 term_freq_;

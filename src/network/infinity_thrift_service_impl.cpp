@@ -2459,9 +2459,6 @@ MatchExpr *InfinityThriftService::GetMatchExprFromProto(Status &status, const in
     match_expr->matching_text_ = expr.matching_text;
     match_expr->options_text_ = expr.options_text;
     SearchOptions options(match_expr->options_text_);
-    if (options.options_.find("index_names") != options.options_.end()) {
-        match_expr->index_names_ = options.options_["index_names"];
-    }
     if (expr.__isset.filter_expr) {
         match_expr->filter_expr_.reset(GetParsedExprFromProto(status, expr.filter_expr));
         if (!status.ok()) {

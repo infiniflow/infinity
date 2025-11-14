@@ -4,7 +4,7 @@
 
 %language "c++"
 %skeleton "lalr1.cc"
-%require "3.8"
+%require "3.5"
 %debug
 %defines
 %define api.namespace {infinity}

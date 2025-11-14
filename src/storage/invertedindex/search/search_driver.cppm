@@ -31,10 +31,10 @@ export enum class FulltextQueryOperatorOption {
  */
 export class SearchDriver {
 public:
-    SearchDriver(const std::map<std::string, std::string> &field2analyzer,
+    SearchDriver(std::map<std::string, std::map<std::string, std::string>> &&field2analyzer,
                  const std::string &default_field,
                  const FulltextQueryOperatorOption operator_option = FulltextQueryOperatorOption::kInfinitySyntax)
-        : field2analyzer_{field2analyzer}, default_field_{SearchDriver::Unescape(default_field)}, operator_option_(operator_option) {}
+        : field2analyzer_{std::move(field2analyzer)}, default_field_{SearchDriver::Unescape(default_field)}, operator_option_(operator_option) {}
 
     // used in PhysicalMatch
     [[nodiscard]] std::unique_ptr<QueryNode> ParseSingleWithFields(const std::string &fields_str, const std::string &query) const;
@@ -44,14 +44,14 @@ public:
 
     // used in SearchParser in ParseSingle. Assumes field and text are both unescaped.
     [[nodiscard]] std::unique_ptr<QueryNode>
-    AnalyzeAndBuildQueryNode(const std::string &field, const std::string &text, bool from_quoted, unsigned long slop = 0) const;
+    AnalyzeAndBuildQueryNode(const std::string &field_index, const std::string &text, bool from_quoted, unsigned long slop = 0) const;
 
     [[nodiscard]] static std::string Unescape(const std::string &text);
 
     /**
      * parsing options
      */
-    const std::map<std::string, std::string> &field2analyzer_;
+    const std::map<std::string, std::map<std::string, std::string>> field2analyzer_;
     const std::string default_field_;
     const FulltextQueryOperatorOption operator_option_ = FulltextQueryOperatorOption::kInfinitySyntax;
 };
