@@ -79,7 +79,7 @@ void CheckpointPeriodicTrigger::Trigger() {
         LOG_DEBUG("No write txn after last checkpoint");
         return;
     }
-    if (wal_manager->IsCheckpointing()) {
+    if (new_txn_mgr->IsCheckpointing()) {
         LOG_INFO("There is a running checkpoint task, skip this checkpoint triggered by periodic timer");
         return;
     }

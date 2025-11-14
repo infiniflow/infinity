@@ -162,6 +162,10 @@ public:
 
     void UpdateTxnBeginTSAndKVInstance(NewTxn *txn);
 
+    bool SetCheckpointBeginTS(TxnTimeStamp checkpoint_ts);
+
+    bool IsCheckpointing() const;
+
 private:
     mutable std::mutex locker_{};
     Storage *storage_{};

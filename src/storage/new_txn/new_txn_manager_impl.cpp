@@ -317,7 +317,8 @@ Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
     }
     if (status.ok()) {
         TransactionType txn_type = txn->GetTxnType();
-        if (txn_type == TransactionType::kNewCheckpoint or txn_type == TransactionType::kSkippedCheckpoint) {
+        if (txn_type == TransactionType::kNewCheckpoint or txn_type == TransactionType::kSkippedCheckpoint or
+            txn_type == TransactionType::kCreateDB) {
             std::lock_guard guard(locker_);
             ckp_begin_ts_ = UNCOMMIT_TS;
         }
@@ -342,7 +343,8 @@ Status NewTxnManager::RollBackTxn(NewTxn *txn) {
     Status status = txn->Rollback();
     if (status.ok()) {
         TransactionType txn_type = txn->GetTxnType();
-        if (txn_type == TransactionType::kNewCheckpoint or txn_type == TransactionType::kSkippedCheckpoint) {
+        if (txn_type == TransactionType::kNewCheckpoint or txn_type == TransactionType::kSkippedCheckpoint or
+            txn_type == TransactionType::kCreateTableSnapshot) {
             std::lock_guard guard(locker_);
             ckp_begin_ts_ = UNCOMMIT_TS;
         }
@@ -898,6 +900,20 @@ void NewTxnManager::UpdateTxnBeginTSAndKVInstance(NewTxn *txn) {
     }
 
     txn->UpdateKVInstance(kv_store_->GetInstance());
+}
+
+bool NewTxnManager::SetCheckpointBeginTS(TxnTimeStamp checkpoint_ts) {
+    std::lock_guard guard(locker_);
+    if (ckp_begin_ts_ == UNCOMMIT_TS) {
+        ckp_begin_ts_ = checkpoint_ts;
+        return true;
+    }
+    return false;
+}
+
+bool NewTxnManager::IsCheckpointing() const {
+    std::lock_guard guard(locker_);
+    return ckp_begin_ts_ != UNCOMMIT_TS;
 }
 
 void NewTxnManager::CollectInfo(NewTxn *txn) {

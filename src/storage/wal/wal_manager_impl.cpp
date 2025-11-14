@@ -436,24 +436,6 @@ void WalManager::FlushLogByReplication(const std::vector<std::string> &synced_lo
     ofs_.flush();
 }
 
-bool WalManager::SetCheckpointing() {
-    bool expect = false;
-    if (checkpoint_in_progress_.compare_exchange_strong(expect, true)) {
-        return true;
-    }
-    return false;
-}
-
-bool WalManager::UnsetCheckpoint() {
-    bool expect = true;
-    if (checkpoint_in_progress_.compare_exchange_strong(expect, false)) {
-        return true;
-    }
-    return false;
-}
-
-bool WalManager::IsCheckpointing() const { return checkpoint_in_progress_; }
-
 /*****************************************************************************
  * CHECKPOINT WAL FILE
  *****************************************************************************/

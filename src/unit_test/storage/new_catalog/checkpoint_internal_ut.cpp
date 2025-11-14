@@ -831,3 +831,26 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint5) {
         EXPECT_TRUE(status.ok());
     }
 }
+
+TEST_P(TestTxnCheckpointInternalTest, test_concurrent_checkpoint) {
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
+        auto *txn2 = new_txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
+        EXPECT_EQ(txn2, nullptr); // Another checkpoint txn is started.
+
+        Status status = txn1->Checkpoint(wal_manager_->LastCheckpointTS(), false);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+    }
+}

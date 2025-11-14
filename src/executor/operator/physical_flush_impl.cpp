@@ -85,12 +85,6 @@ void PhysicalFlush::FlushCatalog(QueryContext *query_context, OperatorState *ope
 
 void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operator_state) {
     auto *wal_manager = query_context->storage()->wal_manager();
-    if (wal_manager->IsCheckpointing()) {
-        LOG_ERROR("There is a running checkpoint task, skip this checkpoint triggered by command");
-        Status status = Status::Checkpointing();
-        RecoverableError(status);
-    }
-
     TxnTimeStamp max_commit_ts{};
     i64 wal_size{};
     std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
