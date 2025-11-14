@@ -106,7 +106,7 @@ public:
 
         for (IntegerT i = 1; i < 20; ++i) {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
-            auto input_block = MakeInputBlock(Value::MakeInt(i), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 1000);
+            auto input_block = MakeInputBlock(Value::MakeInt(i), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 5000);
             auto status = txn->Append(*db_name, *table_name, input_block);
             EXPECT_TRUE(status.ok());
             status = txn_mgr->CommitTxn(txn);
@@ -503,11 +503,6 @@ TEST_P(TableSnapshotTest, test_create_snapshot_delete_data) {
     }
     status = txn1->Delete(*db_name, *table_name, row_ids);
 
-    status = txn_mgr->CommitTxn(txn1);
-    if (!status.ok()) {
-        LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
-    }
-
     // Create Checkpoint
     {
         auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
@@ -537,6 +532,11 @@ TEST_P(TableSnapshotTest, test_create_snapshot_delete_data) {
         LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
     }
 
+    status = txn_mgr->CommitTxn(txn1);
+    if (!status.ok()) {
+        LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
+    }
+
     status = txn_mgr->CommitTxn(txn2);
     if (!status.ok()) {
         LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
@@ -558,14 +558,14 @@ TEST_P(TableSnapshotTest, test_create_snapshot_delete_data) {
     }
 
     {
-        std::string restore_sql = "restore table snapshot test_delete";
+        std::string restore_sql = "restore table snapshot tb1_snapshot";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(restore_sql);
         bool ok = HandleQueryResult(query_result);
         if (ok) {
-            LOG_INFO("std::Thread 1: restore table snapshot test_delete succeeded");
+            LOG_INFO("std::Thread 1: restore table snapshot tb1_snapshot succeeded");
         } else {
-            LOG_INFO("std::Thread 1: restore table snapshot test_delete failed");
+            LOG_INFO("std::Thread 1: restore table snapshot tb1_snapshot failed");
         }
     }
 

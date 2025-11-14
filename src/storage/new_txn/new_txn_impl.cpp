@@ -2711,7 +2711,7 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, std::string &cause, boo
             return CheckConflictTxnStore(static_cast<const RestoreDatabaseTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
         case TransactionType::kCreateTableSnapshot: {
-            // return CheckConflictTxnStore(static_cast<const CreateTableSnapshotTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
+            return CheckConflictTxnStore(static_cast<const CreateTableSnapshotTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
         case TransactionType::kNewCheckpoint:
         default: {
@@ -3950,13 +3950,13 @@ bool NewTxn::CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *prev
 }
 
 bool NewTxn::CheckConflictTxnStore(const CreateTableSnapshotTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
-    retry_query = true;
-    bool conflict = true;
+    // retry_query = true;
+    bool conflict = false;
     if (conflict) {
         cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
         return true;
     }
-    return true;
+    return false;
 }
 
 bool NewTxn::CheckConflictTxnStores(std::shared_ptr<NewTxn> check_txn, std::string &conflict_reason, bool &retry_query) {
@@ -5350,19 +5350,6 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
 
     current_ckp_ts_ = checkpoint_ts;
     LOG_INFO(fmt::format("checkpoint ts for snapshot: {}", current_ckp_ts_));
-
-    // if (last_ckp_ts > 0 and last_ckp_ts + 2 >= checkpoint_ts) {
-    //     txn_context_ptr_->txn_type_ = TransactionType::kSkippedCheckpoint;
-    //     LOG_INFO(fmt::format("Last checkpoint ts {}, this checkpoint begin ts: {}, SKIP CHECKPOINT", last_ckp_ts, checkpoint_ts));
-    //     return Status::OK();
-    // }
-    //
-    // auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
-    // if (!wal_manager->SetCheckpointing()) {
-    //     LOG_ERROR(fmt::format("Create snapshot with txn: {} is conflicted with another checkpoint transaction.", this->TxnID()));
-    //     return Status::Checkpointing();
-    // }
-    // DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
 
     switch (snapshot_type) {
         case SnapshotType::kTableSnapshot: {
