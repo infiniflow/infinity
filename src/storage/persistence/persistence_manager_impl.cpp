@@ -109,10 +109,6 @@ PersistenceManager::~PersistenceManager() {
 #endif
 }
 
-// dir: snapshot_dir
-// persist(snapshot_dir
-// FileHanle
-
 PersistWriteResult PersistenceManager::Persist(const std::string &file_path, const std::string &tmp_file_path, bool try_compose) {
     PersistWriteResult result;
     Status status;
