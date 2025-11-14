@@ -115,7 +115,11 @@ size_t VarBuffer::TotalSize() const {
 
 size_t VarBuffer::GetSize(size_t row_cnt) const {
     std::shared_lock lock(mtx_);
-    return buffer_size_prefix_sum_[row_cnt];
+    if (row_cnt >= buffer_size_prefix_sum_.size()) {
+        return buffer_size_prefix_sum_.back();
+    } else {
+        return buffer_size_prefix_sum_[row_cnt];
+    }
 }
 
 size_t VarBufferManager::Append(std::unique_ptr<char[]> data, size_t size, bool *free_success) {
