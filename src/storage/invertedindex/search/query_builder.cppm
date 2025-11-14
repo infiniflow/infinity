@@ -36,16 +36,14 @@ export struct FullTextQueryContext {
     u32 minimum_should_match_ = 0;
     u32 topn_ = 0;
     EarlyTermAlgo early_term_algo_ = EarlyTermAlgo::kNaive;
-    const std::vector<std::string> &index_names_;
 
     FullTextQueryContext(const FulltextSimilarity ft_similarity,
                          const BM25Params &bm25_params,
                          const MinimumShouldMatchOption &minimum_should_match_option,
                          const RankFeaturesOption &rank_features_option,
-                         const u32 topn,
-                         const std::vector<std::string> &index_names)
+                         const u32 topn)
         : ft_similarity_(ft_similarity), bm25_params_(bm25_params), minimum_should_match_option_(minimum_should_match_option),
-          rank_features_option_(rank_features_option), topn_(topn), index_names_(index_names) {}
+          rank_features_option_(rank_features_option), topn_(topn) {}
 };
 
 export class QueryBuilder {
@@ -56,9 +54,7 @@ public:
 
     ~QueryBuilder();
 
-    std::map<std::string, std::string> GetColumn2Analyzer(const std::vector<std::string> &hints) const {
-        return index_reader_->GetColumn2Analyzer(hints);
-    }
+    std::map<std::string, std::map<std::string, std::string>> GetColumn2Analyzer() const { return index_reader_->GetColumn2Analyzer(); }
 
     std::unique_ptr<DocIterator> CreateSearch(FullTextQueryContext &context);
 

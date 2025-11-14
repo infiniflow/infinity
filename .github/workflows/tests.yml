@@ -65,6 +65,8 @@ jobs:
                   echo "Upload coverage report of PR #${PR_NUMBER}"
                   export ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${PR_RUN_ID}
                   echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}"
+                  export CODECOV_COMMIT_SHA=${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.pull_request.head.sha || github.sha }}
+                  echo "CODECOV_COMMIT_SHA=${CODECOV_COMMIT_SHA}"
                   ./scripts/upload_codecov.sh
                   echo "Cancel myself"
                   gh run cancel ${GITHUB_RUN_ID}
@@ -589,6 +591,12 @@ jobs:
       - name: Upload coverage reports to Codecov
         if: ${{ !cancelled() && !failure() }}
         run: |
+          export CODECOV_COMMIT_SHA=${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.pull_request.head.sha || github.sha }}
+          echo "CODECOV_COMMIT_SHA=${CODECOV_COMMIT_SHA}"
+          export GITHUB_REF_NAME=${{ github.ref_name }}
+          echo "GITHUB_REF_NAME=${GITHUB_REF_NAME}"
+          export PR_NUMBER=${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.pull_request.number || '' }}
+          echo "PR_NUMBER=${PR_NUMBER}"
           ./scripts/upload_codecov.sh
 
       - name: Remove test container

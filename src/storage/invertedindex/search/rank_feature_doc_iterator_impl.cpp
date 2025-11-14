@@ -27,8 +27,8 @@ import row_id;
 
 namespace infinity {
 
-RankFeatureDocIterator::RankFeatureDocIterator(std::unique_ptr<PostingIterator> &&iter, const u64 column_id, float boost)
-    : column_id_(column_id), boost_(boost), iter_(std::move(iter)) {}
+RankFeatureDocIterator::RankFeatureDocIterator(std::unique_ptr<PostingIterator> &&iter, const std::string &column_name, float boost)
+    : column_name_(column_name), boost_(boost), iter_(std::move(iter)) {}
 
 RankFeatureDocIterator::~RankFeatureDocIterator() {}
 
@@ -52,7 +52,7 @@ void RankFeatureDocIterator::PrintTree(std::ostream &os, const std::string &pref
     os << prefix;
     os << (is_final ? "└──" : "├──");
     os << "RankFeatureDocIterator";
-    os << " (column: " << *column_name_ptr_ << ")";
+    os << " (column: " << column_name_ << ")";
     os << " (term: " << *term_ptr_ << ")";
     os << '\n';
 }

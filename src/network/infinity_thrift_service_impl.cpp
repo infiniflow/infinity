@@ -100,7 +100,7 @@ ClientVersions::ClientVersions() {
     client_version_map_[29] = std::string("0.6.0.dev3");
     client_version_map_[30] = std::string("0.6.0.dev5");
     client_version_map_[31] = std::string("0.6.0.dev6");
-    client_version_map_[32] = std::string("0.6.4");
+    client_version_map_[32] = std::string("0.6.5");
 }
 
 std::pair<const char *, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
@@ -2459,9 +2459,6 @@ MatchExpr *InfinityThriftService::GetMatchExprFromProto(Status &status, const in
     match_expr->matching_text_ = expr.matching_text;
     match_expr->options_text_ = expr.options_text;
     SearchOptions options(match_expr->options_text_);
-    if (options.options_.find("index_names") != options.options_.end()) {
-        match_expr->index_names_ = options.options_["index_names"];
-    }
     if (expr.__isset.filter_expr) {
         match_expr->filter_expr_.reset(GetParsedExprFromProto(status, expr.filter_expr));
         if (!status.ok()) {

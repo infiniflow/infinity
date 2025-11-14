@@ -1166,10 +1166,6 @@ std::unique_ptr<MatchExpr> HTTPSearch::ParseMatchText(std::string_view json_sv, 
             for (auto param : value.get_object()) {
                 auto param_k = std::string(static_cast<std::string_view>(param.unescaped_key()));
                 auto param_v = param.value();
-                if (param_k == "index_names") {
-                    match_expr->index_names_ = param_v.get<std::string>();
-                    continue;
-                }
                 if (param_k == "filter") {
                     if (match_expr->filter_expr_) {
                         response["error_code"] = ErrorCode::kInvalidExpression;

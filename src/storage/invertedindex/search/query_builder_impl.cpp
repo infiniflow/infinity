@@ -53,8 +53,7 @@ std::unique_ptr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &co
                                     context.ft_similarity_,
                                     context.bm25_params_,
                                     context.minimum_should_match_,
-                                    context.topn_,
-                                    context.index_names_};
+                                    context.topn_};
     if (!context.rank_features_option_.empty()) {
         auto rank_features_node = std::make_unique<RankFeaturesQueryNode>();
         for (auto rank_feature : context.rank_features_option_) {

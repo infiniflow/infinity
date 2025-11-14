@@ -195,8 +195,7 @@ TEST_F(QueryBuilderTest, test_and) {
     static_cast<QueryNode *>(and_root.get())->PrintTree(oss);
     LOG_INFO(oss.str());
     // apply query builder
-    std::vector<std::string> hints;
-    FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, RankFeaturesOption{}, 10, hints);
+    FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, RankFeaturesOption{}, 10);
     context.early_term_algo_ = EarlyTermAlgo::kNaive;
     context.query_tree_ = std::move(and_root);
     FakeQueryBuilder fake_query_builder;
@@ -266,8 +265,7 @@ TEST_F(QueryBuilderTest, test_or) {
     static_cast<QueryNode *>(or_root.get())->PrintTree(oss);
     LOG_INFO(oss.str());
     // apply query builder
-    std::vector<std::string> hints;
-    FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, RankFeaturesOption{}, 10, hints);
+    FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, RankFeaturesOption{}, 10);
     context.early_term_algo_ = EarlyTermAlgo::kNaive;
     context.query_tree_ = std::move(or_root);
     FakeQueryBuilder fake_query_builder;
@@ -343,8 +341,7 @@ TEST_F(QueryBuilderTest, test_and_not) {
     static_cast<QueryNode *>(and_not_root.get())->PrintTree(oss);
     LOG_INFO(oss.str());
     // apply query builder
-    std::vector<std::string> hints;
-    FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, RankFeaturesOption{}, 10, hints);
+    FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, RankFeaturesOption{}, 10);
     context.early_term_algo_ = EarlyTermAlgo::kNaive;
     context.query_tree_ = std::move(and_not_root);
     FakeQueryBuilder fake_query_builder;
@@ -426,8 +423,7 @@ TEST_F(QueryBuilderTest, test_and_not2) {
     static_cast<QueryNode *>(and_not_root.get())->PrintTree(oss);
     LOG_INFO(oss.str());
     // apply query builder
-    std::vector<std::string> hints;
-    FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, RankFeaturesOption{}, 10, hints);
+    FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, RankFeaturesOption{}, 10);
     context.early_term_algo_ = EarlyTermAlgo::kNaive;
     context.query_tree_ = std::move(and_not_root);
     FakeQueryBuilder fake_query_builder;

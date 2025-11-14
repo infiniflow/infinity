@@ -1,8 +1,8 @@
-// A Bison parser, made by GNU Bison 3.8.2.
+// A Bison parser, made by GNU Bison 3.5.1.
 
 // Locations for Bison parsers in C++
 
-// Copyright (C) 2002-2015, 2018-2021 Free Software Foundation, Inc.
+// Copyright (C) 2002-2015, 2018-2020 Free Software Foundation, Inc.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // As a special exception, you may create a larger work that contains
 // part or all of the Bison parser skeleton and distribute that work
@@ -61,13 +61,11 @@ namespace infinity {
   class position
   {
   public:
-    /// Type for file name.
-    typedef const std::string filename_type;
     /// Type for line and column numbers.
     typedef int counter_type;
 
     /// Construct a position.
-    explicit position (filename_type* f = YY_NULLPTR,
+    explicit position (std::string* f = YY_NULLPTR,
                        counter_type l = 1,
                        counter_type c = 1)
       : filename (f)
@@ -77,7 +75,7 @@ namespace infinity {
 
 
     /// Initialization.
-    void initialize (filename_type* fn = YY_NULLPTR,
+    void initialize (std::string* fn = YY_NULLPTR,
                      counter_type l = 1,
                      counter_type c = 1)
     {
@@ -106,7 +104,7 @@ namespace infinity {
     /** \} */
 
     /// File name to which this position refers.
-    filename_type* filename;
+    std::string* filename;
     /// Current line number.
     counter_type line;
     /// Current column number.
@@ -149,6 +147,24 @@ namespace infinity {
     return res -= width;
   }
 
+  /// Compare two position objects.
+  inline bool
+  operator== (const position& pos1, const position& pos2)
+  {
+    return (pos1.line == pos2.line
+            && pos1.column == pos2.column
+            && (pos1.filename == pos2.filename
+                || (pos1.filename && pos2.filename
+                    && *pos1.filename == *pos2.filename)));
+  }
+
+  /// Compare two position objects.
+  inline bool
+  operator!= (const position& pos1, const position& pos2)
+  {
+    return !(pos1 == pos2);
+  }
+
   /** \brief Intercept output stream redirection.
    ** \param ostr the destination output stream
    ** \param pos a reference to the position to redirect
@@ -166,8 +182,6 @@ namespace infinity {
   class location
   {
   public:
-    /// Type for file name.
-    typedef position::filename_type filename_type;
     /// Type for line and column numbers.
     typedef position::counter_type counter_type;
 
@@ -184,7 +198,7 @@ namespace infinity {
     {}
 
     /// Construct a 0-width location in \a f, \a l, \a c.
-    explicit location (filename_type* f,
+    explicit location (std::string* f,
                        counter_type l = 1,
                        counter_type c = 1)
       : begin (f, l, c)
@@ -193,7 +207,7 @@ namespace infinity {
 
 
     /// Initialization.
-    void initialize (filename_type* f = YY_NULLPTR,
+    void initialize (std::string* f = YY_NULLPTR,
                      counter_type l = 1,
                      counter_type c = 1)
     {
@@ -275,6 +289,20 @@ namespace infinity {
     return res -= width;
   }
 
+  /// Compare two location objects.
+  inline bool
+  operator== (const location& loc1, const location& loc2)
+  {
+    return loc1.begin == loc2.begin && loc1.end == loc2.end;
+  }
+
+  /// Compare two location objects.
+  inline bool
+  operator!= (const location& loc1, const location& loc2)
+  {
+    return !(loc1 == loc2);
+  }
+
   /** \brief Intercept output stream redirection.
    ** \param ostr the destination output stream
    ** \param loc a reference to the location to redirect
@@ -301,6 +329,6 @@ namespace infinity {
 
 #line 10 "search_parser.y"
 } // infinity
-#line 305 "location.hh"
+#line 333 "location.hh"
 
 #endif // !YY_YY_LOCATION_HH_INCLUDED
