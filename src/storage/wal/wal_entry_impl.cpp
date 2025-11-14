@@ -2158,6 +2158,25 @@ bool WalEntry::IsCheckPoint(WalCmdCheckpointV2 *&last_checkpoint_cmd) const {
     return found;
 }
 
+bool WalEntry::IsCheckPoint(WalCmd *&cmd) const {
+    TxnTimeStamp max_commit_ts = 0;
+    bool found = false;
+    for (auto &command : cmds_) {
+        if (command->GetType() == WalCommandType::CLEANUP) {
+            LOG_INFO("CLEANUP command found");
+        }
+        if (command->GetType() == WalCommandType::CHECKPOINT_V2) {
+            auto checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(command.get());
+            if (!found || TxnTimeStamp(checkpoint_cmd->max_commit_ts_) > max_commit_ts) {
+                max_commit_ts = checkpoint_cmd->max_commit_ts_;
+                cmd = command.get();
+                found = true;
+            }
+        }
+    }
+    return found;
+}
+
 bool WalEntry::IsCheckPointOrSnapshot(WalCmd *&cmd) const {
     TxnTimeStamp max_commit_ts = 0;
     bool found = false;
