@@ -1532,7 +1532,7 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
 
     auto data_end_time = std::chrono::high_resolution_clock::now();
     auto data_duration = std::chrono::duration_cast<std::chrono::milliseconds>(data_end_time - data_start_time);
-    LOG_INFO(fmt::format("Saving data and version files took {} ms", data_duration.count()));
+    LOG_TRACE(fmt::format("Saving data and version files took {} ms", data_duration.count()));
 
     {
         auto CreateSnapshotFile = [&](const std::string &file) -> Status {
@@ -1622,12 +1622,12 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
         std::string meta_path = fmt::format("{}/{}/{}.json", snapshot_dir, table_snapshot_info->snapshot_name_, table_snapshot_info->snapshot_name_);
         auto [snapshot_file_handle, meta_status] = VirtualStore::Open(meta_path, FileAccessMode::kWrite);
         if (!meta_status.ok()) {
-            return meta_status;
+            UnrecoverableError(status.message());
         }
 
         status = snapshot_file_handle->Append(json_string.data(), json_string.size());
         if (!status.ok()) {
-            return status;
+            UnrecoverableError(status.message());
         }
         snapshot_file_handle->Sync();
 

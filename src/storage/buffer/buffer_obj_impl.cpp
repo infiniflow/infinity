@@ -230,8 +230,8 @@ bool BufferObj::SaveSnapshot(const std::shared_ptr<TableSnapshotInfo> &table_sna
     if (type_ == BufferType::kEphemeral) {
         switch (status_) {
             case BufferStatus::kNew: {
-                file_worker_->AllocateInMemory();
-                buffer_mgr_->PushGCQueue(this);
+                // file_worker_->AllocateInMemory();
+                // buffer_mgr_->PushGCQueue(this);
                 break;
             }
             case BufferStatus::kLoaded:
