@@ -117,6 +117,58 @@ bool DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
     return true;
 }
 
+bool DataFileWorker::WriteSnapshotFileImpl(size_t row_cnt, size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+    // File structure:
+    // - header: magic number
+    // - header: buffer size
+    // - data buffer
+    // - footer: checksum
+
+    u64 magic_number = 0x00dd3344;
+    Status status = file_handle_->Append(&magic_number, sizeof(magic_number));
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
+    status = file_handle_->Append(const_cast<size_t *>(&buffer_size_), sizeof(buffer_size_));
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
+    status = file_handle_->Append(data_, data_size);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
+    std::ostringstream hex_stream;
+    hex_stream << std::hex << std::setfill('0');
+    size_t log_size = std::min(data_size, static_cast<size_t>(512));
+    for (size_t i = 0; i < log_size; ++i) {
+        hex_stream << std::setw(2) << static_cast<unsigned int>(static_cast<const u8 *>(data_)[i]);
+        if ((i + 1) % 8 == 0 && i + 1 < log_size) { // insert a space every 8 bytes
+            hex_stream << " ";
+        }
+    }
+    if (data_size > log_size) {
+        hex_stream << "... (truncated)";
+    }
+    LOG_TRACE(fmt::format("DataFileWorker::WriteSnapshotFileImpl data: data_={:p}, size={}, hex={}", data_, data_size, hex_stream.str()));
+
+    size_t unused_size = buffer_size_ - data_size;
+    if (unused_size > 0) {
+        std::string str(unused_size, '\0');
+        file_handle_->Append(str, unused_size);
+    }
+
+    u64 checksum{};
+    status = file_handle_->Append(&checksum, sizeof(checksum));
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    prepare_success = true; // Not run defer_fn
+    return true;
+}
+
 void DataFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
 
     if (file_size < sizeof(u64) * 3) {

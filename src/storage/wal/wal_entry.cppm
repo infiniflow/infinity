@@ -878,6 +878,7 @@ export struct WalEntry : WalEntryHeader {
     // Return if the entry is a checkpoint.
     [[nodiscard]] bool IsCheckPoint(WalCmdCheckpoint *&checkpoint_cmd) const;
     [[nodiscard]] bool IsCheckPoint(WalCmdCheckpointV2 *&checkpoint_cmd) const;
+    [[nodiscard]] bool IsCheckPoint(WalCmd *&checkpoint_cmd) const;
 
     // Return if the entry is either a checkpoint or create snapshot (returns base WalCmd pointer)
     [[nodiscard]] bool IsCheckPointOrSnapshot(WalCmd *&cmd) const;
