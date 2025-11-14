@@ -221,6 +221,7 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
 bool BufferObj::SaveSnapshot(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info,
                              bool use_memory,
                              const FileWorkerSaveCtx &ctx,
+                             size_t row_cnt,
                              size_t data_size) {
     std::unique_lock<std::mutex> locker(w_locker_);
 
@@ -236,21 +237,22 @@ bool BufferObj::SaveSnapshot(const std::shared_ptr<TableSnapshotInfo> &table_sna
             case BufferStatus::kLoaded:
                 [[fallthrough]];
             case BufferStatus::kUnloaded: {
-                file_worker_->WriteSnapshotFile(table_snapshot_info, use_memory, ctx, data_size);
+                file_worker_->WriteSnapshotFile(table_snapshot_info, use_memory, ctx, row_cnt, data_size);
                 break;
             }
             case BufferStatus::kFreed: {
-                file_worker_->WriteSnapshotFile1(table_snapshot_info, use_memory, ctx, data_size);
+                if (use_memory) {
+                    file_worker_->ReadFromFile(false);
+                }
+                file_worker_->WriteSnapshotFile(table_snapshot_info, use_memory, ctx, row_cnt, data_size);
                 break;
             }
             default: {
                 UnrecoverableError(fmt::format("Invalid buffer status: {}.", BufferStatusToString(status_)));
             }
         }
-    } else if (type_ == BufferType::kTemp) {
-        file_worker_->WriteSnapshotFile1(table_snapshot_info, use_memory, ctx, data_size);
     } else {
-        file_worker_->WriteSnapshotFile(table_snapshot_info, false, ctx, data_size);
+        file_worker_->WriteSnapshotFile(table_snapshot_info, false, ctx, row_cnt, data_size);
     }
 
     return true;

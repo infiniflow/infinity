@@ -63,6 +63,7 @@ FileWorker::~FileWorker() {
 bool FileWorker::WriteSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info,
                                    bool use_memory,
                                    const FileWorkerSaveCtx &ctx,
+                                   size_t row_cnt,
                                    size_t data_size) {
     std::string snapshot_name = table_snapshot_info->snapshot_name_;
     std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
@@ -83,7 +84,7 @@ bool FileWorker::WriteSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &tab
         DeferFn defer_fn([&]() { file_handle_ = nullptr; });
 
         bool prepare_success = false;
-        bool all_save = WriteSnapshotFileImpl(data_size, prepare_success, ctx);
+        bool all_save = WriteSnapshotFileImpl(row_cnt, data_size, prepare_success, ctx);
         if (prepare_success) {
             file_handle_->Sync();
         }
@@ -94,82 +95,14 @@ bool FileWorker::WriteSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &tab
         if (persistence_manager != nullptr) {
             PersistResultHandler pm_handler(persistence_manager);
             PersistReadResult result = persistence_manager->GetObjCache(src_path);
+            DeferFn defer_fn([&]() {
+                auto res = persistence_manager->PutObjCache(src_path);
+                pm_handler.HandleWriteResult(res);
+            });
+
             const ObjAddr &obj_addr = pm_handler.HandleReadResult(result);
             if (!obj_addr.Valid()) {
-                UnrecoverableError(fmt::format("GetObjCache failed: {}", src_path));
-            }
-
-            std::string read_path = persistence_manager->GetObjPath(obj_addr.obj_key_);
-            LOG_INFO(fmt::format("READ: {} from {}", src_path, read_path));
-
-            auto [read_handle, read_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
-            if (!read_open_status.ok()) {
-                UnrecoverableError(read_open_status.message());
-            }
-
-            auto seek_status = read_handle->Seek(obj_addr.part_offset_);
-            if (!seek_status.ok()) {
-                UnrecoverableError(seek_status.message());
-            }
-
-            auto file_size = obj_addr.part_size_;
-            auto buffer = std::make_unique<char[]>(file_size);
-            auto [nread, read_status] = read_handle->Read(buffer.get(), file_size);
-
-            auto [write_handle, write_open_status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
-            if (!write_open_status.ok()) {
-                UnrecoverableError(write_open_status.message());
-            }
-
-            Status write_status = write_handle->Append(buffer.get(), file_size);
-            if (!write_status.ok()) {
-                UnrecoverableError(write_status.message());
-            }
-            write_handle->Sync();
-        } else {
-            Status status = VirtualStore::Copy(write_path, src_path);
-            if (!status.ok()) {
-                UnrecoverableError(status.message());
-            }
-        }
-
-        return true;
-    }
-}
-
-bool FileWorker::WriteSnapshotFile1(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info,
-                                    bool use_memory,
-                                    const FileWorkerSaveCtx &ctx,
-                                    size_t data_size) {
-    std::string snapshot_name = table_snapshot_info->snapshot_name_;
-    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    std::string write_dir = std::filesystem::path(snapshot_dir) / snapshot_name / *file_dir_;
-    std::string write_path = fmt::format("{}/{}", write_dir, *file_name_);
-    std::string src_path = this->GetFilePath();
-
-    if (!VirtualStore::Exists(write_dir)) {
-        VirtualStore::MakeDirectory(write_dir);
-    }
-
-    if (use_memory) {
-        if (!VirtualStore::Exists(src_path)) {
-            Status status = Status::FileNotFound(src_path);
-            RecoverableError(status);
-        }
-        if (!VirtualStore::Exists(write_dir)) {
-            VirtualStore::MakeDirectory(write_dir);
-        }
-        auto status = VirtualStore::Copy(write_path, src_path);
-        if (!status.ok()) {
-            LOG_WARN(fmt::format("Failed to copy {} to {}: {}", src_path, write_path, status.message()));
-        }
-    } else {
-        PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
-        if (persistence_manager != nullptr) {
-            PersistResultHandler pm_handler(persistence_manager);
-            PersistReadResult result = persistence_manager->GetObjCache(src_path);
-            const ObjAddr &obj_addr = pm_handler.HandleReadResult(result);
-            if (!obj_addr.Valid()) {
+                LOG_INFO(fmt::format("Failed to find object for local path {}", src_path));
                 return false;
             }
 
@@ -206,13 +139,12 @@ bool FileWorker::WriteSnapshotFile1(const std::shared_ptr<TableSnapshotInfo> &ta
                 UnrecoverableError(status.message());
             }
         }
+
+        return true;
     }
-    return true;
 }
 
-bool FileWorker::WriteSnapshotFileImpl(size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-    return WriteToFileImpl(false, prepare_success, ctx);
-}
+bool FileWorker::WriteSnapshotFileImpl(size_t row_cnt, size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx) { return false; }
 
 bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
     if (data_ == nullptr) {

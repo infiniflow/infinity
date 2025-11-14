@@ -1465,12 +1465,22 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                 continue;
             }
 
+            NewTxnGetVisibleRangeState state;
+            status = NewCatalog::GetBlockVisibleRange(block_meta, txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_, state);
+            if (!status.ok()) {
+                return status;
+            }
+
+            std::pair<BlockOffset, BlockOffset> range;
+            BlockOffset row_cnt = 0;
+            while (state.Next(row_cnt, range)) {
+                row_cnt = range.second;
+            }
+
             bool use_memory = false;
-            {
-                std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
-                if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
-                    use_memory = true;
-                }
+            std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
+            if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
+                use_memory = true;
             }
             LOG_TRACE(fmt::format("block: {}, use_memory: {}", block_id, use_memory ? "true" : "false"));
 
@@ -1478,11 +1488,10 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                 std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
                 BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
 
-                std::string version_filepath =
-                    InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + std::string(BlockVersion::PATH);
-                BufferObj *version_buffer = buffer_mgr->GetBufferObject(version_filepath);
+                std::string version_file_path = fmt::format("{}/{}/{}", data_dir, *block_dir_ptr, BlockVersion::PATH);
+                BufferObj *version_buffer = buffer_mgr->GetBufferObject(version_file_path);
                 if (version_buffer == nullptr) {
-                    return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
+                    return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_path));
                 }
 
                 VersionFileWorkerSaveCtx ctx(option.checkpoint_ts_);
@@ -1496,24 +1505,6 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                     return status;
                 }
 
-                NewTxnGetVisibleRangeState state;
-                status = NewCatalog::GetBlockVisibleRange(block_meta, txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_, state);
-                if (!status.ok()) {
-                    return status;
-                }
-
-                std::pair<BlockOffset, BlockOffset> range;
-                BlockOffset row_cnt = 0;
-                while (true) {
-                    bool has_next = state.Next(row_cnt, range);
-                    if (!has_next) {
-                        break;
-                    }
-                    row_cnt = range.second;
-                    LOG_TRACE(fmt::format("range.first: {}, range.second: {}", range.first, range.second));
-                }
-                LOG_TRACE(fmt::format("row_cnt: {}", row_cnt));
-
                 for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
                     ColumnMeta column_meta(column_idx, block_meta);
                     BufferObj *buffer_obj = nullptr;
@@ -1524,15 +1515,15 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
                         return status;
                     }
 
-                    size_t total_data_size = 0;
-                    std::tie(total_data_size, status) = column_meta.GetColumnSize(row_cnt, (*column_defs)[column_idx]);
+                    size_t data_size = 0;
+                    std::tie(data_size, status) = column_meta.GetColumnSize(row_cnt, (*column_defs)[column_idx]);
 
                     if (buffer_obj) {
-                        buffer_obj->SaveSnapshot(table_snapshot_info, use_memory, {}, total_data_size);
+                        buffer_obj->SaveSnapshot(table_snapshot_info, use_memory, {}, row_cnt, data_size);
                     }
 
                     if (outline_buffer_obj) {
-                        outline_buffer_obj->SaveSnapshot(table_snapshot_info, use_memory);
+                        outline_buffer_obj->SaveSnapshot(table_snapshot_info, use_memory, {}, row_cnt, data_size);
                     }
                 }
             }
@@ -1546,16 +1537,18 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &opti
     {
         auto CreateSnapshotFile = [&](const std::string &file) -> Status {
             if (pm != nullptr) {
-                PersistResultHandler handler(pm);
+                PersistResultHandler pm_handler(pm);
                 PersistReadResult result = pm->GetObjCache(file);
+
                 DeferFn defer_fn([&]() {
                     auto res = pm->PutObjCache(file);
-                    handler.HandleWriteResult(res);
+                    pm_handler.HandleWriteResult(res);
                 });
 
-                const ObjAddr &obj_addr = handler.HandleReadResult(result);
+                const ObjAddr &obj_addr = pm_handler.HandleReadResult(result);
                 if (!obj_addr.Valid()) {
-                    UnrecoverableError(fmt::format("GetObjCache failed: {}", file));
+                    LOG_INFO(fmt::format("Failed to find object for local path {}", file));
+                    return Status::OK();
                 }
 
                 std::string read_path = pm->GetObjPath(obj_addr.obj_key_);

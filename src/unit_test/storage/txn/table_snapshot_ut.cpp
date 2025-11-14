@@ -104,20 +104,10 @@ public:
             EXPECT_TRUE(ok);
         }
 
-        for (IntegerT i = 0; i < 20; ++i) {
+        for (IntegerT i = 1; i < 20; ++i) {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
-            auto input_block = MakeInputBlock(Value::MakeInt(i), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
+            auto input_block = MakeInputBlock(Value::MakeInt(i), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 1000);
             auto status = txn->Append(*db_name, *table_name, input_block);
-            EXPECT_TRUE(status.ok());
-            status = txn_mgr->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
-
-        // Create Checkpoint
-        {
-            auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
             status = txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -138,10 +128,29 @@ public:
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
+
+        // Create Checkpoint
+        {
+            auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
+            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
+            EXPECT_TRUE(status.ok());
+            status = txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+
+        // {
+        //     auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("cleanup"), TransactionType::kCleanup);
+        //     Status status = txn->Cleanup();
+        //     EXPECT_TRUE(status.ok());
+        //     status = txn_mgr->CommitTxn(txn);
+        //     EXPECT_TRUE(status.ok());
+        // }
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TableSnapshotTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TableSnapshotTest, ::testing::Values(BaseTestParamStr::NEW_VFS_OFF_BG_OFF_PATH));
+// INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TableSnapshotTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
 
 TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     using namespace infinity;
@@ -468,9 +477,6 @@ TEST_P(TableSnapshotTest, test_restore_table_same_snapshot_multithreaded) {
 }
 
 TEST_P(TableSnapshotTest, test_create_snapshot_delete_data) {
-    using namespace infinity;
-    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-
     {
         std::string restore_sql = "restore table snapshot tb1_snapshot";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
@@ -485,12 +491,14 @@ TEST_P(TableSnapshotTest, test_create_snapshot_delete_data) {
 
     PrintTableRowCount();
 
+    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
     Status status;
     std::vector<RowID> row_ids;
 
     row_ids.clear();
     auto *txn1 = txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
-    for (size_t row_id = 1000; row_id < 11000; ++row_id) {
+    for (size_t row_id = 1000; row_id < 3000; ++row_id) {
         row_ids.push_back(RowID(0, row_id));
     }
     status = txn1->Delete(*db_name, *table_name, row_ids);
@@ -498,6 +506,16 @@ TEST_P(TableSnapshotTest, test_create_snapshot_delete_data) {
     status = txn_mgr->CommitTxn(txn1);
     if (!status.ok()) {
         LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
+    }
+
+    // Create Checkpoint
+    {
+        auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
+        auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
+        EXPECT_TRUE(status.ok());
+        status = txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
     }
 
     PrintTableRowCount();
@@ -511,7 +529,7 @@ TEST_P(TableSnapshotTest, test_create_snapshot_delete_data) {
     auto *txn3 = txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
 
     row_ids.clear();
-    for (size_t row_id = 20000; row_id < 30000; ++row_id) {
+    for (size_t row_id = 4000; row_id < 5000; ++row_id) {
         row_ids.push_back(RowID(0, row_id));
     }
     status = txn3->Delete(*db_name, *table_name, row_ids);

@@ -2324,36 +2324,12 @@ Status NewTxn::GetTableIndexMeta(const std::string &index_name,
 }
 
 Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot *create_table_snapshot_cmd) {
-    // check if duplicate snapshot name
     std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     std::string snapshot_name = create_table_snapshot_cmd->snapshot_name_;
     std::string snapshot_path = snapshot_dir + "/" + snapshot_name;
     if (std::filesystem::exists(snapshot_path)) {
         return Status::SnapshotAlreadyExists(snapshot_name);
     }
-
-    // // dump indexes for snapshot
-    // std::vector<std::shared_ptr<MemIndexDetail>> table_mem_indexes = GetTableMemIndexes(db_name, table_name);
-
-    // // Submit all dump tasks in parallel
-    // std::vector<std::shared_ptr<DumpMemIndexTask>> dump_tasks;
-    // auto *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
-
-    // for (const auto &mem_index_detail : table_mem_indexes) {
-    //     auto dump_index_task = std::make_shared<DumpMemIndexTask>(mem_index_detail->db_name_, mem_index_detail->table_name_,
-    //     mem_index_detail->index_name_, mem_index_detail->segment_id_, mem_index_detail->begin_row_id_);
-    //     dump_tasks.push_back(dump_index_task); dump_index_processor->Submit(std::move(dump_index_task));
-    // }
-
-    // // Wait for all dumps to complete
-    // Status status = Status::OK();
-    // for (auto &dump_task : dump_tasks) {
-    //     dump_task->Wait();
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    // }
-    // After calling Checkpoint()
 
     TxnTimeStamp last_ckp_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
     std::shared_ptr<CheckpointTxnStore> ckp_txn_store = std::make_shared<CheckpointTxnStore>(last_ckp_ts, true);
@@ -2735,7 +2711,6 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, std::string &cause, boo
             return CheckConflictTxnStore(static_cast<const RestoreDatabaseTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
         case TransactionType::kCreateTableSnapshot: {
-            return false;
             // return CheckConflictTxnStore(static_cast<const CreateTableSnapshotTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
         case TransactionType::kNewCheckpoint:
@@ -5376,18 +5351,18 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
     current_ckp_ts_ = checkpoint_ts;
     LOG_INFO(fmt::format("checkpoint ts for snapshot: {}", current_ckp_ts_));
 
-    if (last_ckp_ts > 0 and last_ckp_ts + 2 >= checkpoint_ts) {
-        txn_context_ptr_->txn_type_ = TransactionType::kSkippedCheckpoint;
-        LOG_INFO(fmt::format("Last checkpoint ts {}, this checkpoint begin ts: {}, SKIP CHECKPOINT", last_ckp_ts, checkpoint_ts));
-        return Status::OK();
-    }
-
-    auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
-    if (!wal_manager->SetCheckpointing()) {
-        LOG_ERROR(fmt::format("Create snapshot with txn: {} is conflicted with another checkpoint transaction.", this->TxnID()));
-        return Status::Checkpointing();
-    }
-    DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
+    // if (last_ckp_ts > 0 and last_ckp_ts + 2 >= checkpoint_ts) {
+    //     txn_context_ptr_->txn_type_ = TransactionType::kSkippedCheckpoint;
+    //     LOG_INFO(fmt::format("Last checkpoint ts {}, this checkpoint begin ts: {}, SKIP CHECKPOINT", last_ckp_ts, checkpoint_ts));
+    //     return Status::OK();
+    // }
+    //
+    // auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
+    // if (!wal_manager->SetCheckpointing()) {
+    //     LOG_ERROR(fmt::format("Create snapshot with txn: {} is conflicted with another checkpoint transaction.", this->TxnID()));
+    //     return Status::Checkpointing();
+    // }
+    // DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
 
     switch (snapshot_type) {
         case SnapshotType::kTableSnapshot: {

@@ -50,11 +50,12 @@ public:
     bool WriteSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info,
                            bool use_memory,
                            const FileWorkerSaveCtx &ctx = {},
+                           size_t row_cnt = 0,
                            size_t data_size = 0);
-    bool WriteSnapshotFile1(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info,
-                            bool use_memory,
-                            const FileWorkerSaveCtx &ctx = {},
-                            size_t data_size = 0);
+    // bool WriteSnapshotFile1(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info,
+    //                         bool use_memory,
+    //                         const FileWorkerSaveCtx &ctx = {},
+    //                         size_t data_size = 0);
 
     void ReadFromFile(bool from_spill);
 
@@ -84,7 +85,7 @@ public:
 protected:
     virtual bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
 
-    virtual bool WriteSnapshotFileImpl(size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx = {});
+    virtual bool WriteSnapshotFileImpl(size_t row_cnt, size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx = {});
 
     virtual void ReadFromFileImpl(size_t file_size, bool from_spill) = 0;
 

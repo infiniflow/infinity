@@ -117,7 +117,7 @@ bool DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
     return true;
 }
 
-bool DataFileWorker::WriteSnapshotFileImpl(size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool DataFileWorker::WriteSnapshotFileImpl(size_t row_cnt, size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     // File structure:
     // - header: magic number
     // - header: buffer size
@@ -135,15 +135,11 @@ bool DataFileWorker::WriteSnapshotFileImpl(size_t data_size, bool &prepare_succe
         RecoverableError(status);
     }
 
-    LOG_INFO(fmt::format("data_size = {}, data_size_ = {}", data_size, data_size_.load()));
-    data_size = data_size_.load();
-
     status = file_handle_->Append(data_, data_size);
     if (!status.ok()) {
         RecoverableError(status);
     }
 
-    // Record data_[:min(512,data_size)] to log
     std::ostringstream hex_stream;
     hex_stream << std::hex << std::setfill('0');
     size_t log_size = std::min(data_size, static_cast<size_t>(512));
@@ -156,7 +152,7 @@ bool DataFileWorker::WriteSnapshotFileImpl(size_t data_size, bool &prepare_succe
     if (data_size > log_size) {
         hex_stream << "... (truncated)";
     }
-    LOG_TRACE(fmt::format("DataFileWorker::WriteToFileImpl data: data_={:p}, size={}, hex={}", data_, data_size, hex_stream.str()));
+    LOG_TRACE(fmt::format("DataFileWorker::WriteSnapshotFileImpl data: data_={:p}, size={}, hex={}", data_, data_size, hex_stream.str()));
 
     size_t unused_size = buffer_size_ - data_size;
     if (unused_size > 0) {

@@ -49,7 +49,7 @@ public:
 
 protected:
     bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
-    bool WriteSnapshotFileImpl(size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) override;
+    bool WriteSnapshotFileImpl(size_t row_cnt, size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) override;
 
     void ReadFromFileImpl(size_t file_size, bool from_spill) override;
 

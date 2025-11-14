@@ -63,6 +63,8 @@ public:
 
     size_t TotalSize() const;
 
+    size_t GetSize(size_t row_cnt) const;
+
 private:
     mutable std::shared_mutex mtx_;
 
@@ -89,6 +91,8 @@ public:
     size_t Write(char *ptr, size_t offset, size_t size);
 
     size_t TotalSize();
+
+    size_t GetSize(size_t row_cnt);
 
     void SetToCatalog(BufferObj *outline_buffer_obj);
 
