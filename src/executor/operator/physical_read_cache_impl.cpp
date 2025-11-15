@@ -69,7 +69,7 @@ bool PhysicalReadCache::Execute(QueryContext *query_context, OperatorState *oper
     for (const std::unique_ptr<DataBlock> &cache_block : cache_content_->data_blocks_) {
         std::vector<std::shared_ptr<ColumnVector>> column_vectors;
         for (size_t i : column_map_) {
-            column_vectors.push_back(cache_block->column_vectors[i]);
+            column_vectors.push_back(cache_block->column_vectors_[i]);
         }
         auto data_block = std::make_unique<DataBlock>();
         data_block->Init(std::move(column_vectors));
@@ -97,7 +97,7 @@ std::shared_ptr<std::vector<std::shared_ptr<DataType>>> PhysicalReadCache::GetOu
     }
     auto result_types = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
     for (size_t i : column_map_) {
-        std::shared_ptr<DataType> data_type = cache_content_->data_blocks_[0]->column_vectors[i]->data_type();
+        std::shared_ptr<DataType> data_type = cache_content_->data_blocks_[0]->column_vectors_[i]->data_type();
         result_types->push_back(data_type);
     }
     return result_types;

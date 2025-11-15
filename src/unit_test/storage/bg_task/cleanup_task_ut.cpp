@@ -25,7 +25,7 @@ import :storage;
 import :table_def;
 import :column_vector;
 import :value;
-import :buffer_manager;
+import :fileworker_manager;
 import :physical_import;
 import :status;
 import :bg_task;
@@ -54,7 +54,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          CleanupTaskTest,
                          ::testing::Values(BaseTestParamStr::NEW_BG_ON_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_BG_ON_CONFIG_PATH));
 
-TEST_P(CleanupTaskTest, test_delete_db_simple) {
+TEST_P(CleanupTaskTest, SLOW_test_delete_db_simple) {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto *wal_manager = infinity::InfinityContext::instance().storage()->wal_manager();
     i64 cleanup_interval = InfinityContext::instance().storage()->config()->CleanupInterval();
@@ -136,7 +136,7 @@ TEST_P(CleanupTaskTest, test_delete_db_simple) {
 
         // Wait for the cleanup task to run
         LOG_INFO(fmt::format("cleanup_interval: {} seconds, wait for cleanup task to run", cleanup_interval));
-        sleep(cleanup_interval + 1);
+        std::this_thread::sleep_for(std::chrono::seconds(cleanup_interval + 1));
 
         CheckFilePaths(delete_file_paths, exist_file_paths);
     }

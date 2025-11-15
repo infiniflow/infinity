@@ -467,6 +467,7 @@ using AssociativeMergeOperator = ::ROCKSDB_NAMESPACE::AssociativeMergeOperator;
 using MergeOperator = ::ROCKSDB_NAMESPACE::MergeOperator;
 // using MergeOperators = ::ROCKSDB_NAMESPACE::MergeOperators;
 using Logger = ::ROCKSDB_NAMESPACE::Logger;
+using ColumnFamilyDescriptor = ::ROCKSDB_NAMESPACE::ColumnFamilyDescriptor;
 } // namespace rocksdb
 
 namespace rocksdb {
@@ -475,7 +476,7 @@ export using ::rocksdb::EventListener;
 export using ::rocksdb::DB;
 export using ::rocksdb::FlushJobInfo;
 export using ::rocksdb::CompactionJobInfo;
-}
+} // namespace rocksdb
 
 namespace re2 {
 export using ::re2::RE2;

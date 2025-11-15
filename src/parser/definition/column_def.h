@@ -131,7 +131,7 @@ public:
 
 public:
     int64_t id_{-1};
-    const std::shared_ptr<DataType> column_type_{};
+    const std::shared_ptr<DataType> column_type_;
     std::string name_{};
     std::set<ConstraintType> constraints_{};
     std::string comment_{};

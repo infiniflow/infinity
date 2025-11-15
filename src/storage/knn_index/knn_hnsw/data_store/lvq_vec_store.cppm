@@ -122,17 +122,17 @@ public:
     void CompressTo(const DataType *src, LVQData *dest) const {
         std::unique_ptr<DataType[]> normalized;
         if (normalize_) {
-            normalized = std::make_unique_for_overwrite<DataType[]>(this->dim_);
+            normalized = std::make_unique_for_overwrite<DataType[]>(dim_);
             DataType norm = 0;
-            for (size_t j = 0; j < this->dim_; ++j) {
+            for (size_t j = 0; j < dim_; ++j) {
                 DataType x = src[j];
                 norm += x * x;
             }
             norm = std::sqrt(norm);
             if (norm == 0) {
-                std::fill(normalized.get(), normalized.get() + this->dim_, 0);
+                std::fill(normalized.get(), normalized.get() + dim_, 0);
             } else {
-                for (size_t j = 0; j < this->dim_; ++j) {
+                for (size_t j = 0; j < dim_; ++j) {
                     normalized[j] = src[j] / norm;
                 }
             }

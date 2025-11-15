@@ -55,9 +55,9 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 TEST_P(TestTxnColumn, test_add_columns) {
     using namespace infinity;
 
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto default_value2 = std::make_shared<ConstantExpr>(LiteralType::kString);
     {
@@ -87,24 +87,24 @@ TEST_P(TestTxnColumn, test_add_columns) {
     }
 
     u32 block_row_cnt = 8192;
-    auto make_input_block = [&](Value v1) {
-        auto input_block = std::make_shared<DataBlock>();
-        auto append_to_col = [&](ColumnVector &col, Value v) {
-            for (u32 i = 0; i < block_row_cnt; ++i) {
-                col.AppendValue(std::move(v));
-            }
-        };
-        // Initialize input block
-        {
-            auto col1 = ColumnVector::Make(column_def1->type());
-            col1->Initialize();
-            append_to_col(*col1, v1);
-            input_block->InsertVector(col1, 0);
-        }
-        input_block->Finalize();
-        return input_block;
-    };
     {
+        auto make_input_block = [&](Value v1) {
+            auto input_block = std::make_shared<DataBlock>();
+            // Initialize input block
+            {
+                auto append_to_col = [&](ColumnVector &col, Value v) {
+                    for (u32 i = 0; i < block_row_cnt; ++i) {
+                        col.AppendValue(std::move(v));
+                    }
+                };
+                auto col1 = ColumnVector::Make(column_def1->type());
+                col1->Initialize();
+                append_to_col(*col1, v1);
+                input_block->InsertVector(col1, 0);
+            }
+            input_block->Finalize();
+            return input_block;
+        };
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
         auto input_block = make_input_block(Value::MakeInt(1));
@@ -178,9 +178,9 @@ TEST_P(TestTxnColumn, test_add_columns) {
 
 TEST_P(TestTxnColumn, alter_column) {
     using namespace infinity;
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     std::string table_name = "tb1";
@@ -249,9 +249,9 @@ TEST_P(TestTxnColumn, alter_column) {
 
 TEST_P(TestTxnColumn, add_column_and_drop_db) {
     using namespace infinity;
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     std::string table_name = "tb1";
@@ -433,9 +433,9 @@ TEST_P(TestTxnColumn, add_column_and_drop_db) {
 
 TEST_P(TestTxnColumn, add_column_and_drop_table) {
     using namespace infinity;
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     std::string table_name = "tb1";
@@ -739,9 +739,9 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
 
 TEST_P(TestTxnColumn, add_column_and_add_column) {
     using namespace infinity;
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     std::string table_name = "tb1";
@@ -1029,9 +1029,9 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
 
 TEST_P(TestTxnColumn, drop_column_and_drop_db) {
     using namespace infinity;
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     std::string table_name = "tb1";
@@ -1164,9 +1164,9 @@ TEST_P(TestTxnColumn, drop_column_and_drop_db) {
 
 TEST_P(TestTxnColumn, drop_column_and_drop_table) {
     using namespace infinity;
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     std::string table_name = "tb1";
@@ -1452,9 +1452,9 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
 
 TEST_P(TestTxnColumn, drop_column_and_add_column) {
     using namespace infinity;
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     std::string table_name = "tb1";
@@ -1671,9 +1671,9 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
 
 TEST_P(TestTxnColumn, drop_column_and_drop_column) {
     using namespace infinity;
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());

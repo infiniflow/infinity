@@ -25,7 +25,6 @@ namespace infinity {
 export struct ChunkIndexSnapshotInfo;
 class KVInstance;
 class SegmentIndexMeta;
-class BufferObj;
 
 export struct ChunkIndexMetaInfo {
     ChunkIndexMetaInfo() = default;
@@ -54,13 +53,11 @@ public:
 
     Status GetChunkInfo(ChunkIndexMetaInfo *&chunk_info);
 
-    Status GetIndexBuffer(BufferObj *&index_buffer);
+    Status GetFileWorker(FileWorker *&index_file_worker);
 
     Status InitSet(const ChunkIndexMetaInfo &chunk_info);
 
     Status LoadSet();
-
-    Status RestoreSet();
 
     Status RestoreSetFromSnapshot(const ChunkIndexMetaInfo &chunk_info);
 
@@ -75,7 +72,7 @@ public:
 private:
     Status LoadChunkInfo();
 
-    Status LoadIndexBuffer();
+    Status LoadIndexFileWorker();
 
     std::string GetChunkIndexTag(const std::string &tag) const;
 
@@ -88,7 +85,7 @@ private:
 
     std::optional<ChunkIndexMetaInfo> chunk_info_;
 
-    BufferObj *index_buffer_ = nullptr;
+    FileWorker *index_file_worker_{};
 };
 
 } // namespace infinity

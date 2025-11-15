@@ -36,10 +36,10 @@ public:
                                void *state_ptr_input,
                                void *state_ptr,
                                bool nullable) {
-        const auto *input_ptr = (const InputType *)(input->data());
+        const auto *input_ptr = (const InputType *)(input->data().get());
         const std::shared_ptr<Bitmask> &input_null = input->nulls_ptr_;
 
-        auto *result_ptr = (ResultType *)(result->data());
+        auto *result_ptr = (ResultType *)(result->data().get());
         std::shared_ptr<Bitmask> &result_null = result->nulls_ptr_;
 
         switch (input->vector_type()) {
@@ -106,7 +106,7 @@ public:
                         Operator::Execute(input_ptr[0], result_value, result_null.get(), 0, state_ptr_input, state_ptr);
                         result->buffer_->SetCompactBit(0, result_value);
                     } else if constexpr (std::is_same_v<InputType, EmbeddingT>) {
-                        EmbeddingT embedding_input(input->data(), false);
+                        EmbeddingT embedding_input(input->data().get(), false);
                         Operator::template Execute<InputType, ResultType>(embedding_input,
                                                                           result_ptr[0],
                                                                           result_null.get(),
@@ -191,8 +191,8 @@ private:
         result_null->SetAllTrue();
         size_t count_bytes = count / 8;
         size_t count_tail = count % 8;
-        auto input_u8 = reinterpret_cast<const u8 *>(input->data());
-        auto result_u8 = reinterpret_cast<u8 *>(result->data());
+        auto input_u8 = reinterpret_cast<const u8 *>(input->data().get());
+        auto result_u8 = reinterpret_cast<u8 *>(result->data().get());
         for (size_t i = 0; i < count_bytes; ++i) {
             Operator::Execute(input_u8[i], result_u8[i], result_null.get(), 0, state_ptr_input, state_ptr);
         }

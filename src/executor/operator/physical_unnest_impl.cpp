@@ -102,7 +102,7 @@ bool PhysicalUnnest::Execute(QueryContext *, OperatorState *operator_state) {
         u16 row_count = input_data_block->row_count();
         std::vector<size_t> array_lengths;
         {
-            const auto &unnest_col = input_data_block->column_vectors[unnest_idx];
+            const auto &unnest_col = input_data_block->column_vectors_[unnest_idx];
             auto &output_cols = output_datas[unnest_idx];
             if (output_cols.empty()) {
                 auto col = ColumnVector::Make(output_types[unnest_idx]);
@@ -133,7 +133,7 @@ bool PhysicalUnnest::Execute(QueryContext *, OperatorState *operator_state) {
             if (col_idx == unnest_idx) {
                 continue;
             }
-            const auto &input_col = input_data_block->column_vectors[col_idx];
+            const auto &input_col = input_data_block->column_vectors_[col_idx];
             auto &output_cols = output_datas[col_idx];
             if (output_cols.empty()) {
                 auto col = ColumnVector::Make(output_types[col_idx]);

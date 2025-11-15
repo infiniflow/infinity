@@ -3571,35 +3571,35 @@ public:
                         nlohmann::json snapshot_obj;
 
                         // Extract snapshot name (column 0)
-                        auto &name_column = data_block->column_vectors[0];
+                        auto &name_column = data_block->column_vectors_[0];
                         if (name_column->data_type()->type() == LogicalType::kVarchar) {
                             auto varchar_value = name_column->GetValueByIndex(row_idx);
                             snapshot_obj["name"] = varchar_value.GetVarchar();
                         }
 
                         // Extract scope (column 1)
-                        auto &scope_column = data_block->column_vectors[1];
+                        auto &scope_column = data_block->column_vectors_[1];
                         if (scope_column->data_type()->type() == LogicalType::kVarchar) {
                             auto scope_value = scope_column->GetValueByIndex(row_idx);
                             snapshot_obj["scope"] = scope_value.GetVarchar();
                         }
 
                         // Extract create time (column 2)
-                        auto &time_column = data_block->column_vectors[2];
+                        auto &time_column = data_block->column_vectors_[2];
                         if (time_column->data_type()->type() == LogicalType::kVarchar) {
                             auto time_value = time_column->GetValueByIndex(row_idx);
                             snapshot_obj["time"] = time_value.GetVarchar();
                         }
 
                         // Extract commit timestamp (column 3)
-                        auto &commit_column = data_block->column_vectors[3];
+                        auto &commit_column = data_block->column_vectors_[3];
                         if (commit_column->data_type()->type() == LogicalType::kBigInt) {
                             auto commit_value = commit_column->GetValueByIndex(row_idx);
                             snapshot_obj["commit"] = commit_value.GetValue<BigIntT>();
                         }
 
                         // Extract size (column 4)
-                        auto &size_column = data_block->column_vectors[4];
+                        auto &size_column = data_block->column_vectors_[4];
                         if (size_column->data_type()->type() == LogicalType::kVarchar) {
                             auto size_value = size_column->GetValueByIndex(row_idx);
                             snapshot_obj["size"] = size_value.GetVarchar();
@@ -3667,8 +3667,8 @@ public:
                     for (size_t row_idx = 0; row_idx < row_count; row_idx += 2) {
                         // Each pair consists of a key row and a value row
                         if (row_idx + 1 < row_count) {
-                            auto &key_column = data_block->column_vectors[0];
-                            auto &value_column = data_block->column_vectors[1];
+                            auto &key_column = data_block->column_vectors_[0];
+                            auto &value_column = data_block->column_vectors_[1];
 
                             if (key_column->data_type()->type() == LogicalType::kVarchar &&
                                 value_column->data_type()->type() == LogicalType::kVarchar) {

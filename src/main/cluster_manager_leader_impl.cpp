@@ -222,7 +222,7 @@ Status ClusterManager::RemoveNodeInfo(const std::string &node_name) {
     }
 
     if (old_status == NodeStatus::kAlive) {
-        std::shared_ptr<ChangeRoleTask> change_role_task = std::make_shared<ChangeRoleTask>(node_name, "admin");
+        auto change_role_task = std::make_shared<ChangeRoleTask>(node_name, "admin");
         client_->Send(change_role_task);
         change_role_task->Wait();
 
@@ -484,7 +484,7 @@ Status ClusterManager::SendLogs(const std::string &node_name,
                                 const std::vector<std::shared_ptr<std::string>> &logs,
                                 bool synchronize,
                                 bool on_register) {
-    std::shared_ptr<SyncLogTask> sync_log_task = std::make_shared<SyncLogTask>(node_name, logs, on_register);
+    auto sync_log_task = std::make_shared<SyncLogTask>(node_name, logs, on_register);
     peer_client->Send(sync_log_task);
 
     Status status = Status::OK();

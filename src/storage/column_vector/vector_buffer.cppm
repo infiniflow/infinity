@@ -14,7 +14,6 @@
 
 export module infinity_core:vector_buffer;
 
-import :buffer_handle;
 import :var_buffer;
 import :sparse_util;
 
@@ -24,9 +23,6 @@ import data_type;
 import global_resource_usage;
 
 namespace infinity {
-
-class BufferManager;
-class BufferObj;
 
 export enum class VectorBufferType {
     kInvalid,
@@ -41,52 +37,38 @@ public:
     static std::shared_ptr<VectorBuffer> Make(size_t data_type_size, size_t capacity, VectorBufferType buffer_type);
 
     static std::shared_ptr<VectorBuffer>
-    Make(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, size_t data_type_size, size_t capacity, VectorBufferType buffer_type);
+    Make(FileWorker *data_file_worker, FileWorker *var_file_worker, size_t data_type_size, size_t capacity, VectorBufferType buffer_type);
 
 public:
-    explicit VectorBuffer() {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount("VectorBuffer");
-#endif
-    }
+    explicit VectorBuffer() {}
 
-    ~VectorBuffer() {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::DecrObjectCount("VectorBuffer");
-#endif
-    }
+    ~VectorBuffer() {}
 
     void Initialize(size_t type_size, size_t capacity);
 
     void InitializeCompactBit(size_t capacity);
 
-    void InitializeCompactBit(BufferObj *buffer_obj, size_t capacity);
+    void InitializeCompactBit(FileWorker *file_worker, size_t capacity);
 
-    void Initialize(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, size_t type_size, size_t capacity);
+    void Initialize(FileWorker *data_file_worker, FileWorker *var_file_worker, size_t type_size, size_t capacity);
 
-    void SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj);
+    void SetToCatalog(FileWorker *data_file_worker, FileWorker *var_file_worker);
 
     void ResetToInit(VectorBufferType type);
 
     void Copy(char *input, size_t size);
 
-    [[nodiscard]] char *GetDataMut() {
-        if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
-            return std::get<std::unique_ptr<char[]>>(ptr_).get();
-        } else {
-            return static_cast<char *>(std::get<BufferHandle>(ptr_).GetDataMut());
+    void GetData(std::shared_ptr<char[]> &data) const {
+        if (std::holds_alternative<std::shared_ptr<char[]>>(ptr_)) {
+            data = std::get<std::shared_ptr<char[]>>(ptr_);
+            return;
         }
-    }
-
-    [[nodiscard]] const char *GetData() const {
-        if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
-            return std::get<std::unique_ptr<char[]>>(ptr_).get();
-        } else {
-            return static_cast<const char *>(std::get<BufferHandle>(ptr_).GetData());
-        }
+        std::get<FileWorker *>(ptr_)->Read(data);
     }
 
     [[nodiscard]] bool GetCompactBit(size_t idx) const;
+
+    void SetCompactBit(std::shared_ptr<char[]> &some_ptr, size_t idx, bool val);
 
     void SetCompactBit(size_t idx, bool val);
 
@@ -98,13 +80,13 @@ public:
 
     static void CopyCompactBits(u8 *dst, const u8 *src, size_t dst_start_id, size_t src_start_id, size_t count);
 
+    std::variant<std::shared_ptr<char[]>, FileWorker *> ptr_;
+
 private:
-    bool initialized_{false};
+    bool initialized_{};
 
-    std::variant<std::unique_ptr<char[]>, BufferHandle> ptr_;
-
-    size_t data_size_{0};
-    size_t capacity_{0};
+    size_t data_size_{};
+    size_t capacity_{};
 
 public:
     VectorBufferType buffer_type_{VectorBufferType::kInvalid};
@@ -151,7 +133,7 @@ public:
     VarBufferManager *var_buffer_mgr() const { return var_buffer_mgr_.get(); }
 
 private:
-    std::unique_ptr<VarBufferManager> var_buffer_mgr_{nullptr};
+    std::unique_ptr<VarBufferManager> var_buffer_mgr_;
 };
 
 template <typename DataType, typename IdxType>

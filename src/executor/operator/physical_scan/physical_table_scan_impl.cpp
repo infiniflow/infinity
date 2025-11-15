@@ -181,14 +181,14 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
             switch (column_id) {
                 case COLUMN_IDENTIFIER_ROW_ID: {
                     u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + visible_range.first;
-                    output_ptr->column_vectors[output_column_id]->AppendWith(RowID(segment_id, segment_offset), write_size);
+                    output_ptr->column_vectors_[output_column_id]->AppendWith(RowID(segment_id, segment_offset), write_size);
                     break;
                 }
                 case COLUMN_IDENTIFIER_CREATE: {
                     Status status = NewCatalog::GetCreateTSVector(*current_block_meta,
                                                                   visible_range.first,
                                                                   write_size,
-                                                                  *output_ptr->column_vectors[output_column_id]);
+                                                                  *output_ptr->column_vectors_[output_column_id]);
                     if (!status.ok()) {
                         RecoverableError(status);
                     }
@@ -198,7 +198,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
                     Status status = NewCatalog::GetDeleteTSVector(*current_block_meta,
                                                                   visible_range.first,
                                                                   write_size,
-                                                                  *output_ptr->column_vectors[output_column_id]);
+                                                                  *output_ptr->column_vectors_[output_column_id]);
                     if (!status.ok()) {
                         RecoverableError(status);
                     }
@@ -208,12 +208,12 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
                     ColumnVector column_vector;
                     ColumnMeta column_meta(column_id, *current_block_meta);
                     size_t row_cnt = range_state->block_offset_end();
-                    Status status =
+                    auto status =
                         NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, column_vector);
                     if (!status.ok()) {
                         RecoverableError(status);
                     }
-                    output_ptr->column_vectors[output_column_id]->AppendWith(column_vector, visible_range.first, write_size);
+                    output_ptr->column_vectors_[output_column_id]->AppendWith(column_vector, visible_range.first, write_size);
                 }
             }
             ++output_column_id;

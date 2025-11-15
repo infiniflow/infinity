@@ -81,7 +81,7 @@ TEST_F(ConfigTest, test1) {
 
 TEST_F(ConfigTest, test2) {
     using namespace infinity;
-    std::shared_ptr<std::string> path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/infinity_conf.toml");
+    auto path = std::make_shared<std::string>(fmt::format("{}/config/infinity_conf.toml", test_data_path()));
     Config config;
     auto status = config.Init(path, nullptr);
     ASSERT_TRUE(status.ok());

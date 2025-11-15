@@ -19,7 +19,6 @@ import :local_file_handle;
 import :infinity_exception;
 import :column_vector;
 import :secondary_index_pgm;
-import :buffer_handle;
 import :logger;
 
 import third_party;
@@ -30,7 +29,6 @@ import data_type;
 
 namespace infinity {
 
-class BufferObj;
 class TableIndexMeta;
 
 template <typename T>
@@ -173,7 +171,7 @@ public:
 
     virtual void InsertData(const void *ptr) = 0;
 
-    virtual void InsertMergeData(const std::vector<std::pair<u32, BufferObj *>> &old_chunks) = 0;
+    virtual void InsertMergeData(const std::vector<std::pair<u32, FileWorker *>> &old_chunks) = 0;
 
     // Virtual methods for low cardinality access (default implementations for high cardinality)
     virtual u32 GetUniqueKeyCount() const { return 0; }

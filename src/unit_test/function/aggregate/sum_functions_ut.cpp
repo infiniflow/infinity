@@ -87,7 +87,7 @@ TEST_F(SumFunctionTest, sum_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         BigIntT result;
         result = *(BigIntT *)func.finalize_func_(data_state.get());
 
@@ -118,7 +118,7 @@ TEST_F(SumFunctionTest, sum_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         BigIntT result;
         result = *(BigIntT *)func.finalize_func_(data_state.get());
 
@@ -149,7 +149,7 @@ TEST_F(SumFunctionTest, sum_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         BigIntT result;
         result = *(BigIntT *)func.finalize_func_(data_state.get());
 
@@ -180,7 +180,7 @@ TEST_F(SumFunctionTest, sum_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         BigIntT result;
         result = *(BigIntT *)func.finalize_func_(data_state.get());
 
@@ -211,7 +211,7 @@ TEST_F(SumFunctionTest, sum_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         DoubleT result;
         result = *(DoubleT *)func.finalize_func_(data_state.get());
 
@@ -242,7 +242,7 @@ TEST_F(SumFunctionTest, sum_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         DoubleT result;
         result = *(DoubleT *)func.finalize_func_(data_state.get());
 

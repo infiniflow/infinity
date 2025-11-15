@@ -97,9 +97,21 @@ public:
     }
 
     void SaveToPtr(LocalFileHandle &file_handle) const {
+        // size_t cur_vec_num = data_store_->cur_vec_num();
+        // size_t mmap_size = sizeof(M_) + sizeof(ef_construction_) + sizeof(cur_vec_num);
+
         file_handle.Append(&M_, sizeof(M_));
         file_handle.Append(&ef_construction_, sizeof(ef_construction_));
         data_store_.SaveToPtr(file_handle);
+
+        // size_t cur_vec_num = this->cur_vec_num();
+        //
+        // file_handle.Append(&cur_vec_num, sizeof(cur_vec_num));
+        // this->vec_store_meta_.Save(file_handle);
+        // this->graph_store_meta_.Save(file_handle, cur_vec_num); // could get
+        //
+        // auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
+        // Inner::SaveToPtr(file_handle, inners_.get(), this->vec_store_meta_, this->graph_store_meta_, chunk_size_, chunk_num, last_chunk_size);
     }
 
 protected:

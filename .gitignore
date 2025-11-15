@@ -125,7 +125,8 @@ python/infinity_sdk.egg-info
 sift_1m
 
 # ignore all fvecs benchmark file
-test/data/benchmark/*
+#test/data/benchmark/*
+test/data/benchmark/
 
 # ignore valgrind output file
 callgrind.out.*

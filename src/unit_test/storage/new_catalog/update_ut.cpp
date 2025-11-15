@@ -34,7 +34,6 @@ import :data_block;
 import :column_vector;
 import :value;
 import :new_txn;
-import :buffer_obj;
 import :segment_meta;
 import :block_meta;
 import :column_meta;
@@ -96,7 +95,7 @@ struct TestSetup {
         NewTxnGetVisibleRangeState state;
         SegmentMeta segment_meta(segment_id, *table_meta);
 
-        std::vector<BlockID> *block_ids_ptr = nullptr;
+        std::vector<BlockID> *block_ids_ptr{};
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         // Should only have original block (no update block since update failed)
@@ -141,7 +140,7 @@ struct TestSetup {
         NewTxnGetVisibleRangeState state;
         SegmentMeta segment_meta(segment_id, *table_meta);
 
-        std::vector<BlockID> *block_ids_ptr = nullptr;
+        std::vector<BlockID> *block_ids_ptr{};
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         // Should only have original block (no update block since update failed)
@@ -190,7 +189,7 @@ struct TestSetup {
         NewTxnGetVisibleRangeState state;
         SegmentMeta segment_meta(segment_id, *table_meta);
 
-        std::vector<BlockID> *block_ids_ptr = nullptr;
+        std::vector<BlockID> *block_ids_ptr{};
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, std::vector<BlockID>({0, 1}));
@@ -246,7 +245,7 @@ struct TestSetup {
         NewTxnGetVisibleRangeState state;
         SegmentMeta segment_meta(segment_id, *table_meta);
 
-        std::vector<BlockID> *block_ids_ptr = nullptr;
+        std::vector<BlockID> *block_ids_ptr{};
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, std::vector<BlockID>({0, 1}));
@@ -539,7 +538,7 @@ TEST_P(TestTxnUpdate, test_update_multiple_blocks) {
 
         SegmentMeta segment_meta(segment_id, *table_meta);
 
-        std::vector<BlockID> *block_ids_ptr = nullptr;
+        std::vector<BlockID> *block_ids_ptr{};
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, std::vector<BlockID>({0, 1, 2}));

@@ -25,7 +25,6 @@ namespace infinity {
 class KVInstance;
 class SegmentMeta;
 // struct BlockLock;
-class BufferObj;
 class FastRoughFilter;
 
 export class BlockMeta {
@@ -44,11 +43,7 @@ public:
 
     Status GetBlockLock(std::shared_ptr<BlockLock> &block_lock);
 
-    Status InitSet();
-
-    Status LoadSet(TxnTimeStamp checkpoint_ts);
-
-    Status RestoreSet();
+    Status InitOrLoadSet(TxnTimeStamp checkpoint_ts = 0);
 
     Status RestoreSetFromSnapshot();
 
@@ -58,7 +53,7 @@ public:
 
     std::tuple<size_t, Status> GetRowCnt1();
 
-    std::tuple<BufferObj *, Status> GetVersionBuffer();
+    std::tuple<FileWorker *, Status> GetVersionFileWorker();
 
     std::vector<std::string> FilePaths();
 
@@ -88,7 +83,7 @@ private:
     std::shared_ptr<std::string> block_dir_;
     std::optional<size_t> row_cnt_; // stored in the block version file
 
-    BufferObj *version_buffer_ = nullptr;
+    FileWorker *version_file_worker_ = nullptr;
     std::shared_ptr<FastRoughFilter> fast_rough_filter_;
 };
 

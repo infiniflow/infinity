@@ -20,16 +20,14 @@ module infinity_core:secondary_index_in_mem.impl;
 
 import :secondary_index_in_mem;
 import :default_values;
-import :buffer_manager;
+import :fileworker_manager;
 import :block_column_iter;
 import :infinity_exception;
 import :secondary_index_data;
-import :buffer_handle;
 import :logger;
 import :base_memindex;
 import :memindex_tracer;
 import :column_vector;
-import :buffer_obj;
 import :rcu_multimap;
 
 import std;
@@ -72,14 +70,16 @@ public:
         IncreaseMemoryUsageBase(inserted_rows * MemoryCostOfEachRow());
     }
 
-    void Dump(BufferObj *buffer_obj) const override {
-        BufferHandle handle = buffer_obj->Load();
-        auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
+    void Dump(FileWorker *index_file_worker) const override {
+        // std::shared_ptr<SecondaryIndexData> data_ptr;
+        SecondaryIndexData *data_ptr{};
+        index_file_worker->Read(data_ptr);
 
         std::multimap<KeyType, u32> temp_map;
         const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
 
         data_ptr->InsertData(&temp_map);
+        index_file_worker->Write(data_ptr);
     }
     std::pair<u32, Bitmask> RangeQuery(const void *input) const override {
         const auto &[segment_row_count, b, e] = *static_cast<const std::tuple<u32, KeyType, KeyType> *>(input);
