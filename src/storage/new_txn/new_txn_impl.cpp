@@ -1599,7 +1599,13 @@ TxnTimeStamp NewTxn::GetCurrentCkpTS() const {
     return current_ckp_ts_;
 }
 
+// std::atomic_bool is_asdasdasd{};
+
 Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
+    // while (is_asdasdasd.compare_exchange_weak(false, true)) {
+    //
+    // }
+    // is_asdasdasd.store(true);
     TransactionType txn_type = GetTxnType();
     if (txn_type != TransactionType::kNewCheckpoint && txn_type != TransactionType::kCreateTableSnapshot) {
         UnrecoverableError(fmt::format("Expected transaction type is checkpoint or create table snapshot."));
@@ -1648,7 +1654,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
     fileworker_mgr_->MoveFiles();
 
     auto *pm = InfinityContext::instance().persistence_manager();
-    if (pm != nullptr) {
+    if (pm) {
         PersistResultHandler handler(pm);
         PersistWriteResult result = pm->CurrentObjFinalize(true);
         handler.HandleWriteResult(result);

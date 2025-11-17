@@ -70,6 +70,7 @@ public:
 
     inline PersistenceManager *persistence_manager() const { return persistence_manager_; }
 
+    std::mutex mutex_;
     void MoveFiles();
 
     FileWorkerMap<BMPIndexFileWorker> bmp_map_;

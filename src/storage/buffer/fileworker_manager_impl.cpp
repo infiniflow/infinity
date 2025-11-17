@@ -19,19 +19,6 @@ module;
 module infinity_core:fileworker_manager.impl;
 
 import :fileworker_manager;
-// import :file_worker;
-// import :logger;
-// import :infinity_exception;
-// import :file_worker_type;
-// import :var_file_worker;
-// import :persistence_manager;
-// import :virtual_store;
-// import :kv_store;
-// import :status;
-// import :infinity_context;
-//
-// import std.compat;
-// import third_party;
 
 namespace infinity {
 
@@ -113,6 +100,7 @@ template <typename FileWorkerT>
 void FileWorkerMap<FileWorkerT>::MoveFiles() {
     std::shared_lock lock(rw_mtx_);
     std::vector<std::future<void>> futs;
+    // std::vector<std::future<int>> futs1;
     futs.reserve(map_.size());
     for (auto it = map_.begin(); it != map_.end();) {
         const auto &ptr = it->second;
@@ -120,6 +108,7 @@ void FileWorkerMap<FileWorkerT>::MoveFiles() {
             ++it;
             continue;
         }
+        // futs1.emplace_back(std::async(msync, ptr->mmap_, ptr->mmap_size_, MS_SYNC));
         msync(ptr->mmap_, ptr->mmap_size_, MS_SYNC);
         futs.emplace_back(std::async(&FileWorkerT::MoveFile, ptr.get()));
         ++it;
@@ -127,6 +116,9 @@ void FileWorkerMap<FileWorkerT>::MoveFiles() {
     for (auto &fut : futs) {
         fut.wait();
     }
+    // for (auto &fut : futs1) {
+    //     fut.wait();
+    // }
 }
 
 template struct FileWorkerMap<BMPIndexFileWorker>;
@@ -198,6 +190,7 @@ void FileWorkerManager::RemoveImport(TransactionID txn_id) {
 }
 
 void FileWorkerManager::MoveFiles() {
+    std::lock_guard l(mutex_); // Because of async problem
     std::vector<std::future<void>> futs;
 
     futs.emplace_back(std::async(&FileWorkerMap<BMPIndexFileWorker>::MoveFiles, &bmp_map_));
