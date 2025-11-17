@@ -1119,7 +1119,6 @@ void RAGAnalyzer::MergeWithPosition(const std::vector<std::string> &tokens,
         std::string merged_token = Join(tokens, s, E, "");
         res.push_back(merged_token);
 
-        // 合并位置信息：使用第一个token的起始位置和最后一个token的结束位置
         unsigned start_pos = positions[s].first;
         unsigned end_pos = positions[E - 1].second;
         res_positions.emplace_back(start_pos, end_pos);
