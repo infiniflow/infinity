@@ -67,10 +67,10 @@ public:
                                       std::vector<std::string> &normalize_tokens,
                                       std::vector<std::pair<unsigned, unsigned>> &normalize_positions);
     unsigned MapToOriginalPosition(unsigned processed_pos, const std::vector<std::pair<unsigned, unsigned>> &mapping);
-    void MergeWithPosition(const std::vector<std::string> &tokens, 
-                          const std::vector<std::pair<unsigned, unsigned>> &positions,
-                          std::vector<std::string> &merged_tokens,
-                          std::vector<std::pair<unsigned, unsigned>> &merged_positions);
+    void MergeWithPosition(const std::vector<std::string> &tokens,
+                           const std::vector<std::pair<unsigned, unsigned>> &positions,
+                           std::vector<std::string> &merged_tokens,
+                           std::vector<std::pair<unsigned, unsigned>> &merged_positions);
 
 protected:
     int AnalyzeImpl(const Term &input, void *data, HookType func) override;

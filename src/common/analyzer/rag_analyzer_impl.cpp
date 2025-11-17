@@ -1819,7 +1819,7 @@ void RAGAnalyzer::FineGrainedTokenize(const std::string &tokens, std::vector<std
             };
             dp_debug::CheckDP2(this, token, get_dfs_sorted_tokens, t0, t1);
 #endif
-            }
+        }
         if (token_list.size() < 2) {
             res.push_back(token);
             continue;
@@ -1848,7 +1848,7 @@ void RAGAnalyzer::FineGrainedTokenize(const std::string &tokens, std::vector<std
                 res.push_back(t);
             }
         }
-        }
+    }
     EnglishNormalize(res, result);
     // std::string ret = Join(normalize_res, 0);
     // return ret;
