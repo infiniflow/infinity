@@ -127,14 +127,13 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
     std::shared_ptr<DataTable> output_groupby_table = DataTable::Make(groupby_tabledef, TableType::kIntermediate);
     GenerateGroupByResult(groupby_table, output_groupby_table, hash_table);
 
-    // input table after group by, each block belong to one group. This is the prerequisites to execute aggregate function.
-    std::vector<std::unique_ptr<DataBlock>> grouped_input_datablocks;
-    GroupByInputTable(prev_op_state->data_block_array_, grouped_input_datablocks, hash_table);
-
     // generate output aggregate table
     size_t aggregates_count = aggregates_.size();
     if (aggregates_count > 0) {
-        std::shared_ptr<DataTable> output_aggregate_table{};
+        LOG_INFO("Abc PhysicalAggregate::Execute aggregates_count > 0");
+        // Input table after group by, each block belong to one group. This is the prerequisites to execute aggregate function.
+        std::vector<std::unique_ptr<DataBlock>> grouped_input_datablocks;
+        GroupByInputTable(prev_op_state->data_block_array_, grouped_input_datablocks, hash_table);
 
         // Prepare the output table columns
         std::vector<std::shared_ptr<ColumnDef>> aggregate_columns;
@@ -149,12 +148,11 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
         output_types.reserve(aggregates_count);
         auto &agg_states = aggregate_operator_state->states_;
 
-        AggregateFlag flag = aggregate_operator_state->data_block_array_.empty()
-                                 ? (!task_completed ? AggregateFlag::kUninitialized : AggregateFlag::kRunAndFinish)
-                                 : (!task_completed ? AggregateFlag::kRunning : AggregateFlag::kFinish);
         for (i64 idx = 0; auto &expr : aggregates_) {
             // expression state
-            expr_states.emplace_back(ExpressionState::CreateState(std::static_pointer_cast<AggregateExpression>(expr), agg_states[idx].get(), flag));
+            expr_states.emplace_back(ExpressionState::CreateState(std::static_pointer_cast<AggregateExpression>(expr),
+                                                                  agg_states[idx].get(),
+                                                                  AggregateFlag::kRunAndFinish));
             std::shared_ptr<DataType> data_type = std::make_shared<DataType>(expr->Type());
 
             // column definition
@@ -172,7 +170,7 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
                                                                       std::make_shared<std::string>("aggregate"),
                                                                       std::make_shared<std::string>(""),
                                                                       aggregate_columns);
-        output_aggregate_table = DataTable::Make(aggregate_tabledef, TableType::kAggregate);
+        std::shared_ptr<DataTable> output_aggregate_table = DataTable::Make(aggregate_tabledef, TableType::kAggregate);
 
         // Loop blocks
         size_t input_data_block_count = grouped_input_datablocks.size();
@@ -375,31 +373,6 @@ bool PhysicalAggregate::SimpleAggregateExecute(const std::vector<std::unique_ptr
             // Finalize the output block (e.g. calculate the average value
             output_data_block->Finalize();
         }
-        // {
-        //     auto row = input_data_block->row_count();
-        //     if (row == 0) {
-        //         LOG_WARN("EEE");
-        //     } else {
-        //         auto v = input_data_block->GetValue(0, 0);
-        //         auto ti = v.value_.tiny_int;
-        //         auto si = v.value_.small_int;
-        //         auto i = v.value_.integer;
-        //         LOG_WARN(fmt::format("Agg Input: {}, {},{} {} {}", u64(input_data_block), row, ti, si, i));
-        //     }
-        // }
-        // {
-        //     auto row = output_data_block->row_count();
-        //     if (row == 0) {
-        //         auto row1 = input_data_block->row_count();
-        //         LOG_WARN(fmt::format("FFF {}", row1));
-        //     } else {
-        //         auto v = output_data_block->GetValue(0, 0);
-        //         auto ti = v.value_.tiny_int;
-        //         auto si = v.value_.small_int;
-        //         auto i = v.value_.integer;
-        //         LOG_WARN(fmt::format("Agg Output: {}, {},{} {} {}", u64(output_data_block), row, ti, si, i));
-        //     }
-        // }
     }
     return true;
 }
