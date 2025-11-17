@@ -584,6 +584,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_compact) {
     // }
 
     Checkpoint();
+
     new_txn_mgr_->PrintAllKeyValue();
     Cleanup();
 
