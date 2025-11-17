@@ -81,10 +81,6 @@ public:
 
     void FlushLogByReplication(const std::vector<std::string> &synced_logs, bool on_startup);
 
-    bool SetCheckpointing();
-    bool UnsetCheckpoint();
-    bool IsCheckpointing() const;
-
     void SwapWalFile(TxnTimeStamp max_commit_ts, bool error_if_duplicate);
 
     std::string GetWalFilename() const;
