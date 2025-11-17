@@ -1499,9 +1499,6 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
 
         tokens = std::move(normalize_tokens);
         positions = std::move(normalize_positions);
-
-        // 在 fine-grained 模式下，不进行 merge，因为 stemming 后的 token 在字典中的频率已经改变
-        // 直接使用 EnglishNormalize 后的结果
     }
 
     return {std::move(tokens), std::move(positions)};
@@ -1574,7 +1571,7 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
 
             if (token_str.find(' ') != std::string::npos) {
                 std::vector<std::string> space_split_tokens;
-                Split(token_str, blank_pattern_, space_split_tokens, false); // 不保留分隔符
+                Split(token_str, blank_pattern_, space_split_tokens, false);
                 unsigned space_start_pos = start_pos;
                 for (const auto &space_token : space_split_tokens) {
                     if (space_token.empty()) {
@@ -1583,7 +1580,7 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
                     unsigned space_token_len = static_cast<unsigned>(space_token.size());
                     tokens.push_back(space_token);
                     positions.emplace_back(space_start_pos, space_start_pos + space_token_len);
-                    space_start_pos += space_token_len + 1; // token + 空格
+                    space_start_pos += space_token_len + 1;
                 }
             } else {
                 tokens.push_back(token_str);
@@ -1645,7 +1642,6 @@ void RAGAnalyzer::EnglishNormalizeWithPosition(const std::vector<std::string> &t
             std::string stem_term;
             stemmer_->Stem(lowercase_term, stem_term);
 
-            // 保持原始位置信息，因为位置指向原文
             normalize_tokens.push_back(stem_term);
             normalize_positions.emplace_back(start_pos, end_pos);
         } else {
