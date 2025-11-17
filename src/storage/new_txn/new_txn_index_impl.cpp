@@ -772,7 +772,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
 
                 std::shared_ptr<std::string> index_dir = segment_index_meta.GetSegmentIndexDir();
                 auto base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
-                auto full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
+                auto full_path = fmt::format("{}/{}", InfinityContext::instance().config()->TempDir(), *index_dir);
                 memory_indexer = std::make_unique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
                 need_to_update_ft_segment_ts = true;
                 mem_index->SetFulltextIndex(memory_indexer);
@@ -1281,7 +1281,7 @@ Status NewTxn::PopulateFtIndexInner(std::shared_ptr<IndexBase> index_base,
         if (memory_indexer == nullptr) {
             RowID base_row_id(segment_index_meta.segment_id(), block_id * block_capacity);
             auto base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
-            auto full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
+            auto full_path = fmt::format("{}/{}", InfinityContext::instance().config()->TempDir(), *index_dir);
             memory_indexer = std::make_shared<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
             LOG_INFO(fmt::format("PopulateFtIndexInner created memory_indexer, base_name: {}", base_name));
         }
@@ -1471,7 +1471,7 @@ Status NewTxn::OptimizeFtIndex(std::shared_ptr<IndexBase> index_base,
     for (auto iter = chunk_ids.begin(); iter != chunk_ids.end(); ++iter) {
         ChunkID chunk_id = *iter;
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-        ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+        ChunkIndexMetaInfo *chunk_info_ptr{};
         {
             Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
             if (!status.ok()) {
@@ -2036,7 +2036,7 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
         return status;
     }
 
-    std::vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::vector<SegmentID> *segment_ids_ptr{};
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
     if (!status.ok()) {
         return status;

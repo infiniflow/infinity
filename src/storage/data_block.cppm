@@ -89,15 +89,7 @@ public:
 public:
     [[nodiscard]] size_t column_count() const { return column_count_; }
 
-    [[nodiscard]] u16 row_count() const {
-        if (!finalized_) {
-            if (row_count_ == 0) {
-                return 0;
-            }
-            UnrecoverableError("Not finalized data block");
-        }
-        return row_count_;
-    }
+    [[nodiscard]] u16 row_count() const { return row_count_; }
 
     [[nodiscard]] std::vector<std::shared_ptr<DataType>> types() const {
         std::vector<std::shared_ptr<DataType>> types;

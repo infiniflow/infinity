@@ -23,11 +23,11 @@ public:
     explicit FileWriter(const std::string &path, size_t buffer_size);
 
     std::string path_{};
-    std::unique_ptr<char[]> data_{};
+    std::unique_ptr<char[]> data_;
     size_t offset_{};
     size_t total_written_{};
     size_t buffer_size_{};
-    std::unique_ptr<LocalFileHandle> file_handle_{};
+    std::unique_ptr<LocalFileHandle> file_handle_;
 
 public:
     void WriteByte(const u8 b);

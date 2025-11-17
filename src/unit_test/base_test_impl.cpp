@@ -108,7 +108,7 @@ std::shared_ptr<DataBlock> BaseTestWithParam<T>::MakeInputBlock2(size_t row_cnt)
 
 template <typename T>
 void BaseTestWithParam<T>::CheckFilePaths(std::vector<std::string> &delete_file_paths, std::vector<std::string> &exist_file_paths) {
-    auto *pm = infinity::InfinityContext::instance().persistence_manager();
+    auto *pm = InfinityContext::instance().persistence_manager();
     if (pm == nullptr) {
         auto data_dir = static_cast<fs::path>(GetFullDataDir());
         for (auto &file_path : delete_file_paths) {

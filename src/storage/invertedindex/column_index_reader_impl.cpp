@@ -69,7 +69,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeta &table_index_me
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
         std::shared_ptr<std::string> index_dir = segment_index_meta.GetSegmentIndexDir();
-        std::vector<ChunkID> *chunk_ids_ptr = nullptr;
+        std::vector<ChunkID> *chunk_ids_ptr{};
         std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
         if (!status.ok()) {
             return status;
@@ -78,19 +78,19 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeta &table_index_me
         RowID exp_begin_row_id = INVALID_ROWID;
         for (ChunkID chunk_id : *chunk_ids_ptr) {
             ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-            ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+            ChunkIndexMetaInfo *chunk_info_ptr{};
             {
                 status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
                 if (!status.ok()) {
                     return status;
                 }
             }
-            std::shared_ptr<DiskIndexSegmentReader> segment_reader = std::make_shared<DiskIndexSegmentReader>(segment_id,
-                                                                                                              chunk_id,
-                                                                                                              *index_dir,
-                                                                                                              chunk_info_ptr->base_name_,
-                                                                                                              chunk_info_ptr->base_row_id_,
-                                                                                                              flag);
+            auto segment_reader = std::make_shared<DiskIndexSegmentReader>(segment_id,
+                                                                           chunk_id,
+                                                                           *index_dir,
+                                                                           chunk_info_ptr->base_name_,
+                                                                           chunk_info_ptr->base_row_id_,
+                                                                           flag);
             segment_readers_.push_back(std::move(segment_reader));
 
             IndexFileWorker *index_file_worker{};
@@ -190,9 +190,6 @@ std::shared_ptr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) 
         return index_reader;
     }
 
-    index_reader->column_index_readers_ =
-        std::make_shared<FlatHashMap<u64, std::shared_ptr<std::map<std::string, std::shared_ptr<ColumnIndexReader>>>, detail::Hash<u64>>>();
-
     TableMeta table_meta(db_id_str_, table_id_str_, table_name_, txn);
     std::vector<std::string> *index_id_strs = nullptr;
     std::vector<std::string> *index_name_strs = nullptr;
@@ -218,12 +215,10 @@ std::shared_ptr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) 
         }
 
         std::string column_name = index_base->column_name();
-        auto [column_def, col_def_status] = table_index_meta.GetColumnDef();
-        u64 column_id = column_def->id();
-        if (index_reader->column_index_readers_->find(column_id) == index_reader->column_index_readers_->end()) {
-            (*index_reader->column_index_readers_)[column_id] = std::make_shared<std::map<std::string, std::shared_ptr<ColumnIndexReader>>>();
+        if (index_reader->column_index_readers_.find(column_name) == index_reader->column_index_readers_.end()) {
+            index_reader->column_index_readers_[column_name] = std::map<std::string, std::shared_ptr<ColumnIndexReader>>();
         }
-        auto column_index_map = (*index_reader->column_index_readers_)[column_id];
+        auto &column_index_map = index_reader->column_index_readers_[column_name];
 
         // assert(table_index_entry->GetFulltextSegmentUpdateTs() <= last_known_update_ts_);
         const IndexFullText *index_full_text = reinterpret_cast<const IndexFullText *>(index_base.get());
@@ -231,9 +226,10 @@ std::shared_ptr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) 
         auto column_index_reader = std::make_shared<ColumnIndexReader>();
         optionflag_t flag = index_full_text->flag_;
         column_index_reader->Open(flag, table_index_meta);
-        column_index_reader->analyzer_ = index_full_text->analyzer_;
         column_index_reader->column_name_ = column_name;
-        (*column_index_map)[index_id_str] = std::move(column_index_reader);
+        column_index_reader->index_name_ = index_name_str;
+        column_index_reader->analyzer_ = index_full_text->analyzer_;
+        column_index_map[index_name_str] = std::move(column_index_reader);
     }
 
     if (cache_ts_ == UNCOMMIT_TS || begin_ts > cache_ts_) {
@@ -247,7 +243,7 @@ std::shared_ptr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) 
 void TableIndexReaderCache::Invalidate() {
     std::scoped_lock lock(mutex_);
     cache_ts_ = UNCOMMIT_TS;
-    cache_column_readers_.reset();
+    cache_column_readers_.clear();
 }
 
 } // namespace infinity

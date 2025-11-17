@@ -27,7 +27,7 @@ namespace infinity {
 
 export class RankFeatureDocIterator final : public DocIterator {
 public:
-    RankFeatureDocIterator(std::unique_ptr<PostingIterator> &&iter, u64 column_id, float boost);
+    RankFeatureDocIterator(std::unique_ptr<PostingIterator> &&iter, const std::string &column_name, float boost);
 
     ~RankFeatureDocIterator() override;
 
@@ -50,10 +50,9 @@ public:
     void BatchDecodeTo(RowID buffer_start_doc_id, RowID buffer_end_doc_id, u16 *payload_ptr);
 
     const std::string *term_ptr_ = nullptr;
-    const std::string *column_name_ptr_ = nullptr;
 
 private:
-    u64 column_id_;
+    std::string column_name_;
     float boost_ = 1.0f;
     std::unique_ptr<PostingIterator> iter_;
 };

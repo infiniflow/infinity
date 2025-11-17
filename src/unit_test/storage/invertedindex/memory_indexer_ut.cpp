@@ -144,7 +144,7 @@ public:
         {
             std::string table_key;
             std::string index_key;
-            auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+            auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
             auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("dummy"), TransactionType::kRead);
             Status status = txn->GetTableIndexMeta("db1", "tb1", "idx1", db_meta_, table_meta_, index_meta_, &table_key, &index_key);
             EXPECT_TRUE(status.ok());

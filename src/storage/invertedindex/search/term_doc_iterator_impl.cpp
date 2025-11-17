@@ -30,10 +30,10 @@ import row_id;
 namespace infinity {
 
 TermDocIterator::TermDocIterator(std::unique_ptr<PostingIterator> &&iter,
-                                 const u64 column_id,
+                                 const std::string &column_name,
                                  const float weight,
                                  const FulltextSimilarity ft_similarity)
-    : column_id_(column_id), iter_(std::move(iter)), weight_(weight), ft_similarity_(ft_similarity) {
+    : column_name_(column_name), iter_(std::move(iter)), weight_(weight), ft_similarity_(ft_similarity) {
     doc_freq_ = iter_->GetDocFreq();
     term_freq_ = 0;
     estimate_iterate_cost_ = {0, doc_freq_};
@@ -42,7 +42,7 @@ TermDocIterator::TermDocIterator(std::unique_ptr<PostingIterator> &&iter,
 TermDocIterator::~TermDocIterator() {
     if (SHOULD_LOG_TRACE()) {
         std::ostringstream oss;
-        oss << "TermDocIterator Debug Info:\n    column name: " << *column_name_ptr_ << ", term: " << *term_ptr_
+        oss << "TermDocIterator Debug Info:\n    column name: " << column_name_ << ", term: " << *term_ptr_
             << "\n    access_bm_score_cnt: " << access_bm_score_cnt_ << ", calc_bm_score_cnt: " << calc_bm_score_cnt_
             << "\n    access_score_cnt: " << access_score_cnt_ << ", calc_score_cnt: " << calc_score_cnt_ << ", seek_cnt: " << seek_cnt_
             << "\n    block_skip_cnt: " << block_skip_cnt_ << " block_skip_cnt_inner: " << block_skip_cnt_inner_;
@@ -77,10 +77,11 @@ void TermDocIterator::InitBM25Info(std::unique_ptr<FullTextColumnLengthReader> &
     if (SHOULD_LOG_TRACE()) {
         std::ostringstream oss;
         oss << "TermDocIterator: ";
-        if (column_name_ptr_ != nullptr && term_ptr_ != nullptr) {
-            oss << "column: " << *column_name_ptr_ << ", term: " << *term_ptr_ << ", ";
+        oss << "column: " << column_name_;
+        if (term_ptr_ != nullptr) {
+            oss << ", term: " << *term_ptr_;
         }
-        oss << "bm25_common_score: " << bm25_common_score_ << ", bm25_score_upper_bound: " << bm25_score_upper_bound_
+        oss << ", bm25_common_score: " << bm25_common_score_ << ", bm25_score_upper_bound: " << bm25_score_upper_bound_
             << ", avg_column_len: " << avg_column_len_ << ", f1: " << f1 << ", f2: " << f2 << ", f3: " << f3 << ", f4: " << f4
             << ", total_df: " << total_df_ << ", doc_freq: " << doc_freq_ << ", smooth_idf: " << smooth_idf << ", weight: " << weight_;
         LOG_TRACE(std::move(oss).str());
@@ -163,7 +164,7 @@ void TermDocIterator::PrintTree(std::ostream &os, const std::string &prefix, boo
     os << (is_final ? "└──" : "├──");
     os << "TermDocIterator";
     os << " (weight: " << weight_ << ")";
-    os << " (column: " << *column_name_ptr_ << ")";
+    os << " (column: " << column_name_ << ")";
     os << " (term: " << *term_ptr_ << ")";
     os << " (doc_freq: " << GetDocFreq() << ")";
     os << " (bm25_score_upper_bound: " << BM25ScoreUpperBound() << ")";

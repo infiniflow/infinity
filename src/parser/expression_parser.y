@@ -149,19 +149,15 @@ struct EXPRESSION_LTYPE {
 
 %left       OR
 %left       AND
-%left       BETWEEN CASE WHEN THEN ELSE
 %right      NOT
 
 %nonassoc   '=' EQUAL NOT_EQ LIKE
 %nonassoc   '<' '>' LESS_EQ GREATER_EQ
 
-%nonassoc   IS
+%precedence   IS
 %left       '+' '-'
 %left       '*' '/' '%'
 
-%left       '[' ']'
-%left       '(' ')'
-%left       '.'
 
 %%
 

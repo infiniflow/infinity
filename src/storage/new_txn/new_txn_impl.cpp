@@ -908,7 +908,8 @@ Status NewTxn::CreateIndex(const std::string &db_name,
         LOG_ERROR(fmt::format("CreateIndex: index {} already exists, index_key: {}, index_id: {}", *index_base->index_name_, index_key, index_id));
         return Status(ErrorCode::kDuplicateIndexName,
                       std::make_unique<std::string>(fmt::format("Index: {} already exists", *index_base->index_name_)));
-    } else if (status.code() != ErrorCode::kIndexNotExist) {
+    }
+    if (status.code() != ErrorCode::kIndexNotExist) {
         return status;
     }
 
@@ -4443,8 +4444,7 @@ Status NewTxn::Rollback() {
 }
 
 Status NewTxn::Cleanup() {
-
-    if (base_txn_store_ != nullptr) {
+    if (base_txn_store_) {
         return Status::UnexpectedError("txn store is not null");
     }
     auto begin_ts = BeginTS();
@@ -4467,7 +4467,6 @@ Status NewTxn::Cleanup() {
                              last_cleanup_ts,
                              oldest_txn_begin_ts,
                              last_checkpoint_ts));
-
         return Status::OK();
     }
 
@@ -4488,7 +4487,7 @@ Status NewTxn::Cleanup() {
 
     if (metas.empty()) {
         LOG_TRACE("Cleanup: No data need to clean. Try to remove all empty directories...");
-        FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+        auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
         auto data_dir_str = fileworker_mgr->GetFullDataDir();
         auto data_dir = static_cast<std::filesystem::path>(*data_dir_str);
         // Delete empty dir

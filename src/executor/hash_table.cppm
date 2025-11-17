@@ -39,6 +39,8 @@ export class HashTable : public HashTableBase {
 public:
     void Append(const std::vector<std::shared_ptr<ColumnVector>> &columns, size_t block_id, size_t row_count);
 
+    void Clear() { hash_table_.clear(); }
+
 public:
     // Key -> (block id -> row array)
     std::unordered_map<std::string, std::unordered_map<size_t, std::vector<size_t>>> hash_table_{};

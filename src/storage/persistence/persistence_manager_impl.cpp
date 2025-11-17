@@ -632,7 +632,10 @@ PersistWriteResult PersistenceManager::Cleanup(std::string_view file_path) {
     ObjAddr obj_addr;
     obj_addr.Deserialize(value);
 
-    CleanupNoLock(obj_addr, result.persist_keys_, result.drop_from_remote_keys_, true);
+    {
+        std::lock_guard l{mtx_};
+        CleanupNoLock(obj_addr, result.persist_keys_, result.drop_from_remote_keys_, true);
+    }
     LOG_TRACE(fmt::format("Deleted mapping from local path {} to ObjAddr({}, {}, {})",
                           local_path,
                           obj_addr.obj_key_,

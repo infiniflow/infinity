@@ -58,9 +58,7 @@ void PhraseDocIterator::InitBM25Info(std::unique_ptr<FullTextColumnLengthReader>
     if (SHOULD_LOG_TRACE()) {
         std::ostringstream oss;
         oss << "PhraseDocIterator: ";
-        if (column_name_ptr_ != nullptr) {
-            oss << "column: " << *column_name_ptr_ << ",";
-        }
+        oss << "column: " << column_name_ << ",";
         if (terms_ptr_ != nullptr) {
             oss << " phrase:";
             for (auto term : *terms_ptr_)
@@ -177,7 +175,7 @@ void PhraseDocIterator::PrintTree(std::ostream &os, const std::string &prefix, b
     os << (is_final ? "└──" : "├──");
     os << "PhraseDocIterator";
     os << " (weight: " << weight_ << ")";
-    os << " (column: " << *column_name_ptr_ << ")";
+    os << " (column: " << column_name_ << ")";
     os << " (phrase:";
     for (auto term : *terms_ptr_) {
         os << " " << term;

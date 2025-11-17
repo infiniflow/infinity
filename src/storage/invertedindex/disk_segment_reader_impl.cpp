@@ -42,6 +42,13 @@ import third_party;
 
 namespace infinity {
 
+enum class Tag {
+    kInvalid = 0,
+    kTemp,
+    kData,
+    kS3Cache,
+};
+
 DiskIndexSegmentReader::DiskIndexSegmentReader(SegmentID segment_id,
                                                ChunkID chunk_id,
                                                const std::string &index_dir,
@@ -49,72 +56,107 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(SegmentID segment_id,
                                                RowID base_row_id,
                                                optionflag_t flag)
     : IndexSegmentReader(segment_id, chunk_id), base_row_id_(base_row_id) {
-    std::filesystem::path path = std::filesystem::path(InfinityContext::instance().config()->DataDir()) / index_dir / base_name;
-    std::string path_str = path.string();
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    auto temp_path = std::filesystem::path(InfinityContext::instance().config()->TempDir()) / index_dir / base_name;
+    auto data_path = std::filesystem::path(InfinityContext::instance().config()->DataDir()) / index_dir / base_name;
+    auto temp_path_str = temp_path.string();
+    auto data_path_str = data_path.string();
+    auto *pm = InfinityContext::instance().persistence_manager();
 
-    posting_file_ = path_str;
-    posting_file_.append(POSTING_SUFFIX);
-    std::string posting_file = posting_file_;
-    if (nullptr != pm) {
+    auto temp_posting_path_str = temp_path_str + POSTING_SUFFIX;
+    auto data_posting_path_str = data_path_str + POSTING_SUFFIX;
+
+    if (VirtualStore::Exists(temp_posting_path_str)) {
+        posting_file_ = temp_posting_path_str;
+        i32 rc = VirtualStore::MmapFile(posting_file_, data_ptr_, data_len_);
+        assert(rc == 0);
+        if (rc != 0) {
+            RecoverableError(Status::MmapFileError(posting_file_));
+        }
+    } else if (pm) {
+        posting_file_ = data_posting_path_str;
         PersistResultHandler handler(pm);
-        PersistReadResult result = pm->GetObjCache(posting_file);
-        LOG_DEBUG(fmt::format("DiskIndexSegmentReader pm->GetObjCache(posting_file) {}", posting_file));
-        const ObjAddr &obj_addr = handler.HandleReadResult(result);
+        auto result = pm->GetObjCache(posting_file_);
+        const auto &obj_addr = handler.HandleReadResult(result);
         if (!obj_addr.Valid()) {
             // Empty posting
             return;
         }
-        posting_file_obj_ = pm->GetObjPath(obj_addr.obj_key_);
-        posting_file = posting_file_obj_;
-    }
-    if (posting_file.empty() || std::filesystem::file_size(posting_file) == 0) {
-        // Empty posting
+        const auto &[key, offset, size] = obj_addr;
+        posting_file_obj_ = pm->GetObjPath(key);
+        i32 rc = VirtualStore::MmapFilePart(posting_file_obj_, offset, size, data_ptr_);
+        assert(rc == 0);
+        if (rc != 0) {
+            RecoverableError(Status::MmapFileError(posting_file_));
+        }
+    } else if (VirtualStore::Exists(data_posting_path_str)) {
+        posting_file_ = data_posting_path_str;
+        i32 rc = VirtualStore::MmapFile(posting_file_, data_ptr_, data_len_);
+        assert(rc == 0);
+        if (rc != 0) {
+            RecoverableError(Status::MmapFileError(posting_file_));
+        }
+    } else {
+        UnrecoverableError("Missing fulltext posting file.");
         return;
     }
-    i32 rc = VirtualStore::MmapFile(posting_file, data_ptr_, data_len_);
-    assert(rc == 0);
-    if (rc != 0) {
-        Status status = Status::MmapFileError(posting_file);
-        RecoverableError(status);
-    }
 
-    dict_file_ = path_str;
-    dict_file_.append(DICT_SUFFIX);
-    std::string dict_file = dict_file_;
-    if (nullptr != pm) {
+    auto temp_dict_path_str = temp_path_str + DICT_SUFFIX;
+    auto data_dict_path_str = data_path_str + DICT_SUFFIX;
+
+    if (VirtualStore::Exists(temp_dict_path_str)) {
+        dict_file_ = temp_dict_path_str;
+    } else if (pm) {
+        dict_file_ = data_dict_path_str;
         PersistResultHandler handler(pm);
-        PersistReadResult result = pm->GetObjCache(dict_file);
-        LOG_DEBUG(fmt::format("DiskIndexSegmentReader pm->GetObjCache(dict_file) {}", dict_file));
+        PersistReadResult result = pm->GetObjCache(dict_file_);
+        LOG_DEBUG(fmt::format("DiskIndexSegmentReader pm->GetObjCache(dict_file) {}", dict_file_));
         const ObjAddr &obj_addr = handler.HandleReadResult(result);
-        dict_file = pm->GetObjPath(obj_addr.obj_key_);
+        dict_file_ = pm->GetObjPath(obj_addr.obj_key_);
+    } else if (VirtualStore::Exists(data_dict_path_str)) {
+        dict_file_ = data_dict_path_str;
+    } else {
+        UnrecoverableError("Missing fulltext dict file.");
+        return;
     }
-    dict_reader_ = std::make_shared<DictionaryReader>(dict_file, PostingFormatOption(flag));
+    dict_reader_ = std::make_shared<DictionaryReader>(dict_file_, PostingFormatOption(flag));
 }
 
 DiskIndexSegmentReader::~DiskIndexSegmentReader() {
-    if (data_len_ == 0)
+    if (data_len_ == 0) {
         return;
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    std::string posting_file = posting_file_;
-    if (nullptr != pm) {
-        posting_file = posting_file_obj_;
     }
-    i32 rc = VirtualStore::MunmapFile(posting_file);
-    assert(rc == 0);
-    if (rc != 0) {
-        Status status = Status::MunmapFileError(posting_file);
-        RecoverableError(status);
-    }
-    if (nullptr != pm) {
+    auto *pm = InfinityContext::instance().persistence_manager();
+    if (!posting_file_obj_.empty()) {
         PersistResultHandler handler(pm);
-        PersistWriteResult res1 = pm->PutObjCache(dict_file_);
-        LOG_DEBUG(fmt::format("~DiskIndexSegmentReader pm->PutObjCache(dict_file) {}", dict_file_));
-        PersistWriteResult res2 = pm->PutObjCache(posting_file_);
-        LOG_DEBUG(fmt::format("~DiskIndexSegmentReader pm->PutObjCache(posting_file) {}", posting_file_));
-        handler.HandleWriteResult(res1);
-        handler.HandleWriteResult(res2);
+        auto result = pm->GetObjCache(posting_file_);
+        const auto &obj_addr = handler.HandleReadResult(result);
+        if (!obj_addr.Valid()) {
+            // Empty posting
+            return;
+        }
+        const auto &[key, offset, size] = obj_addr;
+
+        i32 rc = VirtualStore::MunmapFilePart(data_ptr_, offset, data_len_);
+        assert(rc == 0);
+        if (rc != 0) {
+            RecoverableError(Status::MunmapFileError(posting_file_obj_));
+        }
+    } else {
+        i32 rc = VirtualStore::MunmapFile(posting_file_);
+        assert(rc == 0);
+        if (rc != 0) {
+            RecoverableError(Status::MunmapFileError(posting_file_));
+        }
     }
+    // if (pm) {
+    //     PersistResultHandler handler(pm);
+    //     PersistWriteResult res1 = pm->PutObjCache(dict_file_);
+    //     LOG_DEBUG(fmt::format("~DiskIndexSegmentReader pm->PutObjCache(dict_file) {}", dict_file_));
+    //     PersistWriteResult res2 = pm->PutObjCache(posting_file_);
+    //     LOG_DEBUG(fmt::format("~DiskIndexSegmentReader pm->PutObjCache(posting_file) {}", posting_file_));
+    //     handler.HandleWriteResult(res1);
+    //     handler.HandleWriteResult(res2);
+    // }
 }
 
 bool DiskIndexSegmentReader::GetSegmentPosting(const std::string &term, SegmentPosting &seg_posting, bool fetch_position) const {

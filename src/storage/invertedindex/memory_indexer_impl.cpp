@@ -316,7 +316,7 @@ size_t MemoryIndexer::CommitOffline(size_t wait_if_empty_ms) {
         num_runs_++;
     }
 
-    std::unique_lock<std::mutex> task_lock(mutex_);
+    std::unique_lock task_lock(mutex_);
     inflight_tasks_ -= num;
     if (inflight_tasks_ == 0) {
         cv_.notify_all();
@@ -398,18 +398,9 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     auto tmp_dict_file{dict_file};
     auto tmp_column_length_file{column_length_file};
 
-    auto *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr && !spill;
-    if (use_object_cache) {
-        auto tmp_dir = std::filesystem::path(InfinityContext::instance().config()->TempDir());
-        tmp_posting_file = tmp_dir / StringTransform(tmp_posting_file, "/", "_");
-        tmp_dict_file = tmp_dir / StringTransform(tmp_dict_file, "/", "_");
-        tmp_column_length_file = tmp_dir / StringTransform(tmp_column_length_file, "/", "_");
-    } else {
-        auto status = VirtualStore::MakeDirectory(index_dir_);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
+    auto status = VirtualStore::MakeDirectory(index_dir_);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
     }
 
     auto posting_file_writer = std::make_shared<FileWriter>(tmp_posting_file, 128000);
@@ -424,7 +415,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     if (spill) {
         posting_file_writer->WriteVInt(i32(doc_count_));
     }
-    if (posting_table_.get() != nullptr) {
+    if (posting_table_.get()) {
         PostingTableStore &posting_store = posting_table_->store_;
         for (auto it = posting_store.UnsafeBegin(); it != posting_store.UnsafeEnd(); ++it) {
             const PostingPtr posting_writer = it->second;
@@ -445,24 +436,15 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         LOG_INFO(fmt::format("Delete FST file: {}", tmp_fst_file));
         VirtualStore::DeleteFile(tmp_fst_file);
     }
-    auto [file_handle, status] = VirtualStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
+    {
+        auto [file_handle, status] = VirtualStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
 
-    std::vector<u32> &column_length_array = column_lengths_.UnsafeVec();
-    file_handle->Append(&column_length_array[0], sizeof(column_length_array[0]) * column_length_array.size());
-    file_handle->Sync();
-    if (use_object_cache) {
-        PersistResultHandler handler(pm);
-        PersistWriteResult result1 = pm->Persist(posting_file, tmp_posting_file, false);
-        PersistWriteResult result2 = pm->Persist(dict_file, tmp_dict_file, false);
-        PersistWriteResult result3 = pm->Persist(column_length_file, tmp_column_length_file, false);
-        handler.HandleWriteResult(result1);
-        handler.HandleWriteResult(result2);
-        handler.HandleWriteResult(result3);
-        PersistWriteResult result4 = pm->CurrentObjFinalize();
-        handler.HandleWriteResult(result4);
+        std::vector<u32> &column_length_array = column_lengths_.UnsafeVec();
+        file_handle->Append(&column_length_array[0], sizeof(column_length_array[0]) * column_length_array.size());
+        file_handle->Sync();
     }
 
     is_spilled_ = spill;
@@ -726,16 +708,14 @@ void MemoryIndexer::FinalSpillFile() {
 void MemoryIndexer::PrepareSpillFile() {
     spill_file_handle_ = fopen(spill_full_path_.c_str(), "w");
     if (spill_file_handle_ == nullptr) {
-        std::string error_message = fmt::format("Failed to open spill file: {}, error: {}", spill_full_path_, strerror(errno));
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to open spill file: {}, error: {}", spill_full_path_, strerror(errno)));
     }
 
     size_t written = fwrite(&tuple_count_, sizeof(u64), 1, spill_file_handle_);
     if (written != 1) {
         fclose(spill_file_handle_);
         spill_file_handle_ = nullptr;
-        std::string error_message = fmt::format("Failed to write to spill file: {}, error: {}", spill_full_path_, strerror(errno));
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to write to spill file: {}, error: {}", spill_full_path_, strerror(errno)));
     }
 
     const size_t write_buf_size = 128000;

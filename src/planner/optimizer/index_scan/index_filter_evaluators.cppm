@@ -93,7 +93,6 @@ export struct IndexFilterEvaluatorFulltext final : IndexFilterEvaluator {
     f32 score_threshold_ = {};
     FulltextSimilarity ft_similarity_ = FulltextSimilarity::kBM25;
     BM25Params bm25_params_;
-    std::vector<std::string> index_names_;
 
     IndexFilterEvaluatorFulltext(const FilterFulltextExpression *src_filter_fulltext_expression,
                                  const TableInfo *table_info,
@@ -103,12 +102,11 @@ export struct IndexFilterEvaluatorFulltext final : IndexFilterEvaluator {
                                  MinimumShouldMatchOption &&minimum_should_match_option,
                                  const f32 score_threshold,
                                  const FulltextSimilarity ft_similarity,
-                                 const BM25Params &bm25_params,
-                                 std::vector<std::string> &&index_names)
+                                 const BM25Params &bm25_params)
         : IndexFilterEvaluator(Type::kFulltextIndex), src_filter_fulltext_expressions_({src_filter_fulltext_expression}), table_info_(table_info),
           early_term_algo_(early_term_algo), index_reader_(std::move(index_reader)), query_tree_(std::move(query_tree)),
           minimum_should_match_option_(std::move(minimum_should_match_option)), score_threshold_(std::max(score_threshold, 0.0f)),
-          ft_similarity_(ft_similarity), bm25_params_(bm25_params), index_names_(std::move(index_names)) {}
+          ft_similarity_(ft_similarity), bm25_params_(bm25_params) {}
     Bitmask Evaluate(SegmentID segment_id, SegmentOffset segment_row_count) const override;
     bool HaveMinimumShouldMatchOption() const { return !minimum_should_match_option_.empty(); }
     void OptimizeQueryTree();

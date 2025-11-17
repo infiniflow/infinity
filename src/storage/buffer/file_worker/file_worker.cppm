@@ -56,25 +56,28 @@ export class VarBuffer;
 
 export struct FileWorkerSaveCtx {};
 
-export enum class FileWorkerTag1 {
-    kBmp,
-    kData,
-    kEmvb,
-    kHnsw,
-    kIndex,
-    kRaw,
-    kSecondary,
-    kVar,
-    kVersion,
+export struct FileWorkerTag {};
+
+export template <typename FileWorkerT>
+concept FileWorkerConcept = std::derived_from<FileWorkerT, FileWorkerTag> && requires(FileWorkerT file_worker) {
+    file_worker.Read();
+    file_worker.Write();
 };
 
-// export struct FileWorkerTag {};
-//
-// export template <typename FileWorkerT>
-// concept FileWorkerConcept = std::derived_from<FileWorkerT, FileWorkerTag> && requires(FileWorkerT file_worker) {
-//     file_worker.Read();
-//     file_worker.Write();
-// };
+export struct DataFileWorkerV2 : FileWorkerTag {
+    void Write() {}
+    void Read() {}
+};
+
+export struct VarFileWorkerV2 : FileWorkerTag {
+    void Write() {}
+    void Read() {}
+};
+
+export struct VersionFileWorkerV2 : FileWorkerTag {
+    void Write() {}
+    void Read() {}
+};
 
 export class FileWorker {
 public:
@@ -116,24 +119,12 @@ public:
         }
         if (flag) {
             auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kRead);
-            // DeferFn fn([]{})
             if (!status.ok()) {
                 // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
                 close(file_handle->fd());
                 return;
             }
-
-            if (flag) {
-                file_size = file_handle->FileSize();
-            } else {
-                if (persistence_manager_) {
-                    file_handle->Seek(obj_addr_.part_offset_);
-                    file_size = obj_addr_.part_size_;
-                } else {
-                    file_size = file_handle->FileSize();
-                }
-            }
-
+            file_size = file_handle->FileSize();
             Read(data, file_handle, file_size);
             close(file_handle->fd());
         } else {
@@ -255,7 +246,7 @@ protected:
     virtual void Read(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
 
 public:
-    std::shared_mutex rw_mutex_;
+    mutable std::shared_mutex rw_mutex_;
     std::shared_ptr<std::string> rel_file_path_;
     PersistenceManager *persistence_manager_{};
     FileWorkerManager *file_worker_manager_{};

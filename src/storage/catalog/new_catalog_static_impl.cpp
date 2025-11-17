@@ -500,21 +500,21 @@ Status NewCatalog::CleanTable(TableMeta &table_meta, TxnTimeStamp begin_ts, Usag
 
     Status status;
 
-    std::vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::vector<SegmentID> *segment_ids_ptr{};
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
     if (!status.ok()) {
         return status;
     }
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta);
-        status = NewCatalog::CleanSegment(segment_meta, begin_ts, usage_flag);
+        status = CleanSegment(segment_meta, begin_ts, usage_flag);
         if (!status.ok()) {
             return status;
         }
     }
 
-    std::vector<std::string> *index_id_strs_ptr = nullptr;
-    std::vector<std::string> *index_names_ptr = nullptr;
+    std::vector<std::string> *index_id_strs_ptr{};
+    std::vector<std::string> *index_names_ptr{};
     status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
     if (!status.ok()) {
         return status;
@@ -523,7 +523,7 @@ Status NewCatalog::CleanTable(TableMeta &table_meta, TxnTimeStamp begin_ts, Usag
         const std::string &index_id_str = (*index_id_strs_ptr)[i];
         const std::string &index_name_str = (*index_names_ptr)[i];
         TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
-        status = NewCatalog::CleanTableIndex(table_index_meta, usage_flag);
+        status = CleanTableIndex(table_index_meta, usage_flag);
         if (!status.ok()) {
             return status;
         }
@@ -570,7 +570,7 @@ Status NewCatalog::CleanTableIndex(TableIndexMeta &table_index_meta, UsageFlag u
     }
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-        status = NewCatalog::CleanSegmentIndex(segment_index_meta, usage_flag);
+        status = CleanSegmentIndex(segment_index_meta, usage_flag);
         if (!status.ok()) {
             return status;
         }
@@ -935,7 +935,7 @@ Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, Usage
     }
     for (auto chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-        status = NewCatalog::CleanChunkIndex(chunk_index_meta, usage_flag);
+        status = CleanChunkIndex(chunk_index_meta, usage_flag);
         if (!status.ok()) {
             return status;
         }

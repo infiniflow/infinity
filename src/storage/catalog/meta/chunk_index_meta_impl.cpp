@@ -338,25 +338,25 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
     }
     // index_file_worker_->PickForCleanup();
 
-    TableIndexMeta &table_index_meta = segment_index_meta_.table_index_meta();
+    auto &table_index_meta = segment_index_meta_.table_index_meta();
     auto [index_def, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
         return index_status;
     }
     if (usage_flag == UsageFlag::kOther) {
         if (index_def->index_type_ == IndexType::kFullText) {
-            ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+            ChunkIndexMetaInfo *chunk_info_ptr{};
             status = this->GetChunkInfo(chunk_info_ptr);
             if (!status.ok()) {
                 return status;
             }
             std::shared_ptr<std::string> index_dir = segment_index_meta_.GetSegmentIndexDir();
 
-            std::string posting_file = fmt::format("{}/{}", *index_dir, chunk_info_ptr->base_name_ + POSTING_SUFFIX);
-            std::string dict_file = fmt::format("{}/{}", *index_dir, chunk_info_ptr->base_name_ + DICT_SUFFIX);
+            auto posting_file = fmt::format("{}/{}", *index_dir, chunk_info_ptr->base_name_ + POSTING_SUFFIX);
+            auto dict_file = fmt::format("{}/{}", *index_dir, chunk_info_ptr->base_name_ + DICT_SUFFIX);
 
-            PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-            if (pm != nullptr) {
+            auto *pm = InfinityContext::instance().persistence_manager();
+            if (pm) {
                 LOG_INFO(fmt::format("Cleaned chunk index entry, posting: {}, dictionary file: {}", posting_file, dict_file));
 
                 PersistResultHandler handler(pm);
@@ -366,12 +366,21 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
                 handler.HandleWriteResult(result1);
                 handler.HandleWriteResult(result2);
             } else {
-                std::string absolute_posting_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), posting_file);
-                std::string absolute_dict_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), dict_file);
-                LOG_INFO(fmt::format("Clean chunk index entry , posting: {}, dictionary file: {}", absolute_posting_file, absolute_dict_file));
+                auto absolute_data_posting_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), posting_file);
+                auto absolute_data_dict_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), dict_file);
+                auto absolute_temp_posting_file = fmt::format("{}/{}", InfinityContext::instance().config()->TempDir(), posting_file);
+                auto absolute_temp_dict_file = fmt::format("{}/{}", InfinityContext::instance().config()->TempDir(), dict_file);
+                LOG_INFO(
+                    fmt::format("Clean chunk index entry , posting: {}, dictionary file: {}", absolute_data_posting_file, absolute_data_dict_file));
 
-                VirtualStore::DeleteFile(absolute_posting_file);
-                VirtualStore::DeleteFile(absolute_dict_file);
+                VirtualStore::DeleteFile(absolute_data_posting_file);
+                VirtualStore::DeleteFile(absolute_data_dict_file);
+
+                LOG_INFO(
+                    fmt::format("Clean chunk index entry , posting: {}, dictionary file: {}", absolute_temp_posting_file, absolute_temp_dict_file));
+
+                VirtualStore::DeleteFile(absolute_temp_posting_file);
+                VirtualStore::DeleteFile(absolute_temp_dict_file);
             }
         }
     }

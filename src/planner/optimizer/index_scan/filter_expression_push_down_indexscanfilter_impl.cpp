@@ -500,7 +500,6 @@ private:
                 f32 score_threshold = {};
                 FulltextSimilarity ft_similarity = FulltextSimilarity::kBM25;
                 BM25Params bm25_params;
-                std::vector<std::string> index_names;
                 {
                     SearchOptions search_ops(filter_fulltext_expr->options_text_);
 
@@ -605,28 +604,8 @@ private:
                         bm25_params.delta_phrase = delta_phrase_v;
                     }
 
-                    // option: indexes
-                    if (iter = search_ops.options_.find("indexes"); iter != search_ops.options_.end()) {
-                        std::string indexes_text = iter->second;
-                        ToLower(indexes_text);
-                        size_t begin_idx = 0;
-                        size_t len = indexes_text.length();
-                        while (begin_idx < len) {
-                            size_t comma_idx = indexes_text.find_first_of(',', begin_idx);
-                            if (comma_idx == std::string::npos) {
-                                auto index_name = indexes_text.substr(begin_idx);
-                                index_names.emplace_back(index_name);
-                                break;
-                            } else {
-                                auto index_name = indexes_text.substr(begin_idx, comma_idx - begin_idx);
-                                index_names.emplace_back(std::move(index_name));
-                                begin_idx = comma_idx + 1;
-                            }
-                        }
-                    }
-
-                    std::map<std::string, std::string> column2analyzer = index_reader->GetColumn2Analyzer(index_names);
-                    SearchDriver search_driver(column2analyzer, default_field, query_operator_option);
+                    std::map<std::string, std::map<std::string, std::string>> column2analyzer = index_reader->GetColumn2Analyzer();
+                    SearchDriver search_driver(std::move(column2analyzer), default_field, query_operator_option);
                     query_tree = search_driver.ParseSingleWithFields(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_);
                     if (!query_tree) {
                         RecoverableError(Status::ParseMatchExprFailed(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_));
@@ -640,8 +619,7 @@ private:
                                                                       std::move(minimum_should_match_option),
                                                                       score_threshold,
                                                                       ft_similarity,
-                                                                      bm25_params,
-                                                                      std::move(index_names));
+                                                                      bm25_params);
             }
             case Enum::kAndExpr: {
                 std::vector<std::unique_ptr<IndexFilterEvaluator>> candidates;
