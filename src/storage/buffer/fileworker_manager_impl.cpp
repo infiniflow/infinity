@@ -78,11 +78,16 @@ void FileWorkerMap<FileWorkerT>::ClearCleans() {
         std::unique_lock l(rw_clean_mtx_);
         cleans_.swap(cleans);
     }
+    std::vector<std::future<Status>> futs;
+    futs.reserve(cleans.size());
     for (auto *file_worker : cleans) {
-        auto status = file_worker->CleanupFile();
-        // if (!status.ok()) {
-        //     return status;
-        // }
+        futs.emplace_back(std::async(&FileWorkerT::CleanupFile, file_worker));
+    }
+    for (auto &fut : futs) {
+        auto status = fut.get();
+        if (!status.ok()) {
+            // return status;
+        }
     }
 
     {
@@ -107,6 +112,8 @@ void FileWorkerMap<FileWorkerT>::AddToCleanList(FileWorkerT *file_worker) {
 template <typename FileWorkerT>
 void FileWorkerMap<FileWorkerT>::MoveFiles() {
     std::shared_lock lock(rw_mtx_);
+    std::vector<std::future<void>> futs;
+    futs.reserve(map_.size());
     for (auto it = map_.begin(); it != map_.end();) {
         const auto &ptr = it->second;
         if (ptr->rel_file_path_->find("import") != std::string::npos) {
@@ -114,8 +121,11 @@ void FileWorkerMap<FileWorkerT>::MoveFiles() {
             continue;
         }
         msync(ptr->mmap_, ptr->mmap_size_, MS_SYNC);
-        ptr->MoveFile();
+        futs.emplace_back(std::async(&FileWorkerT::MoveFile, ptr.get()));
         ++it;
+    }
+    for (auto &fut : futs) {
+        fut.wait();
     }
 }
 

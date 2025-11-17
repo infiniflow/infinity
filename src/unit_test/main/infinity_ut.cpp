@@ -43,7 +43,7 @@ class InfinityTest : public BaseTest {};
 TEST_F(InfinityTest, test1) {
     using namespace infinity;
     // Earlier cases may leave a dirty infinity instance. Destroy it first.
-    infinity::Infinity::LocalUnInit();
+    Infinity::LocalUnInit();
     std::string path = GetHomeDir();
     RemoveDbDirs();
     Infinity::LocalInit(path);
