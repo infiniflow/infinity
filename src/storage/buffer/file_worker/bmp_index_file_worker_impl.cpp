@@ -44,7 +44,7 @@ BMPIndexFileWorker::BMPIndexFileWorker(std::shared_ptr<std::string> file_path,
     : IndexFileWorker(std::move(file_path), std::move(index_base), std::move(column_def)) {
     if (index_size == 0) {
         std::string index_path = GetFilePath();
-        auto [file_handle, status] = VirtualStore::Open(index_path, FileAccessMode::kRead);
+        auto [file_handle, status] = VirtualStore::Open(index_path, FileAccessMode::kReadWrite);
         if (status.ok()) {
             // When replay by checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
             index_size = file_handle->FileSize();
@@ -75,7 +75,7 @@ bool BMPIndexFileWorker::Write(std::span<BMPHandlerPtr> data,
 }
 
 void BMPIndexFileWorker::Read(std::shared_ptr<BMPHandlerPtr> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
-    data =
+    data = // bmp_handle_impl.cpp:325 memory_leak
         std::shared_ptr<BMPHandlerPtr>(new BMPHandlerPtr{BMPHandler::Make(index_base_.get(), column_def_.get()).release()}, [](BMPHandlerPtr *ptr) {
             delete *ptr;
             delete ptr;

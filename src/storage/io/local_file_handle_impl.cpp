@@ -74,7 +74,7 @@ Status LocalFileHandle::Close() {
 }
 
 Status LocalFileHandle::Append(const void *buffer, u64 nbytes) {
-    if (access_mode_ != FileAccessMode::kWrite) {
+    if (access_mode_ != FileAccessMode::kWrite && access_mode_ != FileAccessMode::kReadWrite) {
         UnrecoverableError(fmt::format("File: {} isn't open.", path_));
     }
     i64 written = 0;

@@ -90,7 +90,7 @@ public:
         std::unique_lock l(rw_mutex_);
 
         [[maybe_unused]] auto tmp = GetFilePathTemp();
-        auto [file_handle, status] = VirtualStore::Open(GetFilePathTemp(), FileAccessMode::kWrite);
+        auto [file_handle, status] = VirtualStore::Open(GetFilePathTemp(), FileAccessMode::kReadWrite);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -111,7 +111,7 @@ public:
         std::string file_path;
         if (VirtualStore::Exists(temp_path)) { // branchless
             file_path = temp_path;
-            auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kRead);
+            auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kReadWrite);
             if (!status.ok()) {
                 std::unique_ptr<LocalFileHandle> file_handle;
                 Read(data, file_handle, file_size);
@@ -125,7 +125,7 @@ public:
             auto result = persistence_manager_->GetObjCache(file_path);
             obj_addr_ = result.obj_addr_;
             auto true_file_path = fmt::format("/var/infinity/persistence/{}", obj_addr_.obj_key_);
-            auto [file_handle, status] = VirtualStore::Open(true_file_path, FileAccessMode::kRead);
+            auto [file_handle, status] = VirtualStore::Open(true_file_path, FileAccessMode::kReadWrite);
             if (!status.ok()) {
                 std::unique_ptr<LocalFileHandle> file_handle;
                 Read(data, file_handle, file_size);
@@ -138,7 +138,7 @@ public:
             close(file_handle->fd());
         } else if (VirtualStore::Exists(data_path, true)) {
             file_path = data_path;
-            auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kRead);
+            auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kReadWrite);
             if (!status.ok()) {
                 std::unique_ptr<LocalFileHandle> file_handle;
                 Read(data, file_handle, file_size);

@@ -49,7 +49,7 @@ HnswFileWorker::HnswFileWorker(std::shared_ptr<std::string> file_path,
     if (index_size == 0) {
 
         std::string index_path = GetFilePath();
-        auto [file_handle, status] = VirtualStore::Open(index_path, FileAccessMode::kRead);
+        auto [file_handle, status] = VirtualStore::Open(index_path, FileAccessMode::kReadWrite);
         if (status.ok()) {
             // When replay by checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
             index_size = file_handle->FileSize();
@@ -75,6 +75,8 @@ bool HnswFileWorker::Write(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle
 
     (hnsw_handler)->SaveToPtr(*file_handle);
 
+    file_handle->Sync();
+
     auto fd = file_handle->fd();
     mmap_size_ = file_handle->FileSize();
     mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
@@ -93,6 +95,7 @@ void HnswFileWorker::Read(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle>
     //     delete ptr;
     // });
     // }
+    // std::println("{}", std::stacktrace::current());
     {
         std::unique_lock l(mutex_);
         if (data_ == nullptr) {

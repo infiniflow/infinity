@@ -21,7 +21,7 @@ import global_resource_usage;
 
 namespace infinity {
 
-export enum class FileAccessMode { kWrite, kRead, kInvalid };
+export enum class FileAccessMode { kWrite, kRead, kReadWrite, kInvalid };
 
 export class LocalFileHandle {
 public:

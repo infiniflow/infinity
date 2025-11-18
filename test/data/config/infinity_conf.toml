@@ -27,7 +27,7 @@ log_file_rotate_count   = 3
 log_level               = "trace"
 
 [storage]
-persistence_dir         = "/var/infinity/persistence"
+persistence_dir         = ""
 storage_type            = "local"
 
 [storage.object_storage]
