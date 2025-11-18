@@ -2196,6 +2196,18 @@ Status NewTxn::PrepareCommit() {
                 }
                 break;
             }
+            case WalCommandType::CREATE_DB_SNAPSHOT: {
+                if (this->IsReplay()) {
+                    LOG_TRACE("Skip replay of CREATE_DB_SNAPSHOT command.");
+                    break;
+                }
+                auto *create_db_snapshot_cmd = static_cast<WalCmdCreateDBSnapshot *>(command.get());
+                Status status = PrepareCommitCreateDBSnapshot(create_db_snapshot_cmd);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
             case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
                 if (this->IsReplay()) {
                     // Skip replay of RESTORE_TABLE_SNAPSHOT command.
@@ -2336,6 +2348,26 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
     LOG_TRACE(fmt::format("last_ckp_ts: {}, begin_ts: {}, commit_ts: {}", last_ckp_ts, txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_));
 
     Status status = this->CheckpointforSnapshot(last_ckp_ts, ckp_txn_store.get(), SnapshotType::kTableSnapshot);
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::PrepareCommitCreateDBSnapshot(const WalCmdCreateDBSnapshot *create_db_snapshot_cmd) {
+    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    std::string snapshot_name = create_db_snapshot_cmd->snapshot_name_;
+    std::string snapshot_path = snapshot_dir + "/" + snapshot_name;
+    if (std::filesystem::exists(snapshot_path)) {
+        return Status::SnapshotAlreadyExists(snapshot_name);
+    }
+
+    TxnTimeStamp last_ckp_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
+    std::shared_ptr<CheckpointTxnStore> ckp_txn_store = std::make_shared<CheckpointTxnStore>(last_ckp_ts, true);
+    LOG_TRACE(fmt::format("last_ckp_ts: {}, begin_ts: {}, commit_ts: {}", last_ckp_ts, txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_));
+
+    Status status = this->CheckpointforSnapshot(last_ckp_ts, ckp_txn_store.get(), SnapshotType::kDatabaseSnapshot);
     if (!status.ok()) {
         return status;
     }
@@ -5364,8 +5396,8 @@ Status NewTxn::CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create
 
 Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store, SnapshotType snapshot_type) {
     TransactionType txn_type = GetTxnType();
-    if (txn_type != TransactionType::kCreateTableSnapshot) {
-        UnrecoverableError(fmt::format("Expected transaction type is create table snapshot."));
+    if (txn_type != TransactionType::kCreateTableSnapshot && txn_type != TransactionType::kCreateDBSnapshot) {
+        UnrecoverableError(fmt::format("Invalid transaction type."));
     }
 
     if (last_ckp_ts % 2 == 0 and last_ckp_ts > 0) {
@@ -5374,7 +5406,7 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
 
     Status status;
     TxnTimeStamp checkpoint_ts = txn_context_ptr_->begin_ts_;
-    SnapshotOption option{checkpoint_ts};
+    SnapshotOption option{snapshot_type, checkpoint_ts};
 
     current_ckp_ts_ = checkpoint_ts;
     LOG_INFO(fmt::format("checkpoint ts for snapshot: {}", current_ckp_ts_));

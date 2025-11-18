@@ -1430,8 +1430,23 @@ Status NewTxn::CreateTableSnapshotFile(TableMeta &table_meta, const SnapshotOpti
     if (!status.ok()) {
         return status;
     }
-    CreateTableSnapshotTxnStore *create_txn_store = static_cast<CreateTableSnapshotTxnStore *>(base_txn_store_.get());
-    table_snapshot_info->snapshot_name_ = create_txn_store->snapshot_name_;
+
+    SnapshotType snapshot_type = option.snapshot_type_;
+    switch (snapshot_type) {
+        case SnapshotType::kTableSnapshot: {
+            auto create_txn_store = static_cast<CreateTableSnapshotTxnStore *>(base_txn_store_.get());
+            table_snapshot_info->snapshot_name_ = create_txn_store->snapshot_name_;
+            break;
+        }
+        case SnapshotType::kDatabaseSnapshot: {
+            auto create_txn_store = static_cast<CreateDBSnapshotTxnStore *>(base_txn_store_.get());
+            table_snapshot_info->snapshot_name_ = create_txn_store->snapshot_name_;
+            break;
+        }
+        default: {
+            UnrecoverableError("Invalid Snapshot type.");
+        }
+    }
 
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     std::string data_dir = InfinityContext::instance().config()->DataDir();
