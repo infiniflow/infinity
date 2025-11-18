@@ -1101,14 +1101,14 @@ void RAGAnalyzer::MergeWithPosition(const std::vector<std::string> &tokens,
     // Filter out empty tokens first (like spaces) to match Merge behavior
     std::vector<std::string> filtered_tokens;
     std::vector<std::pair<unsigned, unsigned>> filtered_positions;
-    
+
     for (size_t i = 0; i < tokens.size(); ++i) {
         if (!tokens[i].empty() && tokens[i] != " ") {
             filtered_tokens.push_back(tokens[i]);
             filtered_positions.push_back(positions[i]);
         }
     }
-    
+
     std::vector<std::string> res;
     std::size_t s = 0;
     std::vector<std::pair<unsigned, unsigned>> res_positions;
