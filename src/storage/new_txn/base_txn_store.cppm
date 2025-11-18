@@ -141,7 +141,7 @@ export struct CreateTableSnapshotTxnStore final : public BaseTxnStore {
 };
 
 export struct CreateDBSnapshotTxnStore final : public BaseTxnStore {
-    CreateDBSnapshotTxnStore() : BaseTxnStore(TransactionType::KCreateDBSnapshot) {}
+    CreateDBSnapshotTxnStore() : BaseTxnStore(TransactionType::kCreateDBSnapshot) {}
 
     std::string db_name_{};
     std::string snapshot_name_{};

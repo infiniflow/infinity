@@ -1684,7 +1684,8 @@ Status NewTxn::CreateDBSnapshotFile(DBMeta &db_meta, const SnapshotOption &optio
     }
 
     size_t table_count = table_id_strs_ptr->size();
-    LOG_DEBUG(fmt::format("checkpoint ts {}, db id {}, got {} tables.", option.checkpoint_ts_, db_meta.db_id_str(), table_count));
+    LOG_DEBUG(
+        fmt::format("NewTxn::CreateDBSnapshotFile, ts: {}, db id: {}, got {} tables.", option.checkpoint_ts_, db_meta.db_id_str(), table_count));
     for (size_t idx = 0; idx < table_count; ++idx) {
         const std::string &table_id_str = table_id_strs_ptr->at(idx);
         const std::string &table_name = table_names_ptr->at(idx);
@@ -5386,10 +5387,9 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
 
             std::shared_ptr<DBMeta> db_meta;
             std::shared_ptr<TableMeta> table_meta;
-            std::string table_key;
             TxnTimeStamp create_timestamp;
 
-            status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp, &table_key);
+            status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
             if (!status.ok()) {
                 return status;
             }
@@ -5398,31 +5398,45 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
             if (!status.ok()) {
                 return status;
             }
-
             break;
         }
         case SnapshotType::kDatabaseSnapshot: {
+            CreateDBSnapshotTxnStore *create_txn_store = static_cast<CreateDBSnapshotTxnStore *>(base_txn_store_.get());
+            std::string db_name = create_txn_store->db_name_;
+
+            std::shared_ptr<DBMeta> db_meta;
+            TxnTimeStamp create_timestamp;
+
+            status = GetDBMeta(db_name, db_meta, create_timestamp);
+            if (!status.ok()) {
+                return status;
+            }
+
+            status = CreateDBSnapshotFile(*db_meta, option, txn_store);
+            if (!status.ok()) {
+                return status;
+            }
             break;
         }
         case SnapshotType::kSystemSnapshot: {
-            // std::vector<std::string> *db_id_strs_ptr;
-            // std::vector<std::string> *db_names_ptr;
-            // CatalogMeta catalog_meta(this);
-            // status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
-            // if (!status.ok()) {
-            //     return status;
-            // }
-            //
-            // size_t db_count = db_id_strs_ptr->size();
-            // for (size_t idx = 0; idx < db_count; ++idx) {
-            //     const std::string &db_id_str = db_id_strs_ptr->at(idx);
-            //     const std::string &db_name = db_names_ptr->at(idx);
-            //     DBMeta db_meta(db_id_str, db_name, this);
-            //     status = CreateDBSnapshotFile(db_meta, option, txn_store);
-            //     if (!status.ok()) {
-            //         return status;
-            //     }
-            // }
+            std::vector<std::string> *db_id_strs_ptr;
+            std::vector<std::string> *db_names_ptr;
+            CatalogMeta catalog_meta(this);
+            status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
+            if (!status.ok()) {
+                return status;
+            }
+
+            size_t db_count = db_id_strs_ptr->size();
+            for (size_t idx = 0; idx < db_count; ++idx) {
+                const std::string &db_id_str = db_id_strs_ptr->at(idx);
+                const std::string &db_name = db_names_ptr->at(idx);
+                DBMeta db_meta(db_id_str, db_name, this);
+                status = CreateDBSnapshotFile(db_meta, option, txn_store);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
             break;
         }
         case SnapshotType::kUnknown: {
