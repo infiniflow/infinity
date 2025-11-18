@@ -1421,7 +1421,7 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const CheckpointOption &op
     return Status::OK();
 }
 
-Status NewTxn::CheckpointTable(TableMeta &table_meta, const SnapshotOption &option, CheckpointTxnStore *ckp_txn_store) {
+Status NewTxn::CreateTableSnapshotFile(TableMeta &table_meta, const SnapshotOption &option, CheckpointTxnStore *ckp_txn_store) {
     Status status;
     std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
 

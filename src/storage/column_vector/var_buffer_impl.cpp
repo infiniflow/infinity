@@ -116,6 +116,7 @@ size_t VarBuffer::TotalSize() const {
 size_t VarBuffer::GetSize(size_t row_cnt) const {
     std::shared_lock lock(mtx_);
     if (row_cnt >= buffer_size_prefix_sum_.size()) {
+        LOG_ERROR("row_cnt >= buffer_size_prefix_sum_size");
         return buffer_size_prefix_sum_.back();
     } else {
         return buffer_size_prefix_sum_[row_cnt];
