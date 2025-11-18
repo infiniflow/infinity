@@ -1688,7 +1688,7 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
                 }
             }
         }
-        
+
         // Apply English normalization to get lowercase and stemmed tokens
         std::vector<std::pair<unsigned, unsigned>> temp_positions = fine_positions;
         EnglishNormalizeWithPosition(temp_tokens, temp_positions, fine_tokens, fine_positions);
