@@ -1098,17 +1098,28 @@ void RAGAnalyzer::MergeWithPosition(const std::vector<std::string> &tokens,
                                     const std::vector<std::pair<unsigned, unsigned>> &positions,
                                     std::vector<std::string> &merged_tokens,
                                     std::vector<std::pair<unsigned, unsigned>> &merged_positions) {
+    // Filter out empty tokens first (like spaces) to match Merge behavior
+    std::vector<std::string> filtered_tokens;
+    std::vector<std::pair<unsigned, unsigned>> filtered_positions;
+    
+    for (size_t i = 0; i < tokens.size(); ++i) {
+        if (!tokens[i].empty() && tokens[i] != " ") {
+            filtered_tokens.push_back(tokens[i]);
+            filtered_positions.push_back(positions[i]);
+        }
+    }
+    
     std::vector<std::string> res;
     std::size_t s = 0;
     std::vector<std::pair<unsigned, unsigned>> res_positions;
 
     while (true) {
-        if (s >= tokens.size())
+        if (s >= filtered_tokens.size())
             break;
 
         std::size_t E = s + 1;
-        for (std::size_t e = s + 2; e < std::min(tokens.size() + 1, s + 6); ++e) {
-            std::string tk = Join(tokens, s, e, "");
+        for (std::size_t e = s + 2; e < std::min(filtered_tokens.size() + 1, s + 6); ++e) {
+            std::string tk = Join(filtered_tokens, s, e, "");
             if (re2::RE2::PartialMatch(tk, regex_split_pattern_)) {
                 if (Freq(tk) > 0) {
                     E = e;
@@ -1116,11 +1127,11 @@ void RAGAnalyzer::MergeWithPosition(const std::vector<std::string> &tokens,
             }
         }
 
-        std::string merged_token = Join(tokens, s, E, "");
+        std::string merged_token = Join(filtered_tokens, s, E, "");
         res.push_back(merged_token);
 
-        unsigned start_pos = positions[s].first;
-        unsigned end_pos = positions[E - 1].second;
+        unsigned start_pos = filtered_positions[s].first;
+        unsigned end_pos = filtered_positions[E - 1].second;
         res_positions.emplace_back(start_pos, end_pos);
 
         s = E;
@@ -1496,8 +1507,13 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
         std::vector<std::pair<unsigned, unsigned>> normalize_positions;
         EnglishNormalizeWithPosition(tokens, positions, normalize_tokens, normalize_positions);
 
-        tokens = std::move(normalize_tokens);
-        positions = std::move(normalize_positions);
+        // Apply MergeWithPosition to match Tokenize behavior
+        std::vector<std::string> merged_tokens;
+        std::vector<std::pair<unsigned, unsigned>> merged_positions;
+        MergeWithPosition(normalize_tokens, normalize_positions, merged_tokens, merged_positions);
+
+        tokens = std::move(merged_tokens);
+        positions = std::move(merged_positions);
     }
 
     return {std::move(tokens), std::move(positions)};
