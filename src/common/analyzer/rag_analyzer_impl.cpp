@@ -1669,6 +1669,8 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
     }
 
     if (zh_num < tks.size() * 0.2) {
+        // English text processing - apply normalization
+        std::vector<std::string> temp_tokens;
         for (size_t i = 0; i < tks.size(); ++i) {
             const auto &token = tks[i];
             const auto &[start_pos, end_pos] = positions[i];
@@ -1680,38 +1682,40 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
             while (std::getline(iss, sub_token, '/')) {
                 if (!sub_token.empty()) {
                     unsigned sub_end = sub_start + sub_token.size();
-                    fine_tokens.push_back(sub_token);
+                    temp_tokens.push_back(sub_token);
                     fine_positions.emplace_back(sub_start, sub_end);
                     sub_start = sub_end + 1;
                 }
             }
         }
-    }
+        
+        // Apply English normalization to get lowercase and stemmed tokens
+        std::vector<std::pair<unsigned, unsigned>> temp_positions = fine_positions;
+        EnglishNormalizeWithPosition(temp_tokens, temp_positions, fine_tokens, fine_positions);
+    } else {
+        // Chinese or mixed text processing - match FineGrainedTokenize behavior
+        for (size_t i = 0; i < tks.size(); ++i) {
+            const auto &token = tks[i];
+            const auto &[start_pos, end_pos] = positions[i];
+            const auto token_len = UTF8Length(token);
 
-    for (size_t i = 0; i < tks.size(); ++i) {
-        const auto &token = tks[i];
-        const auto &[start_pos, end_pos] = positions[i];
-        const auto token_len = static_cast<unsigned>(token.size());
+            if (token_len < 3 || re2::RE2::PartialMatch(token, pattern4_)) {
+                fine_tokens.push_back(token);
+                fine_positions.emplace_back(start_pos, end_pos);
+                continue;
+            }
 
-        if (token_len < 3 || re2::RE2::PartialMatch(token, pattern4_)) {
-            fine_tokens.push_back(token);
-            fine_positions.emplace_back(start_pos, end_pos);
-            continue;
-        }
-
-        std::vector<std::vector<std::pair<std::string, int>>> token_list;
-        if (token_len > 10) {
-            std::vector<std::pair<std::string, int>> tk;
-            tk.emplace_back(token, Encode(-1, 0));
-            token_list.push_back(tk);
-
-            fine_tokens.push_back(token);
-            fine_positions.emplace_back(start_pos, end_pos);
-        } else {
-            std::vector<std::pair<std::string, int>> pre_tokens;
-            std::vector<std::string> best_tokens;
-            double max_score = 0.0F;
-            DFS(token, 0, pre_tokens, token_list, best_tokens, max_score, true);
+            std::vector<std::vector<std::pair<std::string, int>>> token_list;
+            if (token_len > 10) {
+                std::vector<std::pair<std::string, int>> tk;
+                tk.emplace_back(token, Encode(-1, 0));
+                token_list.push_back(tk);
+            } else {
+                std::vector<std::pair<std::string, int>> pre_tokens;
+                std::vector<std::string> best_tokens;
+                double max_score = 0.0F;
+                DFS(token, 0, pre_tokens, token_list, best_tokens, max_score, true);
+            }
 
             if (token_list.size() < 2) {
                 fine_tokens.push_back(token);
@@ -1757,12 +1761,9 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
         }
     }
 
-    std::vector<std::string> normalize_tokens;
-    std::vector<std::pair<unsigned, unsigned>> normalize_positions;
-    EnglishNormalizeWithPosition(fine_tokens, fine_positions, normalize_tokens, normalize_positions);
-
-    fine_tokens = std::move(normalize_tokens);
-    fine_positions = std::move(normalize_positions);
+    // Apply English normalization only if needed, similar to FineGrainedTokenize
+    // For Chinese text, no additional normalization needed
+    // fine_tokens already contains the correct Chinese tokens
 }
 
 void RAGAnalyzer::FineGrainedTokenize(const std::string &tokens, std::vector<std::string> &result) {
