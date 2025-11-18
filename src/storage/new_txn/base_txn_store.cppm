@@ -140,6 +140,17 @@ export struct CreateTableSnapshotTxnStore final : public BaseTxnStore {
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
+export struct CreateDBSnapshotTxnStore final : public BaseTxnStore {
+    CreateDBSnapshotTxnStore() : BaseTxnStore(TransactionType::KCreateDBSnapshot) {}
+
+    std::string db_name_{};
+    std::string snapshot_name_{};
+    TxnTimeStamp max_commit_ts_{};
+
+    std::string ToString() const final;
+    std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
 export struct RestoreTableTxnStore final : public BaseTxnStore {
     RestoreTableTxnStore() : BaseTxnStore(TransactionType::kRestoreTable) {}
 

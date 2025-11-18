@@ -1377,24 +1377,23 @@ Status NewTxn::CreateTableSnapshot(const std::string &db_name, const std::string
     // Check if the DB is valid
     this->CheckTxn(db_name);
 
-    std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
-
-    // First, get the meta info of the table
-    std::shared_ptr<DBMeta> db_meta;
-    std::shared_ptr<TableMeta> table_meta_opt;
-    std::shared_ptr<SegmentMeta> segment_meta_opt;
-    std::string table_key;
-    TxnTimeStamp create_timestamp;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, create_timestamp, &table_key);
-
-    if (!status.ok()) {
-        return status;
-    }
-
     base_txn_store_ = std::make_shared<CreateTableSnapshotTxnStore>();
     CreateTableSnapshotTxnStore *txn_store = static_cast<CreateTableSnapshotTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->table_name_ = table_name;
+    txn_store->snapshot_name_ = snapshot_name;
+    txn_store->max_commit_ts_ = txn_context_ptr_->begin_ts_;
+
+    return Status::OK(); // Success
+}
+
+Status NewTxn::CreateDBSnapshot(const std::string &db_name, const std::string &snapshot_name) {
+    // Check if the DB is valid
+    this->CheckTxn(db_name);
+
+    base_txn_store_ = std::make_shared<CreateDBSnapshotTxnStore>();
+    CreateDBSnapshotTxnStore *txn_store = static_cast<CreateDBSnapshotTxnStore *>(base_txn_store_.get());
+    txn_store->db_name_ = db_name;
     txn_store->snapshot_name_ = snapshot_name;
     txn_store->max_commit_ts_ = txn_context_ptr_->begin_ts_;
 

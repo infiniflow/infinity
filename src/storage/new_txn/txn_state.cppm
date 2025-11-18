@@ -87,7 +87,8 @@ export enum class TransactionType {
     kSetCommand,
     kDropColumn,
     kCleanup,
-    kCreateTableSnapshot
+    kCreateTableSnapshot,
+    KCreateDBSnapshot
 };
 
 export inline std::string TransactionType2Str(TransactionType txn_type) {

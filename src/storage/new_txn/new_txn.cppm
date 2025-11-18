@@ -277,7 +277,7 @@ public:
 
     // // Snapshot OPs
     Status CreateTableSnapshot(const std::string &db_name, const std::string &table_name, const std::string &snapshot_name);
-
+    Status CreateDBSnapshot(const std::string &db_name, const std::string &snapshot_name);
     // std::tuple<std::shared_ptr<TableSnapshotInfo>, Status> GetTableSnapshotInfo(const std::string &db_name, const std::string &table_name);
 
     Status RestoreTableSnapshot(const std::string &db_name, const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info);
