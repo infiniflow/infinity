@@ -1405,63 +1405,34 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
     }
 
     if (alpha_num > (std::size_t)(len * 0.9)) {
-        if (!fine_grained_) {
-            std::vector<std::string> term_list;
-            std::vector<std::string> sentences;
-            SentenceSplitter(line, sentences);
+        std::vector<std::string> term_list;
+        std::vector<std::string> sentences;
+        SentenceSplitter(line, sentences);
 
-            unsigned sentence_start_pos = 0;
-            for (auto &sentence : sentences) {
-                std::vector<std::string> sentence_terms;
-                nltk_tokenizer_->Tokenize(sentence, sentence_terms);
+        unsigned sentence_start_pos = 0;
+        for (auto &sentence : sentences) {
+            std::vector<std::string> sentence_terms;
+            nltk_tokenizer_->Tokenize(sentence, sentence_terms);
 
-                unsigned current_search_pos = 0;
-                for (auto &term : sentence_terms) {
-                    size_t pos_in_sentence = sentence.find(term, current_search_pos);
-                    if (pos_in_sentence != std::string::npos) {
-                        unsigned start_pos = sentence_start_pos + static_cast<unsigned>(pos_in_sentence);
-                        unsigned end_pos = start_pos + static_cast<unsigned>(term.size());
-                        std::string t = lemma_->Lemmatize(term);
-                        char *lowercase_term = lowercase_string_buffer_.data();
-                        ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
-                        std::string stem_term;
-                        stemmer_->Stem(lowercase_term, stem_term);
+            unsigned current_search_pos = 0;
+            for (auto &term : sentence_terms) {
+                size_t pos_in_sentence = sentence.find(term, current_search_pos);
+                if (pos_in_sentence != std::string::npos) {
+                    unsigned start_pos = sentence_start_pos + static_cast<unsigned>(pos_in_sentence);
+                    unsigned end_pos = start_pos + static_cast<unsigned>(term.size());
+                    std::string t = lemma_->Lemmatize(term);
+                    char *lowercase_term = lowercase_string_buffer_.data();
+                    ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
+                    std::string stem_term;
+                    stemmer_->Stem(lowercase_term, stem_term);
 
-                        tokens.push_back(stem_term);
-                        positions.emplace_back(start_pos, end_pos);
+                    tokens.push_back(stem_term);
+                    positions.emplace_back(start_pos, end_pos);
 
-                        current_search_pos = pos_in_sentence + term.size();
-                    }
+                    current_search_pos = pos_in_sentence + term.size();
                 }
-                sentence_start_pos += static_cast<unsigned>(sentence.size());
             }
-        } else {
-            // For fine_grained_=true, don't do stemming here, leave it to FineGrainedTokenizeWithPosition
-            std::vector<std::string> term_list;
-            std::vector<std::string> sentences;
-            SentenceSplitter(line, sentences);
-
-            unsigned sentence_start_pos = 0;
-            for (auto &sentence : sentences) {
-                std::vector<std::string> sentence_terms;
-                nltk_tokenizer_->Tokenize(sentence, sentence_terms);
-
-                unsigned current_search_pos = 0;
-                for (auto &term : sentence_terms) {
-                    size_t pos_in_sentence = sentence.find(term, current_search_pos);
-                    if (pos_in_sentence != std::string::npos) {
-                        unsigned start_pos = sentence_start_pos + static_cast<unsigned>(pos_in_sentence);
-                        unsigned end_pos = start_pos + static_cast<unsigned>(term.size());
-
-                        // Use original token without stemming for fine_grained mode
-                        tokens.push_back(term);
-                        positions.emplace_back(start_pos, end_pos);
-
-                        current_search_pos = pos_in_sentence + term.size();
-                    }
-                }
-                sentence_start_pos += static_cast<unsigned>(sentence.size());
-            }
+            sentence_start_pos += static_cast<unsigned>(sentence.size());
         }
     } else {
         std::vector<std::string> arr;
