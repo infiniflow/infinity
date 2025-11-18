@@ -122,10 +122,11 @@ std::tuple<std::unique_ptr<LocalFileHandle>, Status> VirtualStore::Open(const st
     // if (persistence_manager) {
     //
     // }
+
     switch (access_mode) {
         case FileAccessMode::kRead: {
-            // fd = open(path.c_str(), O_RDONLY, 0666);
-            fd = open(path.c_str(), O_RDWR, 0666);
+            fd = open(path.c_str(), O_RDONLY, 0666);
+            // fd = open(path.c_str(), O_RDWR, 0666);
             break;
         }
         case FileAccessMode::kWrite: {
@@ -137,6 +138,9 @@ std::tuple<std::unique_ptr<LocalFileHandle>, Status> VirtualStore::Open(const st
         case FileAccessMode::kInvalid: {
             break;
         }
+    }
+    if (!std::filesystem::is_regular_file(path)) {
+        return {nullptr, Status::IOError(fmt::format("File: {} is not a regular file", path))};
     }
     if (fd == -1) {
         return {nullptr, Status::IOError(fmt::format("File: {} open failed: {}", path, strerror(errno)))};
