@@ -113,6 +113,16 @@ size_t VarBuffer::TotalSize() const {
     return buffer_size_prefix_sum_.back();
 }
 
+size_t VarBuffer::GetSize(size_t row_cnt) const {
+    std::shared_lock lock(mtx_);
+    if (row_cnt >= buffer_size_prefix_sum_.size()) {
+        LOG_ERROR("row_cnt >= buffer_size_prefix_sum_size");
+        return buffer_size_prefix_sum_.back();
+    } else {
+        return buffer_size_prefix_sum_[row_cnt];
+    }
+}
+
 size_t VarBufferManager::Append(std::unique_ptr<char[]> data, size_t size, bool *free_success) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto *buffer = GetInnerMutNoLock();
@@ -196,6 +206,11 @@ size_t VarBufferManager::Write(char *ptr, size_t offset, size_t size) {
 size_t VarBufferManager::TotalSize() {
     std::unique_lock<std::mutex> lock(mutex_);
     return GetInnerNoLock()->TotalSize();
+}
+
+size_t VarBufferManager::GetSize(size_t row_cnt) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    return GetInnerNoLock()->GetSize(row_cnt);
 }
 
 } // namespace infinity

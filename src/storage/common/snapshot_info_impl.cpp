@@ -432,6 +432,25 @@ Status TableSnapshotInfo::Serialize(const std::string &save_dir, TransactionID t
     return Status::OK();
 }
 
+std::vector<std::string> TableSnapshotInfo::GetIndexFiles() const {
+    std::vector<std::string> files;
+    for (const auto &table_index_snapshot_pair : table_index_snapshots_) {
+        for (const auto &segment_index_snapshot : table_index_snapshot_pair.second->segment_index_snapshots_) {
+            for (const auto &chunk_index_snapshot : segment_index_snapshot->chunk_index_snapshots_) {
+                if (chunk_index_snapshot->full_text_files_.empty()) {
+                    files.emplace_back(
+                        VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_,
+                                                      VirtualStore::ConcatenatePath("seg_" + std::to_string(segment_index_snapshot->segment_id_),
+                                                                                    chunk_index_snapshot->index_filename_)));
+                } else {
+                    files.insert(files.end(), chunk_index_snapshot->full_text_files_.cbegin(), chunk_index_snapshot->full_text_files_.cend());
+                }
+            }
+        }
+    }
+    return files;
+}
+
 std::vector<std::string> TableSnapshotInfo::GetFiles() const {
     std::vector<std::string> files;
     for (const auto &segment_snapshot_pair : segment_snapshots_) {

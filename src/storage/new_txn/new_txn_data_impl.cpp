@@ -1421,6 +1421,227 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const CheckpointOption &op
     return Status::OK();
 }
 
+Status NewTxn::CreateTableSnapshotFile(TableMeta &table_meta, const SnapshotOption &option, CheckpointTxnStore *ckp_txn_store) {
+    Status status;
+    std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
+
+    auto [db_name, table_name] = table_meta.GetDBTableName();
+    std::tie(table_snapshot_info, status) = table_meta.MapMetaToSnapShotInfo(db_name, table_name);
+    if (!status.ok()) {
+        return status;
+    }
+    CreateTableSnapshotTxnStore *create_txn_store = static_cast<CreateTableSnapshotTxnStore *>(base_txn_store_.get());
+    table_snapshot_info->snapshot_name_ = create_txn_store->snapshot_name_;
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    std::string data_dir = InfinityContext::instance().config()->DataDir();
+    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    std::string snapshot_name = table_snapshot_info->snapshot_name_;
+
+    auto data_start_time = std::chrono::high_resolution_clock::now();
+
+    std::vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
+    if (!status.ok()) {
+        return status;
+    }
+
+    std::vector<BlockID> *block_ids_ptr = nullptr;
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentMeta segment_meta(segment_id, table_meta);
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        if (!status.ok()) {
+            return status;
+        }
+        for (BlockID block_id : *block_ids_ptr) {
+            BlockMeta block_meta(block_id, segment_meta);
+
+            std::shared_ptr<BlockLock> block_lock;
+            status = block_meta.GetBlockLock(block_lock);
+            if (!status.ok()) {
+                LOG_TRACE(fmt::format("NewTxn::CheckpointTable segment_id {}, block_id {}, got no BlockLock", segment_id, block_id));
+                continue;
+            }
+
+            NewTxnGetVisibleRangeState state;
+            status = NewCatalog::GetBlockVisibleRange(block_meta, txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_, state);
+            if (!status.ok()) {
+                return status;
+            }
+
+            std::pair<BlockOffset, BlockOffset> range;
+            BlockOffset row_cnt = 0;
+            while (state.Next(row_cnt, range)) {
+                row_cnt = range.second;
+            }
+
+            bool use_memory = false;
+            std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
+            if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
+                use_memory = true;
+            }
+            LOG_TRACE(fmt::format("block: {}, use_memory: {}", block_id, use_memory ? "true" : "false"));
+
+            {
+                std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
+                BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+
+                std::string version_file_path = fmt::format("{}/{}/{}", data_dir, *block_dir_ptr, BlockVersion::PATH);
+                BufferObj *version_buffer = buffer_mgr->GetBufferObject(version_file_path);
+                if (version_buffer == nullptr) {
+                    return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_path));
+                }
+
+                VersionFileWorkerSaveCtx ctx(option.checkpoint_ts_);
+                version_buffer->SaveSnapshot(table_snapshot_info, use_memory, ctx);
+            }
+
+            {
+                std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs;
+                std::tie(column_defs, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
+                if (!status.ok()) {
+                    return status;
+                }
+
+                for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
+                    ColumnMeta column_meta(column_idx, block_meta);
+                    BufferObj *buffer_obj = nullptr;
+                    BufferObj *outline_buffer_obj = nullptr;
+
+                    status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
+                    if (!status.ok()) {
+                        return status;
+                    }
+
+                    size_t data_size = 0;
+                    std::tie(data_size, status) = column_meta.GetColumnSize(row_cnt, (*column_defs)[column_idx]);
+
+                    if (buffer_obj) {
+                        buffer_obj->SaveSnapshot(table_snapshot_info, use_memory, {}, row_cnt, data_size);
+                    }
+
+                    if (outline_buffer_obj) {
+                        outline_buffer_obj->SaveSnapshot(table_snapshot_info, use_memory, {}, row_cnt, data_size);
+                    }
+                }
+            }
+        }
+    }
+
+    auto data_end_time = std::chrono::high_resolution_clock::now();
+    auto data_duration = std::chrono::duration_cast<std::chrono::milliseconds>(data_end_time - data_start_time);
+    LOG_TRACE(fmt::format("Saving data and version files took {} ms", data_duration.count()));
+
+    {
+        auto CreateSnapshotFile = [&](const std::string &file) -> Status {
+            if (pm != nullptr) {
+                PersistResultHandler pm_handler(pm);
+                PersistReadResult result = pm->GetObjCache(file);
+
+                DeferFn defer_fn([&]() {
+                    auto res = pm->PutObjCache(file);
+                    pm_handler.HandleWriteResult(res);
+                });
+
+                const ObjAddr &obj_addr = pm_handler.HandleReadResult(result);
+                if (!obj_addr.Valid()) {
+                    LOG_INFO(fmt::format("Failed to find object for local path {}", file));
+                    return Status::OK();
+                }
+
+                std::string read_path = pm->GetObjPath(obj_addr.obj_key_);
+                std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
+                LOG_TRACE(fmt::format("CreateSnapshotFile, Read path: {}, Write path: {}", read_path, write_path));
+
+                std::string write_dir = VirtualStore::GetParentPath(write_path);
+                if (!VirtualStore::Exists(write_dir)) {
+                    VirtualStore::MakeDirectory(write_dir);
+                }
+
+                auto [read_handle, read_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
+                if (!read_open_status.ok()) {
+                    UnrecoverableError(read_open_status.message());
+                }
+
+                auto seek_status = read_handle->Seek(obj_addr.part_offset_);
+                if (!seek_status.ok()) {
+                    UnrecoverableError(seek_status.message());
+                }
+
+                auto file_size = obj_addr.part_size_;
+                auto buffer = std::make_unique<char[]>(file_size);
+                auto [nread, read_status] = read_handle->Read(buffer.get(), file_size);
+
+                auto [write_handle, write_open_status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
+                if (!write_open_status.ok()) {
+                    UnrecoverableError(write_open_status.message());
+                }
+
+                Status write_status = write_handle->Append(buffer.get(), file_size);
+                if (!write_status.ok()) {
+                    UnrecoverableError(write_status.message());
+                }
+                write_handle->Sync();
+            } else {
+                std::string read_path = fmt::format("{}/{}", data_dir, file);
+                std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
+                LOG_TRACE(fmt::format("CreateSnapshotFile, Read path: {}, Write path: {}", read_path, write_path));
+
+                Status status = VirtualStore::Copy(write_path, read_path);
+                if (!status.ok()) {
+                    UnrecoverableError(status.message());
+                }
+            }
+
+            return Status::OK();
+        };
+
+        auto index_start_time = std::chrono::high_resolution_clock::now();
+
+        std::vector<std::string> index_files = table_snapshot_info->GetIndexFiles();
+        for (const auto &index_file : index_files) {
+            status = CreateSnapshotFile(index_file);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+        }
+
+        auto index_end_time = std::chrono::high_resolution_clock::now();
+        auto index_duration = std::chrono::duration_cast<std::chrono::milliseconds>(index_end_time - index_start_time);
+        LOG_TRACE(fmt::format("Saving index files took {} ms", index_duration.count()));
+    }
+
+    {
+        auto json_start_time = std::chrono::high_resolution_clock::now();
+
+        nlohmann::json json_res = table_snapshot_info->CreateSnapshotMetadataJSON();
+        std::string json_string = json_res.dump();
+
+        std::string meta_path = fmt::format("{}/{}/{}.json", snapshot_dir, table_snapshot_info->snapshot_name_, table_snapshot_info->snapshot_name_);
+        std::string meta_path_dir = VirtualStore::GetParentPath(meta_path);
+        if (!VirtualStore::Exists(meta_path_dir)) {
+            VirtualStore::MakeDirectory(meta_path_dir);
+        }
+
+        auto [snapshot_file_handle, meta_status] = VirtualStore::Open(meta_path, FileAccessMode::kWrite);
+        if (!meta_status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        status = snapshot_file_handle->Append(json_string.data(), json_string.size());
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        snapshot_file_handle->Sync();
+
+        auto json_end_time = std::chrono::high_resolution_clock::now();
+        auto json_duration = std::chrono::duration_cast<std::chrono::milliseconds>(json_end_time - json_start_time);
+        LOG_TRACE(fmt::format("Saving json files took {} ms", json_duration.count()));
+    }
+
+    return Status::OK();
+}
+
 Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const std::string &db_id_str = import_cmd->db_id_;

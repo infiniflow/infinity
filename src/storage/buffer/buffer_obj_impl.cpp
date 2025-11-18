@@ -218,6 +218,46 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
     return write;
 }
 
+bool BufferObj::SaveSnapshot(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info,
+                             bool use_memory,
+                             const FileWorkerSaveCtx &ctx,
+                             size_t row_cnt,
+                             size_t data_size) {
+    LOG_TRACE(fmt::format("BufferObj::SaveSnapshot, type_: {}, status_: {}, file: {}", int(type_), int(status_), GetFilename()));
+
+    if (type_ == BufferType::kEphemeral) {
+        switch (status_) {
+            case BufferStatus::kLoaded: {
+                std::unique_lock<std::mutex> locker(w_locker_);
+                file_worker_->WriteSnapshotFile(table_snapshot_info, true, ctx, row_cnt, data_size);
+                break;
+            }
+            case BufferStatus::kUnloaded: {
+                this->Load();
+                std::unique_lock<std::mutex> locker(w_locker_);
+                file_worker_->WriteSnapshotFile(table_snapshot_info, true, ctx, row_cnt, data_size);
+                break;
+            }
+            case BufferStatus::kFreed: {
+                std::unique_lock<std::mutex> locker(w_locker_);
+                file_worker_->WriteSnapshotFile(table_snapshot_info, false, ctx, row_cnt, data_size);
+                break;
+            }
+            default: {
+                UnrecoverableError(fmt::format("Invalid buffer status: {}.", BufferStatusToString(status_)));
+            }
+        }
+    } else {
+        if (use_memory) {
+            this->Load();
+        }
+        std::unique_lock<std::mutex> locker(w_locker_);
+        file_worker_->WriteSnapshotFile(table_snapshot_info, use_memory, ctx, row_cnt, data_size);
+    }
+
+    return true;
+}
+
 void BufferObj::PickForCleanup() {
     std::unique_lock<std::mutex> locker(w_locker_);
     if (obj_rc_ == 0) {

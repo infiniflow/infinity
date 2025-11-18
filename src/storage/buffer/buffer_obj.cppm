@@ -101,6 +101,12 @@ public:
     // called when checkpoint. or in "IMPORT" operator.
     bool Save(const FileWorkerSaveCtx &ctx = {});
 
+    bool SaveSnapshot(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info,
+                      bool use_memory,
+                      const FileWorkerSaveCtx &ctx = {},
+                      size_t row_cnt = 0,
+                      size_t data_size = 0);
+
     void PickForCleanup();
 
     Status CleanupFile() const;

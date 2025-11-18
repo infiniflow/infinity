@@ -85,6 +85,10 @@ bool VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, co
     return false;
 }
 
+bool VersionFileWorker::WriteSnapshotFileImpl(size_t row_cnt, size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+    return WriteToFileImpl(false, prepare_success, ctx);
+}
+
 void VersionFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     if (data_ != nullptr) {
         UnrecoverableError("Data is already allocated.");
