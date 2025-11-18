@@ -109,6 +109,8 @@ public:
     std::unordered_map<std::string, std::shared_ptr<ObjStat>> GetAllObjects() const;
     std::unordered_map<std::string, ObjAddr> GetAllFiles() const;
 
+    std::string workspace() { return workspace_; }
+
 private:
     std::string ObjCreate();
 

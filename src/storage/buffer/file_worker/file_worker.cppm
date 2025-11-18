@@ -125,7 +125,7 @@ public:
             file_path = data_path;
             auto result = persistence_manager_->GetObjCache(file_path);
             obj_addr_ = result.obj_addr_;
-            auto true_file_path = fmt::format("/var/infinity/persistence/{}", obj_addr_.obj_key_);
+            auto true_file_path = fmt::format("{}/{}", persistence_manager_->workspace(), obj_addr_.obj_key_);
             auto [file_handle, status] = VirtualStore::Open(true_file_path, FileAccessMode::kReadWrite);
             if (!status.ok()) {
                 std::unique_ptr<LocalFileHandle> file_handle;

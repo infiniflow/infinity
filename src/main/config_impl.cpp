@@ -401,8 +401,7 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
         }
 
         // Persistence Dir
-        // std::string persistence_dir = DEFAULT_PERSISTENCE_DIR.data();
-        std::string persistence_dir = "";
+        std::string persistence_dir = DEFAULT_PERSISTENCE_DIR.data();
         if (default_config != nullptr) {
             persistence_dir = default_config->default_persistence_dir_;
         }
