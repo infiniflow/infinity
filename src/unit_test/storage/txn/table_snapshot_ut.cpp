@@ -29,128 +29,128 @@ import logical_type;
 
 using namespace infinity;
 
-class TableSnapshotTest : public NewRequestTest {
-public:
-    std::mutex mtx_{};
-    std::condition_variable cv_{};
-    bool ready_{false};
-
-    std::shared_ptr<std::string> db_name;
-    std::shared_ptr<ColumnDef> column_def1;
-    std::shared_ptr<ColumnDef> column_def2;
-    std::shared_ptr<std::string> table_name;
-    std::shared_ptr<TableDef> table_def;
-    std::shared_ptr<std::string> table_snapshot_name;
-
-    std::shared_ptr<TableSnapshotInfo> table_snapshot_;
-
-    void PrintTableRowCount() {
-        std::string select_sql = fmt::format("select count(*) from {}", *table_name);
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(select_sql);
-        bool ok = HandleQueryResult(query_result);
-        if (ok) {
-            LOG_INFO(fmt::format("RowCount: {}", query_result.ToString()));
-        } else {
-            LOG_INFO("GetTableRowCount failed");
-        }
-    }
-
-    void TearDown() override {
-        // std::string cmd = "rm -rf " + InfinityContext::instance().config()->SnapshotDir();
-        // system(cmd.c_str());
-
-        BaseTestParamStr::TearDown();
-    }
-
-    void SetUp() override {
-        NewRequestTest::SetUp();
-        SetupTestTable();
-    }
-
-    void SetupTestTable() {
-        using namespace infinity;
-        NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-
-        db_name = std::make_shared<std::string>("default_db");
-        column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-        column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-        table_name = std::make_shared<std::string>("tb1");
-        table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
-        table_snapshot_name = std::make_shared<std::string>("tb1_snapshot");
-
-        // Create table
-        {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
-            auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-            EXPECT_TRUE(status.ok());
-            status = txn_mgr->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
-
-        // Create index
-        {
-            std::string create_index_sql = "create index idx1 on tb1(col1)";
-            std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-            QueryResult query_result = query_context->Query(create_index_sql);
-            bool ok = HandleQueryResult(query_result);
-            EXPECT_TRUE(ok);
-        }
-        {
-            std::string create_index_sql = "create index idx2 on tb1(col2) using fulltext";
-            std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-            QueryResult query_result = query_context->Query(create_index_sql);
-            bool ok = HandleQueryResult(query_result);
-            EXPECT_TRUE(ok);
-        }
-
-        for (IntegerT i = 0; i < 20; ++i) {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
-            auto input_block = MakeInputBlock(Value::MakeInt(i), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 5000);
-            auto status = txn->Append(*db_name, *table_name, input_block);
-            EXPECT_TRUE(status.ok());
-            status = txn_mgr->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
-
-        // Create table snapshot
-        {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create snapshot"), TransactionType::kCreateTableSnapshot);
-            auto status = txn->CreateTableSnapshot(*db_name, *table_name, *table_snapshot_name);
-            EXPECT_TRUE(status.ok());
-            txn_mgr->CommitTxn(txn);
-        }
-
-        // Drop table
-        {
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
-            auto status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
-            EXPECT_TRUE(status.ok());
-            txn_mgr->CommitTxn(txn);
-        }
-
-        // Create Checkpoint
-        {
-            auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
-            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
-            EXPECT_TRUE(status.ok());
-            status = txn_mgr->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
-
-        // {
-        //     auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("cleanup"), TransactionType::kCleanup);
-        //     Status status = txn->Cleanup();
-        //     EXPECT_TRUE(status.ok());
-        //     status = txn_mgr->CommitTxn(txn);
-        //     EXPECT_TRUE(status.ok());
-        // }
-    }
-};
+// class TableSnapshotTest : public NewRequestTest {
+// public:
+//     std::mutex mtx_{};
+//     std::condition_variable cv_{};
+//     bool ready_{false};
+//
+//     std::shared_ptr<std::string> db_name;
+//     std::shared_ptr<ColumnDef> column_def1;
+//     std::shared_ptr<ColumnDef> column_def2;
+//     std::shared_ptr<std::string> table_name;
+//     std::shared_ptr<TableDef> table_def;
+//     std::shared_ptr<std::string> table_snapshot_name;
+//
+//     std::shared_ptr<TableSnapshotInfo> table_snapshot_;
+//
+//     void PrintTableRowCount() {
+//         std::string select_sql = fmt::format("select count(*) from {}", *table_name);
+//         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+//         QueryResult query_result = query_context->Query(select_sql);
+//         bool ok = HandleQueryResult(query_result);
+//         if (ok) {
+//             LOG_INFO(fmt::format("RowCount: {}", query_result.ToString()));
+//         } else {
+//             LOG_INFO("GetTableRowCount failed");
+//         }
+//     }
+//
+//     void TearDown() override {
+//         // std::string cmd = "rm -rf " + InfinityContext::instance().config()->SnapshotDir();
+//         // system(cmd.c_str());
+//
+//         BaseTestParamStr::TearDown();
+//     }
+//
+//     void SetUp() override {
+//         NewRequestTest::SetUp();
+//         SetupTestTable();
+//     }
+//
+//     void SetupTestTable() {
+//         using namespace infinity;
+//         NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+//
+//         db_name = std::make_shared<std::string>("default_db");
+//         column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+//         column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+//         table_name = std::make_shared<std::string>("tb1");
+//         table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
+//         table_snapshot_name = std::make_shared<std::string>("tb1_snapshot");
+//
+//         // Create table
+//         {
+//             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+//             auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+//             EXPECT_TRUE(status.ok());
+//             status = txn_mgr->CommitTxn(txn);
+//             EXPECT_TRUE(status.ok());
+//         }
+//
+//         // Create index
+//         {
+//             std::string create_index_sql = "create index idx1 on tb1(col1)";
+//             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+//             QueryResult query_result = query_context->Query(create_index_sql);
+//             bool ok = HandleQueryResult(query_result);
+//             EXPECT_TRUE(ok);
+//         }
+//         {
+//             std::string create_index_sql = "create index idx2 on tb1(col2) using fulltext";
+//             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+//             QueryResult query_result = query_context->Query(create_index_sql);
+//             bool ok = HandleQueryResult(query_result);
+//             EXPECT_TRUE(ok);
+//         }
+//
+//         for (IntegerT i = 0; i < 20; ++i) {
+//             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
+//             auto input_block = MakeInputBlock(Value::MakeInt(i), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 5000);
+//             auto status = txn->Append(*db_name, *table_name, input_block);
+//             EXPECT_TRUE(status.ok());
+//             status = txn_mgr->CommitTxn(txn);
+//             EXPECT_TRUE(status.ok());
+//         }
+//
+//         // Create table snapshot
+//         {
+//             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create snapshot"), TransactionType::kCreateTableSnapshot);
+//             auto status = txn->CreateTableSnapshot(*db_name, *table_name, *table_snapshot_name);
+//             EXPECT_TRUE(status.ok());
+//             txn_mgr->CommitTxn(txn);
+//         }
+//
+//         // Drop table
+//         {
+//             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
+//             auto status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
+//             EXPECT_TRUE(status.ok());
+//             txn_mgr->CommitTxn(txn);
+//         }
+//
+//         // Create Checkpoint
+//         {
+//             auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
+//             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
+//             auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
+//             EXPECT_TRUE(status.ok());
+//             status = txn_mgr->CommitTxn(txn);
+//             EXPECT_TRUE(status.ok());
+//         }
+//
+//         // {
+//         //     auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("cleanup"), TransactionType::kCleanup);
+//         //     Status status = txn->Cleanup();
+//         //     EXPECT_TRUE(status.ok());
+//         //     status = txn_mgr->CommitTxn(txn);
+//         //     EXPECT_TRUE(status.ok());
+//         // }
+//     }
+// };
 
 // INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TableSnapshotTest, ::testing::Values(BaseTestParamStr::NEW_VFS_OFF_BG_OFF_PATH));
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TableSnapshotTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
+// INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TableSnapshotTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
 
 // TEST_P(TableSnapshotTest, DISABLED_MUTED_test_restore_table_rollback_basic) {
 //     using namespace infinity;

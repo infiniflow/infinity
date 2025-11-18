@@ -122,6 +122,7 @@ public:
             Read(data, file_handle, file_size);
             close(file_handle->fd());
         } else if (persistence_manager_) {
+            file_path = data_path;
             auto result = persistence_manager_->GetObjCache(file_path);
             obj_addr_ = result.obj_addr_;
             auto true_file_path = fmt::format("/var/infinity/persistence/{}", obj_addr_.obj_key_);

@@ -76,7 +76,7 @@ bool HnswFileWorker::Write(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle
     (hnsw_handler)->SaveToPtr(*file_handle);
 
     file_handle->Sync();
-
+    // std::terminate();
     auto fd = file_handle->fd();
     mmap_size_ = file_handle->FileSize();
     mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
