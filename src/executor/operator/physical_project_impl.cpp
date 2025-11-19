@@ -113,26 +113,12 @@ bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
 
                     std::shared_ptr<HighlightInfo> highlight_info = it->second;
                     std::vector<std::string> &query_terms = highlight_info->query_terms_;
-                    std::string &analyzer_name = highlight_info->analyzer_;
-                    if (analyzer_name.find("standard") != std::string::npos) {
-                        auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(analyzer_name);
-                        if (!status.ok()) {
-                            RecoverableError(status);
-                        }
-                        analyzer->SetCharOffset(true);
-                        for (size_t i = 0; i < num_rows; ++i) {
-                            std::string raw_content = output_data_block->column_vectors[expr_idx]->GetValueByIndex(i).GetVarchar();
-                            std::string output;
-                            Highlighter::instance().GetHighlightWithStemmer(query_terms, raw_content, output, analyzer.get());
-                            highlight_column->AppendValue(Value::MakeVarchar(output));
-                        }
-                    } else {
-                        for (size_t i = 0; i < num_rows; ++i) {
-                            std::string raw_content = output_data_block->column_vectors[expr_idx]->GetValueByIndex(i).GetVarchar();
-                            std::string output;
-                            Highlighter::instance().GetHighlightWithoutStemmer(query_terms, raw_content, output);
-                            highlight_column->AppendValue(Value::MakeVarchar(output));
-                        }
+
+                    for (size_t i = 0; i < num_rows; ++i) {
+                        std::string raw_content = output_data_block->column_vectors[expr_idx]->GetValueByIndex(i).GetVarchar();
+                        std::string output;
+                        Highlighter::instance().GetHighlight(query_terms, raw_content, output);
+                        highlight_column->AppendValue(Value::MakeVarchar(output));
                     }
                     output_data_block->column_vectors[expr_idx] = std::move(highlight_column);
                 }

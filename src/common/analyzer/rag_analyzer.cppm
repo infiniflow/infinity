@@ -156,5 +156,7 @@ public:
     re2::RE2 blank_pattern_{"( )"};
 
     re2::RE2 replace_space_pattern_{R"#(([ ]+))#"};
+
+    std::unordered_map<std::string, std::string> text_stem_map_;
 };
 } // namespace infinity
