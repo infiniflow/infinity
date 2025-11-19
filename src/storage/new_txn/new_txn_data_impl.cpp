@@ -1421,7 +1421,7 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const CheckpointOption &op
     return Status::OK();
 }
 
-Status NewTxn::CreateTableSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info, const SnapshotOption &option) {
+Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_snapshot_info, const SnapshotOption &option) {
     Status status;
 
     std::string db_name = table_snapshot_info->db_name_;
@@ -1461,7 +1461,7 @@ Status NewTxn::CreateTableSnapshotFile(const std::shared_ptr<TableSnapshotInfo> 
             std::shared_ptr<BlockLock> block_lock;
             status = block_meta.GetBlockLock(block_lock);
             if (!status.ok()) {
-                LOG_TRACE(fmt::format("NewTxn::CheckpointTable segment_id {}, block_id {}, got no BlockLock", segment_id, block_id));
+                LOG_TRACE(fmt::format("NewTxn::CreateTableSnapshotFile segment_id {}, block_id {}, got no BlockLock", segment_id, block_id));
                 continue;
             }
 

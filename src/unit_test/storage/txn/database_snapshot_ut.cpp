@@ -38,7 +38,7 @@ public:
 
     void TearDown() override {
         for (auto snapshot_name : db_snapshot_names) {
-            std::string cmd = "rm -rf " + InfinityContext::instance().config()->SnapshotDir() + *snapshot_name;
+            std::string cmd = fmt::format("rm -rf {}/{}", InfinityContext::instance().config()->SnapshotDir(), *snapshot_name);
             system(cmd.c_str());
             LOG_INFO(fmt::format("Exec cmd: {}", cmd));
         }
@@ -56,6 +56,7 @@ public:
         for (size_t i = 0; i < 1; i++) {
             auto db_name = std::make_shared<std::string>(fmt::format("db_{}", i));
             auto snapshot_name = std::make_shared<std::string>(fmt::format("snapshot_{}", i));
+            db_snapshot_names.emplace_back(snapshot_name);
 
             auto table_name1 = std::make_shared<std::string>(fmt::format("db_{}_tb_1", i));
             auto table_name2 = std::make_shared<std::string>(fmt::format("db_{}_tb_2", i));
@@ -125,7 +126,7 @@ public:
             }
             {
                 auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
-                auto status = txn->DropTable(*db_name, *table_name1, ConflictType::kError);
+                auto status = txn->DropTable(*db_name, *table_name2, ConflictType::kError);
                 EXPECT_TRUE(status.ok());
                 txn_mgr->CommitTxn(txn);
             }

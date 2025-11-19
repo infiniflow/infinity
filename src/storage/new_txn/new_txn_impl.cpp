@@ -1401,7 +1401,13 @@ Status NewTxn::CreateDBSnapshot(const std::string &db_name, const std::string &s
 }
 
 std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSnapshotInfo(const std::string &db_name) {
-    this->CheckTxn(db_name);
+    if (db_name_.empty()) {
+        db_name_ = db_name;
+    } else if (db_name_ != db_name) {
+        std::unique_ptr<std::string> err_msg = std::make_unique<std::string>(fmt::format("Attempt to get table from another database {}", db_name));
+        RecoverableError(Status::InvalidIdentifierName(db_name));
+    }
+
     std::shared_ptr<DBMeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
@@ -1675,9 +1681,10 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
     return Status::OK();
 }
 
-Status NewTxn::CreateDBSnapshotFile(const std::shared_ptr<DatabaseSnapshotInfo> &db_snapshot_info, const SnapshotOption &option) {
-    const auto &table_snapshots = db_snapshot_info->table_snapshots_;
-    for (const auto &table_snapshot_info : table_snapshots) {
+Status NewTxn::CreateDBSnapshotFile(std::shared_ptr<DatabaseSnapshotInfo> db_snapshot_info, const SnapshotOption &option) {
+    auto &table_snapshots = db_snapshot_info->table_snapshots_;
+    for (auto &table_snapshot_info : table_snapshots) {
+        table_snapshot_info->snapshot_name_ = db_snapshot_info->snapshot_name_;
         Status status = CreateTableSnapshotFile(table_snapshot_info, option);
         if (!status.ok()) {
             return status;

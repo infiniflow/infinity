@@ -555,8 +555,8 @@ private:
     Status CheckpointDB(DBMeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
     Status CheckpointTable(TableMeta &table_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
 
-    Status CreateDBSnapshotFile(const std::shared_ptr<DatabaseSnapshotInfo> &db_snapshot_info, const SnapshotOption &option);
-    Status CreateTableSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info, const SnapshotOption &option);
+    Status CreateDBSnapshotFile(std::shared_ptr<DatabaseSnapshotInfo> db_snapshot_info, const SnapshotOption &option);
+    Status CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_snapshot_info, const SnapshotOption &option);
     Status CreateJSONSnapshotFile(std::string json_string, std::string snapshot_name);
 
     Status
