@@ -67,10 +67,6 @@ const char *VarBuffer::Get(size_t offset, size_t size) const {
         std::string error_msg = fmt::format("offset {} is out of range {}", offset, buffer_size_prefix_sum_.back());
         UnrecoverableError(error_msg);
     }
-    if (it == buffer_size_prefix_sum_.begin()) {
-        std::string error_msg = fmt::format("prefix_sum[0] should be 0, but got {}", *it);
-        UnrecoverableError(error_msg);
-    }
     size_t i = std::distance(buffer_size_prefix_sum_.begin(), it);
     size_t offset_in_buffer = offset - buffer_size_prefix_sum_[i];
     if (offset_in_buffer + size > buffer_size_prefix_sum_[i + 1]) {
