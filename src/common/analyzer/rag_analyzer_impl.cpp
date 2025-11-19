@@ -1434,6 +1434,8 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
     std::vector<unsigned> pos_mapping;
     BuildPositionMapping(line, strline, pos_mapping);
 
+
+
     std::size_t alpha_num = 0;
     int len = UTF8Length(strline);
 
@@ -1605,8 +1607,8 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
 
                 tokens.push_back(single_token);
                 if (pos_mapping) {
-                    unsigned mapped_start = (*pos_mapping)[start_pos];
-                    unsigned mapped_end = (*pos_mapping)[end_pos];
+                    unsigned mapped_start = start_pos < pos_mapping->size() ? (*pos_mapping)[start_pos] : 0;
+                    unsigned mapped_end = end_pos < pos_mapping->size() ? (*pos_mapping)[end_pos] : 0;
                     positions.emplace_back(mapped_start, mapped_end);
                 } else {
                     positions.emplace_back(start_pos, end_pos);
@@ -1632,8 +1634,8 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
                     tokens.push_back(space_token);
                     // Map position back to original string if mapping is provided
                     if (pos_mapping) {
-                        unsigned mapped_start = (*pos_mapping)[space_start_pos];
-                        unsigned mapped_end = (*pos_mapping)[space_start_pos + space_token_len];
+                        unsigned mapped_start = space_start_pos < pos_mapping->size() ? (*pos_mapping)[space_start_pos] : 0;
+                        unsigned mapped_end = (space_start_pos + space_token_len) < pos_mapping->size() ? (*pos_mapping)[space_start_pos + space_token_len] : 0;
                         positions.emplace_back(mapped_start, mapped_end);
                     } else {
                         positions.emplace_back(space_start_pos, space_start_pos + space_token_len);
@@ -1644,8 +1646,8 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
                 tokens.push_back(token_str);
                 // Map position back to original string if mapping is provided
                 if (pos_mapping) {
-                    unsigned mapped_start = (*pos_mapping)[start_pos];
-                    unsigned mapped_end = (*pos_mapping)[start_pos + token_len];
+                    unsigned mapped_start = start_pos < pos_mapping->size() ? (*pos_mapping)[start_pos] : 0;
+                    unsigned mapped_end = (start_pos + token_len) < pos_mapping->size() ? (*pos_mapping)[start_pos + token_len] : 0;
                     positions.emplace_back(mapped_start, mapped_end);
                 } else {
                     positions.emplace_back(start_pos, start_pos + token_len);
@@ -1682,8 +1684,8 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
                 tokens.push_back(space_token);
                 // Map position back to original string if mapping is provided
                 if (pos_mapping) {
-                    unsigned mapped_start = (*pos_mapping)[space_start_pos];
-                    unsigned mapped_end = (*pos_mapping)[space_start_pos + space_token_len];
+                    unsigned mapped_start = space_start_pos < pos_mapping->size() ? (*pos_mapping)[space_start_pos] : 0;
+                    unsigned mapped_end = (space_start_pos + space_token_len) < pos_mapping->size() ? (*pos_mapping)[space_start_pos + space_token_len] : 0;
                     positions.emplace_back(mapped_start, mapped_end);
                 } else {
                     positions.emplace_back(space_start_pos, space_start_pos + space_token_len);
@@ -1694,8 +1696,8 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
             tokens.push_back(best_token_str);
             // Map position back to original string if mapping is provided
             if (pos_mapping) {
-                unsigned mapped_start = (*pos_mapping)[start_pos];
-                unsigned mapped_end = (*pos_mapping)[end_pos];
+                unsigned mapped_start = start_pos < pos_mapping->size() ? (*pos_mapping)[start_pos] : 0;
+                unsigned mapped_end = end_pos < pos_mapping->size() ? (*pos_mapping)[end_pos] : 0;
                 positions.emplace_back(mapped_start, mapped_end);
             } else {
                 positions.emplace_back(start_pos, end_pos);
