@@ -595,6 +595,35 @@ Status RAGAnalyzer::Load() {
     return Status::OK();
 }
 
+void RAGAnalyzer::BuildPositionMapping(const std::string &original, const std::string &converted, std::vector<unsigned> &pos_mapping) {
+    pos_mapping.clear();
+    pos_mapping.resize(converted.size() + 1);
+
+    size_t orig_pos = 0;
+    size_t conv_pos = 0;
+
+    // Map each character position from converted string to original string
+    while (orig_pos < original.size() && conv_pos < converted.size()) {
+        // Get character lengths
+        size_t orig_char_len = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(original[orig_pos])];
+        size_t conv_char_len = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(converted[conv_pos])];
+
+        // Map all bytes of current converted character to current original position
+        for (size_t i = 0; i < conv_char_len && conv_pos + i < pos_mapping.size(); ++i) {
+            pos_mapping[conv_pos + i] = static_cast<unsigned>(orig_pos);
+        }
+
+        // Move to next character in both strings
+        orig_pos += orig_char_len;
+        conv_pos += conv_char_len;
+    }
+
+    // Fill any remaining positions
+    for (size_t i = conv_pos; i < pos_mapping.size(); ++i) {
+        pos_mapping[i] = static_cast<unsigned>(original.size());
+    }
+}
+
 std::string RAGAnalyzer::StrQ2B(const std::string &input) {
     std::string output;
     size_t i = 0;
@@ -1239,6 +1268,23 @@ void RAGAnalyzer::TokenizeInner(std::vector<std::string> &res, const std::string
     if (s1 > s) {
         tks = tks1;
     }
+    
+    // Debug for specific test case
+    if (L == "虽然我不怎么玩") {
+        std::cout << "DEBUG: MaxForward result: ";
+        for (size_t i = 0; i < tks.size(); ++i) std::cout << "'" << tks[i] << "' ";
+        std::cout << "score=" << s << std::endl;
+        std::cout << "DEBUG: MaxBackward result: ";
+        auto [tks_debug, s_debug] = MaxBackward(L);
+        for (size_t i = 0; i < tks_debug.size(); ++i) std::cout << "'" << tks_debug[i] << "' ";
+        std::cout << "score=" << s_debug << std::endl;
+        std::cout << "DEBUG: final tks: ";
+        for (size_t i = 0; i < tks.size(); ++i) std::cout << "'" << tks[i] << "' ";
+        std::cout << "final score=" << (s1 > s ? s1 : s) << std::endl;
+        std::cout << "DEBUG: diff array: ";
+        for (size_t i = 0; i < diff.size(); ++i) std::cout << diff[i] << " ";
+        std::cout << std::endl;
+    }
 
     std::size_t i = 0;
     while (i < tks.size()) {
@@ -1394,6 +1440,10 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
     std::vector<std::string> tokens;
     std::vector<std::pair<unsigned, unsigned>> positions;
 
+    // Build character position mapping from converted string back to original string
+    std::vector<unsigned> pos_mapping;
+    BuildPositionMapping(line, strline, pos_mapping);
+
     std::size_t alpha_num = 0;
     int len = UTF8Length(strline);
 
@@ -1434,6 +1484,7 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
             }
             sentence_start_pos += static_cast<unsigned>(sentence.size());
         }
+
     } else {
         std::vector<std::string> arr;
         Split(strline, regex_split_pattern_, arr, true);
@@ -1456,6 +1507,7 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
                 tokens.push_back(L);
                 positions.emplace_back(original_start, original_start + static_cast<unsigned>(L.size()));
                 current_pos = original_start + static_cast<unsigned>(L.size());
+
                 continue;
             }
 
@@ -1464,13 +1516,14 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
                 SplitLongText(L, length, sublines);
                 unsigned subline_start_pos = original_start;
                 for (auto &l : sublines) {
-                    TokenizeInnerWithPosition(l, tokens, positions, subline_start_pos);
+                    TokenizeInnerWithPosition(l, tokens, positions, subline_start_pos, nullptr);
                     subline_start_pos += static_cast<unsigned>(l.size());
                 }
                 current_pos = original_start + static_cast<unsigned>(L.size());
             } else {
-                TokenizeInnerWithPosition(L, tokens, positions, original_start);
+                TokenizeInnerWithPosition(L, tokens, positions, original_start, nullptr);
                 current_pos = original_start + static_cast<unsigned>(L.size());
+
             }
         }
 
@@ -1485,6 +1538,20 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
 
         tokens = std::move(merged_tokens);
         positions = std::move(merged_positions);
+
+        // Apply position mapping to map back to original string positions
+        for (auto &pos : positions) {
+            if (pos.first < pos_mapping.size()) {
+                pos.first = pos_mapping[pos.first];
+            } else {
+                pos.first = static_cast<unsigned>(line.size());
+            }
+            if (pos.second < pos_mapping.size()) {
+                pos.second = pos_mapping[pos.second];
+            } else {
+                pos.second = static_cast<unsigned>(line.size());
+            }
+        }
     }
 
     return {std::move(tokens), std::move(positions)};
@@ -1499,10 +1566,19 @@ unsigned RAGAnalyzer::MapToOriginalPosition(unsigned processed_pos, const std::v
     return processed_pos;
 }
 
+static unsigned CalculateTokensLength(const std::vector<std::string> &tokens, int start, int end) {
+    unsigned total_length = 0;
+    for (int i = start; i < end; ++i) {
+        total_length += static_cast<unsigned>(tokens[i].size());
+    }
+    return total_length;
+}
+
 void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
                                             std::vector<std::string> &tokens,
                                             std::vector<std::pair<unsigned, unsigned>> &positions,
-                                            unsigned base_pos) {
+                                            unsigned base_pos,
+                                            const std::vector<unsigned> *pos_mapping) {
     auto [tks, s] = MaxForward(L);
     auto [tks1, s1] = MaxBackward(L);
 
@@ -1525,27 +1601,20 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
         }
 
         if (s == tks.size()) {
-
-            std::string token_str = Join(tks, i, tks.size());
-            unsigned token_len = static_cast<unsigned>(token_str.size());
-            unsigned start_pos = base_pos + static_cast<unsigned>(Join(tks, 0, i).size());
-
-            if (token_str.find(' ') != std::string::npos) {
-                std::vector<std::string> space_split_tokens;
-                Split(token_str, blank_pattern_, space_split_tokens, false);
-                unsigned space_start_pos = start_pos;
-                for (const auto &space_token : space_split_tokens) {
-                    if (space_token.empty()) {
-                        continue;
-                    }
-                    unsigned space_token_len = static_cast<unsigned>(space_token.size());
-                    tokens.push_back(space_token);
-                    positions.emplace_back(space_start_pos, space_start_pos + space_token_len);
-                    space_start_pos += space_token_len + 1;
+            // When all remaining tokens are the same, process them individually
+            for (std::size_t j = i; j < tks.size(); ++j) {
+                const std::string &single_token = tks[j];
+                unsigned start_pos = base_pos + CalculateTokensLength(tks, 0, j);
+                unsigned end_pos = start_pos + static_cast<unsigned>(single_token.size());
+                
+                tokens.push_back(single_token);
+                if (pos_mapping) {
+                    unsigned mapped_start = (*pos_mapping)[start_pos];
+                    unsigned mapped_end = (*pos_mapping)[end_pos];
+                    positions.emplace_back(mapped_start, mapped_end);
+                } else {
+                    positions.emplace_back(start_pos, end_pos);
                 }
-            } else {
-                tokens.push_back(token_str);
-                positions.emplace_back(start_pos, start_pos + token_len);
             }
             break;
         }
@@ -1553,7 +1622,7 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
         if (s > i) {
             std::string token_str = Join(tks, i, s);
             unsigned token_len = static_cast<unsigned>(token_str.size());
-            unsigned start_pos = base_pos + static_cast<unsigned>(Join(tks, 0, i).size());
+            unsigned start_pos = base_pos + CalculateTokensLength(tks, 0, i);
 
             if (token_str.find(' ') != std::string::npos) {
                 std::vector<std::string> space_split_tokens;
@@ -1565,12 +1634,26 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
                     }
                     unsigned space_token_len = static_cast<unsigned>(space_token.size());
                     tokens.push_back(space_token);
-                    positions.emplace_back(space_start_pos, space_start_pos + space_token_len);
+                    // Map position back to original string if mapping is provided
+                    if (pos_mapping) {
+                        unsigned mapped_start = (*pos_mapping)[space_start_pos];
+                        unsigned mapped_end = (*pos_mapping)[space_start_pos + space_token_len];
+                        positions.emplace_back(mapped_start, mapped_end);
+                    } else {
+                        positions.emplace_back(space_start_pos, space_start_pos + space_token_len);
+                    }
                     space_start_pos += space_token_len + 1;
                 }
             } else {
                 tokens.push_back(token_str);
-                positions.emplace_back(start_pos, start_pos + token_len);
+                // Map position back to original string if mapping is provided
+                if (pos_mapping) {
+                    unsigned mapped_start = (*pos_mapping)[start_pos];
+                    unsigned mapped_end = (*pos_mapping)[start_pos + token_len];
+                    positions.emplace_back(mapped_start, mapped_end);
+                } else {
+                    positions.emplace_back(start_pos, start_pos + token_len);
+                }
             }
         }
 
@@ -1588,7 +1671,7 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
         DFS(token_str, 0, pre_tokens, token_list, best_tokens, max_score, false);
 
         std::string best_token_str = Join(best_tokens, 0);
-        unsigned start_pos = base_pos + static_cast<unsigned>(Join(tks, 0, s).size());
+        unsigned start_pos = base_pos + CalculateTokensLength(tks, 0, s);
         unsigned end_pos = start_pos + static_cast<unsigned>(best_token_str.size());
 
         if (best_token_str.find(' ') != std::string::npos) {
@@ -1601,12 +1684,26 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
                 }
                 unsigned space_token_len = static_cast<unsigned>(space_token.size());
                 tokens.push_back(space_token);
-                positions.emplace_back(space_start_pos, space_start_pos + space_token_len);
+                // Map position back to original string if mapping is provided
+                if (pos_mapping) {
+                    unsigned mapped_start = (*pos_mapping)[space_start_pos];
+                    unsigned mapped_end = (*pos_mapping)[space_start_pos + space_token_len];
+                    positions.emplace_back(mapped_start, mapped_end);
+                } else {
+                    positions.emplace_back(space_start_pos, space_start_pos + space_token_len);
+                }
                 space_start_pos += space_token_len + 1;
             }
         } else {
             tokens.push_back(best_token_str);
-            positions.emplace_back(start_pos, end_pos);
+            // Map position back to original string if mapping is provided
+            if (pos_mapping) {
+                unsigned mapped_start = (*pos_mapping)[start_pos];
+                unsigned mapped_end = (*pos_mapping)[end_pos];
+                positions.emplace_back(mapped_start, mapped_end);
+            } else {
+                positions.emplace_back(start_pos, end_pos);
+            }
         }
 
         i = e + 1;

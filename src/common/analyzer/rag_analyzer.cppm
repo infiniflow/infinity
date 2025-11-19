@@ -57,7 +57,8 @@ public:
     void TokenizeInnerWithPosition(const std::string &L,
                                    std::vector<std::string> &tokens,
                                    std::vector<std::pair<unsigned, unsigned>> &positions,
-                                   unsigned base_pos);
+                                   unsigned base_pos,
+                                   const std::vector<unsigned> *pos_mapping = nullptr);
     void FineGrainedTokenizeWithPosition(const std::string &tokens_str,
                                          const std::vector<std::pair<unsigned, unsigned>> &positions,
                                          std::vector<std::string> &fine_tokens,
@@ -79,6 +80,8 @@ private:
     static constexpr float DENOMINATOR = 1000000;
 
     static std::string StrQ2B(const std::string &input);
+
+    static void BuildPositionMapping(const std::string &original, const std::string &converted, std::vector<unsigned> &pos_mapping);
 
     i32 Freq(std::string_view key) const;
 
