@@ -1275,23 +1275,6 @@ void RAGAnalyzer::TokenizeInner(std::vector<std::string> &res, const std::string
             }
         }
     }
-    
-    // Debug for specific test case
-    if (L == "虽然我不怎么玩") {
-        std::cout << "DEBUG: MaxForward result: ";
-        for (size_t i = 0; i < tks.size(); ++i) std::cout << "'" << tks[i] << "' ";
-        std::cout << "score=" << s << std::endl;
-        std::cout << "DEBUG: MaxBackward result: ";
-        auto [tks_debug, s_debug] = MaxBackward(L);
-        for (size_t i = 0; i < tks_debug.size(); ++i) std::cout << "'" << tks_debug[i] << "' ";
-        std::cout << "score=" << s_debug << std::endl;
-        std::cout << "DEBUG: final tks: ";
-        for (size_t i = 0; i < tks.size(); ++i) std::cout << "'" << tks[i] << "' ";
-        std::cout << "final score=" << (s1 > s ? s1 : s) << std::endl;
-        std::cout << "DEBUG: diff array: ";
-        for (size_t i = 0; i < diff.size(); ++i) std::cout << diff[i] << " ";
-        std::cout << std::endl;
-    }
 
     std::size_t i = 0;
     while (i < tks.size()) {
@@ -1530,7 +1513,6 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
             } else {
                 TokenizeInnerWithPosition(L, tokens, positions, original_start, nullptr);
                 current_pos = original_start + static_cast<unsigned>(L.size());
-
             }
         }
 
@@ -1620,7 +1602,7 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
                 const std::string &single_token = tks[j];
                 unsigned start_pos = base_pos + CalculateTokensLength(tks, 0, j);
                 unsigned end_pos = start_pos + static_cast<unsigned>(single_token.size());
-                
+
                 tokens.push_back(single_token);
                 if (pos_mapping) {
                     unsigned mapped_start = (*pos_mapping)[start_pos];
