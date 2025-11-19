@@ -32,9 +32,17 @@ public:
     BaseTestWithParam() {
         const char *infinity_home_ = GetHomeDir();
         if (bool ok = ValidateDirPermission(infinity_home_); !ok) {
-            std::cerr << "Please create directory " << infinity_home_ << " and ensure current user has RWX permission of it." << std::endl;
+            std::cerr << "FATAL: Please ensure directory " << infinity_home_ << " exists and current user has RWX permission of it." << std::endl;
             abort();
         }
+        const char *RESOURCE_DIR = GetResourceDir();
+        if (!fs::exists(RESOURCE_DIR)) {
+            std::cerr << "WARN: Resource directory doesn't exist: " << RESOURCE_DIR << std::endl;
+        } else if (bool ok = ValidateDirPermission(RESOURCE_DIR); !ok) {
+            std::cerr << "FATAL: Please ensure directory " << RESOURCE_DIR << " exists and current user has RWX permission of it." << std::endl;
+            abort();
+        }
+
         CleanupTmpDir();
     }
 
@@ -88,6 +96,8 @@ protected:
     const char *GetFullPersistDir() { return "/var/infinity/persistence"; }
 
     const char *GetTmpDir() { return "tmp"; }
+
+    const char *GetResourceDir() { return "/usr/share/infinity/resource"; }
 
     void CleanupDbDirs() {
         const char *infinity_db_dirs[] = {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir(), GetFullPersistDir(), GetCatalogDir()};

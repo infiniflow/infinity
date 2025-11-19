@@ -49,4 +49,4 @@ wal_compact_threshold         = "1GB"
 wal_flush                     = "only_write"
 
 [resource]
-resource_dir                  = "/var/infinity/resource"
+resource_dir                  = "/usr/share/infinity/resource"

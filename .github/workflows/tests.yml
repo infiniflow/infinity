@@ -43,6 +43,7 @@ jobs:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           fetch-tags: false
+          submodules: recursive
 
       - name: Backup code
         if: ${{ !cancelled() && !failure() }}
@@ -88,10 +89,10 @@ jobs:
             mkdir -p ${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}
             echo "${PR_SHA} ${GITHUB_RUN_ID}" > ${PR_SHA_FP}
           fi
-          tar --create --gzip --file=infinity.tgz .git $(git ls-files)
+          tar --create --gzip --file=infinity.tgz .git $(git ls-files --recurse-submodules)
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          mkdir -p ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
+          rm -rf ${ARTIFACTS_DIR} && mkdir -p ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
 
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
@@ -663,7 +664,7 @@ jobs:
           TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER=${TEST_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          mkdir ${PWD}/var_infinity
+          rm -rf ${PWD}/var_infinity && mkdir -p ${PWD}/var_infinity
           sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity -v ${PWD}/var_infinity:/var/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Start minio container
@@ -696,6 +697,7 @@ jobs:
           if [[ -n "${MINIO_CONTAINER}" ]]; then sudo docker rm -f -v "${MINIO_CONTAINER}"; fi
           if [[ -n "${TEST_CONTAINER}" ]]; then sudo docker rm -f -v "${TEST_CONTAINER}"; fi
           rm -rf ${MINIO_CONTAINER}
+          rm -rf ${PWD}/var_infinity
 
   reldeb_sqllogical_test:
     name: reldeb_sqllogical_test
@@ -1071,3 +1073,8 @@ jobs:
           echo "8 50" | ./cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_8_threads.log
           ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log benchmark_sift_1_thread.log
           ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log benchmark_sift_8_threads.log
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -rf ${PWD}/db_tmp

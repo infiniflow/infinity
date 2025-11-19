@@ -37,7 +37,7 @@ export struct DefaultConfig {
     std::string default_data_dir_ = "/var/infinity/data";
     std::string default_wal_dir_ = "/var/infinity/wal";
     std::string default_temp_dir_ = "/var/infinity/tmp";
-    std::string default_resource_dir_ = "/var/infinity/resource";
+    std::string default_resource_dir_ = "/usr/share/infinity/resource";
     std::string default_persistence_dir_ = "/var/infinity/persistence";
 };
 

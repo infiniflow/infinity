@@ -36,4 +36,4 @@ memindex_mem0ry_quota   = "1GB"
 wa1_dir                 = "/var/infinity/wawrong"
 
 [resourCEEe]
-resource_dffir          = "/var/infinity/resourcewrong"
+resource_dffir          = "/usr/share/infinity/resourcewrong"
