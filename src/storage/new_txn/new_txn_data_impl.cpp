@@ -1421,49 +1421,36 @@ Status NewTxn::CheckpointTable(TableMeta &table_meta, const CheckpointOption &op
     return Status::OK();
 }
 
-Status NewTxn::CreateTableSnapshotFile(TableMeta &table_meta, const SnapshotOption &option, CheckpointTxnStore *ckp_txn_store) {
+Status NewTxn::CreateTableSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info, const SnapshotOption &option) {
     Status status;
-    std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
 
-    auto [db_name, table_name] = table_meta.GetDBTableName();
-    std::tie(table_snapshot_info, status) = table_meta.MapMetaToSnapShotInfo(db_name, table_name);
-    if (!status.ok()) {
-        return status;
-    }
-
-    SnapshotType snapshot_type = option.snapshot_type_;
-    switch (snapshot_type) {
-        case SnapshotType::kTableSnapshot: {
-            auto create_txn_store = static_cast<CreateTableSnapshotTxnStore *>(base_txn_store_.get());
-            table_snapshot_info->snapshot_name_ = create_txn_store->snapshot_name_;
-            break;
-        }
-        case SnapshotType::kDatabaseSnapshot: {
-            auto create_txn_store = static_cast<CreateDBSnapshotTxnStore *>(base_txn_store_.get());
-            table_snapshot_info->snapshot_name_ = create_txn_store->snapshot_name_;
-            break;
-        }
-        default: {
-            UnrecoverableError("Invalid Snapshot type.");
-        }
-    }
+    std::string db_name = table_snapshot_info->db_name_;
+    std::string table_name = table_snapshot_info->table_name_;
+    std::string snapshot_name = table_snapshot_info->snapshot_name_;
 
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     std::string data_dir = InfinityContext::instance().config()->DataDir();
     std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    std::string snapshot_name = table_snapshot_info->snapshot_name_;
 
-    auto data_start_time = std::chrono::high_resolution_clock::now();
-
-    std::vector<SegmentID> *segment_ids_ptr = nullptr;
-    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
+    std::shared_ptr<DBMeta> db_meta;
+    std::shared_ptr<TableMeta> table_meta;
+    TxnTimeStamp create_timestamp;
+    status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
     if (!status.ok()) {
         return status;
     }
 
+    std::vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+    if (!status.ok()) {
+        return status;
+    }
+
+    auto data_start_time = std::chrono::high_resolution_clock::now();
+
     std::vector<BlockID> *block_ids_ptr = nullptr;
     for (SegmentID segment_id : *segment_ids_ptr) {
-        SegmentMeta segment_meta(segment_id, table_meta);
+        SegmentMeta segment_meta(segment_id, *table_meta);
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         if (!status.ok()) {
             return status;
@@ -1626,33 +1613,33 @@ Status NewTxn::CreateTableSnapshotFile(TableMeta &table_meta, const SnapshotOpti
         LOG_TRACE(fmt::format("Saving index files took {} ms", index_duration.count()));
     }
 
-    {
-        auto json_start_time = std::chrono::high_resolution_clock::now();
-
-        nlohmann::json json_res = table_snapshot_info->CreateSnapshotMetadataJSON();
-        std::string json_string = json_res.dump();
-
-        std::string meta_path = fmt::format("{}/{}/{}.json", snapshot_dir, table_snapshot_info->snapshot_name_, table_snapshot_info->snapshot_name_);
-        std::string meta_path_dir = VirtualStore::GetParentPath(meta_path);
-        if (!VirtualStore::Exists(meta_path_dir)) {
-            VirtualStore::MakeDirectory(meta_path_dir);
-        }
-
-        auto [snapshot_file_handle, meta_status] = VirtualStore::Open(meta_path, FileAccessMode::kWrite);
-        if (!meta_status.ok()) {
-            UnrecoverableError(status.message());
-        }
-
-        status = snapshot_file_handle->Append(json_string.data(), json_string.size());
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-        snapshot_file_handle->Sync();
-
-        auto json_end_time = std::chrono::high_resolution_clock::now();
-        auto json_duration = std::chrono::duration_cast<std::chrono::milliseconds>(json_end_time - json_start_time);
-        LOG_TRACE(fmt::format("Saving json files took {} ms", json_duration.count()));
-    }
+    // {
+    //     auto json_start_time = std::chrono::high_resolution_clock::now();
+    //
+    //     nlohmann::json json_res = table_snapshot_info->CreateSnapshotMetadataJSON();
+    //     std::string json_string = json_res.dump();
+    //
+    //     std::string meta_path = fmt::format("{}/{}/{}.json", snapshot_dir, table_snapshot_info->snapshot_name_,
+    //     table_snapshot_info->snapshot_name_); std::string meta_path_dir = VirtualStore::GetParentPath(meta_path); if
+    //     (!VirtualStore::Exists(meta_path_dir)) {
+    //         VirtualStore::MakeDirectory(meta_path_dir);
+    //     }
+    //
+    //     auto [snapshot_file_handle, meta_status] = VirtualStore::Open(meta_path, FileAccessMode::kWrite);
+    //     if (!meta_status.ok()) {
+    //         UnrecoverableError(status.message());
+    //     }
+    //
+    //     status = snapshot_file_handle->Append(json_string.data(), json_string.size());
+    //     if (!status.ok()) {
+    //         UnrecoverableError(status.message());
+    //     }
+    //     snapshot_file_handle->Sync();
+    //
+    //     auto json_end_time = std::chrono::high_resolution_clock::now();
+    //     auto json_duration = std::chrono::duration_cast<std::chrono::milliseconds>(json_end_time - json_start_time);
+    //     LOG_TRACE(fmt::format("Saving json files took {} ms", json_duration.count()));
+    // }
 
     return Status::OK();
 }

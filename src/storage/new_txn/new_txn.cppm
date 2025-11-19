@@ -555,8 +555,9 @@ private:
     Status CheckpointDB(DBMeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
     Status CheckpointTable(TableMeta &table_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
 
-    Status CreateDBSnapshotFile(DBMeta &db_meta, const SnapshotOption &option, CheckpointTxnStore *ckp_txn_store);
-    Status CreateTableSnapshotFile(TableMeta &table_meta, const SnapshotOption &option, CheckpointTxnStore *ckp_txn_store);
+    Status CreateDBSnapshotFile(const std::shared_ptr<DatabaseSnapshotInfo> &db_snapshot_info, const SnapshotOption &option);
+    Status CreateTableSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info, const SnapshotOption &option);
+    Status CreateJSONSnapshotFile(std::string json_string, std::string snapshot_name);
 
     Status
     CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, std::vector<std::pair<RowID, u64>> &append_ranges);
