@@ -488,11 +488,13 @@ export using ::apache::thrift::TDispatchProcessor;
 export using ::apache::thrift::TProcessorContextFreer;
 export using ::apache::thrift::TBase;
 export using ::apache::thrift::TApplicationException;
+export using ::apache::thrift::TConfiguration;
 namespace protocol {
 export using ::apache::thrift::protocol::TProtocol;
 export using ::apache::thrift::protocol::TOutputRecursionTracker;
 export using ::apache::thrift::protocol::TTransport;
 export using ::apache::thrift::protocol::TBinaryProtocolFactory;
+export using ::apache::thrift::protocol::TBinaryProtocolFactoryT;
 export using ::apache::thrift::protocol::TBinaryProtocol;
 } // namespace protocol
 namespace server {
@@ -505,6 +507,7 @@ export using ::apache::thrift::transport::TBufferedTransportFactory;
 export using ::apache::thrift::transport::TSocket;
 export using ::apache::thrift::transport::TBufferedTransport;
 export using ::apache::thrift::transport::TTransportException;
+export using ::apache::thrift::transport::TTransportFactory;
 } // namespace transport
 namespace concurrency {
 export using ::apache::thrift::concurrency::ThreadFactory;
