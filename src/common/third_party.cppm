@@ -475,7 +475,7 @@ export using ::rocksdb::EventListener;
 export using ::rocksdb::DB;
 export using ::rocksdb::FlushJobInfo;
 export using ::rocksdb::CompactionJobInfo;
-}
+} // namespace rocksdb
 
 namespace re2 {
 export using ::re2::RE2;
@@ -488,6 +488,7 @@ export using ::apache::thrift::TDispatchProcessor;
 export using ::apache::thrift::TProcessorContextFreer;
 export using ::apache::thrift::TBase;
 export using ::apache::thrift::TApplicationException;
+export using ::apache::thrift::TConfiguration;
 namespace protocol {
 export using ::apache::thrift::protocol::TProtocol;
 export using ::apache::thrift::protocol::TOutputRecursionTracker;
@@ -505,6 +506,7 @@ export using ::apache::thrift::transport::TBufferedTransportFactory;
 export using ::apache::thrift::transport::TSocket;
 export using ::apache::thrift::transport::TBufferedTransport;
 export using ::apache::thrift::transport::TTransportException;
+export using ::apache::thrift::transport::TTransportFactory;
 } // namespace transport
 namespace concurrency {
 export using ::apache::thrift::concurrency::ThreadFactory;
