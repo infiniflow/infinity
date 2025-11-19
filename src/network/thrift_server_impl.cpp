@@ -24,6 +24,25 @@ import third_party;
 
 namespace infinity {
 
+class CustomTTransport final : public apache::thrift::protocol::TTransport {
+public:
+    CustomTTransport() : apache::thrift::protocol::TTransport(nullptr) {}
+};
+
+class CustomerBufferedTransportFactory : public apache::thrift::transport::TTransportFactory {
+public:
+    CustomerBufferedTransportFactory() = default;
+
+    ~CustomerBufferedTransportFactory() override = default;
+
+    std::shared_ptr<apache::thrift::protocol::TTransport> getTransport(std::shared_ptr<apache::thrift::protocol::TTransport> trans) override {
+        auto configuration = std::make_shared<apache::thrift::TConfiguration>();
+        configuration->setRecursionLimit(256);
+        trans->setConfiguration(configuration);
+        return std::shared_ptr<apache::thrift::protocol::TTransport>(new apache::thrift::transport::TBufferedTransport(trans));
+    }
+};
+
 class InfinityServiceCloneFactory final : public infinity_thrift_rpc::InfinityServiceIfFactory {
 public:
     ~InfinityServiceCloneFactory() final = default;
@@ -88,7 +107,7 @@ void PoolThriftServer::Init(const std::string &server_address, i32 port_no, i32 
     server = std::make_unique<apache::thrift::server::TThreadPoolServer>(
         std::make_shared<infinity_thrift_rpc::InfinityServiceProcessorFactory>(std::make_shared<InfinityServiceCloneFactory>()),
         server_socket,
-        std::make_shared<apache::thrift::transport::TBufferedTransportFactory>(),
+        std::make_shared<CustomerBufferedTransportFactory>(),
         protocol_factory,
         threadManager);
 
