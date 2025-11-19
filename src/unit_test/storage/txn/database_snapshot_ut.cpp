@@ -29,11 +29,8 @@ import logical_type;
 
 using namespace infinity;
 
-class DBSnapshotTest : public NewRequestTest {
+class DatabaseSnapshotTest : public NewRequestTest {
 public:
-    std::vector<std::shared_ptr<std::string>> db_names;
-    std::vector<std::shared_ptr<std::string>> table_names;
-    std::vector<std::shared_ptr<TableDef>> table_defs;
     std::vector<std::shared_ptr<std::string>> db_snapshot_names;
 
     void TearDown() override {
@@ -53,7 +50,7 @@ public:
     void SetupDatabase() {
         NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-        for (size_t i = 0; i < 1; i++) {
+        for (size_t i = 0; i < 2; i++) {
             auto db_name = std::make_shared<std::string>(fmt::format("db_{}", i));
             auto snapshot_name = std::make_shared<std::string>(fmt::format("snapshot_{}", i));
             db_snapshot_names.emplace_back(snapshot_name);
@@ -90,6 +87,22 @@ public:
                 ASSERT_TRUE(status.ok());
             }
 
+            // // Create index
+            // {
+            //     std::string create_index_sql = "create index idx1 on tb1(col1)";
+            //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+            //     QueryResult query_result = query_context->Query(create_index_sql);
+            //     bool ok = HandleQueryResult(query_result);
+            //     EXPECT_TRUE(ok);
+            // }
+            // {
+            //     std::string create_index_sql = "create index idx2 on tb2(col2) using fulltext";
+            //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+            //     QueryResult query_result = query_context->Query(create_index_sql);
+            //     bool ok = HandleQueryResult(query_result);
+            //     EXPECT_TRUE(ok);
+            // }
+
             // Insert datas
             for (size_t j = 0; j < 10; ++j) {
                 auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
@@ -117,25 +130,80 @@ public:
                 ASSERT_TRUE(status.ok());
             }
 
-            // Drop tables
+            // Drop database
             {
-                auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
-                auto status = txn->DropTable(*db_name, *table_name1, ConflictType::kError);
-                EXPECT_TRUE(status.ok());
-                txn_mgr->CommitTxn(txn);
-            }
-            {
-                auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
-                auto status = txn->DropTable(*db_name, *table_name2, ConflictType::kError);
-                EXPECT_TRUE(status.ok());
-                txn_mgr->CommitTxn(txn);
+                auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop database"), TransactionType::kDropDB);
+                auto status = txn->DropDatabase(*db_name, ConflictType::kError);
+                ASSERT_TRUE(status.ok());
+                status = txn_mgr->CommitTxn(txn);
+                ASSERT_TRUE(status.ok());
             }
         }
     }
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         DBSnapshotTest,
+                         DatabaseSnapshotTest,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(DBSnapshotTest, test1) {}
+TEST_P(DatabaseSnapshotTest, test_restore_database_rollback_basic) {
+    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    // Test restore database
+    {
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("restore database"), TransactionType::kRestoreDatabase);
+
+        std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+        std::shared_ptr<DatabaseSnapshotInfo> database_snapshot;
+        Status status;
+        std::tie(database_snapshot, status) = DatabaseSnapshotInfo::Deserialize(snapshot_dir, *db_snapshot_names[0]);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->RestoreDatabaseSnapshot(database_snapshot);
+        EXPECT_TRUE(status.ok());
+        status = txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    // Verify that the table was restored with data
+    {
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
+        auto [table_info, status] = txn->GetTableInfo("db_0", "db_0_tb_1");
+        ASSERT_TRUE(status.ok());
+        status = txn_mgr->CommitTxn(txn);
+        ASSERT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop database"), TransactionType::kDropDB);
+        auto status = txn->DropDatabase("db_0", ConflictType::kError);
+        ASSERT_TRUE(status.ok());
+        status = txn_mgr->CommitTxn(txn);
+        ASSERT_TRUE(status.ok());
+    }
+
+    // Test rollback
+    {
+        NewTxn *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("restore table"), TransactionType::kRestoreTable);
+        std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+        std::shared_ptr<DatabaseSnapshotInfo> database_snapshot;
+        Status status;
+        std::tie(database_snapshot, status) = DatabaseSnapshotInfo::Deserialize(snapshot_dir, *db_snapshot_names[0]);
+        ASSERT_TRUE(status.ok());
+
+        status = txn->RestoreDatabaseSnapshot(database_snapshot);
+        ASSERT_TRUE(status.ok());
+
+        status = txn->Rollback();
+        ASSERT_TRUE(status.ok());
+    }
+
+    // Verify that the database was not actually created
+    {
+        NewTxn *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check database"), TransactionType::kRead);
+        auto [database_info, status] = txn->GetDatabaseInfo("db_0");
+        ASSERT_FALSE(status.ok());
+        status = txn_mgr->CommitTxn(txn);
+        ASSERT_TRUE(status.ok());
+    }
+}
