@@ -183,6 +183,18 @@ TEST_P(DatabaseSnapshotTest, test_restore_database_rollback_basic) {
     }
 
     {
+        std::string select_sql = fmt::format("select count(*) from {}.{}", "db_0", "db_0_tb_1");
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(select_sql);
+        bool ok = HandleQueryResult(query_result);
+        if (ok) {
+            LOG_INFO(fmt::format("RowCount: {}", query_result.ToString()));
+        } else {
+            LOG_INFO("GetTableRowCount failed");
+        }
+    }
+
+    {
         auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop database"), TransactionType::kDropDB);
         auto status = txn->DropDatabase("db_0", ConflictType::kError);
         ASSERT_TRUE(status.ok());
