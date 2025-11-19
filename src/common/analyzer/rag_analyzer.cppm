@@ -47,9 +47,31 @@ public:
 
     void SetFineGrained(bool fine_grained) { fine_grained_ = fine_grained; }
 
+    void SetEnablePosition(bool enable_position) { enable_position_ = enable_position; }
+
+    std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> TokenizeWithPosition(const std::string &line);
     std::string Tokenize(const std::string &line);
 
     void FineGrainedTokenize(const std::string &tokens, std::vector<std::string> &result);
+
+    void TokenizeInnerWithPosition(const std::string &L,
+                                   std::vector<std::string> &tokens,
+                                   std::vector<std::pair<unsigned, unsigned>> &positions,
+                                   unsigned base_pos,
+                                   const std::vector<unsigned> *pos_mapping = nullptr);
+    void FineGrainedTokenizeWithPosition(const std::string &tokens_str,
+                                         const std::vector<std::pair<unsigned, unsigned>> &positions,
+                                         std::vector<std::string> &fine_tokens,
+                                         std::vector<std::pair<unsigned, unsigned>> &fine_positions);
+    void EnglishNormalizeWithPosition(const std::vector<std::string> &tokens,
+                                      const std::vector<std::pair<unsigned, unsigned>> &positions,
+                                      std::vector<std::string> &normalize_tokens,
+                                      std::vector<std::pair<unsigned, unsigned>> &normalize_positions);
+    unsigned MapToOriginalPosition(unsigned processed_pos, const std::vector<std::pair<unsigned, unsigned>> &mapping);
+    void MergeWithPosition(const std::vector<std::string> &tokens,
+                           const std::vector<std::pair<unsigned, unsigned>> &positions,
+                           std::vector<std::string> &merged_tokens,
+                           std::vector<std::pair<unsigned, unsigned>> &merged_positions);
 
 protected:
     int AnalyzeImpl(const Term &input, void *data, HookType func) override;
@@ -58,6 +80,8 @@ private:
     static constexpr float DENOMINATOR = 1000000;
 
     static std::string StrQ2B(const std::string &input);
+
+    static void BuildPositionMapping(const std::string &original, const std::string &converted, std::vector<unsigned> &pos_mapping);
 
     i32 Freq(std::string_view key) const;
 
@@ -112,6 +136,8 @@ public:
     std::vector<char> lowercase_string_buffer_;
 
     bool fine_grained_{false};
+
+    bool enable_position_{false};
 
     std::unique_ptr<NLTKWordTokenizer> nltk_tokenizer_;
 
