@@ -32,8 +32,8 @@ import std.compat;
 
 namespace infinity {
 
-void Highlighter::GetHighlight(const std::vector<std::string> &query, const std::string &raw_text, std::string &output) {
-    if (query.empty() || raw_text.empty()) {
+void Highlighter::GetHighlight(const std::string &matching_text, const std::string &raw_text, std::string &output, Analyzer *analyzer) {
+    if (matching_text.empty() || raw_text.empty()) {
         output = raw_text;
         return;
     }
@@ -41,17 +41,19 @@ void Highlighter::GetHighlight(const std::vector<std::string> &query, const std:
     std::vector<std::string> ascii_only_queries;
     std::vector<std::string> unicode_queries;
 
-    for (const auto &q : query) {
-        if (IsASCIIWord(q)) {
-            ascii_only_queries.push_back(q);
+    TermList matching_terms;
+    analyzer->Analyze(matching_text, matching_terms);
+    for (auto &term : matching_terms) {
+        if (IsASCIIWord(term.text_)) {
+            ascii_only_queries.push_back(term.text_);
         } else {
-            unicode_queries.push_back(q);
+            unicode_queries.push_back(term.text_);
         }
     }
 
     std::vector<std::pair<size_t, size_t>> matches;
     if (!ascii_only_queries.empty()) {
-        GetASCIIWordHighlight(ascii_only_queries, raw_text, matches);
+        GetASCIIWordHighlight(ascii_only_queries, raw_text, matches, analyzer);
     }
     if (!unicode_queries.empty()) {
         GetUnicodeWordHighlight(unicode_queries, raw_text, matches);
@@ -62,27 +64,14 @@ void Highlighter::GetHighlight(const std::vector<std::string> &query, const std:
 
 void Highlighter::GetASCIIWordHighlight(const std::vector<std::string> &query_texts,
                                         const std::string &raw_text,
-                                        std::vector<std::pair<size_t, size_t>> &matches) {
-    auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer("rag-coarse");
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
-    RAGAnalyzer *rag_analyzer = dynamic_cast<RAGAnalyzer *>(analyzer.get());
-    if (!rag_analyzer) {
-        UnrecoverableError("RAGAnalyzer should be used for highlighter, but it is not RAGAnalyzer");
-    }
+                                        std::vector<std::pair<size_t, size_t>> &matches,
+                                        Analyzer *analyzer) {
 
-    TermList output;
-    analyzer->Analyze(raw_text, output);
-    auto text_stem_map = rag_analyzer->text_stem_map_;
-
-    for (const auto &term : text_stem_map) {
-        if (std::find(query_texts.begin(), query_texts.end(), term.second) != query_texts.end()) {
-            std::string lower_case_raw_text = raw_text;
-            std::transform(lower_case_raw_text.begin(), lower_case_raw_text.end(), lower_case_raw_text.begin(), [](unsigned char c) {
-                return std::tolower(c);
-            });
-            FindASCIIWords(term.first, lower_case_raw_text, matches);
+    TermList doc_terms;
+    analyzer->Analyze(raw_text, doc_terms);
+    for (const auto &term : doc_terms) {
+        if (std::find(query_texts.begin(), query_texts.end(), term.text_) != query_texts.end()) {
+            matches.emplace_back(term.word_offset_, term.end_offset_);
         }
     }
 }

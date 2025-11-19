@@ -1178,7 +1178,6 @@ void RAGAnalyzer::EnglishNormalize(const std::vector<std::string> &tokens, std::
             ToLower(lemma_term.c_str(), lemma_term.size(), lowercase_term, term_string_buffer_limit_);
             std::string stem_term;
             stemmer_->Stem(lowercase_term, stem_term);
-            text_stem_map_.emplace(lowercase_term, stem_term);
             res.push_back(stem_term);
         } else {
             res.push_back(t);
@@ -1392,7 +1391,6 @@ std::string RAGAnalyzer::Tokenize(const std::string &line) {
             ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
             std::string stem_term;
             stemmer_->Stem(lowercase_term, stem_term);
-            text_stem_map_.emplace(lowercase_term, stem_term);
             res.push_back(stem_term);
         }
         std::string ret = Join(res, 0);

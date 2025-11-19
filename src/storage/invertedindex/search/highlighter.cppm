@@ -21,7 +21,7 @@ import :analyzer;
 namespace infinity {
 
 export struct HighlightInfo {
-    std::vector<std::string> query_terms_;
+    std::string matching_text_;
     std::string analyzer_;
 };
 
@@ -29,10 +29,13 @@ export class Highlighter : public Singleton<Highlighter> {
 public:
     Highlighter(const std::string &pre_tag = "<em>", const std::string &post_tag = "</em>") : pre_tag_(pre_tag), post_tag_(post_tag) {}
 
-    void GetHighlight(const std::vector<std::string> &query, const std::string &raw_text, std::string &output);
+    void GetHighlight(const std::string &matching_text, const std::string &raw_text, std::string &output, Analyzer *analyzer);
 
 private:
-    void GetASCIIWordHighlight(const std::vector<std::string> &query, const std::string &raw_text, std::vector<std::pair<size_t, size_t>> &matches);
+    void GetASCIIWordHighlight(const std::vector<std::string> &query,
+                               const std::string &raw_text,
+                               std::vector<std::pair<size_t, size_t>> &matches,
+                               Analyzer *analyzer);
 
     void GetUnicodeWordHighlight(const std::vector<std::string> &query, const std::string &raw_text, std::vector<std::pair<size_t, size_t>> &matches);
 
