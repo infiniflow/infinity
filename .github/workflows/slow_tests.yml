@@ -40,13 +40,14 @@ jobs:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           fetch-tags: false
+          submodules: recursive
 
       - name: Backup code
         run: |
-          tar --create --gzip --file=infinity.tgz .git $(git ls-files)
+          tar --create --gzip --file=infinity.tgz .git $(git ls-files --recurse-submodules)
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          mkdir -p ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
+          rm -rf ${ARTIFACTS_DIR} && mkdir -p ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
 
   debug_build:
     name: debug_build
@@ -67,7 +68,7 @@ jobs:
           BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Build debug version
         if: ${{ !cancelled() && !failure() }}
@@ -108,7 +109,7 @@ jobs:
           TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER=${TEST_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -152,7 +153,7 @@ jobs:
           TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER=${TEST_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -195,7 +196,7 @@ jobs:
           TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER=${TEST_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -240,7 +241,7 @@ jobs:
           TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER=${TEST_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -289,7 +290,7 @@ jobs:
           BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Build reldeb version
         if: ${{ !cancelled() && !failure() }}
@@ -326,7 +327,7 @@ jobs:
           TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER=${TEST_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Unit test reldeb version
         if: ${{ !cancelled() && !failure() }}
@@ -366,7 +367,7 @@ jobs:
           TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER=${TEST_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -421,7 +422,7 @@ jobs:
           TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER=${TEST_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}

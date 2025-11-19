@@ -30,24 +30,13 @@ namespace fs = std::filesystem;
 class IKAnalyzerTest : public BaseTest {};
 
 TEST_F(IKAnalyzerTest, test1) {
-    // Get the path to the executable using the /proc/self/exe symlink
-    fs::path executablePath = "/proc/self/exe";
-    std::error_code ec;
-    // Resolve the symlink to get the actual path
-    executablePath = fs::canonical(executablePath, ec);
-    if (ec) {
-        std::cerr << "Error resolving the path: " << executablePath << " " << ec.message() << std::endl;
+    fs::path RESOURCE_DIR = "/usr/share/infinity/resource";
+    if (!fs::exists(RESOURCE_DIR)) {
+        std::cerr << "Resource directory doesn't exist: " << RESOURCE_DIR << std::endl;
         return;
     }
 
-    fs::path ROOT_PATH = executablePath.parent_path().parent_path().parent_path().parent_path() / "resource";
-
-    if (!fs::exists(ROOT_PATH)) {
-        std::cerr << "Resource directory doesn't exist: " << ROOT_PATH << std::endl;
-        return;
-    }
-#if 0    
-    IKAnalyzer analyzer(ROOT_PATH.string());
+    IKAnalyzer analyzer(RESOURCE_DIR.string());
     analyzer.Load();
     // analyzer.SetFineGrained(true);
     std::vector<std::string> queries = {
@@ -84,5 +73,4 @@ TEST_F(IKAnalyzerTest, test1) {
         }
         std::cout << std::endl;
     }
-#endif
 }

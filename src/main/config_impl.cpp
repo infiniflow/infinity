@@ -635,7 +635,7 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
         }
 
         // Resource Dir
-        std::string resource_dir = "/var/infinity/resource";
+        std::string resource_dir = "/usr/share/infinity/resource";
         if (default_config != nullptr) {
             resource_dir = default_config->default_resource_dir_;
         }
@@ -2457,7 +2457,7 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
                     switch (option_index) {
                         case GlobalOptionIndex::kResourcePath: {
                             // Resource Dir
-                            std::string resource_dir = "/var/infinity/resource";
+                            std::string resource_dir = "/usr/share/infinity/resource";
                             if (elem.second.is_string()) {
                                 resource_dir = elem.second.value_or(resource_dir);
                             } else {
@@ -2479,8 +2479,8 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
 
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kResourcePath) == nullptr) {
                     // Resource Dir
-                    std::string resource_dir = "/var/infinity/resource";
-                    auto resource_dir_option = std::make_unique<StringOption>("resource_dir", resource_dir);
+                    std::string resource_dir = "/usr/share/infinity/resource";
+                    std::unique_ptr<StringOption> resource_dir_option = std::make_unique<StringOption>("resource_dir", resource_dir);
                     Status status = global_options_.AddOption(std::move(resource_dir_option));
                     if (!status.ok()) {
                         UnrecoverableError(status.message());

@@ -23,7 +23,7 @@ if (NOT CMAKE_TOOLCHAIN_FILE)
     endif ()
 endif ()
 
-project(infinity VERSION 0.6.5)
+project(infinity VERSION 0.6.6)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

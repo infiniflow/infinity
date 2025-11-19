@@ -28,7 +28,7 @@ When creating a full-text index, you are required to specify a tokenizer/analyze
 ```yaml
 [resource]
 # Directory for Infinity's resource files, including dictionaries to be used by analyzers
-resource_dir                  = "/var/infinity/resource"
+resource_dir                  = "/usr/share/infinity/resource"
 ```
 
 The following are Infinity's built-in analyzers/tokenizers.

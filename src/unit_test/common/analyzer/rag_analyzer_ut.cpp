@@ -33,27 +33,19 @@ namespace fs = std::filesystem;
 class RAGAnalyzerTest : public BaseTest {};
 
 TEST_F(RAGAnalyzerTest, test1) {
-    // Get the path to the executable using the /proc/self/exe symlink
-    fs::path executablePath = "/proc/self/exe";
-    std::error_code ec;
-    // Resolve the symlink to get the actual path
-    executablePath = fs::canonical(executablePath, ec);
-    if (ec) {
-        std::cerr << "Error resolving the path: " << executablePath << " " << ec.message() << std::endl;
+    fs::path RESOURCE_DIR = "/usr/share/infinity/resource";
+    if (!fs::exists(RESOURCE_DIR)) {
+        std::cerr << "Resource directory doesn't exist: " << RESOURCE_DIR << std::endl;
         return;
     }
 
-    fs::path ROOT_PATH = executablePath.parent_path().parent_path().parent_path().parent_path() / "resource";
-
-    if (!fs::exists(ROOT_PATH)) {
-        std::cerr << "Resource directory doesn't exist: " << ROOT_PATH << std::endl;
-        return;
-    }
-#if 0
-
-    RAGAnalyzer analyzer(ROOT_PATH.string());
+    RAGAnalyzer analyzer(RESOURCE_DIR.string());
     analyzer.Load();
-    // analyzer.SetFineGrained(true);
+
+    analyzer.SetEnablePosition(true);
+    analyzer.SetFineGrained(false);
+
+    std::cout << "\n=== Original Test ===" << std::endl;
     std::vector<std::string> queries = {
         R"#(哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈)#",
         R"#(公开征求意见稿提出，境外投资者可使用自有人民币或外汇投资。使用外汇投资的，可通过债券持有人在香港人民币业务清算行及香港地区经批准可进入境内银行间外汇市场进行交易的境外人民币业务参加行（以下统称香港结算行）办理外汇资金兑换。香港结算行由此所产生的头寸可到境内银行间外汇市场平盘。使用外汇投资的，在其投资的债券到期或卖出后，原则上应兑换回外汇。)#",
@@ -81,10 +73,123 @@ TEST_F(RAGAnalyzerTest, test1) {
         // String ret = analyzer.Tokenize(query);
         // ret = analyzer.FineGrainedTokenize(ret);
         // std::cout << ret << std::endl;
+        std::cout << "Query: " << query << std::endl;
         for (unsigned i = 0; i < term_list.size(); ++i) {
-            std::cout << " " << term_list[i].text_ << "@" << term_list[i].word_offset_;
+            std::cout << "[" << term_list[i].text_ << "@" << term_list[i].word_offset_ << "," << term_list[i].end_offset_ << "] ";
         }
         std::cout << std::endl;
+        std::cout << "---" << std::endl;
     }
-#endif
+}
+
+// Test basic functionality with fine_grained=false, enable_position=false
+TEST_F(RAGAnalyzerTest, test_basic_mode) {
+    fs::path executablePath = "/proc/self/exe";
+    std::error_code ec;
+    executablePath = fs::canonical(executablePath, ec);
+    if (ec) {
+        std::cerr << "Error resolving the path: " << executablePath << " " << ec.message() << std::endl;
+        return;
+    }
+
+    fs::path ROOT_PATH = executablePath.parent_path().parent_path().parent_path().parent_path() / "resource";
+
+    if (!fs::exists(ROOT_PATH)) {
+        std::cerr << "Resource directory doesn't exist: " << ROOT_PATH << std::endl;
+        return;
+    }
+
+    RAGAnalyzer analyzer(ROOT_PATH.string());
+    analyzer.Load();
+    analyzer.SetFineGrained(false);
+    analyzer.SetEnablePosition(false);
+
+    std::string test_text = "Hello world! 你好世界！";
+    TermList term_list;
+    analyzer.Analyze(test_text, term_list);
+
+    EXPECT_GT(term_list.size(), 0);
+    std::cout << "Basic mode tokens: ";
+    for (const auto &term : term_list) {
+        std::cout << "[" << term.text_ << "] ";
+    }
+    std::cout << std::endl;
+}
+
+// Test Tokenize vs TokenizeWithPosition consistency
+TEST_F(RAGAnalyzerTest, test_tokenize_consistency) {
+    fs::path executablePath = "/proc/self/exe";
+    std::error_code ec;
+    executablePath = fs::canonical(executablePath, ec);
+    if (ec) {
+        std::cerr << "Error resolving the path: " << executablePath << " " << ec.message() << std::endl;
+        return;
+    }
+
+    fs::path ROOT_PATH = executablePath.parent_path().parent_path().parent_path().parent_path() / "resource";
+
+    if (!fs::exists(ROOT_PATH)) {
+        std::cerr << "Resource directory doesn't exist: " << ROOT_PATH << std::endl;
+        return;
+    }
+
+    RAGAnalyzer analyzer(ROOT_PATH.string());
+    analyzer.Load();
+    analyzer.SetFineGrained(false); // Test non-fine-grained mode first
+
+    std::vector<std::string> test_cases = {"hello world",
+                                           "Hello world!",
+                                           "Hello world! 你好世界！",
+                                           "Python编程语言是一种powerful的编程工具",
+                                           "The running dogs are barking loudly"};
+
+    for (const auto &test_case : test_cases) {
+        std::cout << "Testing: " << test_case << std::endl;
+
+        // Test Tokenize (returns string)
+        std::string tokenize_result_str = analyzer.Tokenize(test_case);
+        std::vector<std::string> tokenize_result;
+        std::istringstream iss(tokenize_result_str);
+        std::string token;
+        while (iss >> token) {
+            tokenize_result.push_back(token);
+        }
+
+        // Test TokenizeWithPosition (returns vector of tokens and positions)
+        auto [tokenize_with_pos_result, positions] = analyzer.TokenizeWithPosition(test_case);
+
+        // Compare token counts
+        std::cout << "  Tokenize count: " << tokenize_result.size() << ", TokenizeWithPosition count: " << tokenize_with_pos_result.size()
+                  << std::endl;
+
+        std::cout << "  Tokenize result: ";
+        for (const auto &token : tokenize_result) {
+            std::cout << "[" << token << "] ";
+        }
+        std::cout << std::endl;
+
+        std::cout << "  TokenizeWithPosition result: ";
+        for (const auto &token : tokenize_with_pos_result) {
+            std::cout << "[" << token << "] ";
+        }
+        std::cout << std::endl;
+
+        // Check if results are identical
+        bool tokens_match = (tokenize_result.size() == tokenize_with_pos_result.size());
+        if (tokens_match) {
+            for (size_t i = 0; i < tokenize_result.size(); ++i) {
+                if (tokenize_result[i] != tokenize_with_pos_result[i]) {
+                    tokens_match = false;
+                    break;
+                }
+            }
+        }
+
+        EXPECT_TRUE(tokens_match) << "Tokenize results don't match for: " << test_case;
+
+        if (!tokens_match) {
+            std::cout << "  *** MISMATCH DETECTED ***" << std::endl;
+        }
+        std::cout << "---" << std::endl;
+    }
 }

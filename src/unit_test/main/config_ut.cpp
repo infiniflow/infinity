@@ -38,7 +38,7 @@ TEST_F(ConfigTest, test1) {
     auto status = config.Init(path, nullptr);
     ASSERT_TRUE(status.ok());
 
-    EXPECT_EQ(config.Version(), "0.6.5");
+    EXPECT_EQ(config.Version(), "0.6.6");
     EXPECT_EQ(config.TimeZone(), "UTC");
     EXPECT_EQ(config.TimeZoneBias(), 8);
     EXPECT_EQ(config.CPULimit(), std::thread::hardware_concurrency());
@@ -86,7 +86,7 @@ TEST_F(ConfigTest, test2) {
     auto status = config.Init(path, nullptr);
     ASSERT_TRUE(status.ok());
 
-    EXPECT_EQ(config.Version(), "0.6.5");
+    EXPECT_EQ(config.Version(), "0.6.6");
     EXPECT_EQ(config.TimeZone(), "UTC");
     EXPECT_EQ(config.TimeZoneBias(), -8);
 
@@ -208,7 +208,7 @@ TEST_F(ConfigTest, TestValidValues) {
     auto status = config.Init(path, nullptr);
     ASSERT_TRUE(status.ok());
 
-    EXPECT_EQ(config.Version(), "0.6.5");
+    EXPECT_EQ(config.Version(), "0.6.6");
     EXPECT_EQ(config.TimeZone(), "UTC");
     EXPECT_EQ(config.TimeZoneBias(), -8);
     EXPECT_EQ(config.CPULimit(), 2);
@@ -254,7 +254,7 @@ TEST_F(ConfigTest, TestValidValues) {
     EXPECT_EQ(config.CheckpointInterval(), 86400l);
     EXPECT_EQ(config.WALCompactThreshold(), 1024l * 1024l * 1024l);
     // resource
-    EXPECT_EQ(config.ResourcePath(), "/var/infinity/resource");
+    EXPECT_EQ(config.ResourcePath(), "/usr/share/infinity/resource");
     // persistence
     EXPECT_EQ(config.PersistenceDir(), "/var/infinity/persistence");
 }
