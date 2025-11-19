@@ -1267,6 +1267,13 @@ void RAGAnalyzer::TokenizeInner(std::vector<std::string> &res, const std::string
 
     if (s1 > s) {
         tks = tks1;
+        // Recalculate diff array with the new tks size
+        diff.assign(std::max(tks.size(), tks1.size()), 0);
+        for (std::size_t i = 0; i < std::min(tks.size(), tks1.size()); ++i) {
+            if (tks[i] != tks1[i]) {
+                diff[i] = 1;
+            }
+        }
     }
     
     // Debug for specific test case
@@ -1591,6 +1598,13 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
 
     if (s1 > s) {
         tks = tks1;
+        // Recalculate diff array with the new tks size
+        diff.assign(std::max(tks.size(), tks1.size()), 0);
+        for (std::size_t i = 0; i < std::min(tks.size(), tks1.size()); ++i) {
+            if (tks[i] != tks1[i]) {
+                diff[i] = 1;
+            }
+        }
     }
 
     std::size_t i = 0;
