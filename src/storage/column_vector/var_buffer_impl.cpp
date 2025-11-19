@@ -62,12 +62,29 @@ const char *VarBuffer::Get(size_t offset, size_t size) const {
     auto &buffers = std::get<std::vector<std::unique_ptr<char[]>>>(buffers_);
     std::shared_lock lock(mtx_);
     // find the last index i such that buffer_size_prefix_sum_[i] <= offset
-    auto it = std::lower_bound(buffer_size_prefix_sum_.begin(), buffer_size_prefix_sum_.end(), offset);
+
+    // if (offset == buffer_size_prefix_sum_.back()) {
+    //     size_t i = buffer_size_prefix_sum_.size();
+    //     size_t offset_in_buffer = offset - buffer_size_prefix_sum_[i];
+    //     if (offset_in_buffer + size > buffer_size_prefix_sum_[i + 1]) {
+    //         std::string error_msg =
+    //             fmt::format("offset {} and size {} is out of range [{}, {})", offset, size, buffer_size_prefix_sum_[i], buffer_size_prefix_sum_[i +
+    //             1]);
+    //         UnrecoverableError(error_msg);
+    //     }
+    //     return buffers[i].get() + offset_in_buffer;
+    // }
+
+    auto it = std::upper_bound(buffer_size_prefix_sum_.begin(), buffer_size_prefix_sum_.end(), offset);
     if (it == buffer_size_prefix_sum_.end()) {
         std::string error_msg = fmt::format("offset {} is out of range {}", offset, buffer_size_prefix_sum_.back());
         UnrecoverableError(error_msg);
     }
-    size_t i = std::distance(buffer_size_prefix_sum_.begin(), it);
+    if (it == buffer_size_prefix_sum_.begin()) {
+        std::string error_msg = fmt::format("prefix_sum[0] should be 0, but got {}", *it);
+        UnrecoverableError(error_msg);
+    }
+    size_t i = std::distance(buffer_size_prefix_sum_.begin(), it) - 1;
     size_t offset_in_buffer = offset - buffer_size_prefix_sum_[i];
     if (offset_in_buffer + size > buffer_size_prefix_sum_[i + 1]) {
         std::string error_msg =
