@@ -35,7 +35,6 @@ def main():
     latest_avg = get_average_time(latest_fp)
     if latest_avg < 0:
         print("Latest benchmark average time: INVALID")
-        print(latest_avg)
         sys.exit(1)
     difference_percentage = 100 * (latest_avg - golden_avg) / golden_avg
     print(
