@@ -35,23 +35,13 @@ public:
         infinity::GlobalResourceUsage::Init();
 #endif
 
-        // Get the path to the executable using the /proc/self/exe symlink
-        fs::path executablePath = "/proc/self/exe";
-        std::error_code ec;
-        // Resolve the symlink to get the actual path
-        executablePath = fs::canonical(executablePath, ec);
-        if (ec) {
-            std::cerr << "Error resolving the path: " << executablePath << " " << ec.message() << std::endl;
+        fs::path RESOURCE_DIR = "/usr/share/infinity/resource";
+        if (!fs::exists(RESOURCE_DIR)) {
+            std::cerr << "Resource directory doesn't exist: " << RESOURCE_DIR << std::endl;
             return;
         }
 
-        fs::path ROOT_PATH = executablePath.parent_path().parent_path().parent_path().parent_path() / "resource";
-        if (!fs::exists(ROOT_PATH)) {
-            std::cerr << "Resource directory doesn't exist: " << ROOT_PATH << std::endl;
-            return;
-        }
-
-        analyzer_ = new RAGAnalyzer(ROOT_PATH.string());
+        analyzer_ = new RAGAnalyzer(RESOURCE_DIR.string());
         analyzer_->Load();
 
         analyzer_->SetEnablePosition(true);
