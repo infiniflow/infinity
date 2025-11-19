@@ -31,6 +31,9 @@ using namespace infinity;
 
 class DatabaseSnapshotTest : public NewRequestTest {
 public:
+    std::mutex mtx_{};
+    std::condition_variable cv_{};
+    bool ready_{false};
     std::vector<std::shared_ptr<std::string>> db_snapshot_names;
 
     void TearDown() override {
@@ -142,11 +145,16 @@ public:
     }
 };
 
+// INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+//                          DatabaseSnapshotTest,
+//                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
+
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          DatabaseSnapshotTest,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
 TEST_P(DatabaseSnapshotTest, test_restore_database_rollback_basic) {
+    LOG_INFO("--test_restore_database_rollback_basic--");
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     // Test restore database
@@ -205,5 +213,77 @@ TEST_P(DatabaseSnapshotTest, test_restore_database_rollback_basic) {
         ASSERT_FALSE(status.ok());
         status = txn_mgr->CommitTxn(txn);
         ASSERT_TRUE(status.ok());
+    }
+}
+
+TEST_P(DatabaseSnapshotTest, test_restore_database_create_database_multithreaded) {
+    LOG_INFO("--test_restore_database_create_database_multithreaded--");
+
+    auto thread_restore_database = [this]() {
+        NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            ready_ = true;
+            cv_.notify_one();
+        }
+
+        {
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("restore database"), TransactionType::kRestoreDatabase);
+
+            std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+            std::shared_ptr<DatabaseSnapshotInfo> database_snapshot;
+            Status status;
+            std::tie(database_snapshot, status) = DatabaseSnapshotInfo::Deserialize(snapshot_dir, *db_snapshot_names[0]);
+            EXPECT_TRUE(status.ok());
+
+            status = txn->RestoreDatabaseSnapshot(database_snapshot);
+            if (!status.ok()) {
+                LOG_INFO(fmt::format("RestoreDatabaseSnapshot failed, {}", status.message()));
+                status = txn->Rollback();
+                EXPECT_TRUE(status.ok());
+                return;
+            }
+
+            status = txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+
+            {
+                auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
+                auto [table_info, status] = txn->GetTableInfo("db_0", "db_0_tb_1");
+                EXPECT_TRUE(status.ok());
+                status = txn_mgr->CommitTxn(txn);
+                EXPECT_TRUE(status.ok());
+            }
+        }
+    };
+
+    auto thread_create_database = [this]() {
+        NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+        {
+            std::unique_lock<std::mutex> lock(mtx_);
+            cv_.wait(lock, [this] { return ready_; });
+            ready_ = false;
+        }
+
+        // Create database
+        {
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
+            Status status = txn->CreateDatabase("db_0", ConflictType::kError, std::make_shared<std::string>());
+            ASSERT_TRUE(status.ok());
+            status = txn_mgr->CommitTxn(txn);
+            ASSERT_TRUE(status.ok());
+        }
+    };
+
+    std::thread worker(thread_restore_database);
+    std::thread waiter(thread_create_database);
+
+    if (worker.joinable()) {
+        worker.join();
+    }
+    if (waiter.joinable()) {
+        waiter.join();
     }
 }
