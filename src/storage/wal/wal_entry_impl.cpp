@@ -643,6 +643,13 @@ std::shared_ptr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             cmd = std::make_shared<WalCmdCreateTableSnapshot>(db_name, table_name, snapshot_name, max_commit_ts);
             break;
         }
+        case WalCommandType::CREATE_DB_SNAPSHOT: {
+            std::string db_name = ReadBufAdv<std::string>(ptr);
+            std::string snapshot_name = ReadBufAdv<std::string>(ptr);
+            TxnTimeStamp max_commit_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+            cmd = std::make_shared<WalCmdCreateDBSnapshot>(db_name, snapshot_name, max_commit_ts);
+            break;
+        }
         case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
             std::string db_name = ReadBufAdv<std::string>(ptr);
             std::string db_id = ReadBufAdv<std::string>(ptr);
@@ -722,6 +729,13 @@ WalCmdCreateIndexV2 WalCmdCreateIndexV2::ReadBufferAdv(const char *&ptr, i32 max
     WalCmdCreateIndexV2 cmd(db_name, db_id, table_name, table_id, index_id, index_base, table_key);
     cmd.segment_index_infos_ = std::move(segment_index_infos);
     return cmd;
+}
+
+WalCmdCreateDBSnapshot WalCmdCreateDBSnapshot::ReadBufferAdv(const char *&ptr, i32 max_bytes) {
+    std::string db_name = ReadBufAdv<std::string>(ptr);
+    std::string snapshot_name = ReadBufAdv<std::string>(ptr);
+    TxnTimeStamp max_commit_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+    return WalCmdCreateDBSnapshot(db_name, snapshot_name, max_commit_ts);
 }
 
 WalCmdRestoreTableSnapshot WalCmdRestoreTableSnapshot::ReadBufferAdv(const char *&ptr, i32 max_bytes) {
@@ -906,6 +920,12 @@ bool WalCmdCreateTableSnapshot::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCreateTableSnapshot *>(&other);
     return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ &&
            snapshot_name_ == other_cmd->snapshot_name_ && max_commit_ts_ == other_cmd->max_commit_ts_;
+}
+
+bool WalCmdCreateDBSnapshot::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdCreateDBSnapshot *>(&other);
+    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && snapshot_name_ == other_cmd->snapshot_name_ &&
+           max_commit_ts_ == other_cmd->max_commit_ts_;
 }
 
 bool WalCmdRestoreTableSnapshot::operator==(const WalCmd &other) const {
@@ -1108,6 +1128,10 @@ i32 WalCmdCreateTableSnapshot::GetSizeInBytes() const {
            sizeof(max_commit_ts_);
 }
 
+i32 WalCmdCreateDBSnapshot::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + snapshot_name_.size() + sizeof(max_commit_ts_);
+}
+
 i32 WalCmdRestoreDatabaseSnapshot::GetSizeInBytes() const {
     i32 size = sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + db_id_str_.size() + sizeof(i32) + db_comment_.size();
     size += sizeof(i32);
@@ -1211,6 +1235,13 @@ void WalCmdCreateTableSnapshot::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_TABLE_SNAPSHOT);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->snapshot_name_);
+    WriteBufAdv(buf, this->max_commit_ts_);
+}
+
+void WalCmdCreateDBSnapshot::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::CREATE_DB_SNAPSHOT);
+    WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->snapshot_name_);
     WriteBufAdv(buf, this->max_commit_ts_);
 }
@@ -1820,6 +1851,14 @@ std::string WalCmdCreateTableSnapshot::CompactInfo() const {
                        max_commit_ts_);
 }
 
+std::string WalCmdCreateDBSnapshot::CompactInfo() const {
+    return fmt::format("{}: database: {}, snapshot: {}, max_commit_ts: {}",
+                       WalCmd::WalCommandTypeToString(GetType()),
+                       db_name_,
+                       snapshot_name_,
+                       max_commit_ts_);
+}
+
 std::string WalCmdRestoreTableSnapshot::CompactInfo() const {
     return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, table_def: {}, segment_count: {}, index_count: {}, files_count: {}",
                        WalCmd::WalCommandTypeToString(GetType()),
@@ -1837,6 +1876,12 @@ std::string WalCmdCreateTableSnapshot::ToString() const {
     std::stringstream ss;
     ss << "db_name: " << db_name_ << ", table_name: " << table_name_ << ", snapshot_name: " << snapshot_name_ << ", max_commit_ts: " << max_commit_ts_
        << std::endl;
+    return std::move(ss).str();
+}
+
+std::string WalCmdCreateDBSnapshot::ToString() const {
+    std::stringstream ss;
+    ss << "db_name: " << db_name_ << ", snapshot_name: " << snapshot_name_ << ", max_commit_ts: " << max_commit_ts_ << std::endl;
     return std::move(ss).str();
 }
 
@@ -2007,6 +2052,8 @@ std::vector<std::shared_ptr<EraseBaseCache>> WalCmdDropColumnsV2::ToCachedMeta(T
 std::vector<std::shared_ptr<EraseBaseCache>> WalCmdCleanup::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
 
 std::vector<std::shared_ptr<EraseBaseCache>> WalCmdCreateTableSnapshot::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
+
+std::vector<std::shared_ptr<EraseBaseCache>> WalCmdCreateDBSnapshot::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
 
 std::vector<std::shared_ptr<EraseBaseCache>> WalCmdRestoreTableSnapshot::ToCachedMeta(TxnTimeStamp commit_ts) const {
     std::vector<std::shared_ptr<EraseBaseCache>> cache_items;
@@ -2307,6 +2354,9 @@ std::string WalCmd::WalCommandTypeToString(WalCommandType type) {
             break;
         case WalCommandType::CREATE_TABLE_SNAPSHOT:
             command = "CREATE_TABLE_SNAPSHOT";
+            break;
+        case WalCommandType::CREATE_DB_SNAPSHOT:
+            command = "CREATE_DB_SNAPSHOT";
             break;
         default: {
             UnrecoverableError("Unknown command type");
