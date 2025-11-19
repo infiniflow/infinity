@@ -25,7 +25,7 @@ temp_dir                 = "/var/infinity/tmp"
 wal_dir                  = "/var/infinity/wal"
 
 [resource]
-resource_dir             = "/var/infinity/resource"
+resource_dir             = "/usr/share/infinity/resource"
 
 [persistence]
 enabled                  = true

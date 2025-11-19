@@ -5,3 +5,5 @@ if ! id -u infinity > /dev/null 2>&1 ; then
 fi
 
 mkdir -p /var/infinity && chown -R infinity /var/infinity
+
+mkdir -p /usr/share/infinity/resource && chown -R infinity /usr/share/infinity/resource

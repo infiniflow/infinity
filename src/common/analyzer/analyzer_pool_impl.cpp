@@ -78,7 +78,7 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
                 if (config == nullptr) {
                     // InfinityContext has not been initialized.
                     // For unit test only
-                    path = "/var/infinity/resource";
+                    path = "/usr/share/infinity/resource";
                 } else {
                     path = config->ResourcePath();
                 }
@@ -111,7 +111,7 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
                 if (config == nullptr) {
                     // InfinityContext has not been initialized.
                     // For unit test only
-                    path = "/var/infinity/resource";
+                    path = "/usr/share/infinity/resource";
                 } else {
                     path = config->ResourcePath();
                 }
@@ -144,7 +144,7 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
                 if (config == nullptr) {
                     // InfinityContext has not been initialized.
                     // For unit test only
-                    path = "/var/infinity/resource";
+                    path = "/usr/share/infinity/resource";
                 } else {
                     path = config->ResourcePath();
                 }
@@ -176,7 +176,7 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
                 if (config == nullptr) {
                     // InfinityContext has not been initialized.
                     // For unit test only
-                    path = "/var/infinity/resource";
+                    path = "/usr/share/infinity/resource";
                 } else {
                     path = config->ResourcePath();
                 }
@@ -208,7 +208,7 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
                 if (config == nullptr) {
                     // InfinityContext has not been initialized.
                     // For unit test only
-                    path = "/var/infinity/resource";
+                    path = "/usr/share/infinity/resource";
                 } else {
                     path = config->ResourcePath();
                 }
@@ -229,7 +229,7 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
                 if (auto *config = InfinityContext::instance().config(); config == nullptr) {
                     // InfinityContext has not been initialized.
                     // For unit test only
-                    path = "/var/infinity/resource";
+                    path = "/usr/share/infinity/resource";
                 } else {
                     path = config->ResourcePath();
                 }

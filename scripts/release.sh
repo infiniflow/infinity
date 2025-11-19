@@ -34,6 +34,7 @@ function git_retag() {
 }
 
 function build() {
+    git submodule update --init --recursive
     if ! docker ps --format '{{.Names}}' | grep -qw "^$BUILDER_CONTAINER$"; then
         TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
         docker run -d --privileged --name $BUILDER_CONTAINER -e TZ=$TZ -v $HOME:$HOME -v /boot:/boot --network host --hostname $BUILDER_CONTAINER $BUILDER_IMAGE

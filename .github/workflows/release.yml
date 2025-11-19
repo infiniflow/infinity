@@ -27,6 +27,8 @@ jobs:
     # https://github.com/actions/checkout/blob/v5/README.md
     - name: Check out code
       uses: actions/checkout@v5
+      with:
+        submodules: recursive
 
     - name: Prepare release body
       run: |

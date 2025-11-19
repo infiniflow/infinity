@@ -40,13 +40,14 @@ jobs:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           fetch-tags: false
+          submodules: recursive
 
       - name: Backup code
         run: |
-          tar --create --gzip --file=infinity.tgz .git $(git ls-files)
+          tar --create --gzip --file=infinity.tgz .git $(git ls-files --recurse-submodules)
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          mkdir -p ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
+          rm -rf ${ARTIFACTS_DIR} && mkdir -p ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
 
   debug_build:
     name: debug_build

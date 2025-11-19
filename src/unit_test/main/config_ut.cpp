@@ -254,7 +254,7 @@ TEST_F(ConfigTest, TestValidValues) {
     EXPECT_EQ(config.CheckpointInterval(), 86400l);
     EXPECT_EQ(config.WALCompactThreshold(), 1024l * 1024l * 1024l);
     // resource
-    EXPECT_EQ(config.ResourcePath(), "/var/infinity/resource");
+    EXPECT_EQ(config.ResourcePath(), "/usr/share/infinity/resource");
     // persistence
     EXPECT_EQ(config.PersistenceDir(), "/var/infinity/persistence");
 }
