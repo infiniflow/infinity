@@ -209,15 +209,19 @@ Status FileWorker::CleanupFile() const {
             handler.HandleWriteResult(result_data);
         }
 
-        return Status::OK();
+        // return Status::OK();
     }
 
     auto status = VirtualStore::DeleteFile(GetFilePathTemp());
+    VirtualStore::DeleteFile(temp_dict_path);
+    VirtualStore::DeleteFile(temp_posting_path);
     // if (!status.ok()) {
     //     return status;
     // }
     status = VirtualStore::DeleteFile(GetFilePath());
-    return status;
+    status = VirtualStore::DeleteFile(data_dict_path);
+    status = VirtualStore::DeleteFile(data_posting_path);
+    return Status::OK();
 }
 
 } // namespace infinity
