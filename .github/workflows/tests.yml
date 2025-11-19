@@ -101,7 +101,7 @@ jobs:
           echo "CHECK_CONTAINER=${CHECK_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${CHECK_CONTAINER} -e TZ=${TZ} \
-            -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+            -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Check format of changed C/C++ files
         if: ${{ !cancelled() && !failure() }}
