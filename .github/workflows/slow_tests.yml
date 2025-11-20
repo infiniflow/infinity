@@ -126,7 +126,7 @@ jobs:
         run: |
           if [[ -n "${MINIO_CONTAINER}" ]]; then sudo docker rm -f -v "${MINIO_CONTAINER}"; fi
           if [[ -n "${TEST_CONTAINER}" ]]; then sudo docker rm -f -v "${TEST_CONTAINER}"; fi
-          rm -rf ${MINIO_CONTAINER}
+          sudo rm -rf ${MINIO_CONTAINER}
 
   debug_tsan_restart_test:
     name: debug_tsan_restart_test
@@ -204,7 +204,7 @@ jobs:
 
       - name: Run cluster test
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug-tsan/src/infinity"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug-tsan/src/infinity"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -241,7 +241,8 @@ jobs:
           TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER=${TEST_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu20_clang20
+          rm -rf ${PWD}/var_infinity && mkdir -p ${PWD}/var_infinity
+          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity -v ${PWD}/var_infinity:/var/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -261,7 +262,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_tsan_parallel_test && sudo chown -R ${USER} . && cp debug_tsan_parallel*.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
-          sudo docker cp ${TEST_CONTAINER}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
+          cp var_infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
           echo "debug tsan parallel log" && tail -n 1000 debug_tsan_parallel*.log
 
       - name: Remove test container
@@ -270,6 +271,7 @@ jobs:
           if [[ -n "${TEST_CONTAINER}" ]]; then
             sudo docker rm -f -v "${TEST_CONTAINER}"
           fi
+          sudo rm -rf ${PWD}/var_infinity
 
   reldeb_build:
     name: reldeb_build
@@ -344,7 +346,7 @@ jobs:
         run: |
           if [[ -n "${MINIO_CONTAINER}" ]]; then sudo docker rm -f -v "${MINIO_CONTAINER}"; fi
           if [[ -n "${TEST_CONTAINER}" ]]; then sudo docker rm -f -v "${TEST_CONTAINER}"; fi
-          rm -rf ${MINIO_CONTAINER}
+          sudo rm -rf ${MINIO_CONTAINER}
 
   reldeb_parallel_test:
     name: reldeb_parallel_test
@@ -367,7 +369,8 @@ jobs:
           TEST_CONTAINER=infinity_test_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "TEST_CONTAINER=${TEST_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu20_clang20
+          rm -rf ${PWD}/var_infinity && mkdir -p ${PWD}/var_infinity
+          sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity -v ${PWD}/var_infinity:/var/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -387,7 +390,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_parallel_test && cp reldeb_parallel_stderr.log ${ARTIFACTS_DIR}/reldeb_parallel_test/
-          sudo docker cp ${TEST_CONTAINER}:/var/infinity/log/infinity.log ${ARTIFACTS_DIR}/reldeb_parallel_test/
+          cp var_infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_parallel_test/
           echo "reldeb parallel log" && tail -n 1000 reldeb_parallel*.log
 
       - name: Remove test container
@@ -396,6 +399,7 @@ jobs:
           if [[ -n "${TEST_CONTAINER}" ]]; then
             sudo docker rm -f -v "${TEST_CONTAINER}"
           fi
+          sudo rm -rf ${PWD}/var_infinity
 
   reldeb_restart_test:
     name: reldeb_restart_test
