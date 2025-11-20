@@ -1390,7 +1390,11 @@ void RAGAnalyzer::SplitLongText(const std::string &L, u32 length, std::vector<st
 }
 
 std::string RAGAnalyzer::Tokenize(const std::string &line) {
-    std::string str1 = StrQ2B(line);
+    // Python-style simple tokenization: re.sub(r"\W+", " ", line)
+    std::string processed_line = line;
+    re2::RE2::GlobalReplace(&processed_line, non_word_pattern_, " ");
+
+    std::string str1 = StrQ2B(processed_line);
     std::string strline;
     opencc_->convert(str1, strline);
     std::vector<std::string> res;
@@ -1448,7 +1452,10 @@ std::string RAGAnalyzer::Tokenize(const std::string &line) {
 }
 
 std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> RAGAnalyzer::TokenizeWithPosition(const std::string &line) {
-    std::string str1 = StrQ2B(line);
+    // Python-style simple tokenization: re.sub(r"\W+", " ", line)
+    std::string processed_line = line;
+    re2::RE2::GlobalReplace(&processed_line, non_word_pattern_, " ");
+    std::string str1 = StrQ2B(processed_line);
     std::string strline;
     opencc_->convert(str1, strline);
     std::vector<std::string> tokens;
@@ -1456,7 +1463,7 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
 
     // Build character position mapping from converted string back to original string
     std::vector<unsigned> pos_mapping;
-    BuildPositionMapping(line, strline, pos_mapping);
+    BuildPositionMapping(processed_line, strline, pos_mapping);
 
     std::size_t alpha_num = 0;
     int len = UTF8Length(strline);
@@ -1508,7 +1515,6 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
             if (L.empty()) {
                 continue;
             }
-
             std::size_t processed_pos = strline.find(L, current_pos);
             if (processed_pos == std::string::npos) {
                 continue;
@@ -1600,7 +1606,6 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
             diff[i] = 1;
         }
     }
-
     if (s1 > s) {
         tks = tks1;
         // Recalculate diff array with the new tks size

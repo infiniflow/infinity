@@ -151,11 +151,14 @@ public:
 
     re2::RE2 pattern5_{"[a-z\\.-]+"};
 
-    re2::RE2 regex_split_pattern_{R"#(([ ,\.<>/?;'\[\]\`!@#$%^&*$$\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z\.-]+|[0-9,\.-]+))#"};
+    re2::RE2 regex_split_pattern_{R"#(([ ,\.<>/?;:'\[\]\\`!@#$%^&*\(\)\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z0-9,\.-]+))#"};
 
     re2::RE2 blank_pattern_{"( )"};
 
     re2::RE2 replace_space_pattern_{R"#(([ ]+))#"};
+
+    // Python-style non-word character pattern for simple tokenization
+    re2::RE2 non_word_pattern_{R"#(\W+)#"};
 };
 
 export void SentenceSplitter(const std::string &text, std::vector<std::string> &result);
