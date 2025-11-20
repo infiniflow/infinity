@@ -1454,6 +1454,30 @@ std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSna
     return {std::move(database_snapshot_info), Status::OK()};
 }
 
+std::tuple<std::shared_ptr<SystemSnapshotInfo>, Status> NewTxn::GetSystemSnapshotInfo() {
+    std::vector<std::string> *db_id_strs_ptr;
+    std::vector<std::string> *db_names_ptr;
+    CatalogMeta catalog_meta(this);
+    Status status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    std::shared_ptr<SystemSnapshotInfo> system_snapshot_info = std::make_shared<SystemSnapshotInfo>();
+
+    size_t db_count = db_id_strs_ptr->size();
+    for (size_t idx = 0; idx < db_count; ++idx) {
+        const std::string &db_name = db_names_ptr->at(idx);
+        auto [database_snapshot, status] = this->GetDatabaseSnapshotInfo(db_name);
+        if (!status.ok()) {
+            return {nullptr, status};
+        }
+        system_snapshot_info->database_snapshots_.push_back(database_snapshot);
+    }
+
+    return {std::move(system_snapshot_info), Status::OK()};
+}
+
 Status NewTxn::RestoreTableSnapshot(const std::string &db_name, const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info) {
     // Cleanup();
     const std::string &table_name = table_snapshot_info->table_name_;
@@ -1694,6 +1718,18 @@ Status NewTxn::CreateDBSnapshotFile(std::shared_ptr<DatabaseSnapshotInfo> db_sna
     for (auto &table_snapshot_info : table_snapshots) {
         table_snapshot_info->snapshot_name_ = db_snapshot_info->snapshot_name_;
         Status status = CreateTableSnapshotFile(table_snapshot_info, option);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewTxn::CreateSystemSnapshotFile(std::shared_ptr<SystemSnapshotInfo> system_snapshot_info, const SnapshotOption &option) {
+    auto &database_snapshots = system_snapshot_info->database_snapshots_;
+    for (auto &database_snapshot_info : database_snapshots) {
+        database_snapshot_info->snapshot_name_ = system_snapshot_info->snapshot_name_;
+        Status status = CreateDBSnapshotFile(database_snapshot_info, option);
         if (!status.ok()) {
             return status;
         }
@@ -2233,6 +2269,18 @@ Status NewTxn::PrepareCommit() {
                 }
                 auto *create_db_snapshot_cmd = static_cast<WalCmdCreateDBSnapshot *>(command.get());
                 Status status = PrepareCommitCreateDBSnapshot(create_db_snapshot_cmd);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case WalCommandType::CREATE_SYSTEM_SNAPSHOT: {
+                if (this->IsReplay()) {
+                    LOG_TRACE("Skip replay of CREATE_SYSTEM_SNAPSHOT command.");
+                    break;
+                }
+                auto *create_system_snapshot_cmd = static_cast<WalCmdCreateSystemSnapshot *>(command.get());
+                Status status = PrepareCommitCreateSystemSnapshot(create_system_snapshot_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -5581,7 +5629,25 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
             std::string snapshot_name = create_txn_store->snapshot_name_;
 
             std::shared_ptr<SystemSnapshotInfo> system_snapshot_info;
+            std::tie(system_snapshot_info, status) = GetSystemSnapshotInfo();
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
+            system_snapshot_info->snapshot_name_ = snapshot_name;
 
+            // Create system snapshot files
+            status = CreateSystemSnapshotFile(system_snapshot_info, option);
+            if (!status.ok()) {
+                return status;
+            }
+
+            // Create JSON file
+            nlohmann::json json_res = system_snapshot_info->CreateSnapshotMetadataJSON();
+            std::string json_string = json_res.dump();
+            status = CreateJSONSnapshotFile(json_string, snapshot_name);
+            if (!status.ok()) {
+                return status;
+            }
             break;
         }
         case SnapshotType::kUnknown: {

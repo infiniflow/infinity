@@ -291,6 +291,8 @@ public:
 
     std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> GetDatabaseSnapshotInfo(const std::string &db_name);
 
+    std::tuple<std::shared_ptr<SystemSnapshotInfo>, Status> GetSystemSnapshotInfo();
+
     Status RestoreDatabaseSnapshot(const std::shared_ptr<DatabaseSnapshotInfo> &database_snapshot_info);
 
     friend class NewTxnManager;
@@ -558,6 +560,7 @@ private:
     Status CheckpointDB(DBMeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
     Status CheckpointTable(TableMeta &table_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
 
+    Status CreateSystemSnapshotFile(std::shared_ptr<SystemSnapshotInfo> system_snapshot_info, const SnapshotOption &option);
     Status CreateDBSnapshotFile(std::shared_ptr<DatabaseSnapshotInfo> db_snapshot_info, const SnapshotOption &option);
     Status CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_snapshot_info, const SnapshotOption &option);
     Status CreateJSONSnapshotFile(std::string json_string, std::string snapshot_name);
