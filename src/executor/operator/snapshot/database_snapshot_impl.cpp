@@ -31,6 +31,26 @@ import third_party;
 
 namespace infinity {
 
+Status Snapshot::RestoreSystemSnapshot(QueryContext *query_context, const std::string &snapshot_name) {
+    auto *txn_ptr = query_context->GetNewTxn();
+    std::string snapshot_dir = query_context->global_config()->SnapshotDir();
+
+    std::shared_ptr<SystemSnapshotInfo> system_snapshot;
+    Status status;
+    std::tie(system_snapshot, status) = SystemSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
+    if (!status.ok()) {
+        return status;
+    }
+
+    LOG_INFO(fmt::format("txn type: {}", TransactionType2Str(txn_ptr->GetTxnType())));
+
+    status = txn_ptr->RestoreSystemSnapshot(system_snapshot);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
 Status Snapshot::CreateDatabaseSnapshot(QueryContext *query_context, const std::string &snapshot_name, const std::string &db_name) {
     auto *txn_ptr = query_context->GetNewTxn();
     auto *txn_mgr = txn_ptr->txn_mgr();

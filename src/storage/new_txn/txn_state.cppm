@@ -75,6 +75,7 @@ export enum class TransactionType {
     kCreateTable,
     kRestoreTable,
     kRestoreDatabase,
+    kRestoreSystem,
     kDropDB,
     kDropTable,
     kRenameTable,
@@ -150,6 +151,9 @@ export inline std::string TransactionType2Str(TransactionType txn_type) {
         }
         case TransactionType::kRestoreDatabase: {
             return "RestoreDatabase";
+        }
+        case TransactionType::kRestoreSystem: {
+            return "RestoreSystem";
         }
         case TransactionType::kRenameTable: {
             return "RenameTable";

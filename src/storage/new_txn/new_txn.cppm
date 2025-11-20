@@ -295,6 +295,8 @@ public:
 
     Status RestoreDatabaseSnapshot(const std::shared_ptr<DatabaseSnapshotInfo> &database_snapshot_info);
 
+    Status RestoreSystemSnapshot(const std::shared_ptr<SystemSnapshotInfo> &system_snapshot_info);
+
     friend class NewTxnManager;
 
 private:

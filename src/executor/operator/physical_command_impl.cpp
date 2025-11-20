@@ -533,6 +533,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     switch (snapshot_scope) {
                         case SnapshotScope::kSystem: {
                             LOG_INFO(fmt::format("Execute snapshot system restore"));
+                            Status snapshot_status = Snapshot::RestoreSystemSnapshot(query_context, snapshot_name);
+                            if (!snapshot_status.ok()) {
+                                RecoverableError(snapshot_status);
+                            }
                             break;
                         }
                         case SnapshotScope::kDatabase: {

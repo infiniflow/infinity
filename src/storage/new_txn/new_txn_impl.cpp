@@ -1409,13 +1409,6 @@ Status NewTxn::CreateSystemSnapshot(const std::string &snapshot_name) {
 }
 
 std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSnapshotInfo(const std::string &db_name) {
-    if (db_name_.empty()) {
-        db_name_ = db_name;
-    } else if (db_name_ != db_name) {
-        std::unique_ptr<std::string> err_msg = std::make_unique<std::string>(fmt::format("Attempt to get table from another database {}", db_name));
-        RecoverableError(Status::InvalidIdentifierName(db_name));
-    }
-
     std::shared_ptr<DBMeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
@@ -1436,8 +1429,15 @@ std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSna
     // std::string *db_comment = nullptr;
     // status = db_meta->GetComment(db_comment);
     // database_snapshot_info->db_comment_ = *db_comment;
-    database_snapshot_info->db_next_table_id_str_ = std::to_string(std::stoull(table_ids_ptr->back()) + 1);
-    for (size_t i = 0; i < table_ids_ptr->size(); i++) {
+
+    auto table_size = table_ids_ptr->size();
+    if (table_size == 0) {
+        database_snapshot_info->db_next_table_id_str_ = "1";
+    } else {
+        database_snapshot_info->db_next_table_id_str_ = std::to_string(std::stoull(table_ids_ptr->back()) + 1);
+    }
+
+    for (size_t i = 0; i < table_size; i++) {
         std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = GetTableMeta(table_names_ptr->at(i), db_meta, table_meta, create_timestamp);
@@ -1621,6 +1621,16 @@ Status NewTxn::RestoreDatabaseSnapshot(const std::shared_ptr<DatabaseSnapshotInf
     }
 
     LOG_TRACE("NewTxn::RestoreDatabaseSnapshot created database entry is inserted.");
+    return Status::OK();
+}
+
+Status NewTxn::RestoreSystemSnapshot(const std::shared_ptr<SystemSnapshotInfo> &system_snapshot_info) {
+    for (const auto &database_snapshot : system_snapshot_info->database_snapshots_) {
+        Status status = RestoreDatabaseSnapshot(database_snapshot);
+        if (!status.ok()) {
+            return status;
+        }
+    }
     return Status::OK();
 }
 
@@ -2302,6 +2312,14 @@ Status NewTxn::PrepareCommit() {
             case WalCommandType::RESTORE_DATABASE_SNAPSHOT: {
                 auto *restore_database_snapshot_cmd = static_cast<WalCmdRestoreDatabaseSnapshot *>(command.get());
                 Status status = PrepareCommitRestoreDatabaseSnapshot(restore_database_snapshot_cmd);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case WalCommandType::RESTORE_SYSTEM_SNAPSHOT: {
+                auto *restore_system_snapshot_cmd = static_cast<WalCmdRestoreSystemSnapshot *>(command.get());
+                Status status = PrepareCommitRestoreSystemSnapshot(restore_system_snapshot_cmd);
                 if (!status.ok()) {
                     return status;
                 }
