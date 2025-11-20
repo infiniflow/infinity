@@ -2767,6 +2767,9 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, std::string &cause, boo
         case TransactionType::kCreateTableSnapshot: {
             return CheckConflictTxnStore(static_cast<const CreateTableSnapshotTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
+        case TransactionType::kCreateDBSnapshot: {
+            return CheckConflictTxnStore(static_cast<const CreateDBSnapshotTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
+        }
         case TransactionType::kCleanup: {
             return CheckConflictTxnStore(static_cast<const CleanupTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
@@ -4010,9 +4013,56 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableSnapshotTxnStore &txn_store,
     // retry_query = true;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
-        case TransactionType::kNewCheckpoint: {
+        case TransactionType::kCreateDBSnapshot: {
+            auto *create_database_snapshot_txn_store = static_cast<CreateDBSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_database_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kCreateTableSnapshot: {
+            auto *create_table_snapshot_txn_store = static_cast<CreateTableSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_table_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kCleanup: {
             retry_query = true;
             conflict = true;
+            break;
+        }
+        default: {
+        }
+    }
+
+    if (conflict) {
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
+        return true;
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictTxnStore(const CreateDBSnapshotTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    // retry_query = true;
+    bool conflict = false;
+    switch (previous_txn->base_txn_store_->type_) {
+        case TransactionType::kCreateDBSnapshot: {
+            auto *create_database_snapshot_txn_store = static_cast<CreateDBSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_database_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kCreateTableSnapshot: {
+            auto *create_table_snapshot_txn_store = static_cast<CreateTableSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_table_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_) {
+                retry_query = false;
+                conflict = true;
+            }
             break;
         }
         case TransactionType::kCleanup: {
