@@ -30,26 +30,13 @@ namespace fs = std::filesystem;
 class ChineseAnalyzerTest : public BaseTest {};
 
 TEST_F(ChineseAnalyzerTest, test1) {
-    // Get the path to the executable using the /proc/self/exe symlink
-    fs::path executablePath = "/proc/self/exe";
-    std::error_code ec;
-    // Resolve the symlink to get the actual path
-    executablePath = fs::canonical(executablePath, ec);
-    if (ec) {
-        std::cerr << "Error resolving the path: " << executablePath << " " << ec.message() << std::endl;
-        return;
-    }
-    //    std::cerr << "/proc/self/exe: " << executablePath << std::endl;
-
-    fs::path ROOT_PATH = executablePath.parent_path().parent_path().parent_path().parent_path() / "resource";
-    //    std::cerr << "ROOT_PATH: " << ROOT_PATH << std::endl;
-
-    if (!fs::exists(ROOT_PATH)) {
-        std::cerr << "Resource directory doesn't exist: " << ROOT_PATH << std::endl;
+    fs::path RESOURCE_DIR = "/usr/share/infinity/resource";
+    if (!fs::exists(RESOURCE_DIR)) {
+        std::cerr << "Resource directory doesn't exist: " << RESOURCE_DIR << std::endl;
         return;
     }
 
-    ChineseAnalyzer analyzer(ROOT_PATH.string());
+    ChineseAnalyzer analyzer(RESOURCE_DIR.string());
     analyzer.Load();
     std::vector<std::string> queries = {
         R"#(graphic card)#",

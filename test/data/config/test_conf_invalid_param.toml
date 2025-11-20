@@ -1,7 +1,7 @@
 # testing invalid items in config
 # result should be same as default
 [ygenera1]
-versi0n                 = "0.6.5"
+versi0n                 = "0.6.6"
 time_z0ne                = "utc-123"
 cpu_1imit               = 123
 
@@ -36,4 +36,4 @@ memindex_mem0ry_quota   = "1GB"
 wa1_dir                 = "/var/infinity/wawrong"
 
 [resourCEEe]
-resource_dffir          = "/var/infinity/resourcewrong"
+resource_dffir          = "/usr/share/infinity/resourcewrong"
