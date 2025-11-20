@@ -1434,8 +1434,6 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
     std::vector<unsigned> pos_mapping;
     BuildPositionMapping(line, strline, pos_mapping);
 
-
-
     std::size_t alpha_num = 0;
     int len = UTF8Length(strline);
 
@@ -1633,7 +1631,8 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
                     // Map position back to original string if mapping is provided
                     if (pos_mapping) {
                         unsigned mapped_start = space_start_pos < pos_mapping->size() ? (*pos_mapping)[space_start_pos] : 0;
-                        unsigned mapped_end = (space_start_pos + space_token_len) < pos_mapping->size() ? (*pos_mapping)[space_start_pos + space_token_len] : 0;
+                        unsigned mapped_end =
+                            (space_start_pos + space_token_len) < pos_mapping->size() ? (*pos_mapping)[space_start_pos + space_token_len] : 0;
                         positions.emplace_back(mapped_start, mapped_end);
                     } else {
                         positions.emplace_back(space_start_pos, space_start_pos + space_token_len);
@@ -1684,7 +1683,8 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
                 // Map position back to original string if mapping is provided
                 if (pos_mapping) {
                     unsigned mapped_start = space_start_pos < pos_mapping->size() ? (*pos_mapping)[space_start_pos] : 0;
-                    unsigned mapped_end = (space_start_pos + space_token_len) < pos_mapping->size() ? (*pos_mapping)[space_start_pos + space_token_len] : 0;
+                    unsigned mapped_end =
+                        (space_start_pos + space_token_len) < pos_mapping->size() ? (*pos_mapping)[space_start_pos + space_token_len] : 0;
                     positions.emplace_back(mapped_start, mapped_end);
                 } else {
                     positions.emplace_back(space_start_pos, space_start_pos + space_token_len);
