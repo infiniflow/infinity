@@ -1418,11 +1418,51 @@ void RAGAnalyzer::SplitLongText(const std::string &L, u32 length, std::vector<st
     }
 }
 
+// PCRE2-based replacement function to match Python's re.sub behavior
+std::string PCRE2GlobalReplace(const std::string &text, const std::string &pattern, const std::string &replacement) {
+    pcre2_code *re;
+    PCRE2_SPTR pcre2_pattern = reinterpret_cast<PCRE2_SPTR>(pattern.c_str());
+    PCRE2_SPTR pcre2_subject = reinterpret_cast<PCRE2_SPTR>(text.c_str());
+    PCRE2_SPTR pcre2_replacement = reinterpret_cast<PCRE2_SPTR>(replacement.c_str());
+    int errorcode;
+    PCRE2_SIZE erroroffset;
+
+    // Compile the pattern with UTF and UCP flags for Unicode support
+    re = pcre2_compile(pcre2_pattern, PCRE2_ZERO_TERMINATED, PCRE2_UCP | PCRE2_UTF, &errorcode, &erroroffset, nullptr);
+
+    if (re == nullptr) {
+        PCRE2_UCHAR buffer[256];
+        pcre2_get_error_message(errorcode, buffer, sizeof(buffer));
+        std::cerr << "PCRE2 compilation failed at offset " << erroroffset << ": " << buffer << std::endl;
+        return text;
+    }
+
+    pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(re, nullptr);
+
+    size_t outlength = text.length() * 2 < 1024 ? 1024 : text.length() * 2;
+    auto buffer = std::make_unique<PCRE2_UCHAR[]>(outlength);
+
+    pcre2_substitute(re,
+                     pcre2_subject,
+                     text.length(),
+                     0,
+                     PCRE2_SUBSTITUTE_GLOBAL,
+                     match_data,
+                     nullptr,
+                     pcre2_replacement,
+                     PCRE2_ZERO_TERMINATED,
+                     buffer.get(),
+                     &outlength);
+
+    pcre2_match_data_free(match_data);
+    pcre2_code_free(re);
+
+    return std::string(reinterpret_cast<char *>(buffer.get()), outlength);
+}
+
 std::string RAGAnalyzer::Tokenize(const std::string &line) {
     // Python-style simple tokenization: re.sub(r"\W+", " ", line)
-    std::string processed_line = line;
-    re2::RE2::GlobalReplace(&processed_line, non_word_pattern_, " ");
-    std::cout << "processed_line " << processed_line << std::endl;
+    std::string processed_line = PCRE2GlobalReplace(line, R"#(\W+)#", " ");
     std::string str1 = StrQ2B(processed_line);
     std::string strline;
     opencc_->convert(str1, strline);
@@ -1482,8 +1522,7 @@ std::string RAGAnalyzer::Tokenize(const std::string &line) {
 
 std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> RAGAnalyzer::TokenizeWithPosition(const std::string &line) {
     // Python-style simple tokenization: re.sub(r"\W+", " ", line)
-    std::string processed_line = line;
-    re2::RE2::GlobalReplace(&processed_line, non_word_pattern_, " ");
+    std::string processed_line = PCRE2GlobalReplace(line, R"#(\W+)#", " ");
 
     // Build mapping from processed_line positions back to original line positions
     std::vector<unsigned> processed_to_original_mapping;
