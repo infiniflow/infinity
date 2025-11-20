@@ -49,6 +49,8 @@ private:
 
     bool IsASCIIWord(const std::string &word);
 
+    std::string BuildHighlightedSentence(const std::string &sentence, const std::vector<std::pair<size_t, size_t>> &highlights);
+
 private:
     std::string pre_tag_;
     std::string post_tag_;

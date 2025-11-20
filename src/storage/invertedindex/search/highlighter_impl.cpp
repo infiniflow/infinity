@@ -97,19 +97,34 @@ void Highlighter::ApplyHighlights(const std::string &text, const std::vector<std
         output = text;
         return;
     }
-
     auto merged_matches = MergeMatches(matches);
 
-    output = text;
-    for (auto it = merged_matches.rbegin(); it != merged_matches.rend(); ++it) {
-        size_t start = it->first;
-        size_t end = it->second;
+    output.clear();
+    size_t pos = 0;
+    bool prev_highlighted = true;
 
-        std::string before = output.substr(0, start);
-        std::string highlighted = output.substr(start, end - start);
-        std::string after = output.substr(end);
+    // Only show sentences containing highlight words.
+    std::vector<std::string> sentences;
+    SentenceSplitter(text, sentences);
+    for (size_t i = 0; i < sentences.size(); ++i) {
+        std::vector<std::pair<size_t, size_t>> sentence_highlights;
+        for (const auto &[start, end] : merged_matches) {
+            if (start >= pos && end <= pos + sentences[i].length()) {
+                size_t relative_start = start - pos;
+                size_t relative_end = end - pos;
+                sentence_highlights.emplace_back(relative_start, relative_end);
+            }
+        }
 
-        output = before + pre_tag_ + highlighted + post_tag_ + after;
+        bool highlighted = !sentence_highlights.empty();
+        if (highlighted) {
+            output += BuildHighlightedSentence(sentences[i], sentence_highlights);
+        } else if (prev_highlighted) {
+            output += " ... ";
+        }
+
+        prev_highlighted = highlighted;
+        pos += sentences[i].length();
     }
 }
 
@@ -208,4 +223,27 @@ bool Highlighter::IsASCIIWord(const std::string &word) {
     }
     return true;
 }
+
+std::string Highlighter::BuildHighlightedSentence(const std::string &sentence, const std::vector<std::pair<size_t, size_t>> &highlights) {
+    if (highlights.empty())
+        return sentence;
+
+    size_t sentence_length = sentence.length() + highlights.size() * (pre_tag_.length() + post_tag_.length());
+
+    std::string highlighted_sentence;
+    highlighted_sentence.reserve(sentence_length);
+
+    size_t last_pos = 0;
+    for (const auto &[start, end] : highlights) {
+        highlighted_sentence.append(sentence, last_pos, start - last_pos);
+        highlighted_sentence += pre_tag_;
+        highlighted_sentence.append(sentence, start, end - start);
+        highlighted_sentence += post_tag_;
+        last_pos = end;
+    }
+
+    highlighted_sentence.append(sentence, last_pos, std::string::npos);
+    return highlighted_sentence;
+}
+
 }; // namespace infinity

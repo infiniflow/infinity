@@ -157,4 +157,6 @@ public:
 
     re2::RE2 replace_space_pattern_{R"#(([ ]+))#"};
 };
+
+export void SentenceSplitter(const std::string &text, std::vector<std::string> &result);
 } // namespace infinity

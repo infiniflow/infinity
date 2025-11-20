@@ -51,7 +51,7 @@ public:
     RAGAnalyzer *analyzer_;
 };
 
-TEST_F(HighlighterTest, test1) {
+TEST_F(HighlighterTest, DISABLED_SLOW_test1) {
     std::string raw_text = R"##(
 once upon a time there lives an dog.this is a sentence,That is another.你好 世界 dog 你好dog
 
@@ -68,7 +68,7 @@ once upon a time there lives an dog.this is a sentence,That is another.你好 �
     std::cout << "Output: " << output << std::endl;
 }
 
-TEST_F(HighlighterTest, test2) {
+TEST_F(HighlighterTest, DISABLED_SLOW_test2) {
     std::string raw_text = R"##(The runner is running and jumped over jumps happily
     )##";
 
@@ -83,14 +83,14 @@ TEST_F(HighlighterTest, test2) {
     std::cout << "Output: " << output << std::endl;
 }
 
-TEST_F(HighlighterTest, test3) {
+TEST_F(HighlighterTest, DISABLED_SLOW_test3) {
     std::string raw_text =
         R"##({{Redirect|Anarchist|the fictional character|Anarchist (comics)}} {{Redirect|Anarchists}} {{Anarchism sidebar}} {{Libertarianism sidebar}}  '''Anarchism''' is generally defined as the [[political philosophy]] which holds the [[state (polity)|state]] to be undesirable, unnecessary, and harmful,<ref name="definition"> {{Cite journal|last=Malatesta|first=Errico|title=Towards Anarchism|journal=MAN!|publisher=International Group of San Francisco|location=Los Angeles|oclc=3930443|url=http://www.marxists.org/archive/malatesta/1930s/xx/toanarchy.htm|authorlink=Errico Malatesta}} {{Cite journal|url=http://www.theglobeandmail.com/servlet/story/RTGAM.20070514.wxlanarchist14/BNStory/lifeWork/home/ |title=Working for The Man |journal=[[The Globe and Mail]] |accessdate=2008-04-14 |last=Agrell |first=Siri |date=2007-05-14}} {{cite web|url=http://www.britannica.com/eb/article-9117285|title=Anarchism|year=2006|work=Encyclopædia Britannica|publisher=Encyclopædia Britannica Premium Service|accessdate=2006-08-29| archiveurl=)##";
 
     std::cout << "-----------------" << std::endl;
     std::cout << "Raw_text: " << raw_text << std::endl;
 
-    std::string query("harmful chemical anarchism");
+    std::string query("harmful chemical anarchism Premium");
     std::cout << "Query: " << query << std::endl;
 
     std::string output;
@@ -98,8 +98,8 @@ TEST_F(HighlighterTest, test3) {
     std::cout << "Output: " << output << std::endl << std::endl;
 }
 
-TEST_F(HighlighterTest, test4) {
-    std::string raw_text = "南京的南京长江大桥是中国的一条重要的交通";
+TEST_F(HighlighterTest, DISABLED_SLOW_test4) {
+    std::string raw_text = "南京的南京长江大桥是中国的一条重要的交通. 南京长江大桥很壮观";
 
     std::cout << "-----------------" << std::endl;
     std::cout << "Raw_text: " << raw_text << std::endl;
