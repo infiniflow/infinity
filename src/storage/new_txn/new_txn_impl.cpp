@@ -1377,20 +1377,6 @@ Status NewTxn::CreateTableSnapshot(const std::string &db_name, const std::string
     // Check if the DB is valid
     this->CheckTxn(db_name);
 
-    std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
-
-    // First, get the meta info of the table
-    std::shared_ptr<DBMeta> db_meta;
-    std::shared_ptr<TableMeta> table_meta_opt;
-    std::shared_ptr<SegmentMeta> segment_meta_opt;
-    std::string table_key;
-    TxnTimeStamp create_timestamp;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, create_timestamp, &table_key);
-
-    if (!status.ok()) {
-        return status;
-    }
-
     base_txn_store_ = std::make_shared<CreateTableSnapshotTxnStore>();
     CreateTableSnapshotTxnStore *txn_store = static_cast<CreateTableSnapshotTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
@@ -1401,8 +1387,27 @@ Status NewTxn::CreateTableSnapshot(const std::string &db_name, const std::string
     return Status::OK(); // Success
 }
 
-std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSnapshotInfo(const std::string &db_name) {
+Status NewTxn::CreateDBSnapshot(const std::string &db_name, const std::string &snapshot_name) {
+    // Check if the DB is valid
     this->CheckTxn(db_name);
+
+    base_txn_store_ = std::make_shared<CreateDBSnapshotTxnStore>();
+    CreateDBSnapshotTxnStore *txn_store = static_cast<CreateDBSnapshotTxnStore *>(base_txn_store_.get());
+    txn_store->db_name_ = db_name;
+    txn_store->snapshot_name_ = snapshot_name;
+    txn_store->max_commit_ts_ = txn_context_ptr_->begin_ts_;
+
+    return Status::OK(); // Success
+}
+
+std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSnapshotInfo(const std::string &db_name) {
+    if (db_name_.empty()) {
+        db_name_ = db_name;
+    } else if (db_name_ != db_name) {
+        std::unique_ptr<std::string> err_msg = std::make_unique<std::string>(fmt::format("Attempt to get table from another database {}", db_name));
+        RecoverableError(Status::InvalidIdentifierName(db_name));
+    }
+
     std::shared_ptr<DBMeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
@@ -1676,25 +1681,42 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
     return Status::OK();
 }
 
-Status NewTxn::CreateDBSnapshotFile(DBMeta &db_meta, const SnapshotOption &option, CheckpointTxnStore *ckp_txn_store) {
-    std::vector<std::string> *table_id_strs_ptr;
-    std::vector<std::string> *table_names_ptr;
-    Status status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
-    if (!status.ok()) {
-        return status;
-    }
-
-    size_t table_count = table_id_strs_ptr->size();
-    LOG_DEBUG(fmt::format("checkpoint ts {}, db id {}, got {} tables.", option.checkpoint_ts_, db_meta.db_id_str(), table_count));
-    for (size_t idx = 0; idx < table_count; ++idx) {
-        const std::string &table_id_str = table_id_strs_ptr->at(idx);
-        const std::string &table_name = table_names_ptr->at(idx);
-        TableMeta table_meta(db_meta.db_id_str(), table_id_str, table_name, this);
-        status = this->CreateTableSnapshotFile(table_meta, option, ckp_txn_store);
+Status NewTxn::CreateDBSnapshotFile(std::shared_ptr<DatabaseSnapshotInfo> db_snapshot_info, const SnapshotOption &option) {
+    auto &table_snapshots = db_snapshot_info->table_snapshots_;
+    for (auto &table_snapshot_info : table_snapshots) {
+        table_snapshot_info->snapshot_name_ = db_snapshot_info->snapshot_name_;
+        Status status = CreateTableSnapshotFile(table_snapshot_info, option);
         if (!status.ok()) {
             return status;
         }
     }
+    return Status::OK();
+}
+
+Status NewTxn::CreateJSONSnapshotFile(std::string json_string, std::string snapshot_name) {
+    auto json_start_time = std::chrono::high_resolution_clock::now();
+
+    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    std::string meta_path = fmt::format("{}/{}/{}.json", snapshot_dir, snapshot_name, snapshot_name);
+    std::string meta_path_dir = VirtualStore::GetParentPath(meta_path);
+    if (!VirtualStore::Exists(meta_path_dir)) {
+        VirtualStore::MakeDirectory(meta_path_dir);
+    }
+
+    auto [snapshot_file_handle, status] = VirtualStore::Open(meta_path, FileAccessMode::kWrite);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+
+    status = snapshot_file_handle->Append(json_string.data(), json_string.size());
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    snapshot_file_handle->Sync();
+
+    auto json_end_time = std::chrono::high_resolution_clock::now();
+    auto json_duration = std::chrono::duration_cast<std::chrono::milliseconds>(json_end_time - json_start_time);
+    LOG_TRACE(fmt::format("Saving json files took {} ms", json_duration.count()));
 
     return Status::OK();
 }
@@ -2196,6 +2218,18 @@ Status NewTxn::PrepareCommit() {
                 }
                 break;
             }
+            case WalCommandType::CREATE_DB_SNAPSHOT: {
+                if (this->IsReplay()) {
+                    LOG_TRACE("Skip replay of CREATE_DB_SNAPSHOT command.");
+                    break;
+                }
+                auto *create_db_snapshot_cmd = static_cast<WalCmdCreateDBSnapshot *>(command.get());
+                Status status = PrepareCommitCreateDBSnapshot(create_db_snapshot_cmd);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
             case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
                 if (this->IsReplay()) {
                     // Skip replay of RESTORE_TABLE_SNAPSHOT command.
@@ -2336,6 +2370,26 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
     LOG_TRACE(fmt::format("last_ckp_ts: {}, begin_ts: {}, commit_ts: {}", last_ckp_ts, txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_));
 
     Status status = this->CheckpointforSnapshot(last_ckp_ts, ckp_txn_store.get(), SnapshotType::kTableSnapshot);
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::PrepareCommitCreateDBSnapshot(const WalCmdCreateDBSnapshot *create_db_snapshot_cmd) {
+    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    std::string snapshot_name = create_db_snapshot_cmd->snapshot_name_;
+    std::string snapshot_path = snapshot_dir + "/" + snapshot_name;
+    if (std::filesystem::exists(snapshot_path)) {
+        return Status::SnapshotAlreadyExists(snapshot_name);
+    }
+
+    TxnTimeStamp last_ckp_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
+    std::shared_ptr<CheckpointTxnStore> ckp_txn_store = std::make_shared<CheckpointTxnStore>(last_ckp_ts, true);
+    LOG_TRACE(fmt::format("last_ckp_ts: {}, begin_ts: {}, commit_ts: {}", last_ckp_ts, txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_));
+
+    Status status = this->CheckpointforSnapshot(last_ckp_ts, ckp_txn_store.get(), SnapshotType::kDatabaseSnapshot);
     if (!status.ok()) {
         return status;
     }
@@ -2712,6 +2766,9 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, std::string &cause, boo
         }
         case TransactionType::kCreateTableSnapshot: {
             return CheckConflictTxnStore(static_cast<const CreateTableSnapshotTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
+        }
+        case TransactionType::kCreateDBSnapshot: {
+            return CheckConflictTxnStore(static_cast<const CreateDBSnapshotTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
         case TransactionType::kCleanup: {
             return CheckConflictTxnStore(static_cast<const CleanupTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
@@ -3956,9 +4013,56 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableSnapshotTxnStore &txn_store,
     // retry_query = true;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
-        case TransactionType::kNewCheckpoint: {
+        case TransactionType::kCreateDBSnapshot: {
+            auto *create_database_snapshot_txn_store = static_cast<CreateDBSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_database_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kCreateTableSnapshot: {
+            auto *create_table_snapshot_txn_store = static_cast<CreateTableSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_table_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kCleanup: {
             retry_query = true;
             conflict = true;
+            break;
+        }
+        default: {
+        }
+    }
+
+    if (conflict) {
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
+        return true;
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictTxnStore(const CreateDBSnapshotTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    // retry_query = true;
+    bool conflict = false;
+    switch (previous_txn->base_txn_store_->type_) {
+        case TransactionType::kCreateDBSnapshot: {
+            auto *create_database_snapshot_txn_store = static_cast<CreateDBSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_database_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kCreateTableSnapshot: {
+            auto *create_table_snapshot_txn_store = static_cast<CreateTableSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_table_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_) {
+                retry_query = false;
+                conflict = true;
+            }
             break;
         }
         case TransactionType::kCleanup: {
@@ -5364,8 +5468,8 @@ Status NewTxn::CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create
 
 Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store, SnapshotType snapshot_type) {
     TransactionType txn_type = GetTxnType();
-    if (txn_type != TransactionType::kCreateTableSnapshot) {
-        UnrecoverableError(fmt::format("Expected transaction type is create table snapshot."));
+    if (txn_type != TransactionType::kCreateTableSnapshot && txn_type != TransactionType::kCreateDBSnapshot) {
+        UnrecoverableError(fmt::format("Invalid transaction type."));
     }
 
     if (last_ckp_ts % 2 == 0 and last_ckp_ts > 0) {
@@ -5374,7 +5478,7 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
 
     Status status;
     TxnTimeStamp checkpoint_ts = txn_context_ptr_->begin_ts_;
-    SnapshotOption option{checkpoint_ts};
+    SnapshotOption option{snapshot_type, checkpoint_ts};
 
     current_ckp_ts_ = checkpoint_ts;
     LOG_INFO(fmt::format("checkpoint ts for snapshot: {}", current_ckp_ts_));
@@ -5384,51 +5488,70 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
             CreateTableSnapshotTxnStore *create_txn_store = static_cast<CreateTableSnapshotTxnStore *>(base_txn_store_.get());
             std::string db_name = create_txn_store->db_name_;
             std::string table_name = create_txn_store->table_name_;
+            std::string snapshot_name = create_txn_store->snapshot_name_;
 
             std::shared_ptr<DBMeta> db_meta;
             std::shared_ptr<TableMeta> table_meta;
-            std::string table_key;
             TxnTimeStamp create_timestamp;
-
-            status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp, &table_key);
+            status = GetTableMeta(db_name, table_name, db_meta, table_meta, create_timestamp);
             if (!status.ok()) {
                 return status;
             }
 
-            status = CreateTableSnapshotFile(*table_meta, option, txn_store);
+            std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
+            std::tie(table_snapshot_info, status) = table_meta->MapMetaToSnapShotInfo(db_name, table_name);
+            if (!status.ok()) {
+                return status;
+            }
+            table_snapshot_info->snapshot_name_ = snapshot_name;
+
+            // Create table snapshot files
+            status = CreateTableSnapshotFile(table_snapshot_info, option);
             if (!status.ok()) {
                 return status;
             }
 
+            // Create JSON file
+            nlohmann::json json_res = table_snapshot_info->CreateSnapshotMetadataJSON();
+            std::string json_string = json_res.dump();
+            status = CreateJSONSnapshotFile(json_string, snapshot_name);
+            if (!status.ok()) {
+                return status;
+            }
             break;
         }
         case SnapshotType::kDatabaseSnapshot: {
+            CreateDBSnapshotTxnStore *create_txn_store = static_cast<CreateDBSnapshotTxnStore *>(base_txn_store_.get());
+            std::string db_name = create_txn_store->db_name_;
+            std::string snapshot_name = create_txn_store->snapshot_name_;
+
+            std::shared_ptr<DatabaseSnapshotInfo> database_snapshot_info;
+            std::tie(database_snapshot_info, status) = GetDatabaseSnapshotInfo(db_name);
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
+            database_snapshot_info->snapshot_name_ = snapshot_name;
+
+            // Create database snapshot files
+            status = CreateDBSnapshotFile(database_snapshot_info, option);
+            if (!status.ok()) {
+                return status;
+            }
+
+            // Create JSON file
+            nlohmann::json json_res = database_snapshot_info->CreateSnapshotMetadataJSON();
+            std::string json_string = json_res.dump();
+            status = CreateJSONSnapshotFile(json_string, snapshot_name);
+            if (!status.ok()) {
+                return status;
+            }
             break;
         }
         case SnapshotType::kSystemSnapshot: {
-            // std::vector<std::string> *db_id_strs_ptr;
-            // std::vector<std::string> *db_names_ptr;
-            // CatalogMeta catalog_meta(this);
-            // status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
-            // if (!status.ok()) {
-            //     return status;
-            // }
-            //
-            // size_t db_count = db_id_strs_ptr->size();
-            // for (size_t idx = 0; idx < db_count; ++idx) {
-            //     const std::string &db_id_str = db_id_strs_ptr->at(idx);
-            //     const std::string &db_name = db_names_ptr->at(idx);
-            //     DBMeta db_meta(db_id_str, db_name, this);
-            //     status = CreateDBSnapshotFile(db_meta, option, txn_store);
-            //     if (!status.ok()) {
-            //         return status;
-            //     }
-            // }
             break;
         }
         case SnapshotType::kUnknown: {
             UnrecoverableError("Invalid SnapshotType.");
-            break;
         }
     }
     return Status::OK();

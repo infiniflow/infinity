@@ -79,7 +79,7 @@ Status Snapshot::RestoreDatabaseSnapshot(QueryContext *query_context, const std:
     // LOG_INFO(fmt::format("txn state: {}", TxnState2Str(txn_ptr->GetTxnState())));
     //    if(!status.ok()) {
     //        return status;
-    //    }
+    //    }for
     //    txn_ptr->ApplyTableSnapshot(table_snapshot);
     return Status::OK();
 }
