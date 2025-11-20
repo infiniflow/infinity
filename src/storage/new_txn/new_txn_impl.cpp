@@ -2318,11 +2318,11 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::RESTORE_SYSTEM_SNAPSHOT: {
-                auto *restore_system_snapshot_cmd = static_cast<WalCmdRestoreSystemSnapshot *>(command.get());
-                Status status = PrepareCommitRestoreSystemSnapshot(restore_system_snapshot_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
+                // auto *restore_system_snapshot_cmd = static_cast<WalCmdRestoreSystemSnapshot *>(command.get());
+                // Status status = PrepareCommitRestoreSystemSnapshot(restore_system_snapshot_cmd);
+                // if (!status.ok()) {
+                //     return status;
+                // }
                 break;
             }
             default: {

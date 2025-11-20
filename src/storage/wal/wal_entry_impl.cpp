@@ -978,6 +978,19 @@ bool WalCmdRestoreDatabaseSnapshot::operator==(const WalCmd &other) const {
     return true;
 }
 
+bool WalCmdRestoreSystemSnapshot::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdRestoreSystemSnapshot *>(&other);
+    if (other_cmd == nullptr || restore_database_wal_cmds_.size() != other_cmd->restore_database_wal_cmds_.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < restore_database_wal_cmds_.size(); i++) {
+        if (restore_database_wal_cmds_[i] != other_cmd->restore_database_wal_cmds_[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 i32 WalCmdCreateDatabaseV2::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_id_.size() + sizeof(i32) + this->db_comment_.size();
 }
@@ -1156,6 +1169,15 @@ i32 WalCmdRestoreDatabaseSnapshot::GetSizeInBytes() const {
     return size;
 }
 
+i32 WalCmdRestoreSystemSnapshot::GetSizeInBytes() const {
+    i32 size = sizeof(WalCommandType);
+    size += sizeof(i32);
+    for (const auto &restore_database_wal_cmd : restore_database_wal_cmds_) {
+        size += restore_database_wal_cmd.GetSizeInBytes();
+    }
+    return size;
+}
+
 void WalCmdCreateDatabaseV2::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_DATABASE_V2);
     WriteBufAdv(buf, this->db_name_);
@@ -1275,6 +1297,14 @@ void WalCmdRestoreDatabaseSnapshot::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, static_cast<i32>(restore_table_wal_cmds_.size()));
     for (const auto &restore_table_wal_cmd : restore_table_wal_cmds_) {
         restore_table_wal_cmd.WriteAdv(buf);
+    }
+}
+
+void WalCmdRestoreSystemSnapshot::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::RESTORE_SYSTEM_SNAPSHOT);
+    WriteBufAdv(buf, static_cast<i32>(restore_database_wal_cmds_.size()));
+    for (const auto &restore_database_wal_cmd : restore_database_wal_cmds_) {
+        restore_database_wal_cmd.WriteAdv(buf);
     }
 }
 
@@ -1948,6 +1978,15 @@ std::string WalCmdRestoreDatabaseSnapshot::ToString() const {
     return std::move(ss).str();
 }
 
+std::string WalCmdRestoreSystemSnapshot::ToString() const {
+    std::stringstream ss;
+    ss << "restore_database_wal_cmds count: " << restore_database_wal_cmds_.size() << std::endl;
+    for (size_t i = 0; i < restore_database_wal_cmds_.size(); ++i) {
+        ss << "  restore_database_wal_cmd " << i << ": " << restore_database_wal_cmds_[i].ToString();
+    }
+    return std::move(ss).str();
+}
+
 std::string WalCmdRestoreDatabaseSnapshot::CompactInfo() const {
     std::stringstream ss;
     ss << "db_name: " << db_name_ << std::endl;
@@ -1956,6 +1995,15 @@ std::string WalCmdRestoreDatabaseSnapshot::CompactInfo() const {
     ss << "restore_table_wal_cmds count: " << restore_table_wal_cmds_.size() << std::endl;
     for (size_t i = 0; i < restore_table_wal_cmds_.size(); ++i) {
         ss << "  restore_table_wal_cmd " << i << ": " << restore_table_wal_cmds_[i].CompactInfo();
+    }
+    return std::move(ss).str();
+}
+
+std::string WalCmdRestoreSystemSnapshot::CompactInfo() const {
+    std::stringstream ss;
+    ss << "restore_table_wal_cmds count: " << restore_database_wal_cmds_.size() << std::endl;
+    for (size_t i = 0; i < restore_database_wal_cmds_.size(); ++i) {
+        ss << "  restore_database_wal_cmd " << i << ": " << restore_database_wal_cmds_[i].CompactInfo();
     }
     return std::move(ss).str();
 }
@@ -2098,6 +2146,11 @@ std::vector<std::shared_ptr<EraseBaseCache>> WalCmdRestoreTableSnapshot::ToCache
 std::vector<std::shared_ptr<EraseBaseCache>> WalCmdRestoreDatabaseSnapshot::ToCachedMeta(TxnTimeStamp commit_ts) const {
     std::vector<std::shared_ptr<EraseBaseCache>> cache_items;
     cache_items.push_back(std::make_shared<MetaEraseDbCache>(db_name_));
+    return cache_items;
+}
+
+std::vector<std::shared_ptr<EraseBaseCache>> WalCmdRestoreSystemSnapshot::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    std::vector<std::shared_ptr<EraseBaseCache>> cache_items;
     return cache_items;
 }
 

@@ -193,6 +193,15 @@ export struct RestoreDatabaseTxnStore final : public BaseTxnStore {
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
+export struct RestoreSystemTxnStore final : public BaseTxnStore {
+    RestoreSystemTxnStore() : BaseTxnStore(TransactionType::kRestoreSystem) {}
+
+    std::vector<std::shared_ptr<RestoreDatabaseTxnStore>> restore_database_txn_stores_{};
+
+    std::string ToString() const final;
+    std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
 export struct DropTableTxnStore final : public BaseTxnStore {
     DropTableTxnStore() : BaseTxnStore(TransactionType::kDropTable) {}
     ~DropTableTxnStore() override = default;
