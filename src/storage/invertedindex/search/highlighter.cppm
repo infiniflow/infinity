@@ -21,19 +21,38 @@ import :analyzer;
 namespace infinity {
 
 export struct HighlightInfo {
-    std::vector<std::string> query_terms_;
+    std::string matching_text_;
     std::string analyzer_;
 };
 
 export class Highlighter : public Singleton<Highlighter> {
 public:
-    Highlighter();
+    Highlighter(const std::string &pre_tag = "<em>", const std::string &post_tag = "</em>") : pre_tag_(pre_tag), post_tag_(post_tag) {}
 
-    void GetHighlightWithoutStemmer(const std::vector<std::string> &query, const std::string &raw_text, std::string &output);
-
-    void GetHighlightWithStemmer(const std::vector<std::string> &query, const std::string &raw_text, std::string &output, Analyzer *analyzer);
+    void GetHighlight(const std::string &matching_text, const std::string &raw_text, std::string &output, Analyzer *analyzer);
 
 private:
-    AhoCorasick sentence_delimiter_;
+    void GetASCIIWordHighlight(const std::vector<std::string> &query,
+                               const std::string &raw_text,
+                               std::vector<std::pair<size_t, size_t>> &matches,
+                               Analyzer *analyzer);
+
+    void GetUnicodeWordHighlight(const std::vector<std::string> &query, const std::string &raw_text, std::vector<std::pair<size_t, size_t>> &matches);
+
+    void ApplyHighlights(const std::string &text, const std::vector<std::pair<size_t, size_t>> &matches, std::string &output);
+
+    void FindASCIIWords(const std::string &pattern, const std::string &text, std::vector<std::pair<size_t, size_t>> &matches);
+
+    std::string EscapeRegex(const std::string &input);
+
+    std::vector<std::pair<size_t, size_t>> MergeMatches(const std::vector<std::pair<size_t, size_t>> &matches);
+
+    bool IsASCIIWord(const std::string &word);
+
+    std::string BuildHighlightedSentence(const std::string &sentence, const std::vector<std::pair<size_t, size_t>> &highlights);
+
+private:
+    std::string pre_tag_;
+    std::string post_tag_;
 };
 }; // namespace infinity
