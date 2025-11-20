@@ -225,8 +225,9 @@ void BlockVersion::LoadFromFile(std::shared_ptr<BlockVersion> &data, size_t &mma
         BlockOffset capacity{};
         std::memcpy(&capacity, (char *)mmap_p + offset, sizeof(capacity));
         offset += sizeof(capacity);
-
+        std::println("*** OK");
         for (auto &ts : deleted) {
+            // ts =
             std::memcpy(&ts, (char *)mmap_p + offset, sizeof(ts));
             offset += sizeof(ts);
         }

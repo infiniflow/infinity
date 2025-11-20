@@ -1788,15 +1788,15 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
         BlockMeta block_meta(block_info.block_id_, segment_meta);
         auto block_dir_ptr = block_meta.GetBlockDir();
 
-        auto [version_buffer, status] = block_meta.GetVersionFileWorker();
+        auto [version_file_worker, status] = block_meta.GetVersionFileWorker();
         if (!status.ok()) {
             return status;
         }
         auto block_version = std::make_shared<BlockVersion>(block_meta.block_capacity());
-        static_cast<FileWorker *>(version_buffer)->Read(block_version);
+        static_cast<FileWorker *>(version_file_worker)->Read(block_version);
 
         block_version->CommitAppend(save_ts, commit_ts);
-        static_cast<FileWorker *>(version_buffer)->Write(std::span{block_version.get(), 1}, VersionFileWorkerSaveCtx(commit_ts));
+        static_cast<FileWorker *>(version_file_worker)->Write(std::span{block_version.get(), 1}, VersionFileWorkerSaveCtx(commit_ts));
 
         std::shared_ptr<BlockLock> block_lock;
         status = block_meta.GetBlockLock(block_lock);

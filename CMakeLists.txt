@@ -323,8 +323,8 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 
     set(CMAKE_DEBUG_POSTFIX "")
 
-else ()
-    message(FATAL_ERROR "Only support CMake build type: Debug, RelWithDebInfo, and Release")
+#else ()
+#    message(FATAL_ERROR "Only support CMake build type: Debug, RelWithDebInfo, and Release")
 endif ()
 
 if (CLANG_VERSION_STRING VERSION_EQUAL 17)

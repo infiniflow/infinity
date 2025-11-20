@@ -21,8 +21,6 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str, test_case: str = "")
         "-x",
         "-m",
         pytest_mark,
-        "-v",
-        "-s",
         test_case,
     ]
     quoted_args = ['"' + arg + '"' if " " in arg else arg for arg in args]
