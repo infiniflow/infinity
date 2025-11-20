@@ -408,13 +408,37 @@ public:
         size_t end = result.find(' ');
         while (end != std::string::npos) {
             if (end != start) {
-                tokens.push_back(result.substr(start, end - start));
+                std::string token = result.substr(start, end - start);
+                // Split tokens containing underscores
+                if (token.find('_') != std::string::npos) {
+                    std::stringstream ss(token);
+                    std::string sub_token;
+                    while (std::getline(ss, sub_token, '_')) {
+                        if (!sub_token.empty()) {
+                            tokens.push_back(sub_token);
+                        }
+                    }
+                } else {
+                    tokens.push_back(token);
+                }
             }
             start = end + 1;
             end = result.find(' ', start);
         }
         if (start != result.length()) {
-            tokens.push_back(result.substr(start));
+            std::string token = result.substr(start);
+            // Split tokens containing underscores
+            if (token.find('_') != std::string::npos) {
+                std::stringstream ss(token);
+                std::string sub_token;
+                while (std::getline(ss, sub_token, '_')) {
+                    if (!sub_token.empty()) {
+                        tokens.push_back(sub_token);
+                    }
+                }
+            } else {
+                tokens.push_back(token);
+            }
         }
     }
 
