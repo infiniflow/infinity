@@ -48,7 +48,7 @@ If you start up Infinity from DEB or RPM, the configuration file will be in the 
 ```toml
 [general]
 # Infinity server version, the minor version of this parameter should match server minor version.
-version                  = "0.6.5"
+version                  = "0.6.6"
 # Timezone
 time_zone                = "utc-8"
 # The number of worker threads. Defaults to the number of CPU cores.
@@ -213,5 +213,5 @@ wal_flush                     = "only_write"
 
 [resource]
 # Directory for Infinity's resource files, including the dictionary files used by the analyzer
-resource_dir                  = "/var/infinity/resource"
+resource_dir                  = "/usr/share/infinity/resource"
 ```

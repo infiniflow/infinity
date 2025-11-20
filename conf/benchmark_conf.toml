@@ -1,5 +1,5 @@
 [general]
-version                  = "0.6.5"
+version                  = "0.6.6"
 time_zone                = "utc-8"
 
 [network]
@@ -64,4 +64,4 @@ wal_compact_threshold         = "1GB"
 wal_flush                     = "only_write"
 
 [resource]
-resource_dir                  = "/var/infinity/resource"
+resource_dir                  = "/usr/share/infinity/resource"
