@@ -57,7 +57,7 @@ public:
 
     const char *Get(size_t offset, size_t size) const;
 
-    size_t Write(char *ptr) const;
+    size_t Write(char *ptr, size_t size = std::numeric_limits<size_t>::max()) const;
 
     size_t Write(char *ptr, size_t offset, size_t size) const;
 

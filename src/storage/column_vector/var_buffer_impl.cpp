@@ -94,23 +94,25 @@ const char *VarBuffer::Get(size_t offset, size_t size) const {
     return buffers[i].get() + offset_in_buffer;
 }
 
-size_t VarBuffer::Write(char *ptr) const {
+size_t VarBuffer::Write(char *ptr, size_t size) const {
     if (std::holds_alternative<const char *>(buffers_)) {
         UnrecoverableError("Cannot write to a const buffer");
-        // const auto *buffer = std::get<const char *>(buffers_);
-        // std::memcpy(ptr, buffer, buffer_size_prefix_sum_.back());
-        // return buffer_size_prefix_sum_.back();
     }
     auto &buffers = std::get<std::vector<std::unique_ptr<char[]>>>(buffers_);
+
+    size_t total_size = 0;
     std::shared_lock lock(mtx_);
-    char *start = ptr;
     for (size_t i = 0; i < buffers.size(); ++i) {
         const auto &buffer = buffers[i];
         size_t buffer_size = buffer_size_prefix_sum_[i + 1] - buffer_size_prefix_sum_[i];
+        if (total_size + buffer_size > size) {
+            break;
+        }
         std::memcpy(ptr, buffer.get(), buffer_size);
+        total_size += buffer_size;
         ptr += buffer_size;
     }
-    return ptr - start;
+    return total_size;
 }
 
 size_t VarBuffer::Write(char *ptr, size_t offset, size_t size) const {
