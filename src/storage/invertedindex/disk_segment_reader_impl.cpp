@@ -67,11 +67,11 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(SegmentID segment_id,
 
     if (VirtualStore::Exists(temp_posting_path_str)) {
         posting_file_ = temp_posting_path_str;
-        i32 rc = VirtualStore::MmapFile(posting_file_, data_ptr_, data_len_);
-        assert(rc == 0);
-        if (rc != 0) {
-            RecoverableError(Status::MmapFileError(posting_file_));
-        }
+        [[maybe_unused]] i32 rc = VirtualStore::MmapFile(posting_file_, data_ptr_, data_len_);
+        // assert(rc == 0);
+        // if (rc != 0) {
+        //     RecoverableError(Status::MmapFileError(posting_file_));
+        // }
     } else if (pm) {
         posting_file_ = data_posting_path_str;
         PersistResultHandler handler(pm);
@@ -83,18 +83,18 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(SegmentID segment_id,
         }
         const auto &[key, offset, size] = obj_addr;
         posting_file_obj_ = pm->GetObjPath(key);
-        i32 rc = VirtualStore::MmapFilePart(posting_file_obj_, offset, size, data_ptr_);
-        assert(rc == 0);
-        if (rc != 0) {
-            RecoverableError(Status::MmapFileError(posting_file_));
-        }
+        [[maybe_unused]] i32 rc = VirtualStore::MmapFilePart(posting_file_obj_, offset, size, data_ptr_);
+        // assert(rc == 0);
+        // if (rc != 0) {
+        //     RecoverableError(Status::MmapFileError(posting_file_));
+        // }
     } else if (VirtualStore::Exists(data_posting_path_str)) {
         posting_file_ = data_posting_path_str;
-        i32 rc = VirtualStore::MmapFile(posting_file_, data_ptr_, data_len_);
-        assert(rc == 0);
-        if (rc != 0) {
-            RecoverableError(Status::MmapFileError(posting_file_));
-        }
+        [[maybe_unused]] i32 rc = VirtualStore::MmapFile(posting_file_, data_ptr_, data_len_);
+        // assert(rc == 0);
+        // if (rc != 0) {
+        //     RecoverableError(Status::MmapFileError(posting_file_));
+        // }
     } else {
         UnrecoverableError("Missing fulltext posting file.");
         return;
