@@ -60,6 +60,7 @@ struct WalCmdAlterIndexV2;
 struct WalCmdCleanup;
 struct WalCmdCreateTableSnapshot;
 struct WalCmdCreateDBSnapshot;
+struct WalCmdCreateSystemSnapshot;
 struct WalCmdRestoreTableSnapshot;
 struct WalCmdRestoreDatabaseSnapshot;
 
@@ -278,9 +279,10 @@ public:
 
     Status OptimizeIndex(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id);
 
-    // // Snapshot OPs
     Status CreateTableSnapshot(const std::string &db_name, const std::string &table_name, const std::string &snapshot_name);
     Status CreateDBSnapshot(const std::string &db_name, const std::string &snapshot_name);
+    Status CreateSystemSnapshot(const std::string &snapshot_name);
+
     // std::tuple<std::shared_ptr<TableSnapshotInfo>, Status> GetTableSnapshotInfo(const std::string &db_name, const std::string &table_name);
 
     Status RestoreTableSnapshot(const std::string &db_name, const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info);
@@ -591,6 +593,7 @@ private:
     Status CommitCheckpointTableData(TableMeta &table_meta, TxnTimeStamp checkpoint_ts);
     Status PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
     Status PrepareCommitCreateDBSnapshot(const WalCmdCreateDBSnapshot *create_db_snapshot_cmd);
+    Status PrepareCommitCreateSystemSnapshot(const WalCmdCreateSystemSnapshot *create_system_snapshot_cmd);
     Status PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files = false);
     Status PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd);
     Status CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create_table_snapshot_cmd);

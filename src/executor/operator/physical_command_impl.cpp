@@ -478,6 +478,11 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
 
                     switch (snapshot_scope) {
                         case SnapshotScope::kSystem: {
+                            NewTxn *new_txn = query_context->GetNewTxn();
+                            Status snapshot_status = new_txn->CreateSystemSnapshot(snapshot_name);
+                            if (!snapshot_status.ok()) {
+                                RecoverableError(snapshot_status);
+                            }
                             LOG_INFO(fmt::format("Execute snapshot system"));
                             break;
                         }

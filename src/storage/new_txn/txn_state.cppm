@@ -88,7 +88,8 @@ export enum class TransactionType {
     kDropColumn,
     kCleanup,
     kCreateTableSnapshot,
-    kCreateDBSnapshot
+    kCreateDBSnapshot,
+    kCreateSystemSnapshot
 };
 
 export inline std::string TransactionType2Str(TransactionType txn_type) {
@@ -179,6 +180,9 @@ export inline std::string TransactionType2Str(TransactionType txn_type) {
         }
         case TransactionType::kCreateDBSnapshot: {
             return "CreateDBSnapshot";
+        }
+        case TransactionType::kCreateSystemSnapshot: {
+            return "CreateSystemSnapshot";
         }
         case TransactionType::kSetCommand: {
             return "SetCommand";
