@@ -36,6 +36,8 @@ struct FileWorkerMap {
 
     FileWorkerT *GetFileWorker(const std::string &rel_file_path);
 
+    FileWorkerT *GetFileWorkerNoLock(const std::string &rel_file_path);
+
     void AddToCleanList(FileWorkerT *file_worker);
 
     void ClearCleans();
@@ -46,7 +48,7 @@ struct FileWorkerMap {
     std::unordered_map<std::string, std::unique_ptr<FileWorkerT>> map_;
 
     mutable std::shared_mutex rw_temp_mtx_;
-    std::unordered_map<std::string, std::unique_ptr<FileWorkerT>> temp_map_;
+    std::unordered_set<std::string> active_dic_;
 
     mutable std::shared_mutex rw_clean_mtx_;
     std::vector<FileWorkerT *> cleans_;

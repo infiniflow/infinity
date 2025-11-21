@@ -24,22 +24,25 @@ namespace infinity {
 
 template <typename FileWorkerT>
 FileWorkerT *FileWorkerMap<FileWorkerT>::EmplaceFileWorker(std::unique_ptr<FileWorkerT> file_worker) {
-    std::unique_lock lock(rw_temp_mtx_);
+    std::unique_lock lock(rw_mtx_);
     auto rel_file_path = file_worker->rel_file_path_;
-    if (auto iter = temp_map_.find(*rel_file_path); iter != temp_map_.end()) {
+    active_dic_.emplace(rel_file_path);
+    if (auto iter = map_.find(*rel_file_path); iter != map_.end()) {
         return iter->second.get();
     }
-    auto [iter, _] = temp_map_.emplace(*rel_file_path, std::move(file_worker));
+    auto [iter, _] = map_.emplace(*rel_file_path, std::move(file_worker));
     return iter->second.get();
 }
 
 template <typename FileWorkerT>
 void FileWorkerMap<FileWorkerT>::RemoveImport(TransactionID txn_id) {
-    std::unique_lock lock(rw_temp_mtx_);
-    for (auto it = temp_map_.begin(); it != temp_map_.end();) {
+    std::unique_lock lock(rw_mtx_);
+    for (auto it = map_.begin(); it != map_.end();) {
+        auto &[rel_file_path, _] = *it;
         auto pat = fmt::format("import{}", txn_id);
-        if (it->first.find(pat) != std::string::npos) {
-            it = temp_map_.erase(it);
+        if (rel_file_path.find(pat) != std::string::npos) {
+            it = map_.erase(it);
+            active_dic_.erase(rel_file_path);
         } else {
             ++it;
         }
@@ -49,20 +52,19 @@ void FileWorkerMap<FileWorkerT>::RemoveImport(TransactionID txn_id) {
 template <typename FileWorkerT>
 FileWorkerT *FileWorkerMap<FileWorkerT>::GetFileWorker(const std::string &rel_file_path) {
     {
-        // std::shared_lock lock(rw_temp_mtx_);
-        std::unique_lock lock(rw_mtx_);
-        if (auto iter = temp_map_.find(rel_file_path); iter != temp_map_.end()) {
+        std::shared_lock lock(rw_mtx_);
+        if (auto iter = map_.find(rel_file_path); iter != map_.end()) {
             return iter->second.get();
         }
-        // }
-        // {
-        // std::unique_lock lock(rw_mtx_);
-        if (auto iter = map_.find(rel_file_path); iter != map_.end()) {
-            auto &[_, file_worker] = *iter;
-            auto *temp_file_worker = EmplaceFileWorker(std::move(file_worker));
-            // You should not remove the fileworker in map_
-            return temp_file_worker;
-        }
+    }
+    LOG_TRACE(fmt::format("FileWorkerManager::GetFileWorker: file {} not found.", rel_file_path));
+    return nullptr;
+}
+
+template <typename FileWorkerT>
+FileWorkerT *FileWorkerMap<FileWorkerT>::GetFileWorkerNoLock(const std::string &rel_file_path) {
+    if (auto iter = map_.find(rel_file_path); iter != map_.end()) {
+        return iter->second.get();
     }
     LOG_TRACE(fmt::format("FileWorkerManager::GetFileWorker: file {} not found.", rel_file_path));
     return nullptr;
@@ -89,23 +91,30 @@ void FileWorkerMap<FileWorkerT>::ClearCleans() {
     // }
 
     {
-        // std::unique_lock lock(rw_temp_mtx_);
         std::unique_lock lock(rw_mtx_);
         for (auto *file_worker : cleans) {
             auto fileworker_key = *(file_worker->rel_file_path_);
-            [[maybe_unused]] size_t remove_n = temp_map_.erase(fileworker_key);
+            [[maybe_unused]] size_t remove_n = map_.erase(fileworker_key);
+            active_dic_.erase(fileworker_key);
             // if (remove_n != 1) {
             //     UnrecoverableError(fmt::format("FileWorkerManager::RemoveClean: file {} not found.", file_path.c_str()));
             // }
         }
-        temp_map_.rehash(temp_map_.size());
+        map_.rehash(map_.size());
+
+        // for (auto *file_worker : cleans) {
+        //     auto fileworker_key = *(file_worker->rel_file_path_);
+        //     [[maybe_unused]] size_t remove_n = map_.erase(fileworker_key);
+        //     // if (remove_n != 1) {
+        //     //     UnrecoverableError(fmt::format("FileWorkerManager::RemoveClean: file {} not found.", file_path.c_str()));
+        //     // }
+        // }
     }
 }
 
 template <typename FileWorkerT>
 void FileWorkerMap<FileWorkerT>::AddToCleanList(FileWorkerT *file_worker) {
     std::unique_lock lock(rw_clean_mtx_);
-    // map_ -> temp_map_ // need improve
     cleans_.emplace_back(file_worker);
 }
 
@@ -116,24 +125,22 @@ void FileWorkerMap<FileWorkerT>::MoveFiles() {
     // std::vector<std::future<void>> futs;
     // std::vector<std::future<int>> futs1;
     // futs.reserve(map_.size());
-    for (auto it = temp_map_.begin(); it != temp_map_.end();) {
-        auto &[rel_file_path, file_worker] = *it;
-        if (file_worker->rel_file_path_->find("import") != std::string::npos) {
+    for (auto it = active_dic_.begin(); it != active_dic_.end();) {
+        auto &rel_file_path = *it;
+        if (rel_file_path->find("import") != std::string::npos) {
             ++it;
             continue;
         }
+        auto file_worker = GetFileWorkerNoLock();
+        // assert(file_worker);
         // futs1.emplace_back(std::async(msync, ptr->mmap_, ptr->mmap_size_, MS_SYNC));
         msync(file_worker->mmap_, file_worker->mmap_size_, MS_SYNC);
         file_worker->MoveFile();
         // futs.emplace_back(std::async(std::launch::async, &FileWorkerT::MoveFile, ptr.get()));
         ++it;
-        {
-            // std::unique_lock l(rw_mtx_);
-            map_[rel_file_path] = std::move(file_worker);
-        }
     }
 
-    temp_map_.clear();
+    active_dic_.clear();
     // for (auto &fut : futs) {
     //     fut.wait();
     // }
