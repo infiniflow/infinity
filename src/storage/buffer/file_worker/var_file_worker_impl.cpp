@@ -84,21 +84,12 @@ void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<Local
         return;
     }
     if (!mmap_) {
-        // if (file_size < buffer_size_) {
-        //     UnrecoverableError(fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_));
-        // } else {
-
-        // }
-
         auto buffer = std::make_unique<char[]>(buffer_size);
 
         auto [nbytes, status] = file_handle->Read(buffer.get(), buffer_size);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        // if (nbytes != buffer_size_) {
-        //     UnrecoverableError(fmt::format("Read {} bytes from file failed, only {} bytes read.", buffer_size_, nbytes));
-        // }
 
         data = std::make_shared<VarBuffer>(this, std::move(buffer), buffer_size);
 
