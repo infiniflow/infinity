@@ -127,11 +127,11 @@ void FileWorkerMap<FileWorkerT>::MoveFiles() {
     // futs.reserve(map_.size());
     for (auto it = active_dic_.begin(); it != active_dic_.end();) {
         auto &rel_file_path = *it;
-        if (rel_file_path->find("import") != std::string::npos) {
+        if (rel_file_path.find("import") != std::string::npos) {
             ++it;
             continue;
         }
-        auto file_worker = GetFileWorkerNoLock();
+        auto file_worker = GetFileWorkerNoLock(rel_file_path);
         // assert(file_worker);
         // futs1.emplace_back(std::async(msync, ptr->mmap_, ptr->mmap_size_, MS_SYNC));
         msync(file_worker->mmap_, file_worker->mmap_size_, MS_SYNC);
