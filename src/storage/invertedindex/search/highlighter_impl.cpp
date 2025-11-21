@@ -15,6 +15,8 @@
 module;
 
 #include "common/analyzer/string_utils.h"
+#define PCRE2_CODE_UNIT_WIDTH 8
+#include <pcre2.h>
 
 module infinity_core:highlighter.impl;
 
@@ -22,164 +24,226 @@ import :highlighter;
 import :aho_corasick;
 import :analyzer;
 import :term;
+import :analyzer_pool;
+import :rag_analyzer;
+import :infinity_exception;
 
 import std.compat;
 
 namespace infinity {
 
-Highlighter::Highlighter() {
-    std::set<std::string> patterns;
-    patterns.insert(".");
-    patterns.insert(",");
-    patterns.insert("?");
-    patterns.insert("!");
-    patterns.insert(";");
-    patterns.insert("\n");
-    patterns.insert("，");
-    patterns.insert("。");
-    patterns.insert("？");
-    patterns.insert("！");
-    patterns.insert("；");
-    std::vector<std::string> pattern_vector(patterns.begin(), patterns.end());
-    sentence_delimiter_.Build(pattern_vector);
-}
-
-void Highlighter::GetHighlightWithoutStemmer(const std::vector<std::string> &query, const std::string &raw_text, std::string &output) {
-    const u32 max_results = 1024;
-    std::vector<AhoCorasick::ResultType> matches(max_results + 1);
-    auto num_results = sentence_delimiter_.Find(raw_text, matches.data(), max_results);
-    std::vector<std::string> sentences;
-    sentences.reserve(num_results);
-    std::size_t last_position = 0;
-    for (u32 i = 0; i < num_results; ++i) {
-        AhoCorasick::ResultType r = matches[i];
-        if (r.position > 0) {
-            std::size_t end_offset = r.position - last_position + r.length;
-            while (raw_text[last_position + end_offset - 1] == '\n') {
-                --end_offset;
-            };
-            if (end_offset == 0)
-                continue;
-            sentences.push_back(raw_text.substr(last_position, end_offset));
-            last_position = r.position + r.length;
-        }
+void Highlighter::GetHighlight(const std::string &matching_text, const std::string &raw_text, std::string &output, Analyzer *analyzer) {
+    if (matching_text.empty() || raw_text.empty()) {
+        output = raw_text;
+        return;
     }
-    std::set<std::string> patterns;
-    for (auto &query_term : query) {
-        patterns.insert(ToLowerString(query_term));
-    }
-    std::vector<std::string> pattern_vector(patterns.begin(), patterns.end());
-    AhoCorasick automaton;
-    automaton.Build(pattern_vector);
-    std::size_t last_sentence_pos = 0;
-    for (unsigned i = 0; i < sentences.size(); ++i) {
-        std::string &sentence_raw = sentences[i];
-        std::string sentence = ToLowerString(sentence_raw);
 
-        num_results = automaton.Find(sentence, matches.data(), max_results);
-        if (num_results > 0) {
-            last_position = 0;
-            if (i > (last_sentence_pos + 1))
-                output.append("...");
+    std::vector<std::string> ascii_only_queries;
+    std::vector<std::string> unicode_queries;
 
-            for (u32 i = 0; i < num_results; ++i) {
-                AhoCorasick::ResultType r = matches[i];
-                output.append(sentence_raw.substr(last_position, r.position - last_position));
-                output.append("<em>");
-                output.append(pattern_vector[r.value]);
-                output.append("</em>");
-                last_position = r.position + r.length;
-            }
-            output.append(sentence_raw.substr(last_position, sentence_raw.size() - last_position));
-            last_sentence_pos = i;
-        }
-    }
-}
-
-void Highlighter::GetHighlightWithStemmer(const std::vector<std::string> &query,
-                                          const std::string &raw_text,
-                                          std::string &output,
-                                          Analyzer *analyzer) {
-    analyzer->SetCharOffset(true);
-    TermList term_list;
-    analyzer->Analyze(raw_text, term_list);
-
-    std::sort(term_list.begin(), term_list.end(), [](const Term &lhs, const Term &rhs) noexcept { return lhs.text_ < rhs.text_; });
-
-    TermList hit_list;
-    for (auto &query_term : query) {
-        auto lower = std::lower_bound(term_list.begin(), term_list.end(), query_term, [](auto element, auto query_term) {
-            return element.text_ < query_term;
-        });
-        for (auto iter = lower; iter != term_list.end(); ++iter) {
-            if (iter->text_ == query_term) {
-                hit_list.push_back(*iter);
-            }
-        }
-    }
-    std::sort(hit_list.begin(), hit_list.end(), [](const Term &lhs, const Term &rhs) noexcept { return lhs.word_offset_ < rhs.word_offset_; });
-
-    const u32 max_results = 1024;
-    std::vector<AhoCorasick::ResultType> matches(max_results + 1);
-    auto num_results = sentence_delimiter_.Find(raw_text, matches.data(), max_results);
-    std::vector<std::size_t> sentence_boundaries;
-    sentence_boundaries.reserve(num_results);
-    std::size_t last_position = 0;
-    for (u32 i = 0; i < num_results; ++i) {
-        AhoCorasick::ResultType r = matches[i];
-        if (r.position > 0) {
-            std::size_t end_offset = r.position - last_position + r.length;
-            while (raw_text[last_position + end_offset - 1] == '\n') {
-                --end_offset;
-            };
-            if (end_offset == 0)
-                continue;
-            sentence_boundaries.push_back(last_position + end_offset);
-            last_position = r.position + r.length;
-        }
-    }
-    if (0 == num_results)
-        sentence_boundaries.push_back(raw_text.size());
-
-    std::size_t last_sentence_pos = 0;
-    std::size_t last_term_pos = 0;
-    std::vector<std::size_t>::iterator last_sentence_iter = sentence_boundaries.end();
-    for (auto &term : hit_list) {
-        auto it = std::lower_bound(sentence_boundaries.begin(), sentence_boundaries.end(), term.word_offset_, [](auto element, auto value) {
-            return element < value;
-        });
-        if (last_sentence_iter == sentence_boundaries.end()) {
-            last_sentence_pos = 0;
-            output.append(raw_text.substr(last_sentence_pos, term.word_offset_ - last_sentence_pos));
+    TermList matching_terms;
+    analyzer->Analyze(matching_text, matching_terms);
+    for (auto &term : matching_terms) {
+        if (IsASCIIWord(term.text_)) {
+            ascii_only_queries.push_back(term.text_);
         } else {
-            std::size_t distance = it - last_sentence_iter;
-            if (distance > 1) {
-                output.append("...");
-                last_sentence_pos = *(it - 1);
-                output.append(raw_text.substr(last_sentence_pos, term.word_offset_ - last_sentence_pos));
-            } else if (distance == 1) {
-                last_sentence_pos = *(it - 1);
-                output.append(raw_text.substr(last_sentence_pos, term.word_offset_ - last_sentence_pos));
-            } else {
-                // multiple terms hit in one sentence
-                output.append(raw_text.substr(last_term_pos, term.word_offset_ - last_term_pos));
+            unicode_queries.push_back(term.text_);
+        }
+    }
+
+    std::vector<std::pair<size_t, size_t>> matches;
+    if (!ascii_only_queries.empty()) {
+        GetASCIIWordHighlight(ascii_only_queries, raw_text, matches, analyzer);
+    }
+    if (!unicode_queries.empty()) {
+        GetUnicodeWordHighlight(unicode_queries, raw_text, matches);
+    }
+
+    ApplyHighlights(raw_text, matches, output);
+}
+
+void Highlighter::GetASCIIWordHighlight(const std::vector<std::string> &query_texts,
+                                        const std::string &raw_text,
+                                        std::vector<std::pair<size_t, size_t>> &matches,
+                                        Analyzer *analyzer) {
+
+    TermList doc_terms;
+    analyzer->Analyze(raw_text, doc_terms);
+    for (const auto &term : doc_terms) {
+        if (std::find(query_texts.begin(), query_texts.end(), term.text_) != query_texts.end()) {
+            matches.emplace_back(term.word_offset_, term.end_offset_);
+        }
+    }
+}
+
+void Highlighter::GetUnicodeWordHighlight(const std::vector<std::string> &query_texts,
+                                          const std::string &raw_text,
+                                          std::vector<std::pair<size_t, size_t>> &matches) {
+    for (const auto &query_text : query_texts) {
+        size_t start = 0;
+        while (true) {
+            size_t pos = raw_text.find(query_text, start);
+            if (pos == std::string::npos) {
+                break;
+            }
+            matches.emplace_back(pos, pos + query_text.length());
+            start = pos + 1;
+        }
+    }
+}
+
+void Highlighter::ApplyHighlights(const std::string &text, const std::vector<std::pair<size_t, size_t>> &matches, std::string &output) {
+    if (matches.empty()) {
+        output = text;
+        return;
+    }
+    auto merged_matches = MergeMatches(matches);
+
+    output.clear();
+    size_t pos = 0;
+    bool prev_highlighted = true;
+
+    // Only show sentences containing highlight words.
+    std::vector<std::string> sentences;
+    SentenceSplitter(text, sentences);
+    for (size_t i = 0; i < sentences.size(); ++i) {
+        std::vector<std::pair<size_t, size_t>> sentence_highlights;
+        for (const auto &[start, end] : merged_matches) {
+            if (start >= pos && end <= pos + sentences[i].length()) {
+                size_t relative_start = start - pos;
+                size_t relative_end = end - pos;
+                sentence_highlights.emplace_back(relative_start, relative_end);
             }
         }
 
-        output.append("<em>");
-        output.append(raw_text.substr(term.word_offset_, term.end_offset_ - term.word_offset_));
-        output.append("</em>");
-        last_term_pos = term.end_offset_;
-        if (it != sentence_boundaries.end()) {
-            last_sentence_iter = it;
-            last_sentence_pos = *it;
+        bool highlighted = !sentence_highlights.empty();
+        if (highlighted) {
+            output += BuildHighlightedSentence(sentences[i], sentence_highlights);
+        } else if (prev_highlighted) {
+            output += " ... ";
+        }
+
+        prev_highlighted = highlighted;
+        pos += sentences[i].length();
+    }
+}
+
+void Highlighter::FindASCIIWords(const std::string &pattern, const std::string &text, std::vector<std::pair<size_t, size_t>> &matches) {
+    pcre2_code *re;
+    PCRE2_SPTR text_ptr = (PCRE2_SPTR)text.c_str();
+    PCRE2_SIZE text_len = text.length();
+
+    int errornumber;
+    PCRE2_SIZE erroroffset;
+
+    std::string regex_pattern = "\\b" + EscapeRegex(pattern) + "\\b";
+    PCRE2_SPTR regex_ptr = (PCRE2_SPTR)regex_pattern.c_str();
+
+    re = pcre2_compile(regex_ptr, PCRE2_ZERO_TERMINATED, PCRE2_CASELESS, &errornumber, &erroroffset, NULL);
+    if (re == NULL) {
+        return;
+    }
+
+    pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(re, NULL);
+
+    PCRE2_SIZE start_offset = 0;
+    int rc;
+
+    while (start_offset < text_len) {
+        rc = pcre2_match(re, text_ptr, text_len, start_offset, 0, match_data, NULL);
+
+        if (rc < 0) {
+            break;
+        }
+
+        PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
+        size_t start = ovector[0];
+        size_t end = ovector[1];
+
+        matches.emplace_back(start, end);
+        start_offset = end;
+
+        if (start == end) {
+            start_offset++;
         }
     }
-    if (last_term_pos < last_sentence_pos)
-        output.append(raw_text.substr(last_term_pos, last_sentence_pos - last_term_pos));
-    if (last_sentence_iter != sentence_boundaries.end()) {
-        output.append("...");
+
+    pcre2_match_data_free(match_data);
+    pcre2_code_free(re);
+}
+
+std::string Highlighter::EscapeRegex(const std::string &input) {
+    static const std::string special_chars = "\\^$.*+?()[]{}|";
+    std::string result;
+
+    for (char c : input) {
+        if (special_chars.find(c) != std::string::npos) {
+            result += '\\';
+        }
+        result += c;
     }
+
+    return result;
+}
+
+std::vector<std::pair<size_t, size_t>> Highlighter::MergeMatches(const std::vector<std::pair<size_t, size_t>> &matches) {
+    if (matches.empty()) {
+        return {};
+    }
+
+    auto sorted_matches = matches;
+    std::sort(sorted_matches.begin(), sorted_matches.end());
+
+    std::vector<std::pair<size_t, size_t>> merged;
+    size_t current_start = sorted_matches[0].first;
+    size_t current_end = sorted_matches[0].second;
+
+    for (size_t i = 1; i < sorted_matches.size(); ++i) {
+        size_t start = sorted_matches[i].first;
+        size_t end = sorted_matches[i].second;
+
+        if (start <= current_end) {
+            current_end = std::max(current_end, end);
+        } else {
+            merged.emplace_back(current_start, current_end);
+            current_start = start;
+            current_end = end;
+        }
+    }
+
+    merged.emplace_back(current_start, current_end);
+    return merged;
+}
+
+bool Highlighter::IsASCIIWord(const std::string &word) {
+    for (char c : word) {
+        if (static_cast<unsigned char>(c) > 127) {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::string Highlighter::BuildHighlightedSentence(const std::string &sentence, const std::vector<std::pair<size_t, size_t>> &highlights) {
+    if (highlights.empty())
+        return sentence;
+
+    size_t sentence_length = sentence.length() + highlights.size() * (pre_tag_.length() + post_tag_.length());
+
+    std::string highlighted_sentence;
+    highlighted_sentence.reserve(sentence_length);
+
+    size_t last_pos = 0;
+    for (const auto &[start, end] : highlights) {
+        highlighted_sentence.append(sentence, last_pos, start - last_pos);
+        highlighted_sentence += pre_tag_;
+        highlighted_sentence.append(sentence, start, end - start);
+        highlighted_sentence += post_tag_;
+        last_pos = end;
+    }
+
+    highlighted_sentence.append(sentence, last_pos, std::string::npos);
+    return highlighted_sentence;
 }
 
 }; // namespace infinity

@@ -358,7 +358,7 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                         for (auto &column_name : columns) {
                             for (auto &[highlight_column_id, highlight_info] : highlight_columns_) {
                                 if (column_name == projection_expressions_[highlight_column_id]->Name()) {
-                                    highlight_info->query_terms_.insert(highlight_info->query_terms_.end(), terms.begin(), terms.end());
+                                    highlight_info->matching_text_ = match_node->match_expr_->matching_text_;
                                     highlight_info->analyzer_ = "rag-coarse";
                                 }
                             }
@@ -449,16 +449,6 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                                                         total_hits_count_flag_);
             limit->set_left_node(root);
             root = limit;
-        }
-
-        // Finalize highlight info
-        if (!highlight_columns_.empty()) {
-            for (auto &[highlight_column_id, highlight_info] : highlight_columns_) {
-                // Deduplicate terms
-                std::sort(highlight_info->query_terms_.begin(), highlight_info->query_terms_.end());
-                highlight_info->query_terms_.erase(std::unique(highlight_info->query_terms_.begin(), highlight_info->query_terms_.end()),
-                                                   highlight_info->query_terms_.end());
-            }
         }
 
         auto project = std::make_shared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
