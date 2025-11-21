@@ -21,16 +21,12 @@ import global_resource_usage;
 
 namespace infinity {
 
-export enum class FileAccessMode { kWrite, kRead, kMmapRead, kInvalid };
+export enum class FileAccessMode { kWrite, kRead, kReadWrite, kInvalid };
 
 export class LocalFileHandle {
 public:
-    LocalFileHandle(i32 fd, const std::string &path, FileAccessMode file_access_mode) : fd_(fd), path_(path), access_mode_(file_access_mode) {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount("LocalFileHandle");
-#endif
-    }
-    ~LocalFileHandle();
+    LocalFileHandle(i32 fd, const std::string &path, FileAccessMode file_access_mode) : fd_(fd), path_(path), access_mode_(file_access_mode) {}
+    // ~LocalFileHandle();
 
     Status Append(const void *buffer, u64 nbytes);
     Status Append(const std::string &buffer, u64 nbytes);
@@ -43,7 +39,7 @@ public:
     Status Sync();
 
 public:
-    i32 FileDescriptor() const { return fd_; }
+    i32 fd() const { return fd_; }
 
     std::string Path() const { return path_; }
 
@@ -52,7 +48,7 @@ private:
 
 private:
     i32 fd_{-1};
-    std::string path_{};
+    std::string path_;
     FileAccessMode access_mode_{FileAccessMode::kInvalid};
 };
 

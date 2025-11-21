@@ -83,7 +83,7 @@ bool PhysicalCrossProduct::Execute(QueryContext *, OperatorState *) {
 
                 // Prepare the left columns
                 for (size_t column_idx = 0; column_idx < left_column_count; ++column_idx) {
-                    const std::shared_ptr<ColumnVector> &left_column_vector = left_block->column_vectors[column_idx];
+                    const std::shared_ptr<ColumnVector> &left_column_vector = left_block->column_vectors_[column_idx];
 
                     // Generate output column vector
                     std::shared_ptr<ColumnVector> column_vector = ColumnVector::Make(left_column_vector->data_type());
@@ -99,7 +99,7 @@ bool PhysicalCrossProduct::Execute(QueryContext *, OperatorState *) {
 
                 // Prepare the right columns
                 for (size_t column_idx = 0; column_idx < right_column_count; ++column_idx) {
-                    const std::shared_ptr<ColumnVector> &right_column_vector = right_block->column_vectors[column_idx];
+                    const std::shared_ptr<ColumnVector> &right_column_vector = right_block->column_vectors_[column_idx];
                     output_columns.emplace_back(right_column_vector);
                 }
 

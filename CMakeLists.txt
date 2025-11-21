@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 4.0.3...4.1.1)
+cmake_minimum_required(VERSION 4.0.3...4.2.0)
 
 cmake_policy(SET CMP0167 OLD)
 
 set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS TRUE)
 
-if (CMAKE_VERSION GREATER_EQUAL 4.0.3 AND CMAKE_VERSION LESS_EQUAL 4.1.1)
+if (CMAKE_VERSION GREATER_EQUAL 4.0.3 AND CMAKE_VERSION LESS_EQUAL 4.2.0)
     set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
 endif ()
 
@@ -323,8 +323,8 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 
     set(CMAKE_DEBUG_POSTFIX "")
 
-else ()
-    message(FATAL_ERROR "Only support CMake build type: Debug, RelWithDebInfo, and Release")
+#else ()
+#    message(FATAL_ERROR "Only support CMake build type: Debug, RelWithDebInfo, and Release")
 endif ()
 
 if (CLANG_VERSION_STRING VERSION_EQUAL 17)

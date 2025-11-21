@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:new_txn;
 
 import :txn_state;
@@ -59,11 +57,8 @@ struct WalCmdCheckpointV2;
 struct WalCmdAlterIndexV2;
 struct WalCmdCleanup;
 struct WalCmdCreateTableSnapshot;
-struct WalCmdCreateDBSnapshot;
 struct WalCmdRestoreTableSnapshot;
 struct WalCmdRestoreDatabaseSnapshot;
-
-class BufferObj;
 
 class ColumnMeta;
 class BlockMeta;
@@ -102,9 +97,6 @@ struct RestoreTableTxnStore;
 struct RestoreDatabaseTxnStore;
 struct UpdateTxnStore;
 struct CreateTableSnapshotTxnStore;
-struct CreateDBSnapshotTxnStore;
-struct CleanupTxnStore;
-class BufferManager;
 class IndexBase;
 struct DataBlock;
 class TableDef;
@@ -124,11 +116,6 @@ class NewCatalog;
 class NewTxnManager;
 
 export struct CheckpointOption {
-    TxnTimeStamp checkpoint_ts_ = 0;
-};
-
-export struct SnapshotOption {
-    SnapshotType snapshot_type_{SnapshotType::kUnknown};
     TxnTimeStamp checkpoint_ts_ = 0;
 };
 
@@ -279,8 +266,10 @@ public:
     Status OptimizeIndex(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id);
 
     // // Snapshot OPs
-    Status CreateTableSnapshot(const std::string &db_name, const std::string &table_name, const std::string &snapshot_name);
     Status CreateDBSnapshot(const std::string &db_name, const std::string &snapshot_name);
+
+    Status CreateTableSnapshot(const std::string &db_name, const std::string &table_name, const std::string &snapshot_name);
+
     // std::tuple<std::shared_ptr<TableSnapshotInfo>, Status> GetTableSnapshotInfo(const std::string &db_name, const std::string &table_name);
 
     Status RestoreTableSnapshot(const std::string &db_name, const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info);
@@ -362,7 +351,7 @@ public:
     Status Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint);
 
     // Getter
-    [[nodiscard]] BufferManager *buffer_mgr() const { return buffer_mgr_; }
+    [[nodiscard]] FileWorkerManager *fileworker_mgr() const { return fileworker_mgr_; }
 
     [[nodiscard]] TransactionID TxnID() const;
 
@@ -542,23 +531,13 @@ private:
                             SegmentMeta &segment_meta,
                             RowID base_rowid,
                             u32 row_cnt,
-                            BufferObj *buffer_obj);
+                            FileWorker *file_worker);
 
     Status AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, const std::vector<std::unique_ptr<InitParameter>> &params);
 
     Status ReplayAlterIndexByParams(WalCmdAlterIndexV2 *alter_index_cmd);
 
     Status DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id);
-    // Status DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta,
-    //                            const ChunkID &new_chunk_id,
-    //                            const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info);
-
-    Status CheckpointDB(DBMeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
-    Status CheckpointTable(TableMeta &table_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
-
-    Status CreateDBSnapshotFile(std::shared_ptr<DatabaseSnapshotInfo> db_snapshot_info, const SnapshotOption &option);
-    Status CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_snapshot_info, const SnapshotOption &option);
-    Status CreateJSONSnapshotFile(std::string json_string, std::string snapshot_name);
 
     Status
     CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, std::vector<std::pair<RowID, u64>> &append_ranges);
@@ -589,18 +568,16 @@ private:
     Status CommitCheckpointDB(DBMeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointTable(TableMeta &table_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointTableData(TableMeta &table_meta, TxnTimeStamp checkpoint_ts);
-    Status PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
-    Status PrepareCommitCreateDBSnapshot(const WalCmdCreateDBSnapshot *create_db_snapshot_cmd);
-    Status PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files = false);
-    Status PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd);
-    Status CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
-    Status CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store, SnapshotType snapshot_type);
+    // Status PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
+    // Status PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files = false);
+    // Status PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd);
+    // Status CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
+    // Status CheckpointForSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store);
 
     Status AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
     Status CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
     Status FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts);
     Status FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts);
-    Status TryToMmap(BlockMeta &block_meta, TxnTimeStamp save_ts, bool *to_mmap = nullptr);
 
     Status IncrLatestID(std::string &id_str, std::string_view id_name) const;
 
@@ -625,8 +602,6 @@ private:
     bool CheckConflictTxnStore(const RestoreTableTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);
     bool CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);
     bool CheckConflictTxnStore(const CreateTableSnapshotTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);
-    bool CheckConflictTxnStore(const CreateDBSnapshotTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);
-    bool CheckConflictTxnStore(const CleanupTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);
 
 public:
     bool IsReplay() const;
@@ -696,14 +671,14 @@ public:
                                 const std::string &table_name,
                                 std::shared_ptr<DataBlock> input_block,
                                 const u64 &input_block_idx,
-                                std::vector<std::string> *object_paths = nullptr);
+                                std::vector<std::string> *file_worker_paths = nullptr);
 
     Status PrintVersionInBlock(BlockMeta &block_meta, const std::vector<BlockOffset> &block_offsets, bool ignore_invisible);
 
 private:
     // Reference to external class
     NewTxnManager *txn_mgr_{};
-    BufferManager *buffer_mgr_{}; // This BufferManager ptr Only for replaying wal
+    FileWorkerManager *fileworker_mgr_{}; // This FileWorkerManager ptr Only for replaying wal
     NewCatalog *new_catalog_{};
 
     // Used to store the local data in this transaction

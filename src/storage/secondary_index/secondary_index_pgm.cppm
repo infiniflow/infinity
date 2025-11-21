@@ -161,9 +161,9 @@ public:
     }
 
     void BuildIndex(size_t data_cnt, const void *data_ptr) override {
-        if (initialized_) {
-            UnrecoverableError("Already initialized.");
-        }
+        // if (initialized_) {
+        //     UnrecoverableError("Already initialized.");
+        // }
         auto typed_data_ptr = static_cast<const IndexValueType *>(data_ptr);
         pgm_index_ = std::make_unique<PGMWithExtraFunction<IndexValueType>>(typed_data_ptr, typed_data_ptr + data_cnt);
         initialized_ = true;

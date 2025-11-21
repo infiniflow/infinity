@@ -65,7 +65,7 @@ std::shared_ptr<std::vector<std::shared_ptr<DataType>>> LogicalReadCache::GetOut
     }
     auto result_types = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
     for (size_t column_id : column_map_) {
-        std::shared_ptr<DataType> data_type = cache_content_->data_blocks_[0]->column_vectors[column_id]->data_type();
+        std::shared_ptr<DataType> data_type = cache_content_->data_blocks_[0]->column_vectors_[column_id]->data_type();
         result_types->push_back(data_type);
     }
     return result_types;

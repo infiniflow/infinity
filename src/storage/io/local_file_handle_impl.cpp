@@ -33,29 +33,25 @@ import global_resource_usage;
 
 namespace infinity {
 
-LocalFileHandle::~LocalFileHandle() {
-    Status status = Sync();
-    if (!status.ok()) {
-        return;
-    }
-
-    if (fd_ == -1) {
-        UnrecoverableError(fmt::format("File was closed before or not open"));
-    }
-
-    i32 ret = close(fd_);
-    if (ret == -1) {
-        UnrecoverableError(fmt::format("Close file: {}, error: {}", path_, strerror(errno)));
-    }
-
-    fd_ = -1;
-    path_.clear();
-    access_mode_ = FileAccessMode::kInvalid;
-
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::DecrObjectCount("LocalFileHandle");
-#endif
-}
+// LocalFileHandle::~LocalFileHandle() {
+//     Status status = Sync();
+//     if (!status.ok()) {
+//         return;
+//     }
+//
+//     if (fd_ == -1) {
+//         UnrecoverableError(fmt::format("File was closed before or not open"));
+//     }
+//
+//     i32 ret = close(fd_);
+//     if (ret == -1) {
+//         UnrecoverableError(fmt::format("Close file: {}, error: {}", path_, strerror(errno)));
+//     }
+//
+//     fd_ = -1;
+//     path_.clear();
+//     access_mode_ = FileAccessMode::kInvalid;
+// }
 
 Status LocalFileHandle::Close() {
     Status status = Sync();
@@ -78,7 +74,7 @@ Status LocalFileHandle::Close() {
 }
 
 Status LocalFileHandle::Append(const void *buffer, u64 nbytes) {
-    if (access_mode_ != FileAccessMode::kWrite) {
+    if (access_mode_ != FileAccessMode::kWrite && access_mode_ != FileAccessMode::kReadWrite) {
         UnrecoverableError(fmt::format("File: {} isn't open.", path_));
     }
     i64 written = 0;

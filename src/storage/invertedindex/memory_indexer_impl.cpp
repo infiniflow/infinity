@@ -84,8 +84,8 @@ MemoryIndexer::MemoryIndexer(const std::string &index_dir,
                              optionflag_t flag,
                              const std::string &analyzer)
     : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), posting_format_(PostingFormatOption(flag_)),
-      analyzer_(analyzer), inverting_thread_pool_(infinity::InfinityContext::instance().GetFulltextInvertingThreadPool()),
-      commiting_thread_pool_(infinity::InfinityContext::instance().GetFulltextCommitingThreadPool()), ring_sorted_(13UL) {
+      analyzer_(analyzer), inverting_thread_pool_(InfinityContext::instance().GetFulltextInvertingThreadPool()),
+      commiting_thread_pool_(InfinityContext::instance().GetFulltextCommitingThreadPool()), ring_sorted_(13UL) {
     assert(std::filesystem::path(index_dir).is_absolute());
     posting_table_ = std::make_shared<PostingTable>();
     prepared_posting_ = std::make_shared<PostingWriter>(posting_format_, column_lengths_);
@@ -316,7 +316,7 @@ size_t MemoryIndexer::CommitOffline(size_t wait_if_empty_ms) {
         num_runs_++;
     }
 
-    std::unique_lock<std::mutex> task_lock(mutex_);
+    std::unique_lock task_lock(mutex_);
     inflight_tasks_ -= num;
     if (inflight_tasks_ == 0) {
         cv_.notify_all();
@@ -394,40 +394,31 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     std::string posting_file = std::filesystem::path(index_dir_) / (base_name_ + POSTING_SUFFIX + (spill ? SPILL_SUFFIX : ""));
     std::string dict_file = std::filesystem::path(index_dir_) / (base_name_ + DICT_SUFFIX + (spill ? SPILL_SUFFIX : ""));
     std::string column_length_file = std::filesystem::path(index_dir_) / (base_name_ + LENGTH_SUFFIX + (spill ? SPILL_SUFFIX : ""));
-    std::string tmp_posting_file(posting_file);
-    std::string tmp_dict_file(dict_file);
-    std::string tmp_column_length_file(column_length_file);
+    auto tmp_posting_file{posting_file};
+    auto tmp_dict_file{dict_file};
+    auto tmp_column_length_file{column_length_file};
 
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr && !spill;
-    if (use_object_cache) {
-        std::filesystem::path tmp_dir = std::filesystem::path(InfinityContext::instance().config()->TempDir());
-        tmp_posting_file = tmp_dir / StringTransform(tmp_posting_file, "/", "_");
-        tmp_dict_file = tmp_dir / StringTransform(tmp_dict_file, "/", "_");
-        tmp_column_length_file = tmp_dir / StringTransform(tmp_column_length_file, "/", "_");
-    } else {
-        Status status = VirtualStore::MakeDirectory(index_dir_);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
+    auto status = VirtualStore::MakeDirectory(index_dir_);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
     }
 
-    std::shared_ptr<FileWriter> posting_file_writer = std::make_shared<FileWriter>(tmp_posting_file, 128000);
-    std::shared_ptr<FileWriter> dict_file_writer = std::make_shared<FileWriter>(tmp_dict_file, 128000);
+    auto posting_file_writer = std::make_shared<FileWriter>(tmp_posting_file, 128000);
+    auto dict_file_writer = std::make_shared<FileWriter>(tmp_dict_file, 128000);
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
 
-    std::string tmp_fst_file = tmp_dict_file + ".fst";
-    std::ofstream ofs(tmp_fst_file.c_str(), std::ios::binary | std::ios::trunc);
+    auto tmp_fst_file = fmt::format("{}.fst", tmp_dict_file);
+    std::ofstream ofs(tmp_fst_file, std::ios::binary | std::ios::trunc);
     OstreamWriter wtr(ofs);
     FstBuilder fst_builder(wtr);
 
     if (spill) {
         posting_file_writer->WriteVInt(i32(doc_count_));
     }
-    if (posting_table_.get() != nullptr) {
-        MemoryIndexer::PostingTableStore &posting_store = posting_table_->store_;
+    if (posting_table_.get()) {
+        PostingTableStore &posting_store = posting_table_->store_;
         for (auto it = posting_store.UnsafeBegin(); it != posting_store.UnsafeEnd(); ++it) {
-            const MemoryIndexer::PostingPtr posting_writer = it->second;
+            const PostingPtr posting_writer = it->second;
             TermMeta term_meta(posting_writer->GetDF(), posting_writer->GetTotalTF());
             posting_writer->Dump(posting_file_writer, term_meta, spill);
             size_t term_meta_offset = dict_file_writer->TotalWrittenBytes();
@@ -445,24 +436,15 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         LOG_INFO(fmt::format("Delete FST file: {}", tmp_fst_file));
         VirtualStore::DeleteFile(tmp_fst_file);
     }
-    auto [file_handle, status] = VirtualStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
+    {
+        auto [file_handle, status] = VirtualStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
 
-    std::vector<u32> &column_length_array = column_lengths_.UnsafeVec();
-    file_handle->Append(&column_length_array[0], sizeof(column_length_array[0]) * column_length_array.size());
-    file_handle->Sync();
-    if (use_object_cache) {
-        PersistResultHandler handler(pm);
-        PersistWriteResult result1 = pm->Persist(posting_file, tmp_posting_file, false);
-        PersistWriteResult result2 = pm->Persist(dict_file, tmp_dict_file, false);
-        PersistWriteResult result3 = pm->Persist(column_length_file, tmp_column_length_file, false);
-        handler.HandleWriteResult(result1);
-        handler.HandleWriteResult(result2);
-        handler.HandleWriteResult(result3);
-        PersistWriteResult result4 = pm->CurrentObjFinalize();
-        handler.HandleWriteResult(result4);
+        std::vector<u32> &column_length_array = column_lengths_.UnsafeVec();
+        file_handle->Append(&column_length_array[0], sizeof(column_length_array[0]) * column_length_array.size());
+        file_handle->Sync();
     }
 
     is_spilled_ = spill;
@@ -726,16 +708,14 @@ void MemoryIndexer::FinalSpillFile() {
 void MemoryIndexer::PrepareSpillFile() {
     spill_file_handle_ = fopen(spill_full_path_.c_str(), "w");
     if (spill_file_handle_ == nullptr) {
-        std::string error_message = fmt::format("Failed to open spill file: {}, error: {}", spill_full_path_, strerror(errno));
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to open spill file: {}, error: {}", spill_full_path_, strerror(errno)));
     }
 
     size_t written = fwrite(&tuple_count_, sizeof(u64), 1, spill_file_handle_);
     if (written != 1) {
         fclose(spill_file_handle_);
         spill_file_handle_ = nullptr;
-        std::string error_message = fmt::format("Failed to write to spill file: {}, error: {}", spill_full_path_, strerror(errno));
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to write to spill file: {}, error: {}", spill_full_path_, strerror(errno)));
     }
 
     const size_t write_buf_size = 128000;

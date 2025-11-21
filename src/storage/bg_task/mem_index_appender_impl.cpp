@@ -88,7 +88,8 @@ void MemIndexAppender::Process() {
                     }
                     if (storage_mode == StorageMode::kWritable) {
                         auto append_mem_index_task = static_cast<AppendMemIndexTask *>(bg_task.get());
-                        std::shared_ptr<MemoryIndexer> memory_indexer = append_mem_index_task->mem_index_->GetFulltextIndex();
+                        auto memory_indexer = append_mem_index_task->mem_index_->GetFulltextIndex();
+                        // std::println("#########{}", append_mem_index_task->input_column_->ToString());
                         if (memory_indexer == nullptr) {
                             // Only used for full text index, currently
                             UnrecoverableError("Not inverted index");

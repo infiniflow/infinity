@@ -22,7 +22,7 @@ import :ivf_index_data;
 import :index_ivf;
 import :ivf_index_storage;
 import :index_base;
-import :buffer_manager;
+
 import :infinity_exception;
 import :status;
 import :default_values;
@@ -52,7 +52,7 @@ public:
 
     const char *GetEmbedding(size_t offset) override {
         size_t block_offset = UpdateColumnVector(offset);
-        return cur_column_vector_.data() + block_offset * cur_column_vector_.data_type_size_;
+        return cur_column_vector_.data().get() + block_offset * cur_column_vector_.data_type_size_;
     }
 
     std::pair<std::span<const char>, size_t> GetMultiVector(size_t offset) override {
@@ -67,7 +67,6 @@ private:
         if (block_id != last_block_id_) {
             last_block_id_ = block_id;
             BlockMeta block_meta(block_id, segment_meta_);
-            // auto [row_cnt, status] = block_meta.GetRowCnt();
             auto [row_cnt, status] = block_meta.GetRowCnt1();
             if (!status.ok()) {
                 UnrecoverableError("Get row count failed");

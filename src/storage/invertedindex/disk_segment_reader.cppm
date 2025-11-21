@@ -25,7 +25,7 @@ import :term_meta;
 import internal_types;
 
 namespace infinity {
-export class DiskIndexSegmentReader : public IndexSegmentReader {
+export class DiskIndexSegmentReader final : public IndexSegmentReader {
 public:
     DiskIndexSegmentReader(SegmentID segment_id,
                            ChunkID chunk_id,
@@ -41,9 +41,9 @@ public:
 private:
     RowID base_row_id_{INVALID_ROWID};
     std::shared_ptr<DictionaryReader> dict_reader_;
-    std::string posting_file_{};
-    std::string posting_file_obj_{};
-    std::string dict_file_{};
+    std::string posting_file_;
+    std::string posting_file_obj_;
+    std::string dict_file_;
     u8 *data_ptr_{};
     size_t data_len_{};
 };

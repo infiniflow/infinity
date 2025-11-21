@@ -42,8 +42,6 @@ import :value;
 import :kv_code;
 import :kv_store;
 import :new_txn;
-import :buffer_obj;
-import :buffer_handle;
 import :secondary_index_in_mem;
 import :secondary_index_data;
 import :segment_meta;

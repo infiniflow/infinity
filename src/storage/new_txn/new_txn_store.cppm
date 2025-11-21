@@ -30,7 +30,6 @@ namespace infinity {
 export class NewTxn;
 class BGTaskProcessor;
 struct DataBlock;
-class BufferManager;
 
 class KVInstance;
 struct WalSegmentInfo;

@@ -56,10 +56,10 @@ bool PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operato
     for (size_t block_idx = 0; block_idx < data_block_count; ++block_idx) {
         DataBlock *input_data_block_ptr = prev_op_state->data_block_array_[block_idx].get();
         for (size_t i = 0; i < input_data_block_ptr->column_count(); i++) {
-            std::shared_ptr<ColumnVector> column_vector = input_data_block_ptr->column_vectors[i];
+            std::shared_ptr<ColumnVector> column_vector = input_data_block_ptr->column_vectors_[i];
             if (column_vector->data_type()->type() == LogicalType::kRowID) {
                 row_ids.resize(column_vector->Size());
-                std::memcpy(row_ids.data(), column_vector->data(), column_vector->Size() * sizeof(RowID));
+                std::memcpy(row_ids.data(), column_vector->data().get(), column_vector->Size() * sizeof(RowID));
                 break;
             }
         }

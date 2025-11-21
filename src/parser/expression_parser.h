@@ -35,29 +35,28 @@
    are private implementation details.  Do not rely on them.  */
 
 #ifndef YY_EXPRESSION_EXPRESSION_PARSER_H_INCLUDED
-# define YY_EXPRESSION_EXPRESSION_PARSER_H_INCLUDED
+#define YY_EXPRESSION_EXPRESSION_PARSER_H_INCLUDED
 /* Debug traces.  */
 #ifndef EXPRESSIONDEBUG
-# if defined YYDEBUG
+#if defined YYDEBUG
 #if YYDEBUG
-#   define EXPRESSIONDEBUG 1
-#  else
-#   define EXPRESSIONDEBUG 0
-#  endif
-# else /* ! defined YYDEBUG */
-#  define EXPRESSIONDEBUG 1
-# endif /* ! defined YYDEBUG */
-#endif  /* ! defined EXPRESSIONDEBUG */
+#define EXPRESSIONDEBUG 1
+#else
+#define EXPRESSIONDEBUG 0
+#endif
+#else /* ! defined YYDEBUG */
+#define EXPRESSIONDEBUG 1
+#endif /* ! defined YYDEBUG */
+#endif /* ! defined EXPRESSIONDEBUG */
 #if EXPRESSIONDEBUG
 extern int expressiondebug;
 #endif
 /* "%code requires" blocks.  */
 #line 10 "expression_parser.y"
 
-
+#include "definition/column_def.h"
 #include "expression.h"
 #include "expression_parser_result.h"
-#include "definition/column_def.h"
 #include "type/info/decimal_info.h"
 #include "type/info/embedding_info.h"
 
@@ -78,33 +77,32 @@ struct EXPRESSION_LTYPE {
     int total_column;
     int string_length;
 
-    std::vector<void*> parameters;
+    std::vector<void *> parameters;
 };
 
 #define EXPRESSIONLTYPE EXPRESSION_LTYPE
 #define EXPRESSIONLTYPE_IS_DECLARED 1
 
-#define YY_USER_ACTION \
-    yylloc->first_line = yylloc->last_line;      \
-    yylloc->first_column = yylloc->last_column;  \
-    for(int i = 0; yytext[i] != '\0'; ++ i) {   \
-        yylloc->total_column++;                   \
-        yylloc->string_length++;                  \
-        if (yytext[i] == '\n') {                  \
-            yylloc->last_line++;                    \
-            yylloc->last_column = 0;                \
-        } else {                                  \
-            yylloc->last_column++;                  \
-        }                                         \
+#define YY_USER_ACTION                                                                                                                               \
+    yylloc->first_line = yylloc->last_line;                                                                                                          \
+    yylloc->first_column = yylloc->last_column;                                                                                                      \
+    for (int i = 0; yytext[i] != '\0'; ++i) {                                                                                                        \
+        yylloc->total_column++;                                                                                                                      \
+        yylloc->string_length++;                                                                                                                     \
+        if (yytext[i] == '\n') {                                                                                                                     \
+            yylloc->last_line++;                                                                                                                     \
+            yylloc->last_column = 0;                                                                                                                 \
+        } else {                                                                                                                                     \
+            yylloc->last_column++;                                                                                                                   \
+        }                                                                                                                                            \
     }
 
 #line 102 "expression_parser.h"
 
 /* Token type.  */
 #ifndef EXPRESSIONTOKENTYPE
-# define EXPRESSIONTOKENTYPE
-  enum expressiontokentype
-  {
+#define EXPRESSIONTOKENTYPE
+enum expressiontokentype {
     IDENTIFIER = 258,
     STRING = 259,
     DOUBLE_VALUE = 260,
@@ -268,48 +266,43 @@ struct EXPRESSION_LTYPE {
     QUERY = 418,
     FUSION = 419,
     NUMBER = 420
-  };
+};
 #endif
 
 /* Value type.  */
-#if ! defined EXPRESSIONSTYPE && ! defined EXPRESSIONSTYPE_IS_DECLARED
-union EXPRESSIONSTYPE
-{
+#if !defined EXPRESSIONSTYPE && !defined EXPRESSIONSTYPE_IS_DECLARED
+union EXPRESSIONSTYPE {
 #line 85 "expression_parser.y"
 
-    bool    bool_value;
-    char*   str_value;
-    double  double_value;
+    bool bool_value;
+    char *str_value;
+    double double_value;
     int64_t long_value;
 
-    infinity::ParsedExpr*             expr_t;
-    infinity::ConstantExpr*           const_expr_t;
-    std::vector<infinity::ParsedExpr*>*    expr_array_t;
+    infinity::ParsedExpr *expr_t;
+    infinity::ConstantExpr *const_expr_t;
+    std::vector<infinity::ParsedExpr *> *expr_array_t;
 
 #line 290 "expression_parser.h"
-
 };
 typedef union EXPRESSIONSTYPE EXPRESSIONSTYPE;
-# define EXPRESSIONSTYPE_IS_TRIVIAL 1
-# define EXPRESSIONSTYPE_IS_DECLARED 1
+#define EXPRESSIONSTYPE_IS_TRIVIAL 1
+#define EXPRESSIONSTYPE_IS_DECLARED 1
 #endif
 
 /* Location type.  */
-#if ! defined EXPRESSIONLTYPE && ! defined EXPRESSIONLTYPE_IS_DECLARED
+#if !defined EXPRESSIONLTYPE && !defined EXPRESSIONLTYPE_IS_DECLARED
 typedef struct EXPRESSIONLTYPE EXPRESSIONLTYPE;
-struct EXPRESSIONLTYPE
-{
-  int first_line;
-  int first_column;
-  int last_line;
-  int last_column;
+struct EXPRESSIONLTYPE {
+    int first_line;
+    int first_column;
+    int last_line;
+    int last_column;
 };
-# define EXPRESSIONLTYPE_IS_DECLARED 1
-# define EXPRESSIONLTYPE_IS_TRIVIAL 1
+#define EXPRESSIONLTYPE_IS_DECLARED 1
+#define EXPRESSIONLTYPE_IS_TRIVIAL 1
 #endif
 
-
-
-int expressionparse (void *scanner, infinity::ExpressionParserResult* result);
+int expressionparse(void *scanner, infinity::ExpressionParserResult *result);
 
 #endif /* !YY_EXPRESSION_EXPRESSION_PARSER_H_INCLUDED  */

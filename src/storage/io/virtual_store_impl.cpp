@@ -118,22 +118,31 @@ std::string ToString(StorageType storage_type) {
 
 std::tuple<std::unique_ptr<LocalFileHandle>, Status> VirtualStore::Open(const std::string &path, FileAccessMode access_mode) {
     i32 fd = -1;
+    // auto persistence_manager = InfinityContext::instance().storage()->persistence_manager();
+    // if (persistence_manager) {
+    //
+    // }
+
     switch (access_mode) {
         case FileAccessMode::kRead: {
             fd = open(path.c_str(), O_RDONLY, 0666);
+            // fd = open(path.c_str(), O_RDWR, 0666);
             break;
         }
+        case FileAccessMode::kReadWrite:
+            [[fallthrough]];
         case FileAccessMode::kWrite: {
+            auto ps = fs::path(path).parent_path().string();
+            MakeDirectory(ps);
             fd = open(path.c_str(), O_RDWR | O_CREAT, 0666);
-            break;
-        }
-        case FileAccessMode::kMmapRead: {
-            UnrecoverableError("Unsupported now.");
             break;
         }
         case FileAccessMode::kInvalid: {
             break;
         }
+    }
+    if (!std::filesystem::is_regular_file(path)) {
+        return {nullptr, Status::IOError(fmt::format("File: {} is not a regular file", path))};
     }
     if (fd == -1) {
         return {nullptr, Status::IOError(fmt::format("File: {} open failed: {}", path, strerror(errno)))};
@@ -151,10 +160,15 @@ std::unique_ptr<StreamReader> VirtualStore::OpenStreamReader(const std::string &
 }
 
 // For local disk filesystem, such as temp file, disk cache and WAL
-bool VirtualStore::Exists(const std::string &path) {
+bool VirtualStore::Exists(std::string_view path, bool is_v2) {
+    if (is_v2) {
+        if (auto persistence_manager = InfinityContext::instance().storage()->persistence_manager()) {
+            return persistence_manager->GetObjCache(path).obj_addr_.Valid();
+        }
+    }
     std::error_code error_code;
-    fs::path p{path};
-    bool is_exists = std::filesystem::exists(p, error_code);
+    // fs::path p{path};
+    bool is_exists = std::filesystem::exists(path, error_code);
     if (error_code.value() == 0) {
         return is_exists;
     } else {
@@ -168,12 +182,11 @@ Status VirtualStore::DeleteFile(const std::string &file_name) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", file_name));
     }
     std::error_code error_code;
-    fs::path p{file_name};
-    if (!Exists(p)) {
+    if (!Exists(file_name)) {
         LOG_WARN(fmt::format("The {} to be deleted does not exists ", file_name));
         return Status::OK();
     }
-    bool is_deleted = std::filesystem::remove(p, error_code);
+    bool is_deleted = std::filesystem::remove(file_name, error_code);
     if (error_code.value() != 0) {
         UnrecoverableError(fmt::format("Delete file {} exception: {}", file_name, strerror(errno)));
     }
@@ -205,7 +218,7 @@ Status VirtualStore::DeleteFileBG(const std::string &path) {
     return Status::OK();
 }
 
-Status VirtualStore::MakeDirectory(const std::string &path) {
+Status VirtualStore::MakeDirectory(std::string_view path) {
     if (VirtualStore::Exists(path)) {
         if (std::filesystem::is_directory(path)) {
             return Status::OK();
@@ -233,7 +246,7 @@ Status VirtualStore::RemoveDirectory(const std::string &path) {
     fs::path p{path};
     std::filesystem::remove_all(p, error_code);
     if (error_code.value() != 0) {
-        UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
+        // UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
     }
     return Status::OK();
 }
@@ -268,8 +281,10 @@ void VirtualStore::RecursiveCleanupAllEmptyDir(const std::string &path) {
         RecursiveCleanupAllEmptyDir(entry.path());
     }
 
-    if (std::filesystem::is_empty(path)) {
-        std::filesystem::remove(path);
+    std::error_code ec;
+    if (std::filesystem::is_empty(path, ec)) {
+        // std::error_code ec;
+        std::filesystem::remove(path, ec);
     }
 }
 
@@ -290,7 +305,7 @@ Status VirtualStore::Rename(const std::string &old_path, const std::string &new_
     }
 
     if (rename(old_path.c_str(), new_path.c_str()) != 0) {
-        UnrecoverableError(fmt::format("Can't rename file: {}, {}", old_path, strerror(errno)));
+        // UnrecoverableError(fmt::format("Can't rename file: {}, {}", old_path, strerror(errno)));
     }
     return Status::OK();
 }
@@ -339,7 +354,7 @@ Status VirtualStore::Merge(const std::string &dst_path, const std::string &src_p
     return Status::OK();
 }
 
-Status VirtualStore::Copy(const std::string &dst_path, const std::string &src_path) {
+Status VirtualStore::Copy(std::string_view dst_path, std::string_view src_path) {
     if (!std::filesystem::path(dst_path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", dst_path));
     }
@@ -347,7 +362,7 @@ Status VirtualStore::Copy(const std::string &dst_path, const std::string &src_pa
         UnrecoverableError(fmt::format("{} isn't absolute path.", src_path));
     }
 
-    std::string dst_dir = GetParentPath(dst_path);
+    auto dst_dir = GetParentPath(dst_path);
     if (!VirtualStore::Exists(dst_dir)) {
         VirtualStore::MakeDirectory(dst_dir);
     }
@@ -382,7 +397,7 @@ size_t VirtualStore::GetFileSize(const std::string &path) {
     return std::filesystem::file_size(path);
 }
 
-std::string VirtualStore::GetParentPath(const std::string &path) { return fs::path(path).parent_path().string(); }
+std::string VirtualStore::GetParentPath(std::string_view path) { return fs::path(path).parent_path().string(); }
 
 size_t VirtualStore::GetDirectorySize(const std::string &path) {
     if (!std::filesystem::path(path).is_absolute()) {
@@ -400,7 +415,7 @@ size_t VirtualStore::GetDirectorySize(const std::string &path) {
 }
 
 std::string VirtualStore::ConcatenatePath(const std::string &dir_path, const std::string &file_path) {
-    std::filesystem::path full_path = std::filesystem::path(dir_path) / file_path;
+    auto full_path = std::filesystem::path(dir_path) / file_path;
     return full_path.string();
 }
 

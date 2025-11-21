@@ -42,8 +42,6 @@ import :value;
 import :kv_code;
 import :kv_store;
 import :new_txn;
-import :buffer_obj;
-import :buffer_handle;
 import :secondary_index_in_mem;
 import :secondary_index_data;
 import :segment_meta;
@@ -219,8 +217,8 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_rollback) {
             }
             for (const auto chunk_id : my_chunk_ids) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-                BufferObj *buffer_obj = nullptr;
-                status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+                IndexFileWorker *file_worker{};
+                status = chunk_index_meta.GetFileWorker(file_worker);
                 EXPECT_TRUE(status.ok());
             }
             status = new_txn_mgr->CommitTxn(txn);
@@ -684,7 +682,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_index) {
     }
 }
 
-TEST_P(TestTxnOptimizeIndex, DISABLED_SLOW_optimize_index_and_optimize_index) {
+TEST_P(TestTxnOptimizeIndex, SLOW_optimize_index_and_optimize_index) {
     auto CheckTable = [&] {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
 
@@ -819,7 +817,7 @@ TEST_P(TestTxnOptimizeIndex, DISABLED_SLOW_optimize_index_and_optimize_index) {
     }
 }
 
-TEST_P(TestTxnOptimizeIndex, DISABLED_SLOW_optimize_index_and_dump_index) {
+TEST_P(TestTxnOptimizeIndex, SLOW_optimize_index_and_dump_index) {
     auto PrepareForOptimizeAndDumpIndex = [&] {
         PrepareForOptimizeIndex();
         {
