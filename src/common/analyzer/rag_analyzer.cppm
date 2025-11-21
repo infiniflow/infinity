@@ -83,8 +83,6 @@ private:
 
     static void BuildPositionMapping(const std::string &original, const std::string &converted, std::vector<unsigned> &pos_mapping);
 
-    static void BuildProcessedToOriginalMapping(const std::string &original, const std::string &processed, std::vector<unsigned> &mapping);
-
     i32 Freq(std::string_view key) const;
 
     static std::string Key(std::string_view line);

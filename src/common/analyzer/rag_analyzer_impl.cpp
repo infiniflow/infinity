@@ -648,35 +648,6 @@ void RAGAnalyzer::BuildPositionMapping(const std::string &original, const std::s
     }
 }
 
-void RAGAnalyzer::BuildProcessedToOriginalMapping(const std::string &original, const std::string &processed, std::vector<unsigned> &mapping) {
-    mapping.clear();
-    mapping.resize(processed.size() + 1);
-
-    size_t orig_pos = 0;
-    size_t proc_pos = 0;
-
-    // Map each character position from processed string to original string
-    while (orig_pos < original.size() && proc_pos < processed.size()) {
-        // Get character lengths
-        size_t orig_char_len = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(original[orig_pos])];
-        size_t proc_char_len = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(processed[proc_pos])];
-
-        // Map all bytes of current processed character to current original position
-        for (size_t i = 0; i < proc_char_len && proc_pos + i < mapping.size(); ++i) {
-            mapping[proc_pos + i] = static_cast<unsigned>(orig_pos);
-        }
-
-        // Move to next character in both strings
-        orig_pos += orig_char_len;
-        proc_pos += proc_char_len;
-    }
-
-    // Fill any remaining positions
-    for (size_t i = proc_pos; i < mapping.size(); ++i) {
-        mapping[i] = static_cast<unsigned>(original.size());
-    }
-}
-
 std::string RAGAnalyzer::StrQ2B(const std::string &input) {
     std::string output;
     size_t i = 0;
@@ -1478,7 +1449,7 @@ std::string RAGAnalyzer::Tokenize(const std::string &line) {
     if (alpha_num > (std::size_t)(len * 0.9)) {
         std::vector<std::string> term_list;
         std::vector<std::string> sentences;
-        SentenceSplitter(processed_line, sentences);
+        SentenceSplitter(line, sentences);
         for (auto &sentence : sentences) {
             nltk_tokenizer_->Tokenize(sentence, term_list);
         }
@@ -1534,7 +1505,7 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
     std::vector<std::string> tokens;
     std::vector<std::pair<unsigned, unsigned>> positions;
 
-    // Build character position mapping from converted string back to processed string
+    // Build character position mapping from converted string back to original string
     std::vector<unsigned> pos_mapping;
     BuildPositionMapping(processed_line, strline, pos_mapping);
 
@@ -1551,7 +1522,7 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
     if (alpha_num > (std::size_t)(len * 0.9)) {
         std::vector<std::string> term_list;
         std::vector<std::string> sentences;
-        SentenceSplitter(processed_line, sentences);
+        SentenceSplitter(line, sentences);
 
         unsigned sentence_start_pos = 0;
         for (auto &sentence : sentences) {
@@ -1577,20 +1548,6 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
                 }
             }
             sentence_start_pos += static_cast<unsigned>(sentence.size());
-        }
-
-        // Map positions from processed_line back to original line
-        for (auto &pos : positions) {
-            if (pos.first < processed_to_original_mapping.size()) {
-                pos.first = processed_to_original_mapping[pos.first];
-            } else {
-                pos.first = static_cast<unsigned>(line.size());
-            }
-            if (pos.second < processed_to_original_mapping.size()) {
-                pos.second = processed_to_original_mapping[pos.second];
-            } else {
-                pos.second = static_cast<unsigned>(line.size());
-            }
         }
 
     } else {
@@ -1645,29 +1602,15 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
         tokens = std::move(merged_tokens);
         positions = std::move(merged_positions);
 
-        // Apply position mapping to map back to processed string positions
+        // Apply position mapping to map back to original string positions
         for (auto &pos : positions) {
             if (pos.first < pos_mapping.size()) {
                 pos.first = pos_mapping[pos.first];
             } else {
-                pos.first = static_cast<unsigned>(processed_line.size());
+                pos.first = static_cast<unsigned>(line.size());
             }
             if (pos.second < pos_mapping.size()) {
                 pos.second = pos_mapping[pos.second];
-            } else {
-                pos.second = static_cast<unsigned>(processed_line.size());
-            }
-        }
-
-        // Now map from processed_line positions back to original line positions
-        for (auto &pos : positions) {
-            if (pos.first < processed_to_original_mapping.size()) {
-                pos.first = processed_to_original_mapping[pos.first];
-            } else {
-                pos.first = static_cast<unsigned>(line.size());
-            }
-            if (pos.second < processed_to_original_mapping.size()) {
-                pos.second = processed_to_original_mapping[pos.second];
             } else {
                 pos.second = static_cast<unsigned>(line.size());
             }
