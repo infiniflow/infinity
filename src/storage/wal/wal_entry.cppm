@@ -78,8 +78,9 @@ export enum class WalCommandType : i8 {
     // Snapshot
     // -----------------------------
     CREATE_TABLE_SNAPSHOT = 110,
-    RESTORE_TABLE_SNAPSHOT = 111,
-    RESTORE_DATABASE_SNAPSHOT = 112,
+    CREATE_DB_SNAPSHOT = 111,
+    RESTORE_TABLE_SNAPSHOT = 112,
+    RESTORE_DATABASE_SNAPSHOT = 113,
     // -----------------------------
     // Other
     // -----------------------------
@@ -777,6 +778,25 @@ export struct WalCmdCreateTableSnapshot : public WalCmd {
 
     std::string db_name_{};
     std::string table_name_{};
+    std::string snapshot_name_{};
+    TxnTimeStamp max_commit_ts_{};
+};
+
+export struct WalCmdCreateDBSnapshot : public WalCmd {
+    WalCmdCreateDBSnapshot(const std::string &db_name, const std::string &snapshot_name, TxnTimeStamp max_commit_ts)
+        : WalCmd(WalCommandType::CREATE_DB_SNAPSHOT), db_name_(db_name), snapshot_name_(snapshot_name), max_commit_ts_(max_commit_ts) {}
+
+    bool operator==(const WalCmd &other) const final;
+    [[nodiscard]] i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+
+    std::string ToString() const final;
+    std::string CompactInfo() const final;
+    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+
+    static WalCmdCreateDBSnapshot ReadBufferAdv(const char *&ptr, i32 max_bytes);
+
+    std::string db_name_{};
     std::string snapshot_name_{};
     TxnTimeStamp max_commit_ts_{};
 };

@@ -82,11 +82,23 @@ std::string CreateTableSnapshotTxnStore::ToString() const {
                        max_commit_ts_);
 }
 
+std::string CreateDBSnapshotTxnStore::ToString() const {
+    return fmt::format("{}: database: {}, snapshot: {}, max_commit_ts: {}", TransactionType2Str(type_), db_name_, snapshot_name_, max_commit_ts_);
+}
+
 // check if we need it
 std::shared_ptr<WalEntry> CreateTableSnapshotTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     std::shared_ptr<WalEntry> wal_entry = std::make_shared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
     std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdCreateTableSnapshot>(db_name_, table_name_, snapshot_name_, max_commit_ts_);
+    wal_entry->cmds_.push_back(wal_command);
+    return wal_entry;
+}
+
+std::shared_ptr<WalEntry> CreateDBSnapshotTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
+    std::shared_ptr<WalEntry> wal_entry = std::make_shared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
+    std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdCreateDBSnapshot>(db_name_, snapshot_name_, max_commit_ts_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }

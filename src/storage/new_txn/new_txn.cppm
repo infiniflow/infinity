@@ -266,6 +266,8 @@ public:
     Status OptimizeIndex(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id);
 
     // // Snapshot OPs
+    Status CreateDBSnapshot(const std::string &db_name, const std::string &snapshot_name);
+
     Status CreateTableSnapshot(const std::string &db_name, const std::string &table_name, const std::string &snapshot_name);
 
     // std::tuple<std::shared_ptr<TableSnapshotInfo>, Status> GetTableSnapshotInfo(const std::string &db_name, const std::string &table_name);
@@ -566,11 +568,11 @@ private:
     Status CommitCheckpointDB(DBMeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointTable(TableMeta &table_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointTableData(TableMeta &table_meta, TxnTimeStamp checkpoint_ts);
-    Status PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
-    Status PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files = false);
-    Status PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd);
-    Status CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
-    Status CheckpointForSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store);
+    // Status PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
+    // Status PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files = false);
+    // Status PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd);
+    // Status CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
+    // Status CheckpointForSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store);
 
     Status AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
     Status CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);

@@ -25,6 +25,7 @@ import :data_block;
 import :column_vector;
 import :infinity_exception;
 import :analyzer_pool;
+import :rag_analyzer;
 import :value;
 import :physical_project;
 import :highlighter;
@@ -104,37 +105,37 @@ bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
 
             for (size_t expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
                 evaluator.Execute(expressions_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors_[expr_idx]);
+            }
 
-                auto it = highlight_columns_.find(expr_idx);
-                if (it != highlight_columns_.end()) {
-                    size_t num_rows = output_data_block->column_vectors_[expr_idx]->Size();
-                    std::shared_ptr<ColumnVector> highlight_column = ColumnVector::Make(output_data_block->column_vectors_[expr_idx]->data_type());
-                    highlight_column->Initialize(ColumnVectorType::kFlat, num_rows);
+            if (!highlight_columns_.empty()) {
+                for (size_t expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
+                    auto it = highlight_columns_.find(expr_idx);
+                    if (it != highlight_columns_.end()) {
+                        size_t num_rows = output_data_block->column_vectors_[expr_idx]->Size();
+                        std::shared_ptr<ColumnVector> highlight_column =
+                            ColumnVector::Make(output_data_block->column_vectors_[expr_idx]->data_type());
+                        highlight_column->Initialize(ColumnVectorType::kFlat, num_rows);
+                        std::shared_ptr<HighlightInfo> highlight_info = it->second;
 
-                    std::shared_ptr<HighlightInfo> highlight_info = it->second;
-                    std::vector<std::string> &query_terms = highlight_info->query_terms_;
-                    std::string &analyzer_name = highlight_info->analyzer_;
-                    if (analyzer_name.find("standard") != std::string::npos) {
-                        auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(analyzer_name);
+                        auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(highlight_info->analyzer_);
                         if (!status.ok()) {
                             RecoverableError(status);
                         }
-                        analyzer->SetCharOffset(true);
+
+                        RAGAnalyzer *rag_analyzer = dynamic_cast<RAGAnalyzer *>(analyzer.get());
+                        if (!rag_analyzer) {
+                            UnrecoverableError(fmt::format("RAGAnalyzer should be used for highlight. Analyzer is : {}", highlight_info->analyzer_));
+                        }
+                        rag_analyzer->SetEnablePosition(true);
+
                         for (size_t i = 0; i < num_rows; ++i) {
                             std::string raw_content = output_data_block->column_vectors_[expr_idx]->GetValueByIndex(i).GetVarchar();
                             std::string output;
-                            Highlighter::instance().GetHighlightWithStemmer(query_terms, raw_content, output, analyzer.get());
+                            Highlighter::instance().GetHighlight(highlight_info->matching_text_, raw_content, output, analyzer.get());
                             highlight_column->AppendValue(Value::MakeVarchar(output));
                         }
-                    } else {
-                        for (size_t i = 0; i < num_rows; ++i) {
-                            std::string raw_content = output_data_block->column_vectors_[expr_idx]->GetValueByIndex(i).GetVarchar();
-                            std::string output;
-                            Highlighter::instance().GetHighlightWithoutStemmer(query_terms, raw_content, output);
-                            highlight_column->AppendValue(Value::MakeVarchar(output));
-                        }
+                        output_data_block->column_vectors_[expr_idx] = std::move(highlight_column);
                     }
-                    output_data_block->column_vectors_[expr_idx] = std::move(highlight_column);
                 }
             }
             output_data_block->Finalize();

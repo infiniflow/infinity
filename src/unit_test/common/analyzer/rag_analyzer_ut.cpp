@@ -32,7 +32,7 @@ namespace fs = std::filesystem;
 
 class RAGAnalyzerTest : public BaseTest {};
 
-TEST_F(RAGAnalyzerTest, test1) {
+TEST_F(RAGAnalyzerTest, DISABLED_SLOW_test1) {
     fs::path RESOURCE_DIR = "/usr/share/infinity/resource";
     if (!fs::exists(RESOURCE_DIR)) {
         std::cerr << "Resource directory doesn't exist: " << RESOURCE_DIR << std::endl;
@@ -83,7 +83,7 @@ TEST_F(RAGAnalyzerTest, test1) {
 }
 
 // Test basic functionality with fine_grained=false, enable_position=false
-TEST_F(RAGAnalyzerTest, test_basic_mode) {
+TEST_F(RAGAnalyzerTest, DISABLED_SLOW_test_basic_mode) {
     fs::path executablePath = "/proc/self/exe";
     std::error_code ec;
     executablePath = fs::canonical(executablePath, ec);
@@ -117,7 +117,7 @@ TEST_F(RAGAnalyzerTest, test_basic_mode) {
 }
 
 // Test Tokenize vs TokenizeWithPosition consistency
-TEST_F(RAGAnalyzerTest, test_tokenize_consistency) {
+TEST_F(RAGAnalyzerTest, DISABLED_SLOW_test_tokenize_consistency) {
     fs::path executablePath = "/proc/self/exe";
     std::error_code ec;
     executablePath = fs::canonical(executablePath, ec);

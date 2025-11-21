@@ -130,7 +130,6 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
     // generate output aggregate table
     size_t aggregates_count = aggregates_.size();
     if (aggregates_count > 0) {
-        LOG_INFO("Abc PhysicalAggregate::Execute aggregates_count > 0");
         // Input table after group by, each block belong to one group. This is the prerequisites to execute aggregate function.
         std::vector<std::unique_ptr<DataBlock>> grouped_input_datablocks;
         GroupByInputTable(prev_op_state->data_block_array_, grouped_input_datablocks, hash_table);
