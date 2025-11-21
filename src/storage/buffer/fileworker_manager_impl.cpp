@@ -41,8 +41,8 @@ void FileWorkerMap<FileWorkerT>::RemoveImport(TransactionID txn_id) {
         auto &[rel_file_path, _] = *it;
         auto pat = fmt::format("import{}", txn_id);
         if (rel_file_path.find(pat) != std::string::npos) {
-            it = map_.erase(it);
             active_dic_.erase(rel_file_path);
+            it = map_.erase(it);
         } else {
             ++it;
         }
