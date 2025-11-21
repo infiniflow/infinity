@@ -156,9 +156,6 @@ public:
     re2::RE2 blank_pattern_{"( )"};
 
     re2::RE2 replace_space_pattern_{R"#(([ ]+))#"};
-
-    // Python-style non-word character pattern for simple tokenization
-    // Note: Now using PCRE2 instead of RE2 for better Unicode support
 };
 
 export void SentenceSplitter(const std::string &text, std::vector<std::string> &result);
