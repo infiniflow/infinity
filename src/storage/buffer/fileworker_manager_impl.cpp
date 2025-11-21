@@ -26,7 +26,7 @@ template <typename FileWorkerT>
 FileWorkerT *FileWorkerMap<FileWorkerT>::EmplaceFileWorker(std::unique_ptr<FileWorkerT> file_worker) {
     std::unique_lock lock(rw_mtx_);
     auto rel_file_path = file_worker->rel_file_path_;
-    active_dic_.emplace(rel_file_path);
+    active_dic_.emplace(*rel_file_path);
     if (auto iter = map_.find(*rel_file_path); iter != map_.end()) {
         return iter->second.get();
     }
