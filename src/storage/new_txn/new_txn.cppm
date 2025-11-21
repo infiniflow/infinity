@@ -63,6 +63,7 @@ struct WalCmdCreateDBSnapshot;
 struct WalCmdCreateSystemSnapshot;
 struct WalCmdRestoreTableSnapshot;
 struct WalCmdRestoreDatabaseSnapshot;
+struct WalCmdRestoreSystemSnapshot;
 
 class BufferObj;
 
@@ -601,6 +602,7 @@ private:
     Status PrepareCommitCreateSystemSnapshot(const WalCmdCreateSystemSnapshot *create_system_snapshot_cmd);
     Status PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files = false);
     Status PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd);
+    Status PrepareCommitRestoreSystemSnapshot(const WalCmdRestoreSystemSnapshot *restore_system_snapshot_cmd);
     Status CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
     Status CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store, SnapshotType snapshot_type);
 
