@@ -143,13 +143,13 @@ public:
 
     re2::RE2 pattern1_{"[a-zA-Z_-]+$"};
 
-    re2::RE2 pattern2_{"[a-z\\.-]+$"};
+    re2::RE2 pattern2_{"[a-zA-Z\\.-]+$"};
 
     re2::RE2 pattern3_{"[0-9\\.-]+$"};
 
     re2::RE2 pattern4_{"[0-9,\\.-]+$"};
 
-    re2::RE2 pattern5_{"[a-z\\.-]+"};
+    re2::RE2 pattern5_{"[a-zA-Z\\.-]+"};
 
     re2::RE2 regex_split_pattern_{R"#(([ ,\.<>/?;:'\[\]\\`!@#$%^&*\(\)\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z0-9,\.-]+))#"};
 
