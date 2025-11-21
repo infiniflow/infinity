@@ -22,6 +22,7 @@ temp_dir                 = "/var/infinity/tmp"
 
 [wal]
 wal_dir                  = "/var/infinity/wal"
+checkpoint_interval      = "0s"
 
 [resource]
 resource_dir             = "/usr/share/infinity/resource"
