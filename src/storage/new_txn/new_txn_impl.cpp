@@ -2933,6 +2933,9 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, std::string &cause, boo
         case TransactionType::kRestoreDatabase: {
             return CheckConflictTxnStore(static_cast<const RestoreDatabaseTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
+        case TransactionType::kRestoreSystem: {
+            return CheckConflictTxnStore(static_cast<const RestoreSystemTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
+        }
         case TransactionType::kCreateTableSnapshot: {
             return CheckConflictTxnStore(static_cast<const CreateTableSnapshotTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
@@ -2953,6 +2956,15 @@ bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *pr
     const std::string &db_name = txn_store.db_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
+        case TransactionType::kCreateTableSnapshot:
+            [[fallthrough]];
+        case TransactionType::kCreateDBSnapshot:
+            [[fallthrough]];
+        case TransactionType::kCreateSystemSnapshot:
+            [[fallthrough]];
+        case TransactionType::kRestoreTable: {
+            break;
+        }
         case TransactionType::kRestoreDatabase: {
             RestoreDatabaseTxnStore *restore_database_txn_store = static_cast<RestoreDatabaseTxnStore *>(previous_txn->base_txn_store_.get());
             if (restore_database_txn_store->db_name_ == db_name) {
@@ -2961,9 +2973,14 @@ bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *pr
             }
             break;
         }
-        case TransactionType::kCreateTableSnapshot: {
-            retry_query = true;
-            conflict = true;
+        case TransactionType::kRestoreSystem: {
+            RestoreSystemTxnStore *restore_system_txn_store = static_cast<RestoreSystemTxnStore *>(previous_txn->base_txn_store_.get());
+            for (auto restore_database_txn_stores : restore_system_txn_store->restore_database_txn_stores_) {
+                if (restore_database_txn_stores->db_name_ == db_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+            }
             break;
         }
         default: {
@@ -2989,15 +3006,91 @@ bool NewTxn::CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, New
             }
             break;
         }
+        case TransactionType::kCreateTableSnapshot:
+            [[fallthrough]];
+        case TransactionType::kCreateDBSnapshot:
+            [[fallthrough]];
+        case TransactionType::kCreateSystemSnapshot: {
+            break;
+        }
+        case TransactionType::kRestoreTable: {
+            RestoreTableTxnStore *previous_txn_store = static_cast<RestoreTableTxnStore *>(previous_txn->base_txn_store_.get());
+            for (const auto &restore_table_txn_store : txn_store.restore_table_txn_stores_) {
+                if (previous_txn_store->table_name_ == restore_table_txn_store->table_name_) {
+                    retry_query = false;
+                    conflict = true;
+                    break;
+                }
+            }
+            break;
+        }
         case TransactionType::kRestoreDatabase: {
-            RestoreDatabaseTxnStore *restore_database_txn_store = static_cast<RestoreDatabaseTxnStore *>(previous_txn->base_txn_store_.get());
-            if (restore_database_txn_store->db_name_ == db_name) {
+            RestoreDatabaseTxnStore *previous_txn_store = static_cast<RestoreDatabaseTxnStore *>(previous_txn->base_txn_store_.get());
+            if (previous_txn_store->db_name_ == db_name) {
                 retry_query = false;
                 conflict = true;
             }
             break;
         }
-        case TransactionType::kCreateTableSnapshot: {
+        case TransactionType::kRestoreSystem: {
+            retry_query = true;
+            conflict = true;
+            break;
+        }
+        default: {
+        }
+    }
+
+    if (conflict) {
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
+        return true;
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictTxnStore(const RestoreSystemTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    bool conflict = false;
+    switch (previous_txn->base_txn_store_->type_) {
+        case TransactionType::kCreateDB: {
+            CreateDBTxnStore *previous_txn_store = static_cast<CreateDBTxnStore *>(previous_txn->base_txn_store_.get());
+            for (const auto &restore_database_txn_store : txn_store.restore_database_txn_stores_) {
+                if (restore_database_txn_store->db_name_ == previous_txn_store->db_name_) {
+                    retry_query = false;
+                    conflict = true;
+                }
+            }
+            break;
+        }
+        case TransactionType::kCreateTableSnapshot:
+            [[fallthrough]];
+        case TransactionType::kCreateDBSnapshot:
+            [[fallthrough]];
+        case TransactionType::kCreateSystemSnapshot: {
+            break;
+        }
+        case TransactionType::kRestoreTable: {
+            RestoreTableTxnStore *previous_txn_store = static_cast<RestoreTableTxnStore *>(previous_txn->base_txn_store_.get());
+            for (const auto &restore_database_txn_store : txn_store.restore_database_txn_stores_) {
+                for (const auto &restore_table_txn_store : restore_database_txn_store->restore_table_txn_stores_) {
+                    if (restore_table_txn_store->table_name_ == previous_txn_store->table_name_) {
+                        retry_query = false;
+                        conflict = true;
+                    }
+                }
+            }
+            break;
+        }
+        case TransactionType::kRestoreDatabase: {
+            RestoreDatabaseTxnStore *previous_txn_store = static_cast<RestoreDatabaseTxnStore *>(previous_txn->base_txn_store_.get());
+            for (const auto &restore_database_txn_store : txn_store.restore_database_txn_stores_) {
+                if (restore_database_txn_store->db_name_ == previous_txn_store->db_name_) {
+                    retry_query = false;
+                    conflict = true;
+                }
+            }
+            break;
+        }
+        case TransactionType::kRestoreSystem: {
             retry_query = true;
             conflict = true;
             break;
