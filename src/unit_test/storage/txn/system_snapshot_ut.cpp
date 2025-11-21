@@ -345,91 +345,32 @@ TEST_P(SystemSnapshotTest, test_restore_system_create_database_multithreaded) {
     }
 }
 
-//
-// TEST_P(DatabaseSnapshotTest, test_create_snapshot_same_name_multithreaded) {
-//     LOG_INFO("--test_create_snapshot_same_name_multithreaded--");
-//
-//     auto thread_create_snapshot1 = [this]() {
-//         NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-//         {
-//             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("restore database"), TransactionType::kRestoreDatabase);
-//
-//             std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-//             std::shared_ptr<DatabaseSnapshotInfo> database_snapshot;
-//             Status status;
-//             std::tie(database_snapshot, status) = DatabaseSnapshotInfo::Deserialize(snapshot_dir, *db_snapshot_names[0]);
-//             EXPECT_TRUE(status.ok());
-//
-//             status = txn->RestoreDatabaseSnapshot(database_snapshot);
-//             EXPECT_TRUE(status.ok());
-//
-//             status = txn_mgr->CommitTxn(txn);
-//             EXPECT_TRUE(status.ok());
-//
-//             {
-//                 auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
-//                 auto [table_info, status] = txn->GetTableInfo("db_0", "db_0_tb_1");
-//                 EXPECT_TRUE(status.ok());
-//                 status = txn_mgr->CommitTxn(txn);
-//                 EXPECT_TRUE(status.ok());
-//             }
-//         }
-//
-//         {
-//             std::lock_guard<std::mutex> lock(mtx_);
-//             ready_ = true;
-//             cv_.notify_one();
-//         }
-//
-//         {
-//             std::string create_snapshot_sql = "create snapshot conflict_snapshot on database db_0";
-//             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-//             QueryResult query_result = query_context->Query(create_snapshot_sql);
-//             bool ok = HandleQueryResult(query_result);
-//             if (ok) {
-//                 LOG_INFO("create snapshot conflict_snapshot on database db_0 succeeded");
-//             } else {
-//                 LOG_INFO("create snapshot conflict_snapshot on database db_0 failed");
-//             }
-//         }
-//     };
-//
-//     auto thread_create_snapshot2 = [this]() {
-//         {
-//             std::unique_lock<std::mutex> lock(mtx_);
-//             cv_.wait(lock, [this] { return ready_; });
-//             ready_ = false;
-//         }
-//
-//         {
-//             std::string create_snapshot_sql = "create snapshot conflict_snapshot on database db_0";
-//             std::unique_ptr<QueryContext> query_context = MakeQueryContext2();
-//             QueryResult query_result = query_context->Query(create_snapshot_sql);
-//             bool ok = HandleQueryResult(query_result);
-//             if (ok) {
-//                 LOG_INFO("create snapshot conflict_snapshot on database db_0 succeeded");
-//             } else {
-//                 LOG_INFO("create snapshot conflict_snapshot on database db_0 failed");
-//             }
-//         }
-//     };
-//
-//     std::thread worker(thread_create_snapshot1);
-//     std::thread waiter(thread_create_snapshot2);
-//
-//     if (worker.joinable()) {
-//         worker.join();
-//     }
-//     if (waiter.joinable()) {
-//         waiter.join();
-//     }
-//
-//     {
-//         std::string list_snapshots_sql = "show snapshots";
-//         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-//         QueryResult query_result = query_context->Query(list_snapshots_sql);
-//         bool ok = HandleQueryResult(query_result);
-//         EXPECT_TRUE(ok);
-//         LOG_INFO("Final snapshots: " + query_result.ToString());
-//     }
-// }
+TEST_P(SystemSnapshotTest, test_sql_parser) {
+    LOG_INFO("--test_sql_parser--");
+
+    std::string snapshot_name = "sql_snapshot";
+
+    {
+        std::string sql = fmt::format("create snapshot {} on system", snapshot_name);
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+        bool ok = HandleQueryResult(query_result);
+        if (ok) {
+            LOG_INFO(fmt::format("{} success", sql));
+        } else {
+            LOG_INFO(fmt::format("{} failed", sql));
+        }
+    }
+
+    {
+        std::string sql = fmt::format("restore system snapshot {}", snapshot_name);
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+        bool ok = HandleQueryResult(query_result);
+        if (ok) {
+            LOG_INFO(fmt::format("{} success", sql));
+        } else {
+            LOG_INFO(fmt::format("{} failed", sql));
+        }
+    }
+}
