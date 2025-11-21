@@ -562,7 +562,7 @@ Status NewTxn::ReplayDelete(WalCmdDeleteV2 *delete_cmd, TxnTimeStamp commit_ts, 
     return PrepareCommitDelete(delete_cmd);
 }
 
-Status NewTxn::DeleteInner(const std::string &db_name, const std::string &table_name, TableMeta &table_meta, const std::vector<RowID> &row_ids) {
+Status NewTxn::DeleteInner(const std::string &db_name, const std::string &table_name, const TableMeta &table_meta, const std::vector<RowID> &row_ids) {
     auto delete_command = std::make_shared<WalCmdDeleteV2>(db_name, table_meta.db_id_str(), table_name, table_meta.table_id_str(), row_ids);
     auto wal_command = static_pointer_cast<WalCmd>(delete_command);
     wal_entry_->cmds_.push_back(wal_command);
@@ -979,7 +979,7 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
 
         // delete in version file
         BufferHandle buffer_handle = version_buffer->Load();
-        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+        BlockVersion *block_version = static_cast<BlockVersion *>(buffer_handle.GetDataMut());
         undo_block_offsets.reserve(block_offsets.size());
         for (BlockOffset block_offset : block_offsets) {
             status = block_version->Delete(block_offset, commit_ts);
@@ -1015,7 +1015,7 @@ Status NewTxn::RollbackDeleteInBlock(BlockMeta &block_meta, const std::vector<Bl
 
         // delete in version file
         BufferHandle buffer_handle = version_buffer->Load();
-        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+        BlockVersion *block_version = static_cast<BlockVersion *>(buffer_handle.GetDataMut());
         for (BlockOffset block_offset : block_offsets) {
             block_version->RollbackDelete(block_offset);
         }
@@ -1043,7 +1043,7 @@ Status NewTxn::PrintVersionInBlock(BlockMeta &block_meta, const std::vector<Bloc
 
         // delete in version file
         BufferHandle buffer_handle = version_buffer->Load();
-        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+        BlockVersion *block_version = static_cast<BlockVersion *>(buffer_handle.GetDataMut());
         for (BlockOffset block_offset : block_offsets) {
             status = block_version->Print(begin_ts, block_offset, ignore_invisible);
             if (!status.ok()) {
@@ -1595,7 +1595,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                 std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
                 LOG_TRACE(fmt::format("CreateSnapshotFile, Read path: {}, Write path: {}", read_path, write_path));
 
-                Status status = VirtualStore::Copy(write_path, read_path);
+                status = VirtualStore::Copy(write_path, read_path);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }
@@ -2068,7 +2068,7 @@ Status NewTxn::AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segm
             return status;
         }
         BufferHandle buffer_handle = version_buffer->Load();
-        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+        BlockVersion *block_version = static_cast<BlockVersion *>(buffer_handle.GetDataMut());
 
         block_version->Append(save_ts, block_info.row_count_);
     }
@@ -2087,7 +2087,7 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
             return status;
         }
         BufferHandle buffer_handle = version_buffer->Load();
-        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+        BlockVersion *block_version = static_cast<BlockVersion *>(buffer_handle.GetDataMut());
 
         block_version->CommitAppend(save_ts, commit_ts);
         version_buffer->Save(VersionFileWorkerSaveCtx(commit_ts));
