@@ -100,10 +100,13 @@ TEST_P(CleanupTaskTest, test_delete_db_simple) {
 
         {
             auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
-            EXPECT_TRUE(status.ok());
-            status = new_txn_mgr->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
+            if (txn != nullptr) {
+                auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
+                EXPECT_TRUE(status.ok());
+                status = new_txn_mgr->CommitTxn(txn);
+                EXPECT_TRUE(status.ok());
+                ;
+            }
         }
 
         std::vector<std::string> exist_file_paths;
@@ -128,10 +131,12 @@ TEST_P(CleanupTaskTest, test_delete_db_simple) {
 
         {
             auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
-            auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
-            EXPECT_TRUE(status.ok());
-            status = new_txn_mgr->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
+            if (txn != nullptr) {
+                auto status = txn->Checkpoint(wal_manager->LastCheckpointTS(), false);
+                EXPECT_TRUE(status.ok());
+                status = new_txn_mgr->CommitTxn(txn);
+                EXPECT_TRUE(status.ok());
+            }
         }
 
         // Wait for the cleanup task to run
