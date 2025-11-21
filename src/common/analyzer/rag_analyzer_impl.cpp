@@ -1391,12 +1391,12 @@ void RAGAnalyzer::SplitLongText(const std::string &L, u32 length, std::vector<st
 
 // PCRE2-based replacement function to match Python's re.sub behavior
 // Returns processed string and position mapping from processed to original
-std::pair<std::string, std::vector<std::pair<unsigned, unsigned>>> PCRE2GlobalReplaceWithPosition(
-    const std::string &text, const std::string &pattern, const std::string &replacement) {
-    
+std::pair<std::string, std::vector<std::pair<unsigned, unsigned>>>
+PCRE2GlobalReplaceWithPosition(const std::string &text, const std::string &pattern, const std::string &replacement) {
+
     std::vector<std::pair<unsigned, unsigned>> pos_mapping;
     std::string result;
-    
+
     pcre2_code *re;
     PCRE2_SPTR pcre2_pattern = reinterpret_cast<PCRE2_SPTR>(pattern.c_str());
     PCRE2_SPTR pcre2_subject = reinterpret_cast<PCRE2_SPTR>(text.c_str());
@@ -1418,17 +1418,17 @@ std::pair<std::string, std::vector<std::pair<unsigned, unsigned>>> PCRE2GlobalRe
 
     PCRE2_SIZE current_pos = 0;
     PCRE2_SIZE last_match_end = 0;
-    
+
     // Process the string match by match
     while (current_pos < text.length()) {
         int rc = pcre2_match(re, pcre2_subject, text.length(), current_pos, 0, match_data, nullptr);
-        
+
         if (rc < 0) {
             // No more matches, copy remaining text
             if (last_match_end < text.length()) {
                 std::string remaining = text.substr(last_match_end);
                 result += remaining;
-                
+
                 // Map each character in remaining text
                 for (size_t i = 0; i < remaining.length(); ++i) {
                     pos_mapping.emplace_back(last_match_end + i, last_match_end + i);
@@ -1436,33 +1436,33 @@ std::pair<std::string, std::vector<std::pair<unsigned, unsigned>>> PCRE2GlobalRe
             }
             break;
         }
-        
+
         PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
         PCRE2_SIZE match_start = ovector[0];
         PCRE2_SIZE match_end = ovector[1];
-        
+
         // Copy text before the match
         if (last_match_end < match_start) {
             std::string before_match = text.substr(last_match_end, match_start - last_match_end);
             result += before_match;
-            
+
             // Map each character in before_match
             for (size_t i = 0; i < before_match.length(); ++i) {
                 pos_mapping.emplace_back(last_match_end + i, last_match_end + i);
             }
         }
-        
+
         // Add the replacement string
         result += replacement;
-        
+
         // Map each character in replacement to the start of the match
         for (size_t i = 0; i < replacement.length(); ++i) {
             pos_mapping.emplace_back(match_start, match_start);
         }
-        
+
         last_match_end = match_end;
         current_pos = match_end;
-        
+
         // If the match was zero-length, move forward one character to avoid infinite loop
         if (match_start == match_end) {
             if (current_pos < text.length()) {
@@ -1472,10 +1472,10 @@ std::pair<std::string, std::vector<std::pair<unsigned, unsigned>>> PCRE2GlobalRe
             }
         }
     }
-    
+
     pcre2_match_data_free(match_data);
     pcre2_code_free(re);
-    
+
     return {result, pos_mapping};
 }
 
@@ -1567,7 +1567,7 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
     // Combine all position mappings: strline -> str1 -> processed_line -> line
     std::vector<unsigned> final_pos_mapping;
     final_pos_mapping.resize(strline.size() + 1);
-    
+
     for (size_t i = 0; i < strline.size(); ++i) {
         if (i < opencc_pos_mapping.size()) {
             unsigned str1_pos = opencc_pos_mapping[i];
@@ -1585,7 +1585,7 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
             final_pos_mapping[i] = static_cast<unsigned>(line.size());
         }
     }
-    
+
     // Fill the last position
     if (strline.size() < final_pos_mapping.size()) {
         final_pos_mapping[strline.size()] = static_cast<unsigned>(line.size());
@@ -1624,7 +1624,7 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
                     stemmer_->Stem(lowercase_term, stem_term);
 
                     tokens.push_back(stem_term);
-                    
+
                     // Map positions back to original string using final_pos_mapping
                     if (start_pos < final_pos_mapping.size()) {
                         positions.emplace_back(final_pos_mapping[start_pos], final_pos_mapping[end_pos]);
@@ -1657,7 +1657,7 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
             auto length = UTF8Length(L);
             if (length < 2 || re2::RE2::PartialMatch(L, pattern2_) || re2::RE2::PartialMatch(L, pattern3_)) {
                 tokens.push_back(L);
-                
+
                 // Map positions back to original string using final_pos_mapping
                 unsigned start_pos = original_start;
                 unsigned end_pos = original_start + static_cast<unsigned>(L.size());
@@ -1666,7 +1666,7 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
                 } else {
                     positions.emplace_back(static_cast<unsigned>(line.size()), static_cast<unsigned>(line.size()));
                 }
-                
+
                 current_pos = original_start + static_cast<unsigned>(L.size());
                 continue;
             }
