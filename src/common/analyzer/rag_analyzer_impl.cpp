@@ -1495,10 +1495,6 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
     // Python-style simple tokenization: re.sub(r"\W+", " ", line)
     std::string processed_line = PCRE2GlobalReplace(line, R"#(\W+)#", " ");
 
-    // Build mapping from processed_line positions back to original line positions
-    std::vector<unsigned> processed_to_original_mapping;
-    BuildProcessedToOriginalMapping(line, processed_line, processed_to_original_mapping);
-
     std::string str1 = StrQ2B(processed_line);
     std::string strline;
     opencc_->convert(str1, strline);
@@ -1522,7 +1518,7 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
     if (alpha_num > (std::size_t)(len * 0.9)) {
         std::vector<std::string> term_list;
         std::vector<std::string> sentences;
-        SentenceSplitter(line, sentences);
+        SentenceSplitter(processed_line, sentences);
 
         unsigned sentence_start_pos = 0;
         for (auto &sentence : sentences) {
