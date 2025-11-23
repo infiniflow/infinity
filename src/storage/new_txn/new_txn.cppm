@@ -60,8 +60,10 @@ struct WalCmdAlterIndexV2;
 struct WalCmdCleanup;
 struct WalCmdCreateTableSnapshot;
 struct WalCmdCreateDBSnapshot;
+struct WalCmdCreateSystemSnapshot;
 struct WalCmdRestoreTableSnapshot;
 struct WalCmdRestoreDatabaseSnapshot;
+struct WalCmdRestoreSystemSnapshot;
 
 class BufferObj;
 
@@ -100,6 +102,7 @@ struct DropTableTxnStore;
 struct RenameTableTxnStore;
 struct RestoreTableTxnStore;
 struct RestoreDatabaseTxnStore;
+struct RestoreSystemTxnStore;
 struct UpdateTxnStore;
 struct CreateTableSnapshotTxnStore;
 struct CreateDBSnapshotTxnStore;
@@ -278,9 +281,10 @@ public:
 
     Status OptimizeIndex(const std::string &db_name, const std::string &table_name, const std::string &index_name, SegmentID segment_id);
 
-    // // Snapshot OPs
     Status CreateTableSnapshot(const std::string &db_name, const std::string &table_name, const std::string &snapshot_name);
     Status CreateDBSnapshot(const std::string &db_name, const std::string &snapshot_name);
+    Status CreateSystemSnapshot(const std::string &snapshot_name);
+
     // std::tuple<std::shared_ptr<TableSnapshotInfo>, Status> GetTableSnapshotInfo(const std::string &db_name, const std::string &table_name);
 
     Status RestoreTableSnapshot(const std::string &db_name, const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info);
@@ -289,7 +293,11 @@ public:
 
     std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> GetDatabaseSnapshotInfo(const std::string &db_name);
 
+    std::tuple<std::shared_ptr<SystemSnapshotInfo>, Status> GetSystemSnapshotInfo();
+
     Status RestoreDatabaseSnapshot(const std::shared_ptr<DatabaseSnapshotInfo> &database_snapshot_info);
+
+    Status RestoreSystemSnapshot(const std::shared_ptr<SystemSnapshotInfo> &system_snapshot_info);
 
     friend class NewTxnManager;
 
@@ -556,6 +564,7 @@ private:
     Status CheckpointDB(DBMeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
     Status CheckpointTable(TableMeta &table_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
 
+    Status CreateSystemSnapshotFile(std::shared_ptr<SystemSnapshotInfo> system_snapshot_info, const SnapshotOption &option);
     Status CreateDBSnapshotFile(std::shared_ptr<DatabaseSnapshotInfo> db_snapshot_info, const SnapshotOption &option);
     Status CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_snapshot_info, const SnapshotOption &option);
     Status CreateJSONSnapshotFile(std::string json_string, std::string snapshot_name);
@@ -591,8 +600,10 @@ private:
     Status CommitCheckpointTableData(TableMeta &table_meta, TxnTimeStamp checkpoint_ts);
     Status PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
     Status PrepareCommitCreateDBSnapshot(const WalCmdCreateDBSnapshot *create_db_snapshot_cmd);
+    Status PrepareCommitCreateSystemSnapshot(const WalCmdCreateSystemSnapshot *create_system_snapshot_cmd);
     Status PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files = false);
     Status PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd);
+    Status PrepareCommitRestoreSystemSnapshot(const WalCmdRestoreSystemSnapshot *restore_system_snapshot_cmd);
     Status CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
     Status CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store, SnapshotType snapshot_type);
 
@@ -624,6 +635,7 @@ private:
     bool CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);
     bool CheckConflictTxnStore(const RestoreTableTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);
     bool CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const RestoreSystemTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);
     bool CheckConflictTxnStore(const CreateTableSnapshotTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);
     bool CheckConflictTxnStore(const CreateDBSnapshotTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);
     bool CheckConflictTxnStore(const CleanupTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);

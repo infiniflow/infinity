@@ -151,6 +151,16 @@ export struct CreateDBSnapshotTxnStore final : public BaseTxnStore {
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
+export struct CreateSystemSnapshotTxnStore final : public BaseTxnStore {
+    CreateSystemSnapshotTxnStore() : BaseTxnStore(TransactionType::kCreateSystemSnapshot) {}
+
+    std::string snapshot_name_{};
+    TxnTimeStamp max_commit_ts_{};
+
+    std::string ToString() const final;
+    std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
 export struct RestoreTableTxnStore final : public BaseTxnStore {
     RestoreTableTxnStore() : BaseTxnStore(TransactionType::kRestoreTable) {}
 
@@ -178,6 +188,15 @@ export struct RestoreDatabaseTxnStore final : public BaseTxnStore {
     std::string db_id_str_{};
     std::string db_comment_{};
     std::vector<std::shared_ptr<RestoreTableTxnStore>> restore_table_txn_stores_{};
+
+    std::string ToString() const final;
+    std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
+export struct RestoreSystemTxnStore final : public BaseTxnStore {
+    RestoreSystemTxnStore() : BaseTxnStore(TransactionType::kRestoreSystem) {}
+
+    std::vector<std::shared_ptr<RestoreDatabaseTxnStore>> restore_database_txn_stores_{};
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;

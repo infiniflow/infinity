@@ -779,6 +779,17 @@ std::vector<std::string> DatabaseSnapshotInfo::GetFiles() const {
     return files;
 }
 
+std::vector<std::string> SystemSnapshotInfo::GetFiles() const {
+    std::vector<std::string> files;
+    for (const auto &database_snapshot : database_snapshots_) {
+        for (const auto &table_snapshot : database_snapshot->table_snapshots_) {
+            std::vector<std::string> table_files = table_snapshot->GetFiles();
+            files.insert(files.end(), table_files.begin(), table_files.end());
+        }
+    }
+    return files;
+}
+
 Status DatabaseSnapshotInfo::Serialize(const std::string &save_dir, TxnTimeStamp commit_ts) {
     Config *config = InfinityContext::instance().config();
     PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
@@ -920,8 +931,14 @@ Status DatabaseSnapshotInfo::Serialize(const std::string &save_dir, TxnTimeStamp
     return Status::OK();
 }
 
+Status SystemSnapshotInfo::Serialize(const std::string &save_dir, TxnTimeStamp commit_ts) { return Status::OK(); }
+
 std::string DatabaseSnapshotInfo::ToString() const {
     return fmt::format("DatabaseSnapshotInfo: db_name: {}, snapshot_name: {}, version: {}", db_name_, snapshot_name_, version_);
+}
+
+std::string SystemSnapshotInfo::ToString() const {
+    return fmt::format("SystemSnapshotInfo: snapshot_name: {}, version: {}", snapshot_name_, version_);
 }
 
 nlohmann::json DatabaseSnapshotInfo::CreateSnapshotMetadataJSON() const {
@@ -939,6 +956,19 @@ nlohmann::json DatabaseSnapshotInfo::CreateSnapshotMetadataJSON() const {
         json_res["table_snapshots"].emplace_back(table_snapshot->CreateSnapshotMetadataJSON());
     }
 
+    return json_res;
+}
+
+nlohmann::json SystemSnapshotInfo::CreateSnapshotMetadataJSON() const {
+    nlohmann::json json_res;
+    json_res["version"] = version_;
+    json_res["snapshot_name"] = snapshot_name_;
+    json_res["snapshot_scope"] = SnapshotScope::kSystem;
+
+    // Serialize all database snapshots
+    for (const auto &db_snapshot : database_snapshots_) {
+        json_res["database_snapshots"].emplace_back(db_snapshot->CreateSnapshotMetadataJSON());
+    }
     return json_res;
 }
 
@@ -999,6 +1029,91 @@ std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> DatabaseSnapshotInfo::
     }
 
     return {database_snapshot, Status::OK()};
+}
+
+std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> DatabaseSnapshotInfo::Deserialize(const nlohmann::json &snapshot_meta_json) {
+    if (!snapshot_meta_json.contains("snapshot_scope") || snapshot_meta_json["snapshot_scope"] != SnapshotScope::kDatabase) {
+        return {nullptr, Status::Unknown("Invalid snapshot scope")};
+    }
+
+    // Create DatabaseSnapshotInfo object
+    auto database_snapshot = std::make_shared<DatabaseSnapshotInfo>();
+
+    // Deserialize basic fields
+    database_snapshot->version_ = snapshot_meta_json["version"];
+    database_snapshot->snapshot_name_ = snapshot_meta_json["snapshot_name"];
+    database_snapshot->scope_ = static_cast<SnapshotScope>(snapshot_meta_json["snapshot_scope"]);
+    database_snapshot->db_name_ = snapshot_meta_json["database_name"];
+    database_snapshot->db_id_str_ = snapshot_meta_json["db_id_str"];
+    database_snapshot->db_comment_ = snapshot_meta_json["db_comment"];
+    database_snapshot->db_next_table_id_str_ = snapshot_meta_json["db_next_table_id_str"];
+
+    // Deserialize table snapshots
+    if (snapshot_meta_json.contains("table_snapshots")) {
+        for (const auto &table_snapshot_json : snapshot_meta_json["table_snapshots"]) {
+            auto [table_snapshot, table_status] = TableSnapshotInfo::Deserialize(table_snapshot_json);
+            if (!table_status.ok()) {
+                return {nullptr, table_status};
+            }
+            database_snapshot->table_snapshots_.emplace_back(table_snapshot);
+        }
+    }
+
+    return {database_snapshot, Status::OK()};
+}
+
+std::tuple<std::shared_ptr<SystemSnapshotInfo>, Status> SystemSnapshotInfo::Deserialize(const std::string &snapshot_dir,
+                                                                                        const std::string &snapshot_name) {
+    LOG_INFO(fmt::format("Deserialize snapshot: {}/{}", snapshot_dir, snapshot_name));
+
+    std::string meta_path = fmt::format("{}/{}/{}.json", snapshot_dir, snapshot_name, snapshot_name);
+
+    if (!VirtualStore::Exists(meta_path)) {
+        return {nullptr, Status::FileNotFound(meta_path)};
+    }
+    auto [meta_file_handle, status] = VirtualStore::Open(meta_path, FileAccessMode::kRead);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    i64 file_size = meta_file_handle->FileSize();
+    std::string json_str(file_size, 0);
+    auto [n_bytes, status_read] = meta_file_handle->Read(json_str.data(), file_size);
+    if (!status.ok()) {
+        RecoverableError(status_read);
+    }
+    if ((size_t)file_size != n_bytes) {
+        Status status = Status::FileCorrupted(meta_path);
+        RecoverableError(status);
+    }
+
+    nlohmann::json snapshot_meta_json = nlohmann::json::parse(json_str);
+
+    if (!snapshot_meta_json.contains("snapshot_scope") || snapshot_meta_json["snapshot_scope"] != SnapshotScope::kSystem) {
+        return {nullptr, Status::Unknown("Invalid snapshot scope")};
+    }
+
+    // Create SystemSnapshotInfo object
+    auto system_snapshot = std::make_shared<SystemSnapshotInfo>();
+
+    // Deserialize basic fields
+    system_snapshot->version_ = snapshot_meta_json["version"];
+    system_snapshot->snapshot_name_ = snapshot_meta_json["snapshot_name"];
+    system_snapshot->scope_ = static_cast<SnapshotScope>(snapshot_meta_json["snapshot_scope"]);
+
+    // Deserialize table snapshots
+    if (snapshot_meta_json.contains("database_snapshots")) {
+        for (const auto &database_snapshot_json : snapshot_meta_json["database_snapshots"]) {
+            auto [database_snapshot, database_status] = DatabaseSnapshotInfo::Deserialize(database_snapshot_json);
+            if (!database_status.ok()) {
+                return {nullptr, database_status};
+            }
+
+            system_snapshot->database_snapshots_.emplace_back(database_snapshot);
+        }
+    }
+
+    return {system_snapshot, Status::OK()};
 }
 
 } // namespace infinity

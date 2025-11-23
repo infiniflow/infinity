@@ -30,7 +30,6 @@ import :logger;
 import third_party;
 
 namespace infinity {
-
 Status Snapshot::CreateDatabaseSnapshot(QueryContext *query_context, const std::string &snapshot_name, const std::string &db_name) {
     auto *txn_ptr = query_context->GetNewTxn();
     auto *txn_mgr = txn_ptr->txn_mgr();

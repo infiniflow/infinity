@@ -738,6 +738,12 @@ WalCmdCreateDBSnapshot WalCmdCreateDBSnapshot::ReadBufferAdv(const char *&ptr, i
     return WalCmdCreateDBSnapshot(db_name, snapshot_name, max_commit_ts);
 }
 
+WalCmdCreateSystemSnapshot WalCmdCreateSystemSnapshot::ReadBufferAdv(const char *&ptr, i32 max_bytes) {
+    std::string snapshot_name = ReadBufAdv<std::string>(ptr);
+    TxnTimeStamp max_commit_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+    return WalCmdCreateSystemSnapshot(snapshot_name, max_commit_ts);
+}
+
 WalCmdRestoreTableSnapshot WalCmdRestoreTableSnapshot::ReadBufferAdv(const char *&ptr, i32 max_bytes) {
     const char *const ptr_end = ptr + max_bytes;
     std::string db_name = ReadBufAdv<std::string>(ptr);
@@ -928,6 +934,11 @@ bool WalCmdCreateDBSnapshot::operator==(const WalCmd &other) const {
            max_commit_ts_ == other_cmd->max_commit_ts_;
 }
 
+bool WalCmdCreateSystemSnapshot::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdCreateSystemSnapshot *>(&other);
+    return other_cmd != nullptr && snapshot_name_ == other_cmd->snapshot_name_ && max_commit_ts_ == other_cmd->max_commit_ts_;
+}
+
 bool WalCmdRestoreTableSnapshot::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdRestoreTableSnapshot *>(&other);
     if (other_cmd == nullptr || db_name_ != other_cmd->db_name_ || db_id_ != other_cmd->db_id_ || table_name_ != other_cmd->table_name_ ||
@@ -961,6 +972,19 @@ bool WalCmdRestoreDatabaseSnapshot::operator==(const WalCmd &other) const {
     }
     for (size_t i = 0; i < restore_table_wal_cmds_.size(); i++) {
         if (restore_table_wal_cmds_[i] != other_cmd->restore_table_wal_cmds_[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool WalCmdRestoreSystemSnapshot::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdRestoreSystemSnapshot *>(&other);
+    if (other_cmd == nullptr || restore_database_wal_cmds_.size() != other_cmd->restore_database_wal_cmds_.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < restore_database_wal_cmds_.size(); i++) {
+        if (restore_database_wal_cmds_[i] != other_cmd->restore_database_wal_cmds_[i]) {
             return false;
         }
     }
@@ -1132,11 +1156,24 @@ i32 WalCmdCreateDBSnapshot::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + snapshot_name_.size() + sizeof(max_commit_ts_);
 }
 
+i32 WalCmdCreateSystemSnapshot::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(i32) + snapshot_name_.size() + sizeof(max_commit_ts_);
+}
+
 i32 WalCmdRestoreDatabaseSnapshot::GetSizeInBytes() const {
     i32 size = sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + db_id_str_.size() + sizeof(i32) + db_comment_.size();
     size += sizeof(i32);
     for (const auto &restore_table_wal_cmd : restore_table_wal_cmds_) {
         size += restore_table_wal_cmd.GetSizeInBytes();
+    }
+    return size;
+}
+
+i32 WalCmdRestoreSystemSnapshot::GetSizeInBytes() const {
+    i32 size = sizeof(WalCommandType);
+    size += sizeof(i32);
+    for (const auto &restore_database_wal_cmd : restore_database_wal_cmds_) {
+        size += restore_database_wal_cmd.GetSizeInBytes();
     }
     return size;
 }
@@ -1246,6 +1283,12 @@ void WalCmdCreateDBSnapshot::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->max_commit_ts_);
 }
 
+void WalCmdCreateSystemSnapshot::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::CREATE_SYSTEM_SNAPSHOT);
+    WriteBufAdv(buf, this->snapshot_name_);
+    WriteBufAdv(buf, this->max_commit_ts_);
+}
+
 void WalCmdRestoreDatabaseSnapshot::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::RESTORE_DATABASE_SNAPSHOT);
     WriteBufAdv(buf, this->db_name_);
@@ -1254,6 +1297,14 @@ void WalCmdRestoreDatabaseSnapshot::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, static_cast<i32>(restore_table_wal_cmds_.size()));
     for (const auto &restore_table_wal_cmd : restore_table_wal_cmds_) {
         restore_table_wal_cmd.WriteAdv(buf);
+    }
+}
+
+void WalCmdRestoreSystemSnapshot::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::RESTORE_SYSTEM_SNAPSHOT);
+    WriteBufAdv(buf, static_cast<i32>(restore_database_wal_cmds_.size()));
+    for (const auto &restore_database_wal_cmd : restore_database_wal_cmds_) {
+        restore_database_wal_cmd.WriteAdv(buf);
     }
 }
 
@@ -1859,6 +1910,10 @@ std::string WalCmdCreateDBSnapshot::CompactInfo() const {
                        max_commit_ts_);
 }
 
+std::string WalCmdCreateSystemSnapshot::CompactInfo() const {
+    return fmt::format("{}: snapshot: {}, max_commit_ts: {}", WalCmd::WalCommandTypeToString(GetType()), snapshot_name_, max_commit_ts_);
+}
+
 std::string WalCmdRestoreTableSnapshot::CompactInfo() const {
     return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, table_def: {}, segment_count: {}, index_count: {}, files_count: {}",
                        WalCmd::WalCommandTypeToString(GetType()),
@@ -1882,6 +1937,12 @@ std::string WalCmdCreateTableSnapshot::ToString() const {
 std::string WalCmdCreateDBSnapshot::ToString() const {
     std::stringstream ss;
     ss << "db_name: " << db_name_ << ", snapshot_name: " << snapshot_name_ << ", max_commit_ts: " << max_commit_ts_ << std::endl;
+    return std::move(ss).str();
+}
+
+std::string WalCmdCreateSystemSnapshot::ToString() const {
+    std::stringstream ss;
+    ss << "snapshot_name: " << snapshot_name_ << ", max_commit_ts: " << max_commit_ts_ << std::endl;
     return std::move(ss).str();
 }
 
@@ -1917,6 +1978,15 @@ std::string WalCmdRestoreDatabaseSnapshot::ToString() const {
     return std::move(ss).str();
 }
 
+std::string WalCmdRestoreSystemSnapshot::ToString() const {
+    std::stringstream ss;
+    ss << "restore_database_wal_cmds count: " << restore_database_wal_cmds_.size() << std::endl;
+    for (size_t i = 0; i < restore_database_wal_cmds_.size(); ++i) {
+        ss << "  restore_database_wal_cmd " << i << ": " << restore_database_wal_cmds_[i].ToString();
+    }
+    return std::move(ss).str();
+}
+
 std::string WalCmdRestoreDatabaseSnapshot::CompactInfo() const {
     std::stringstream ss;
     ss << "db_name: " << db_name_ << std::endl;
@@ -1925,6 +1995,15 @@ std::string WalCmdRestoreDatabaseSnapshot::CompactInfo() const {
     ss << "restore_table_wal_cmds count: " << restore_table_wal_cmds_.size() << std::endl;
     for (size_t i = 0; i < restore_table_wal_cmds_.size(); ++i) {
         ss << "  restore_table_wal_cmd " << i << ": " << restore_table_wal_cmds_[i].CompactInfo();
+    }
+    return std::move(ss).str();
+}
+
+std::string WalCmdRestoreSystemSnapshot::CompactInfo() const {
+    std::stringstream ss;
+    ss << "restore_table_wal_cmds count: " << restore_database_wal_cmds_.size() << std::endl;
+    for (size_t i = 0; i < restore_database_wal_cmds_.size(); ++i) {
+        ss << "  restore_database_wal_cmd " << i << ": " << restore_database_wal_cmds_[i].CompactInfo();
     }
     return std::move(ss).str();
 }
@@ -2055,6 +2134,8 @@ std::vector<std::shared_ptr<EraseBaseCache>> WalCmdCreateTableSnapshot::ToCached
 
 std::vector<std::shared_ptr<EraseBaseCache>> WalCmdCreateDBSnapshot::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
 
+std::vector<std::shared_ptr<EraseBaseCache>> WalCmdCreateSystemSnapshot::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
+
 std::vector<std::shared_ptr<EraseBaseCache>> WalCmdRestoreTableSnapshot::ToCachedMeta(TxnTimeStamp commit_ts) const {
     std::vector<std::shared_ptr<EraseBaseCache>> cache_items;
     cache_items.push_back(std::make_shared<MetaEraseDbCache>(db_name_));
@@ -2065,6 +2146,11 @@ std::vector<std::shared_ptr<EraseBaseCache>> WalCmdRestoreTableSnapshot::ToCache
 std::vector<std::shared_ptr<EraseBaseCache>> WalCmdRestoreDatabaseSnapshot::ToCachedMeta(TxnTimeStamp commit_ts) const {
     std::vector<std::shared_ptr<EraseBaseCache>> cache_items;
     cache_items.push_back(std::make_shared<MetaEraseDbCache>(db_name_));
+    return cache_items;
+}
+
+std::vector<std::shared_ptr<EraseBaseCache>> WalCmdRestoreSystemSnapshot::ToCachedMeta(TxnTimeStamp commit_ts) const {
+    std::vector<std::shared_ptr<EraseBaseCache>> cache_items;
     return cache_items;
 }
 
