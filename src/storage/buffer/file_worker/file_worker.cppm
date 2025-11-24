@@ -103,7 +103,7 @@ public:
     }
 
     void Read(auto &data) {
-        std::shared_lock l(rw_mutex_);
+        std::unique_lock l(rw_mutex_);
         size_t file_size = 0;
 
         auto temp_path = GetFilePathTemp();
