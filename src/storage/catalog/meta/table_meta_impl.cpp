@@ -140,7 +140,7 @@ Status TableMeta::GetIndexID(const std::string &index_name, std::string &index_k
     size_t max_visible_index_index = std::numeric_limits<size_t>::max();
     TxnTimeStamp max_commit_ts = 0;
     for (size_t i = 0; i < index_kvs.size(); ++i) {
-        TxnTimeStamp commit_ts = infinity::GetTimestampFromKey(index_kvs[i].first);
+        TxnTimeStamp commit_ts = GetTimestampFromKey(index_kvs[i].first);
         if ((commit_ts <= begin_ts_ || (txn_ != nullptr && txn_->IsReplay() && commit_ts == commit_ts_)) && commit_ts > max_commit_ts) {
             max_commit_ts = commit_ts;
             max_visible_index_index = i;
@@ -436,9 +436,8 @@ Status TableMeta::GetTableInfo(TableInfo &table_info) {
         return status;
     }
     table_info.column_defs_ = *column_defs;
-    std::sort(table_info.column_defs_.begin(),
-              table_info.column_defs_.end(),
-              [](const std::shared_ptr<ColumnDef> &a, const std::shared_ptr<ColumnDef> &b) { return a->id_ < b->id_; });
+    std::ranges::sort(table_info.column_defs_,
+                      [](const std::shared_ptr<ColumnDef> &a, const std::shared_ptr<ColumnDef> &b) { return a->id_ < b->id_; });
     table_info.column_count_ = table_info.column_defs_.size();
 
     table_info.db_id_ = db_id_str_;
@@ -609,9 +608,7 @@ Status TableMeta::LoadColumnDefs() {
             }
         }
     }
-    std::sort(column_defs->begin(), column_defs->end(), [](const std::shared_ptr<ColumnDef> &a, const std::shared_ptr<ColumnDef> &b) {
-        return a->id_ < b->id_;
-    });
+    std::ranges::sort(*column_defs, [](const std::shared_ptr<ColumnDef> &a, const std::shared_ptr<ColumnDef> &b) { return a->id_ < b->id_; });
     column_defs_ = std::move(column_defs);
     if (table_cache.get() != nullptr && txn_ != nullptr && txn_->readonly()) {
         txn_->AddCacheInfo(std::make_shared<TableCacheColumnInfo>(db_id_, table_name_, begin_ts_, column_defs_));
