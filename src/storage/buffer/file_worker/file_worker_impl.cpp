@@ -146,6 +146,28 @@ bool FileWorker::WriteSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &tab
 
 bool FileWorker::WriteSnapshotFileImpl(size_t row_cnt, size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx) { return false; }
 
+void FileWorker::ReadFromSnapshotFile(const std::string &snapshot_name, bool from_spill) {
+    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    std::string read_dir = std::filesystem::path(snapshot_dir) / snapshot_name / *file_dir_;
+    std::string read_path = fmt::format("{}/{}", read_dir, *file_name_);
+
+    bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
+    size_t file_size = 0;
+    auto [file_handle, status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Read path: {}, error: {}", read_path, status.message()));
+    }
+    if (use_object_cache) {
+        file_handle->Seek(obj_addr_.part_offset_);
+        file_size = obj_addr_.part_size_;
+    } else {
+        file_size = file_handle->FileSize();
+    }
+    file_handle_ = std::move(file_handle);
+    DeferFn defer_fn2([&]() { file_handle_ = nullptr; });
+    ReadFromFileImpl(file_size, from_spill);
+}
+
 bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
     if (data_ == nullptr) {
         UnrecoverableError("No data will be written.");

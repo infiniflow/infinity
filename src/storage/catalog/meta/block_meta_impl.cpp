@@ -142,7 +142,7 @@ Status BlockMeta::RestoreSet() {
     return Status::OK();
 }
 
-Status BlockMeta::RestoreSetFromSnapshot() {
+Status BlockMeta::RestoreSetFromSnapshot(const std::string &snapshot_name) {
     // TODO: need to fix this
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     {
@@ -165,7 +165,7 @@ Status BlockMeta::RestoreSetFromSnapshot() {
     }
     version_buffer_->AddObjRc();
 
-    BufferHandle buffer_handle = version_buffer_->Load();
+    BufferHandle buffer_handle = version_buffer_->Load(snapshot_name);
     auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
     block_version->RestoreFromSnapshot(commit_ts_);
 
@@ -433,8 +433,8 @@ std::tuple<std::shared_ptr<BlockSnapshotInfo>, Status> BlockMeta::MapMetaToSnapS
     return {block_snapshot_info, Status::OK()};
 }
 
-Status BlockMeta::RestoreFromSnapshot() {
-    Status status = RestoreSetFromSnapshot();
+Status BlockMeta::RestoreFromSnapshot(const std::string &snapshot_name) {
+    Status status = RestoreSetFromSnapshot(snapshot_name);
     if (!status.ok()) {
         return status;
     }

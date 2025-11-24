@@ -70,6 +70,80 @@ void BufferObj::UpdateFileWorkerInfo(std::unique_ptr<FileWorker> new_file_worker
     }
 }
 
+BufferHandle BufferObj::Load(const std::string &snapshot_name) {
+    buffer_mgr_->AddRequestCount();
+    std::unique_lock<std::mutex> locker(w_locker_);
+    if (type_ == BufferType::kMmap) {
+        switch (status_) {
+            case BufferStatus::kUnloaded:
+            case BufferStatus::kLoaded: {
+                break;
+            }
+            case BufferStatus::kFreed:
+            case BufferStatus::kNew: {
+                file_worker_->Mmap();
+                break;
+            }
+            default: {
+                UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
+            }
+        }
+        status_ = BufferStatus::kLoaded;
+        ++rc_;
+        void *data = file_worker_->GetMmapData();
+        return BufferHandle(this, data);
+    }
+    switch (status_) {
+        case BufferStatus::kLoaded: {
+            break;
+        }
+        case BufferStatus::kUnloaded: {
+            if (!buffer_mgr_->RemoveFromGCQueue(this)) {
+                UnrecoverableError(fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", GetFilename()));
+            }
+            break;
+        }
+        case BufferStatus::kFreed: {
+            buffer_mgr_->AddCacheMissCount();
+
+            if (type_ == BufferType::kEphemeral) {
+                UnrecoverableError("Invalid status");
+            }
+
+            bool from_spill = type_ != BufferType::kPersistent;
+            file_worker_->ReadFromSnapshotFile(snapshot_name, from_spill);
+
+            size_t buffer_size = GetBufferSize();
+            LOG_TRACE(fmt::format("Request memory {}", buffer_size));
+            bool free_success = buffer_mgr_->RequestSpace(buffer_size);
+            if (!free_success) {
+                UnrecoverableError("Out of memory.");
+            }
+            break;
+        }
+        case BufferStatus::kNew: {
+            buffer_mgr_->AddCacheMissCount();
+
+            size_t buffer_size = GetBufferSize();
+            LOG_TRACE(fmt::format("Request memory {}", buffer_size));
+            bool free_success = buffer_mgr_->RequestSpace(buffer_size);
+            if (!free_success) {
+                UnrecoverableError("Out of memory.");
+            }
+            file_worker_->AllocateInMemory();
+            LOG_TRACE(fmt::format("Allocated memory {}", buffer_size));
+            break;
+        }
+        default: {
+            UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
+        }
+    }
+    status_ = BufferStatus::kLoaded;
+    ++rc_;
+    void *data = file_worker_->GetData();
+    return BufferHandle(this, data);
+}
+
 BufferHandle BufferObj::Load() {
     buffer_mgr_->AddRequestCount();
     std::unique_lock<std::mutex> locker(w_locker_);

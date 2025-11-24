@@ -50,7 +50,7 @@ public:
 
     Status RestoreSet();
 
-    Status RestoreSetFromSnapshot();
+    Status RestoreSetFromSnapshot(const std::string &snapshot_name);
 
     Status UninitSet(UsageFlag usage_flag);
 
@@ -72,7 +72,7 @@ public:
 
     Status SetFastRoughFilter(std::shared_ptr<FastRoughFilter> fast_rough_filter);
 
-    Status RestoreFromSnapshot();
+    Status RestoreFromSnapshot(const std::string &snapshot_name);
 
     std::tuple<std::shared_ptr<BlockSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 

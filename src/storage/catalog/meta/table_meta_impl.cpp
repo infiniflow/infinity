@@ -1063,7 +1063,7 @@ Status TableMeta::RestoreFromSnapshot(WalCmdRestoreTableSnapshot *restore_table_
             }
         }
         SegmentMeta segment_meta(segment_info.segment_id_, *this);
-        Status status = segment_meta.RestoreFromSnapshot(segment_info, is_link_files);
+        Status status = segment_meta.RestoreFromSnapshot(restore_table_snapshot_cmd->snapshot_name_, segment_info, is_link_files);
         if (!status.ok()) {
             return status;
         }

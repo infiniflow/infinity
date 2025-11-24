@@ -234,7 +234,10 @@ std::tuple<std::shared_ptr<DatabaseInfo>, Status> DBMeta::GetDatabaseInfo() {
 }
 
 std::tuple<std::string, Status> DBMeta::GetNextTableID() {
-    std::string next_table_id_key = GetDBTag(NEXT_TABLE_ID.data());
+    LOG_INFO(fmt::format("db_id: {}", db_id_str_));
+    std::string next_table_id_key = GetDBTag("next_table_id");
+    // std::string next_table_id_key = fmt::format("db|{}|{}", db_id_str_, "next_table_id");
+    // std::string next_table_id_key = "db|" + db_id_str_ + "|next_table_id";
     std::string next_table_id_str;
     Status status = kv_instance_->Get(next_table_id_key, next_table_id_str);
     if (!status.ok()) {

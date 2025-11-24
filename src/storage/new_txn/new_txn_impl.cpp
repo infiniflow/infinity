@@ -421,7 +421,6 @@ Status NewTxn::CreateTable(const std::string &db_name, const std::shared_ptr<Tab
     if (!status.ok()) {
         return status;
     }
-
     // Put the data into local txn store
     if (base_txn_store_ != nullptr) {
         return Status::UnexpectedError("txn store is not null");
@@ -1426,18 +1425,18 @@ std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSna
         return {nullptr, status};
     }
 
+    std::string next_table_id_str;
+    std::tie(next_table_id_str, status) = db_meta->GetNextTableID();
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    database_snapshot_info->db_next_table_id_str_ = next_table_id_str;
+
     // std::string *db_comment = nullptr;
     // status = db_meta->GetComment(db_comment);
     // database_snapshot_info->db_comment_ = *db_comment;
 
-    auto table_size = table_ids_ptr->size();
-    if (table_size == 0) {
-        database_snapshot_info->db_next_table_id_str_ = "1";
-    } else {
-        database_snapshot_info->db_next_table_id_str_ = std::to_string(std::stoull(table_ids_ptr->back()) + 1);
-    }
-
-    for (size_t i = 0; i < table_size; i++) {
+    for (size_t i = 0; i < table_ids_ptr->size(); i++) {
         std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
         status = GetTableMeta(table_names_ptr->at(i), db_meta, table_meta, create_timestamp);
@@ -1558,18 +1557,26 @@ Status NewTxn::RestoreTableSnapshot(const std::string &db_name, const std::share
 }
 
 Status NewTxn::RestoreDatabaseSnapshot(const std::shared_ptr<DatabaseSnapshotInfo> &database_snapshot_info) {
-    // Cleanup();
-    const std::string &db_name = database_snapshot_info->db_name_;
+    // std::string snapshot_name = database_snapshot_info->snapshot_name_;
+    // std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    // std::string restore_dir = fmt::format("{}/{}", snapshot_dir, snapshot_name);
+    // if (!VirtualStore::Exists(restore_dir)) {
+    //     return Status(ErrorCode::kSnapshotAlreadyDeleted, std::make_unique<std::string>(fmt::format("Snapshot {} does not exist", snapshot_name)));
+    // }
 
-    std::shared_ptr<DBMeta> db_meta;
+    CatalogMeta catalog_meta(this);
     TxnTimeStamp db_create_ts;
-    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
+    std::string db_key;
+    std::string db_id;
+    const std::string &db_name = database_snapshot_info->db_name_;
+    Status status = catalog_meta.GetDBID(db_name, db_key, db_id, db_create_ts);
     if (status.ok()) {
         return Status::DuplicateDatabase(db_name);
     }
     if (status.code() != ErrorCode::kDBNotExist) {
         return status;
     }
+    auto db_meta = std::make_shared<DBMeta>(db_id, db_name, this);
 
     std::string db_id_str;
     status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
@@ -1583,8 +1590,8 @@ Status NewTxn::RestoreDatabaseSnapshot(const std::shared_ptr<DatabaseSnapshotInf
     txn_store->db_id_str_ = db_id_str;
     txn_store->db_comment_ = database_snapshot_info->db_comment_;
     // Copy database snapshot files
-    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     std::string snapshot_name = database_snapshot_info->snapshot_name_;
+    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     std::vector<std::string> files_to_restore = database_snapshot_info->GetFiles();
     std::vector<std::string> restored_file_paths;
     status =
@@ -1605,6 +1612,10 @@ Status NewTxn::RestoreDatabaseSnapshot(const std::shared_ptr<DatabaseSnapshotInf
 
         std::shared_ptr<RestoreTableTxnStore> tmp_txn_store_ = std::make_shared<RestoreTableTxnStore>();
 
+        // std::string next_table_id_str;
+        // std::tie(next_table_id_str, status) = db_meta->GetNextTableID();
+        // LOG_TRACE(fmt::format("Restore table with id: {}", next_table_id_str));
+
         // Use the helper function to process snapshot restoration data
         status = ProcessSnapshotRestorationData(db_name,
                                                 db_id_str,
@@ -1617,6 +1628,7 @@ Status NewTxn::RestoreDatabaseSnapshot(const std::shared_ptr<DatabaseSnapshotInf
         if (!status.ok()) {
             return status;
         }
+
         txn_store->restore_table_txn_stores_.push_back(std::move(tmp_txn_store_));
     }
 
@@ -2362,11 +2374,6 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
-                if (this->IsReplay()) {
-                    // Skip replay of RESTORE_TABLE_SNAPSHOT command.
-                    LOG_TRACE("Skip replay of RESTORE_TABLE_SNAPSHOT command.");
-                    break;
-                }
                 auto *restore_table_snapshot_cmd = static_cast<WalCmdRestoreTableSnapshot *>(command.get());
                 Status status = PrepareCommitRestoreTableSnapshot(restore_table_snapshot_cmd);
                 if (!status.ok()) {
@@ -2830,7 +2837,13 @@ Status NewTxn::PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseS
     if (!status.ok()) {
         return status;
     }
+
+    LOG_TRACE(fmt::format("Ready to restore database: db_name: {}, db_id: {}, tables_size: {}",
+                          restore_database_snapshot_cmd->db_name_,
+                          restore_database_snapshot_cmd->db_id_str_,
+                          restore_database_snapshot_cmd->restore_table_wal_cmds_.size()));
     for (const auto &restore_table_snapshot_cmd : restore_database_snapshot_cmd->restore_table_wal_cmds_) {
+        LOG_TRACE(restore_table_snapshot_cmd.ToString());
         status = RestoreTableFromSnapshot(&restore_table_snapshot_cmd, *db_meta, false);
         if (!status.ok()) {
             return status;
@@ -3156,33 +3169,39 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn 
             break;
         }
         case TransactionType::kRestoreTable: {
-            RestoreTableTxnStore *restore_table_txn_store = static_cast<RestoreTableTxnStore *>(previous_txn->base_txn_store_.get());
-            if (restore_table_txn_store->db_name_ == db_name && restore_table_txn_store->table_name_ == table_name) {
-                retry_query = false;
-                conflict = true;
-            }
+            // RestoreTableTxnStore *restore_table_txn_store = static_cast<RestoreTableTxnStore *>(previous_txn->base_txn_store_.get());
+            // if (restore_table_txn_store->db_name_ == db_name && restore_table_txn_store->table_name_ == table_name) {
+            //     retry_query = false;
+            //     conflict = true;
+            // }
+            retry_query = true;
+            conflict = true;
             break;
         }
         case TransactionType::kRestoreDatabase: {
-            RestoreDatabaseTxnStore *restore_database_txn_store = static_cast<RestoreDatabaseTxnStore *>(previous_txn->base_txn_store_.get());
-            for (const auto &restore_table_txn_store : restore_database_txn_store->restore_table_txn_stores_) {
-                if (restore_table_txn_store->db_name_ == db_name && restore_table_txn_store->table_name_ == table_name) {
-                    retry_query = false;
-                    conflict = true;
-                }
-            }
+            // RestoreDatabaseTxnStore *restore_database_txn_store = static_cast<RestoreDatabaseTxnStore *>(previous_txn->base_txn_store_.get());
+            // for (const auto &restore_table_txn_store : restore_database_txn_store->restore_table_txn_stores_) {
+            //     if (restore_table_txn_store->db_name_ == db_name && restore_table_txn_store->table_name_ == table_name) {
+            //         retry_query = false;
+            //         conflict = true;
+            //     }
+            // }
+            retry_query = true;
+            conflict = true;
             break;
         }
         case TransactionType::kRestoreSystem: {
-            RestoreSystemTxnStore *restore_system_txn_store = static_cast<RestoreSystemTxnStore *>(previous_txn->base_txn_store_.get());
-            for (const auto &restore_database_txn_store : restore_system_txn_store->restore_database_txn_stores_) {
-                for (const auto &restore_table_txn_store : restore_database_txn_store->restore_table_txn_stores_) {
-                    if (restore_table_txn_store->db_name_ == db_name && restore_table_txn_store->table_name_ == table_name) {
-                        retry_query = false;
-                        conflict = true;
-                    }
-                }
-            }
+            // RestoreSystemTxnStore *restore_system_txn_store = static_cast<RestoreSystemTxnStore *>(previous_txn->base_txn_store_.get());
+            // for (const auto &restore_database_txn_store : restore_system_txn_store->restore_database_txn_stores_) {
+            //     for (const auto &restore_table_txn_store : restore_database_txn_store->restore_table_txn_stores_) {
+            //         if (restore_table_txn_store->db_name_ == db_name && restore_table_txn_store->table_name_ == table_name) {
+            //             retry_query = false;
+            //             conflict = true;
+            //         }
+            //     }
+            // }
+            retry_query = true;
+            conflict = true;
             break;
         }
         case TransactionType::kCreateTableSnapshot:
@@ -4810,11 +4829,11 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             //                                                         column_def));
             //             }
             //     }
-
+            //
             // }
-
+            //
             // for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
-
+            //
             //     for (const auto &segment_index_info : index_cmd.segment_index_infos_) {
             //         metas.emplace_back(std::make_unique<SegmentIndexMetaKey>(restore_table_txn_store->db_id_str_,
             //                                                            restore_table_txn_store->table_id_str_,
@@ -4829,7 +4848,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             //         }
             //     }
             // }
-
+            //
             // Status cleanup_status = CleanupInner(std::move(metas));
             // if (!cleanup_status.ok()) {
             //     LOG_WARN(fmt::format("Failed to clean up metadata during restore table rollback: {}", cleanup_status.message()));
@@ -4849,6 +4868,114 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 if (!remove_status.ok()) {
                     LOG_WARN(fmt::format("Failed to remove database directory during rollback: {}", db_dir));
                 }
+            }
+
+            // for (const auto &restore_table_txn_store : restore_database_txn_store->restore_table_txn_stores_) {
+            //     // Clean up metadata entries that were created
+            //     std::vector<std::shared_ptr<MetaKey>> metas;
+            //     for (const auto &segment_info : restore_table_txn_store->segment_infos_) {
+            //         metas.emplace_back(std::make_unique<SegmentMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                       restore_table_txn_store->table_id_str_,
+            //                                                       segment_info.segment_id_));
+            //         for (const auto &block_id : segment_info.block_ids_) {
+            //         metas.emplace_back(std::make_unique<BlockMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                     restore_table_txn_store->table_id_str_,
+            //                                                     segment_info.segment_id_,
+            //                                                     block_id));
+            //             for (const auto &column_def : restore_table_txn_store->table_def_->columns()) {
+            //                 metas.emplace_back(std::make_unique<ColumnMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                             restore_table_txn_store->table_id_str_,
+            //                                                             segment_info.segment_id_,
+            //                                                             block_id,
+            //                                                             column_def));
+            //                 }
+            //         }
+            //
+            //     }
+            //
+            //     for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
+            //
+            //         for (const auto &segment_index_info : index_cmd.segment_index_infos_) {
+            //             metas.emplace_back(std::make_unique<SegmentIndexMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                                restore_table_txn_store->table_id_str_,
+            //                                                                index_cmd.index_id_,
+            //                                                                segment_index_info.segment_id_));
+            //             for (const auto &chunk_info : segment_index_info.chunk_infos_) {
+            //             metas.emplace_back(std::make_unique<ChunkIndexMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                                 restore_table_txn_store->table_id_str_,
+            //                                                                 index_cmd.index_id_,
+            //                                                                 segment_index_info.segment_id_,
+            //                                                                 chunk_info.chunk_id_));
+            //             }
+            //         }
+            //     }
+            //
+            //     Status cleanup_status = CleanupInner(std::move(metas));
+            //     if (!cleanup_status.ok()) {
+            //         LOG_WARN(fmt::format("Failed to clean up metadata during restore table rollback: {}", cleanup_status.message()));
+            //     }
+            // }
+
+            break;
+        }
+        case TransactionType::kRestoreSystem: {
+            Config *config = InfinityContext::instance().config();
+            std::string data_dir = config->DataDir();
+            RestoreSystemTxnStore *restore_system_txn_store = static_cast<RestoreSystemTxnStore *>(base_txn_store_.get());
+            for (const auto &restore_database_txn_store : restore_system_txn_store->restore_database_txn_stores_) {
+                // Remove the database directory
+                std::string db_dir = fmt::format("{}/db_{}", data_dir, restore_database_txn_store->db_id_str_);
+
+                if (VirtualStore::Exists(db_dir)) {
+                    Status remove_status = VirtualStore::RemoveDirectory(db_dir);
+                    if (!remove_status.ok()) {
+                        LOG_WARN(fmt::format("Failed to remove database directory during rollback: {}", db_dir));
+                    }
+                }
+
+                // for (const auto &restore_table_txn_store : restore_database_txn_store->restore_table_txn_stores_) {
+                //     // Clean up metadata entries that were created
+                //     std::vector<std::shared_ptr<MetaKey>> metas;
+                //     for (const auto &segment_info : restore_table_txn_store->segment_infos_) {
+                //         metas.emplace_back(std::make_unique<SegmentMetaKey>(restore_table_txn_store->db_id_str_,
+                //                                                       restore_table_txn_store->table_id_str_,
+                //                                                       segment_info.segment_id_));
+                //         for (const auto &block_id : segment_info.block_ids_) {
+                //             metas.emplace_back(std::make_unique<BlockMetaKey>(restore_table_txn_store->db_id_str_,
+                //                                                         restore_table_txn_store->table_id_str_,
+                //                                                         segment_info.segment_id_,
+                //                                                         block_id));
+                //             for (const auto &column_def : restore_table_txn_store->table_def_->columns()) {
+                //                 metas.emplace_back(std::make_unique<ColumnMetaKey>(restore_table_txn_store->db_id_str_,
+                //                                                             restore_table_txn_store->table_id_str_,
+                //                                                             segment_info.segment_id_,
+                //                                                             block_id,
+                //                                                             column_def));
+                //             }
+                //         }
+                //     }
+                //
+                //     for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
+                //         for (const auto &segment_index_info : index_cmd.segment_index_infos_) {
+                //             metas.emplace_back(std::make_unique<SegmentIndexMetaKey>(restore_table_txn_store->db_id_str_,
+                //                                                                restore_table_txn_store->table_id_str_,
+                //                                                                index_cmd.index_id_,
+                //                                                                segment_index_info.segment_id_));
+                //             for (const auto &chunk_info : segment_index_info.chunk_infos_) {
+                //                 metas.emplace_back(std::make_unique<ChunkIndexMetaKey>(restore_table_txn_store->db_id_str_,
+                //                                                                     restore_table_txn_store->table_id_str_,
+                //                                                                     index_cmd.index_id_,
+                //                                                                     segment_index_info.segment_id_,
+                //                                                                     chunk_info.chunk_id_));
+                //             }
+                //         }
+                //     }
+                //
+                //     Status cleanup_status = CleanupInner(std::move(metas));
+                //     if (!cleanup_status.ok()) {
+                //         LOG_WARN(fmt::format("Failed to clean up metadata during restore table rollback: {}", cleanup_status.message()));
+                //     }
+                // }
             }
             break;
         }

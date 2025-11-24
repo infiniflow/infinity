@@ -190,6 +190,7 @@ Status TableIndexMeta::InitSet1(const std::shared_ptr<IndexBase> &index_base, Ne
     }
     if (index_base->index_type_ == IndexType::kFullText) {
         std::string segment_update_ts_key = GetTableIndexTag("segment_update_ts");
+        LOG_INFO(fmt::format("segment_update_ts_key: {}", segment_update_ts_key));
         auto segment_update_ts = std::make_shared<SegmentUpdateTS>();
         Status status = new_catalog->AddSegmentUpdateTS(segment_update_ts_key, segment_update_ts);
         if (!status.ok()) {

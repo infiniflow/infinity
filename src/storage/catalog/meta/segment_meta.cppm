@@ -100,7 +100,7 @@ public:
 
     Status RestoreSet();
 
-    Status RestoreFromSnapshot(const WalSegmentInfoV2 &segment_info, bool is_link_files = false);
+    Status RestoreFromSnapshot(const std::string &snapshot_name, const WalSegmentInfoV2 &segment_info, bool is_link_files = false);
 
 private:
     Status LoadFirstDeleteTS();

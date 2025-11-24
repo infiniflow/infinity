@@ -61,11 +61,7 @@ Status Snapshot::RestoreDatabaseSnapshot(QueryContext *query_context, const std:
         return status;
     }
 
-    // check txn_type
     LOG_INFO(fmt::format("txn type: {}", TransactionType2Str(txn_ptr->GetTxnType())));
-    // if (txn_ptr->GetTxnType() != TransactionType::kRestoreTable) {
-    //     return Status::InvalidArgument("Txn type is not RestoreTable");
-    // }
 
     status = txn_ptr->RestoreDatabaseSnapshot(database_snapshot);
     if (!status.ok()) {
