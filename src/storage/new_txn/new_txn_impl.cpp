@@ -1582,16 +1582,6 @@ Status NewTxn::RestoreDatabaseSnapshot(std::shared_ptr<DatabaseSnapshotInfo> &da
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_id_str;
     txn_store->db_comment_ = database_snapshot_info->db_comment_;
-    // Copy database snapshot files
-    std::string snapshot_name = database_snapshot_info->snapshot_name_;
-    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    std::vector<std::string> files_to_restore = database_snapshot_info->GetFiles();
-    std::vector<std::string> restored_file_paths;
-    status =
-        database_snapshot_info->RestoreSnapshotFiles(snapshot_dir, snapshot_name, files_to_restore, db_id_str, db_id_str, restored_file_paths, true);
-    if (!status.ok()) {
-        return status;
-    }
 
     // Process each table snapshot within the database
     for (const auto &table_snapshot_info : database_snapshot_info->table_snapshots_) {
@@ -1611,7 +1601,7 @@ Status NewTxn::RestoreDatabaseSnapshot(std::shared_ptr<DatabaseSnapshotInfo> &da
                                                            snapshot_name,
                                                            table_snapshot_info->GetFiles(),
                                                            next_table_id_str,
-                                                           db_meta->db_id_str(),
+                                                           db_id_str,
                                                            restored_file_paths,
                                                            false);
 
@@ -1631,7 +1621,7 @@ Status NewTxn::RestoreDatabaseSnapshot(std::shared_ptr<DatabaseSnapshotInfo> &da
         status = ProcessSnapshotRestorationData(db_name,
                                                 db_id_str,
                                                 table_name,
-                                                table_snapshot_info->table_id_str_,
+                                                next_table_id_str,
                                                 table_def,
                                                 table_snapshot_info,
                                                 snapshot_name,
@@ -1675,17 +1665,6 @@ Status NewTxn::RestoreSystemSnapshot(std::shared_ptr<SystemSnapshotInfo> &system
         database_txn_store->db_id_str_ = db_id_str;
         database_txn_store->db_comment_ = database_snapshot_info->db_comment_;
 
-        // Copy database snapshot files
-        std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-        std::string snapshot_name = database_snapshot_info->snapshot_name_;
-        std::vector<std::string> files_to_restore = database_snapshot_info->GetFiles();
-        std::vector<std::string> restored_file_paths;
-        status = database_snapshot_info
-                     ->RestoreSnapshotFiles(snapshot_dir, snapshot_name, files_to_restore, db_id_str, db_id_str, restored_file_paths, true);
-        if (!status.ok()) {
-            return status;
-        }
-
         for (const auto &table_snapshot_info : database_snapshot_info->table_snapshots_) {
             const std::string &table_name = table_snapshot_info->table_name_;
 
@@ -1704,7 +1683,7 @@ Status NewTxn::RestoreSystemSnapshot(std::shared_ptr<SystemSnapshotInfo> &system
                                                                snapshot_name,
                                                                table_snapshot_info->GetFiles(),
                                                                next_table_id_str,
-                                                               db_meta->db_id_str(),
+                                                               db_id_str,
                                                                restored_file_paths,
                                                                false);
 
@@ -1722,7 +1701,7 @@ Status NewTxn::RestoreSystemSnapshot(std::shared_ptr<SystemSnapshotInfo> &system
             status = ProcessSnapshotRestorationData(db_name,
                                                     db_id_str,
                                                     table_name,
-                                                    table_snapshot_info->table_id_str_,
+                                                    next_table_id_str,
                                                     table_def,
                                                     table_snapshot_info,
                                                     snapshot_name,
@@ -2824,12 +2803,6 @@ Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restor
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     Status status;
     std::shared_ptr<TableMeta> table_meta;
-
-    // std::string next_table_id_str;
-    // std::tie(next_table_id_str, status) = db_meta.GetNextTableID();
-    // LOG_TRACE(fmt::format("NewTxn::RestoreTableFromSnapshot, old_table_id: {}, new_table_id: {}",
-    //                       restore_table_snapshot_cmd->table_id_,
-    //                       next_table_id_str));
 
     if (!is_link_files) {
         status = NewCatalog::AddNewTable(db_meta,
