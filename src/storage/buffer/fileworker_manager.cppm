@@ -47,7 +47,6 @@ struct FileWorkerMap {
     mutable std::shared_mutex rw_mtx_;
     std::unordered_map<std::string, std::unique_ptr<FileWorkerT>> map_;
 
-    mutable std::shared_mutex rw_temp_mtx_;
     std::unordered_set<std::string> active_dic_;
 
     mutable std::shared_mutex rw_clean_mtx_;

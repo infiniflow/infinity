@@ -134,7 +134,6 @@ void FileWorkerMap<FileWorkerT>::MoveFiles() {
         auto file_worker = GetFileWorkerNoLock(rel_file_path);
         // assert(file_worker);
         // futs1.emplace_back(std::async(msync, ptr->mmap_, ptr->mmap_size_, MS_SYNC));
-        msync(file_worker->mmap_, file_worker->mmap_size_, MS_SYNC);
         file_worker->MoveFile();
         // futs.emplace_back(std::async(std::launch::async, &FileWorkerT::MoveFile, ptr.get()));
         ++it;
