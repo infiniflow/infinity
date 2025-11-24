@@ -130,6 +130,8 @@ class TestSnapshot:
                                                                                                    5).to_df()
             print(f"   Sparse vector search results: {len(sparse_result)} rows")
 
+            restored_table.optimize()
+
         except Exception as e:
             print(f"   ERROR in search operations: {e}")
             raise

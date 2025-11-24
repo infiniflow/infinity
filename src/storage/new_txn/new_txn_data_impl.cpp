@@ -1523,7 +1523,11 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                     }
 
                     if (outline_buffer_obj) {
-                        outline_buffer_obj->SaveSnapshot(table_snapshot_info, use_memory, {}, row_cnt, data_size);
+                        // For outline buffer, we need to save it first and then save snapshot.
+                        // Sparse data is stored in outline buffer. It is difficult to get the sparse data of specified row count from memory
+                        // because there might be 1 or 2 buffer offsets for the same row.
+                        outline_buffer_obj->Save();
+                        outline_buffer_obj->SaveSnapshot(table_snapshot_info, false, {}, row_cnt, data_size);
                     }
                 }
             }
