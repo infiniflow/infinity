@@ -650,6 +650,12 @@ std::shared_ptr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             cmd = std::make_shared<WalCmdCreateDBSnapshot>(db_name, snapshot_name, max_commit_ts);
             break;
         }
+        case WalCommandType::CREATE_SYSTEM_SNAPSHOT: {
+            std::string snapshot_name = ReadBufAdv<std::string>(ptr);
+            TxnTimeStamp max_commit_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+            cmd = std::make_shared<WalCmdCreateSystemSnapshot>(snapshot_name, max_commit_ts);
+            break;
+        }
         case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
             std::string db_name = ReadBufAdv<std::string>(ptr);
             std::string db_id = ReadBufAdv<std::string>(ptr);
@@ -698,6 +704,16 @@ std::shared_ptr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
                 restore_table_wal_cmds.push_back(WalCmdRestoreTableSnapshot::ReadBufferAdv(ptr, max_bytes));
             }
             cmd = std::make_shared<WalCmdRestoreDatabaseSnapshot>(db_name, db_id, db_comment, restore_table_wal_cmds);
+            break;
+        }
+        case WalCommandType::RESTORE_SYSTEM_SNAPSHOT: {
+            i32 restore_database_n = ReadBufAdv<i32>(ptr);
+            std::vector<WalCmdRestoreDatabaseSnapshot> restore_database_wal_cmds;
+            for (i32 i = 0; i < restore_database_n; ++i) {
+                ReadBufAdv<WalCommandType>(ptr);
+                restore_database_wal_cmds.push_back(WalCmdRestoreDatabaseSnapshot::ReadBufferAdv(ptr, max_bytes));
+            }
+            cmd = std::make_shared<WalCmdRestoreSystemSnapshot>(restore_database_wal_cmds);
             break;
         }
         default: {
@@ -770,6 +786,19 @@ WalCmdRestoreTableSnapshot WalCmdRestoreTableSnapshot::ReadBufferAdv(const char 
         files.push_back(ReadBufAdv<std::string>(ptr));
     }
     return WalCmdRestoreTableSnapshot(db_name, db_id, table_name, table_id, snapshot_name, table_def, segment_infos, index_cmds, files);
+}
+
+WalCmdRestoreDatabaseSnapshot WalCmdRestoreDatabaseSnapshot::ReadBufferAdv(const char *&ptr, i32 max_bytes) {
+    std::string db_name = ReadBufAdv<std::string>(ptr);
+    std::string db_id = ReadBufAdv<std::string>(ptr);
+    std::string db_comment = ReadBufAdv<std::string>(ptr);
+    i32 restore_table_n = ReadBufAdv<i32>(ptr);
+    std::vector<WalCmdRestoreTableSnapshot> restore_table_wal_cmds;
+    for (i32 i = 0; i < restore_table_n; ++i) {
+        ReadBufAdv<WalCommandType>(ptr);
+        restore_table_wal_cmds.push_back(WalCmdRestoreTableSnapshot::ReadBufferAdv(ptr, max_bytes));
+    }
+    return WalCmdRestoreDatabaseSnapshot(db_name, db_id, db_comment, restore_table_wal_cmds);
 }
 
 bool WalCmdCreateDatabaseV2::operator==(const WalCmd &other) const {
@@ -2438,11 +2467,17 @@ std::string WalCmd::WalCommandTypeToString(WalCommandType type) {
         case WalCommandType::RESTORE_DATABASE_SNAPSHOT:
             command = "RESTORE_DATABASE_SNAPSHOT";
             break;
+        case WalCommandType::RESTORE_SYSTEM_SNAPSHOT:
+            command = "RESTORE_SYSTEM_SNAPSHOT";
+            break;
         case WalCommandType::CREATE_TABLE_SNAPSHOT:
             command = "CREATE_TABLE_SNAPSHOT";
             break;
         case WalCommandType::CREATE_DB_SNAPSHOT:
             command = "CREATE_DB_SNAPSHOT";
+            break;
+        case WalCommandType::CREATE_SYSTEM_SNAPSHOT:
+            command = "CREATE_SYSTEM_SNAPSHOT";
             break;
         default: {
             UnrecoverableError("Unknown command type");

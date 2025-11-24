@@ -399,7 +399,7 @@ std::tuple<std::shared_ptr<SegmentSnapshotInfo>, Status> SegmentMeta::MapMetaToS
     return {std::move(segment_snapshot_info), Status::OK()};
 }
 
-Status SegmentMeta::RestoreFromSnapshot(const std::string &snapshot_name, const WalSegmentInfoV2 &segment_info, bool is_link_files) {
+Status SegmentMeta::RestoreFromSnapshot(const WalSegmentInfoV2 &segment_info, bool is_link_files) {
     if (!is_link_files) {
         Status status = RestoreSet();
         if (!status.ok()) {
@@ -414,7 +414,7 @@ Status SegmentMeta::RestoreFromSnapshot(const std::string &snapshot_name, const 
             }
         }
         BlockMeta block_meta(block_id, *this);
-        Status status = block_meta.RestoreFromSnapshot(snapshot_name);
+        Status status = block_meta.RestoreFromSnapshot();
         if (!status.ok()) {
             return status;
         }

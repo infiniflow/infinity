@@ -1477,7 +1477,7 @@ std::tuple<std::shared_ptr<SystemSnapshotInfo>, Status> NewTxn::GetSystemSnapsho
     return {std::move(system_snapshot_info), Status::OK()};
 }
 
-Status NewTxn::RestoreTableSnapshot(const std::string &db_name, const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info) {
+Status NewTxn::RestoreTableSnapshot(const std::string &db_name, std::shared_ptr<TableSnapshotInfo> &table_snapshot_info) {
     // Cleanup();
     const std::string &table_name = table_snapshot_info->table_name_;
     this->CheckTxn(db_name);
@@ -1507,6 +1507,7 @@ Status NewTxn::RestoreTableSnapshot(const std::string &db_name, const std::share
     if (!status.ok()) {
         return status;
     }
+    LOG_INFO(fmt::format("NewTxn::RestoreTableSnapshot, table_id_str: {}", table_id_str));
 
     std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>(db_name),
                                                          std::make_shared<std::string>(table_name),
@@ -1556,14 +1557,7 @@ Status NewTxn::RestoreTableSnapshot(const std::string &db_name, const std::share
     return Status::OK();
 }
 
-Status NewTxn::RestoreDatabaseSnapshot(const std::shared_ptr<DatabaseSnapshotInfo> &database_snapshot_info) {
-    // std::string snapshot_name = database_snapshot_info->snapshot_name_;
-    // std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    // std::string restore_dir = fmt::format("{}/{}", snapshot_dir, snapshot_name);
-    // if (!VirtualStore::Exists(restore_dir)) {
-    //     return Status(ErrorCode::kSnapshotAlreadyDeleted, std::make_unique<std::string>(fmt::format("Snapshot {} does not exist", snapshot_name)));
-    // }
-
+Status NewTxn::RestoreDatabaseSnapshot(std::shared_ptr<DatabaseSnapshotInfo> &database_snapshot_info) {
     CatalogMeta catalog_meta(this);
     TxnTimeStamp db_create_ts;
     std::string db_key;
@@ -1636,7 +1630,7 @@ Status NewTxn::RestoreDatabaseSnapshot(const std::shared_ptr<DatabaseSnapshotInf
     return Status::OK();
 }
 
-Status NewTxn::RestoreSystemSnapshot(const std::shared_ptr<SystemSnapshotInfo> &system_snapshot_info) {
+Status NewTxn::RestoreSystemSnapshot(std::shared_ptr<SystemSnapshotInfo> &system_snapshot_info) {
     auto RestoreDatabaseSnapshot2 = [&](const std::shared_ptr<DatabaseSnapshotInfo> &database_snapshot_info) -> Status {
         const std::string &db_name = database_snapshot_info->db_name_;
 
@@ -2786,20 +2780,21 @@ Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restor
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     Status status;
     std::shared_ptr<TableMeta> table_meta;
+
+    std::string next_table_id_str;
+    std::tie(next_table_id_str, status) = db_meta.GetNextTableID();
+    LOG_TRACE(fmt::format("NewTxn::RestoreTableFromSnapshot, old_table_id: {}, new_table_id: {}",
+                          restore_table_snapshot_cmd->table_id_,
+                          next_table_id_str));
+
     if (!is_link_files) {
-        status = NewCatalog::AddNewTable(db_meta,
-                                         restore_table_snapshot_cmd->table_id_,
-                                         begin_ts,
-                                         commit_ts,
-                                         restore_table_snapshot_cmd->table_def_,
-                                         table_meta);
+        status = NewCatalog::AddNewTable(db_meta, next_table_id_str, begin_ts, commit_ts, restore_table_snapshot_cmd->table_def_, table_meta);
         // table with the same name already exists
         if (!status.ok()) {
             return status;
         }
     } else {
-        table_meta =
-            std::make_shared<TableMeta>(db_meta.db_id_str(), restore_table_snapshot_cmd->table_id_, restore_table_snapshot_cmd->table_name_, this);
+        table_meta = std::make_shared<TableMeta>(db_meta.db_id_str(), next_table_id_str, restore_table_snapshot_cmd->table_name_, this);
     }
 
     // restore metadata of the table

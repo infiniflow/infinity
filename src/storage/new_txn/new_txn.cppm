@@ -287,7 +287,7 @@ public:
 
     // std::tuple<std::shared_ptr<TableSnapshotInfo>, Status> GetTableSnapshotInfo(const std::string &db_name, const std::string &table_name);
 
-    Status RestoreTableSnapshot(const std::string &db_name, const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info);
+    Status RestoreTableSnapshot(const std::string &db_name, std::shared_ptr<TableSnapshotInfo> &table_snapshot_info);
 
     Status RestoreTableIndexesFromSnapshot(TableMeta &table_meta, const std::vector<WalCmdCreateIndexV2> &index_cmds, bool is_link_files = false);
 
@@ -295,9 +295,9 @@ public:
 
     std::tuple<std::shared_ptr<SystemSnapshotInfo>, Status> GetSystemSnapshotInfo();
 
-    Status RestoreDatabaseSnapshot(const std::shared_ptr<DatabaseSnapshotInfo> &database_snapshot_info);
+    Status RestoreDatabaseSnapshot(std::shared_ptr<DatabaseSnapshotInfo> &database_snapshot_info);
 
-    Status RestoreSystemSnapshot(const std::shared_ptr<SystemSnapshotInfo> &system_snapshot_info);
+    Status RestoreSystemSnapshot(std::shared_ptr<SystemSnapshotInfo> &system_snapshot_info);
 
     friend class NewTxnManager;
 

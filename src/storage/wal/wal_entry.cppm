@@ -871,6 +871,8 @@ export struct WalCmdRestoreDatabaseSnapshot : public WalCmd {
     std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
+    static WalCmdRestoreDatabaseSnapshot ReadBufferAdv(const char *&ptr, i32 max_bytes);
+
     std::string db_name_{};
     std::string db_id_str_{};
     std::string db_comment_{};
