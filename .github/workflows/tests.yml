@@ -100,8 +100,7 @@ jobs:
           CHECK_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "CHECK_CONTAINER=${CHECK_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${CHECK_CONTAINER} -e TZ=${TZ} \
-            -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${CHECK_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu20_clang20
 
       - name: Check format of changed C/C++ files
         if: ${{ !cancelled() && !failure() }}
@@ -208,9 +207,11 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           MINIO_CONTAINER=minio_${TEST_CONTAINER}
+          MINIO_VOLUME_PATH=${PWD}/${MINIO_CONTAINER}
           echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> ${GITHUB_ENV}
-          rm -rf ${MINIO_CONTAINER} && mkdir -p ${MINIO_CONTAINER}
-          sudo docker run -d --net=container:${TEST_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_CONTAINER}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          echo "MINIO_VOLUME_PATH=${MINIO_VOLUME_PATH}" >> ${GITHUB_ENV}
+          rm -rf ${MINIO_VOLUME_PATH} && mkdir -p ${MINIO_VOLUME_PATH}
+          sudo docker run -d --net=container:${TEST_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v ${MINIO_VOLUME_PATH}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
           sleep 5s
           if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
               echo "Minio container is not running"
@@ -240,7 +241,7 @@ jobs:
         run: |
           if [[ -n "${MINIO_CONTAINER}" ]]; then sudo docker rm -f -v "${MINIO_CONTAINER}"; fi
           if [[ -n "${TEST_CONTAINER}" ]]; then sudo docker rm -f -v "${TEST_CONTAINER}"; fi
-          sudo rm -rf ${MINIO_CONTAINER}
+          if [[ -n "${MINIO_VOLUME_PATH}" ]]; then sudo rm -rf "${MINIO_VOLUME_PATH}"; fi
 
   debug_sqllogical_test:
     name: debug_sqllogical_test
@@ -658,9 +659,11 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           MINIO_CONTAINER=minio_${TEST_CONTAINER}
+          MINIO_VOLUME_PATH=${PWD}/${MINIO_CONTAINER}
           echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> ${GITHUB_ENV}
-          rm -rf ${MINIO_CONTAINER} && mkdir -p ${MINIO_CONTAINER}
-          sudo docker run -d --net=container:${TEST_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_CONTAINER}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          echo "MINIO_VOLUME_PATH=${MINIO_VOLUME_PATH}" >> ${GITHUB_ENV}
+          rm -rf ${MINIO_VOLUME_PATH} && mkdir -p ${MINIO_VOLUME_PATH}
+          sudo docker run -d --net=container:${TEST_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v ${MINIO_VOLUME_PATH}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
           sleep 5s
           if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
               echo "Minio container is not running"
@@ -682,7 +685,7 @@ jobs:
         run: |
           if [[ -n "${MINIO_CONTAINER}" ]]; then sudo docker rm -f -v "${MINIO_CONTAINER}"; fi
           if [[ -n "${TEST_CONTAINER}" ]]; then sudo docker rm -f -v "${TEST_CONTAINER}"; fi
-          sudo rm -rf ${MINIO_CONTAINER}
+          if [[ -n "${MINIO_VOLUME_PATH}" ]]; then sudo rm -rf "${MINIO_VOLUME_PATH}"; fi
 
   reldeb_sqllogical_test:
     name: reldeb_sqllogical_test
@@ -920,9 +923,11 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           MINIO_CONTAINER=minio_${TEST_CONTAINER}
+          MINIO_VOLUME_PATH=${PWD}/${MINIO_CONTAINER}
           echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> ${GITHUB_ENV}
-          rm -rf ${MINIO_CONTAINER} && mkdir -p ${MINIO_CONTAINER}
-          sudo docker run -d --net=container:${TEST_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_CONTAINER}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          echo "MINIO_VOLUME_PATH=${MINIO_VOLUME_PATH}" >> ${GITHUB_ENV}
+          rm -rf ${MINIO_VOLUME_PATH} && mkdir -p ${MINIO_VOLUME_PATH}
+          sudo docker run -d --net=container:${TEST_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v ${MINIO_VOLUME_PATH}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
           sleep 5s
           if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
               echo "Minio container is not running"
@@ -951,7 +956,7 @@ jobs:
         run: |
           if [[ -n "${MINIO_CONTAINER}" ]]; then sudo docker rm -f -v "${MINIO_CONTAINER}"; fi
           if [[ -n "${TEST_CONTAINER}" ]]; then sudo docker rm -f -v "${TEST_CONTAINER}"; fi
-          sudo rm -rf ${MINIO_CONTAINER}
+          if [[ -n "${MINIO_VOLUME_PATH}" ]]; then sudo rm -rf "${MINIO_VOLUME_PATH}"; fi
 
   reldeb_minio_parallel_test:
     name: reldeb_minio_parallel_test
@@ -988,9 +993,11 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           MINIO_CONTAINER=minio_${TEST_CONTAINER}
+          MINIO_VOLUME_PATH=${PWD}/${MINIO_CONTAINER}
           echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> ${GITHUB_ENV}
-          rm -rf ${MINIO_CONTAINER} && mkdir -p ${MINIO_CONTAINER}
-          sudo docker run -d --net=container:${TEST_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ${MINIO_CONTAINER}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          echo "MINIO_VOLUME_PATH=${MINIO_VOLUME_PATH}" >> ${GITHUB_ENV}
+          rm -rf ${MINIO_VOLUME_PATH} && mkdir -p ${MINIO_VOLUME_PATH}
+          sudo docker run -d --net=container:${TEST_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v ${MINIO_VOLUME_PATH}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
           sleep 5s
           if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
               echo "Minio container is not running"
@@ -1019,7 +1026,7 @@ jobs:
         run: |
           if [[ -n "${MINIO_CONTAINER}" ]]; then sudo docker rm -f -v "${MINIO_CONTAINER}"; fi
           if [[ -n "${TEST_CONTAINER}" ]]; then sudo docker rm -f -v "${TEST_CONTAINER}"; fi
-          sudo rm -rf ${MINIO_CONTAINER}
+          if [[ -n "${MINIO_VOLUME_PATH}" ]]; then sudo rm -rf "${MINIO_VOLUME_PATH}"; fi
 
   reldeb_benchmark:
     name: reldeb_benchmark

@@ -109,7 +109,7 @@ TEST_P(DumpMemIndexTaskTest, row_cnt_exceed_memindex_capacity) {
     append();
 
     // Wait for the mem index dump in background to finish
-    sleep(1);
+    sleep(2);
 
     // Check chunk index after first mem index dump
     {
@@ -158,7 +158,7 @@ TEST_P(DumpMemIndexTaskTest, row_cnt_exceed_memindex_capacity) {
     append();
 
     // Wait for the mem index dump in background to finish
-    sleep(1);
+    sleep(2);
 
     // Check chunk index after second mem index dump
     {

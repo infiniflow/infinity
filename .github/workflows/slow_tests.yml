@@ -111,6 +111,21 @@ jobs:
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu20_clang20
 
+      - name: Start minio container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          MINIO_CONTAINER=minio_${TEST_CONTAINER}
+          MINIO_VOLUME_PATH=${PWD}/${MINIO_CONTAINER}
+          echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> ${GITHUB_ENV}
+          echo "MINIO_VOLUME_PATH=${MINIO_VOLUME_PATH}" >> ${GITHUB_ENV}
+          rm -rf ${MINIO_VOLUME_PATH} && mkdir -p ${MINIO_VOLUME_PATH}
+          sudo docker run -d --net=container:${TEST_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v ${MINIO_VOLUME_PATH}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          sleep 5s
+          if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
+              echo "Minio container is not running"
+              exit 1
+          fi
+
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${TEST_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter=*SLOW_* > debug_unit_test_stdout.log 2> debug_unit_test_stderr.log"
@@ -126,7 +141,7 @@ jobs:
         run: |
           if [[ -n "${MINIO_CONTAINER}" ]]; then sudo docker rm -f -v "${MINIO_CONTAINER}"; fi
           if [[ -n "${TEST_CONTAINER}" ]]; then sudo docker rm -f -v "${TEST_CONTAINER}"; fi
-          sudo rm -rf ${MINIO_CONTAINER}
+          if [[ -n "${MINIO_VOLUME_PATH}" ]]; then sudo rm -rf "${MINIO_VOLUME_PATH}"; fi
 
   debug_tsan_restart_test:
     name: debug_tsan_restart_test
@@ -331,6 +346,21 @@ jobs:
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged -d --name ${TEST_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu20_clang20
 
+      - name: Start minio container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          MINIO_CONTAINER=minio_${TEST_CONTAINER}
+          MINIO_VOLUME_PATH=${PWD}/${MINIO_CONTAINER}
+          echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> ${GITHUB_ENV}
+          echo "MINIO_VOLUME_PATH=${MINIO_VOLUME_PATH}" >> ${GITHUB_ENV}
+          rm -rf ${MINIO_VOLUME_PATH} && mkdir -p ${MINIO_VOLUME_PATH}
+          sudo docker run -d --net=container:${TEST_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v ${MINIO_VOLUME_PATH}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          sleep 5s
+          if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
+              echo "Minio container is not running"
+              exit 1
+          fi
+
       - name: Unit test reldeb version
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${TEST_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-reldeb/src/test_main --gtest_also_run_disabled_tests --gtest_filter=*SLOW_* > reldeb_unit_test_stdout.log 2> reldeb_unit_test_stderr.log"
@@ -346,7 +376,7 @@ jobs:
         run: |
           if [[ -n "${MINIO_CONTAINER}" ]]; then sudo docker rm -f -v "${MINIO_CONTAINER}"; fi
           if [[ -n "${TEST_CONTAINER}" ]]; then sudo docker rm -f -v "${TEST_CONTAINER}"; fi
-          sudo rm -rf ${MINIO_CONTAINER}
+          if [[ -n "${MINIO_VOLUME_PATH}" ]]; then sudo rm -rf "${MINIO_VOLUME_PATH}"; fi
 
   reldeb_parallel_test:
     name: reldeb_parallel_test
