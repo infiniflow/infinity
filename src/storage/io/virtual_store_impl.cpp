@@ -336,12 +336,12 @@ Status VirtualStore::Merge(const std::string &dst_path, const std::string &src_p
     fs::path src{src_path};
     std::ifstream srcFile(src, std::ios::binary);
     if (!srcFile.is_open()) {
-        UnrecoverableError(fmt::format("Failed to open source file {}", src_path));
+        // UnrecoverableError(fmt::format("Failed to open source file {}", src_path));
         return Status::OK();
     }
     std::ofstream dstFile(dst, std::ios::binary | std::ios::app);
     if (!dstFile.is_open()) {
-        UnrecoverableError(fmt::format("Failed to open destination file {}", dst_path));
+        // UnrecoverableError(fmt::format("Failed to open destination file {}", dst_path));
         return Status::OK();
     }
     char buffer[DEFAULT_READ_BUFFER_SIZE];

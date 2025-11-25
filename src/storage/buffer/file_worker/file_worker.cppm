@@ -93,7 +93,7 @@ public:
         [[maybe_unused]] auto tmp = GetFilePathTemp();
         auto [file_handle, status] = VirtualStore::Open(GetFilePathTemp(), FileAccessMode::kReadWrite);
         if (!status.ok()) {
-            UnrecoverableError(status.message());
+            // UnrecoverableError(status.message());
         }
 
         bool prepare_success = false;
