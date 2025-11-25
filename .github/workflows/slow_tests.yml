@@ -51,7 +51,7 @@ jobs:
 
   debug_build:
     name: debug_build
-    runs-on: [ "self-hosted", "slow-test" ]
+    runs-on: [ "self-hosted", "infinity-build" ]
     needs: download_code
     steps:
       - name: Prepare code
@@ -290,7 +290,7 @@ jobs:
 
   reldeb_build:
     name: reldeb_build
-    runs-on: [ "self-hosted", "slow-test" ]
+    runs-on: [ "self-hosted", "infinity-build" ]
     needs: download_code
     steps:
       - name: Prepare code
