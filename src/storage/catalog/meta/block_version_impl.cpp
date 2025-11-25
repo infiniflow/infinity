@@ -194,6 +194,7 @@ void BlockVersion::LoadFromFile(std::shared_ptr<BlockVersion> &data, size_t &mma
             file_handle->Read(&block_version->deleted_[i], sizeof(TxnTimeStamp));
         }
 
+        file_handle->Seek(0);
         auto fd = file_handle->fd();
         mmap_size = sizeof(create_size) + sizeof(capacity) + (2 * create_size + capacity) * sizeof(TxnTimeStamp);
         mmap_p = mmap(nullptr, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 /*align_offset*/);
