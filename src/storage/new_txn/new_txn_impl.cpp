@@ -5458,6 +5458,30 @@ Status NewTxn::ReplayWalCmd(const std::shared_ptr<WalCmd> &command, TxnTimeStamp
             }
             break;
         }
+        case WalCommandType::RESTORE_DATABASE_SNAPSHOT: {
+            auto *restore_database_cmd = static_cast<WalCmdRestoreDatabaseSnapshot *>(command.get());
+
+            for (auto &restore_table_cmd : restore_database_cmd->restore_table_wal_cmds_) {
+                Status status = ReplayRestoreTableSnapshot(&restore_table_cmd, commit_ts, txn_id);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+            break;
+        }
+        case WalCommandType::RESTORE_SYSTEM_SNAPSHOT: {
+            auto *restore_system_cmd = static_cast<WalCmdRestoreSystemSnapshot *>(command.get());
+
+            for (auto &restore_database_cmd : restore_system_cmd->restore_database_wal_cmds_) {
+                for (auto &restore_table_cmd : restore_database_cmd.restore_table_wal_cmds_) {
+                    Status status = ReplayRestoreTableSnapshot(&restore_table_cmd, commit_ts, txn_id);
+                    if (!status.ok()) {
+                        return status;
+                    }
+                }
+            }
+            break;
+        }
         default: {
             break;
         }
