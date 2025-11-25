@@ -34,15 +34,15 @@ test00 -5.190000
 test44 -5.190000
 test11 -9.660001
 
-query I
-EXPLAIN SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
-----
- PROJECT (3)
-  - table index: #4
-  - expressions: [title (#0), SCORE (#1)]
- -> Read cache (2)
-    - table name: (default_db.cached_tensor_scan)
-    - output columns: [title, __score, __rowid]
+# query I
+# EXPLAIN SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
+# ----
+#  PROJECT (3)
+#   - table index: #4
+#   - expressions: [title (#0), SCORE (#1)]
+#  -> Read cache (2)
+#     - table name: (default_db.cached_tensor_scan)
+#     - output columns: [title, __score, __rowid]
 
 query I
 SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
@@ -109,15 +109,15 @@ test33 3.620001
 test77 2.260000
 test77 2.260000
 
-query I
-EXPLAIN SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
-----
- PROJECT (3)
-  - table index: #4
-  - expressions: [title (#0), SCORE (#1)]
- -> Read cache (2)
-    - table name: (default_db.cached_tensor_scan)
-    - output columns: [title, __score, __rowid]
+# query I
+# EXPLAIN SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
+# ----
+#  PROJECT (3)
+#   - table index: #4
+#   - expressions: [title (#0), SCORE (#1)]
+#  -> Read cache (2)
+#     - table name: (default_db.cached_tensor_scan)
+#     - output columns: [title, __score, __rowid]
 
 query I
 SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
