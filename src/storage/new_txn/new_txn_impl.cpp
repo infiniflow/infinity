@@ -1655,6 +1655,7 @@ Status NewTxn::RestoreSystemSnapshot(std::shared_ptr<SystemSnapshotInfo> &system
 
         std::string db_id_str;
         status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
+        LOG_TRACE(fmt::format("txn: {}, restore db, apply db_id: {}", txn_context_ptr_->txn_id_, db_id_str));
         if (!status.ok()) {
             return status;
         }
@@ -1709,10 +1710,8 @@ Status NewTxn::RestoreSystemSnapshot(std::shared_ptr<SystemSnapshotInfo> &system
             if (!status.ok()) {
                 return status;
             }
-
             database_txn_store->restore_table_txn_stores_.push_back(std::move(tmp_txn_store));
         }
-
         system_txn_store->restore_database_txn_stores_.push_back(std::move(database_txn_store));
         return Status::OK();
     };
