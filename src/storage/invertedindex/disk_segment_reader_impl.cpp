@@ -148,15 +148,6 @@ DiskIndexSegmentReader::~DiskIndexSegmentReader() {
             RecoverableError(Status::MunmapFileError(posting_file_));
         }
     }
-    // if (pm) {
-    //     PersistResultHandler handler(pm);
-    //     PersistWriteResult res1 = pm->PutObjCache(dict_file_);
-    //     LOG_DEBUG(fmt::format("~DiskIndexSegmentReader pm->PutObjCache(dict_file) {}", dict_file_));
-    //     PersistWriteResult res2 = pm->PutObjCache(posting_file_);
-    //     LOG_DEBUG(fmt::format("~DiskIndexSegmentReader pm->PutObjCache(posting_file) {}", posting_file_));
-    //     handler.HandleWriteResult(res1);
-    //     handler.HandleWriteResult(res2);
-    // }
 }
 
 bool DiskIndexSegmentReader::GetSegmentPosting(const std::string &term, SegmentPosting &seg_posting, bool fetch_position) const {

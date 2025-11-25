@@ -263,7 +263,6 @@ void SystemCache::DropIndexCache(u64 db_id, u64 table_id, u64 index_id) {
     auto index_iter = table_cache->index_cache_map_.find(index_id);
     if (index_iter == table_cache->index_cache_map_.end()) {
         LOG_WARN(fmt::format("Database: {}, table: {}, index: {} is already dropped", db_id, table_id, index_id));
-        // UnrecoverableError(fmt::format("Table index cache with id: {} not found", index_id));
         return;
     }
     table_cache->DropTableIndexCacheNolock(index_id);
@@ -307,7 +306,6 @@ DbCache *SystemCache::GetDbCacheNolock(u64 db_id) {
     auto db_iter = db_cache_map_.find(db_id);
     if (db_iter == db_cache_map_.end()) {
         LOG_WARN(fmt::format("Db cache with id: {} not found", db_id));
-        // UnrecoverableError(fmt::format("Db cache with id: {} not found", db_id));
         return nullptr;
     }
     DbCache *db_cache = db_iter->second.get();

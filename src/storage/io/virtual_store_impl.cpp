@@ -126,7 +126,6 @@ std::tuple<std::unique_ptr<LocalFileHandle>, Status> VirtualStore::Open(const st
     switch (access_mode) {
         case FileAccessMode::kRead: {
             fd = open(path.c_str(), O_RDONLY, 0666);
-            // fd = open(path.c_str(), O_RDWR, 0666);
             break;
         }
         case FileAccessMode::kReadWrite:
@@ -255,9 +254,9 @@ Status VirtualStore::CleanupDirectory(const std::string &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", path));
     }
-    std::error_code error_code;
     fs::path p{path};
     if (!std::filesystem::exists(p)) {
+        std::error_code error_code;
         std::filesystem::create_directories(p, error_code);
         if (error_code.value() != 0) {
             UnrecoverableError(fmt::format("CleanupDirectory create {} exception: {}", path, error_code.message()));

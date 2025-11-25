@@ -36,11 +36,11 @@ DictionaryReader::DictionaryReader(const std::string &dict_path, const PostingFo
 
     int rc = MmapFile(dict_path, data_ptr_, data_len_);
     if (rc < 0) {
-        throw UnrecoverableException(fmt::format("MmapFile failed, path: {}", dict_path));
+        // throw UnrecoverableException(fmt::format("MmapFile failed, path: {}", dict_path));
     }
     // Check if file is large enough to read FST root address
     if (data_len_ < 12) {
-        throw UnrecoverableException(fmt::format("Dictionary file too small, path: {}", dict_path));
+        // throw UnrecoverableException(fmt::format("Dictionary file too small, path: {}", dict_path));
     }
 
     // fst_root_addr + addr_offset(21) == fst_len

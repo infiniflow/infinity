@@ -55,7 +55,7 @@ void InfinityContext::InitPhase1(const std::shared_ptr<std::string> &config_path
         fmt::print("Error: {}\n", status.message());
         std::exit(static_cast<int>(status.code()));
     }
-    InfinityContext::instance().config()->PrintAll(); // Print all configs
+    instance().config()->PrintAll(); // Print all configs
     status = Logger::Initialize(config_.get());
     if (!status.ok()) {
         std::exit(static_cast<int>(status.code()));

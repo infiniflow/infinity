@@ -110,14 +110,14 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeta &table_index_me
 
         {
             std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-            std::shared_ptr<MemoryIndexer> memory_indexer = mem_index == nullptr ? nullptr : mem_index->GetFulltextIndex();
+            std::shared_ptr<MemoryIndexer> memory_indexer = mem_index ? mem_index->GetFulltextIndex() : nullptr;
             if (memory_indexer && memory_indexer->GetDocCount() != 0) {
                 RowID act_begin_row_id = memory_indexer->GetBeginRowID();
                 if (exp_begin_row_id != INVALID_ROWID && exp_begin_row_id != act_begin_row_id) {
                     LOG_WARN(
                         fmt::format("ColumnIndexReader::Open rows [{}, {}) are skipped", exp_begin_row_id.ToUint64(), act_begin_row_id.ToUint64()));
                 }
-                std::shared_ptr<InMemIndexSegmentReader> segment_reader = std::make_shared<InMemIndexSegmentReader>(segment_id, memory_indexer.get());
+                auto segment_reader = std::make_shared<InMemIndexSegmentReader>(segment_id, memory_indexer.get());
                 segment_readers_.push_back(std::move(segment_reader));
                 // for loading column length file
                 memory_indexer_ = memory_indexer;

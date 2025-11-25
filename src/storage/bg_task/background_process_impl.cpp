@@ -112,7 +112,6 @@ void BGTaskProcessor::Process() {
                         Status status = new_txn_shared->Cleanup();
                         if (!status.ok()) {
                             LOG_WARN("Background cleanup failed. Due to excessive IO pressure?");
-                            // UnrecoverableError(status.message());
                         }
                         status = new_txn_mgr->CommitTxn(new_txn_shared.get());
                         if (!status.ok()) {

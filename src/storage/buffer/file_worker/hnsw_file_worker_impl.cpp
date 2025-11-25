@@ -100,7 +100,6 @@ void HnswFileWorker::Read(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle>
         std::unique_lock l(mutex_);
         if (data_ == nullptr) {
             data_ = HnswHandlerPtr{HnswHandler::Make(index_base_.get(), column_def_).release()};
-            // UnrecoverableError("asdasdasdasda");
         }
     }
     // data = std::make_shared<HnswHandlerPtr>(HnswHandlerPtr{HnswHandler::Make(index_base_.get(), column_def_).release()});
