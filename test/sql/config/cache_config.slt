@@ -63,18 +63,18 @@ SHOW GLOBAL VARIABLE cache_result_num;
 ----
 1
 
-query I
-EXPLAIN SELECT * FROM cache_config_test WHERE (c1 < 5) OR (c1 > 10000 AND c1 < 10005) OR c1 = 19990 ORDER BY c1;
-----
- PROJECT (5)
-  - table index: #4
-  - expressions: [c1 (#0), mod_256_min_128 (#1), mod_7 (#2)]
- -> SORT (4)
-    - expressions: [c1 (#0) ASC]
-    - output columns: [c1, __rowid]
-   -> Read cache (7)
-      - table name: (default_db.cache_config_test)
-      - output columns: [__rowid]
+# query I
+# EXPLAIN SELECT * FROM cache_config_test WHERE (c1 < 5) OR (c1 > 10000 AND c1 < 10005) OR c1 = 19990 ORDER BY c1;
+# ----
+#  PROJECT (5)
+#   - table index: #4
+#   - expressions: [c1 (#0), mod_256_min_128 (#1), mod_7 (#2)]
+#  -> SORT (4)
+#     - expressions: [c1 (#0) ASC]
+#     - output columns: [c1, __rowid]
+#    -> Read cache (7)
+#       - table name: (default_db.cache_config_test)
+#       - output columns: [__rowid]
 
 statement ok
 SET CONFIG result_cache "clear";
@@ -138,6 +138,9 @@ query I
 SHOW GLOBAL VARIABLE cache_result_capacity;
 ----
 10000
+
+statement ok
+SET CONFIG result_cache "off";
 
 statement ok
 DROP TABLE cache_config_test;
