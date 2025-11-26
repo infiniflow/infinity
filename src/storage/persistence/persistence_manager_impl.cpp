@@ -443,11 +443,13 @@ void PersistenceManager::CurrentObjAppendNoLock(std::string_view tmp_file_path, 
 
     std::ifstream srcFile(src_fp, std::ios::binary);
     if (!srcFile.is_open()) {
-        UnrecoverableError(fmt::format("Failed to open source file {}", tmp_file_path));
+        // UnrecoverableError(fmt::format("Failed to open source file {}", tmp_file_path));
+        return;
     }
     std::ofstream dstFile(dst_fp, std::ios::binary | std::ios::app);
     if (!dstFile.is_open()) {
-        UnrecoverableError(fmt::format("Failed to open destination file {} {}", strerror(errno), dst_fp.string()));
+        // UnrecoverableError(fmt::format("Failed to open destination file {} {}", strerror(errno), dst_fp.string()));
+        return;
     }
     {
         dstFile.seekp(0, std::ios::end);
