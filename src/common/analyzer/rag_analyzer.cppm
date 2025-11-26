@@ -73,6 +73,8 @@ public:
                            std::vector<std::string> &merged_tokens,
                            std::vector<std::pair<unsigned, unsigned>> &merged_positions);
 
+    void SplitByLang(const std::string &line, std::vector<std::pair<std::string, bool>> &txt_lang_pairs) const;
+
 protected:
     int AnalyzeImpl(const Term &input, void *data, HookType func) override;
 

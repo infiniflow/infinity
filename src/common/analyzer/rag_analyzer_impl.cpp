@@ -1213,6 +1213,43 @@ void RAGAnalyzer::EnglishNormalize(const std::vector<std::string> &tokens, std::
     }
 }
 
+void RAGAnalyzer::SplitByLang(const std::string &line, std::vector<std::pair<std::string, bool>> &txt_lang_pairs) const {
+    std::vector<std::string> arr;
+    Split(line, regex_split_pattern_, arr, true);
+
+    for (const auto &a : arr) {
+        if (a.empty()) {
+            continue;
+        }
+
+        std::size_t s = 0;
+        std::size_t e = s + 1;
+        bool zh = IsChinese(UTF8Substr(a, s, 1));
+
+        while (e < UTF8Length(a)) {
+            bool _zh = IsChinese(UTF8Substr(a, e, 1));
+            if (_zh == zh) {
+                e++;
+                continue;
+            }
+
+            std::string segment = UTF8Substr(a, s, e - s);
+            txt_lang_pairs.emplace_back(segment, zh);
+
+            s = e;
+            e = s + 1;
+            zh = _zh;
+        }
+
+        if (s >= UTF8Length(a)) {
+            continue;
+        }
+
+        std::string segment = UTF8Substr(a, s, e - s);
+        txt_lang_pairs.emplace_back(segment, zh);
+    }
+}
+
 void RAGAnalyzer::TokenizeInner(std::vector<std::string> &res, const std::string &L) const {
     auto [tks, s] = MaxForward(L);
     auto [tks1, s1] = MaxBackward(L);
@@ -1503,47 +1540,45 @@ std::string PCRE2GlobalReplace(const std::string &text, const std::string &patte
 }
 
 std::string RAGAnalyzer::Tokenize(const std::string &line) {
-    // Python-style simple tokenization: re.sub(r"\W+", " ", line)
+    // Python-style simple tokenization: re.sub(r"\\W+", " ", line)
     std::string processed_line = PCRE2GlobalReplace(line, R"#(\W+)#", " ");
     std::string str1 = StrQ2B(processed_line);
     std::string strline;
     opencc_->convert(str1, strline);
-    std::vector<std::string> res;
-    std::size_t alpha_num = 0;
-    int len = UTF8Length(strline);
-    for (int i = 0; i < len; ++i) {
-        std::string t = UTF8Substr(strline, i, 1);
-        if (IsAlphabet(t)) {
-            alpha_num++;
-        }
-    }
-    if (alpha_num > (std::size_t)(len * 0.9)) {
-        std::vector<std::string> term_list;
-        std::vector<std::string> sentences;
-        SentenceSplitter(processed_line, sentences);
-        for (auto &sentence : sentences) {
-            nltk_tokenizer_->Tokenize(sentence, term_list);
-        }
-        for (unsigned i = 0; i < term_list.size(); ++i) {
-            std::string t = lemma_->Lemmatize(term_list[i]);
-            char *lowercase_term = lowercase_string_buffer_.data();
-            ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
-            std::string stem_term;
-            stemmer_->Stem(lowercase_term, stem_term);
-            res.push_back(stem_term);
-        }
-        std::string ret = Join(res, 0);
-        return ret;
-    }
 
-    std::vector<std::string> arr;
-    Split(strline, regex_split_pattern_, arr, true);
-    for (const auto &L : arr) {
+    std::vector<std::string> res;
+
+    // Use SplitByLang to separate by language
+    std::vector<std::pair<std::string, bool>> arr;
+    SplitByLang(strline, arr);
+
+    for (const auto &[L, lang] : arr) {
+        if (!lang) {
+            // Non-Chinese text: use NLTK tokenizer, lemmatize and stem
+            std::vector<std::string> term_list;
+            std::vector<std::string> sentences;
+            SentenceSplitter(L, sentences);
+            for (auto &sentence : sentences) {
+                nltk_tokenizer_->Tokenize(sentence, term_list);
+            }
+            for (unsigned i = 0; i < term_list.size(); ++i) {
+                std::string t = lemma_->Lemmatize(term_list[i]);
+                char *lowercase_term = lowercase_string_buffer_.data();
+                ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
+                std::string stem_term;
+                stemmer_->Stem(lowercase_term, stem_term);
+                res.push_back(stem_term);
+            }
+            continue;
+        }
+
         auto length = UTF8Length(L);
         if (length < 2 || re2::RE2::PartialMatch(L, pattern2_) || re2::RE2::PartialMatch(L, pattern3_)) { //[a-z\\.-]+$  [0-9\\.-]+$
             res.push_back(L);
             continue;
         }
+
+        // Chinese processing: use TokenizeInner
 #if 0
         if (length > MAX_SENTENCE_LEN) {
             std::vector<std::string> sublines;
@@ -1553,8 +1588,9 @@ std::string RAGAnalyzer::Tokenize(const std::string &line) {
             }
         } else
 #endif
-            TokenizeInner(res, L);
+        TokenizeInner(res, L);
     }
+
     std::vector<std::string> normalize_res;
     EnglishNormalize(res, normalize_res);
     std::string r = Join(normalize_res, 0);
