@@ -409,14 +409,19 @@ public:
         while (end != std::string::npos) {
             if (end != start) {
                 std::string token = result.substr(start, end - start);
-                // Split tokens containing underscores
+                // Split tokens containing underscores and keep underscores as separate tokens
                 if (token.find('_') != std::string::npos) {
                     std::stringstream ss(token);
                     std::string sub_token;
+                    bool first = true;
                     while (std::getline(ss, sub_token, '_')) {
+                        if (!first) {
+                            tokens.push_back("_");
+                        }
                         if (!sub_token.empty()) {
                             tokens.push_back(sub_token);
                         }
+                        first = false;
                     }
                 } else {
                     tokens.push_back(token);
@@ -427,14 +432,19 @@ public:
         }
         if (start != result.length()) {
             std::string token = result.substr(start);
-            // Split tokens containing underscores
+            // Split tokens containing underscores and keep underscores as separate tokens
             if (token.find('_') != std::string::npos) {
                 std::stringstream ss(token);
                 std::string sub_token;
+                bool first = true;
                 while (std::getline(ss, sub_token, '_')) {
+                    if (!first) {
+                        tokens.push_back("_");
+                    }
                     if (!sub_token.empty()) {
                         tokens.push_back(sub_token);
                     }
+                    first = false;
                 }
             } else {
                 tokens.push_back(token);
@@ -719,8 +729,6 @@ std::string RAGAnalyzer::RKey(const std::string_view line) {
     return reversed;
 }
 
-#define DIVIDE_F_BY_N 1
-
 std::pair<std::vector<std::string>, double> RAGAnalyzer::Score(const std::vector<std::pair<std::string, int>> &token_freqs) {
     constexpr i64 B = 30;
     i64 F = 0, L = 0;
@@ -731,11 +739,7 @@ std::pair<std::vector<std::string>, double> RAGAnalyzer::Score(const std::vector
         L += (UTF8Length(token) < 2) ? 0 : 1;
         tokens.push_back(token);
     }
-#ifdef DIVIDE_F_BY_N
-    const auto score = (B + L + F) / static_cast<double>(tokens.size());
-#else
-    const auto score = F + (B + L) / static_cast<double>(tokens.size());
-#endif
+    const auto score = B / static_cast<double>(tokens.size()) + L + F;
     return {std::move(tokens), score};
 }
 
