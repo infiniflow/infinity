@@ -739,7 +739,7 @@ std::pair<std::vector<std::string>, double> RAGAnalyzer::Score(const std::vector
         L += (UTF8Length(token) < 2) ? 0 : 1;
         tokens.push_back(token);
     }
-    const auto score = B / static_cast<double>(tokens.size()) + L + F;
+    const auto score = B / static_cast<double>(tokens.size()) + L / static_cast<double>(tokens.size()) + F;
     return {std::move(tokens), score};
 }
 
@@ -1544,7 +1544,7 @@ std::string RAGAnalyzer::Tokenize(const std::string &line) {
             res.push_back(L);
             continue;
         }
-#if 1
+#if 0
         if (length > MAX_SENTENCE_LEN) {
             std::vector<std::string> sublines;
             SplitLongText(L, length, sublines);
