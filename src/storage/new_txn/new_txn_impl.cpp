@@ -5793,92 +5793,92 @@ Status NewTxn::ProcessSnapshotRestorationData(const std::string &db_name,
 }
 
 Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_table_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
-    const std::string &db_name = restore_table_cmd->db_name_;
-
-    // Check if the table already exists
-    std::string table_key = KeyEncode::CatalogTableKey(restore_table_cmd->db_id_, *restore_table_cmd->table_def_->table_name(), commit_ts);
-    std::string table_id;
-    Status status = kv_instance_->Get(table_key, table_id);
-    // bool is_link_files = false;
-    if (status.ok()) {
-        if (table_id == restore_table_cmd->table_id_) {
-
-            LOG_WARN(fmt::format("Skipping replay restore table: Table {} with id {} already exists, commit ts: {}, txn: {}.",
-                                 *restore_table_cmd->table_def_->table_name(),
-                                 restore_table_cmd->table_id_,
-                                 commit_ts,
-                                 txn_id));
-            // is_link_files = true;
-        } else {
-            LOG_ERROR(fmt::format("Replay restore table: Table {} with id {} already exists with different id {}, commit ts: {}, txn: {}.",
-                                  *restore_table_cmd->table_def_->table_name(),
-                                  restore_table_cmd->table_id_,
-                                  table_id,
-                                  commit_ts,
-                                  txn_id));
-            return Status::UnexpectedError("Table ID mismatch during replay of table restore.");
-        }
-    }
-
-    // Check persistence manager state during restore replay
-    PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
-    if (persistence_manager != nullptr) {
-        std::unordered_map<std::string, ObjAddr> all_files = persistence_manager->GetAllFiles();
-        LOG_DEBUG(fmt::format("Persistence manager has {} registered files during restore replay, commit ts: {}, txn: {}",
-                              all_files.size(),
-                              commit_ts,
-                              txn_id));
-
-        // Check if any files from this table are registered
-        std::string table_prefix = "db_" + restore_table_cmd->db_id_ + "/tbl_" + restore_table_cmd->table_id_;
-        size_t table_file_count = 0;
-        for (const auto &[file_path, obj_addr] : all_files) {
-            if (file_path.find(table_prefix) != std::string::npos) {
-                table_file_count++;
-                LOG_DEBUG(fmt::format("Found registered table file: {} -> obj_addr: ({}, {}, {})",
-                                      file_path,
-                                      obj_addr.obj_key_,
-                                      obj_addr.part_offset_,
-                                      obj_addr.part_size_));
-            }
-        }
-        LOG_DEBUG(fmt::format("Table {} has {} files registered in persistence manager", restore_table_cmd->table_id_, table_file_count));
-    } else { // check if the data still exist in the system
-        std::string data_dir = InfinityContext::instance().config()->DataDir();
-        std::string table_data_dir = VirtualStore::ConcatenatePath(VirtualStore::ConcatenatePath(data_dir, "db_" + restore_table_cmd->db_id_),
-                                                                   "tbl_" + restore_table_cmd->table_id_);
-        if (!VirtualStore::Exists(table_data_dir)) {
-            LOG_ERROR(fmt::format("Table data directory {} does not exist, commit ts: {}, txn: {}.", table_data_dir, commit_ts, txn_id));
-            // return Status::OK();
-        }
-    }
-
-    // if exist proceed
-    std::shared_ptr<DBMeta> db_meta;
-    TxnTimeStamp db_create_ts;
-    status = GetDBMeta(db_name, db_meta, db_create_ts);
-    if (!status.ok()) {
-        return status;
-    }
-
-    // Get next table id of the db
-    std::string next_table_id_key = KeyEncode::CatalogDbTagKey(restore_table_cmd->db_id_, NEXT_TABLE_ID.data());
-    std::string next_table_id_str;
-    status = kv_instance_->Get(next_table_id_key, next_table_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-    u64 next_table_id = std::stoull(next_table_id_str);
-    u64 this_table_id = std::stoull(restore_table_cmd->table_id_);
-    if (this_table_id + 1 > next_table_id) {
-        // Update the next table id
-        std::string new_next_table_id_str = std::to_string(this_table_id + 1);
-        status = kv_instance_->Put(next_table_id_key, new_next_table_id_str);
-        if (!status.ok()) {
-            return status;
-        }
-        LOG_TRACE(fmt::format("Update next table id to {} for database {}.", new_next_table_id_str, restore_table_cmd->db_name_));
-    }
+    // const std::string &db_name = restore_table_cmd->db_name_;
+    //
+    // // Check if the table already exists
+    // std::string table_key = KeyEncode::CatalogTableKey(restore_table_cmd->db_id_, *restore_table_cmd->table_def_->table_name(), commit_ts);
+    // std::string table_id;
+    // Status status = kv_instance_->Get(table_key, table_id);
+    // // bool is_link_files = false;
+    // if (status.ok()) {
+    //     if (table_id == restore_table_cmd->table_id_) {
+    //
+    //         LOG_WARN(fmt::format("Skipping replay restore table: Table {} with id {} already exists, commit ts: {}, txn: {}.",
+    //                              *restore_table_cmd->table_def_->table_name(),
+    //                              restore_table_cmd->table_id_,
+    //                              commit_ts,
+    //                              txn_id));
+    //         // is_link_files = true;
+    //     } else {
+    //         LOG_ERROR(fmt::format("Replay restore table: Table {} with id {} already exists with different id {}, commit ts: {}, txn: {}.",
+    //                               *restore_table_cmd->table_def_->table_name(),
+    //                               restore_table_cmd->table_id_,
+    //                               table_id,
+    //                               commit_ts,
+    //                               txn_id));
+    //         return Status::UnexpectedError("Table ID mismatch during replay of table restore.");
+    //     }
+    // }
+    //
+    // // Check persistence manager state during restore replay
+    // PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
+    // if (persistence_manager != nullptr) {
+    //     std::unordered_map<std::string, ObjAddr> all_files = persistence_manager->GetAllFiles();
+    //     LOG_DEBUG(fmt::format("Persistence manager has {} registered files during restore replay, commit ts: {}, txn: {}",
+    //                           all_files.size(),
+    //                           commit_ts,
+    //                           txn_id));
+    //
+    //     // Check if any files from this table are registered
+    //     std::string table_prefix = "db_" + restore_table_cmd->db_id_ + "/tbl_" + restore_table_cmd->table_id_;
+    //     size_t table_file_count = 0;
+    //     for (const auto &[file_path, obj_addr] : all_files) {
+    //         if (file_path.find(table_prefix) != std::string::npos) {
+    //             table_file_count++;
+    //             LOG_DEBUG(fmt::format("Found registered table file: {} -> obj_addr: ({}, {}, {})",
+    //                                   file_path,
+    //                                   obj_addr.obj_key_,
+    //                                   obj_addr.part_offset_,
+    //                                   obj_addr.part_size_));
+    //         }
+    //     }
+    //     LOG_DEBUG(fmt::format("Table {} has {} files registered in persistence manager", restore_table_cmd->table_id_, table_file_count));
+    // } else { // check if the data still exist in the system
+    //     std::string data_dir = InfinityContext::instance().config()->DataDir();
+    //     std::string table_data_dir = VirtualStore::ConcatenatePath(VirtualStore::ConcatenatePath(data_dir, "db_" + restore_table_cmd->db_id_),
+    //                                                                "tbl_" + restore_table_cmd->table_id_);
+    //     if (!VirtualStore::Exists(table_data_dir)) {
+    //         LOG_ERROR(fmt::format("Table data directory {} does not exist, commit ts: {}, txn: {}.", table_data_dir, commit_ts, txn_id));
+    //         // return Status::OK();
+    //     }
+    // }
+    //
+    // // if exist proceed
+    // std::shared_ptr<DBMeta> db_meta;
+    // TxnTimeStamp db_create_ts;
+    // status = GetDBMeta(db_name, db_meta, db_create_ts);
+    // if (!status.ok()) {
+    //     return status;
+    // }
+    //
+    // // Get next table id of the db
+    // std::string next_table_id_key = KeyEncode::CatalogDbTagKey(restore_table_cmd->db_id_, NEXT_TABLE_ID.data());
+    // std::string next_table_id_str;
+    // status = kv_instance_->Get(next_table_id_key, next_table_id_str);
+    // if (!status.ok()) {
+    //     return status;
+    // }
+    // u64 next_table_id = std::stoull(next_table_id_str);
+    // u64 this_table_id = std::stoull(restore_table_cmd->table_id_);
+    // if (this_table_id + 1 > next_table_id) {
+    //     // Update the next table id
+    //     std::string new_next_table_id_str = std::to_string(this_table_id + 1);
+    //     status = kv_instance_->Put(next_table_id_key, new_next_table_id_str);
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    //     LOG_TRACE(fmt::format("Update next table id to {} for database {}.", new_next_table_id_str, restore_table_cmd->db_name_));
+    // }
 
     // status = PrepareCommitRestoreTableSnapshot(restore_table_cmd, is_link_files);
     // if (!status.ok()) {
@@ -5899,12 +5899,72 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     //     return status;
     // }
 
+    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    std::string snapshot_name = restore_table_cmd->snapshot_name_;
+    std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
+    Status status;
+    std::tie(table_snapshot_info, status) = TableSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
+    if (!status.ok()) {
+        return status;
+    }
+
+    const std::string &table_name = table_snapshot_info->table_name_;
+    const std::string &db_name = table_snapshot_info->db_name_;
+
+    std::shared_ptr<DBMeta> db_meta;
+    TxnTimeStamp db_create_ts;
+    status = GetDBMeta(db_name, db_meta, db_create_ts);
+    if (!status.ok()) {
+        return status;
+    }
+    std::string table_id_str;
+    std::string table_key;
+    TxnTimeStamp table_create_ts;
+    status = db_meta->GetTableID(table_name, table_key, table_id_str, table_create_ts);
+
+    if (status.ok()) {
+        // if (conflict_type == ConflictType::kIgnore) {
+        //     return Status::OK();
+        // }
+        return Status(ErrorCode::kDuplicateTableName, std::make_unique<std::string>(fmt::format("Table: {} already exists", table_name)));
+    } else if (status.code() != ErrorCode::kTableNotExist) {
+        return status;
+    }
+
+    // Get the latest table id
+    std::tie(table_id_str, status) = db_meta->GetNextTableID();
+    if (!status.ok()) {
+        return status;
+    }
+
+    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>(db_name),
+                                                         std::make_shared<std::string>(table_name),
+                                                         std::make_shared<std::string>(table_snapshot_info->table_comment_),
+                                                         table_snapshot_info->columns_);
+    // copy files from snapshot to data dir
+    std::vector<std::string> restored_file_paths;
+
+    status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir,
+                                                       snapshot_name,
+                                                       table_snapshot_info->GetFiles(),
+                                                       table_id_str,
+                                                       db_meta->db_id_str(),
+                                                       restored_file_paths,
+                                                       false);
+    if (!status.ok()) {
+        return status;
+    }
     return Status::OK();
 }
 
 Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *restore_database_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    std::string snapshot_name = restore_database_cmd->restore_table_wal_cmds_[0].snapshot_name_;
+    std::string snapshot_name;
+    if (restore_database_cmd->restore_table_wal_cmds_.size() > 0) {
+        snapshot_name = restore_database_cmd->restore_table_wal_cmds_[0].snapshot_name_;
+    } else {
+        return Status::OK();
+    }
     std::shared_ptr<DatabaseSnapshotInfo> database_snapshot_info;
     Status status;
     std::tie(database_snapshot_info, status) = DatabaseSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
@@ -5958,7 +6018,13 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
 
 Status NewTxn::ReplayRestoreSystemSnapshot(WalCmdRestoreSystemSnapshot *restore_system_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    std::string snapshot_name = restore_system_cmd->restore_database_wal_cmds_[0].restore_table_wal_cmds_[0].snapshot_name_;
+    std::string snapshot_name;
+    if (restore_system_cmd->restore_database_wal_cmds_.size() > 0 &&
+        restore_system_cmd->restore_database_wal_cmds_[0].restore_table_wal_cmds_.size() > 0) {
+        snapshot_name = restore_system_cmd->restore_database_wal_cmds_[0].restore_table_wal_cmds_[0].snapshot_name_;
+    } else {
+        return Status::OK();
+    }
     std::shared_ptr<SystemSnapshotInfo> system_snapshot_info;
     Status status;
     std::tie(system_snapshot_info, status) = SystemSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
