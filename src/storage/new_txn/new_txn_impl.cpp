@@ -421,7 +421,6 @@ Status NewTxn::CreateTable(const std::string &db_name, const std::shared_ptr<Tab
     if (!status.ok()) {
         return status;
     }
-
     // Put the data into local txn store
     if (base_txn_store_ != nullptr) {
         return Status::UnexpectedError("txn store is not null");
@@ -1400,14 +1399,15 @@ Status NewTxn::CreateDBSnapshot(const std::string &db_name, const std::string &s
     return Status::OK(); // Success
 }
 
-std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSnapshotInfo(const std::string &db_name) {
-    if (db_name_.empty()) {
-        db_name_ = db_name;
-    } else if (db_name_ != db_name) {
-        std::unique_ptr<std::string> err_msg = std::make_unique<std::string>(fmt::format("Attempt to get table from another database {}", db_name));
-        RecoverableError(Status::InvalidIdentifierName(db_name));
-    }
+Status NewTxn::CreateSystemSnapshot(const std::string &snapshot_name) {
+    base_txn_store_ = std::make_shared<CreateSystemSnapshotTxnStore>();
+    CreateSystemSnapshotTxnStore *txn_store = static_cast<CreateSystemSnapshotTxnStore *>(base_txn_store_.get());
+    txn_store->snapshot_name_ = snapshot_name;
+    txn_store->max_commit_ts_ = txn_context_ptr_->begin_ts_;
+    return Status::OK(); // Success
+}
 
+std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSnapshotInfo(const std::string &db_name) {
     std::shared_ptr<DBMeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
@@ -1425,10 +1425,17 @@ std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSna
         return {nullptr, status};
     }
 
+    std::string next_table_id_str;
+    std::tie(next_table_id_str, status) = db_meta->GetNextTableID();
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    database_snapshot_info->db_next_table_id_str_ = next_table_id_str;
+
     // std::string *db_comment = nullptr;
     // status = db_meta->GetComment(db_comment);
     // database_snapshot_info->db_comment_ = *db_comment;
-    database_snapshot_info->db_next_table_id_str_ = std::to_string(std::stoull(table_ids_ptr->back()) + 1);
+
     for (size_t i = 0; i < table_ids_ptr->size(); i++) {
         std::shared_ptr<TableMeta> table_meta;
         TxnTimeStamp create_timestamp;
@@ -1446,7 +1453,31 @@ std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSna
     return {std::move(database_snapshot_info), Status::OK()};
 }
 
-Status NewTxn::RestoreTableSnapshot(const std::string &db_name, const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info) {
+std::tuple<std::shared_ptr<SystemSnapshotInfo>, Status> NewTxn::GetSystemSnapshotInfo() {
+    std::vector<std::string> *db_id_strs_ptr;
+    std::vector<std::string> *db_names_ptr;
+    CatalogMeta catalog_meta(this);
+    Status status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    std::shared_ptr<SystemSnapshotInfo> system_snapshot_info = std::make_shared<SystemSnapshotInfo>();
+
+    size_t db_count = db_id_strs_ptr->size();
+    for (size_t idx = 0; idx < db_count; ++idx) {
+        const std::string &db_name = db_names_ptr->at(idx);
+        auto [database_snapshot, status] = this->GetDatabaseSnapshotInfo(db_name);
+        if (!status.ok()) {
+            return {nullptr, status};
+        }
+        system_snapshot_info->database_snapshots_.push_back(database_snapshot);
+    }
+
+    return {std::move(system_snapshot_info), Status::OK()};
+}
+
+Status NewTxn::RestoreTableSnapshot(const std::string &db_name, std::shared_ptr<TableSnapshotInfo> &table_snapshot_info) {
     // Cleanup();
     const std::string &table_name = table_snapshot_info->table_name_;
     this->CheckTxn(db_name);
@@ -1518,26 +1549,27 @@ Status NewTxn::RestoreTableSnapshot(const std::string &db_name, const std::share
     LOG_TRACE("NewTxn::RestoreTable created table entry is inserted.");
     // figure out why this is needed
     // status = db_meta.value().kv_instance().Commit();
-    if (!status.ok()) {
-        return status;
-    }
+    // if (!status.ok()) {
+    //     return status;
+    // }
 
     return Status::OK();
 }
 
-Status NewTxn::RestoreDatabaseSnapshot(const std::shared_ptr<DatabaseSnapshotInfo> &database_snapshot_info) {
-    // Cleanup();
-    const std::string &db_name = database_snapshot_info->db_name_;
-
-    std::shared_ptr<DBMeta> db_meta;
+Status NewTxn::RestoreDatabaseSnapshot(std::shared_ptr<DatabaseSnapshotInfo> &database_snapshot_info) {
+    CatalogMeta catalog_meta(this);
     TxnTimeStamp db_create_ts;
-    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
+    std::string db_key;
+    std::string db_id;
+    const std::string &db_name = database_snapshot_info->db_name_;
+    Status status = catalog_meta.GetDBID(db_name, db_key, db_id, db_create_ts);
     if (status.ok()) {
         return Status::DuplicateDatabase(db_name);
     }
     if (status.code() != ErrorCode::kDBNotExist) {
         return status;
     }
+    auto db_meta = std::make_shared<DBMeta>(db_id, db_name, this);
 
     std::string db_id_str;
     status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
@@ -1550,20 +1582,32 @@ Status NewTxn::RestoreDatabaseSnapshot(const std::shared_ptr<DatabaseSnapshotInf
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_id_str;
     txn_store->db_comment_ = database_snapshot_info->db_comment_;
-    // Copy database snapshot files
-    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    std::string snapshot_name = database_snapshot_info->snapshot_name_;
-    std::vector<std::string> files_to_restore = database_snapshot_info->GetFiles();
-    std::vector<std::string> restored_file_paths;
-    status =
-        database_snapshot_info->RestoreSnapshotFiles(snapshot_dir, snapshot_name, files_to_restore, db_id_str, db_id_str, restored_file_paths, true);
-    if (!status.ok()) {
-        return status;
-    }
 
     // Process each table snapshot within the database
     for (const auto &table_snapshot_info : database_snapshot_info->table_snapshots_) {
         const std::string &table_name = table_snapshot_info->table_name_;
+
+        std::string next_table_id_str;
+        std::tie(next_table_id_str, status) = db_meta->GetNextTableID();
+        LOG_TRACE(
+            fmt::format("NewTxn::RestoreTableSnapshot, old_table_id: {}, new_table_id: {}", table_snapshot_info->table_id_str_, next_table_id_str));
+
+        // copy files from snapshot to data dir
+        std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+        std::string snapshot_name = table_snapshot_info->snapshot_name_;
+        std::vector<std::string> restored_file_paths;
+
+        status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir,
+                                                           snapshot_name,
+                                                           table_snapshot_info->GetFiles(),
+                                                           next_table_id_str,
+                                                           db_id_str,
+                                                           restored_file_paths,
+                                                           false);
+
+        if (!status.ok()) {
+            return status;
+        }
 
         // Create table definition
         std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>(db_name),
@@ -1571,24 +1615,115 @@ Status NewTxn::RestoreDatabaseSnapshot(const std::shared_ptr<DatabaseSnapshotInf
                                                              std::make_shared<std::string>(table_snapshot_info->table_comment_),
                                                              table_snapshot_info->columns_);
 
-        std::shared_ptr<RestoreTableTxnStore> tmp_txn_store_ = std::make_shared<RestoreTableTxnStore>();
+        std::shared_ptr<RestoreTableTxnStore> tmp_txn_store = std::make_shared<RestoreTableTxnStore>();
 
         // Use the helper function to process snapshot restoration data
         status = ProcessSnapshotRestorationData(db_name,
                                                 db_id_str,
                                                 table_name,
-                                                table_snapshot_info->table_id_str_,
+                                                next_table_id_str,
                                                 table_def,
                                                 table_snapshot_info,
                                                 snapshot_name,
-                                                tmp_txn_store_.get());
+                                                tmp_txn_store.get());
         if (!status.ok()) {
             return status;
         }
-        txn_store->restore_table_txn_stores_.push_back(std::move(tmp_txn_store_));
+
+        txn_store->restore_table_txn_stores_.push_back(std::move(tmp_txn_store));
     }
 
     LOG_TRACE("NewTxn::RestoreDatabaseSnapshot created database entry is inserted.");
+    return Status::OK();
+}
+
+Status NewTxn::RestoreSystemSnapshot(std::shared_ptr<SystemSnapshotInfo> &system_snapshot_info) {
+    auto RestoreDatabaseSnapshot2 = [&](std::shared_ptr<DatabaseSnapshotInfo> &database_snapshot_info) -> Status {
+        CatalogMeta catalog_meta(this);
+        TxnTimeStamp db_create_ts;
+        std::string db_key;
+        std::string db_id;
+        const std::string &db_name = database_snapshot_info->db_name_;
+        Status status = catalog_meta.GetDBID(db_name, db_key, db_id, db_create_ts);
+        if (status.ok()) {
+            return Status::DuplicateDatabase(db_name);
+        }
+        if (status.code() != ErrorCode::kDBNotExist) {
+            return status;
+        }
+        auto db_meta = std::make_shared<DBMeta>(db_id, db_name, this);
+
+        std::string db_id_str;
+        status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
+        LOG_TRACE(fmt::format("txn: {}, restore db, apply db_id: {}", txn_context_ptr_->txn_id_, db_id_str));
+        if (!status.ok()) {
+            return status;
+        }
+
+        RestoreSystemTxnStore *system_txn_store = static_cast<RestoreSystemTxnStore *>(base_txn_store_.get());
+        auto database_txn_store = std::make_shared<RestoreDatabaseTxnStore>();
+        database_txn_store->db_name_ = db_name;
+        database_txn_store->db_id_str_ = db_id_str;
+        database_txn_store->db_comment_ = database_snapshot_info->db_comment_;
+
+        for (const auto &table_snapshot_info : database_snapshot_info->table_snapshots_) {
+            const std::string &table_name = table_snapshot_info->table_name_;
+
+            std::string next_table_id_str;
+            std::tie(next_table_id_str, status) = db_meta->GetNextTableID();
+            LOG_TRACE(fmt::format("NewTxn::RestoreTableSnapshot, old_table_id: {}, new_table_id: {}",
+                                  table_snapshot_info->table_id_str_,
+                                  next_table_id_str));
+
+            // copy files from snapshot to data dir
+            std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+            std::string snapshot_name = table_snapshot_info->snapshot_name_;
+            std::vector<std::string> restored_file_paths;
+
+            status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir,
+                                                               snapshot_name,
+                                                               table_snapshot_info->GetFiles(),
+                                                               next_table_id_str,
+                                                               db_id_str,
+                                                               restored_file_paths,
+                                                               false);
+
+            if (!status.ok()) {
+                return status;
+            }
+
+            std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>(db_name),
+                                                                 std::make_shared<std::string>(table_name),
+                                                                 std::make_shared<std::string>(table_snapshot_info->table_comment_),
+                                                                 table_snapshot_info->columns_);
+
+            std::shared_ptr<RestoreTableTxnStore> tmp_txn_store = std::make_shared<RestoreTableTxnStore>();
+
+            status = ProcessSnapshotRestorationData(db_name,
+                                                    db_id_str,
+                                                    table_name,
+                                                    next_table_id_str,
+                                                    table_def,
+                                                    table_snapshot_info,
+                                                    snapshot_name,
+                                                    tmp_txn_store.get());
+            if (!status.ok()) {
+                return status;
+            }
+            database_txn_store->restore_table_txn_stores_.push_back(std::move(tmp_txn_store));
+        }
+        system_txn_store->restore_database_txn_stores_.push_back(std::move(database_txn_store));
+        return Status::OK();
+    };
+
+    base_txn_store_ = std::make_shared<RestoreSystemTxnStore>();
+    for (auto &database_snapshot : system_snapshot_info->database_snapshots_) {
+        Status status = RestoreDatabaseSnapshot2(database_snapshot);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    LOG_TRACE("NewTxn::RestoreSystemSnapshot created database entry is inserted.");
     return Status::OK();
 }
 
@@ -1686,6 +1821,18 @@ Status NewTxn::CreateDBSnapshotFile(std::shared_ptr<DatabaseSnapshotInfo> db_sna
     for (auto &table_snapshot_info : table_snapshots) {
         table_snapshot_info->snapshot_name_ = db_snapshot_info->snapshot_name_;
         Status status = CreateTableSnapshotFile(table_snapshot_info, option);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewTxn::CreateSystemSnapshotFile(std::shared_ptr<SystemSnapshotInfo> system_snapshot_info, const SnapshotOption &option) {
+    auto &database_snapshots = system_snapshot_info->database_snapshots_;
+    for (auto &database_snapshot_info : database_snapshots) {
+        database_snapshot_info->snapshot_name_ = system_snapshot_info->snapshot_name_;
+        Status status = CreateDBSnapshotFile(database_snapshot_info, option);
         if (!status.ok()) {
             return status;
         }
@@ -2230,12 +2377,19 @@ Status NewTxn::PrepareCommit() {
                 }
                 break;
             }
-            case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
+            case WalCommandType::CREATE_SYSTEM_SNAPSHOT: {
                 if (this->IsReplay()) {
-                    // Skip replay of RESTORE_TABLE_SNAPSHOT command.
-                    LOG_TRACE("Skip replay of RESTORE_TABLE_SNAPSHOT command.");
+                    LOG_TRACE("Skip replay of CREATE_SYSTEM_SNAPSHOT command.");
                     break;
                 }
+                auto *create_system_snapshot_cmd = static_cast<WalCmdCreateSystemSnapshot *>(command.get());
+                Status status = PrepareCommitCreateSystemSnapshot(create_system_snapshot_cmd);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
                 auto *restore_table_snapshot_cmd = static_cast<WalCmdRestoreTableSnapshot *>(command.get());
                 Status status = PrepareCommitRestoreTableSnapshot(restore_table_snapshot_cmd);
                 if (!status.ok()) {
@@ -2246,6 +2400,14 @@ Status NewTxn::PrepareCommit() {
             case WalCommandType::RESTORE_DATABASE_SNAPSHOT: {
                 auto *restore_database_snapshot_cmd = static_cast<WalCmdRestoreDatabaseSnapshot *>(command.get());
                 Status status = PrepareCommitRestoreDatabaseSnapshot(restore_database_snapshot_cmd);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case WalCommandType::RESTORE_SYSTEM_SNAPSHOT: {
+                auto *restore_system_snapshot_cmd = static_cast<WalCmdRestoreSystemSnapshot *>(command.get());
+                Status status = PrepareCommitRestoreSystemSnapshot(restore_system_snapshot_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -2390,6 +2552,26 @@ Status NewTxn::PrepareCommitCreateDBSnapshot(const WalCmdCreateDBSnapshot *creat
     LOG_TRACE(fmt::format("last_ckp_ts: {}, begin_ts: {}, commit_ts: {}", last_ckp_ts, txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_));
 
     Status status = this->CheckpointforSnapshot(last_ckp_ts, ckp_txn_store.get(), SnapshotType::kDatabaseSnapshot);
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::PrepareCommitCreateSystemSnapshot(const WalCmdCreateSystemSnapshot *create_system_snapshot_cmd) {
+    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    std::string snapshot_name = create_system_snapshot_cmd->snapshot_name_;
+    std::string snapshot_path = snapshot_dir + "/" + snapshot_name;
+    if (std::filesystem::exists(snapshot_path)) {
+        return Status::SnapshotAlreadyExists(snapshot_name);
+    }
+
+    TxnTimeStamp last_ckp_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
+    std::shared_ptr<CheckpointTxnStore> ckp_txn_store = std::make_shared<CheckpointTxnStore>(last_ckp_ts, true);
+    LOG_TRACE(fmt::format("last_ckp_ts: {}, begin_ts: {}, commit_ts: {}", last_ckp_ts, txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_));
+
+    Status status = this->CheckpointforSnapshot(last_ckp_ts, ckp_txn_store.get(), SnapshotType::kSystemSnapshot);
     if (!status.ok()) {
         return status;
     }
@@ -2620,6 +2802,7 @@ Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restor
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     Status status;
     std::shared_ptr<TableMeta> table_meta;
+
     if (!is_link_files) {
         status = NewCatalog::AddNewTable(db_meta,
                                          restore_table_snapshot_cmd->table_id_,
@@ -2671,8 +2854,24 @@ Status NewTxn::PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseS
     if (!status.ok()) {
         return status;
     }
+
+    LOG_TRACE(fmt::format("Ready to restore database: db_name: {}, db_id: {}, tables_size: {}",
+                          restore_database_snapshot_cmd->db_name_,
+                          restore_database_snapshot_cmd->db_id_str_,
+                          restore_database_snapshot_cmd->restore_table_wal_cmds_.size()));
     for (const auto &restore_table_snapshot_cmd : restore_database_snapshot_cmd->restore_table_wal_cmds_) {
+        LOG_TRACE(restore_table_snapshot_cmd.ToString());
         status = RestoreTableFromSnapshot(&restore_table_snapshot_cmd, *db_meta, false);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewTxn::PrepareCommitRestoreSystemSnapshot(const WalCmdRestoreSystemSnapshot *restore_system_snapshot_cmd) {
+    for (const auto &restore_database_snapshot_cmd : restore_system_snapshot_cmd->restore_database_wal_cmds_) {
+        Status status = PrepareCommitRestoreDatabaseSnapshot(&restore_database_snapshot_cmd);
         if (!status.ok()) {
             return status;
         }
@@ -2764,6 +2963,9 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, std::string &cause, boo
         case TransactionType::kRestoreDatabase: {
             return CheckConflictTxnStore(static_cast<const RestoreDatabaseTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
+        case TransactionType::kRestoreSystem: {
+            return CheckConflictTxnStore(static_cast<const RestoreSystemTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
+        }
         case TransactionType::kCreateTableSnapshot: {
             return CheckConflictTxnStore(static_cast<const CreateTableSnapshotTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
@@ -2784,6 +2986,15 @@ bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *pr
     const std::string &db_name = txn_store.db_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
+        case TransactionType::kCreateTableSnapshot:
+            [[fallthrough]];
+        case TransactionType::kCreateDBSnapshot:
+            [[fallthrough]];
+        case TransactionType::kCreateSystemSnapshot:
+            [[fallthrough]];
+        case TransactionType::kRestoreTable: {
+            break;
+        }
         case TransactionType::kRestoreDatabase: {
             RestoreDatabaseTxnStore *restore_database_txn_store = static_cast<RestoreDatabaseTxnStore *>(previous_txn->base_txn_store_.get());
             if (restore_database_txn_store->db_name_ == db_name) {
@@ -2792,9 +3003,14 @@ bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *pr
             }
             break;
         }
-        case TransactionType::kCreateTableSnapshot: {
-            retry_query = true;
-            conflict = true;
+        case TransactionType::kRestoreSystem: {
+            RestoreSystemTxnStore *restore_system_txn_store = static_cast<RestoreSystemTxnStore *>(previous_txn->base_txn_store_.get());
+            for (auto restore_database_txn_stores : restore_system_txn_store->restore_database_txn_stores_) {
+                if (restore_database_txn_stores->db_name_ == db_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+            }
             break;
         }
         default: {
@@ -2820,15 +3036,91 @@ bool NewTxn::CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, New
             }
             break;
         }
+        case TransactionType::kCreateTableSnapshot:
+            [[fallthrough]];
+        case TransactionType::kCreateDBSnapshot:
+            [[fallthrough]];
+        case TransactionType::kCreateSystemSnapshot: {
+            break;
+        }
+        case TransactionType::kRestoreTable: {
+            RestoreTableTxnStore *previous_txn_store = static_cast<RestoreTableTxnStore *>(previous_txn->base_txn_store_.get());
+            for (const auto &restore_table_txn_store : txn_store.restore_table_txn_stores_) {
+                if (previous_txn_store->table_name_ == restore_table_txn_store->table_name_) {
+                    retry_query = false;
+                    conflict = true;
+                    break;
+                }
+            }
+            break;
+        }
         case TransactionType::kRestoreDatabase: {
-            RestoreDatabaseTxnStore *restore_database_txn_store = static_cast<RestoreDatabaseTxnStore *>(previous_txn->base_txn_store_.get());
-            if (restore_database_txn_store->db_name_ == db_name) {
+            RestoreDatabaseTxnStore *previous_txn_store = static_cast<RestoreDatabaseTxnStore *>(previous_txn->base_txn_store_.get());
+            if (previous_txn_store->db_name_ == db_name) {
                 retry_query = false;
                 conflict = true;
             }
             break;
         }
-        case TransactionType::kCreateTableSnapshot: {
+        case TransactionType::kRestoreSystem: {
+            retry_query = true;
+            conflict = true;
+            break;
+        }
+        default: {
+        }
+    }
+
+    if (conflict) {
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
+        return true;
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictTxnStore(const RestoreSystemTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    bool conflict = false;
+    switch (previous_txn->base_txn_store_->type_) {
+        case TransactionType::kCreateDB: {
+            CreateDBTxnStore *previous_txn_store = static_cast<CreateDBTxnStore *>(previous_txn->base_txn_store_.get());
+            for (const auto &restore_database_txn_store : txn_store.restore_database_txn_stores_) {
+                if (restore_database_txn_store->db_name_ == previous_txn_store->db_name_) {
+                    retry_query = false;
+                    conflict = true;
+                }
+            }
+            break;
+        }
+        case TransactionType::kCreateTableSnapshot:
+            [[fallthrough]];
+        case TransactionType::kCreateDBSnapshot:
+            [[fallthrough]];
+        case TransactionType::kCreateSystemSnapshot: {
+            break;
+        }
+        case TransactionType::kRestoreTable: {
+            RestoreTableTxnStore *previous_txn_store = static_cast<RestoreTableTxnStore *>(previous_txn->base_txn_store_.get());
+            for (const auto &restore_database_txn_store : txn_store.restore_database_txn_stores_) {
+                for (const auto &restore_table_txn_store : restore_database_txn_store->restore_table_txn_stores_) {
+                    if (restore_table_txn_store->table_name_ == previous_txn_store->table_name_) {
+                        retry_query = false;
+                        conflict = true;
+                    }
+                }
+            }
+            break;
+        }
+        case TransactionType::kRestoreDatabase: {
+            RestoreDatabaseTxnStore *previous_txn_store = static_cast<RestoreDatabaseTxnStore *>(previous_txn->base_txn_store_.get());
+            for (const auto &restore_database_txn_store : txn_store.restore_database_txn_stores_) {
+                if (restore_database_txn_store->db_name_ == previous_txn_store->db_name_) {
+                    retry_query = false;
+                    conflict = true;
+                }
+            }
+            break;
+        }
+        case TransactionType::kRestoreSystem: {
             retry_query = true;
             conflict = true;
             break;
@@ -2894,16 +3186,46 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn 
             break;
         }
         case TransactionType::kRestoreTable: {
-            RestoreTableTxnStore *restore_table_txn_store = static_cast<RestoreTableTxnStore *>(previous_txn->base_txn_store_.get());
-            if (restore_table_txn_store->db_name_ == db_name && restore_table_txn_store->table_name_ == table_name) {
-                retry_query = false;
-                conflict = true;
-            }
-            break;
-        }
-        case TransactionType::kCreateTableSnapshot: {
+            // RestoreTableTxnStore *restore_table_txn_store = static_cast<RestoreTableTxnStore *>(previous_txn->base_txn_store_.get());
+            // if (restore_table_txn_store->db_name_ == db_name && restore_table_txn_store->table_name_ == table_name) {
+            //     retry_query = false;
+            //     conflict = true;
+            // }
             retry_query = true;
             conflict = true;
+            break;
+        }
+        case TransactionType::kRestoreDatabase: {
+            // RestoreDatabaseTxnStore *restore_database_txn_store = static_cast<RestoreDatabaseTxnStore *>(previous_txn->base_txn_store_.get());
+            // for (const auto &restore_table_txn_store : restore_database_txn_store->restore_table_txn_stores_) {
+            //     if (restore_table_txn_store->db_name_ == db_name && restore_table_txn_store->table_name_ == table_name) {
+            //         retry_query = false;
+            //         conflict = true;
+            //     }
+            // }
+            retry_query = true;
+            conflict = true;
+            break;
+        }
+        case TransactionType::kRestoreSystem: {
+            // RestoreSystemTxnStore *restore_system_txn_store = static_cast<RestoreSystemTxnStore *>(previous_txn->base_txn_store_.get());
+            // for (const auto &restore_database_txn_store : restore_system_txn_store->restore_database_txn_stores_) {
+            //     for (const auto &restore_table_txn_store : restore_database_txn_store->restore_table_txn_stores_) {
+            //         if (restore_table_txn_store->db_name_ == db_name && restore_table_txn_store->table_name_ == table_name) {
+            //             retry_query = false;
+            //             conflict = true;
+            //         }
+            //     }
+            // }
+            retry_query = true;
+            conflict = true;
+            break;
+        }
+        case TransactionType::kCreateTableSnapshot:
+            [[fallthrough]];
+        case TransactionType::kCreateDBSnapshot:
+            [[fallthrough]];
+        case TransactionType::kCreateSystemSnapshot: {
             break;
         }
         default: {
@@ -2946,6 +3268,20 @@ bool NewTxn::CheckConflictTxnStore(const RestoreTableTxnStore &txn_store, NewTxn
             }
             break;
         }
+        case TransactionType::kCompact: {
+            CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(previous_txn->base_txn_store_.get());
+            if (compact_txn_store->db_name_ == db_name && compact_txn_store->table_name_ == table_name) {
+                retry_query = false;
+                conflict = true;
+            }
+        }
+        case TransactionType::kCreateTableSnapshot:
+            [[fallthrough]];
+        case TransactionType::kCreateDBSnapshot:
+            [[fallthrough]];
+        case TransactionType::kCreateSystemSnapshot: {
+            break;
+        }
         case TransactionType::kRestoreTable: {
             RestoreTableTxnStore *restore_table_txn_store = static_cast<RestoreTableTxnStore *>(previous_txn->base_txn_store_.get());
             if (restore_table_txn_store->db_name_ == db_name && restore_table_txn_store->table_name_ == table_name) {
@@ -2954,21 +3290,27 @@ bool NewTxn::CheckConflictTxnStore(const RestoreTableTxnStore &txn_store, NewTxn
             }
             break;
         }
-        case TransactionType::kCreateTableSnapshot: {
-            CreateTableSnapshotTxnStore *create_table_snapshot_txn_store =
-                static_cast<CreateTableSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
-            if (create_table_snapshot_txn_store->db_name_ == db_name && create_table_snapshot_txn_store->table_name_ == table_name) {
-                retry_query = true;
-                conflict = true;
+        case TransactionType::kRestoreDatabase: {
+            RestoreDatabaseTxnStore *restore_database_txn_store = static_cast<RestoreDatabaseTxnStore *>(previous_txn->base_txn_store_.get());
+            for (const auto &restore_table_txn_store : restore_database_txn_store->restore_table_txn_stores_) {
+                if (restore_table_txn_store->db_name_ == db_name && restore_table_txn_store->table_name_ == table_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
             }
             break;
         }
-        case TransactionType::kCompact: {
-            CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(previous_txn->base_txn_store_.get());
-            if (compact_txn_store->db_name_ == db_name && compact_txn_store->table_name_ == table_name) {
-                retry_query = false;
-                conflict = true;
+        case TransactionType::kRestoreSystem: {
+            RestoreSystemTxnStore *restore_system_txn_store = static_cast<RestoreSystemTxnStore *>(previous_txn->base_txn_store_.get());
+            for (const auto &restore_database_txn_store : restore_system_txn_store->restore_database_txn_stores_) {
+                for (const auto &restore_table_txn_store : restore_database_txn_store->restore_table_txn_stores_) {
+                    if (restore_table_txn_store->db_name_ == db_name && restore_table_txn_store->table_name_ == table_name) {
+                        retry_query = false;
+                        conflict = true;
+                    }
+                }
             }
+            break;
         }
         default: {
         }
@@ -4504,11 +4846,11 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             //                                                         column_def));
             //             }
             //     }
-
+            //
             // }
-
+            //
             // for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
-
+            //
             //     for (const auto &segment_index_info : index_cmd.segment_index_infos_) {
             //         metas.emplace_back(std::make_unique<SegmentIndexMetaKey>(restore_table_txn_store->db_id_str_,
             //                                                            restore_table_txn_store->table_id_str_,
@@ -4523,7 +4865,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             //         }
             //     }
             // }
-
+            //
             // Status cleanup_status = CleanupInner(std::move(metas));
             // if (!cleanup_status.ok()) {
             //     LOG_WARN(fmt::format("Failed to clean up metadata during restore table rollback: {}", cleanup_status.message()));
@@ -4543,6 +4885,114 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 if (!remove_status.ok()) {
                     LOG_WARN(fmt::format("Failed to remove database directory during rollback: {}", db_dir));
                 }
+            }
+
+            // for (const auto &restore_table_txn_store : restore_database_txn_store->restore_table_txn_stores_) {
+            //     // Clean up metadata entries that were created
+            //     std::vector<std::shared_ptr<MetaKey>> metas;
+            //     for (const auto &segment_info : restore_table_txn_store->segment_infos_) {
+            //         metas.emplace_back(std::make_unique<SegmentMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                       restore_table_txn_store->table_id_str_,
+            //                                                       segment_info.segment_id_));
+            //         for (const auto &block_id : segment_info.block_ids_) {
+            //         metas.emplace_back(std::make_unique<BlockMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                     restore_table_txn_store->table_id_str_,
+            //                                                     segment_info.segment_id_,
+            //                                                     block_id));
+            //             for (const auto &column_def : restore_table_txn_store->table_def_->columns()) {
+            //                 metas.emplace_back(std::make_unique<ColumnMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                             restore_table_txn_store->table_id_str_,
+            //                                                             segment_info.segment_id_,
+            //                                                             block_id,
+            //                                                             column_def));
+            //                 }
+            //         }
+            //
+            //     }
+            //
+            //     for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
+            //
+            //         for (const auto &segment_index_info : index_cmd.segment_index_infos_) {
+            //             metas.emplace_back(std::make_unique<SegmentIndexMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                                restore_table_txn_store->table_id_str_,
+            //                                                                index_cmd.index_id_,
+            //                                                                segment_index_info.segment_id_));
+            //             for (const auto &chunk_info : segment_index_info.chunk_infos_) {
+            //             metas.emplace_back(std::make_unique<ChunkIndexMetaKey>(restore_table_txn_store->db_id_str_,
+            //                                                                 restore_table_txn_store->table_id_str_,
+            //                                                                 index_cmd.index_id_,
+            //                                                                 segment_index_info.segment_id_,
+            //                                                                 chunk_info.chunk_id_));
+            //             }
+            //         }
+            //     }
+            //
+            //     Status cleanup_status = CleanupInner(std::move(metas));
+            //     if (!cleanup_status.ok()) {
+            //         LOG_WARN(fmt::format("Failed to clean up metadata during restore table rollback: {}", cleanup_status.message()));
+            //     }
+            // }
+
+            break;
+        }
+        case TransactionType::kRestoreSystem: {
+            Config *config = InfinityContext::instance().config();
+            std::string data_dir = config->DataDir();
+            RestoreSystemTxnStore *restore_system_txn_store = static_cast<RestoreSystemTxnStore *>(base_txn_store_.get());
+            for (const auto &restore_database_txn_store : restore_system_txn_store->restore_database_txn_stores_) {
+                // Remove the database directory
+                std::string db_dir = fmt::format("{}/db_{}", data_dir, restore_database_txn_store->db_id_str_);
+
+                if (VirtualStore::Exists(db_dir)) {
+                    Status remove_status = VirtualStore::RemoveDirectory(db_dir);
+                    if (!remove_status.ok()) {
+                        LOG_WARN(fmt::format("Failed to remove database directory during rollback: {}", db_dir));
+                    }
+                }
+
+                // for (const auto &restore_table_txn_store : restore_database_txn_store->restore_table_txn_stores_) {
+                //     // Clean up metadata entries that were created
+                //     std::vector<std::shared_ptr<MetaKey>> metas;
+                //     for (const auto &segment_info : restore_table_txn_store->segment_infos_) {
+                //         metas.emplace_back(std::make_unique<SegmentMetaKey>(restore_table_txn_store->db_id_str_,
+                //                                                       restore_table_txn_store->table_id_str_,
+                //                                                       segment_info.segment_id_));
+                //         for (const auto &block_id : segment_info.block_ids_) {
+                //             metas.emplace_back(std::make_unique<BlockMetaKey>(restore_table_txn_store->db_id_str_,
+                //                                                         restore_table_txn_store->table_id_str_,
+                //                                                         segment_info.segment_id_,
+                //                                                         block_id));
+                //             for (const auto &column_def : restore_table_txn_store->table_def_->columns()) {
+                //                 metas.emplace_back(std::make_unique<ColumnMetaKey>(restore_table_txn_store->db_id_str_,
+                //                                                             restore_table_txn_store->table_id_str_,
+                //                                                             segment_info.segment_id_,
+                //                                                             block_id,
+                //                                                             column_def));
+                //             }
+                //         }
+                //     }
+                //
+                //     for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
+                //         for (const auto &segment_index_info : index_cmd.segment_index_infos_) {
+                //             metas.emplace_back(std::make_unique<SegmentIndexMetaKey>(restore_table_txn_store->db_id_str_,
+                //                                                                restore_table_txn_store->table_id_str_,
+                //                                                                index_cmd.index_id_,
+                //                                                                segment_index_info.segment_id_));
+                //             for (const auto &chunk_info : segment_index_info.chunk_infos_) {
+                //                 metas.emplace_back(std::make_unique<ChunkIndexMetaKey>(restore_table_txn_store->db_id_str_,
+                //                                                                     restore_table_txn_store->table_id_str_,
+                //                                                                     index_cmd.index_id_,
+                //                                                                     segment_index_info.segment_id_,
+                //                                                                     chunk_info.chunk_id_));
+                //             }
+                //         }
+                //     }
+                //
+                //     Status cleanup_status = CleanupInner(std::move(metas));
+                //     if (!cleanup_status.ok()) {
+                //         LOG_WARN(fmt::format("Failed to clean up metadata during restore table rollback: {}", cleanup_status.message()));
+                //     }
+                // }
             }
             break;
         }
@@ -5008,6 +5458,24 @@ Status NewTxn::ReplayWalCmd(const std::shared_ptr<WalCmd> &command, TxnTimeStamp
             }
             break;
         }
+        case WalCommandType::RESTORE_DATABASE_SNAPSHOT: {
+            auto *restore_database_cmd = static_cast<WalCmdRestoreDatabaseSnapshot *>(command.get());
+
+            Status status = ReplayRestoreDatabaseSnapshot(restore_database_cmd, commit_ts, txn_id);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case WalCommandType::RESTORE_SYSTEM_SNAPSHOT: {
+            auto *restore_system_cmd = static_cast<WalCmdRestoreSystemSnapshot *>(command.get());
+
+            Status status = ReplayRestoreSystemSnapshot(restore_system_cmd, commit_ts, txn_id);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
         default: {
             break;
         }
@@ -5325,98 +5793,97 @@ Status NewTxn::ProcessSnapshotRestorationData(const std::string &db_name,
 }
 
 Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_table_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
-    const std::string &db_name = restore_table_cmd->db_name_;
+    // const std::string &db_name = restore_table_cmd->db_name_;
+    //
+    // // Check if the table already exists
+    // std::string table_key = KeyEncode::CatalogTableKey(restore_table_cmd->db_id_, *restore_table_cmd->table_def_->table_name(), commit_ts);
+    // std::string table_id;
+    // Status status = kv_instance_->Get(table_key, table_id);
+    // // bool is_link_files = false;
+    // if (status.ok()) {
+    //     if (table_id == restore_table_cmd->table_id_) {
+    //
+    //         LOG_WARN(fmt::format("Skipping replay restore table: Table {} with id {} already exists, commit ts: {}, txn: {}.",
+    //                              *restore_table_cmd->table_def_->table_name(),
+    //                              restore_table_cmd->table_id_,
+    //                              commit_ts,
+    //                              txn_id));
+    //         // is_link_files = true;
+    //     } else {
+    //         LOG_ERROR(fmt::format("Replay restore table: Table {} with id {} already exists with different id {}, commit ts: {}, txn: {}.",
+    //                               *restore_table_cmd->table_def_->table_name(),
+    //                               restore_table_cmd->table_id_,
+    //                               table_id,
+    //                               commit_ts,
+    //                               txn_id));
+    //         return Status::UnexpectedError("Table ID mismatch during replay of table restore.");
+    //     }
+    // }
+    //
+    // // Check persistence manager state during restore replay
+    // PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
+    // if (persistence_manager != nullptr) {
+    //     std::unordered_map<std::string, ObjAddr> all_files = persistence_manager->GetAllFiles();
+    //     LOG_DEBUG(fmt::format("Persistence manager has {} registered files during restore replay, commit ts: {}, txn: {}",
+    //                           all_files.size(),
+    //                           commit_ts,
+    //                           txn_id));
+    //
+    //     // Check if any files from this table are registered
+    //     std::string table_prefix = "db_" + restore_table_cmd->db_id_ + "/tbl_" + restore_table_cmd->table_id_;
+    //     size_t table_file_count = 0;
+    //     for (const auto &[file_path, obj_addr] : all_files) {
+    //         if (file_path.find(table_prefix) != std::string::npos) {
+    //             table_file_count++;
+    //             LOG_DEBUG(fmt::format("Found registered table file: {} -> obj_addr: ({}, {}, {})",
+    //                                   file_path,
+    //                                   obj_addr.obj_key_,
+    //                                   obj_addr.part_offset_,
+    //                                   obj_addr.part_size_));
+    //         }
+    //     }
+    //     LOG_DEBUG(fmt::format("Table {} has {} files registered in persistence manager", restore_table_cmd->table_id_, table_file_count));
+    // } else { // check if the data still exist in the system
+    //     std::string data_dir = InfinityContext::instance().config()->DataDir();
+    //     std::string table_data_dir = VirtualStore::ConcatenatePath(VirtualStore::ConcatenatePath(data_dir, "db_" + restore_table_cmd->db_id_),
+    //                                                                "tbl_" + restore_table_cmd->table_id_);
+    //     if (!VirtualStore::Exists(table_data_dir)) {
+    //         LOG_ERROR(fmt::format("Table data directory {} does not exist, commit ts: {}, txn: {}.", table_data_dir, commit_ts, txn_id));
+    //         // return Status::OK();
+    //     }
+    // }
+    //
+    // // if exist proceed
+    // std::shared_ptr<DBMeta> db_meta;
+    // TxnTimeStamp db_create_ts;
+    // status = GetDBMeta(db_name, db_meta, db_create_ts);
+    // if (!status.ok()) {
+    //     return status;
+    // }
+    //
+    // // Get next table id of the db
+    // std::string next_table_id_key = KeyEncode::CatalogDbTagKey(restore_table_cmd->db_id_, NEXT_TABLE_ID.data());
+    // std::string next_table_id_str;
+    // status = kv_instance_->Get(next_table_id_key, next_table_id_str);
+    // if (!status.ok()) {
+    //     return status;
+    // }
+    // u64 next_table_id = std::stoull(next_table_id_str);
+    // u64 this_table_id = std::stoull(restore_table_cmd->table_id_);
+    // if (this_table_id + 1 > next_table_id) {
+    //     // Update the next table id
+    //     std::string new_next_table_id_str = std::to_string(this_table_id + 1);
+    //     status = kv_instance_->Put(next_table_id_key, new_next_table_id_str);
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    //     LOG_TRACE(fmt::format("Update next table id to {} for database {}.", new_next_table_id_str, restore_table_cmd->db_name_));
+    // }
 
-    // Check if the table already exists
-    std::string table_key = KeyEncode::CatalogTableKey(restore_table_cmd->db_id_, *restore_table_cmd->table_def_->table_name(), commit_ts);
-    std::string table_id;
-    Status status = kv_instance_->Get(table_key, table_id);
-    bool is_link_files = false;
-    if (status.ok()) {
-        if (table_id == restore_table_cmd->table_id_) {
-
-            LOG_WARN(fmt::format("Skipping replay restore table: Table {} with id {} already exists, commit ts: {}, txn: {}.",
-                                 *restore_table_cmd->table_def_->table_name(),
-                                 restore_table_cmd->table_id_,
-                                 commit_ts,
-                                 txn_id));
-            is_link_files = true;
-        } else {
-            LOG_ERROR(fmt::format("Replay restore table: Table {} with id {} already exists with different id {}, commit ts: {}, txn: {}.",
-                                  *restore_table_cmd->table_def_->table_name(),
-                                  restore_table_cmd->table_id_,
-                                  table_id,
-                                  commit_ts,
-                                  txn_id));
-            return Status::UnexpectedError("Table ID mismatch during replay of table restore.");
-        }
-    }
-
-    // Check persistence manager state during restore replay
-    PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
-    if (persistence_manager != nullptr) {
-        std::unordered_map<std::string, ObjAddr> all_files = persistence_manager->GetAllFiles();
-        LOG_DEBUG(fmt::format("Persistence manager has {} registered files during restore replay, commit ts: {}, txn: {}",
-                              all_files.size(),
-                              commit_ts,
-                              txn_id));
-
-        // Check if any files from this table are registered
-        std::string table_prefix = "db_" + restore_table_cmd->db_id_ + "/tbl_" + restore_table_cmd->table_id_;
-        size_t table_file_count = 0;
-        for (const auto &[file_path, obj_addr] : all_files) {
-            if (file_path.find(table_prefix) != std::string::npos) {
-                table_file_count++;
-                LOG_DEBUG(fmt::format("Found registered table file: {} -> obj_addr: ({}, {}, {})",
-                                      file_path,
-                                      obj_addr.obj_key_,
-                                      obj_addr.part_offset_,
-                                      obj_addr.part_size_));
-            }
-        }
-        LOG_DEBUG(fmt::format("Table {} has {} files registered in persistence manager", restore_table_cmd->table_id_, table_file_count));
-    } else { // check if the data still exist in the system
-        std::string data_dir = InfinityContext::instance().config()->DataDir();
-        std::string table_data_dir = VirtualStore::ConcatenatePath(VirtualStore::ConcatenatePath(data_dir, "db_" + restore_table_cmd->db_id_),
-                                                                   "tbl_" + restore_table_cmd->table_id_);
-        if (!VirtualStore::Exists(table_data_dir)) {
-            LOG_ERROR(fmt::format("Table data directory {} does not exist, commit ts: {}, txn: {}.", table_data_dir, commit_ts, txn_id));
-            // return Status::OK();
-        }
-    }
-
-    // if exist proceed
-    std::shared_ptr<DBMeta> db_meta;
-    TxnTimeStamp db_create_ts;
-    status = GetDBMeta(db_name, db_meta, db_create_ts);
-    if (!status.ok()) {
-        return status;
-    }
-
-    // Get next table id of the db
-    std::string next_table_id_key = KeyEncode::CatalogDbTagKey(restore_table_cmd->db_id_, NEXT_TABLE_ID.data());
-    std::string next_table_id_str;
-    status = kv_instance_->Get(next_table_id_key, next_table_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-    u64 next_table_id = std::stoull(next_table_id_str);
-    u64 this_table_id = std::stoull(restore_table_cmd->table_id_);
-    if (this_table_id + 1 > next_table_id) {
-        // Update the next table id
-        std::string new_next_table_id_str = std::to_string(this_table_id + 1);
-        status = kv_instance_->Put(next_table_id_key, new_next_table_id_str);
-        if (!status.ok()) {
-            return status;
-        }
-        LOG_TRACE(fmt::format("Update next table id to {} for database {}.", new_next_table_id_str, restore_table_cmd->db_name_));
-    }
-
-    status = PrepareCommitRestoreTableSnapshot(restore_table_cmd, is_link_files);
-
-    if (!status.ok()) {
-        return status;
-    }
+    // status = PrepareCommitRestoreTableSnapshot(restore_table_cmd, is_link_files);
+    // if (!status.ok()) {
+    //     return status;
+    // }
 
     // std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     // std::string snapshot_name = restore_table_cmd->snapshot_name_;
@@ -5432,6 +5899,186 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     //     return status;
     // }
 
+    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    std::string snapshot_name = restore_table_cmd->snapshot_name_;
+    std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
+    Status status;
+    std::tie(table_snapshot_info, status) = TableSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
+    if (!status.ok()) {
+        return status;
+    }
+
+    const std::string &table_name = table_snapshot_info->table_name_;
+    const std::string &db_name = table_snapshot_info->db_name_;
+
+    std::shared_ptr<DBMeta> db_meta;
+    TxnTimeStamp db_create_ts;
+    status = GetDBMeta(db_name, db_meta, db_create_ts);
+    if (!status.ok()) {
+        return status;
+    }
+    std::string table_id_str;
+    std::string table_key;
+    TxnTimeStamp table_create_ts;
+    status = db_meta->GetTableID(table_name, table_key, table_id_str, table_create_ts);
+
+    if (status.ok()) {
+        // if (conflict_type == ConflictType::kIgnore) {
+        //     return Status::OK();
+        // }
+        return Status(ErrorCode::kDuplicateTableName, std::make_unique<std::string>(fmt::format("Table: {} already exists", table_name)));
+    } else if (status.code() != ErrorCode::kTableNotExist) {
+        return status;
+    }
+
+    // Get the latest table id
+    std::tie(table_id_str, status) = db_meta->GetNextTableID();
+    if (!status.ok()) {
+        return status;
+    }
+
+    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>(db_name),
+                                                         std::make_shared<std::string>(table_name),
+                                                         std::make_shared<std::string>(table_snapshot_info->table_comment_),
+                                                         table_snapshot_info->columns_);
+    // copy files from snapshot to data dir
+    std::vector<std::string> restored_file_paths;
+
+    status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir,
+                                                       snapshot_name,
+                                                       table_snapshot_info->GetFiles(),
+                                                       table_id_str,
+                                                       db_meta->db_id_str(),
+                                                       restored_file_paths,
+                                                       false);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
+Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *restore_database_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    std::string snapshot_name{};
+    if (restore_database_cmd->restore_table_wal_cmds_.size() > 0) {
+        snapshot_name = restore_database_cmd->restore_table_wal_cmds_[0].snapshot_name_;
+    } else {
+        return Status::OK();
+    }
+    std::shared_ptr<DatabaseSnapshotInfo> database_snapshot_info;
+    Status status;
+    std::tie(database_snapshot_info, status) = DatabaseSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
+    if (!status.ok()) {
+        return status;
+    }
+
+    CatalogMeta catalog_meta(this);
+    TxnTimeStamp db_create_ts;
+    std::string db_key;
+    std::string db_id;
+    const std::string &db_name = database_snapshot_info->db_name_;
+    status = catalog_meta.GetDBID(db_name, db_key, db_id, db_create_ts);
+    if (status.ok()) {
+        return Status::DuplicateDatabase(db_name);
+    }
+    if (status.code() != ErrorCode::kDBNotExist) {
+        return status;
+    }
+    auto db_meta = std::make_shared<DBMeta>(db_id, db_name, this);
+
+    std::string db_id_str;
+    status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
+    if (!status.ok()) {
+        return status;
+    }
+
+    for (const auto &table_snapshot_info : database_snapshot_info->table_snapshots_) {
+        std::string next_table_id_str;
+        std::tie(next_table_id_str, status) = db_meta->GetNextTableID();
+
+        // copy files from snapshot to data dir
+        std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+        std::string snapshot_name = table_snapshot_info->snapshot_name_;
+        std::vector<std::string> restored_file_paths;
+
+        status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir,
+                                                           snapshot_name,
+                                                           table_snapshot_info->GetFiles(),
+                                                           next_table_id_str,
+                                                           db_id_str,
+                                                           restored_file_paths,
+                                                           false);
+
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewTxn::ReplayRestoreSystemSnapshot(WalCmdRestoreSystemSnapshot *restore_system_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    std::string snapshot_name{};
+
+    for (auto &restore_database_wal_cmd : restore_system_cmd->restore_database_wal_cmds_) {
+        if (restore_database_wal_cmd.restore_table_wal_cmds_.size() > 0) {
+            snapshot_name = restore_database_wal_cmd.restore_table_wal_cmds_[0].snapshot_name_;
+        }
+    }
+    if (snapshot_name.empty()) {
+        return Status::OK();
+    }
+
+    std::shared_ptr<SystemSnapshotInfo> system_snapshot_info;
+    Status status;
+    std::tie(system_snapshot_info, status) = SystemSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
+    if (!status.ok()) {
+        return status;
+    }
+
+    for (auto &database_snapshot_info : system_snapshot_info->database_snapshots_) {
+        CatalogMeta catalog_meta(this);
+        TxnTimeStamp db_create_ts;
+        std::string db_key;
+        std::string db_id;
+        const std::string &db_name = database_snapshot_info->db_name_;
+        status = catalog_meta.GetDBID(db_name, db_key, db_id, db_create_ts);
+        if (status.ok()) {
+            return Status::DuplicateDatabase(db_name);
+        }
+        if (status.code() != ErrorCode::kDBNotExist) {
+            return status;
+        }
+        auto db_meta = std::make_shared<DBMeta>(db_id, db_name, this);
+
+        std::string db_id_str;
+        status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
+        if (!status.ok()) {
+            return status;
+        }
+
+        for (const auto &table_snapshot_info : database_snapshot_info->table_snapshots_) {
+            std::string next_table_id_str;
+            std::tie(next_table_id_str, status) = db_meta->GetNextTableID();
+
+            // copy files from snapshot to data dir
+            std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+            std::string snapshot_name = table_snapshot_info->snapshot_name_;
+            std::vector<std::string> restored_file_paths;
+
+            status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir,
+                                                               snapshot_name,
+                                                               table_snapshot_info->GetFiles(),
+                                                               next_table_id_str,
+                                                               db_id_str,
+                                                               restored_file_paths,
+                                                               false);
+
+            if (!status.ok()) {
+                return status;
+            }
+        }
+    }
     return Status::OK();
 }
 
@@ -5468,7 +6115,8 @@ Status NewTxn::CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create
 
 Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store, SnapshotType snapshot_type) {
     TransactionType txn_type = GetTxnType();
-    if (txn_type != TransactionType::kCreateTableSnapshot && txn_type != TransactionType::kCreateDBSnapshot) {
+    if (txn_type != TransactionType::kCreateTableSnapshot && txn_type != TransactionType::kCreateDBSnapshot &&
+        txn_type != TransactionType::kCreateSystemSnapshot) {
         UnrecoverableError(fmt::format("Invalid transaction type."));
     }
 
@@ -5548,6 +6196,29 @@ Status NewTxn::CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStor
             break;
         }
         case SnapshotType::kSystemSnapshot: {
+            CreateSystemSnapshotTxnStore *create_txn_store = static_cast<CreateSystemSnapshotTxnStore *>(base_txn_store_.get());
+            std::string snapshot_name = create_txn_store->snapshot_name_;
+
+            std::shared_ptr<SystemSnapshotInfo> system_snapshot_info;
+            std::tie(system_snapshot_info, status) = GetSystemSnapshotInfo();
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
+            system_snapshot_info->snapshot_name_ = snapshot_name;
+
+            // Create system snapshot files
+            status = CreateSystemSnapshotFile(system_snapshot_info, option);
+            if (!status.ok()) {
+                return status;
+            }
+
+            // Create JSON file
+            nlohmann::json json_res = system_snapshot_info->CreateSnapshotMetadataJSON();
+            std::string json_string = json_res.dump();
+            status = CreateJSONSnapshotFile(json_string, snapshot_name);
+            if (!status.ok()) {
+                return status;
+            }
             break;
         }
         case SnapshotType::kUnknown: {

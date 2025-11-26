@@ -311,14 +311,14 @@ TEST_P(TableSnapshotTest, test_create_snapshot_same_name_multithreaded) {
         }
 
         {
-            std::string create_snapshot_sql = "create snapshot conflict_snapshot on table t1";
+            std::string create_snapshot_sql = "create snapshot conflict_snapshot on table tb1";
             std::unique_ptr<QueryContext> query_context = MakeQueryContext2();
             QueryResult query_result = query_context->Query(create_snapshot_sql);
             bool ok = HandleQueryResult(query_result);
             if (ok) {
-                LOG_INFO("create snapshot conflict_snapshot on table t1 succeeded");
+                LOG_INFO("create snapshot conflict_snapshot on table tb1 succeeded");
             } else {
-                LOG_INFO("create snapshot conflict_snapshot on table t1 failed");
+                LOG_INFO("create snapshot conflict_snapshot on table tb1 failed");
             }
         }
     };
