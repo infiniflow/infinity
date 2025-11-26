@@ -1,5 +1,5 @@
 # NOTICE: This Dockerfile depends on BuildKit
-# NOTICE: You must run download_deps_infinity_builder_ubuntu20.sh script BEFORE building this image
+# NOTICE: You must run download_deps_infinity_builder_ubuntu20.py script BEFORE building this image
 
 FROM ubuntu:20.04
 
@@ -179,5 +179,7 @@ RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple &&
 # Install infinity python sdk and other packages for later use by infinity tests
 RUN --mount=type=bind,source=python/requirements.txt,target=/root/requirements_1.txt --mount=type=bind,source=python/benchmark/requirements.txt,target=/root/requirements_2.txt  --mount=type=bind,source=python/restart_test/requirements.txt,target=/root/requirements_3.txt --mount=type=bind,source=python/test_cluster/requirements.txt,target=/root/requirements_4.txt \
     pip3 install --no-input -r /root/requirements_1.txt -r /root/requirements_2.txt -r /root/requirements_3.txt -r /root/requirements_4.txt
+
+COPY nltk_data /root/nltk_data
 
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]
