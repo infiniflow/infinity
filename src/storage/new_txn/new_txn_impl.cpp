@@ -4635,14 +4635,19 @@ Status NewTxn::Cleanup() {
         }
     }
 
+    auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+    auto data_dir_str = fileworker_mgr->GetFullDataDir();
+    auto data_dir = static_cast<std::filesystem::path>(*data_dir_str);
+
+    auto temp_dir_str = fileworker_mgr->GetTempDir();
+    auto temp_dir = static_cast<std::filesystem::path>(*temp_dir_str);
+
     if (metas.empty()) {
         LOG_TRACE("Cleanup: No data need to clean. Try to remove all empty directories...");
-        auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
-        auto data_dir_str = fileworker_mgr->GetFullDataDir();
-        auto data_dir = static_cast<std::filesystem::path>(*data_dir_str);
+
         // Delete empty dir
         VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
-        VirtualStore::RecursiveCleanupAllEmptyDir("/var/infinity/tmp");
+        VirtualStore::RecursiveCleanupAllEmptyDir(temp_dir);
         return Status::OK();
     }
 
@@ -4656,8 +4661,8 @@ Status NewTxn::Cleanup() {
     txn_store->metas_ = metas;
 
     // Delete empty dir
-    VirtualStore::RecursiveCleanupAllEmptyDir("/var/infinity/data");
-    VirtualStore::RecursiveCleanupAllEmptyDir("/var/infinity/tmp");
+    VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
+    VirtualStore::RecursiveCleanupAllEmptyDir(temp_dir);
 
     return Status::OK();
 }

@@ -35,6 +35,7 @@ export using boost::dynamic_bitset;
 export using boost::upgrade_lock;
 export using boost::upgrade_to_unique_lock;
 export using boost::shared_mutex;
+export using boost::unique_lock;
 namespace asio {
 export using boost::asio::io_context;
 export using boost::asio::read;

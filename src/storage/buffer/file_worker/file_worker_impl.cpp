@@ -108,7 +108,7 @@ FileWorker::FileWorker(std::shared_ptr<std::string> rel_file_path) : rel_file_pa
 // }
 
 void FileWorker::MoveFile() {
-    std::unique_lock l(rw_mutex_);
+    boost::unique_lock l(boost_rw_mutex_);
     msync(mmap_, mmap_size_, MS_SYNC);
     auto temp_path = GetFilePathTemp();
     auto data_path = GetFilePath();

@@ -88,7 +88,7 @@ public:
     virtual ~FileWorker() = default;
 
     bool Write(auto data, const FileWorkerSaveCtx &ctx = {}) {
-        std::unique_lock l(rw_mutex_);
+        boost::unique_lock l(boost_rw_mutex_);
 
         [[maybe_unused]] auto tmp = GetFilePathTemp();
         auto [file_handle, status] = VirtualStore::Open(GetFilePathTemp(), FileAccessMode::kReadWrite);
@@ -105,7 +105,7 @@ public:
     }
 
     void Read(auto &data) {
-        boost::upgrade_lock l(rw_mutex_);
+        boost::upgrade_lock l(boost_rw_mutex_);
         if (mmap_) {
             size_t file_size = 0;
 
@@ -289,7 +289,7 @@ protected:
     virtual void Read(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
 
 public:
-    mutable boost::shared_mutex rw_mutex_;
+    mutable boost::shared_mutex boost_rw_mutex_;
     std::shared_ptr<std::string> rel_file_path_;
     PersistenceManager *persistence_manager_{};
     FileWorkerManager *file_worker_manager_{};
