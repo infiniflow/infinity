@@ -1549,9 +1549,9 @@ Status NewTxn::RestoreTableSnapshot(const std::string &db_name, std::shared_ptr<
     LOG_TRACE("NewTxn::RestoreTable created table entry is inserted.");
     // figure out why this is needed
     // status = db_meta.value().kv_instance().Commit();
-    if (!status.ok()) {
-        return status;
-    }
+    // if (!status.ok()) {
+    //     return status;
+    // }
 
     return Status::OK();
 }
