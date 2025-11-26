@@ -378,8 +378,8 @@ jobs:
           if [[ -n "${TEST_CONTAINER}" ]]; then sudo docker rm -f -v "${TEST_CONTAINER}"; fi
           if [[ -n "${MINIO_VOLUME_PATH}" ]]; then sudo rm -rf "${MINIO_VOLUME_PATH}"; fi
 
-  reldeb_pytest:
-    name: reldeb_pytest
+  reldeb_pytest_bundle:
+    name: reldeb_pytest_bundle
     runs-on: [ "self-hosted", "slow-test" ]
     needs:
       - reldeb_build
@@ -410,7 +410,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec -d ${TEST_CONTAINER} bash -c "cd /infinity/ && cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> reldeb_parallel_stderr.log"
 
-      - name: Run HTTP infinity reldeb version
+      - name: Run pytest bundle infinity reldeb version
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_pytest_parallel_continuous.py"
