@@ -58,6 +58,7 @@ public:
     //                         size_t data_size = 0);
 
     void ReadFromFile(bool from_spill);
+    void ReadFromSnapshotFile(const std::string &snapshot_name, bool from_spill);
 
     void MoveFile();
 

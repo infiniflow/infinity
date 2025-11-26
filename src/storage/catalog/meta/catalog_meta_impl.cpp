@@ -59,22 +59,18 @@ Status CatalogMeta::GetDBID(const std::string &db_name, std::string &db_key, std
             return Status::OK();
         }
     }
-
     std::string db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);
 
     auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(db_key_prefix);
-
     std::vector<std::pair<std::string, std::string>> db_kvs;
     while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
         db_kvs.emplace_back(iter2->Key().ToString(), iter2->Value().ToString());
         iter2->Next();
     }
-
     if (db_kvs.size() == 0) {
         return Status::DBNotExist(db_name);
     }
-
     size_t max_visible_db_index = std::numeric_limits<size_t>::max();
     TxnTimeStamp max_commit_ts = 0;
     for (size_t i = 0; i < db_kvs.size(); ++i) {
@@ -85,27 +81,21 @@ Status CatalogMeta::GetDBID(const std::string &db_name, std::string &db_key, std
             max_visible_db_index = i;
         }
     }
-
     if (max_visible_db_index == std::numeric_limits<size_t>::max()) {
         return Status::DBNotExist(db_name);
     }
-
     db_key = db_kvs[max_visible_db_index].first;
     db_id_str = db_kvs[max_visible_db_index].second;
-
     std::string drop_db_ts{};
     kv_instance_->Get(KeyEncode::DropDBKey(db_name, max_commit_ts, db_id_str), drop_db_ts);
-
     if (!drop_db_ts.empty() && std::stoull(drop_db_ts) <= read_ts_) {
         //        db_cache = std::make_shared<MetaDbCache>(db_name, std::stoull(db_id_str), max_commit_ts, db_key, true);
         //        meta_cache_->Put({db_cache});
         return Status::DBNotExist(db_name);
     }
-
     if (txn_ != nullptr and txn_->readonly()) {
         txn_->AddMetaCache(std::make_shared<MetaDbCache>(db_name, std::stoull(db_id_str), max_commit_ts, db_key, false, txn_->TxnID()));
     }
-
     create_ts = max_commit_ts;
     return Status::OK();
 }

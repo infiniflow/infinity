@@ -506,6 +506,10 @@ void QueryContext::BeginTxn(const BaseStatement *base_statement) {
                         }
                         case SnapshotOp::kRestore: {
                             switch (snapshot_scope) {
+                                case SnapshotScope::kSystem: {
+                                    transaction_type = TransactionType::kRestoreSystem;
+                                    break;
+                                }
                                 case SnapshotScope::kDatabase: {
                                     transaction_type = TransactionType::kRestoreDatabase;
                                     break;

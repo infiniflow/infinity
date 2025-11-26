@@ -95,6 +95,8 @@ public:
     // called by ObjectHandle when load first time for that ObjectHandle
     BufferHandle Load();
 
+    BufferHandle Load(const std::string &snapshot_name);
+
     // called by BufferMgr in GC process.
     bool Free();
 

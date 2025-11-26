@@ -26,6 +26,7 @@ public:
     static Status RestoreTableSnapshot(QueryContext *query_context, const std::string &snapshot_name);
     static Status CreateDatabaseSnapshot(QueryContext *query_context, const std::string &snapshot_name, const std::string &db_name);
     static Status RestoreDatabaseSnapshot(QueryContext *query_context, const std::string &snapshot_name);
+    static Status RestoreSystemSnapshot(QueryContext *query_context, const std::string &snapshot_name);
     static Status DropSnapshot(QueryContext *query_context, const std::string &snapshot_name);
 };
 

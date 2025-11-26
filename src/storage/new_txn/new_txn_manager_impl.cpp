@@ -563,6 +563,7 @@ void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
                 u64 db_id = std::stoull(txn_store->db_id_str_);
                 system_cache_->AddNewDbCache(txn_store->db_name_, db_id);
                 for (const auto &restore_table_txn_store : txn_store->restore_table_txn_stores_) {
+                    LOG_INFO(fmt::format("add db cache: db_id: {}, table_id: {}", db_id, restore_table_txn_store->table_id_));
                     system_cache_->AddNewTableCache(db_id, restore_table_txn_store->table_id_, restore_table_txn_store->table_name_);
                     if (!restore_table_txn_store->segment_infos_.empty()) {
                         system_cache_->ApplySegmentIDs(db_id,
@@ -571,6 +572,28 @@ void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
                     }
                     for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
                         system_cache_->AddNewIndexCache(db_id, restore_table_txn_store->table_id_, index_cmd.index_id_);
+                    }
+                }
+            }
+            break;
+        }
+        case TransactionType::kRestoreSystem: {
+            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            if (base_txn_store != nullptr) {
+                RestoreSystemTxnStore *txn_store = static_cast<RestoreSystemTxnStore *>(base_txn_store);
+                for (const auto &restore_database_txn_stores : txn_store->restore_database_txn_stores_) {
+                    u64 db_id = std::stoull(restore_database_txn_stores->db_id_str_);
+                    system_cache_->AddNewDbCache(restore_database_txn_stores->db_name_, db_id);
+                    for (const auto &restore_table_txn_store : restore_database_txn_stores->restore_table_txn_stores_) {
+                        system_cache_->AddNewTableCache(db_id, restore_table_txn_store->table_id_, restore_table_txn_store->table_name_);
+                        if (!restore_table_txn_store->segment_infos_.empty()) {
+                            system_cache_->ApplySegmentIDs(db_id,
+                                                           restore_table_txn_store->table_id_,
+                                                           restore_table_txn_store->segment_infos_.back().segment_id_ + 1);
+                        }
+                        for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
+                            system_cache_->AddNewIndexCache(db_id, restore_table_txn_store->table_id_, index_cmd.index_id_);
+                        }
                     }
                 }
             }

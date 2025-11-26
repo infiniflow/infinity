@@ -202,7 +202,7 @@ TEST_P(DatabaseSnapshotTest, test_restore_database_rollback_basic) {
 
     // Test rollback
     {
-        NewTxn *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("restore table"), TransactionType::kRestoreTable);
+        NewTxn *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("restore database"), TransactionType::kRestoreDatabase);
         std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
         std::shared_ptr<DatabaseSnapshotInfo> database_snapshot;
         Status status;
@@ -384,12 +384,4 @@ TEST_P(DatabaseSnapshotTest, test_create_snapshot_same_name_multithreaded) {
         EXPECT_TRUE(ok);
         LOG_INFO("Final snapshots: " + query_result.ToString());
     }
-
-    // {
-    //     std::string sql = "drop snapshot conflict_snapshot";
-    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-    //     QueryResult query_result = query_context->Query(sql);
-    //     bool ok = HandleQueryResult(query_result);
-    //     EXPECT_TRUE(ok);
-    // }
 }

@@ -2387,6 +2387,12 @@ command_statement: USE IDENTIFIER {
     $$->command_info_ = std::make_shared<infinity::SnapshotCmd>($3, infinity::SnapshotOp::kDrop, infinity::SnapshotScope::kIgnore);
     free($3);
 }
+| RESTORE SYSTEM SNAPSHOT IDENTIFIER {
+    ParserHelper::ToLower($4);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SnapshotCmd>($4, infinity::SnapshotOp::kRestore, infinity::SnapshotScope::kSystem);
+    free($4);
+}
 | RESTORE DATABASE SNAPSHOT IDENTIFIER {
     ParserHelper::ToLower($4);
     $$ = new infinity::CommandStatement();
