@@ -154,7 +154,19 @@ export struct DatabaseSnapshotInfo : public SnapshotInfo {
     Status Serialize(const std::string &save_path, TxnTimeStamp commit_ts);
     std::string ToString() const;
     nlohmann::json CreateSnapshotMetadataJSON() const;
+
     static std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> Deserialize(const std::string &snapshot_dir, const std::string &snapshot_name);
+    static std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> Deserialize(const nlohmann::json &snapshot_meta_json);
+};
+
+export struct SystemSnapshotInfo : public SnapshotInfo {
+    std::vector<std::shared_ptr<DatabaseSnapshotInfo>> database_snapshots_{};
+
+    std::vector<std::string> GetFiles() const;
+    Status Serialize(const std::string &save_path, TxnTimeStamp commit_ts);
+    std::string ToString() const;
+    nlohmann::json CreateSnapshotMetadataJSON() const;
+    static std::tuple<std::shared_ptr<SystemSnapshotInfo>, Status> Deserialize(const std::string &snapshot_dir, const std::string &snapshot_name);
 };
 
 } // namespace infinity

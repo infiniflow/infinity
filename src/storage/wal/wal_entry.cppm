@@ -79,8 +79,10 @@ export enum class WalCommandType : i8 {
     // -----------------------------
     CREATE_TABLE_SNAPSHOT = 110,
     CREATE_DB_SNAPSHOT = 111,
-    RESTORE_TABLE_SNAPSHOT = 112,
-    RESTORE_DATABASE_SNAPSHOT = 113,
+    CREATE_SYSTEM_SNAPSHOT = 112,
+    RESTORE_TABLE_SNAPSHOT = 113,
+    RESTORE_DATABASE_SNAPSHOT = 114,
+    RESTORE_SYSTEM_SNAPSHOT = 115,
     // -----------------------------
     // Other
     // -----------------------------
@@ -801,6 +803,24 @@ export struct WalCmdCreateDBSnapshot : public WalCmd {
     TxnTimeStamp max_commit_ts_{};
 };
 
+export struct WalCmdCreateSystemSnapshot : public WalCmd {
+    WalCmdCreateSystemSnapshot(const std::string &snapshot_name, TxnTimeStamp max_commit_ts)
+        : WalCmd(WalCommandType::CREATE_SYSTEM_SNAPSHOT), snapshot_name_(snapshot_name), max_commit_ts_(max_commit_ts) {}
+
+    bool operator==(const WalCmd &other) const final;
+    [[nodiscard]] i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+
+    std::string ToString() const final;
+    std::string CompactInfo() const final;
+    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+
+    static WalCmdCreateSystemSnapshot ReadBufferAdv(const char *&ptr, i32 max_bytes);
+
+    std::string snapshot_name_{};
+    TxnTimeStamp max_commit_ts_{};
+};
+
 export struct WalCmdRestoreTableSnapshot : public WalCmd {
     WalCmdRestoreTableSnapshot(const std::string &db_name,
                                const std::string &db_id,
@@ -851,11 +871,28 @@ export struct WalCmdRestoreDatabaseSnapshot : public WalCmd {
     std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
+    static WalCmdRestoreDatabaseSnapshot ReadBufferAdv(const char *&ptr, i32 max_bytes);
+
     std::string db_name_{};
     std::string db_id_str_{};
     std::string db_comment_{};
 
     std::vector<WalCmdRestoreTableSnapshot> restore_table_wal_cmds_{};
+};
+
+export struct WalCmdRestoreSystemSnapshot : public WalCmd {
+    WalCmdRestoreSystemSnapshot(const std::vector<WalCmdRestoreDatabaseSnapshot> &restore_database_wal_cmds)
+        : WalCmd(WalCommandType::RESTORE_SYSTEM_SNAPSHOT), restore_database_wal_cmds_(restore_database_wal_cmds) {}
+
+    bool operator==(const WalCmd &other) const final;
+    [[nodiscard]] i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+
+    std::string ToString() const final;
+    std::string CompactInfo() const final;
+    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+
+    std::vector<WalCmdRestoreDatabaseSnapshot> restore_database_wal_cmds_{};
 };
 
 export struct WalEntryHeader {
