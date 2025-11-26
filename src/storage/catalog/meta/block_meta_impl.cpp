@@ -142,7 +142,7 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
         if (!status.ok()) {
             return status;
         }
-        InfinityContext::instance().storage()->fileworker_manager()->version_map_.AddToCleanList(version_buffer);
+        InfinityContext::instance().storage()->fileworker_manager()->version_map_.MoveToCleans(version_buffer);
     }
     return Status::OK();
 }

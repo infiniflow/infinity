@@ -38,7 +38,7 @@ struct FileWorkerMap {
 
     FileWorkerT *GetFileWorkerNoLock(const std::string &rel_file_path);
 
-    void AddToCleanList(FileWorkerT *file_worker);
+    void MoveToCleans(FileWorkerT *file_worker);
 
     void ClearCleans();
 

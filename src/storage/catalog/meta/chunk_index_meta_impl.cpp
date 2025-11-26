@@ -305,30 +305,30 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
     }
     switch (index_file_worker_->Type()) {
         case FileWorkerType::kBMPIndexFile: {
-            InfinityContext::instance().storage()->fileworker_manager()->bmp_map_.AddToCleanList(
+            InfinityContext::instance().storage()->fileworker_manager()->bmp_map_.MoveToCleans(
                 dynamic_cast<BMPIndexFileWorker *>(index_file_worker_));
             break;
         }
         case FileWorkerType::kEMVBIndexFile: {
-            InfinityContext::instance().storage()->fileworker_manager()->emvb_map_.AddToCleanList(
+            InfinityContext::instance().storage()->fileworker_manager()->emvb_map_.MoveToCleans(
                 dynamic_cast<EMVBIndexFileWorker *>(index_file_worker_));
             break;
         }
         case FileWorkerType::kHNSWIndexFile: {
-            InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.AddToCleanList(dynamic_cast<HnswFileWorker *>(index_file_worker_));
+            InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.MoveToCleans(dynamic_cast<HnswFileWorker *>(index_file_worker_));
             break;
         }
         case FileWorkerType::kIVFIndexFile: {
-            InfinityContext::instance().storage()->fileworker_manager()->ivf_map_.AddToCleanList(
+            InfinityContext::instance().storage()->fileworker_manager()->ivf_map_.MoveToCleans(
                 dynamic_cast<IVFIndexFileWorker *>(index_file_worker_));
             break;
         }
         case FileWorkerType::kRawFile: {
-            InfinityContext::instance().storage()->fileworker_manager()->raw_map_.AddToCleanList(dynamic_cast<RawFileWorker *>(index_file_worker_));
+            InfinityContext::instance().storage()->fileworker_manager()->raw_map_.MoveToCleans(dynamic_cast<RawFileWorker *>(index_file_worker_));
             break;
         }
         case FileWorkerType::kSecondaryIndexFile: {
-            InfinityContext::instance().storage()->fileworker_manager()->secondary_map_.AddToCleanList(
+            InfinityContext::instance().storage()->fileworker_manager()->secondary_map_.MoveToCleans(
                 dynamic_cast<SecondaryIndexFileWorker *>(index_file_worker_));
             break;
         }

@@ -163,9 +163,9 @@ Status ColumnMeta::UninitSet(const std::shared_ptr<ColumnDef> &column_def, Usage
         if (!status.ok()) {
             return status;
         }
-        InfinityContext::instance().storage()->fileworker_manager()->data_map_.AddToCleanList(data_file_worker_);
+        InfinityContext::instance().storage()->fileworker_manager()->data_map_.MoveToCleans(data_file_worker_);
         if (var_file_worker_) {
-            InfinityContext::instance().storage()->fileworker_manager()->var_map_.AddToCleanList(var_file_worker_);
+            InfinityContext::instance().storage()->fileworker_manager()->var_map_.MoveToCleans(var_file_worker_);
         }
     }
 

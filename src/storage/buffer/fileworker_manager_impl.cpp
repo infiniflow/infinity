@@ -113,7 +113,7 @@ void FileWorkerMap<FileWorkerT>::ClearCleans() {
 }
 
 template <typename FileWorkerT>
-void FileWorkerMap<FileWorkerT>::AddToCleanList(FileWorkerT *file_worker) {
+void FileWorkerMap<FileWorkerT>::MoveToCleans(FileWorkerT *file_worker) {
     std::unique_lock lock(rw_clean_mtx_);
     cleans_.emplace_back(file_worker);
 }
