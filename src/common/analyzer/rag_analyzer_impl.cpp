@@ -1287,41 +1287,39 @@ void RAGAnalyzer::TokenizeInner(std::vector<std::string> &res, const std::string
     }
 
 #else
-    std::vector<int> diff(std::max(tks.size(), tks1.size()), 0);
-    for (std::size_t i = 0; i < std::min(tks.size(), tks1.size()); ++i) {
-        if (tks[i] != tks1[i]) {
-            diff[i] = 1;
-        }
+    std::size_t i = 0, j = 0, _i = 0, _j = 0, same = 0;
+    while ((i + same < tks1.size()) && (j + same < tks.size()) && tks1[i + same] == tks[j + same]) {
+        same++;
     }
-
-    if (s1 > s) {
-        tks = tks1;
+    if (same > 0) {
+        res.push_back(Join(tks, j, j + same));
     }
-
-    std::size_t i = 0;
-    while (i < tks.size()) {
-        std::size_t s = i;
-        while (s < tks.size() && diff[s] == 0) {
-            s++;
+    _i = i + same;
+    _j = j + same;
+    j = _j + 1;
+    i = _i + 1;
+    while (i < tks1.size() && j < tks.size()) {
+        std::string tk1 = Join(tks1, _i, i, "");
+        std::string tk = Join(tks, _j, j, "");
+        if (tk1 != tk) {
+            if (tk1.length() > tk.length()) {
+                j++;
+            } else {
+                i++;
+            }
+            continue;
         }
-        if (s == tks.size()) {
-            res.push_back(Join(tks, i, tks.size()));
-            break;
+        if (tks1[i] != tks[j]) {
+            i++;
+            j++;
+            continue;
         }
-        if (s > i) {
-            res.push_back(Join(tks, i, s));
-        }
-
-        std::size_t e = s;
-        while (e < tks.size() && e - s < 5 && diff[e] == 1) {
-            e++;
-        }
-
+        
         std::vector<std::pair<std::string, int>> pre_tokens;
         std::vector<std::vector<std::pair<std::string, int>>> token_list;
         std::vector<std::string> best_tokens;
         double max_score = std::numeric_limits<double>::lowest();
-        const auto str_for_dfs = Join(tks, s, e < tks.size() ? e + 1 : e, "");
+        const auto str_for_dfs = Join(tks, _j, j, "");
 #ifdef INFINITY_DEBUG
         const auto t0 = std::chrono::high_resolution_clock::now();
 #endif
@@ -1330,11 +1328,32 @@ void RAGAnalyzer::TokenizeInner(std::vector<std::string> &res, const std::string
         const auto t1 = std::chrono::high_resolution_clock::now();
         dp_debug::CheckDP(this, str_for_dfs, best_tokens, max_score, t0, t1);
 #endif
-        // std::vector<std::pair<std::vector<std::string>, double>> sorted_tokens;
-        // SortTokens(token_list, sorted_tokens);
-        // res.push_back(Join(sorted_tokens[0].first, 0));
         res.push_back(Join(best_tokens, 0));
-        i = e + 1;
+
+        same = 1;
+        while (i + same < tks1.size() && j + same < tks.size() && tks1[i + same] == tks[j + same])
+            same++;
+        res.push_back(Join(tks, j, j + same));
+        _i = i + same;
+        _j = j + same;
+        j = _j + 1;
+        i = _i + 1;
+    }
+    if (_i < tks1.size()) {
+        std::vector<std::pair<std::string, int>> pre_tokens;
+        std::vector<std::vector<std::pair<std::string, int>>> token_list;
+        std::vector<std::string> best_tokens;
+        double max_score = std::numeric_limits<double>::lowest();
+        const auto str_for_dfs = Join(tks, _j, tks.size(), "");
+#ifdef INFINITY_DEBUG
+        const auto t0 = std::chrono::high_resolution_clock::now();
+#endif
+        DFS(str_for_dfs, 0, pre_tokens, token_list, best_tokens, max_score, false);
+#ifdef INFINITY_DEBUG
+        const auto t1 = std::chrono::high_resolution_clock::now();
+        dp_debug::CheckDP(this, str_for_dfs, best_tokens, max_score, t0, t1);
+#endif
+        res.push_back(Join(best_tokens, 0));
     }
 #endif
 }
@@ -1724,96 +1743,90 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
                                             const std::vector<unsigned> *pos_mapping) {
     auto [tks, s] = MaxForward(L);
     auto [tks1, s1] = MaxBackward(L);
-    std::vector<int> diff(std::max(tks.size(), tks1.size()), 0);
-    for (std::size_t i = 0; i < std::min(tks.size(), tks1.size()); ++i) {
-        if (tks[i] != tks1[i]) {
-            diff[i] = 1;
-        }
+    
+    // Use the same algorithm as Python version
+    std::size_t i = 0, j = 0, _i = 0, _j = 0, same = 0;
+    while ((i + same < tks1.size()) && (j + same < tks.size()) && tks1[i + same] == tks[j + same]) {
+        same++;
     }
-    if (s1 > s) {
-        tks = tks1;
-    }
+    if (same > 0) {
+        std::string token_str = Join(tks, j, j + same);
+        unsigned token_len = static_cast<unsigned>(token_str.size());
+        unsigned start_pos = base_pos + CalculateTokensLength(tks, 0, j);
 
-    std::size_t i = 0;
-    while (i < tks.size()) {
-        std::size_t s = i;
-        while (s < tks.size() && diff[s] == 0) {
-            s++;
-        }
-
-        if (s == tks.size()) {
-            // When all remaining tokens are the same, process them individually
-            for (std::size_t j = i; j < tks.size(); ++j) {
-                const std::string &single_token = tks[j];
-                unsigned start_pos = base_pos + CalculateTokensLength(tks, 0, j);
-                unsigned end_pos = start_pos + static_cast<unsigned>(single_token.size());
-                tokens.push_back(single_token);
-                if (pos_mapping) {
-                    unsigned mapped_start = start_pos < pos_mapping->size() ? (*pos_mapping)[start_pos] : 0;
-                    unsigned mapped_end = end_pos < pos_mapping->size() ? (*pos_mapping)[end_pos] : 0;
-                    positions.emplace_back(mapped_start, mapped_end);
-                } else {
-                    positions.emplace_back(start_pos, end_pos);
+        if (token_str.find(' ') != std::string::npos) {
+            std::vector<std::string> space_split_tokens;
+            Split(token_str, blank_pattern_, space_split_tokens, false);
+            unsigned space_start_pos = start_pos;
+            for (const auto &space_token : space_split_tokens) {
+                if (space_token.empty()) {
+                    continue;
                 }
-            }
-            break;
-        }
-
-        if (s > i) {
-            std::string token_str = Join(tks, i, s);
-            unsigned token_len = static_cast<unsigned>(token_str.size());
-            unsigned start_pos = base_pos + CalculateTokensLength(tks, 0, i);
-
-            if (token_str.find(' ') != std::string::npos) {
-                std::vector<std::string> space_split_tokens;
-                Split(token_str, blank_pattern_, space_split_tokens, false);
-                unsigned space_start_pos = start_pos;
-                for (const auto &space_token : space_split_tokens) {
-                    if (space_token.empty()) {
-                        continue;
-                    }
-                    unsigned space_token_len = static_cast<unsigned>(space_token.size());
-                    tokens.push_back(space_token);
-                    // Map position back to original string if mapping is provided
-                    if (pos_mapping) {
-                        unsigned mapped_start = space_start_pos < pos_mapping->size() ? (*pos_mapping)[space_start_pos] : 0;
-                        unsigned mapped_end =
-                            (space_start_pos + space_token_len) < pos_mapping->size() ? (*pos_mapping)[space_start_pos + space_token_len] : 0;
-                        positions.emplace_back(mapped_start, mapped_end);
-                    } else {
-                        positions.emplace_back(space_start_pos, space_start_pos + space_token_len);
-                    }
-                    space_start_pos += space_token_len;
-                }
-            } else {
-                tokens.push_back(token_str);
+                unsigned space_token_len = static_cast<unsigned>(space_token.size());
+                tokens.push_back(space_token);
                 // Map position back to original string if mapping is provided
                 if (pos_mapping) {
-                    unsigned mapped_start = start_pos < pos_mapping->size() ? (*pos_mapping)[start_pos] : 0;
-                    unsigned mapped_end = (start_pos + token_len) < pos_mapping->size() ? (*pos_mapping)[start_pos + token_len] : 0;
+                    unsigned mapped_start = space_start_pos < pos_mapping->size() ? (*pos_mapping)[space_start_pos] : 0;
+                    unsigned mapped_end =
+                        (space_start_pos + space_token_len) < pos_mapping->size() ? (*pos_mapping)[space_start_pos + space_token_len] : 0;
                     positions.emplace_back(mapped_start, mapped_end);
                 } else {
-                    positions.emplace_back(start_pos, start_pos + token_len);
+                    positions.emplace_back(space_start_pos, space_start_pos + space_token_len);
                 }
+                space_start_pos += space_token_len;
+            }
+        } else {
+            tokens.push_back(token_str);
+            // Map position back to original string if mapping is provided
+            if (pos_mapping) {
+                unsigned mapped_start = start_pos < pos_mapping->size() ? (*pos_mapping)[start_pos] : 0;
+                unsigned mapped_end = (start_pos + token_len) < pos_mapping->size() ? (*pos_mapping)[start_pos + token_len] : 0;
+                positions.emplace_back(mapped_start, mapped_end);
+            } else {
+                positions.emplace_back(start_pos, start_pos + token_len);
             }
         }
-
-        std::size_t e = s;
-        while (e < tks.size() && e - s < 5 && diff[e] == 1) {
-            e++;
+    }
+    _i = i + same;
+    _j = j + same;
+    j = _j + 1;
+    i = _i + 1;
+    
+    while (i < tks1.size() && j < tks.size()) {
+        std::string tk1 = Join(tks1, _i, i, "");
+        std::string tk = Join(tks, _j, j, "");
+        if (tk1 != tk) {
+            if (tk1.length() > tk.length()) {
+                j++;
+            } else {
+                i++;
+            }
+            continue;
         }
-
-        std::string token_str = Join(tks, s, e < tks.size() ? e + 1 : e, "");
+        if (tks1[i] != tks[j]) {
+            i++;
+            j++;
+            continue;
+        }
+        
+        // Handle different part with DFS
         std::vector<std::pair<std::string, int>> pre_tokens;
         std::vector<std::vector<std::pair<std::string, int>>> token_list;
         std::vector<std::string> best_tokens;
         double max_score = std::numeric_limits<double>::lowest();
-
-        DFS(token_str, 0, pre_tokens, token_list, best_tokens, max_score, false);
-
+        const auto str_for_dfs = Join(tks, _j, j, "");
+#ifdef INFINITY_DEBUG
+        const auto t0 = std::chrono::high_resolution_clock::now();
+#endif
+        DFS(str_for_dfs, 0, pre_tokens, token_list, best_tokens, max_score, false);
+#ifdef INFINITY_DEBUG
+        const auto t1 = std::chrono::high_resolution_clock::now();
+        dp_debug::CheckDP(this, str_for_dfs, best_tokens, max_score, t0, t1);
+#endif
+        
         std::string best_token_str = Join(best_tokens, 0);
-        unsigned start_pos = base_pos + CalculateTokensLength(tks, 0, s);
-        std::string original_token_str = Join(tks, s, e < tks.size() ? e + 1 : e, "");
+        unsigned start_pos = base_pos + CalculateTokensLength(tks, 0, _j);
+        std::string original_token_str = Join(tks, _j, j, "");
         unsigned end_pos = start_pos + static_cast<unsigned>(original_token_str.size());
 
         if (best_token_str.find(' ') != std::string::npos) {
@@ -1844,13 +1857,112 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
                 unsigned mapped_start = start_pos < pos_mapping->size() ? (*pos_mapping)[start_pos] : 0;
                 unsigned mapped_end = end_pos < pos_mapping->size() ? (*pos_mapping)[end_pos] : 0;
                 positions.emplace_back(mapped_start, mapped_end);
-
             } else {
                 positions.emplace_back(start_pos, end_pos);
             }
         }
 
-        i = e + 1;
+        same = 1;
+        while (i + same < tks1.size() && j + same < tks.size() && tks1[i + same] == tks[j + same])
+            same++;
+            
+        // Handle same part after different tokens
+        std::string token_str = Join(tks, j, j + same);
+        unsigned token_len = static_cast<unsigned>(token_str.size());
+        start_pos = base_pos + CalculateTokensLength(tks, 0, j);
+
+        if (token_str.find(' ') != std::string::npos) {
+            std::vector<std::string> space_split_tokens;
+            Split(token_str, blank_pattern_, space_split_tokens, false);
+            unsigned space_start_pos = start_pos;
+            for (const auto &space_token : space_split_tokens) {
+                if (space_token.empty()) {
+                    continue;
+                }
+                unsigned space_token_len = static_cast<unsigned>(space_token.size());
+                tokens.push_back(space_token);
+                // Map position back to original string if mapping is provided
+                if (pos_mapping) {
+                    unsigned mapped_start = space_start_pos < pos_mapping->size() ? (*pos_mapping)[space_start_pos] : 0;
+                    unsigned mapped_end =
+                        (space_start_pos + space_token_len) < pos_mapping->size() ? (*pos_mapping)[space_start_pos + space_token_len] : 0;
+                    positions.emplace_back(mapped_start, mapped_end);
+                } else {
+                    positions.emplace_back(space_start_pos, space_start_pos + space_token_len);
+                }
+                space_start_pos += space_token_len;
+            }
+        } else {
+            tokens.push_back(token_str);
+            // Map position back to original string if mapping is provided
+            if (pos_mapping) {
+                unsigned mapped_start = start_pos < pos_mapping->size() ? (*pos_mapping)[start_pos] : 0;
+                unsigned mapped_end = (start_pos + token_len) < pos_mapping->size() ? (*pos_mapping)[start_pos + token_len] : 0;
+                positions.emplace_back(mapped_start, mapped_end);
+            } else {
+                positions.emplace_back(start_pos, start_pos + token_len);
+            }
+        }
+        
+        _i = i + same;
+        _j = j + same;
+        j = _j + 1;
+        i = _i + 1;
+    }
+    
+    // Handle remaining part
+    if (_i < tks1.size()) {
+        std::vector<std::pair<std::string, int>> pre_tokens;
+        std::vector<std::vector<std::pair<std::string, int>>> token_list;
+        std::vector<std::string> best_tokens;
+        double max_score = std::numeric_limits<double>::lowest();
+        const auto str_for_dfs = Join(tks, _j, tks.size(), "");
+#ifdef INFINITY_DEBUG
+        const auto t0 = std::chrono::high_resolution_clock::now();
+#endif
+        DFS(str_for_dfs, 0, pre_tokens, token_list, best_tokens, max_score, false);
+#ifdef INFINITY_DEBUG
+        const auto t1 = std::chrono::high_resolution_clock::now();
+        dp_debug::CheckDP(this, str_for_dfs, best_tokens, max_score, t0, t1);
+#endif
+        
+        std::string best_token_str = Join(best_tokens, 0);
+        unsigned start_pos = base_pos + CalculateTokensLength(tks, 0, _j);
+        std::string original_token_str = Join(tks, _j, tks.size(), "");
+        unsigned end_pos = start_pos + static_cast<unsigned>(original_token_str.size());
+
+        if (best_token_str.find(' ') != std::string::npos) {
+            std::vector<std::string> space_split_tokens;
+            Split(best_token_str, blank_pattern_, space_split_tokens, false);
+            unsigned space_start_pos = start_pos;
+            for (const auto &space_token : space_split_tokens) {
+                if (space_token.empty()) {
+                    continue;
+                }
+                unsigned space_token_len = static_cast<unsigned>(space_token.size());
+                tokens.push_back(space_token);
+                // Map position back to original string if mapping is provided
+                if (pos_mapping) {
+                    unsigned mapped_start = space_start_pos < pos_mapping->size() ? (*pos_mapping)[space_start_pos] : 0;
+                    unsigned mapped_end =
+                        (space_start_pos + space_token_len) < pos_mapping->size() ? (*pos_mapping)[space_start_pos + space_token_len] : 0;
+                    positions.emplace_back(mapped_start, mapped_end);
+                } else {
+                    positions.emplace_back(space_start_pos, space_start_pos + space_token_len);
+                }
+                space_start_pos += space_token_len;
+            }
+        } else {
+            tokens.push_back(best_token_str);
+            // Map position back to original string if mapping is provided
+            if (pos_mapping) {
+                unsigned mapped_start = start_pos < pos_mapping->size() ? (*pos_mapping)[start_pos] : 0;
+                unsigned mapped_end = end_pos < pos_mapping->size() ? (*pos_mapping)[end_pos] : 0;
+                positions.emplace_back(mapped_start, mapped_end);
+            } else {
+                positions.emplace_back(start_pos, end_pos);
+            }
+        }
     }
 }
 
