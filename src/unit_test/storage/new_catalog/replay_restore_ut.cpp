@@ -266,8 +266,6 @@ protected:
     std::shared_ptr<IndexBase> index_def4{};
     u32 block_row_cnt{};
     std::shared_ptr<std::string> snapshot_dir;
-    // Store original chunk IDs for verification
-    std::map<std::string, std::map<SegmentID, std::vector<ChunkID>>> original_chunk_ids_{};
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
