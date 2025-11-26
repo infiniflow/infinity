@@ -540,7 +540,7 @@ Status NewTxn::Delete(const std::string &db_name, const std::string &table_name,
         delete_txn_store->row_ids_.insert(delete_txn_store->row_ids_.end(), row_ids.begin(), row_ids.end());
     }
 
-    return DeleteInner(db_name, table_name, *table_meta_opt, row_ids);
+    return DeleteInner(db_name, *table_meta_opt, row_ids);
 }
 
 Status NewTxn::ReplayDelete(WalCmdDeleteV2 *delete_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
@@ -562,8 +562,9 @@ Status NewTxn::ReplayDelete(WalCmdDeleteV2 *delete_cmd, TxnTimeStamp commit_ts, 
     return PrepareCommitDelete(delete_cmd);
 }
 
-Status NewTxn::DeleteInner(const std::string &db_name, const std::string &table_name, const TableMeta &table_meta, const std::vector<RowID> &row_ids) {
-    auto delete_command = std::make_shared<WalCmdDeleteV2>(db_name, table_meta.db_id_str(), table_name, table_meta.table_id_str(), row_ids);
+Status NewTxn::DeleteInner(const std::string &db_name, const TableMeta &table_meta, const std::vector<RowID> &row_ids) {
+    auto delete_command =
+        std::make_shared<WalCmdDeleteV2>(db_name, table_meta.db_id_str(), table_meta.table_name(), table_meta.table_id_str(), row_ids);
     auto wal_command = static_pointer_cast<WalCmd>(delete_command);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(std::make_shared<std::string>(delete_command->ToString()));
@@ -615,7 +616,7 @@ Status NewTxn::Update(const std::string &db_name,
     if (!status.ok()) {
         return status;
     }
-    status = this->DeleteInner(db_name, table_name, *table_meta, row_ids);
+    status = this->DeleteInner(db_name, *table_meta, row_ids);
     if (!status.ok()) {
         return status;
     }
