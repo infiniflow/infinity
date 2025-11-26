@@ -4462,17 +4462,6 @@ void NewTxn::CommitBottom() {
                 }
                 break;
             }
-            case WalCommandType::CREATE_TABLE_SNAPSHOT: {
-                if (this->IsReplay()) {
-                    break;
-                }
-                auto *create_table_snapshot_cmd = static_cast<WalCmdCreateTableSnapshot *>(command.get());
-                auto status = CommitBottomCreateTableSnapshot(create_table_snapshot_cmd);
-                if (!status.ok()) {
-                    UnrecoverableError(fmt::format("CommitBottomCreateTableSnapshot failed: {}", status.message()));
-                }
-                break;
-            }
             default: {
                 break;
             }
@@ -5938,10 +5927,6 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
         return status;
     }
 
-    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>(db_name),
-                                                         std::make_shared<std::string>(table_name),
-                                                         std::make_shared<std::string>(table_snapshot_info->table_comment_),
-                                                         table_snapshot_info->columns_);
     // copy files from snapshot to data dir
     std::vector<std::string> restored_file_paths;
 
@@ -6084,37 +6069,6 @@ Status NewTxn::ReplayRestoreSystemSnapshot(WalCmdRestoreSystemSnapshot *restore_
             }
         }
     }
-    return Status::OK();
-}
-
-Status NewTxn::CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create_table_snapshot_cmd) {
-
-    // ManualDumpIndex(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_);
-    //
-    // // create a new snapshot
-    // std::shared_ptr<DBMeta> db_meta;
-    // std::shared_ptr<TableMeta> table_meta;
-    // TxnTimeStamp create_timestamp;
-    // Status status = GetTableMeta(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_, db_meta, table_meta,
-    // create_timestamp); if (!status.ok()) {
-    //     return status;
-    // }
-    // table_meta->SetBeginTS(txn_context_ptr_->commit_ts_);
-    //
-    // std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
-    // std::tie(table_snapshot_info, status) =
-    //     table_meta->MapMetaToSnapShotInfo(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_);
-    // if (!status.ok()) {
-    //     return status;
-    // }
-    // table_snapshot_info->snapshot_name_ = create_table_snapshot_cmd->snapshot_name_;
-    //
-    // std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    // status = table_snapshot_info->Serialize(snapshot_dir, this->TxnID());
-    // if (!status.ok()) {
-    //     return status;
-    // }
-
     return Status::OK();
 }
 
