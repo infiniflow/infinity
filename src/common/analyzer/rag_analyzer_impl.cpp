@@ -1212,6 +1212,7 @@ void RAGAnalyzer::EnglishNormalize(const std::vector<std::string> &tokens, std::
 void RAGAnalyzer::TokenizeInner(std::vector<std::string> &res, const std::string &L) const {
     auto [tks, s] = MaxForward(L);
     auto [tks1, s1] = MaxBackward(L);
+
 #if 0
     std::size_t i = 0, j = 0, _i = 0, _j = 0, same = 0;
     while ((i + same < tks1.size()) && (j + same < tks.size()) && tks1[i + same] == tks[j + same]) {
@@ -1291,13 +1292,6 @@ void RAGAnalyzer::TokenizeInner(std::vector<std::string> &res, const std::string
 
     if (s1 > s) {
         tks = tks1;
-        // Recalculate diff array with the new tks size
-        diff.assign(std::max(tks.size(), tks1.size()), 0);
-        for (std::size_t i = 0; i < std::min(tks.size(), tks1.size()); ++i) {
-            if (tks[i] != tks1[i]) {
-                diff[i] = 1;
-            }
-        }
     }
 
     std::size_t i = 0;
@@ -1503,7 +1497,7 @@ std::string RAGAnalyzer::Tokenize(const std::string &line) {
     if (alpha_num > (std::size_t)(len * 0.9)) {
         std::vector<std::string> term_list;
         std::vector<std::string> sentences;
-        SentenceSplitter(line, sentences);
+        SentenceSplitter(processed_line, sentences);
         for (auto &sentence : sentences) {
             nltk_tokenizer_->Tokenize(sentence, term_list);
         }
@@ -1734,13 +1728,6 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
     }
     if (s1 > s) {
         tks = tks1;
-        // Recalculate diff array with the new tks size
-        diff.assign(std::max(tks.size(), tks1.size()), 0);
-        for (std::size_t i = 0; i < std::min(tks.size(), tks1.size()); ++i) {
-            if (tks[i] != tks1[i]) {
-                diff[i] = 1;
-            }
-        }
     }
 
     std::size_t i = 0;
