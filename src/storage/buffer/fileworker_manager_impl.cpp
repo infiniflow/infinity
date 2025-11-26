@@ -77,11 +77,11 @@ void FileWorkerMap<FileWorkerT>::ClearCleans() {
         std::unique_lock l(rw_clean_mtx_);
         cleans_.swap(cleans);
     }
-    std::vector<std::future<Status>> futs;
-    futs.reserve(cleans.size());
+    // std::vector<std::future<Status>> futs;
+    // futs.reserve(cleans.size());
     for (auto *file_worker : cleans) {
-        // file_worker->CleanupFile();
-        futs.emplace_back(std::async(&FileWorkerT::CleanupFile, file_worker));
+        file_worker->CleanupFile();
+        // futs.emplace_back(std::async(&FileWorkerT::CleanupFile, file_worker));
     }
     // for (auto &fut : futs) {
     //     auto status = fut.get();
