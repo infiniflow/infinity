@@ -24,15 +24,15 @@ SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:
 2
 1
 
-query I
-EXPLAIN SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
-----
- PROJECT (3)
-  - table index: #4
-  - expressions: [col1 (#0)]
- -> Read cache (2)
-    - table name: (default_db.cached_sparse_scan)
-    - output columns: [col1, __score, __rowid]
+# query I
+# EXPLAIN SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+# ----
+#  PROJECT (3)
+#   - table index: #4
+#   - expressions: [col1 (#0)]
+#  -> Read cache (2)
+#     - table name: (default_db.cached_sparse_scan)
+#     - output columns: [col1, __score, __rowid]
 
 query I
 SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
@@ -77,15 +77,15 @@ SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:
 4
 2
 
-query I
-EXPLAIN SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
-----
- PROJECT (3)
-  - table index: #4
-  - expressions: [col1 (#0)]
- -> Read cache (2)
-    - table name: (default_db.cached_sparse_scan)
-    - output columns: [col1, __score, __rowid]
+# query I
+# EXPLAIN SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+# ----
+#  PROJECT (3)
+#   - table index: #4
+#   - expressions: [col1 (#0)]
+#  -> Read cache (2)
+#     - table name: (default_db.cached_sparse_scan)
+#     - output columns: [col1, __score, __rowid]
 
 query I
 SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);

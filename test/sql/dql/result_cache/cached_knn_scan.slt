@@ -33,15 +33,15 @@ SELECT c1, Distance() FROM cached_knn_scan SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0
 6 0.060000
 4 0.100000
 
-query I
-EXPLAIN SELECT c1, Distance() FROM cached_knn_scan SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
-----
- PROJECT (3)
-  - table index: #4
-  - expressions: [c1 (#0), DISTANCE (#1)]
- -> Read cache (2)
-    - table name: (default_db.cached_knn_scan)
-    - output columns: [c1, __score, __rowid]
+# query I
+# EXPLAIN SELECT c1, Distance() FROM cached_knn_scan SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+# ----
+#  PROJECT (3)
+#   - table index: #4
+#   - expressions: [c1 (#0), DISTANCE (#1)]
+#  -> Read cache (2)
+#     - table name: (default_db.cached_knn_scan)
+#     - output columns: [c1, __score, __rowid]
 
 query I
 SELECT c1, Distance() FROM cached_knn_scan SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
@@ -69,3 +69,5 @@ EXPLAIN SELECT c1, Distance() FROM cached_knn_scan SEARCH MATCH VECTOR (c2, [0.3
 statement ok
 DROP TABLE cached_knn_scan;
 
+statement ok
+SET CONFIG result_cache "off";

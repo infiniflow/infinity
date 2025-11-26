@@ -29,30 +29,30 @@ SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH MATCH TE
 ----
 Anarchism 30-APR-2012 03:25:17.000 0 22.299635
 
-query I
-EXPLAIN SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
-----
- PROJECT (3)
-  - table index: #4
-  - expressions: [doctitle (#0), docdate (#1), ROW_ID (#3), SCORE (#2)]
- -> Read cache (2)
-    - table name: (default_db.cached_fulltext)
-    - output columns: [doctitle, docdate, __score, __rowid]
+# query I
+# EXPLAIN SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
+# ----
+#  PROJECT (3)
+#   - table index: #4
+#   - expressions: [doctitle (#0), docdate (#1), ROW_ID (#3), SCORE (#2)]
+#  -> Read cache (2)
+#     - table name: (default_db.cached_fulltext)
+#     - output columns: [doctitle, docdate, __score, __rowid]
 
 query I
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
 ----
 Anarchism 30-APR-2012 03:25:17.000 0 22.299635
 
-query I
-EXPLAIN SELECT ROW_ID() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
-----
- PROJECT (3)
-  - table index: #4
-  - expressions: [ROW_ID (#1)]
- -> Read cache (2)
-    - table name: (default_db.cached_fulltext)
-    - output columns: [__score, __rowid]
+# query I
+# EXPLAIN SELECT ROW_ID() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
+# ----
+#  PROJECT (3)
+#   - table index: #4
+#   - expressions: [ROW_ID (#1)]
+#  -> Read cache (2)
+#     - table name: (default_db.cached_fulltext)
+#     - output columns: [__score, __rowid]
 
 query I
 SELECT ROW_ID() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');

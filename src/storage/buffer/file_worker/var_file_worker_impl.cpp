@@ -82,7 +82,7 @@ bool VarFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const 
     size_t data_size = buffer->TotalSize();
     auto buffer_data = std::make_unique<char[]>(data_size);
     char *ptr = buffer_data.get();
-    buffer->Write(ptr);
+    buffer->Write(ptr, data_size);
 
     Status status = file_handle_->Append(buffer_data.get(), data_size);
     if (!status.ok()) {
@@ -106,7 +106,7 @@ bool VarFileWorker::WriteSnapshotFileImpl(size_t row_cnt, size_t data_size, bool
 
     auto buffer_data = std::make_unique<char[]>(total_size);
     char *ptr = buffer_data.get();
-    buffer->Write(ptr);
+    buffer->Write(ptr, total_size);
 
     auto rel_size = buffer->GetSize(row_cnt);
     Status status = file_handle_->Append(buffer_data.get(), rel_size);

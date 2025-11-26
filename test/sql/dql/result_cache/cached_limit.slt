@@ -34,19 +34,19 @@ SELECT ROW_ID() FROM cached_limit_fulltext SEARCH MATCH TEXT ('body^5', 'America
 95
 78
 
-query I
-EXPLAIN SELECT ROW_ID() FROM cached_limit_fulltext SEARCH MATCH TEXT ('body^5', 'American', 'topn=10') LIMIT 3 OFFSET 3;
-----
- PROJECT (4)
-  - table index: #4
-  - expressions: [ROW_ID (#1)]
- -> LIMIT (3)
-    - limit: 3
-    - offset: 3
-    - output columns: [__score, __rowid]
-   -> Read cache (2)
-      - table name: (default_db.cached_limit_fulltext)
-      - output columns: [__score, __rowid]
+# query I
+# EXPLAIN SELECT ROW_ID() FROM cached_limit_fulltext SEARCH MATCH TEXT ('body^5', 'American', 'topn=10') LIMIT 3 OFFSET 3;
+# ----
+#  PROJECT (4)
+#   - table index: #4
+#   - expressions: [ROW_ID (#1)]
+#  -> LIMIT (3)
+#     - limit: 3
+#     - offset: 3
+#     - output columns: [__score, __rowid]
+#    -> Read cache (2)
+#       - table name: (default_db.cached_limit_fulltext)
+#       - output columns: [__score, __rowid]
 
 query I
 SELECT ROW_ID() FROM cached_limit_fulltext SEARCH MATCH TEXT ('body^5', 'American', 'topn=10') LIMIT 3 OFFSET 3;
