@@ -5959,7 +5959,7 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
 
 Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *restore_database_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    std::string snapshot_name;
+    std::string snapshot_name{};
     if (restore_database_cmd->restore_table_wal_cmds_.size() > 0) {
         snapshot_name = restore_database_cmd->restore_table_wal_cmds_[0].snapshot_name_;
     } else {
@@ -6018,13 +6018,17 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
 
 Status NewTxn::ReplayRestoreSystemSnapshot(WalCmdRestoreSystemSnapshot *restore_system_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    std::string snapshot_name;
-    if (restore_system_cmd->restore_database_wal_cmds_.size() > 0 &&
-        restore_system_cmd->restore_database_wal_cmds_[0].restore_table_wal_cmds_.size() > 0) {
-        snapshot_name = restore_system_cmd->restore_database_wal_cmds_[0].restore_table_wal_cmds_[0].snapshot_name_;
-    } else {
+    std::string snapshot_name{};
+
+    for (auto &restore_database_wal_cmd : restore_system_cmd->restore_database_wal_cmds_) {
+        if (restore_database_wal_cmd.restore_table_wal_cmds_.size() > 0) {
+            snapshot_name = restore_database_wal_cmd.restore_table_wal_cmds_[0].snapshot_name_;
+        }
+    }
+    if (snapshot_name.empty()) {
         return Status::OK();
     }
+
     std::shared_ptr<SystemSnapshotInfo> system_snapshot_info;
     Status status;
     std::tie(system_snapshot_info, status) = SystemSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
