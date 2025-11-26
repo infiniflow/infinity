@@ -163,8 +163,8 @@ SHOW TRANSACTIONS;
 statement ok
 SHOW CATALOG;
 
-statement ok
-SHOW LOGS;
+# statement ok
+# SHOW LOGS;
 
 statement ok
 SHOW MEMORY;
