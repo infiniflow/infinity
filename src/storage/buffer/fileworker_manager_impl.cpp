@@ -94,7 +94,7 @@ void FileWorkerMap<FileWorkerT>::ClearCleans() {
         std::unique_lock lock(rw_mtx_);
         for (auto *file_worker : cleans) {
             auto fileworker_key = *(file_worker->rel_file_path_);
-            [[maybe_unused]] size_t remove_n = map_.erase(fileworker_key);
+            map_.erase(fileworker_key);
             active_dic_.erase(fileworker_key);
             // if (remove_n != 1) {
             //     UnrecoverableError(fmt::format("FileWorkerManager::RemoveClean: file {} not found.", file_path.c_str()));

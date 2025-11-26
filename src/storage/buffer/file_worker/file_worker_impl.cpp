@@ -113,16 +113,6 @@ void FileWorker::MoveFile() {
     auto temp_path = GetFilePathTemp();
     auto data_path = GetFilePath();
 
-    auto temp_dict_path =
-        fmt::format("{}/{}.dic", InfinityContext::instance().config()->TempDir(), rel_file_path_->substr(0, rel_file_path_->find_first_of('.')));
-    auto temp_posting_path =
-        fmt::format("{}/{}.pos", InfinityContext::instance().config()->TempDir(), rel_file_path_->substr(0, rel_file_path_->find_first_of('.')));
-
-    auto data_dict_path =
-        fmt::format("{}/{}.dic", InfinityContext::instance().config()->DataDir(), rel_file_path_->substr(0, rel_file_path_->find_first_of('.')));
-    auto data_posting_path =
-        fmt::format("{}/{}.pos", InfinityContext::instance().config()->DataDir(), rel_file_path_->substr(0, rel_file_path_->find_first_of('.')));
-
     if (persistence_manager_) {
         PersistResultHandler handler(persistence_manager_);
         if (!VirtualStore::Exists(temp_path)) {
@@ -134,6 +124,20 @@ void FileWorker::MoveFile() {
         obj_addr_ = persist_result.obj_addr_;
 
         if (Type() == FileWorkerType::kRawFile) {
+            auto temp_dict_path = fmt::format("{}/{}.dic",
+                                              InfinityContext::instance().config()->TempDir(),
+                                              rel_file_path_->substr(0, rel_file_path_->find_first_of('.')));
+            auto temp_posting_path = fmt::format("{}/{}.pos",
+                                                 InfinityContext::instance().config()->TempDir(),
+                                                 rel_file_path_->substr(0, rel_file_path_->find_first_of('.')));
+
+            auto data_dict_path = fmt::format("{}/{}.dic",
+                                              InfinityContext::instance().config()->DataDir(),
+                                              rel_file_path_->substr(0, rel_file_path_->find_first_of('.')));
+            auto data_posting_path = fmt::format("{}/{}.pos",
+                                                 InfinityContext::instance().config()->DataDir(),
+                                                 rel_file_path_->substr(0, rel_file_path_->find_first_of('.')));
+
             auto persist_result2 = persistence_manager_->Persist(data_dict_path, temp_dict_path);
             auto persist_result3 = persistence_manager_->Persist(data_posting_path, temp_posting_path);
         }
@@ -143,13 +147,25 @@ void FileWorker::MoveFile() {
         }
         auto data_path_parent = VirtualStore::GetParentPath(data_path);
         if (!VirtualStore::Exists(data_path_parent)) {
-
-        } else {
-            VirtualStore::DeleteFile(data_path);
+            VirtualStore::MakeDirectory(data_path_parent);
         }
-        VirtualStore::MakeDirectory(data_path_parent);
+
         VirtualStore::Copy(data_path, temp_path);
         if (Type() == FileWorkerType::kRawFile) {
+            auto temp_dict_path = fmt::format("{}/{}.dic",
+                                              InfinityContext::instance().config()->TempDir(),
+                                              rel_file_path_->substr(0, rel_file_path_->find_first_of('.')));
+            auto temp_posting_path = fmt::format("{}/{}.pos",
+                                                 InfinityContext::instance().config()->TempDir(),
+                                                 rel_file_path_->substr(0, rel_file_path_->find_first_of('.')));
+
+            auto data_dict_path = fmt::format("{}/{}.dic",
+                                              InfinityContext::instance().config()->DataDir(),
+                                              rel_file_path_->substr(0, rel_file_path_->find_first_of('.')));
+            auto data_posting_path = fmt::format("{}/{}.pos",
+                                                 InfinityContext::instance().config()->DataDir(),
+                                                 rel_file_path_->substr(0, rel_file_path_->find_first_of('.')));
+
             VirtualStore::Copy(data_dict_path, temp_dict_path);
             VirtualStore::Copy(data_posting_path, temp_posting_path);
         }
@@ -175,8 +191,10 @@ Status FileWorker::CleanupFile() const {
     if (persistence_manager_) {
         PersistResultHandler handler{persistence_manager_};
         auto status = VirtualStore::DeleteFile(GetFilePathTemp());
-        status = VirtualStore::DeleteFile(temp_posting_path);
-        status = VirtualStore::DeleteFile(temp_dict_path);
+        if (Type() == FileWorkerType::kRawFile) {
+            status = VirtualStore::DeleteFile(data_dict_path);
+            status = VirtualStore::DeleteFile(data_posting_path);
+        }
         // auto result_temp = persistence_manager_->Cleanup(GetFilePathTemp());
         // if (!result_temp.obj_addr_.Valid()) {
         //     return Status::OK();
@@ -191,38 +209,43 @@ Status FileWorker::CleanupFile() const {
             handler.HandleWriteResult(result_data);
         }
 
-        {
-            auto result_data = persistence_manager_->Cleanup(data_dict_path);
-            if (!result_data.obj_addr_.Valid()) {
-                return Status::OK();
+        if (Type() == FileWorkerType::kRawFile) {
+            {
+                auto result_data = persistence_manager_->Cleanup(data_dict_path);
+                if (!result_data.obj_addr_.Valid()) {
+                    return Status::OK();
+                }
+                // Delete files
+                // handler.HandleWriteResult(result_temp);
+                handler.HandleWriteResult(result_data);
             }
-            // Delete files
-            // handler.HandleWriteResult(result_temp);
-            handler.HandleWriteResult(result_data);
-        }
 
-        {
-            auto result_data = persistence_manager_->Cleanup(data_posting_path);
-            if (!result_data.obj_addr_.Valid()) {
-                return Status::OK();
+            {
+                auto result_data = persistence_manager_->Cleanup(data_posting_path);
+                if (!result_data.obj_addr_.Valid()) {
+                    return Status::OK();
+                }
+                // Delete files
+                // handler.HandleWriteResult(result_temp);
+                handler.HandleWriteResult(result_data);
             }
-            // Delete files
-            // handler.HandleWriteResult(result_temp);
-            handler.HandleWriteResult(result_data);
         }
 
         // return Status::OK();
     }
 
     auto status = VirtualStore::DeleteFile(GetFilePathTemp());
-    VirtualStore::DeleteFile(temp_dict_path);
-    VirtualStore::DeleteFile(temp_posting_path);
-    // if (!status.ok()) {
-    //     return status;
-    // }
     status = VirtualStore::DeleteFile(GetFilePath());
-    status = VirtualStore::DeleteFile(data_dict_path);
-    status = VirtualStore::DeleteFile(data_posting_path);
+    if (Type() == FileWorkerType::kRawFile) {
+        VirtualStore::DeleteFile(temp_dict_path);
+        VirtualStore::DeleteFile(temp_posting_path);
+        // if (!status.ok()) {
+        //     return status;
+        // }
+
+        status = VirtualStore::DeleteFile(data_dict_path);
+        status = VirtualStore::DeleteFile(data_posting_path);
+    }
     return Status::OK();
 }
 

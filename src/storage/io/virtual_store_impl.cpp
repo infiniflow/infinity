@@ -362,8 +362,8 @@ Status VirtualStore::Copy(std::string_view dst_path, std::string_view src_path) 
     }
 
     auto dst_dir = GetParentPath(dst_path);
-    if (!VirtualStore::Exists(dst_dir)) {
-        VirtualStore::MakeDirectory(dst_dir);
+    if (!Exists(dst_dir)) {
+        MakeDirectory(dst_dir);
     }
 
     try {
