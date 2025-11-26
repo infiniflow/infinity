@@ -1644,113 +1644,105 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
         final_pos_mapping[strline.size()] = static_cast<unsigned>(line.size());
     }
 
-    std::size_t alpha_num = 0;
-    int len = UTF8Length(strline);
+    // Use SplitByLang to separate by language
+    std::vector<std::pair<std::string, bool>> arr;
+    SplitByLang(strline, arr);
+    unsigned current_pos = 0;
 
-    for (int i = 0; i < len; ++i) {
-        std::string t = UTF8Substr(strline, i, 1);
-        if (IsAlphabet(t)) {
-            alpha_num++;
+    for (const auto &[L, lang] : arr) {
+        if (L.empty()) {
+            continue;
         }
-    }
 
-    if (alpha_num > (std::size_t)(len * 0.9)) {
-        std::vector<std::string> term_list;
-        std::vector<std::string> sentences;
-        SentenceSplitter(strline, sentences);
+        std::size_t processed_pos = strline.find(L, current_pos);
+        if (processed_pos == std::string::npos) {
+            continue;
+        }
 
-        unsigned sentence_start_pos = 0;
-        for (auto &sentence : sentences) {
-            std::vector<std::string> sentence_terms;
-            nltk_tokenizer_->Tokenize(sentence, sentence_terms);
+        unsigned original_start = current_pos;
+        current_pos = original_start + static_cast<unsigned>(L.size());
 
-            unsigned current_search_pos = 0;
-            for (auto &term : sentence_terms) {
-                size_t pos_in_sentence = sentence.find(term, current_search_pos);
-                if (pos_in_sentence != std::string::npos) {
-                    unsigned start_pos = sentence_start_pos + static_cast<unsigned>(pos_in_sentence);
-                    unsigned end_pos = start_pos + static_cast<unsigned>(term.size());
-                    std::string t = lemma_->Lemmatize(term);
-                    char *lowercase_term = lowercase_string_buffer_.data();
-                    ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
-                    std::string stem_term;
-                    stemmer_->Stem(lowercase_term, stem_term);
+        if (!lang) {
+            // Non-Chinese text: use NLTK tokenizer, lemmatize and stem
+            std::vector<std::string> term_list;
+            std::vector<std::string> sentences;
+            SentenceSplitter(L, sentences);
 
-                    tokens.push_back(stem_term);
+            unsigned sentence_start_pos = original_start;
+            for (auto &sentence : sentences) {
+                std::vector<std::string> sentence_terms;
+                nltk_tokenizer_->Tokenize(sentence, sentence_terms);
 
-                    // Map positions back to original string using final_pos_mapping
-                    if (start_pos < final_pos_mapping.size()) {
-                        positions.emplace_back(final_pos_mapping[start_pos], final_pos_mapping[end_pos]);
-                    } else {
-                        positions.emplace_back(static_cast<unsigned>(line.size()), static_cast<unsigned>(line.size()));
+                unsigned current_search_pos = 0;
+                for (auto &term : sentence_terms) {
+                    size_t pos_in_sentence = sentence.find(term, current_search_pos);
+                    if (pos_in_sentence != std::string::npos) {
+                        unsigned start_pos = sentence_start_pos + static_cast<unsigned>(pos_in_sentence);
+                        unsigned end_pos = start_pos + static_cast<unsigned>(term.size());
+                        std::string t = lemma_->Lemmatize(term);
+                        char *lowercase_term = lowercase_string_buffer_.data();
+                        ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
+                        std::string stem_term;
+                        stemmer_->Stem(lowercase_term, stem_term);
+
+                        tokens.push_back(stem_term);
+
+                        // Map positions back to original string using final_pos_mapping
+                        if (start_pos < final_pos_mapping.size()) {
+                            positions.emplace_back(final_pos_mapping[start_pos], final_pos_mapping[end_pos]);
+                        } else {
+                            positions.emplace_back(static_cast<unsigned>(line.size()), static_cast<unsigned>(line.size()));
+                        }
+
+                        current_search_pos = pos_in_sentence + term.size();
                     }
-
-                    current_search_pos = pos_in_sentence + term.size();
                 }
+                sentence_start_pos += static_cast<unsigned>(sentence.size());
             }
-            sentence_start_pos += static_cast<unsigned>(sentence.size());
+            continue;
         }
 
-    } else {
-        std::vector<std::string> arr;
-        Split(strline, regex_split_pattern_, arr, true);
+        auto length = UTF8Length(L);
+        if (length < 2 || re2::RE2::PartialMatch(L, pattern2_) || re2::RE2::PartialMatch(L, pattern3_)) {
+            tokens.push_back(L);
 
-        unsigned current_pos = 0;
-        for (const auto &L : arr) {
-            if (L.empty()) {
-                continue;
-            }
-            std::size_t processed_pos = strline.find(L, current_pos);
-            if (processed_pos == std::string::npos) {
-                continue;
-            }
-
-            unsigned original_start = current_pos;
-
-            auto length = UTF8Length(L);
-            if (length < 2 || re2::RE2::PartialMatch(L, pattern2_) || re2::RE2::PartialMatch(L, pattern3_)) {
-                tokens.push_back(L);
-
-                // Map positions back to original string using final_pos_mapping
-                unsigned start_pos = original_start;
-                unsigned end_pos = original_start + static_cast<unsigned>(L.size());
-                if (start_pos < final_pos_mapping.size() && end_pos < final_pos_mapping.size()) {
-                    positions.emplace_back(final_pos_mapping[start_pos], final_pos_mapping[end_pos]);
-                } else {
-                    positions.emplace_back(static_cast<unsigned>(line.size()), static_cast<unsigned>(line.size()));
-                }
-
-                current_pos = original_start + static_cast<unsigned>(L.size());
-                continue;
-            }
-
-            if (length > MAX_SENTENCE_LEN) {
-                std::vector<std::string> sublines;
-                SplitLongText(L, length, sublines);
-                unsigned subline_start_pos = original_start;
-                for (auto &l : sublines) {
-                    TokenizeInnerWithPosition(l, tokens, positions, subline_start_pos, &final_pos_mapping);
-                    subline_start_pos += static_cast<unsigned>(l.size());
-                }
-                current_pos = original_start + static_cast<unsigned>(L.size());
+            // Map positions back to original string using final_pos_mapping
+            unsigned start_pos = original_start;
+            unsigned end_pos = original_start + static_cast<unsigned>(L.size());
+            if (start_pos < final_pos_mapping.size() && end_pos < final_pos_mapping.size()) {
+                positions.emplace_back(final_pos_mapping[start_pos], final_pos_mapping[end_pos]);
             } else {
-                TokenizeInnerWithPosition(L, tokens, positions, original_start, &final_pos_mapping);
-                current_pos = original_start + static_cast<unsigned>(L.size());
+                positions.emplace_back(static_cast<unsigned>(line.size()), static_cast<unsigned>(line.size()));
             }
+            continue;
         }
 
-        std::vector<std::string> normalize_tokens;
-        std::vector<std::pair<unsigned, unsigned>> normalize_positions;
-        EnglishNormalizeWithPosition(tokens, positions, normalize_tokens, normalize_positions);
-
-        // Apply MergeWithPosition to match Tokenize behavior
-        std::vector<std::string> merged_tokens;
-        std::vector<std::pair<unsigned, unsigned>> merged_positions;
-        MergeWithPosition(normalize_tokens, normalize_positions, merged_tokens, merged_positions);
-
-        tokens = std::move(merged_tokens);
-        positions = std::move(merged_positions);
+        // Chinese processing: use TokenizeInnerWithPosition
+#if 0
+        if (length > MAX_SENTENCE_LEN) {
+            std::vector<std::string> sublines;
+            SplitLongText(L, length, sublines);
+            unsigned subline_start_pos = original_start;
+            for (auto &l : sublines) {
+                TokenizeInnerWithPosition(l, tokens, positions, subline_start_pos, &final_pos_mapping);
+                subline_start_pos += static_cast<unsigned>(l.size());
+            }
+        } else
+#endif
+        TokenizeInnerWithPosition(L, tokens, positions, original_start, &final_pos_mapping);
     }
+
+    std::vector<std::string> normalize_tokens;
+    std::vector<std::pair<unsigned, unsigned>> normalize_positions;
+    EnglishNormalizeWithPosition(tokens, positions, normalize_tokens, normalize_positions);
+
+    // Apply MergeWithPosition to match Tokenize behavior
+    std::vector<std::string> merged_tokens;
+    std::vector<std::pair<unsigned, unsigned>> merged_positions;
+    MergeWithPosition(normalize_tokens, normalize_positions, merged_tokens, merged_positions);
+
+    tokens = std::move(merged_tokens);
+    positions = std::move(merged_positions);
 
     return {std::move(tokens), std::move(positions)};
 }
