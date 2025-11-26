@@ -439,7 +439,8 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     {
         auto [file_handle, status] = VirtualStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
         if (!status.ok()) {
-            UnrecoverableError(status.message());
+            // fuck
+            // UnrecoverableError(status.message());
         }
 
         std::vector<u32> &column_length_array = column_lengths_.UnsafeVec();

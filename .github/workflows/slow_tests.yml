@@ -378,8 +378,8 @@ jobs:
           if [[ -n "${TEST_CONTAINER}" ]]; then sudo docker rm -f -v "${TEST_CONTAINER}"; fi
           if [[ -n "${MINIO_VOLUME_PATH}" ]]; then sudo rm -rf "${MINIO_VOLUME_PATH}"; fi
 
-  reldeb_parallel_test:
-    name: reldeb_parallel_test
+  reldeb_pytest:
+    name: reldeb_pytest
     runs-on: [ "self-hosted", "slow-test" ]
     needs:
       - reldeb_build
