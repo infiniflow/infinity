@@ -29,7 +29,6 @@ import :term;
 import :stemmer;
 import :analyzer;
 import :darts_trie;
-import :lemmatizer;
 import :wordnet_lemmatizer;
 import :stemmer;
 import :term;
@@ -557,9 +556,9 @@ RAGAnalyzer::RAGAnalyzer(const std::string &path)
 }
 
 RAGAnalyzer::RAGAnalyzer(const RAGAnalyzer &other)
-    : own_dict_(false), trie_(other.trie_), pos_table_(other.pos_table_), lemma_(other.lemma_), wordnet_lemma_(other.wordnet_lemma_),
-      stemmer_(std::make_unique<Stemmer>()), opencc_(other.opencc_), lowercase_string_buffer_(term_string_buffer_limit_),
-      fine_grained_(other.fine_grained_), nltk_tokenizer_(std::make_unique<NLTKWordTokenizer>()) {
+    : own_dict_(false), trie_(other.trie_), pos_table_(other.pos_table_), wordnet_lemma_(other.wordnet_lemma_), stemmer_(std::make_unique<Stemmer>()),
+      opencc_(other.opencc_), lowercase_string_buffer_(term_string_buffer_limit_), fine_grained_(other.fine_grained_),
+      nltk_tokenizer_(std::make_unique<NLTKWordTokenizer>()) {
     InitStemmer(STEM_LANG_ENGLISH);
 }
 
@@ -567,7 +566,6 @@ RAGAnalyzer::~RAGAnalyzer() {
     if (own_dict_) {
         delete trie_;
         delete pos_table_;
-        delete lemma_;
         delete wordnet_lemma_;
         delete opencc_;
     }
@@ -631,7 +629,6 @@ Status RAGAnalyzer::Load() {
     if (!fs::exists(lemma_path)) {
         return Status::InvalidAnalyzerFile(lemma_path);
     }
-    lemma_ = new Lemmatizer(lemma_path.string());
 
     wordnet_lemma_ = new WordNetLemmatizer(lemma_path.string());
 
@@ -1371,7 +1368,7 @@ void RAGAnalyzer::TokenizeInner(std::vector<std::string> &res, const std::string
             j++;
             continue;
         }
-        
+
         std::vector<std::pair<std::string, int>> pre_tokens;
         std::vector<std::vector<std::pair<std::string, int>>> token_list;
         std::vector<std::string> best_tokens;
@@ -1790,7 +1787,7 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
                                             const std::vector<unsigned> *pos_mapping) {
     auto [tks, s] = MaxForward(L);
     auto [tks1, s1] = MaxBackward(L);
-    
+
     // Use the same algorithm as Python version
     std::size_t i = 0, j = 0, _i = 0, _j = 0, same = 0;
     while ((i + same < tks1.size()) && (j + same < tks.size()) && tks1[i + same] == tks[j + same]) {
@@ -1838,7 +1835,7 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
     _j = j + same;
     j = _j + 1;
     i = _i + 1;
-    
+
     while (i < tks1.size() && j < tks.size()) {
         std::string tk1 = Join(tks1, _i, i, "");
         std::string tk = Join(tks, _j, j, "");
@@ -1855,7 +1852,7 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
             j++;
             continue;
         }
-        
+
         // Handle different part with DFS
         std::vector<std::pair<std::string, int>> pre_tokens;
         std::vector<std::vector<std::pair<std::string, int>>> token_list;
@@ -1870,7 +1867,7 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
         const auto t1 = std::chrono::high_resolution_clock::now();
         dp_debug::CheckDP(this, str_for_dfs, best_tokens, max_score, t0, t1);
 #endif
-        
+
         std::string best_token_str = Join(best_tokens, 0);
         unsigned start_pos = base_pos + CalculateTokensLength(tks, 0, _j);
         std::string original_token_str = Join(tks, _j, j, "");
@@ -1912,7 +1909,7 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
         same = 1;
         while (i + same < tks1.size() && j + same < tks.size() && tks1[i + same] == tks[j + same])
             same++;
-            
+
         // Handle same part after different tokens
         std::string token_str = Join(tks, j, j + same);
         unsigned token_len = static_cast<unsigned>(token_str.size());
@@ -1950,13 +1947,13 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
                 positions.emplace_back(start_pos, start_pos + token_len);
             }
         }
-        
+
         _i = i + same;
         _j = j + same;
         j = _j + 1;
         i = _i + 1;
     }
-    
+
     // Handle remaining part
     if (_i < tks1.size()) {
         std::vector<std::pair<std::string, int>> pre_tokens;
@@ -1972,7 +1969,7 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
         const auto t1 = std::chrono::high_resolution_clock::now();
         dp_debug::CheckDP(this, str_for_dfs, best_tokens, max_score, t0, t1);
 #endif
-        
+
         std::string best_token_str = Join(best_tokens, 0);
         unsigned start_pos = base_pos + CalculateTokensLength(tks, 0, _j);
         std::string original_token_str = Join(tks, _j, tks.size(), "");

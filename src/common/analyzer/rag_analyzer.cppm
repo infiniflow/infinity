@@ -21,7 +21,6 @@ export module infinity_core:rag_analyzer;
 import :term;
 import :status;
 import :darts_trie;
-import :lemmatizer;
 import :stemmer;
 import :analyzer;
 import :wordnet_lemmatizer;
@@ -129,8 +128,6 @@ public:
     DartsTrie *trie_{nullptr};
 
     POSTable *pos_table_{nullptr};
-
-    Lemmatizer *lemma_{nullptr};
 
     WordNetLemmatizer *wordnet_lemma_{nullptr};
 

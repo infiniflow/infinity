@@ -14,10 +14,10 @@
 
 module;
 
+#include <cassert>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
-#include <filesystem>
-#include <cassert>
 
 module infinity_core:wordnet_lemmatizer.impl;
 
@@ -35,15 +35,13 @@ static const std::string ADV = "r";
 static const std::string NOUN = "n";
 static const std::string VERB = "v";
 
-WordNetLemmatizer::WordNetLemmatizer(const std::string &wordnet_path) : wordnet_path_(wordnet_path) {
-    Load();
-}
+WordNetLemmatizer::WordNetLemmatizer(const std::string &wordnet_path) : wordnet_path_(wordnet_path) { Load(); }
 
 WordNetLemmatizer::~WordNetLemmatizer() {}
 
 Status WordNetLemmatizer::Load() {
     file_map_ = {{ADJ, "adj"}, {ADV, "adv"}, {NOUN, "noun"}, {VERB, "verb"}};
-    
+
     MORPHOLOGICAL_SUBSTITUTIONS = {
         {NOUN, {{"s", ""}, {"ses", "s"}, {"ves", "f"}, {"xes", "x"}, {"zes", "z"}, {"ches", "ch"}, {"shes", "sh"}, {"men", "man"}, {"ies", "y"}}},
         {VERB, {{"s", ""}, {"ies", "y"}, {"es", "e"}, {"es", ""}, {"ed", "e"}, {"ed", ""}, {"ing", "e"}, {"ing", ""}}},
@@ -57,7 +55,7 @@ Status WordNetLemmatizer::Load() {
     if (!status.ok()) {
         return status;
     }
-    
+
     LoadExceptions();
     return Status::OK();
 }
@@ -85,7 +83,7 @@ Status WordNetLemmatizer::LoadLemmas() {
             try {
                 std::string lemma;
                 stream >> lemma;
-                
+
                 if (lemmas_.find(lemma) == lemmas_.end()) {
                     lemmas_[lemma] = std::unordered_set<std::string>();
                 }
@@ -125,13 +123,13 @@ void WordNetLemmatizer::LoadExceptions() {
             std::istringstream stream(line);
             std::string inflected_form;
             stream >> inflected_form;
-            
+
             std::vector<std::string> base_forms;
             std::string base_form;
             while (stream >> base_form) {
                 base_forms.push_back(base_form);
             }
-            
+
             exceptions_[pos_abbrev][inflected_form] = base_forms;
         }
     }
@@ -141,11 +139,10 @@ void WordNetLemmatizer::LoadExceptions() {
 std::vector<std::string> WordNetLemmatizer::CollectSubstitutions(const std::vector<std::string> &forms, const std::string &pos) {
     const auto &substitutions = MORPHOLOGICAL_SUBSTITUTIONS.at(pos);
     std::vector<std::string> results;
-    
+
     for (const auto &form : forms) {
         for (const auto &[old_suffix, new_suffix] : substitutions) {
-            if (form.size() >= old_suffix.size() && 
-                form.compare(form.size() - old_suffix.size(), old_suffix.size(), old_suffix) == 0) {
+            if (form.size() >= old_suffix.size() && form.compare(form.size() - old_suffix.size(), old_suffix.size(), old_suffix) == 0) {
                 results.push_back(form.substr(0, form.size() - old_suffix.size()) + new_suffix);
             }
         }
@@ -156,10 +153,9 @@ std::vector<std::string> WordNetLemmatizer::CollectSubstitutions(const std::vect
 std::vector<std::string> WordNetLemmatizer::CollectSubstitutions(const std::string &form, const std::string &pos) {
     const auto &substitutions = MORPHOLOGICAL_SUBSTITUTIONS.at(pos);
     std::vector<std::string> results;
-    
+
     for (const auto &[old_suffix, new_suffix] : substitutions) {
-        if (form.size() >= old_suffix.size() && 
-            form.compare(form.size() - old_suffix.size(), old_suffix.size(), old_suffix) == 0) {
+        if (form.size() >= old_suffix.size() && form.compare(form.size() - old_suffix.size(), old_suffix.size(), old_suffix) == 0) {
             results.push_back(form.substr(0, form.size() - old_suffix.size()) + new_suffix);
         }
     }
@@ -169,7 +165,7 @@ std::vector<std::string> WordNetLemmatizer::CollectSubstitutions(const std::stri
 std::vector<std::string> WordNetLemmatizer::FilterForms(const std::vector<std::string> &forms, const std::string &pos) {
     std::vector<std::string> result;
     std::unordered_set<std::string> seen;
-    
+
     for (const auto &form : forms) {
         if (lemmas_.find(form) != lemmas_.end()) {
             if (lemmas_[form].find(pos) != lemmas_[form].end()) {
@@ -197,7 +193,7 @@ std::vector<std::string> WordNetLemmatizer::Morphy(const std::string &form, cons
     std::vector<std::string> forms = CollectSubstitutions(form, pos);
     std::vector<std::string> combined_forms = forms;
     combined_forms.push_back(form);
-    
+
     // First attempt with original form and first-level substitutions
     auto results = FilterForms(combined_forms, pos);
     if (!results.empty()) {

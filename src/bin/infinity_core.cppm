@@ -421,7 +421,7 @@ export import :chinese_analyzer;
 export import :rank_features_analyzer;
 export import :whitespace_analyzer;
 export import :tokenizer;
-export import :lemmatizer;
+export import :wordnet_lemmatizer;
 export import :jieba;
 export import :zsv;
 export import :status;
