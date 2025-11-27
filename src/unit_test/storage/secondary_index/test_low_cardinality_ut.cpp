@@ -285,3 +285,108 @@ TEST_F(LowCardinalitySecondaryIndexTest, TestSaveLoadLowCardinality) {
     std::string cmd = fmt::format("rm -rf {}", tmp_path);
     system(cmd.c_str());
 }
+
+TEST_F(LowCardinalitySecondaryIndexTest, TestAllDataType) {
+    {
+        const u32 chunk_row_count = 500;
+        const u32 unique_values = 10;
+
+        // Create test data with only one unique value
+        auto test_data = CreateLowCardinalityData<BigIntT>(chunk_row_count, unique_values);
+
+        // Create low cardinality secondary index
+        auto data_type = std::make_shared<DataType>(LogicalType::kBigInt);
+        auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
+
+        // Insert data
+        index->InsertData(&test_data);
+
+        // Verify single unique key
+        EXPECT_EQ(index->GetUniqueKeyCount(), 10);
+    }
+    {
+        const u32 chunk_row_count = 500;
+        const u32 unique_values = 10;
+
+        // Create test data with only one unique value
+        auto test_data = CreateLowCardinalityData<DoubleT>(chunk_row_count, unique_values);
+
+        // Create low cardinality secondary index
+        auto data_type = std::make_shared<DataType>(LogicalType::kDouble);
+        auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
+
+        // Insert data
+        index->InsertData(&test_data);
+
+        // Verify single unique key
+        EXPECT_EQ(index->GetUniqueKeyCount(), 10);
+    }
+    {
+        const u32 chunk_row_count = 500;
+        const u32 unique_values = 10;
+
+        // Create test data with only one unique value
+        auto test_data = CreateLowCardinalityData<DateT>(chunk_row_count, unique_values);
+
+        // Create low cardinality secondary index
+        auto data_type = std::make_shared<DataType>(LogicalType::kDate);
+        auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
+
+        // Insert data
+        index->InsertData(&test_data);
+
+        // Verify single unique key
+        EXPECT_EQ(index->GetUniqueKeyCount(), 10);
+    }
+    {
+        const u32 chunk_row_count = 500;
+        const u32 unique_values = 10;
+
+        // Create test data with only one unique value
+        auto test_data = CreateLowCardinalityData<TimeT>(chunk_row_count, unique_values);
+
+        // Create low cardinality secondary index
+        auto data_type = std::make_shared<DataType>(LogicalType::kTime);
+        auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
+
+        // Insert data
+        index->InsertData(&test_data);
+
+        // Verify single unique key
+        EXPECT_EQ(index->GetUniqueKeyCount(), 10);
+    }
+    {
+        const u32 chunk_row_count = 500;
+        const u32 unique_values = 10;
+
+        // Create test data with only one unique value
+        auto test_data = CreateLowCardinalityData<DateTimeT>(chunk_row_count, unique_values);
+
+        // Create low cardinality secondary index
+        auto data_type = std::make_shared<DataType>(LogicalType::kDateTime);
+        auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
+
+        // Insert data
+        index->InsertData(&test_data);
+
+        // Verify single unique key
+        EXPECT_EQ(index->GetUniqueKeyCount(), 10);
+    }
+    {
+        const u32 chunk_row_count = 500;
+        const u32 unique_values = 10;
+
+        // Create test data with only one unique value
+        auto test_data = CreateLowCardinalityData<TimestampT>(chunk_row_count, unique_values);
+
+        // Create low cardinality secondary index
+        auto data_type = std::make_shared<DataType>(LogicalType::kTimestamp);
+        auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
+
+        // Insert data
+        index->InsertData(&test_data);
+
+        // Verify single unique key
+        EXPECT_EQ(index->GetUniqueKeyCount(), 10);
+    }
+}
