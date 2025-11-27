@@ -490,6 +490,15 @@ def naiveQie(txt):
         tks.append(t)
     return tks
 
+tokenizer = RagTokenizer()
+tokenize = tokenizer.tokenize
+fine_grained_tokenize = tokenizer.fine_grained_tokenize
+tag = tokenizer.tag
+freq = tokenizer.freq
+loadUserDict = tokenizer.loadUserDict
+addUserDict = tokenizer.addUserDict
+tradi2simp = tokenizer._tradi2simp
+strQ2B = tokenizer._strQ2B
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Rag Tokenizer')
