@@ -30,6 +30,7 @@ import :stemmer;
 import :analyzer;
 import :darts_trie;
 import :lemmatizer;
+import :wordnet_lemmatizer;
 import :stemmer;
 import :term;
 
@@ -556,9 +557,9 @@ RAGAnalyzer::RAGAnalyzer(const std::string &path)
 }
 
 RAGAnalyzer::RAGAnalyzer(const RAGAnalyzer &other)
-    : own_dict_(false), trie_(other.trie_), pos_table_(other.pos_table_), lemma_(other.lemma_), stemmer_(std::make_unique<Stemmer>()),
-      opencc_(other.opencc_), lowercase_string_buffer_(term_string_buffer_limit_), fine_grained_(other.fine_grained_),
-      nltk_tokenizer_(std::make_unique<NLTKWordTokenizer>()) {
+    : own_dict_(false), trie_(other.trie_), pos_table_(other.pos_table_), lemma_(other.lemma_), wordnet_lemma_(other.wordnet_lemma_),
+      stemmer_(std::make_unique<Stemmer>()), opencc_(other.opencc_), lowercase_string_buffer_(term_string_buffer_limit_),
+      fine_grained_(other.fine_grained_), nltk_tokenizer_(std::make_unique<NLTKWordTokenizer>()) {
     InitStemmer(STEM_LANG_ENGLISH);
 }
 
@@ -567,6 +568,7 @@ RAGAnalyzer::~RAGAnalyzer() {
         delete trie_;
         delete pos_table_;
         delete lemma_;
+        delete wordnet_lemma_;
         delete opencc_;
     }
 }
@@ -630,6 +632,8 @@ Status RAGAnalyzer::Load() {
         return Status::InvalidAnalyzerFile(lemma_path);
     }
     lemma_ = new Lemmatizer(lemma_path.string());
+
+    wordnet_lemma_ = new WordNetLemmatizer(lemma_path.string());
 
     fs::path opencc_path(root / OPENCC_PATH);
 
@@ -1217,7 +1221,7 @@ void RAGAnalyzer::MergeWithPosition(const std::vector<std::string> &tokens,
 void RAGAnalyzer::EnglishNormalize(const std::vector<std::string> &tokens, std::vector<std::string> &res) {
     for (auto &t : tokens) {
         if (re2::RE2::PartialMatch(t, pattern1_)) { //"[a-zA-Z_-]+$"
-            std::string lemma_term = lemma_->Lemmatize(t);
+            std::string lemma_term = wordnet_lemma_->Lemmatize(t);
             char *lowercase_term = lowercase_string_buffer_.data();
             ToLower(lemma_term.c_str(), lemma_term.size(), lowercase_term, term_string_buffer_limit_);
             std::string stem_term;
@@ -1578,7 +1582,7 @@ std::string RAGAnalyzer::Tokenize(const std::string &line) {
                 nltk_tokenizer_->Tokenize(sentence, term_list);
             }
             for (unsigned i = 0; i < term_list.size(); ++i) {
-                std::string t = lemma_->Lemmatize(term_list[i]);
+                std::string t = wordnet_lemma_->Lemmatize(term_list[i]);
                 char *lowercase_term = lowercase_string_buffer_.data();
                 ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
                 std::string stem_term;
@@ -1587,7 +1591,6 @@ std::string RAGAnalyzer::Tokenize(const std::string &line) {
             }
             continue;
         }
-
         auto length = UTF8Length(L);
         if (length < 2 || re2::RE2::PartialMatch(L, pattern2_) || re2::RE2::PartialMatch(L, pattern3_)) { //[a-z\\.-]+$  [0-9\\.-]+$
             res.push_back(L);
@@ -1607,9 +1610,9 @@ std::string RAGAnalyzer::Tokenize(const std::string &line) {
         TokenizeInner(res, L);
     }
 
-    std::vector<std::string> normalize_res;
-    EnglishNormalize(res, normalize_res);
-    std::string r = Join(normalize_res, 0);
+    // std::vector<std::string> normalize_res;
+    // EnglishNormalize(res, normalize_res);
+    std::string r = Join(res, 0);
     std::string ret = Merge(r);
     return ret;
 }
@@ -1695,7 +1698,7 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
                     if (pos_in_sentence != std::string::npos) {
                         unsigned start_pos = sentence_start_pos + static_cast<unsigned>(pos_in_sentence);
                         unsigned end_pos = start_pos + static_cast<unsigned>(term.size());
-                        std::string t = lemma_->Lemmatize(term);
+                        std::string t = wordnet_lemma_->Lemmatize(term);
                         char *lowercase_term = lowercase_string_buffer_.data();
                         ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
                         std::string stem_term;
@@ -1748,14 +1751,14 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
         TokenizeInnerWithPosition(L, tokens, positions, original_start, &final_pos_mapping);
     }
 
-    std::vector<std::string> normalize_tokens;
-    std::vector<std::pair<unsigned, unsigned>> normalize_positions;
-    EnglishNormalizeWithPosition(tokens, positions, normalize_tokens, normalize_positions);
+    // std::vector<std::string> normalize_tokens;
+    // std::vector<std::pair<unsigned, unsigned>> normalize_positions;
+    // EnglishNormalizeWithPosition(tokens, positions, normalize_tokens, normalize_positions);
 
     // Apply MergeWithPosition to match Tokenize behavior
     std::vector<std::string> merged_tokens;
     std::vector<std::pair<unsigned, unsigned>> merged_positions;
-    MergeWithPosition(normalize_tokens, normalize_positions, merged_tokens, merged_positions);
+    MergeWithPosition(tokens, positions, merged_tokens, merged_positions);
 
     tokens = std::move(merged_tokens);
     positions = std::move(merged_positions);
@@ -2019,7 +2022,7 @@ void RAGAnalyzer::EnglishNormalizeWithPosition(const std::vector<std::string> &t
         const auto &[start_pos, end_pos] = positions[i];
 
         if (re2::RE2::PartialMatch(token, pattern1_)) { //"[a-zA-Z_-]+$"
-            std::string lemma_term = lemma_->Lemmatize(token);
+            std::string lemma_term = wordnet_lemma_->Lemmatize(token);
             char *lowercase_term = lowercase_string_buffer_.data();
             ToLower(lemma_term.c_str(), lemma_term.size(), lowercase_term, term_string_buffer_limit_);
             std::string stem_term;

@@ -24,6 +24,7 @@ import :darts_trie;
 import :lemmatizer;
 import :stemmer;
 import :analyzer;
+import :wordnet_lemmatizer;
 
 import third_party;
 
@@ -130,6 +131,8 @@ public:
     POSTable *pos_table_{nullptr};
 
     Lemmatizer *lemma_{nullptr};
+
+    WordNetLemmatizer *wordnet_lemma_{nullptr};
 
     std::unique_ptr<Stemmer> stemmer_;
 
