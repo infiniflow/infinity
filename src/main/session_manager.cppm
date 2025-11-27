@@ -56,7 +56,7 @@ public:
 
     std::shared_ptr<RemoteSession> CreateRemoteSession() {
         u64 session_id = ++session_id_generator_;
-        std::shared_ptr<RemoteSession> remote_session = std::make_shared<RemoteSession>(session_id);
+        auto remote_session = std::make_shared<RemoteSession>(session_id);
         {
             std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
             sessions_.emplace(session_id, remote_session.get());
@@ -66,7 +66,7 @@ public:
 
     std::shared_ptr<LocalSession> CreateLocalSession() {
         u64 session_id = ++session_id_generator_;
-        std::shared_ptr<LocalSession> local_session = std::make_shared<LocalSession>(session_id);
+        auto local_session = std::make_shared<LocalSession>(session_id);
         {
             std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
             sessions_.emplace(session_id, local_session.get());
@@ -100,7 +100,7 @@ public:
 
     void AddQueryRecord(u64 session_id, u64 query_id, const std::string &query_kind, const std::string &query_text) {
         std::unique_lock<std::mutex> lock(query_record_locker_);
-        std::shared_ptr<QueryInfo> query_info = std::make_shared<QueryInfo>(query_id, query_kind, query_text, BaseProfiler());
+        auto query_info = std::make_shared<QueryInfo>(query_id, query_kind, query_text, BaseProfiler());
         query_info->profiler_.Begin();
         query_record_container_.emplace(session_id, std::move(query_info));
     }

@@ -28,8 +28,8 @@ private:
     std::string posting_file_path_;
     std::shared_ptr<DictionaryReader> dict_reader_;
     std::shared_ptr<FileReader> posting_file_;
-    ByteSlice *doc_list_slice_{nullptr};
-    ByteSlice *pos_list_slice_{nullptr};
+    ByteSlice *doc_list_slice_{};
+    ByteSlice *pos_list_slice_{};
 
     std::shared_ptr<ByteSliceReader> doc_list_reader_;
     std::shared_ptr<ByteSliceReader> pos_list_reader_;

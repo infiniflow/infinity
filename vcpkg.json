@@ -9,6 +9,7 @@
     "abseil",
     "arrow",
     "boost-asio",
+    "boost-thread",
     "bzip2",
     "brotli",
     "cli11",

@@ -34,7 +34,7 @@ class ObjectStats;
 export class Storage;
 
 export struct ObjAddr {
-    std::string obj_key_{};
+    std::string obj_key_;
     size_t part_offset_{};
     size_t part_size_{};
 
@@ -61,7 +61,7 @@ export struct PersistReadResult {
     ObjAddr obj_addr_;                               // where data should read from
     std::vector<std::string> drop_keys_;             // object that should be removed from local disk. because of 1. disk used over limit
     std::vector<std::string> drop_from_remote_keys_; // object that should be removed from remote storage. because of object's all parts are deleted
-    std::shared_ptr<ObjStat> obj_stat_{nullptr};     // object stat
+    std::shared_ptr<ObjStat> obj_stat_;              // object stat
 };
 
 export class PersistenceManager {
@@ -80,23 +80,23 @@ public:
     // Create new object or append to current object, and returns the location.
     // file_path is the key of local_path_obj_ and may not exist. tmp_file_path is the file which contains the data to be persisted.
     // tmp_file_path will be deleted after its data be persisted.
-    [[nodiscard]] PersistWriteResult Persist(const std::string &file_path, const std::string &tmp_file_path, bool try_compose = true);
+    [[nodiscard]] PersistWriteResult Persist(std::string_view file_path, std::string_view tmp_file_path, bool try_compose = true);
 
     // Force finalize current object. Subsequent append on the finalized object is forbidden.
     // IMPORT / COMPACT / OPTIMIZE / DUMP MEM INDEX operations should call this method to finalize the current object.
     [[nodiscard]] PersistWriteResult CurrentObjFinalize(bool validate = false);
 
     // Download the whole object from object store if it's not in cache. Increase refcount and return the cached object file path.
-    [[nodiscard]] PersistReadResult GetObjCache(const std::string &local_path);
+    [[nodiscard]] PersistReadResult GetObjCache(std::string_view local_path);
 
-    std::tuple<size_t, Status> GetFileSize(const std::string &file_path);
+    std::tuple<size_t, Status> GetFileSize(std::string_view file_path);
 
     // std::tuple<size_t, Status> GetDirectorySize(const std::string &path_str);
     // ObjAddr GetObjCacheWithoutCnt(const std::string &local_path);
 
-    [[nodiscard]] PersistWriteResult PutObjCache(const std::string &file_path);
+    [[nodiscard]] PersistWriteResult PutObjCache(std::string_view file_path);
 
-    [[nodiscard]] PersistWriteResult Cleanup(const std::string &file_path);
+    [[nodiscard]] PersistWriteResult Cleanup(std::string_view file_path);
 
     /**
      * Utils
@@ -109,6 +109,8 @@ public:
     std::unordered_map<std::string, std::shared_ptr<ObjStat>> GetAllObjects() const;
     std::unordered_map<std::string, ObjAddr> GetAllFiles() const;
 
+    std::string workspace() { return workspace_; }
+
 private:
     std::string ObjCreate();
 
@@ -117,7 +119,7 @@ private:
 
     // Append file to the current object.
     // It finalizes current object if new size exceeds the size limit.
-    void CurrentObjAppendNoLock(const std::string &tmp_file_path, size_t file_size);
+    void CurrentObjAppendNoLock(std::string_view tmp_file_path, size_t file_size);
 
     // Finalize current object.
     void CurrentObjFinalizeNoLock(std::vector<std::string> &persist_keys);
@@ -128,7 +130,7 @@ private:
                        std::vector<std::string> &drop_from_remote_keys,
                        bool check_ref_count = false);
 
-    std::string RemovePrefix(const std::string &path);
+    std::string_view RemovePrefix(std::string_view path);
 
     // ObjStat GetObjStatByObjAddr(const ObjAddr &obj_addr);
 
@@ -141,8 +143,8 @@ private:
 
     // void AddObjAddrToKVStore(const std::string &path, const ObjAddr &obj_addr);
 
-    Storage *storage_;
-    KVStore *kv_store_{nullptr};
+    Storage *storage_{};
+    KVStore *kv_store_{};
     std::string workspace_;
     std::string local_data_dir_;
     size_t object_size_limit_;
@@ -153,9 +155,9 @@ private:
     std::shared_ptr<ObjectStats> object_stats_{};
     // Current unsealed object key
     std::string current_object_key_;
-    size_t current_object_size_ = 0;
-    size_t current_object_parts_ = 0;
-    size_t current_object_ref_count_ = 0;
+    size_t current_object_size_{};
+    size_t current_object_parts_{};
+    size_t current_object_ref_count_{};
     friend struct AddrSerializer;
 };
 

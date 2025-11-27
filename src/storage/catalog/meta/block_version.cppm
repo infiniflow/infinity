@@ -19,7 +19,7 @@ import :status;
 
 namespace infinity {
 
-struct ColumnVector;
+export struct ColumnVector;
 
 struct CreateField {
     TxnTimeStamp create_ts_{};
@@ -32,6 +32,8 @@ struct CreateField {
     void SaveToFile(LocalFileHandle *file_handle) const;
     static CreateField LoadFromFile(LocalFileHandle *file_handle);
 };
+
+std::atomic_int cnt{};
 
 export struct BlockVersion {
     constexpr static std::string_view PATH = "version";
@@ -48,10 +50,9 @@ export struct BlockVersion {
     i32 GetRowCount(TxnTimeStamp begin_ts) const;
     i64 GetRowCount() const;
 
-    bool SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
+    bool SaveToFile(void *&mmap, size_t &mmap_size, const std::string &rel_path, TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
 
-    void SpillToFile(LocalFileHandle *file_handle) const;
-    static std::unique_ptr<BlockVersion> LoadFromFile(LocalFileHandle *file_handle);
+    static void LoadFromFile(std::shared_ptr<BlockVersion> &data, size_t &mmap_size, void *&mmap, LocalFileHandle *file_handle);
 
     void GetCreateTS(size_t offset, size_t size, ColumnVector &res) const;
 
@@ -77,10 +78,10 @@ export struct BlockVersion {
     }
 
 private:
-    mutable std::shared_mutex rw_mutex_{};
-    std::vector<CreateField> created_{}; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
-                                         // risk to write uninitialized buffer. (ts, rows)
-    std::vector<TxnTimeStamp> deleted_{};
+    mutable std::shared_mutex rw_mutex_;
+    std::vector<CreateField> created_; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
+                                       // risk to write uninitialized buffer. (ts, rows)
+    std::vector<TxnTimeStamp> deleted_;
 
     TxnTimeStamp latest_change_ts_{}; // used by checkpoint to decide if the version file need to be flushed or not.
 };

@@ -62,7 +62,7 @@ public:
             }
             case ColumnVectorType::kFlat: {
                 size_t row_count = input_column_vector->Size();
-                auto *input_ptr = (InputType *)(input_column_vector->data());
+                auto *input_ptr = (InputType *)(input_column_vector->data().get());
                 for (size_t idx = 0; idx < row_count; ++idx) {
                     ((AggregateState *)state)->Update(input_ptr, idx);
                 }
@@ -78,7 +78,7 @@ public:
                     }
                     break;
                 }
-                auto *input_ptr = (InputType *)(input_column_vector->data());
+                auto *input_ptr = (InputType *)(input_column_vector->data().get());
                 ((AggregateState *)state)->Update(input_ptr, 0);
                 break;
             }

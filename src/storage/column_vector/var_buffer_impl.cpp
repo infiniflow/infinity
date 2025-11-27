@@ -16,16 +16,15 @@ module infinity_core:var_buffer.impl;
 
 import :var_buffer;
 import :infinity_exception;
-import :buffer_manager;
-import :var_file_worker;
 import :infinity_context;
+import :var_file_worker;
 
 import std;
 import third_party;
 
 namespace infinity {
 
-size_t VarBuffer::Append(std::unique_ptr<char[]> buffer, size_t size, bool *free_success_p) {
+size_t VarBuffer::Append(std::unique_ptr<char[]> buffer, size_t size) {
     if (std::holds_alternative<const char *>(buffers_)) {
         UnrecoverableError("Cannot append to a const buffer");
     }
@@ -35,20 +34,13 @@ size_t VarBuffer::Append(std::unique_ptr<char[]> buffer, size_t size, bool *free
     size_t offset = buffer_size_prefix_sum_.back();
     buffer_size_prefix_sum_.push_back(offset + size);
 
-    bool free_success = true;
-    if (buffer_obj_ != nullptr) {
-        free_success = buffer_obj_->AddBufferSize(size);
-    }
-    if (free_success_p != nullptr) {
-        *free_success_p = free_success;
-    }
     return offset;
 }
 
-size_t VarBuffer::Append(const char *data, size_t size, bool *free_success) {
+size_t VarBuffer::Append(const char *data, size_t size) {
     auto buffer = std::make_unique<char[]>(size);
     std::memcpy(buffer.get(), data, size);
-    return Append(std::move(buffer), size, free_success);
+    return Append(std::move(buffer), size);
 }
 
 const char *VarBuffer::Get(size_t offset, size_t size) const {
@@ -62,22 +54,18 @@ const char *VarBuffer::Get(size_t offset, size_t size) const {
     auto &buffers = std::get<std::vector<std::unique_ptr<char[]>>>(buffers_);
     std::shared_lock lock(mtx_);
     // find the last index i such that buffer_size_prefix_sum_[i] <= offset
-
-    auto it = std::upper_bound(buffer_size_prefix_sum_.begin(), buffer_size_prefix_sum_.end(), offset);
+    auto it = std::ranges::upper_bound(buffer_size_prefix_sum_, offset);
     if (it == buffer_size_prefix_sum_.end()) {
-        std::string error_msg = fmt::format("offset {} is out of range {}", offset, buffer_size_prefix_sum_.back());
-        UnrecoverableError(error_msg);
+        UnrecoverableError(fmt::format("offset {} is out of range {}", offset, buffer_size_prefix_sum_.back()));
     }
     if (it == buffer_size_prefix_sum_.begin()) {
-        std::string error_msg = fmt::format("prefix_sum[0] should be 0, but got {}", *it);
-        UnrecoverableError(error_msg);
+        UnrecoverableError(fmt::format("prefix_sum[0] should be 0, but got {}", *it));
     }
     size_t i = std::distance(buffer_size_prefix_sum_.begin(), it) - 1;
     size_t offset_in_buffer = offset - buffer_size_prefix_sum_[i];
     if (offset_in_buffer + size > buffer_size_prefix_sum_[i + 1]) {
-        std::string error_msg =
-            fmt::format("offset {} and size {} is out of range [{}, {})", offset, size, buffer_size_prefix_sum_[i], buffer_size_prefix_sum_[i + 1]);
-        UnrecoverableError(error_msg);
+        UnrecoverableError(
+            fmt::format("offset {} and size {} is out of range [{}, {})", offset, size, buffer_size_prefix_sum_[i], buffer_size_prefix_sum_[i + 1]));
     }
     return buffers[i].get() + offset_in_buffer;
 }
@@ -116,84 +104,80 @@ size_t VarBuffer::TotalSize() const {
     return buffer_size_prefix_sum_.back();
 }
 
-size_t VarBuffer::GetSize(size_t row_cnt) const {
-    std::shared_lock lock(mtx_);
-    if (row_cnt >= buffer_size_prefix_sum_.size()) {
-        LOG_ERROR("row_cnt >= buffer_size_prefix_sum_size");
-        return buffer_size_prefix_sum_.back();
-    } else {
-        return buffer_size_prefix_sum_[row_cnt];
-    }
-}
-
-size_t VarBufferManager::Append(std::unique_ptr<char[]> data, size_t size, bool *free_success) {
+size_t VarBufferManager::Append(std::unique_ptr<char[]> data, size_t size) {
     std::unique_lock<std::mutex> lock(mutex_);
-    auto *buffer = GetInnerMutNoLock();
-    size_t offset = buffer->Append(std::move(data), size, free_success);
+    auto buffer = GetInnerNoLock();
+    size_t offset = buffer->Append(std::move(data), size);
+    // my_var_buffer_ = buffer;
+    // if (!mem_buffer_) {
+    //     var_fileworker_->Write(std::span{buffer.get(), 1});
+    // }
     return offset;
 }
 
-VarBufferManager::VarBufferManager(BufferObj *outline_buffer_obj)
-    : type_(BufferType::kNewCatalog), buffer_handle_(std::nullopt), outline_buffer_obj_(outline_buffer_obj) {}
+VarBufferManager::VarBufferManager(VarFileWorker *var_file_worker)
+    : type_(BufferType::kNewCatalog), data_file_worker_(nullptr), var_fileworker_(var_file_worker) {}
 
-size_t VarBufferManager::Append(const char *data, size_t size, bool *free_success) {
+size_t VarBufferManager::Append(const char *data, size_t size) {
     auto buffer = std::make_unique<char[]>(size);
     std::memcpy(buffer.get(), data, size);
-    return Append(std::move(buffer), size, free_success);
+    return Append(std::move(buffer), size);
 }
 
-void VarBufferManager::SetToCatalog(BufferObj *outline_buffer_obj) {
+void VarBufferManager::SetToCatalog(VarFileWorker *var_file_worker) {
     std::unique_lock<std::mutex> lock(mutex_);
     if (type_ != BufferType::kBuffer) {
         UnrecoverableError("Cannot convert to new catalog");
     }
     type_ = BufferType::kNewCatalog;
-    outline_buffer_obj_ = outline_buffer_obj;
+    var_fileworker_ = var_file_worker;
     if (!mem_buffer_) {
-        mem_buffer_ = std::make_unique<VarBuffer>();
+        mem_buffer_ = std::make_shared<VarBuffer>();
     }
-    outline_buffer_obj_->SetData(mem_buffer_.release());
-
-    buffer_handle_ = outline_buffer_obj_->Load();
+    // var_fileworker_->SetData(mem_buffer_.release());
+    static_cast<FileWorker *>(var_fileworker_)->Write(std::span{mem_buffer_.get(), 1});
+    mem_buffer_.reset(); // this is shit
 }
 
-VarBuffer *VarBufferManager::GetInnerMutNoLock() {
+std::shared_ptr<VarBuffer> VarBufferManager::GetInnerNoLock() {
+    std::shared_ptr<VarBuffer> var_buffer;
     switch (type_) {
         case BufferType::kBuffer: {
-            if (mem_buffer_.get() == nullptr) {
-                mem_buffer_ = std::make_unique<VarBuffer>();
+            if (mem_buffer_ == nullptr) {
+                mem_buffer_ = std::make_shared<VarBuffer>();
             }
-            return mem_buffer_.get();
+            // my_var_buffer_ = mem_buffer_;
+            // // my_var_buffer_ = std::move(mem_buffer_);
+            // return var_buffer
+            // if (mem_buffer_->TotalSize() == 0) {
+            //     // std::println("..................");
+            // }
+            var_buffer = mem_buffer_;
+            return var_buffer; // copy eliminate
         }
         case BufferType::kNewCatalog: {
-            if (!buffer_handle_.has_value()) {
-                buffer_handle_ = outline_buffer_obj_->Load();
+            // std::shared_ptr<VarBuffer> var_buffer;
+            if (my_var_buffer_) {
+                var_buffer = my_var_buffer_;
+                return var_buffer;
             }
-            return static_cast<VarBuffer *>(buffer_handle_->GetDataMut());
-        }
-    }
-}
-
-const VarBuffer *VarBufferManager::GetInnerNoLock() {
-    switch (type_) {
-        case BufferType::kBuffer: {
-            if (mem_buffer_.get() == nullptr) {
-                mem_buffer_ = std::make_unique<VarBuffer>();
-            }
-            return mem_buffer_.get();
-        }
-        case BufferType::kNewCatalog: {
-            if (!buffer_handle_.has_value()) {
-                buffer_handle_ = outline_buffer_obj_->Load();
-            }
-            return static_cast<const VarBuffer *>(buffer_handle_->GetData());
+            static_cast<FileWorker *>(var_fileworker_)->Read(var_buffer);
+            my_var_buffer_ = var_buffer;
+            // if (var_buffer->TotalSize() == 0) {
+            //     std::println("//////////////////");
+            // }
+            return var_buffer;
         }
     }
 }
 
 const char *VarBufferManager::Get(size_t offset, size_t size) {
     std::unique_lock<std::mutex> lock(mutex_);
+    // std::weak_ptr<VarBuffer> some_buffer = GetInnerNoLock();
     return GetInnerNoLock()->Get(offset, size);
+    // return some_buffer.lock()->Get(offset, size);
+    // return my_var_buffer_->Get(offset, size);
+    // return some_ptr;
 }
 
 size_t VarBufferManager::Write(char *ptr) {
@@ -208,12 +192,8 @@ size_t VarBufferManager::Write(char *ptr, size_t offset, size_t size) {
 
 size_t VarBufferManager::TotalSize() {
     std::unique_lock<std::mutex> lock(mutex_);
+    // return GetInnerNoLock()->TotalSize();
     return GetInnerNoLock()->TotalSize();
-}
-
-size_t VarBufferManager::GetSize(size_t row_cnt) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    return GetInnerNoLock()->GetSize(row_cnt);
 }
 
 } // namespace infinity

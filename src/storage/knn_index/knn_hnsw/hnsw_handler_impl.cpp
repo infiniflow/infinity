@@ -7,8 +7,7 @@ module;
 module infinity_core:hnsw_handler.impl;
 
 import :hnsw_handler;
-import :buffer_manager;
-import :buffer_handle;
+
 import :block_column_iter;
 import :memindex_tracer;
 import :default_values;
@@ -458,7 +457,7 @@ void HnswHandler::LoadFromPtr(LocalFileHandle &file_handle, size_t file_size) {
         hnsw_);
 }
 
-void HnswHandler::LoadFromPtr(const char *ptr, size_t size) {
+void HnswHandler::LoadFromPtr(LocalFileHandle &file_handle, const char *ptr, size_t size) {
     std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
@@ -467,7 +466,8 @@ void HnswHandler::LoadFromPtr(const char *ptr, size_t size) {
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    UnrecoverableError("Invalid index type.");
+                    // UnrecoverableError("Invalid index type.");
+                    index = IndexT::LoadFromPtr(file_handle, size);
                 } else {
                     index = IndexT::LoadFromPtr(ptr, size);
                 }
@@ -563,6 +563,7 @@ HnswIndexInMem::~HnswIndexInMem() {
     if (own_memory_ && hnsw_handler_ != nullptr) {
         delete hnsw_handler_;
     }
+    // delete hnsw_handler_;
 
     auto *storage = InfinityContext::instance().storage();
     if (storage == nullptr) {
@@ -620,17 +621,20 @@ void HnswIndexInMem::InsertVecs(SegmentOffset block_offset,
     IncreaseMemoryUsageBase(mem_usage);
 }
 
-void HnswIndexInMem::Dump(BufferObj *buffer_obj, size_t *dump_size_ptr) {
+void HnswIndexInMem::Dump(FileWorker *index_file_worker, size_t *dump_size_ptr) {
     if (dump_size_ptr != nullptr) {
         size_t dump_size = hnsw_handler_->MemUsage();
         *dump_size_ptr = dump_size;
     }
 
-    BufferHandle handle = buffer_obj->Load();
-    auto *data_ptr = static_cast<HnswHandlerPtr *>(handle.GetDataMut());
-    *data_ptr = hnsw_handler_;
+    // std::shared_ptr<HnswHandlerPtr> data_ptr;
+    // index_file_worker->Read(data_ptr);
+    // delete *data_ptr;
+    // auto some = new HnswHandlerPtr();
+    // *data_ptr = hnsw_handler_;
     own_memory_ = false;
-    chunk_handle_ = std::move(handle);
+    index_file_worker_ = std::move(index_file_worker);
+    index_file_worker_->Write(hnsw_handler_);
 }
 
 size_t

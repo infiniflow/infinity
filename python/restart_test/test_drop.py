@@ -23,14 +23,14 @@ class TestDrop:
             res = table_obj.insert([{"c1": i} for i in range(10)])
             assert res.error_code == ErrorCode.OK
             # wait flush
-            time.sleep(2)
+            time.sleep(3)
 
             table_obj.delete("c1 < 5")
 
             db_obj.drop_table("test_drop")
 
             # wait for the drop be flushed in delta ckp
-            time.sleep(3)
+            time.sleep(4)
 
         part1()
 

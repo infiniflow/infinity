@@ -98,7 +98,7 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
             if (strcmp(str, "-fine") == 0) {
                 cut_grain = CutGrain::kFine;
             }
-            std::unique_ptr<ChineseAnalyzer> analyzer = std::make_unique<ChineseAnalyzer>(*reinterpret_cast<ChineseAnalyzer *>(prototype));
+            auto analyzer = std::make_unique<ChineseAnalyzer>(*reinterpret_cast<ChineseAnalyzer *>(prototype));
             analyzer->SetCutGrain(cut_grain);
             return {std::move(analyzer), Status::OK()};
         }
@@ -115,7 +115,7 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
                 } else {
                     path = config->ResourcePath();
                 }
-                std::unique_ptr<TraditionalChineseAnalyzer> analyzer = std::make_unique<TraditionalChineseAnalyzer>(std::move(path));
+                auto analyzer = std::make_unique<TraditionalChineseAnalyzer>(std::move(path));
                 if (auto load_status = analyzer->Load(); !load_status.ok()) {
                     return {nullptr, load_status};
                 }
@@ -130,8 +130,7 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
             if (strcmp(str, "-fine") == 0) {
                 cut_grain = CutGrain::kFine;
             }
-            std::unique_ptr<TraditionalChineseAnalyzer> analyzer =
-                std::make_unique<TraditionalChineseAnalyzer>(*reinterpret_cast<TraditionalChineseAnalyzer *>(prototype));
+            auto analyzer = std::make_unique<TraditionalChineseAnalyzer>(*reinterpret_cast<TraditionalChineseAnalyzer *>(prototype));
             analyzer->SetCutGrain(cut_grain);
             return {std::move(analyzer), Status::OK()};
         }
@@ -163,7 +162,7 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
             if (strcmp(str, "-fine") == 0) {
                 fine_grained = true;
             }
-            std::unique_ptr<RAGAnalyzer> analyzer = std::make_unique<RAGAnalyzer>(*reinterpret_cast<RAGAnalyzer *>(prototype));
+            auto analyzer = std::make_unique<RAGAnalyzer>(*reinterpret_cast<RAGAnalyzer *>(prototype));
             analyzer->SetFineGrained(fine_grained);
             return {std::move(analyzer), Status::OK()};
         }
@@ -180,7 +179,7 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
                 } else {
                     path = config->ResourcePath();
                 }
-                std::unique_ptr<IKAnalyzer> analyzer = std::make_unique<IKAnalyzer>(std::move(path));
+                auto analyzer = std::make_unique<IKAnalyzer>(std::move(path));
                 Status load_status = analyzer->Load();
                 if (!load_status.ok()) {
                     return {nullptr, load_status};
@@ -196,7 +195,7 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
             if (strcmp(str, "-fine") == 0) {
                 fine_grained = true;
             }
-            std::unique_ptr<IKAnalyzer> analyzer = std::make_unique<IKAnalyzer>(*reinterpret_cast<IKAnalyzer *>(prototype));
+            auto analyzer = std::make_unique<IKAnalyzer>(*reinterpret_cast<IKAnalyzer *>(prototype));
             analyzer->SetFineGrained(fine_grained);
             return {std::move(analyzer), Status::OK()};
         }
@@ -212,7 +211,7 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
                 } else {
                     path = config->ResourcePath();
                 }
-                std::unique_ptr<JapaneseAnalyzer> analyzer = std::make_unique<JapaneseAnalyzer>(std::move(path));
+                auto analyzer = std::make_unique<JapaneseAnalyzer>(std::move(path));
                 Status load_status = analyzer->Load();
                 if (!load_status.ok()) {
                     return {nullptr, load_status};
@@ -233,7 +232,7 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
                 } else {
                     path = config->ResourcePath();
                 }
-                std::unique_ptr<KoreanAnalyzer> analyzer = std::make_unique<KoreanAnalyzer>(std::move(path));
+                auto analyzer = std::make_unique<KoreanAnalyzer>(std::move(path));
                 Status load_status = analyzer->Load();
                 if (!load_status.ok()) {
                     return {nullptr, load_status};

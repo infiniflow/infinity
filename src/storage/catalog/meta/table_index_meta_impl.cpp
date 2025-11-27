@@ -166,33 +166,9 @@ Status TableIndexMeta::RemoveSegmentIndexIDs(const std::vector<SegmentID> &segme
     return Status::OK();
 }
 
-Status TableIndexMeta::GetSegmentUpdateTS(std::shared_ptr<SegmentUpdateTS> &segment_update_ts) {
-    if (segment_update_ts_) {
-        segment_update_ts = segment_update_ts_;
-        return Status::OK();
-    }
-    std::string segment_update_ts_key = GetTableIndexTag("segment_update_ts");
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    Status status = new_catalog->GetSegmentUpdateTS(segment_update_ts_key, segment_update_ts);
-    if (!status.ok()) {
-        return status;
-    }
-    segment_update_ts_ = segment_update_ts;
-    return Status::OK();
-}
-
 Status TableIndexMeta::InitSet1(const std::shared_ptr<IndexBase> &index_base, NewCatalog *new_catalog) {
     {
         Status status = SetIndexBase(index_base);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    if (index_base->index_type_ == IndexType::kFullText) {
-        std::string segment_update_ts_key = GetTableIndexTag("segment_update_ts");
-        LOG_INFO(fmt::format("segment_update_ts_key: {}", segment_update_ts_key));
-        auto segment_update_ts = std::make_shared<SegmentUpdateTS>();
-        Status status = new_catalog->AddSegmentUpdateTS(segment_update_ts_key, segment_update_ts);
         if (!status.ok()) {
             return status;
         }
@@ -214,10 +190,6 @@ Status TableIndexMeta::UninitSet1(UsageFlag usage_flag) {
             if (!status.ok() && status.code() != ErrorCode::kCatalogError) {
                 return status;
             }
-
-            NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-            std::string segment_update_ts_key = GetTableIndexTag("segment_update_ts");
-            new_catalog->DropSegmentUpdateTSByKey(segment_update_ts_key);
         }
     }
 

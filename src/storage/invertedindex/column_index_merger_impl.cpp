@@ -46,30 +46,19 @@ void ColumnIndexMerger::Merge(const std::vector<std::string> &base_names, const 
     if (base_rowids.empty()) {
         return;
     }
-    std::filesystem::path path = std::filesystem::path(InfinityContext::instance().config()->DataDir()) / index_dir_ / dst_base_name;
-    std::string index_prefix = path.string();
-    std::string dict_file = index_prefix + DICT_SUFFIX;
-    std::string fst_file = dict_file + ".fst";
-    std::string posting_file = index_prefix + POSTING_SUFFIX;
-    std::string column_length_file = index_prefix + LENGTH_SUFFIX;
+    std::filesystem::path path = std::filesystem::path(InfinityContext::instance().config()->TempDir()) / index_dir_ / dst_base_name;
+    auto index_prefix = path.string();
+    auto dict_file = index_prefix + DICT_SUFFIX;
+    auto fst_file = dict_file + ".fst";
+    auto posting_file = index_prefix + POSTING_SUFFIX;
+    auto column_length_file = index_prefix + LENGTH_SUFFIX;
 
-    std::string tmp_dict_file(dict_file);
-    std::string tmp_posting_file(posting_file);
-    std::string tmp_column_length_file(column_length_file);
-    std::string tmp_fst_file(fst_file);
+    auto tmp_dict_file(dict_file);
+    auto tmp_posting_file(posting_file);
+    auto tmp_column_length_file(column_length_file);
+    auto tmp_fst_file(fst_file);
 
-    // handle persistence obj_addrs
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-    if (use_object_cache) {
-        std::filesystem::path temp_dir = std::filesystem::path(InfinityContext::instance().config()->TempDir());
-        tmp_dict_file = temp_dir / StringTransform(tmp_dict_file, "/", "_");
-        tmp_posting_file = temp_dir / StringTransform(tmp_posting_file, "/", "_");
-        tmp_column_length_file = temp_dir / StringTransform(tmp_column_length_file, "/", "_");
-        tmp_fst_file = temp_dir / StringTransform(tmp_fst_file, "/", "_");
-    }
-
-    std::shared_ptr<FileWriter> dict_file_writer = std::make_shared<FileWriter>(tmp_dict_file, 1024);
+    auto dict_file_writer = std::make_shared<FileWriter>(tmp_dict_file, 1024);
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
     posting_file_writer_ = std::make_shared<FileWriter>(tmp_posting_file, 1024);
     std::ofstream ofs(tmp_fst_file.c_str(), std::ios::binary | std::ios::trunc);
@@ -92,18 +81,11 @@ void ColumnIndexMerger::Merge(const std::vector<std::string> &base_names, const 
         // otherwise the range of row_id will be very large ( >= 2^32)
         std::vector<u32> &unsafe_column_lengths = column_lengths_.UnsafeVec();
         unsafe_column_lengths.clear();
-        PersistResultHandler handler(pm);
         for (u32 i = 0; i < base_names.size(); ++i) {
             std::string column_len_file =
-                std::filesystem::path(InfinityContext::instance().config()->DataDir()) / index_dir_ / (base_names[i] + LENGTH_SUFFIX);
+                std::filesystem::path(InfinityContext::instance().config()->TempDir()) / index_dir_ / (base_names[i] + LENGTH_SUFFIX);
             RowID base_row_id = base_rowids[i];
             u32 id_offset = base_row_id - merge_base_rowid;
-
-            if (use_object_cache) {
-                PersistReadResult result = pm->GetObjCache(column_len_file);
-                const ObjAddr &obj_addr = handler.HandleReadResult(result);
-                column_len_file = pm->GetObjPath(obj_addr.obj_key_);
-            }
 
             auto [file_handle, open_status] = VirtualStore::Open(column_len_file, FileAccessMode::kRead);
             if (!open_status.ok()) {
@@ -120,13 +102,6 @@ void ColumnIndexMerger::Merge(const std::vector<std::string> &base_names, const 
             }
             if (read_count != file_size) {
                 UnrecoverableError("ColumnIndexMerger: when loading column length file, read_count != file_size");
-            }
-
-            if (use_object_cache) {
-                column_len_file =
-                    std::filesystem::path(InfinityContext::instance().config()->DataDir()) / index_dir_ / (base_names[i] + LENGTH_SUFFIX);
-                PersistWriteResult res = pm->PutObjCache(column_len_file);
-                handler.HandleWriteResult(res);
             }
         }
 
@@ -157,17 +132,6 @@ void ColumnIndexMerger::Merge(const std::vector<std::string> &base_names, const 
 
     LOG_INFO(fmt::format("Delete FST file: {}", tmp_fst_file));
     VirtualStore::DeleteFile(tmp_fst_file);
-    if (use_object_cache) {
-        PersistResultHandler handler(pm);
-        PersistWriteResult result1 = pm->Persist(dict_file, tmp_dict_file, false);
-        PersistWriteResult result2 = pm->Persist(posting_file, tmp_posting_file, false);
-        PersistWriteResult result3 = pm->Persist(column_length_file, tmp_column_length_file, false);
-        handler.HandleWriteResult(result1);
-        handler.HandleWriteResult(result2);
-        handler.HandleWriteResult(result3);
-        PersistWriteResult result4 = pm->CurrentObjFinalize();
-        handler.HandleWriteResult(result4);
-    }
 }
 
 void ColumnIndexMerger::MergeTerm(const std::string &term,

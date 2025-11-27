@@ -31,10 +31,10 @@ public:
                                size_t count,
                                void *state_ptr,
                                bool nullable) {
-        const auto *input_ptr = (const InputElemType *)(input->data());
+        const auto *input_ptr = (const InputElemType *)(input->data().get());
         const std::shared_ptr<Bitmask> &input_null = input->nulls_ptr_;
 
-        auto *result_ptr = (OutputElemType *)(result->data());
+        auto *result_ptr = (OutputElemType *)(result->data().get());
         std::shared_ptr<Bitmask> &result_null = result->nulls_ptr_;
 
         auto embedding_info = static_cast<EmbeddingInfo *>(input->data_type()->type_info().get());

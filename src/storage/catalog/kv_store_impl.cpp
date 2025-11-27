@@ -99,34 +99,7 @@ Status KVInstance::Get(const std::string &key, std::string &value) {
     return Status::OK();
 }
 
-// Status KVInstance::GetForUpdate(const std::string &key, std::string &value) {
-//     rocksdb::Status s = transaction_->GetForUpdate(read_options_, key, &value);
-//     if (!s.ok()) {
-//         switch (s.code()) {
-//             case rocksdb::Status::Code::kNotFound: {
-//                 return Status::NotFound(fmt::format("Key not found: {}", key));
-//             }
-//             default: {
-//                 std::string msg = fmt::format("rocksdb::Transaction::GetForUpdate key: {}", key);
-//                 LOG_DEBUG(msg);
-//                 return Status::RocksDBError(std::move(s), key);
-//             }
-//         }
-//     }
-//     return Status::OK();
-// }
-
 std::unique_ptr<KVIterator> KVInstance::GetIterator() { return std::make_unique<KVIterator>(transaction_->GetIterator(read_options_)); }
-
-// std::unique_ptr<KVIterator> KVInstance::GetIterator(const char *lower_bound_key, const char *upper_bound_key) {
-//     if (lower_bound_key != nullptr) {
-//         read_options_.iterate_lower_bound = new rocksdb::Slice(lower_bound_key);
-//     }
-//     if (upper_bound_key != nullptr) {
-//         read_options_.iterate_upper_bound = new rocksdb::Slice(upper_bound_key);
-//     }
-//     return std::make_unique<KVIterator>(transaction_->GetIterator(read_options_));
-// }
 
 std::vector<std::pair<std::string, std::string>> KVInstance::GetAllKeyValue() {
     std::vector<std::pair<std::string, std::string>> result;
@@ -187,9 +160,9 @@ public:
 
     void OnFlushCompleted(rocksdb::DB *db, const rocksdb::FlushJobInfo &info) final {
         const auto &absolute_file_path = info.file_path;
-        auto v = infinity::Partition(absolute_file_path, '/');
+        auto v = Partition(absolute_file_path, '/');
         auto &file = v.back();
-        auto *config = infinity::InfinityContext::instance().config();
+        auto *config = InfinityContext::instance().config();
         const auto &catalog_path = config->CatalogDir();
 
         // sst
@@ -206,7 +179,7 @@ public:
 
         for (auto &file : local_live_files | std::views::filter(std::not_fn(IsSstFile))) {
             // upload to s3
-            auto v = infinity::Partition(file, '/');
+            auto v = Partition(file, '/');
             auto &file1 = v.back();
             remote_file_path = fmt::format("{}/{}", S3_META_PREFIX, file1);
             local_file_path = fmt::format("{}/{}", catalog_path, file1);
@@ -230,14 +203,14 @@ public:
         const auto &catalog_path = config->CatalogDir();
 
         for (const auto &absolute_file_path : output_files) {
-            auto v = infinity::Partition(absolute_file_path, '/');
+            auto v = Partition(absolute_file_path, '/');
             auto &file = v.back();
             auto remote_file_path = fmt::format("{}/{}", S3_META_SST_PREFIX, file);
             auto local_file_path = fmt::format("{}/{}", catalog_path, file);
             VirtualStore::UploadObject(local_file_path, remote_file_path);
         }
         for (const auto &absolute_file_path : input_files) {
-            auto v = infinity::Partition(absolute_file_path, '/');
+            auto v = Partition(absolute_file_path, '/');
             auto &file = v.back();
             auto remote_file_path = fmt::format("{}/{}", S3_META_SST_PREFIX, file);
             VirtualStore::RemoveObject(remote_file_path);
@@ -254,7 +227,7 @@ public:
 
         for (auto &file : local_live_files | std::views::filter(std::not_fn(IsSstFile))) {
             // upload to s3
-            auto v = infinity::Partition(file, '/');
+            auto v = Partition(file, '/');
             auto &file1 = v.back();
             auto remote_file_path = fmt::format("{}/{}", S3_META_PREFIX, file1);
             auto local_file_path = fmt::format("{}/{}", catalog_path, file1);
@@ -276,7 +249,7 @@ Status KVStore::Init(const std::string &db_path) {
 
     txn_options_.set_snapshot = true;
 
-    auto *config = infinity::InfinityContext::instance().config();
+    auto *config = InfinityContext::instance().config();
     if (config != nullptr && config->StorageType() == StorageType::kMinio) {
         options_.listeners.emplace_back(std::make_shared<FlushListener>());
         options_.listeners.emplace_back(std::make_shared<CompactListener>());

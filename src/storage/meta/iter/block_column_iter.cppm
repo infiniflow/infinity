@@ -14,8 +14,6 @@
 
 export module infinity_core:block_column_iter;
 
-import :buffer_handle;
-import :buffer_manager;
 import :column_vector;
 import :sparse_util;
 import :multivector_util;
@@ -40,7 +38,7 @@ public:
         if (cur_ == end_) {
             return std::nullopt;
         }
-        const void *ret = col_.data() + cur_ * ele_size_;
+        const void *ret = col_.data().get() + cur_ * ele_size_;
         const auto *v_ptr = reinterpret_cast<ValueType>(ret);
         return std::make_pair(v_ptr, block_offset_ + cur_++);
     }

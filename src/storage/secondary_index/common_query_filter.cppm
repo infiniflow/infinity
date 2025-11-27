@@ -25,7 +25,6 @@ class FastRoughFilterEvaluator;
 class BaseTableRef;
 class BaseExpression;
 class QueryContext;
-class BufferManager;
 class NewTxn;
 
 export struct CommonQueryFilter {

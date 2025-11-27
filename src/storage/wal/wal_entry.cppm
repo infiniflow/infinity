@@ -36,7 +36,7 @@ enum class SegmentStatus : u8;
 class ChunkIndexMeta;
 class ChunkIndexMetaInfo;
 class BlockMeta;
-class SegmentMeta;
+export class SegmentMeta;
 struct EraseBaseCache;
 
 export enum class WalCommandType : i8 {
@@ -471,7 +471,7 @@ export struct WalCmdAppendV2 final : public WalCmd {
     std::string table_name_{};
     std::string table_id_{};
     std::vector<std::pair<RowID, u64>> row_ranges_{};
-    std::shared_ptr<DataBlock> block_{};
+    std::shared_ptr<DataBlock> block_;
 };
 
 export struct WalCmdDeleteV2 final : public WalCmd {

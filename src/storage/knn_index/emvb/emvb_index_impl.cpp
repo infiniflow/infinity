@@ -25,7 +25,7 @@ import :status;
 import :logger;
 import :infinity_exception;
 import :column_vector;
-import :buffer_manager;
+
 import :default_values;
 import :block_index;
 import :new_catalog;
@@ -100,7 +100,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
             UnrecoverableError("EMVBIndex::BuildEMVBIndex: GetColumnVector failed!");
         }
 
-        const TensorT *tensor_ptr = reinterpret_cast<const TensorT *>(column_vector.data());
+        const TensorT *tensor_ptr = reinterpret_cast<const TensorT *>(column_vector.data().get());
         for (u32 i = 0; i < row_count; ++i) {
             {
                 const SegmentOffset new_segment_offset = start_segment_offset + i;
@@ -119,7 +119,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
                     if (!status.ok()) {
                         UnrecoverableError("EMVBIndex::BuildEMVBIndex: GetColumnVector failed!");
                     }
-                    tensor_ptr = reinterpret_cast<const TensorT *>(column_vector.data());
+                    tensor_ptr = reinterpret_cast<const TensorT *>(column_vector.data().get());
                 }
             }
             const auto [embedding_num, chunk_offset] = tensor_ptr[block_offset];

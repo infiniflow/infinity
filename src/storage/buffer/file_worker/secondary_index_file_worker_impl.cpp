@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <sys/mman.h>
+#include <unistd.h>
+
 module infinity_core:secondary_index_file_worker.impl;
 
 import :secondary_index_file_worker;
@@ -29,55 +34,59 @@ import third_party;
 namespace infinity {
 
 SecondaryIndexFileWorker::~SecondaryIndexFileWorker() {
-    if (data_ != nullptr) {
-        FreeInMemory();
-        data_ = nullptr;
-    }
+    munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
-void SecondaryIndexFileWorker::AllocateInMemory() {
-    if (data_) [[unlikely]] {
-        UnrecoverableError("AllocateInMemory: Already allocated.");
-    } else if (auto &data_type = column_def_->type(); data_type->CanBuildSecondaryIndex()) [[likely]] {
-        data_ = static_cast<void *>(GetSecondaryIndexData(data_type, row_count_, true));
-        LOG_TRACE("Finished AllocateInMemory().");
-    } else {
-        UnrecoverableError(fmt::format("Cannot build secondary index on data type: {}", data_type->ToString()));
-    }
-}
+bool SecondaryIndexFileWorker::Write(SecondaryIndexDataBase<HighCardinalityTag> *data,
+                                     std::unique_ptr<LocalFileHandle> &file_handle,
+                                     bool &prepare_success,
+                                     const FileWorkerSaveCtx &ctx) {
+    auto index = data;
+    index->SaveIndexInner(*file_handle);
+    prepare_success = true;
+    file_handle->Sync();
+    LOG_TRACE("Finished WriteToFileImpl(bool &prepare_success).");
 
-void SecondaryIndexFileWorker::FreeInMemory() {
-    if (data_) [[likely]] {
-        auto index = static_cast<SecondaryIndexData *>(data_);
-        delete index;
-        data_ = nullptr;
-        LOG_TRACE("Finished SecondaryIndexFileWorker::FreeInMemory(), deleted data_ ptr.");
-    } else {
-        UnrecoverableError("FreeInMemory: Data is not allocated.");
-    }
-}
-
-bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-    if (data_) [[likely]] {
-        auto index = static_cast<SecondaryIndexData *>(data_);
-        index->SaveIndexInner(*file_handle_);
-        prepare_success = true;
-        LOG_TRACE("Finished WriteToFileImpl(bool &prepare_success).");
-    } else {
-        UnrecoverableError("WriteToFileImpl: data_ is nullptr");
-    }
     return true;
 }
 
-void SecondaryIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
-    if (!data_) [[likely]] {
-        auto index = GetSecondaryIndexData(column_def_->type(), row_count_, false);
-        index->ReadIndexInner(*file_handle_);
-        data_ = static_cast<void *>(index);
-        LOG_TRACE("Finished ReadFromFileImpl().");
-    } else {
-        UnrecoverableError("ReadFromFileImpl: data_ is not nullptr");
+bool SecondaryIndexFileWorker::Write(SecondaryIndexDataBase<LowCardinalityTag> *data,
+                                     std::unique_ptr<LocalFileHandle> &file_handle,
+                                     bool &prepare_success,
+                                     const FileWorkerSaveCtx &ctx) {
+    auto index = data;
+    index->SaveIndexInner(*file_handle);
+    prepare_success = true;
+    file_handle->Sync();
+    LOG_TRACE("Finished WriteToFileImpl(bool &prepare_success).");
+
+    return true;
+}
+
+void SecondaryIndexFileWorker::Read(SecondaryIndexDataBase<HighCardinalityTag> *&data,
+                                    std::unique_ptr<LocalFileHandle> &file_handle,
+                                    size_t file_size) {
+    auto index = GetSecondaryIndexData(column_def_->type(), row_count_, false);
+    // data = std::shared_ptr<SecondaryIndexDataBase<HighCardinalityTag>>(index);
+    data = index;
+    if (!file_handle) {
+        return;
     }
+    data->ReadIndexInner(*file_handle);
+    LOG_TRACE("Finished Read().");
+}
+
+void SecondaryIndexFileWorker::Read(std::shared_ptr<SecondaryIndexDataBase<LowCardinalityTag>> &data,
+                                    std::unique_ptr<LocalFileHandle> &file_handle,
+                                    size_t file_size) {
+    auto index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(column_def_->type(), row_count_, false);
+    data = std::shared_ptr<SecondaryIndexDataBase<LowCardinalityTag>>(index);
+    if (!file_handle) {
+        return;
+    }
+    data->ReadIndexInner(*file_handle);
+    LOG_TRACE("Finished Read().");
 }
 
 } // namespace infinity
