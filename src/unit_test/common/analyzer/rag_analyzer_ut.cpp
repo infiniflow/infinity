@@ -24,7 +24,6 @@ import :analyzer;
 import :rag_analyzer;
 import :darts_trie;
 import :darts;
-import :lemmatizer;
 
 using namespace infinity;
 
