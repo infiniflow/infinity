@@ -253,3 +253,35 @@ TEST_F(LowCardinalitySecondaryIndexTest, TestComparisonWithHighCardinality) {
     delete high_card_index;
     delete low_card_index;
 }
+
+TEST_F(LowCardinalitySecondaryIndexTest, TestSaveLoadLowCardinality) {
+    const u32 chunk_row_count = 1000;
+    const u32 unique_values = 5;
+
+    // Create test data
+    auto test_data = CreateLowCardinalityData<i32>(chunk_row_count, unique_values);
+
+    // Create low cardinality secondary index
+    auto data_type = std::make_shared<DataType>(LogicalType::kInteger);
+    auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
+    ASSERT_NE(index, nullptr);
+
+    // Insert data
+    index->InsertData(&test_data);
+    auto key_count = index->GetUniqueKeyCount();
+
+    // Save data
+    std::string tmp_path = fmt::format("{}/{}", "/var/infinity/tmp", "test001.idx");
+    auto [file, status] = VirtualStore::Open(tmp_path, FileAccessMode::kWrite);
+    EXPECT_TRUE(status.ok());
+    index->SaveIndexInner(*file);
+
+    // Load data
+    auto [file2, status2] = VirtualStore::Open(tmp_path, FileAccessMode::kRead);
+    EXPECT_TRUE(status2.ok());
+    index->ReadIndexInner(*file2);
+    EXPECT_EQ(key_count, index->GetUniqueKeyCount());
+
+    std::string cmd = fmt::format("rm -rf {}", tmp_path);
+    system(cmd.c_str());
+}
