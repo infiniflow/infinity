@@ -409,8 +409,12 @@ public:
         while (end != std::string::npos) {
             if (end != start) {
                 std::string token = result.substr(start, end - start);
-                // Split tokens containing underscores and keep underscores as separate tokens
-                if (token.find('_') != std::string::npos) {
+                // Handle underscore tokens properly
+                if (token == "_") {
+                    // Single underscore token
+                    tokens.push_back("_");
+                } else if (token.find('_') != std::string::npos) {
+                    // Split tokens containing underscores and keep underscores as separate tokens
                     std::stringstream ss(token);
                     std::string sub_token;
                     bool first = true;
@@ -423,6 +427,10 @@ public:
                         }
                         first = false;
                     }
+                    // Handle case where token ends with underscore
+                    if (token.back() == '_') {
+                        tokens.push_back("_");
+                    }
                 } else {
                     tokens.push_back(token);
                 }
@@ -432,8 +440,12 @@ public:
         }
         if (start != result.length()) {
             std::string token = result.substr(start);
-            // Split tokens containing underscores and keep underscores as separate tokens
-            if (token.find('_') != std::string::npos) {
+            // Handle underscore tokens properly
+            if (token == "_") {
+                // Single underscore token
+                tokens.push_back("_");
+            } else if (token.find('_') != std::string::npos) {
+                // Split tokens containing underscores and keep underscores as separate tokens
                 std::stringstream ss(token);
                 std::string sub_token;
                 bool first = true;
@@ -445,6 +457,10 @@ public:
                         tokens.push_back(sub_token);
                     }
                     first = false;
+                }
+                // Handle case where token ends with underscore
+                if (token.back() == '_') {
+                    tokens.push_back("_");
                 }
             } else {
                 tokens.push_back(token);
