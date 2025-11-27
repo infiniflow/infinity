@@ -1580,6 +1580,7 @@ Status NewTxn::RestoreDatabaseSnapshot(std::shared_ptr<DatabaseSnapshotInfo> &da
     base_txn_store_ = std::make_shared<RestoreDatabaseTxnStore>();
     RestoreDatabaseTxnStore *txn_store = static_cast<RestoreDatabaseTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
+    txn_store->snapshot_name_ = database_snapshot_info->snapshot_name_;
     txn_store->db_id_str_ = db_id_str;
     txn_store->db_comment_ = database_snapshot_info->db_comment_;
 
@@ -1663,6 +1664,7 @@ Status NewTxn::RestoreSystemSnapshot(std::shared_ptr<SystemSnapshotInfo> &system
         RestoreSystemTxnStore *system_txn_store = static_cast<RestoreSystemTxnStore *>(base_txn_store_.get());
         auto database_txn_store = std::make_shared<RestoreDatabaseTxnStore>();
         database_txn_store->db_name_ = db_name;
+        database_txn_store->snapshot_name_ = database_snapshot_info->snapshot_name_;
         database_txn_store->db_id_str_ = db_id_str;
         database_txn_store->db_comment_ = database_snapshot_info->db_comment_;
 
@@ -1717,6 +1719,8 @@ Status NewTxn::RestoreSystemSnapshot(std::shared_ptr<SystemSnapshotInfo> &system
     };
 
     base_txn_store_ = std::make_shared<RestoreSystemTxnStore>();
+    RestoreSystemTxnStore *system_txn_store = static_cast<RestoreSystemTxnStore *>(base_txn_store_.get());
+    system_txn_store->snapshot_name_ = system_snapshot_info->snapshot_name_;
     for (auto &database_snapshot : system_snapshot_info->database_snapshots_) {
         Status status = RestoreDatabaseSnapshot2(database_snapshot);
         if (!status.ok()) {
@@ -5947,12 +5951,8 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
     LOG_TRACE(fmt::format("Replay restore database: {} with id {}.", restore_database_cmd->db_name_, restore_database_cmd->db_id_str_));
 
     std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    std::string snapshot_name{};
-    if (restore_database_cmd->restore_table_wal_cmds_.size() > 0) {
-        snapshot_name = restore_database_cmd->restore_table_wal_cmds_[0].snapshot_name_;
-    } else {
-        return Status::OK();
-    }
+    std::string snapshot_name = restore_database_cmd->snapshot_name_;
+
     std::shared_ptr<DatabaseSnapshotInfo> database_snapshot_info;
     Status status;
     std::tie(database_snapshot_info, status) = DatabaseSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
@@ -5985,8 +5985,6 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
         std::tie(next_table_id_str, status) = db_meta->GetNextTableID();
 
         // copy files from snapshot to data dir
-        std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-        std::string snapshot_name = table_snapshot_info->snapshot_name_;
         std::vector<std::string> restored_file_paths;
 
         status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir,
@@ -6008,16 +6006,7 @@ Status NewTxn::ReplayRestoreSystemSnapshot(WalCmdRestoreSystemSnapshot *restore_
     LOG_TRACE("Replay restore system");
 
     std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    std::string snapshot_name{};
-
-    for (auto &restore_database_wal_cmd : restore_system_cmd->restore_database_wal_cmds_) {
-        if (restore_database_wal_cmd.restore_table_wal_cmds_.size() > 0) {
-            snapshot_name = restore_database_wal_cmd.restore_table_wal_cmds_[0].snapshot_name_;
-        }
-    }
-    if (snapshot_name.empty()) {
-        return Status::OK();
-    }
+    std::string snapshot_name = restore_system_cmd->snapshot_name_;
 
     std::shared_ptr<SystemSnapshotInfo> system_snapshot_info;
     Status status;
@@ -6052,8 +6041,6 @@ Status NewTxn::ReplayRestoreSystemSnapshot(WalCmdRestoreSystemSnapshot *restore_
             std::tie(next_table_id_str, status) = db_meta->GetNextTableID();
 
             // copy files from snapshot to data dir
-            std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-            std::string snapshot_name = table_snapshot_info->snapshot_name_;
             std::vector<std::string> restored_file_paths;
 
             status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir,

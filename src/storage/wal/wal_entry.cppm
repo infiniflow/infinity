@@ -859,9 +859,10 @@ export struct WalCmdRestoreDatabaseSnapshot : public WalCmd {
     WalCmdRestoreDatabaseSnapshot(const std::string &db_name,
                                   const std::string &db_id_str,
                                   const std::string &db_comment,
+                                  const std::string &snapshot_name,
                                   const std::vector<WalCmdRestoreTableSnapshot> &restore_table_wal_cmds)
         : WalCmd(WalCommandType::RESTORE_DATABASE_SNAPSHOT), db_name_(db_name), db_id_str_(db_id_str), db_comment_(db_comment),
-          restore_table_wal_cmds_(restore_table_wal_cmds) {}
+          snapshot_name_(snapshot_name), restore_table_wal_cmds_(restore_table_wal_cmds) {}
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -876,13 +877,14 @@ export struct WalCmdRestoreDatabaseSnapshot : public WalCmd {
     std::string db_name_{};
     std::string db_id_str_{};
     std::string db_comment_{};
+    std::string snapshot_name_{};
 
     std::vector<WalCmdRestoreTableSnapshot> restore_table_wal_cmds_{};
 };
 
 export struct WalCmdRestoreSystemSnapshot : public WalCmd {
-    WalCmdRestoreSystemSnapshot(const std::vector<WalCmdRestoreDatabaseSnapshot> &restore_database_wal_cmds)
-        : WalCmd(WalCommandType::RESTORE_SYSTEM_SNAPSHOT), restore_database_wal_cmds_(restore_database_wal_cmds) {}
+    WalCmdRestoreSystemSnapshot(const std::string &snapshot_name, const std::vector<WalCmdRestoreDatabaseSnapshot> &restore_database_wal_cmds)
+        : WalCmd(WalCommandType::RESTORE_SYSTEM_SNAPSHOT), snapshot_name_(snapshot_name), restore_database_wal_cmds_(restore_database_wal_cmds) {}
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -892,6 +894,7 @@ export struct WalCmdRestoreSystemSnapshot : public WalCmd {
     std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
+    std::string snapshot_name_{};
     std::vector<WalCmdRestoreDatabaseSnapshot> restore_database_wal_cmds_{};
 };
 

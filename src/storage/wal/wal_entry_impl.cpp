@@ -697,23 +697,25 @@ std::shared_ptr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             std::string db_name = ReadBufAdv<std::string>(ptr);
             std::string db_id = ReadBufAdv<std::string>(ptr);
             std::string db_comment = ReadBufAdv<std::string>(ptr);
+            std::string snapshot_name = ReadBufAdv<std::string>(ptr);
             i32 restore_table_n = ReadBufAdv<i32>(ptr);
             std::vector<WalCmdRestoreTableSnapshot> restore_table_wal_cmds;
             for (i32 i = 0; i < restore_table_n; ++i) {
                 ReadBufAdv<WalCommandType>(ptr);
                 restore_table_wal_cmds.push_back(WalCmdRestoreTableSnapshot::ReadBufferAdv(ptr, max_bytes));
             }
-            cmd = std::make_shared<WalCmdRestoreDatabaseSnapshot>(db_name, db_id, db_comment, restore_table_wal_cmds);
+            cmd = std::make_shared<WalCmdRestoreDatabaseSnapshot>(db_name, db_id, db_comment, snapshot_name, restore_table_wal_cmds);
             break;
         }
         case WalCommandType::RESTORE_SYSTEM_SNAPSHOT: {
+            std::string snapshot_name = ReadBufAdv<std::string>(ptr);
             i32 restore_database_n = ReadBufAdv<i32>(ptr);
             std::vector<WalCmdRestoreDatabaseSnapshot> restore_database_wal_cmds;
             for (i32 i = 0; i < restore_database_n; ++i) {
                 ReadBufAdv<WalCommandType>(ptr);
                 restore_database_wal_cmds.push_back(WalCmdRestoreDatabaseSnapshot::ReadBufferAdv(ptr, max_bytes));
             }
-            cmd = std::make_shared<WalCmdRestoreSystemSnapshot>(restore_database_wal_cmds);
+            cmd = std::make_shared<WalCmdRestoreSystemSnapshot>(snapshot_name, restore_database_wal_cmds);
             break;
         }
         default: {
@@ -792,13 +794,14 @@ WalCmdRestoreDatabaseSnapshot WalCmdRestoreDatabaseSnapshot::ReadBufferAdv(const
     std::string db_name = ReadBufAdv<std::string>(ptr);
     std::string db_id = ReadBufAdv<std::string>(ptr);
     std::string db_comment = ReadBufAdv<std::string>(ptr);
+    std::string snapshot_name = ReadBufAdv<std::string>(ptr);
     i32 restore_table_n = ReadBufAdv<i32>(ptr);
     std::vector<WalCmdRestoreTableSnapshot> restore_table_wal_cmds;
     for (i32 i = 0; i < restore_table_n; ++i) {
         ReadBufAdv<WalCommandType>(ptr);
         restore_table_wal_cmds.push_back(WalCmdRestoreTableSnapshot::ReadBufferAdv(ptr, max_bytes));
     }
-    return WalCmdRestoreDatabaseSnapshot(db_name, db_id, db_comment, restore_table_wal_cmds);
+    return WalCmdRestoreDatabaseSnapshot(db_name, db_id, db_comment, snapshot_name, restore_table_wal_cmds);
 }
 
 bool WalCmdCreateDatabaseV2::operator==(const WalCmd &other) const {
@@ -996,7 +999,7 @@ bool WalCmdRestoreTableSnapshot::operator==(const WalCmd &other) const {
 bool WalCmdRestoreDatabaseSnapshot::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdRestoreDatabaseSnapshot *>(&other);
     if (other_cmd == nullptr || db_name_ != other_cmd->db_name_ || db_id_str_ != other_cmd->db_id_str_ || db_comment_ != other_cmd->db_comment_ ||
-        restore_table_wal_cmds_.size() != other_cmd->restore_table_wal_cmds_.size()) {
+        snapshot_name_ != other_cmd->snapshot_name_ || restore_table_wal_cmds_.size() != other_cmd->restore_table_wal_cmds_.size()) {
         return false;
     }
     for (size_t i = 0; i < restore_table_wal_cmds_.size(); i++) {
@@ -1009,7 +1012,8 @@ bool WalCmdRestoreDatabaseSnapshot::operator==(const WalCmd &other) const {
 
 bool WalCmdRestoreSystemSnapshot::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdRestoreSystemSnapshot *>(&other);
-    if (other_cmd == nullptr || restore_database_wal_cmds_.size() != other_cmd->restore_database_wal_cmds_.size()) {
+    if (other_cmd == nullptr || snapshot_name_ != other_cmd->snapshot_name_ ||
+        restore_database_wal_cmds_.size() != other_cmd->restore_database_wal_cmds_.size()) {
         return false;
     }
     for (size_t i = 0; i < restore_database_wal_cmds_.size(); i++) {
@@ -1190,7 +1194,8 @@ i32 WalCmdCreateSystemSnapshot::GetSizeInBytes() const {
 }
 
 i32 WalCmdRestoreDatabaseSnapshot::GetSizeInBytes() const {
-    i32 size = sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + db_id_str_.size() + sizeof(i32) + db_comment_.size();
+    i32 size = sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + db_id_str_.size() + sizeof(i32) + db_comment_.size() +
+               sizeof(i32) + snapshot_name_.size();
     size += sizeof(i32);
     for (const auto &restore_table_wal_cmd : restore_table_wal_cmds_) {
         size += restore_table_wal_cmd.GetSizeInBytes();
@@ -1199,7 +1204,7 @@ i32 WalCmdRestoreDatabaseSnapshot::GetSizeInBytes() const {
 }
 
 i32 WalCmdRestoreSystemSnapshot::GetSizeInBytes() const {
-    i32 size = sizeof(WalCommandType);
+    i32 size = sizeof(WalCommandType) + sizeof(i32) + snapshot_name_.size();
     size += sizeof(i32);
     for (const auto &restore_database_wal_cmd : restore_database_wal_cmds_) {
         size += restore_database_wal_cmd.GetSizeInBytes();
@@ -1323,6 +1328,7 @@ void WalCmdRestoreDatabaseSnapshot::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->db_id_str_);
     WriteBufAdv(buf, this->db_comment_);
+    WriteBufAdv(buf, this->snapshot_name_);
     WriteBufAdv(buf, static_cast<i32>(restore_table_wal_cmds_.size()));
     for (const auto &restore_table_wal_cmd : restore_table_wal_cmds_) {
         restore_table_wal_cmd.WriteAdv(buf);
@@ -1331,6 +1337,7 @@ void WalCmdRestoreDatabaseSnapshot::WriteAdv(char *&buf) const {
 
 void WalCmdRestoreSystemSnapshot::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::RESTORE_SYSTEM_SNAPSHOT);
+    WriteBufAdv(buf, this->snapshot_name_);
     WriteBufAdv(buf, static_cast<i32>(restore_database_wal_cmds_.size()));
     for (const auto &restore_database_wal_cmd : restore_database_wal_cmds_) {
         restore_database_wal_cmd.WriteAdv(buf);
@@ -2000,6 +2007,7 @@ std::string WalCmdRestoreDatabaseSnapshot::ToString() const {
     ss << "db_name: " << db_name_ << std::endl;
     ss << "db_id_str: " << db_id_str_ << std::endl;
     ss << "db_comment: " << db_comment_ << std::endl;
+    ss << "snapshot_name: " << snapshot_name_ << std::endl;
     ss << "restore_table_wal_cmds count: " << restore_table_wal_cmds_.size() << std::endl;
     for (size_t i = 0; i < restore_table_wal_cmds_.size(); ++i) {
         ss << "  restore_table_wal_cmd " << i << ": " << restore_table_wal_cmds_[i].ToString();
@@ -2009,6 +2017,7 @@ std::string WalCmdRestoreDatabaseSnapshot::ToString() const {
 
 std::string WalCmdRestoreSystemSnapshot::ToString() const {
     std::stringstream ss;
+    ss << "snapshot_name: " << snapshot_name_ << std::endl;
     ss << "restore_database_wal_cmds count: " << restore_database_wal_cmds_.size() << std::endl;
     for (size_t i = 0; i < restore_database_wal_cmds_.size(); ++i) {
         ss << "  restore_database_wal_cmd " << i << ": " << restore_database_wal_cmds_[i].ToString();
@@ -2021,6 +2030,7 @@ std::string WalCmdRestoreDatabaseSnapshot::CompactInfo() const {
     ss << "db_name: " << db_name_ << std::endl;
     ss << "db_id_str: " << db_id_str_ << std::endl;
     ss << "db_comment: " << db_comment_ << std::endl;
+    ss << "snapshot_name: " << snapshot_name_ << std::endl;
     ss << "restore_table_wal_cmds count: " << restore_table_wal_cmds_.size() << std::endl;
     for (size_t i = 0; i < restore_table_wal_cmds_.size(); ++i) {
         ss << "  restore_table_wal_cmd " << i << ": " << restore_table_wal_cmds_[i].CompactInfo();
@@ -2030,6 +2040,7 @@ std::string WalCmdRestoreDatabaseSnapshot::CompactInfo() const {
 
 std::string WalCmdRestoreSystemSnapshot::CompactInfo() const {
     std::stringstream ss;
+    ss << "snapshot_name: " << snapshot_name_ << std::endl;
     ss << "restore_table_wal_cmds count: " << restore_database_wal_cmds_.size() << std::endl;
     for (size_t i = 0; i < restore_database_wal_cmds_.size(); ++i) {
         ss << "  restore_database_wal_cmd " << i << ": " << restore_database_wal_cmds_[i].CompactInfo();
