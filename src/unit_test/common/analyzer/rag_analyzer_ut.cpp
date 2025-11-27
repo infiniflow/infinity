@@ -68,7 +68,7 @@ public:
     }
 
     RAGAnalyzer *analyzer_;
-    std::string rag_tokenizer_path_ = std::filesystem::current_path().parent_path().parent_path() / "python/rag_tokenizer";
+    std::string rag_tokenizer_path_ = "python/rag_tokenizer";
     std::string input_file_ = rag_tokenizer_path_ + "/tokenizer_input.txt";
 
     // Mismatch tokens for: is, data, CCS, experiencing, faster, LLMs, largest
