@@ -555,5 +555,18 @@ if __name__ == '__main__':
             results.append(error_msg)
 
     # Output results
-    for i, (text, result) in enumerate(zip(texts, results), 1):
-        print(result)
+    if args.output:
+        # Write to output file
+        logging.info(f"Writing results to output file: {args.output}")
+        with open(args.output, 'w', encoding='utf-8') as f:
+            for i, (text, result) in enumerate(zip(texts, results), 1):
+                if isinstance(result, list):
+                    output_line = ' '.join(result)
+                else:
+                    output_line = str(result)
+                f.write(output_line + '\n')
+        logging.info(f"Results written to {args.output}")
+    else:
+        # Print to console
+        for i, (text, result) in enumerate(zip(texts, results), 1):
+            print(result)
