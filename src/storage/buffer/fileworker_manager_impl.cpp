@@ -122,8 +122,8 @@ template <typename FileWorkerT>
 void FileWorkerMap<FileWorkerT>::MoveFiles() {
     // std::shared_lock lock(rw_temp_mtx_);
     std::unique_lock l(rw_mtx_);
-    std::vector<std::future<void>> futs;
-    futs.reserve(map_.size());
+    // std::vector<std::future<void>> futs;
+    // futs.reserve(map_.size());
     for (auto it = active_dic_.begin(); it != active_dic_.end();) {
         auto &rel_file_path = *it;
         if (rel_file_path.find("import") != std::string::npos) {
@@ -132,15 +132,15 @@ void FileWorkerMap<FileWorkerT>::MoveFiles() {
         }
         auto file_worker = GetFileWorkerNoLock(rel_file_path);
         // assert(file_worker);
-        // file_worker->MoveFile();
-        futs.emplace_back(std::async(&FileWorkerT::MoveFile, file_worker));
+        file_worker->MoveFile();
+        // futs.emplace_back(std::async(&FileWorkerT::MoveFile, file_worker));
         ++it;
     }
 
     active_dic_.clear();
-    for (auto &fut : futs) {
-        fut.wait();
-    }
+    // for (auto &fut : futs) {
+    //     fut.wait();
+    // }
 }
 
 template struct FileWorkerMap<BMPIndexFileWorker>;
