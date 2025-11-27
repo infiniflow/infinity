@@ -4,8 +4,8 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//
 //     https://www.apache.org/licenses/LICENSE-2.0
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,42 +14,41 @@
 
 module;
 
-export module infinity_core:lemmatizer;
+export module infinity_core:wordnet_lemmatizer;
 
 import :status;
 
 namespace infinity {
 
-export class Lemmatizer {
+export class WordNetLemmatizer {
 public:
-    Lemmatizer(const std::string &path);
+    WordNetLemmatizer(const std::string &wordnet_path);
 
-    ~Lemmatizer();
+    ~WordNetLemmatizer();
 
     Status Load();
 
     std::string Lemmatize(const std::string &form, const std::string &pos = "");
 
 private:
-    Status LoadLemmaPosOffsetMap();
+    Status LoadLemmas();
 
-    void LoadExceptionMap();
+    void LoadExceptions();
 
     std::vector<std::string> Morphy(const std::string &form, const std::string &pos, bool check_exceptions = true);
 
-    std::vector<std::string> ApplyRules(const std::vector<std::string> &forms, const std::string &pos);
+    std::vector<std::string> CollectSubstitutions(const std::vector<std::string> &forms, const std::string &pos);
+    std::vector<std::string> CollectSubstitutions(const std::string &form, const std::string &pos);
 
     std::vector<std::string> FilterForms(const std::vector<std::string> &forms, const std::string &pos);
 
-    std::string path_;
+    std::string wordnet_path_;
 
-    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<int>>> lemma_pos_offset_map_;
-    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<std::string>>> exception_map_;
-    std::unordered_map<std::string, int> pos_numbers_;
-    std::unordered_map<int, std::string> pos_names_;
-    std::unordered_map<std::string, std::string> file_map_;
+    std::unordered_map<std::string, std::unordered_set<std::string>> lemmas_;
+    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<std::string>>> exceptions_;
     std::unordered_map<std::string, std::vector<std::pair<std::string, std::string>>> MORPHOLOGICAL_SUBSTITUTIONS;
     std::vector<std::string> POS_LIST;
+    std::unordered_map<std::string, std::string> file_map_;
 };
 
 } // namespace infinity

@@ -29,7 +29,7 @@ import :term;
 import :stemmer;
 import :analyzer;
 import :darts_trie;
-import :lemmatizer;
+import :wordnet_lemmatizer;
 import :stemmer;
 import :term;
 
@@ -409,14 +409,27 @@ public:
         while (end != std::string::npos) {
             if (end != start) {
                 std::string token = result.substr(start, end - start);
-                // Split tokens containing underscores
-                if (token.find('_') != std::string::npos) {
+                // Handle underscore tokens properly
+                if (token == "_") {
+                    // Single underscore token
+                    tokens.push_back("_");
+                } else if (token.find('_') != std::string::npos) {
+                    // Split tokens containing underscores and keep underscores as separate tokens
                     std::stringstream ss(token);
                     std::string sub_token;
+                    bool first = true;
                     while (std::getline(ss, sub_token, '_')) {
+                        if (!first) {
+                            tokens.push_back("_");
+                        }
                         if (!sub_token.empty()) {
                             tokens.push_back(sub_token);
                         }
+                        first = false;
+                    }
+                    // Handle case where token ends with underscore
+                    if (token.back() == '_') {
+                        tokens.push_back("_");
                     }
                 } else {
                     tokens.push_back(token);
@@ -427,14 +440,27 @@ public:
         }
         if (start != result.length()) {
             std::string token = result.substr(start);
-            // Split tokens containing underscores
-            if (token.find('_') != std::string::npos) {
+            // Handle underscore tokens properly
+            if (token == "_") {
+                // Single underscore token
+                tokens.push_back("_");
+            } else if (token.find('_') != std::string::npos) {
+                // Split tokens containing underscores and keep underscores as separate tokens
                 std::stringstream ss(token);
                 std::string sub_token;
+                bool first = true;
                 while (std::getline(ss, sub_token, '_')) {
+                    if (!first) {
+                        tokens.push_back("_");
+                    }
                     if (!sub_token.empty()) {
                         tokens.push_back(sub_token);
                     }
+                    first = false;
+                }
+                // Handle case where token ends with underscore
+                if (token.back() == '_') {
+                    tokens.push_back("_");
                 }
             } else {
                 tokens.push_back(token);
@@ -530,7 +556,7 @@ RAGAnalyzer::RAGAnalyzer(const std::string &path)
 }
 
 RAGAnalyzer::RAGAnalyzer(const RAGAnalyzer &other)
-    : own_dict_(false), trie_(other.trie_), pos_table_(other.pos_table_), lemma_(other.lemma_), stemmer_(std::make_unique<Stemmer>()),
+    : own_dict_(false), trie_(other.trie_), pos_table_(other.pos_table_), wordnet_lemma_(other.wordnet_lemma_), stemmer_(std::make_unique<Stemmer>()),
       opencc_(other.opencc_), lowercase_string_buffer_(term_string_buffer_limit_), fine_grained_(other.fine_grained_),
       nltk_tokenizer_(std::make_unique<NLTKWordTokenizer>()) {
     InitStemmer(STEM_LANG_ENGLISH);
@@ -540,7 +566,7 @@ RAGAnalyzer::~RAGAnalyzer() {
     if (own_dict_) {
         delete trie_;
         delete pos_table_;
-        delete lemma_;
+        delete wordnet_lemma_;
         delete opencc_;
     }
 }
@@ -603,7 +629,8 @@ Status RAGAnalyzer::Load() {
     if (!fs::exists(lemma_path)) {
         return Status::InvalidAnalyzerFile(lemma_path);
     }
-    lemma_ = new Lemmatizer(lemma_path.string());
+
+    wordnet_lemma_ = new WordNetLemmatizer(lemma_path.string());
 
     fs::path opencc_path(root / OPENCC_PATH);
 
@@ -719,8 +746,6 @@ std::string RAGAnalyzer::RKey(const std::string_view line) {
     return reversed;
 }
 
-#define DIVIDE_F_BY_N 1
-
 std::pair<std::vector<std::string>, double> RAGAnalyzer::Score(const std::vector<std::pair<std::string, int>> &token_freqs) {
     constexpr i64 B = 30;
     i64 F = 0, L = 0;
@@ -731,11 +756,7 @@ std::pair<std::vector<std::string>, double> RAGAnalyzer::Score(const std::vector
         L += (UTF8Length(token) < 2) ? 0 : 1;
         tokens.push_back(token);
     }
-#ifdef DIVIDE_F_BY_N
-    const auto score = (B + L + F) / static_cast<double>(tokens.size());
-#else
-    const auto score = F + (B + L) / static_cast<double>(tokens.size());
-#endif
+    const auto score = B / static_cast<double>(tokens.size()) + L / static_cast<double>(tokens.size()) + F;
     return {std::move(tokens), score};
 }
 
@@ -1197,7 +1218,7 @@ void RAGAnalyzer::MergeWithPosition(const std::vector<std::string> &tokens,
 void RAGAnalyzer::EnglishNormalize(const std::vector<std::string> &tokens, std::vector<std::string> &res) {
     for (auto &t : tokens) {
         if (re2::RE2::PartialMatch(t, pattern1_)) { //"[a-zA-Z_-]+$"
-            std::string lemma_term = lemma_->Lemmatize(t);
+            std::string lemma_term = wordnet_lemma_->Lemmatize(t);
             char *lowercase_term = lowercase_string_buffer_.data();
             ToLower(lemma_term.c_str(), lemma_term.size(), lowercase_term, term_string_buffer_limit_);
             std::string stem_term;
@@ -1206,6 +1227,43 @@ void RAGAnalyzer::EnglishNormalize(const std::vector<std::string> &tokens, std::
         } else {
             res.push_back(t);
         }
+    }
+}
+
+void RAGAnalyzer::SplitByLang(const std::string &line, std::vector<std::pair<std::string, bool>> &txt_lang_pairs) const {
+    std::vector<std::string> arr;
+    Split(line, regex_split_pattern_, arr, true);
+
+    for (const auto &a : arr) {
+        if (a.empty()) {
+            continue;
+        }
+
+        std::size_t s = 0;
+        std::size_t e = s + 1;
+        bool zh = IsChinese(UTF8Substr(a, s, 1));
+
+        while (e < UTF8Length(a)) {
+            bool _zh = IsChinese(UTF8Substr(a, e, 1));
+            if (_zh == zh) {
+                e++;
+                continue;
+            }
+
+            std::string segment = UTF8Substr(a, s, e - s);
+            txt_lang_pairs.emplace_back(segment, zh);
+
+            s = e;
+            e = s + 1;
+            zh = _zh;
+        }
+
+        if (s >= UTF8Length(a)) {
+            continue;
+        }
+
+        std::string segment = UTF8Substr(a, s, e - s);
+        txt_lang_pairs.emplace_back(segment, zh);
     }
 }
 
@@ -1283,41 +1341,39 @@ void RAGAnalyzer::TokenizeInner(std::vector<std::string> &res, const std::string
     }
 
 #else
-    std::vector<int> diff(std::max(tks.size(), tks1.size()), 0);
-    for (std::size_t i = 0; i < std::min(tks.size(), tks1.size()); ++i) {
-        if (tks[i] != tks1[i]) {
-            diff[i] = 1;
-        }
+    std::size_t i = 0, j = 0, _i = 0, _j = 0, same = 0;
+    while ((i + same < tks1.size()) && (j + same < tks.size()) && tks1[i + same] == tks[j + same]) {
+        same++;
     }
-
-    if (s1 > s) {
-        tks = tks1;
+    if (same > 0) {
+        res.push_back(Join(tks, j, j + same));
     }
-
-    std::size_t i = 0;
-    while (i < tks.size()) {
-        std::size_t s = i;
-        while (s < tks.size() && diff[s] == 0) {
-            s++;
+    _i = i + same;
+    _j = j + same;
+    j = _j + 1;
+    i = _i + 1;
+    while (i < tks1.size() && j < tks.size()) {
+        std::string tk1 = Join(tks1, _i, i, "");
+        std::string tk = Join(tks, _j, j, "");
+        if (tk1 != tk) {
+            if (tk1.length() > tk.length()) {
+                j++;
+            } else {
+                i++;
+            }
+            continue;
         }
-        if (s == tks.size()) {
-            res.push_back(Join(tks, i, tks.size()));
-            break;
-        }
-        if (s > i) {
-            res.push_back(Join(tks, i, s));
-        }
-
-        std::size_t e = s;
-        while (e < tks.size() && e - s < 5 && diff[e] == 1) {
-            e++;
+        if (tks1[i] != tks[j]) {
+            i++;
+            j++;
+            continue;
         }
 
         std::vector<std::pair<std::string, int>> pre_tokens;
         std::vector<std::vector<std::pair<std::string, int>>> token_list;
         std::vector<std::string> best_tokens;
         double max_score = std::numeric_limits<double>::lowest();
-        const auto str_for_dfs = Join(tks, s, e < tks.size() ? e + 1 : e, "");
+        const auto str_for_dfs = Join(tks, _j, j, "");
 #ifdef INFINITY_DEBUG
         const auto t0 = std::chrono::high_resolution_clock::now();
 #endif
@@ -1326,11 +1382,32 @@ void RAGAnalyzer::TokenizeInner(std::vector<std::string> &res, const std::string
         const auto t1 = std::chrono::high_resolution_clock::now();
         dp_debug::CheckDP(this, str_for_dfs, best_tokens, max_score, t0, t1);
 #endif
-        // std::vector<std::pair<std::vector<std::string>, double>> sorted_tokens;
-        // SortTokens(token_list, sorted_tokens);
-        // res.push_back(Join(sorted_tokens[0].first, 0));
         res.push_back(Join(best_tokens, 0));
-        i = e + 1;
+
+        same = 1;
+        while (i + same < tks1.size() && j + same < tks.size() && tks1[i + same] == tks[j + same])
+            same++;
+        res.push_back(Join(tks, j, j + same));
+        _i = i + same;
+        _j = j + same;
+        j = _j + 1;
+        i = _i + 1;
+    }
+    if (_i < tks1.size()) {
+        std::vector<std::pair<std::string, int>> pre_tokens;
+        std::vector<std::vector<std::pair<std::string, int>>> token_list;
+        std::vector<std::string> best_tokens;
+        double max_score = std::numeric_limits<double>::lowest();
+        const auto str_for_dfs = Join(tks, _j, tks.size(), "");
+#ifdef INFINITY_DEBUG
+        const auto t0 = std::chrono::high_resolution_clock::now();
+#endif
+        DFS(str_for_dfs, 0, pre_tokens, token_list, best_tokens, max_score, false);
+#ifdef INFINITY_DEBUG
+        const auto t1 = std::chrono::high_resolution_clock::now();
+        dp_debug::CheckDP(this, str_for_dfs, best_tokens, max_score, t0, t1);
+#endif
+        res.push_back(Join(best_tokens, 0));
     }
 #endif
 }
@@ -1480,48 +1557,45 @@ std::string PCRE2GlobalReplace(const std::string &text, const std::string &patte
 }
 
 std::string RAGAnalyzer::Tokenize(const std::string &line) {
-    // Python-style simple tokenization: re.sub(r"\W+", " ", line)
+    // Python-style simple tokenization: re.sub(r"\\W+", " ", line)
     std::string processed_line = PCRE2GlobalReplace(line, R"#(\W+)#", " ");
     std::string str1 = StrQ2B(processed_line);
     std::string strline;
     opencc_->convert(str1, strline);
-    std::vector<std::string> res;
-    std::size_t alpha_num = 0;
-    int len = UTF8Length(strline);
-    for (int i = 0; i < len; ++i) {
-        std::string t = UTF8Substr(strline, i, 1);
-        if (IsAlphabet(t)) {
-            alpha_num++;
-        }
-    }
-    if (alpha_num > (std::size_t)(len * 0.9)) {
-        std::vector<std::string> term_list;
-        std::vector<std::string> sentences;
-        SentenceSplitter(processed_line, sentences);
-        for (auto &sentence : sentences) {
-            nltk_tokenizer_->Tokenize(sentence, term_list);
-        }
-        for (unsigned i = 0; i < term_list.size(); ++i) {
-            std::string t = lemma_->Lemmatize(term_list[i]);
-            char *lowercase_term = lowercase_string_buffer_.data();
-            ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
-            std::string stem_term;
-            stemmer_->Stem(lowercase_term, stem_term);
-            res.push_back(stem_term);
-        }
-        std::string ret = Join(res, 0);
-        return ret;
-    }
 
-    std::vector<std::string> arr;
-    Split(strline, regex_split_pattern_, arr, true);
-    for (const auto &L : arr) {
+    std::vector<std::string> res;
+
+    // Use SplitByLang to separate by language
+    std::vector<std::pair<std::string, bool>> arr;
+    SplitByLang(strline, arr);
+
+    for (const auto &[L, lang] : arr) {
+        if (!lang) {
+            // Non-Chinese text: use NLTK tokenizer, lemmatize and stem
+            std::vector<std::string> term_list;
+            std::vector<std::string> sentences;
+            SentenceSplitter(L, sentences);
+            for (auto &sentence : sentences) {
+                nltk_tokenizer_->Tokenize(sentence, term_list);
+            }
+            for (unsigned i = 0; i < term_list.size(); ++i) {
+                std::string t = wordnet_lemma_->Lemmatize(term_list[i]);
+                char *lowercase_term = lowercase_string_buffer_.data();
+                ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
+                std::string stem_term;
+                stemmer_->Stem(lowercase_term, stem_term);
+                res.push_back(stem_term);
+            }
+            continue;
+        }
         auto length = UTF8Length(L);
         if (length < 2 || re2::RE2::PartialMatch(L, pattern2_) || re2::RE2::PartialMatch(L, pattern3_)) { //[a-z\\.-]+$  [0-9\\.-]+$
             res.push_back(L);
             continue;
         }
-#if 1
+
+        // Chinese processing: use TokenizeInner
+#if 0
         if (length > MAX_SENTENCE_LEN) {
             std::vector<std::string> sublines;
             SplitLongText(L, length, sublines);
@@ -1530,11 +1604,12 @@ std::string RAGAnalyzer::Tokenize(const std::string &line) {
             }
         } else
 #endif
-            TokenizeInner(res, L);
+        TokenizeInner(res, L);
     }
-    std::vector<std::string> normalize_res;
-    EnglishNormalize(res, normalize_res);
-    std::string r = Join(normalize_res, 0);
+
+    // std::vector<std::string> normalize_res;
+    // EnglishNormalize(res, normalize_res);
+    std::string r = Join(res, 0);
     std::string ret = Merge(r);
     return ret;
 }
@@ -1585,113 +1660,105 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
         final_pos_mapping[strline.size()] = static_cast<unsigned>(line.size());
     }
 
-    std::size_t alpha_num = 0;
-    int len = UTF8Length(strline);
+    // Use SplitByLang to separate by language
+    std::vector<std::pair<std::string, bool>> arr;
+    SplitByLang(strline, arr);
+    unsigned current_pos = 0;
 
-    for (int i = 0; i < len; ++i) {
-        std::string t = UTF8Substr(strline, i, 1);
-        if (IsAlphabet(t)) {
-            alpha_num++;
+    for (const auto &[L, lang] : arr) {
+        if (L.empty()) {
+            continue;
         }
-    }
 
-    if (alpha_num > (std::size_t)(len * 0.9)) {
-        std::vector<std::string> term_list;
-        std::vector<std::string> sentences;
-        SentenceSplitter(strline, sentences);
+        std::size_t processed_pos = strline.find(L, current_pos);
+        if (processed_pos == std::string::npos) {
+            continue;
+        }
 
-        unsigned sentence_start_pos = 0;
-        for (auto &sentence : sentences) {
-            std::vector<std::string> sentence_terms;
-            nltk_tokenizer_->Tokenize(sentence, sentence_terms);
+        unsigned original_start = current_pos;
+        current_pos = original_start + static_cast<unsigned>(L.size());
 
-            unsigned current_search_pos = 0;
-            for (auto &term : sentence_terms) {
-                size_t pos_in_sentence = sentence.find(term, current_search_pos);
-                if (pos_in_sentence != std::string::npos) {
-                    unsigned start_pos = sentence_start_pos + static_cast<unsigned>(pos_in_sentence);
-                    unsigned end_pos = start_pos + static_cast<unsigned>(term.size());
-                    std::string t = lemma_->Lemmatize(term);
-                    char *lowercase_term = lowercase_string_buffer_.data();
-                    ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
-                    std::string stem_term;
-                    stemmer_->Stem(lowercase_term, stem_term);
+        if (!lang) {
+            // Non-Chinese text: use NLTK tokenizer, lemmatize and stem
+            std::vector<std::string> term_list;
+            std::vector<std::string> sentences;
+            SentenceSplitter(L, sentences);
 
-                    tokens.push_back(stem_term);
+            unsigned sentence_start_pos = original_start;
+            for (auto &sentence : sentences) {
+                std::vector<std::string> sentence_terms;
+                nltk_tokenizer_->Tokenize(sentence, sentence_terms);
 
-                    // Map positions back to original string using final_pos_mapping
-                    if (start_pos < final_pos_mapping.size()) {
-                        positions.emplace_back(final_pos_mapping[start_pos], final_pos_mapping[end_pos]);
-                    } else {
-                        positions.emplace_back(static_cast<unsigned>(line.size()), static_cast<unsigned>(line.size()));
+                unsigned current_search_pos = 0;
+                for (auto &term : sentence_terms) {
+                    size_t pos_in_sentence = sentence.find(term, current_search_pos);
+                    if (pos_in_sentence != std::string::npos) {
+                        unsigned start_pos = sentence_start_pos + static_cast<unsigned>(pos_in_sentence);
+                        unsigned end_pos = start_pos + static_cast<unsigned>(term.size());
+                        std::string t = wordnet_lemma_->Lemmatize(term);
+                        char *lowercase_term = lowercase_string_buffer_.data();
+                        ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
+                        std::string stem_term;
+                        stemmer_->Stem(lowercase_term, stem_term);
+
+                        tokens.push_back(stem_term);
+
+                        // Map positions back to original string using final_pos_mapping
+                        if (start_pos < final_pos_mapping.size()) {
+                            positions.emplace_back(final_pos_mapping[start_pos], final_pos_mapping[end_pos]);
+                        } else {
+                            positions.emplace_back(static_cast<unsigned>(line.size()), static_cast<unsigned>(line.size()));
+                        }
+
+                        current_search_pos = pos_in_sentence + term.size();
                     }
-
-                    current_search_pos = pos_in_sentence + term.size();
                 }
+                sentence_start_pos += static_cast<unsigned>(sentence.size());
             }
-            sentence_start_pos += static_cast<unsigned>(sentence.size());
+            continue;
         }
 
-    } else {
-        std::vector<std::string> arr;
-        Split(strline, regex_split_pattern_, arr, true);
+        auto length = UTF8Length(L);
+        if (length < 2 || re2::RE2::PartialMatch(L, pattern2_) || re2::RE2::PartialMatch(L, pattern3_)) {
+            tokens.push_back(L);
 
-        unsigned current_pos = 0;
-        for (const auto &L : arr) {
-            if (L.empty()) {
-                continue;
-            }
-            std::size_t processed_pos = strline.find(L, current_pos);
-            if (processed_pos == std::string::npos) {
-                continue;
-            }
-
-            unsigned original_start = current_pos;
-
-            auto length = UTF8Length(L);
-            if (length < 2 || re2::RE2::PartialMatch(L, pattern2_) || re2::RE2::PartialMatch(L, pattern3_)) {
-                tokens.push_back(L);
-
-                // Map positions back to original string using final_pos_mapping
-                unsigned start_pos = original_start;
-                unsigned end_pos = original_start + static_cast<unsigned>(L.size());
-                if (start_pos < final_pos_mapping.size() && end_pos < final_pos_mapping.size()) {
-                    positions.emplace_back(final_pos_mapping[start_pos], final_pos_mapping[end_pos]);
-                } else {
-                    positions.emplace_back(static_cast<unsigned>(line.size()), static_cast<unsigned>(line.size()));
-                }
-
-                current_pos = original_start + static_cast<unsigned>(L.size());
-                continue;
-            }
-
-            if (length > MAX_SENTENCE_LEN) {
-                std::vector<std::string> sublines;
-                SplitLongText(L, length, sublines);
-                unsigned subline_start_pos = original_start;
-                for (auto &l : sublines) {
-                    TokenizeInnerWithPosition(l, tokens, positions, subline_start_pos, &final_pos_mapping);
-                    subline_start_pos += static_cast<unsigned>(l.size());
-                }
-                current_pos = original_start + static_cast<unsigned>(L.size());
+            // Map positions back to original string using final_pos_mapping
+            unsigned start_pos = original_start;
+            unsigned end_pos = original_start + static_cast<unsigned>(L.size());
+            if (start_pos < final_pos_mapping.size() && end_pos < final_pos_mapping.size()) {
+                positions.emplace_back(final_pos_mapping[start_pos], final_pos_mapping[end_pos]);
             } else {
-                TokenizeInnerWithPosition(L, tokens, positions, original_start, &final_pos_mapping);
-                current_pos = original_start + static_cast<unsigned>(L.size());
+                positions.emplace_back(static_cast<unsigned>(line.size()), static_cast<unsigned>(line.size()));
             }
+            continue;
         }
 
-        std::vector<std::string> normalize_tokens;
-        std::vector<std::pair<unsigned, unsigned>> normalize_positions;
-        EnglishNormalizeWithPosition(tokens, positions, normalize_tokens, normalize_positions);
-
-        // Apply MergeWithPosition to match Tokenize behavior
-        std::vector<std::string> merged_tokens;
-        std::vector<std::pair<unsigned, unsigned>> merged_positions;
-        MergeWithPosition(normalize_tokens, normalize_positions, merged_tokens, merged_positions);
-
-        tokens = std::move(merged_tokens);
-        positions = std::move(merged_positions);
+        // Chinese processing: use TokenizeInnerWithPosition
+#if 0
+        if (length > MAX_SENTENCE_LEN) {
+            std::vector<std::string> sublines;
+            SplitLongText(L, length, sublines);
+            unsigned subline_start_pos = original_start;
+            for (auto &l : sublines) {
+                TokenizeInnerWithPosition(l, tokens, positions, subline_start_pos, &final_pos_mapping);
+                subline_start_pos += static_cast<unsigned>(l.size());
+            }
+        } else
+#endif
+        TokenizeInnerWithPosition(L, tokens, positions, original_start, &final_pos_mapping);
     }
+
+    // std::vector<std::string> normalize_tokens;
+    // std::vector<std::pair<unsigned, unsigned>> normalize_positions;
+    // EnglishNormalizeWithPosition(tokens, positions, normalize_tokens, normalize_positions);
+
+    // Apply MergeWithPosition to match Tokenize behavior
+    std::vector<std::string> merged_tokens;
+    std::vector<std::pair<unsigned, unsigned>> merged_positions;
+    MergeWithPosition(tokens, positions, merged_tokens, merged_positions);
+
+    tokens = std::move(merged_tokens);
+    positions = std::move(merged_positions);
 
     return {std::move(tokens), std::move(positions)};
 }
@@ -1720,96 +1787,90 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
                                             const std::vector<unsigned> *pos_mapping) {
     auto [tks, s] = MaxForward(L);
     auto [tks1, s1] = MaxBackward(L);
-    std::vector<int> diff(std::max(tks.size(), tks1.size()), 0);
-    for (std::size_t i = 0; i < std::min(tks.size(), tks1.size()); ++i) {
-        if (tks[i] != tks1[i]) {
-            diff[i] = 1;
-        }
+
+    // Use the same algorithm as Python version
+    std::size_t i = 0, j = 0, _i = 0, _j = 0, same = 0;
+    while ((i + same < tks1.size()) && (j + same < tks.size()) && tks1[i + same] == tks[j + same]) {
+        same++;
     }
-    if (s1 > s) {
-        tks = tks1;
-    }
+    if (same > 0) {
+        std::string token_str = Join(tks, j, j + same);
+        unsigned token_len = static_cast<unsigned>(token_str.size());
+        unsigned start_pos = base_pos + CalculateTokensLength(tks, 0, j);
 
-    std::size_t i = 0;
-    while (i < tks.size()) {
-        std::size_t s = i;
-        while (s < tks.size() && diff[s] == 0) {
-            s++;
-        }
-
-        if (s == tks.size()) {
-            // When all remaining tokens are the same, process them individually
-            for (std::size_t j = i; j < tks.size(); ++j) {
-                const std::string &single_token = tks[j];
-                unsigned start_pos = base_pos + CalculateTokensLength(tks, 0, j);
-                unsigned end_pos = start_pos + static_cast<unsigned>(single_token.size());
-                tokens.push_back(single_token);
-                if (pos_mapping) {
-                    unsigned mapped_start = start_pos < pos_mapping->size() ? (*pos_mapping)[start_pos] : 0;
-                    unsigned mapped_end = end_pos < pos_mapping->size() ? (*pos_mapping)[end_pos] : 0;
-                    positions.emplace_back(mapped_start, mapped_end);
-                } else {
-                    positions.emplace_back(start_pos, end_pos);
+        if (token_str.find(' ') != std::string::npos) {
+            std::vector<std::string> space_split_tokens;
+            Split(token_str, blank_pattern_, space_split_tokens, false);
+            unsigned space_start_pos = start_pos;
+            for (const auto &space_token : space_split_tokens) {
+                if (space_token.empty()) {
+                    continue;
                 }
-            }
-            break;
-        }
-
-        if (s > i) {
-            std::string token_str = Join(tks, i, s);
-            unsigned token_len = static_cast<unsigned>(token_str.size());
-            unsigned start_pos = base_pos + CalculateTokensLength(tks, 0, i);
-
-            if (token_str.find(' ') != std::string::npos) {
-                std::vector<std::string> space_split_tokens;
-                Split(token_str, blank_pattern_, space_split_tokens, false);
-                unsigned space_start_pos = start_pos;
-                for (const auto &space_token : space_split_tokens) {
-                    if (space_token.empty()) {
-                        continue;
-                    }
-                    unsigned space_token_len = static_cast<unsigned>(space_token.size());
-                    tokens.push_back(space_token);
-                    // Map position back to original string if mapping is provided
-                    if (pos_mapping) {
-                        unsigned mapped_start = space_start_pos < pos_mapping->size() ? (*pos_mapping)[space_start_pos] : 0;
-                        unsigned mapped_end =
-                            (space_start_pos + space_token_len) < pos_mapping->size() ? (*pos_mapping)[space_start_pos + space_token_len] : 0;
-                        positions.emplace_back(mapped_start, mapped_end);
-                    } else {
-                        positions.emplace_back(space_start_pos, space_start_pos + space_token_len);
-                    }
-                    space_start_pos += space_token_len;
-                }
-            } else {
-                tokens.push_back(token_str);
+                unsigned space_token_len = static_cast<unsigned>(space_token.size());
+                tokens.push_back(space_token);
                 // Map position back to original string if mapping is provided
                 if (pos_mapping) {
-                    unsigned mapped_start = start_pos < pos_mapping->size() ? (*pos_mapping)[start_pos] : 0;
-                    unsigned mapped_end = (start_pos + token_len) < pos_mapping->size() ? (*pos_mapping)[start_pos + token_len] : 0;
+                    unsigned mapped_start = space_start_pos < pos_mapping->size() ? (*pos_mapping)[space_start_pos] : 0;
+                    unsigned mapped_end =
+                        (space_start_pos + space_token_len) < pos_mapping->size() ? (*pos_mapping)[space_start_pos + space_token_len] : 0;
                     positions.emplace_back(mapped_start, mapped_end);
                 } else {
-                    positions.emplace_back(start_pos, start_pos + token_len);
+                    positions.emplace_back(space_start_pos, space_start_pos + space_token_len);
                 }
+                space_start_pos += space_token_len;
+            }
+        } else {
+            tokens.push_back(token_str);
+            // Map position back to original string if mapping is provided
+            if (pos_mapping) {
+                unsigned mapped_start = start_pos < pos_mapping->size() ? (*pos_mapping)[start_pos] : 0;
+                unsigned mapped_end = (start_pos + token_len) < pos_mapping->size() ? (*pos_mapping)[start_pos + token_len] : 0;
+                positions.emplace_back(mapped_start, mapped_end);
+            } else {
+                positions.emplace_back(start_pos, start_pos + token_len);
             }
         }
+    }
+    _i = i + same;
+    _j = j + same;
+    j = _j + 1;
+    i = _i + 1;
 
-        std::size_t e = s;
-        while (e < tks.size() && e - s < 5 && diff[e] == 1) {
-            e++;
+    while (i < tks1.size() && j < tks.size()) {
+        std::string tk1 = Join(tks1, _i, i, "");
+        std::string tk = Join(tks, _j, j, "");
+        if (tk1 != tk) {
+            if (tk1.length() > tk.length()) {
+                j++;
+            } else {
+                i++;
+            }
+            continue;
+        }
+        if (tks1[i] != tks[j]) {
+            i++;
+            j++;
+            continue;
         }
 
-        std::string token_str = Join(tks, s, e < tks.size() ? e + 1 : e, "");
+        // Handle different part with DFS
         std::vector<std::pair<std::string, int>> pre_tokens;
         std::vector<std::vector<std::pair<std::string, int>>> token_list;
         std::vector<std::string> best_tokens;
         double max_score = std::numeric_limits<double>::lowest();
-
-        DFS(token_str, 0, pre_tokens, token_list, best_tokens, max_score, false);
+        const auto str_for_dfs = Join(tks, _j, j, "");
+#ifdef INFINITY_DEBUG
+        const auto t0 = std::chrono::high_resolution_clock::now();
+#endif
+        DFS(str_for_dfs, 0, pre_tokens, token_list, best_tokens, max_score, false);
+#ifdef INFINITY_DEBUG
+        const auto t1 = std::chrono::high_resolution_clock::now();
+        dp_debug::CheckDP(this, str_for_dfs, best_tokens, max_score, t0, t1);
+#endif
 
         std::string best_token_str = Join(best_tokens, 0);
-        unsigned start_pos = base_pos + CalculateTokensLength(tks, 0, s);
-        std::string original_token_str = Join(tks, s, e < tks.size() ? e + 1 : e, "");
+        unsigned start_pos = base_pos + CalculateTokensLength(tks, 0, _j);
+        std::string original_token_str = Join(tks, _j, j, "");
         unsigned end_pos = start_pos + static_cast<unsigned>(original_token_str.size());
 
         if (best_token_str.find(' ') != std::string::npos) {
@@ -1840,13 +1901,112 @@ void RAGAnalyzer::TokenizeInnerWithPosition(const std::string &L,
                 unsigned mapped_start = start_pos < pos_mapping->size() ? (*pos_mapping)[start_pos] : 0;
                 unsigned mapped_end = end_pos < pos_mapping->size() ? (*pos_mapping)[end_pos] : 0;
                 positions.emplace_back(mapped_start, mapped_end);
-
             } else {
                 positions.emplace_back(start_pos, end_pos);
             }
         }
 
-        i = e + 1;
+        same = 1;
+        while (i + same < tks1.size() && j + same < tks.size() && tks1[i + same] == tks[j + same])
+            same++;
+
+        // Handle same part after different tokens
+        std::string token_str = Join(tks, j, j + same);
+        unsigned token_len = static_cast<unsigned>(token_str.size());
+        start_pos = base_pos + CalculateTokensLength(tks, 0, j);
+
+        if (token_str.find(' ') != std::string::npos) {
+            std::vector<std::string> space_split_tokens;
+            Split(token_str, blank_pattern_, space_split_tokens, false);
+            unsigned space_start_pos = start_pos;
+            for (const auto &space_token : space_split_tokens) {
+                if (space_token.empty()) {
+                    continue;
+                }
+                unsigned space_token_len = static_cast<unsigned>(space_token.size());
+                tokens.push_back(space_token);
+                // Map position back to original string if mapping is provided
+                if (pos_mapping) {
+                    unsigned mapped_start = space_start_pos < pos_mapping->size() ? (*pos_mapping)[space_start_pos] : 0;
+                    unsigned mapped_end =
+                        (space_start_pos + space_token_len) < pos_mapping->size() ? (*pos_mapping)[space_start_pos + space_token_len] : 0;
+                    positions.emplace_back(mapped_start, mapped_end);
+                } else {
+                    positions.emplace_back(space_start_pos, space_start_pos + space_token_len);
+                }
+                space_start_pos += space_token_len;
+            }
+        } else {
+            tokens.push_back(token_str);
+            // Map position back to original string if mapping is provided
+            if (pos_mapping) {
+                unsigned mapped_start = start_pos < pos_mapping->size() ? (*pos_mapping)[start_pos] : 0;
+                unsigned mapped_end = (start_pos + token_len) < pos_mapping->size() ? (*pos_mapping)[start_pos + token_len] : 0;
+                positions.emplace_back(mapped_start, mapped_end);
+            } else {
+                positions.emplace_back(start_pos, start_pos + token_len);
+            }
+        }
+
+        _i = i + same;
+        _j = j + same;
+        j = _j + 1;
+        i = _i + 1;
+    }
+
+    // Handle remaining part
+    if (_i < tks1.size()) {
+        std::vector<std::pair<std::string, int>> pre_tokens;
+        std::vector<std::vector<std::pair<std::string, int>>> token_list;
+        std::vector<std::string> best_tokens;
+        double max_score = std::numeric_limits<double>::lowest();
+        const auto str_for_dfs = Join(tks, _j, tks.size(), "");
+#ifdef INFINITY_DEBUG
+        const auto t0 = std::chrono::high_resolution_clock::now();
+#endif
+        DFS(str_for_dfs, 0, pre_tokens, token_list, best_tokens, max_score, false);
+#ifdef INFINITY_DEBUG
+        const auto t1 = std::chrono::high_resolution_clock::now();
+        dp_debug::CheckDP(this, str_for_dfs, best_tokens, max_score, t0, t1);
+#endif
+
+        std::string best_token_str = Join(best_tokens, 0);
+        unsigned start_pos = base_pos + CalculateTokensLength(tks, 0, _j);
+        std::string original_token_str = Join(tks, _j, tks.size(), "");
+        unsigned end_pos = start_pos + static_cast<unsigned>(original_token_str.size());
+
+        if (best_token_str.find(' ') != std::string::npos) {
+            std::vector<std::string> space_split_tokens;
+            Split(best_token_str, blank_pattern_, space_split_tokens, false);
+            unsigned space_start_pos = start_pos;
+            for (const auto &space_token : space_split_tokens) {
+                if (space_token.empty()) {
+                    continue;
+                }
+                unsigned space_token_len = static_cast<unsigned>(space_token.size());
+                tokens.push_back(space_token);
+                // Map position back to original string if mapping is provided
+                if (pos_mapping) {
+                    unsigned mapped_start = space_start_pos < pos_mapping->size() ? (*pos_mapping)[space_start_pos] : 0;
+                    unsigned mapped_end =
+                        (space_start_pos + space_token_len) < pos_mapping->size() ? (*pos_mapping)[space_start_pos + space_token_len] : 0;
+                    positions.emplace_back(mapped_start, mapped_end);
+                } else {
+                    positions.emplace_back(space_start_pos, space_start_pos + space_token_len);
+                }
+                space_start_pos += space_token_len;
+            }
+        } else {
+            tokens.push_back(best_token_str);
+            // Map position back to original string if mapping is provided
+            if (pos_mapping) {
+                unsigned mapped_start = start_pos < pos_mapping->size() ? (*pos_mapping)[start_pos] : 0;
+                unsigned mapped_end = end_pos < pos_mapping->size() ? (*pos_mapping)[end_pos] : 0;
+                positions.emplace_back(mapped_start, mapped_end);
+            } else {
+                positions.emplace_back(start_pos, end_pos);
+            }
+        }
     }
 }
 
@@ -1859,7 +2019,7 @@ void RAGAnalyzer::EnglishNormalizeWithPosition(const std::vector<std::string> &t
         const auto &[start_pos, end_pos] = positions[i];
 
         if (re2::RE2::PartialMatch(token, pattern1_)) { //"[a-zA-Z_-]+$"
-            std::string lemma_term = lemma_->Lemmatize(token);
+            std::string lemma_term = wordnet_lemma_->Lemmatize(token);
             char *lowercase_term = lowercase_string_buffer_.data();
             ToLower(lemma_term.c_str(), lemma_term.size(), lowercase_term, term_string_buffer_limit_);
             std::string stem_term;
