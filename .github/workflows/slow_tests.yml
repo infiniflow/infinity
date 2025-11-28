@@ -22,7 +22,7 @@ concurrency:
 jobs:
   download_code:
     name: download_code
-    if: ${{ github.event_name != 'pull_request_target' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
+    if: ${{ github.event_name != 'pull_request_target' || (github.event.pull_request.draft == false && contains(github.event.pull_request.labels.*.name, 'slow-test')) }}
     runs-on: [ "self-hosted", "slow-test" ]
     steps:
       - name: Ensure workspace ownership
