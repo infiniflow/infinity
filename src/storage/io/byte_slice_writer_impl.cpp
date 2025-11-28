@@ -39,6 +39,8 @@ void ByteSliceWriter::Dump(const std::shared_ptr<FileWriter> &file) {
 
 void ByteSliceWriter::Load(const std::shared_ptr<FileReader> &file, u32 size) {
     ByteSlice *slice = CreateSlice(size);
+    slice->size_ = size;
+
     file->Read((char *)slice->data_, size);
     slice_list_->Clear();
     slice_list_->Add(slice);
