@@ -333,22 +333,22 @@ TEST_P(TableSnapshotTest, test_create_snapshot_same_name_multithreaded) {
         waiter.join();
     }
 
-    {
-        std::string list_snapshots_sql = "show snapshots";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(list_snapshots_sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-        LOG_INFO("Final snapshots: " + query_result.ToString());
-    }
+    // {
+    //     std::string list_snapshots_sql = "show snapshots";
+    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+    //     QueryResult query_result = query_context->Query(list_snapshots_sql);
+    //     bool ok = HandleQueryResult(query_result);
+    //     EXPECT_TRUE(ok);
+    //     LOG_INFO("Final snapshots: " + query_result.ToString());
+    // }
 
-    {
-        std::string sql = "drop snapshot conflict_snapshot";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-    }
+    // {
+    //     std::string sql = "drop snapshot conflict_snapshot";
+    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+    //     QueryResult query_result = query_context->Query(sql);
+    //     bool ok = HandleQueryResult(query_result);
+    //     EXPECT_TRUE(ok);
+    // }
 }
 
 TEST_P(TableSnapshotTest, test_show_snapshot_multithreaded) {

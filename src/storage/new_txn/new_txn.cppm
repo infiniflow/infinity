@@ -106,6 +106,7 @@ struct RestoreSystemTxnStore;
 struct UpdateTxnStore;
 struct CreateTableSnapshotTxnStore;
 struct CreateDBSnapshotTxnStore;
+struct CreateSystemSnapshotTxnStore;
 struct CleanupTxnStore;
 class BufferManager;
 class IndexBase;
@@ -640,6 +641,7 @@ private:
     bool CheckConflictTxnStore(const RestoreSystemTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);
     bool CheckConflictTxnStore(const CreateTableSnapshotTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);
     bool CheckConflictTxnStore(const CreateDBSnapshotTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const CreateSystemSnapshotTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);
     bool CheckConflictTxnStore(const CleanupTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query);
 
 public:

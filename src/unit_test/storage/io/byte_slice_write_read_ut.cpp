@@ -150,6 +150,42 @@ TEST_F(ByteSliceReaderWriterTest, test5) {
     }
 }
 
+TEST_F(ByteSliceReaderWriterTest, test6) {
+    using namespace infinity;
+    std::string path = "/var/infinity/tmp/test001.txt";
+
+    // Prepare data
+    ByteSliceWriter writer;
+    i16 i;
+    for (i = 0; i < 1000; i++) {
+        writer.WriteInt16(i);
+    }
+    size_t size = writer.GetSize();
+    ASSERT_EQ(i * sizeof(i16), size);
+
+    // Dump data
+    auto file_writer = std::make_shared<FileWriter>(path, 128000);
+    writer.Dump(file_writer);
+    file_writer->Sync();
+
+    writer.Reset();
+
+    // Load data
+    auto file_reader = std::make_shared<FileReader>(path, 128000);
+    writer.Load(file_reader, 1000 * sizeof(i16));
+
+    // Verify the loaded data
+    ByteSliceReader reader(writer.GetByteSliceList());
+    for (i = 0; i < 1000; i++) {
+        i16 value = reader.ReadInt16();
+        ASSERT_EQ(value, i);
+    }
+}
+
+// TEST_F(ByteSliceReaderWriterTest, test7) {
+//
+// }
+
 TEST_F(ByteSliceReaderWriterTest, TestDataConsistency) {
     using namespace infinity;
     ByteSliceWriter writer;

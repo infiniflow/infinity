@@ -281,9 +281,6 @@ TEST_F(LowCardinalitySecondaryIndexTest, TestSaveLoadLowCardinality) {
     EXPECT_TRUE(status2.ok());
     index->ReadIndexInner(*file2);
     EXPECT_EQ(key_count, index->GetUniqueKeyCount());
-
-    std::string cmd = fmt::format("rm -rf {}", tmp_path);
-    system(cmd.c_str());
 }
 
 TEST_F(LowCardinalitySecondaryIndexTest, TestAllDataType) {
