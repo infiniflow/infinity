@@ -32,6 +32,7 @@ import :new_catalog;
 import :new_txn_manager;
 import :admin_executor;
 import :utility;
+import :explain_logical_plan;
 
 import std.compat;
 
@@ -220,12 +221,36 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
 
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();
         logical_plans = logical_planner_->LogicalPlans();
+        if (base_statement->type_ == StatementType::kSelect && SHOULD_LOG_DEBUG()) {
+            for (auto &logical_plan : logical_plans) {
+                std::shared_ptr<std::vector<std::shared_ptr<std::string>>> explain_result =
+                    std::make_shared<std::vector<std::shared_ptr<std::string>>>();
+                ExplainLogicalPlan::Explain(logical_plan.get(), explain_result);
+                std::stringstream ss;
+                for (const auto &line : *explain_result) {
+                    ss << *line << std::endl;
+                }
+                LOG_DEBUG(fmt::format("Logical Plan (Before Opt): \n{}", ss.str()));
+            }
+        }
         StopProfile(QueryPhase::kLogicalPlan);
         //        LOG_WARN(fmt::format("Before optimizer cost: {}", profiler.ElapsedToString()));
         // Apply optimized rule to the logical plan
         StartProfile(QueryPhase::kOptimizer);
         for (auto &logical_plan : logical_plans) {
             optimizer_->optimize(logical_plan, base_statement->type_);
+        }
+        if (base_statement->type_ == StatementType::kSelect && SHOULD_LOG_DEBUG()) {
+            for (auto &logical_plan : logical_plans) {
+                std::shared_ptr<std::vector<std::shared_ptr<std::string>>> explain_result =
+                    std::make_shared<std::vector<std::shared_ptr<std::string>>>();
+                ExplainLogicalPlan::Explain(logical_plan.get(), explain_result);
+                std::stringstream ss;
+                for (const auto &line : *explain_result) {
+                    ss << *line << std::endl;
+                }
+                LOG_DEBUG(fmt::format("Logical Plan (After Opt): \n{}", ss.str()));
+            }
         }
         StopProfile(QueryPhase::kOptimizer);
 
