@@ -73,7 +73,4 @@ TEST_F(HighCardinalitySecondaryIndexTest, TestSaveLoadHighCardinality) {
     EXPECT_TRUE(status2.ok());
     index2->ReadIndexInner(*file2);
     EXPECT_EQ(key_count, index2->GetUniqueKeyCount());
-
-    std::string cmd = fmt::format("rm -rf {}", tmp_path);
-    system(cmd.c_str());
 }

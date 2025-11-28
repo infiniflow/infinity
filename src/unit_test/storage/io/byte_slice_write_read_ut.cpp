@@ -154,32 +154,31 @@ TEST_F(ByteSliceReaderWriterTest, test6) {
     using namespace infinity;
     std::string path = "/var/infinity/tmp/test001.txt";
 
-    {
-        ByteSliceWriter writer;
-        i64 i;
-        for (i = 0; i < 1000; i++) {
-            writer.WriteInt16(i);
-        }
-        size_t size = writer.GetSize();
-        ASSERT_EQ(i * sizeof(i16), size);
-
-        auto file_writer = std::make_shared<FileWriter>(path, 128000);
-        writer.Dump(file_writer);
-        file_writer->Sync();
+    // Prepare data
+    ByteSliceWriter writer;
+    i16 i;
+    for (i = 0; i < 1000; i++) {
+        writer.WriteInt16(i);
     }
+    size_t size = writer.GetSize();
+    ASSERT_EQ(i * sizeof(i16), size);
 
-    {
-        ByteSliceWriter writer;
-        auto file_reader = std::make_shared<FileReader>(path, 128000);
-        writer.Load(file_reader, 1000 * sizeof(i16));
+    // Dump data
+    auto file_writer = std::make_shared<FileWriter>(path, 128000);
+    writer.Dump(file_writer);
+    file_writer->Sync();
 
-        LOG_INFO(fmt::format("writer.size: {}", writer.GetSize()));
+    writer.Reset();
 
-        ByteSliceReader reader(writer.GetByteSliceList());
-        for (i16 i = 0; i < 1000; i++) {
-            i16 value = reader.ReadInt16();
-            ASSERT_EQ(value, i);
-        }
+    // Load data
+    auto file_reader = std::make_shared<FileReader>(path, 128000);
+    writer.Load(file_reader, 1000 * sizeof(i16));
+
+    // Verify the loaded data
+    ByteSliceReader reader(writer.GetByteSliceList());
+    for (i = 0; i < 1000; i++) {
+        i16 value = reader.ReadInt16();
+        ASSERT_EQ(value, i);
     }
 }
 
