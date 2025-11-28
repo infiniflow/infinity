@@ -25,7 +25,7 @@ concurrency:
 jobs:
   code_static_check:
     name: code_static_check
-    if: ${{ github.event_name != 'pull_request_target' || contains(github.event.pull_request.labels.*.name, 'ci') }}
+    if: ${{ github.event_name != 'pull_request_target' || (contains(github.event.pull_request.labels.*.name, 'ci') && github.event.pull_request.mergeable != false) }}
     runs-on: [ "self-hosted", "infinity-test" ]
     steps:
       - name: Ensure workspace ownership
