@@ -441,14 +441,16 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
             root = std::move(match_knn_nodes[0]);
         }
 
-        if (limit_expression_.get() != nullptr) {
-            auto limit = std::make_shared<LogicalLimit>(bind_context->GetNewLogicalNodeId(),
-                                                        base_table_ref,
-                                                        limit_expression_,
-                                                        offset_expression_,
-                                                        total_hits_count_flag_);
-            limit->set_left_node(root);
-            root = limit;
+        if (!group_by_expressions_.empty() || !aggregate_expressions_.empty()) {
+            // Build logical aggregate
+            auto aggregate = std::make_shared<LogicalAggregate>(bind_context->GetNewLogicalNodeId(),
+                                                                base_table_ref,
+                                                                group_by_expressions_,
+                                                                groupby_index_,
+                                                                aggregate_expressions_,
+                                                                aggregate_index_);
+            aggregate->set_left_node(root);
+            root = aggregate;
         }
 
         auto project = std::make_shared<LogicalProject>(bind_context->GetNewLogicalNodeId(),

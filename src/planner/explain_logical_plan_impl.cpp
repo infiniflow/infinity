@@ -241,6 +241,14 @@ ExplainLogicalPlan::Explain(const LogicalNode *statement, std::shared_ptr<std::v
             Explain((LogicalCheck *)statement, result, intent_size);
             break;
         }
+        case LogicalNodeType::kInvalid:
+        case LogicalNodeType::kDropIndex:
+        case LogicalNodeType::kCommand:
+        case LogicalNodeType::kCompact:
+        case LogicalNodeType::kCompactIndex:
+        case LogicalNodeType::kReadCache:
+        case LogicalNodeType::kMock:
+            break;
         default: {
             UnrecoverableError("Unexpected logical node type");
         }
@@ -794,11 +802,13 @@ ExplainLogicalPlan::Explain(const LogicalFilter *filter_node, std::shared_ptr<st
         output_columns_str += " - output columns: [";
         std::shared_ptr<std::vector<std::string>> output_columns = filter_node->GetOutputNames();
         size_t column_count = output_columns->size();
-        for (size_t idx = 0; idx < column_count - 1; ++idx) {
-            output_columns_str += output_columns->at(idx);
-            output_columns_str += ", ";
+        if (column_count > 0) {
+            for (size_t idx = 0; idx < column_count - 1; ++idx) {
+                output_columns_str += output_columns->at(idx);
+                output_columns_str += ", ";
+            }
+            output_columns_str += output_columns->back();
         }
-        output_columns_str += output_columns->back();
         output_columns_str += "]";
 
         result->emplace_back(std::make_shared<std::string>(output_columns_str));
@@ -823,11 +833,13 @@ ExplainLogicalPlan::Explain(const LogicalUnnest *unnest_node, std::shared_ptr<st
         std::string unnest_expression_str = std::string(intent_size, ' ') + " - unnest expression: [";
         const std::vector<std::shared_ptr<BaseExpression>> &expression_list = unnest_node->expression_list();
         size_t expression_count = expression_list.size();
-        for (size_t idx = 0; idx < expression_count - 1; ++idx) {
-            ExplainLogicalPlan::Explain(expression_list[idx].get(), unnest_expression_str);
-            unnest_expression_str += ", ";
+        if (expression_count > 0) {
+            for (size_t idx = 0; idx < expression_count - 1; ++idx) {
+                ExplainLogicalPlan::Explain(expression_list[idx].get(), unnest_expression_str);
+                unnest_expression_str += ", ";
+            }
+            ExplainLogicalPlan::Explain(expression_list.back().get(), unnest_expression_str);
         }
-        ExplainLogicalPlan::Explain(expression_list.back().get(), unnest_expression_str);
         unnest_expression_str += "]";
         result->emplace_back(std::make_shared<std::string>(unnest_expression_str));
     }
@@ -837,10 +849,13 @@ ExplainLogicalPlan::Explain(const LogicalUnnest *unnest_node, std::shared_ptr<st
         std::string output_columns_str = std::string(intent_size, ' ') + " - output columns: [";
         std::shared_ptr<std::vector<std::string>> output_columns = unnest_node->GetOutputNames();
         size_t column_count = output_columns->size();
-        for (size_t idx = 0; idx < column_count - 1; ++idx) {
-            output_columns_str += output_columns->at(idx) + ", ";
+        if (column_count > 0) {
+            for (size_t idx = 0; idx < column_count - 1; ++idx) {
+                output_columns_str += output_columns->at(idx) + ", ";
+            }
+            output_columns_str += output_columns->back();
         }
-        output_columns_str += output_columns->back() + "]";
+        output_columns_str += "]";
         result->emplace_back(std::make_shared<std::string>(output_columns_str));
     }
     return Status::OK();
@@ -864,11 +879,13 @@ Status ExplainLogicalPlan::Explain(const LogicalUnnestAggregate *unnest_aggregat
         std::string unnest_expression_str = std::string(intent_size, ' ') + " - unnest expression: [";
         const std::vector<std::shared_ptr<BaseExpression>> &expression_list = unnest_aggregate_node->unnest_expression_list();
         size_t expression_count = expression_list.size();
-        for (size_t idx = 0; idx < expression_count - 1; ++idx) {
-            ExplainLogicalPlan::Explain(expression_list[idx].get(), unnest_expression_str);
-            unnest_expression_str += ", ";
+        if (expression_count > 0) {
+            for (size_t idx = 0; idx < expression_count - 1; ++idx) {
+                ExplainLogicalPlan::Explain(expression_list[idx].get(), unnest_expression_str);
+                unnest_expression_str += ", ";
+            }
+            ExplainLogicalPlan::Explain(expression_list.back().get(), unnest_expression_str);
         }
-        ExplainLogicalPlan::Explain(expression_list.back().get(), unnest_expression_str);
         unnest_expression_str += "]";
         result->emplace_back(std::make_shared<std::string>(unnest_expression_str));
     }
@@ -918,10 +935,13 @@ Status ExplainLogicalPlan::Explain(const LogicalUnnestAggregate *unnest_aggregat
         std::string output_columns_str = std::string(intent_size, ' ') + " - output columns: [";
         std::shared_ptr<std::vector<std::string>> output_columns = unnest_aggregate_node->GetOutputNames();
         size_t column_count = output_columns->size();
-        for (size_t idx = 0; idx < column_count - 1; ++idx) {
-            output_columns_str += output_columns->at(idx) + ", ";
+        if (column_count > 0) {
+            for (size_t idx = 0; idx < column_count - 1; ++idx) {
+                output_columns_str += output_columns->at(idx) + ", ";
+            }
+            output_columns_str += output_columns->back();
         }
-        output_columns_str += output_columns->back() + "]";
+        output_columns_str += "]";
         result->emplace_back(std::make_shared<std::string>(output_columns_str));
     }
     return Status::OK();
@@ -1230,11 +1250,13 @@ ExplainLogicalPlan::Explain(const LogicalSort *sort_node, std::shared_ptr<std::v
         output_columns_str += " - output columns: [";
         std::shared_ptr<std::vector<std::string>> output_columns = sort_node->GetOutputNames();
         size_t column_count = output_columns->size();
-        for (size_t idx = 0; idx < column_count - 1; ++idx) {
-            output_columns_str += output_columns->at(idx);
-            output_columns_str += ", ";
+        if (column_count > 0) {
+            for (size_t idx = 0; idx < column_count - 1; ++idx) {
+                output_columns_str += output_columns->at(idx);
+                output_columns_str += ", ";
+            }
+            output_columns_str += output_columns->back();
         }
-        output_columns_str += output_columns->back();
         output_columns_str += "]";
         result->emplace_back(std::make_shared<std::string>(output_columns_str));
     }
@@ -1278,11 +1300,13 @@ ExplainLogicalPlan::Explain(const LogicalLimit *limit_node, std::shared_ptr<std:
         output_columns_str += " - output columns: [";
         std::shared_ptr<std::vector<std::string>> output_columns = limit_node->GetOutputNames();
         size_t column_count = output_columns->size();
-        for (size_t idx = 0; idx < column_count - 1; ++idx) {
-            output_columns_str += output_columns->at(idx);
-            output_columns_str += ", ";
+        if (column_count > 0) {
+            for (size_t idx = 0; idx < column_count - 1; ++idx) {
+                output_columns_str += output_columns->at(idx);
+                output_columns_str += ", ";
+            }
+            output_columns_str += output_columns->back();
         }
-        output_columns_str += output_columns->back();
         output_columns_str += "]";
         result->emplace_back(std::make_shared<std::string>(output_columns_str));
     }
@@ -1337,10 +1361,13 @@ Status ExplainLogicalPlan::Explain(const LogicalTop *top_node, std::shared_ptr<s
         std::string output_columns_str = std::string(intent_size, ' ') + " - output columns: [";
         std::shared_ptr<std::vector<std::string>> output_columns = top_node->GetOutputNames();
         size_t column_count = output_columns->size();
-        for (size_t idx = 0; idx < column_count - 1; ++idx) {
-            output_columns_str += output_columns->at(idx) + ", ";
+        if (column_count > 0) {
+            for (size_t idx = 0; idx < column_count - 1; ++idx) {
+                output_columns_str += output_columns->at(idx) + ", ";
+            }
+            output_columns_str += output_columns->back();
         }
-        output_columns_str += output_columns->back() + "]";
+        output_columns_str += "]";
         result->emplace_back(std::make_shared<std::string>(output_columns_str));
     }
     return Status::OK();
@@ -1369,11 +1396,13 @@ Status ExplainLogicalPlan::Explain(const LogicalCrossProduct *cross_product_node
         output_columns_str += " - output columns: [";
         std::shared_ptr<std::vector<std::string>> output_columns = cross_product_node->GetOutputNames();
         size_t column_count = output_columns->size();
-        for (size_t idx = 0; idx < column_count - 1; ++idx) {
-            output_columns_str += output_columns->at(idx);
-            output_columns_str += ", ";
+        if (column_count > 0) {
+            for (size_t idx = 0; idx < column_count - 1; ++idx) {
+                output_columns_str += output_columns->at(idx);
+                output_columns_str += ", ";
+            }
+            output_columns_str += output_columns->back();
         }
-        output_columns_str += output_columns->back();
         output_columns_str += "]";
         result->emplace_back(std::make_shared<std::string>(output_columns_str));
     }
@@ -1419,11 +1448,13 @@ ExplainLogicalPlan::Explain(const LogicalJoin *join_node, std::shared_ptr<std::v
         output_columns_str += " - output columns: [";
         std::shared_ptr<std::vector<std::string>> output_columns = join_node->GetOutputNames();
         size_t column_count = output_columns->size();
-        for (size_t idx = 0; idx < column_count - 1; ++idx) {
-            output_columns_str += output_columns->at(idx);
-            output_columns_str += ", ";
+        if (column_count > 0) {
+            for (size_t idx = 0; idx < column_count - 1; ++idx) {
+                output_columns_str += output_columns->at(idx);
+                output_columns_str += ", ";
+            }
+            output_columns_str += output_columns->back();
         }
-        output_columns_str += output_columns->back();
         output_columns_str += "]";
         result->emplace_back(std::make_shared<std::string>(output_columns_str));
     }

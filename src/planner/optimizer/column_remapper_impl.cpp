@@ -71,6 +71,44 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
             VisitNodeExpression(op);
             break;
         }
+        case LogicalNodeType::kTableScan:
+        case LogicalNodeType::kIndexScan: {
+            VisitNodeChildren(op);
+            bindings_ = op.GetColumnBindings();
+            output_types_ = op.GetOutputTypes();
+
+            // Special columns are in output_types_ but not in bindings_
+            // Calculate this BEFORE processing load_metas
+            const size_t special_column_count = output_types_->size() - bindings_.size();
+
+            auto load_metas = op.load_metas();
+            if (load_metas.get() != nullptr) {
+                // Filter out load_metas that are already in bindings_
+                // This prevents columns that are already in the scan output from being "loaded" again
+                std::vector<LoadMeta> filtered_metas;
+                for (size_t i = 0; i < load_metas->size(); ++i) {
+                    auto &load_meta = (*load_metas)[i];
+                    auto it = std::find(bindings_.begin(), bindings_.end(), load_meta.binding_);
+                    if (it == bindings_.end()) {
+                        // Not in bindings_, need to load
+                        load_meta.index_ = bindings_.size();
+                        bindings_.push_back(load_meta.binding_);
+                        filtered_metas.push_back(load_meta);
+                    }
+                    // If already in bindings_, skip it (don't add to filtered_metas)
+                }
+                // Update the operator's load_metas to only include columns that actually need loading
+                if (filtered_metas.empty()) {
+                    op.set_load_metas(nullptr);
+                } else {
+                    op.set_load_metas(std::make_shared<std::vector<LoadMeta>>(std::move(filtered_metas)));
+                }
+            }
+            // column_cnt_ = all regular columns (initial + new loaded) + special columns
+            column_cnt_ = bindings_.size() + special_column_count;
+            VisitNodeExpression(op);
+            break;
+        }
         default: {
             VisitNodeChildren(op);
             load_func();

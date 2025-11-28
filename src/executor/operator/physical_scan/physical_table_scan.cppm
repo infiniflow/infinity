@@ -25,6 +25,7 @@ import :meta_info;
 import :load_meta;
 import :fast_rough_filter;
 import :physical_scan_base;
+import :default_values;
 
 import internal_types;
 import data_type;

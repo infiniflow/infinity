@@ -443,6 +443,7 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionEx
     CheckFuncType(function_set_ptr->type_);
 
     // Check if it is count(*)
+    bool is_count_star = false;
     if (function_set_ptr->name() == "COUNT") {
         if (!expr.arguments_ || expr.arguments_->empty()) {
             RecoverableError(Status::SyntaxError("No arguments for COUNT function found."));
@@ -451,6 +452,7 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionEx
             if ((*expr.arguments_)[0]->type_ == ParsedExprType::kColumn) {
                 auto *col_expr = static_cast<ColumnExpr *>((*expr.arguments_)[0]);
                 if (col_expr->star_) {
+                    is_count_star = true;
                     std::string &table_name = bind_context_ptr->table_names_[0];
                     TableInfo *table_info = bind_context_ptr->binding_by_name_[table_name]->table_info_.get();
                     col_expr->names_.clear();
@@ -531,6 +533,7 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionEx
             auto aggregate_function_set_ptr = static_pointer_cast<AggregateFunctionSet>(function_set_ptr);
             AggregateFunction aggregate_function = aggregate_function_set_ptr->GetMostMatchFunction(arguments[0]);
             auto aggregate_function_ptr = std::make_shared<AggregateExpression>(aggregate_function, arguments);
+            aggregate_function_ptr->SetCountStar(is_count_star);
             return aggregate_function_ptr;
         }
         case FunctionType::kTable: {

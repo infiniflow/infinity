@@ -78,7 +78,25 @@ void RefencecColumnCollection::VisitNode(LogicalNode &op) {
 
         column_types_.insert({table_idx, column_types});
         column_names_.insert({table_idx, column_names});
-        scan_bindings_.insert({table_idx, scan_bindings});
+
+        if (scan_bindings_.find(table_idx) == scan_bindings_.end()) {
+            scan_bindings_.insert({table_idx, scan_bindings});
+        } else {
+            auto &current_bindings = scan_bindings_[table_idx];
+            for (const auto &binding : scan_bindings) {
+                bool exists = false;
+                for (const auto &existing : current_bindings) {
+                    if (existing == binding) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists) {
+                    current_bindings.push_back(binding);
+                }
+            }
+        }
+
         unloaded_bindings_.insert(scan_bindings.begin(), scan_bindings.end());
     }
     VisitNodeChildren(op);
@@ -194,15 +212,23 @@ void CleanScan::VisitNode(LogicalNode &op) {
             CleanScanVisitBaseTableRefNode<LogicalMatch>(op, last_op_load_metas_, scan_table_indexes_);
             break;
         }
-        case LogicalNodeType::kLimit: {
-            // Skip
-            VisitNodeChildren(op);
-            VisitNodeExpression(op);
-            break;
-        }
         case LogicalNodeType::kFusion: {
-            last_op_load_metas_ = op.load_metas();
+            auto saved_last_op_load_metas = last_op_load_metas_;
+            auto current_load_metas = op.load_metas();
+            std::shared_ptr<std::vector<LoadMeta>> merged_metas;
+            if (last_op_load_metas_ && !last_op_load_metas_->empty()) {
+                merged_metas = std::make_shared<std::vector<LoadMeta>>();
+                merged_metas->reserve(last_op_load_metas_->size() + (current_load_metas ? current_load_metas->size() : 0));
+                merged_metas->insert(merged_metas->end(), last_op_load_metas_->begin(), last_op_load_metas_->end());
+                if (current_load_metas) {
+                    merged_metas->insert(merged_metas->end(), current_load_metas->begin(), current_load_metas->end());
+                }
+            } else {
+                merged_metas = current_load_metas;
+            }
+            last_op_load_metas_ = merged_metas;
             last_op_node_id_ = op.node_id();
+
             const auto &fusion = static_cast<const LogicalFusion &>(op);
             if (!op.left_node()) {
                 UnrecoverableError("Internal error: Fusion has no left node.");
@@ -215,6 +241,7 @@ void CleanScan::VisitNode(LogicalNode &op) {
                 // Skip
                 VisitNodeChildren(op);
                 VisitNodeExpression(op);
+                last_op_load_metas_ = saved_last_op_load_metas;
                 break;
             }
             // now fusion has only search node children
@@ -261,6 +288,9 @@ void CleanScan::VisitNode(LogicalNode &op) {
                 UnrecoverableError("Internal error: Fusion has load_metas");
             }
             std::vector<LoadMeta> children_columns;
+            if (merged_metas) {
+                children_columns.insert(children_columns.end(), merged_metas->begin(), merged_metas->end());
+            }
             apply_to_fusion_children([&children_columns](LogicalNode &node) {
                 auto &node_load_metas = *node.load_metas();
                 children_columns.insert(children_columns.end(),
@@ -277,30 +307,46 @@ void CleanScan::VisitNode(LogicalNode &op) {
             // edit children's base_table_ref_
             scan_table_indexes_.push_back(common_base_table_ref->table_index_);
             common_base_table_ref->RetainColumnByIndices(LoadedColumn(&children_columns, common_base_table_ref));
+            last_op_load_metas_ = saved_last_op_load_metas;
             break;
         }
         default: {
-            last_op_load_metas_ = op.load_metas();
+            auto saved_last_op_load_metas = last_op_load_metas_;
+            auto current_load_metas = op.load_metas();
+            std::shared_ptr<std::vector<LoadMeta>> merged_metas;
+            if (last_op_load_metas_ && !last_op_load_metas_->empty()) {
+                merged_metas = std::make_shared<std::vector<LoadMeta>>();
+                merged_metas->reserve(last_op_load_metas_->size() + (current_load_metas ? current_load_metas->size() : 0));
+                merged_metas->insert(merged_metas->end(), last_op_load_metas_->begin(), last_op_load_metas_->end());
+                if (current_load_metas) {
+                    merged_metas->insert(merged_metas->end(), current_load_metas->begin(), current_load_metas->end());
+                }
+            } else {
+                merged_metas = current_load_metas;
+            }
+            last_op_load_metas_ = merged_metas;
             last_op_node_id_ = op.node_id();
             VisitNodeChildren(op);
             VisitNodeExpression(op);
-            if (last_op_node_id_ != op.node_id()) {
-                // last_op_load_metas_ is not used
-                break;
-            }
+            last_op_load_metas_ = saved_last_op_load_metas;
+
             auto load_metas = op.load_metas();
-            if (!scan_table_indexes_.empty()) {
+            if (!scan_table_indexes_.empty() && load_metas && !load_metas->empty()) {
                 std::vector<LoadMeta> filtered_metas;
 
-                for (size_t i = 0; i < scan_table_indexes_.size(); i++) {
-                    for (size_t j = 0; j < load_metas->size(); j++) {
-                        if ((*load_metas)[j].binding_.table_idx != scan_table_indexes_[i]) {
-                            filtered_metas.push_back((*load_metas)[j]);
+                for (size_t j = 0; j < load_metas->size(); j++) {
+                    bool found = false;
+                    for (size_t i = 0; i < scan_table_indexes_.size(); i++) {
+                        if ((*load_metas)[j].binding_.table_idx == scan_table_indexes_[i]) {
+                            found = true;
+                            break;
                         }
+                    }
+                    if (!found) {
+                        filtered_metas.push_back((*load_metas)[j]);
                     }
                 }
                 op.set_load_metas(std::make_shared<std::vector<LoadMeta>>(std::move(filtered_metas)));
-                scan_table_indexes_.clear();
             }
             break;
         }

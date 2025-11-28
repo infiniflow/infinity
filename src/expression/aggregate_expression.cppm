@@ -33,8 +33,11 @@ public:
 
     bool IsCountStar() const;
 
+    void SetCountStar(bool count_star) { count_star_ = count_star; }
+
 public:
     AggregateFunction aggregate_function_;
+    bool count_star_{false};
 };
 
 } // namespace infinity

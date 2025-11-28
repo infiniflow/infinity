@@ -22,6 +22,9 @@ import :logical_project;
 import :logical_table_scan;
 import :logical_index_scan;
 import :logical_match;
+import :aggregate_expression;
+import :column_expression;
+import :default_values;
 
 namespace infinity {
 
@@ -51,6 +54,23 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
                 aggr.aggregates_ = std::move(filtered_aggregates);
                 if (aggr.aggregates_.empty() && aggr.groups_.empty()) {
                     // TODO: CountStar -> Count(*) is not supported yet
+                }
+
+                for (auto &expr : aggr.aggregates_) {
+                    auto *agg_expr = static_cast<AggregateExpression *>(expr.get());
+                    if (agg_expr->IsCountStar()) {
+                        if (!agg_expr->arguments().empty() && agg_expr->arguments()[0]->type() == ExpressionType::kColumn) {
+                            auto *old_col = static_cast<ColumnExpression *>(agg_expr->arguments()[0].get());
+                            auto row_id_col = ColumnExpression::Make(DataType(LogicalType::kRowID),
+                                                                     old_col->table_name(),
+                                                                     old_col->binding().table_idx,
+                                                                     "ROW_ID",
+                                                                     COLUMN_IDENTIFIER_ROW_ID,
+                                                                     old_col->depth(),
+                                                                     SpecialType::kRowID);
+                            agg_expr->arguments()[0] = row_id_col;
+                        }
+                    }
                 }
             }
             RemoveUnusedColumns remove;
