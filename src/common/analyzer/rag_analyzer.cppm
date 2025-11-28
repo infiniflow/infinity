@@ -21,9 +21,9 @@ export module infinity_core:rag_analyzer;
 import :term;
 import :status;
 import :darts_trie;
-import :lemmatizer;
 import :stemmer;
 import :analyzer;
+import :wordnet_lemmatizer;
 
 import third_party;
 
@@ -72,6 +72,8 @@ public:
                            const std::vector<std::pair<unsigned, unsigned>> &positions,
                            std::vector<std::string> &merged_tokens,
                            std::vector<std::pair<unsigned, unsigned>> &merged_positions);
+
+    void SplitByLang(const std::string &line, std::vector<std::pair<std::string, bool>> &txt_lang_pairs) const;
 
 protected:
     int AnalyzeImpl(const Term &input, void *data, HookType func) override;
@@ -127,7 +129,7 @@ public:
 
     POSTable *pos_table_{nullptr};
 
-    Lemmatizer *lemma_{nullptr};
+    WordNetLemmatizer *wordnet_lemma_{nullptr};
 
     std::unique_ptr<Stemmer> stemmer_;
 
