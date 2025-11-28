@@ -362,29 +362,38 @@ TEST_F(VirtualStoreTest, minio_download) {
 
 TEST_F(VirtualStoreTest, TestStorageType) {
     StorageType type = String2StorageType("local");
-    ASSERT_EQ(ToString(type), std::string("local"));
+    ASSERT_EQ(type, StorageType::kLocal);
 
     type = String2StorageType("minio");
-    ASSERT_EQ(ToString(type), std::string("minio"));
+    ASSERT_EQ(type, StorageType::kMinio);
 
     type = String2StorageType("aws_s3");
-    ASSERT_EQ(ToString(type), std::string("local"));
+    ASSERT_EQ(type, StorageType::kLocal);
 
     type = String2StorageType("azure_blob");
-    ASSERT_EQ(ToString(type), std::string("local"));
+    ASSERT_EQ(type, StorageType::kLocal);
 
     type = String2StorageType("gcs");
-    ASSERT_EQ(ToString(type), std::string("local"));
+    ASSERT_EQ(type, StorageType::kLocal);
 
     type = String2StorageType("oss");
-    ASSERT_EQ(ToString(type), std::string("local"));
+    ASSERT_EQ(type, StorageType::kLocal);
 
     type = String2StorageType("cos");
-    ASSERT_EQ(ToString(type), std::string("local"));
+    ASSERT_EQ(type, StorageType::kLocal);
 
     type = String2StorageType("hdfs");
-    ASSERT_EQ(ToString(type), std::string("local"));
+    ASSERT_EQ(type, StorageType::kLocal);
 
     type = String2StorageType("nfs");
-    ASSERT_EQ(ToString(type), std::string("local"));
+    ASSERT_EQ(type, StorageType::kLocal);
+
+    ASSERT_EQ(ToString(StorageType::kAwsS3), std::string("aws s3"));
+    ASSERT_EQ(ToString(StorageType::kAzureBlob), std::string("azure blob"));
+    ASSERT_EQ(ToString(StorageType::kGCS), std::string("google cloud storage"));
+    ASSERT_EQ(ToString(StorageType::kOSS), std::string("aliyun object storage service"));
+    ASSERT_EQ(ToString(StorageType::kCOS), std::string("tencent cloud object storage"));
+    ASSERT_EQ(ToString(StorageType::kOBS), std::string("huawei object storage service"));
+    ASSERT_EQ(ToString(StorageType::kHDFS), std::string("hadoop file system"));
+    ASSERT_EQ(ToString(StorageType::kNFS), std::string("network file system"));
 }
