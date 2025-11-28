@@ -185,6 +185,7 @@ export struct RestoreDatabaseTxnStore final : public BaseTxnStore {
     RestoreDatabaseTxnStore() : BaseTxnStore(TransactionType::kRestoreDatabase) {}
 
     std::string db_name_{};
+    std::string snapshot_name_{};
     std::string db_id_str_{};
     std::string db_comment_{};
     std::vector<std::shared_ptr<RestoreTableTxnStore>> restore_table_txn_stores_{};
@@ -196,6 +197,7 @@ export struct RestoreDatabaseTxnStore final : public BaseTxnStore {
 export struct RestoreSystemTxnStore final : public BaseTxnStore {
     RestoreSystemTxnStore() : BaseTxnStore(TransactionType::kRestoreSystem) {}
 
+    std::string snapshot_name_{};
     std::vector<std::shared_ptr<RestoreDatabaseTxnStore>> restore_database_txn_stores_{};
 
     std::string ToString() const final;
