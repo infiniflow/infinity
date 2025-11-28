@@ -89,8 +89,8 @@ void ByteSliceList::MergeWith(ByteSliceList &other) {
     if (head_ == nullptr) {
         head_ = other.head_;
         tail_ = other.tail_;
-    } else {
-        tail_->next_ = other.head_;
+    } else if (other.head_ != nullptr) {
+        tail_->next_ = other.head_->next_;
         tail_ = other.tail_;
     }
 
