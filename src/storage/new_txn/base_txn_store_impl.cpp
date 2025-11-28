@@ -177,7 +177,8 @@ std::shared_ptr<WalEntry> RestoreDatabaseTxnStore::ToWalEntry(TxnTimeStamp commi
                                                      restore_table_txn_store->files_);
         restore_table_wal_cmds.push_back(restore_table_cmd);
     }
-    std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdRestoreDatabaseSnapshot>(db_name_, db_id_str_, db_comment_, restore_table_wal_cmds);
+    std::shared_ptr<WalCmd> wal_command =
+        std::make_shared<WalCmdRestoreDatabaseSnapshot>(db_name_, db_id_str_, db_comment_, snapshot_name_, restore_table_wal_cmds);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }
@@ -204,10 +205,11 @@ std::shared_ptr<WalEntry> RestoreSystemTxnStore::ToWalEntry(TxnTimeStamp commit_
         WalCmdRestoreDatabaseSnapshot restore_database_cmd(restore_database_txn_store->db_name_,
                                                            restore_database_txn_store->db_id_str_,
                                                            restore_database_txn_store->db_comment_,
+                                                           restore_database_txn_store->snapshot_name_,
                                                            restore_table_wal_cmds);
         restore_database_wal_cmds.push_back(restore_database_cmd);
     }
-    std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdRestoreSystemSnapshot>(restore_database_wal_cmds);
+    std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdRestoreSystemSnapshot>(snapshot_name_, restore_database_wal_cmds);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }
