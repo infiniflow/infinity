@@ -2066,7 +2066,7 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
             while (std::getline(iss, sub_token, '/')) {
                 if (!sub_token.empty()) {
                     unsigned sub_end = sub_start + sub_token.size();
-                    temp_tokens.push_back(sub_token);
+                    fine_tokens.push_back(sub_token);
                     fine_positions.emplace_back(sub_start, sub_end);
                     sub_start = sub_end + 1;
                 }
@@ -2074,8 +2074,8 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
         }
 
         // Apply English normalization to get lowercase and stemmed tokens
-        std::vector<std::pair<unsigned, unsigned>> temp_positions = fine_positions;
-        EnglishNormalizeWithPosition(temp_tokens, temp_positions, fine_tokens, fine_positions);
+        // std::vector<std::pair<unsigned, unsigned>> temp_positions = fine_positions;
+        // EnglishNormalizeWithPosition(temp_tokens, temp_positions, fine_tokens, fine_positions);
     } else {
         // Chinese or mixed text processing - match FineGrainedTokenize behavior
         for (size_t i = 0; i < tks.size(); ++i) {
