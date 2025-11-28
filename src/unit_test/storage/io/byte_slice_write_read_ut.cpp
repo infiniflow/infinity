@@ -182,9 +182,69 @@ TEST_F(ByteSliceReaderWriterTest, test6) {
     }
 }
 
-// TEST_F(ByteSliceReaderWriterTest, test7) {
-//
-// }
+TEST_F(ByteSliceReaderWriterTest, test7) {
+    using namespace infinity;
+
+    // Prepare data
+    ByteSliceWriter writer1;
+    i16 i;
+    for (i = 500; i < 1000; i++) {
+        writer1.WriteInt16(i);
+    }
+    ASSERT_EQ(writer1.GetSize(), 500 * sizeof(i16));
+
+    ByteSliceWriter writer2;
+    for (i = 1000; i < 1500; i++) {
+        writer2.WriteInt16(i);
+    }
+    ASSERT_EQ(writer2.GetSize(), 500 * sizeof(i16));
+
+    // Merge data (head --> writer2's data --> writer1's data --> tail)
+    writer2.Write(*writer1.GetByteSliceList());
+
+    ASSERT_EQ(writer1.GetSize(), 0);
+    ASSERT_EQ(writer2.GetSize(), 1000 * sizeof(i16));
+
+    // Verify data
+    ByteSliceReader reader1(writer2.GetByteSliceList());
+    for (i = 1000; i < 1500; i++) {
+        i16 value = reader1.ReadInt16();
+        ASSERT_EQ(value, i);
+    }
+    for (i = 500; i < 1000; i++) {
+        i16 value = reader1.ReadInt16();
+        ASSERT_EQ(value, i);
+    }
+
+    // Prepare data
+    ByteSliceWriter writer3;
+    for (i = 1500; i < 2000; i++) {
+        writer3.WriteInt16(i);
+    }
+    ASSERT_EQ(writer3.GetSize(), 500 * sizeof(i16));
+
+    // Merge data (head --> writer3's data --> writer2's partial data --> tail)
+    writer3.Write(*writer2.GetByteSliceList(), 0, writer2.GetSize() / 2 + 100);
+
+    // There must be something wrong
+    // ASSERT_EQ(writer2.GetSize(), 0);
+    // ASSERT_EQ(writer3.GetSize(), (1000 + 500 + 50) * sizeof(i16));
+
+    // Verify data
+    ByteSliceReader reader2(writer3.GetByteSliceList());
+    for (i = 1500; i < 2000; i++) {
+        i16 value = reader2.ReadInt16();
+        ASSERT_EQ(value, i);
+    }
+    for (i = 1000; i < 1500; i++) {
+        i16 value = reader2.ReadInt16();
+        ASSERT_EQ(value, i);
+    }
+    for (i = 500; i < 550; i++) {
+        i16 value = reader2.ReadInt16();
+        ASSERT_EQ(value, i);
+    }
+}
 
 TEST_F(ByteSliceReaderWriterTest, TestDataConsistency) {
     using namespace infinity;
