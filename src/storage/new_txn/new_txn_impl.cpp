@@ -2976,6 +2976,9 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, std::string &cause, boo
         case TransactionType::kCreateDBSnapshot: {
             return CheckConflictTxnStore(static_cast<const CreateDBSnapshotTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
+        case TransactionType::kCreateSystemSnapshot: {
+            return CheckConflictTxnStore(static_cast<const CreateSystemSnapshotTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
+        }
         case TransactionType::kCleanup: {
             return CheckConflictTxnStore(static_cast<const CleanupTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
@@ -4356,12 +4359,17 @@ bool NewTxn::CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *prev
 }
 
 bool NewTxn::CheckConflictTxnStore(const CreateTableSnapshotTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    auto CompareCommitTS = [&]() -> bool {
+        TxnTimeStamp commit_ts1 = previous_txn->CommitTS();
+        TxnTimeStamp commit_ts2 = this->CommitTS();
+        return commit_ts1 < commit_ts2;
+    };
     // retry_query = true;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCreateDBSnapshot: {
             auto *create_database_snapshot_txn_store = static_cast<CreateDBSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
-            if (create_database_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_) {
+            if (create_database_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_ && CompareCommitTS()) {
                 retry_query = false;
                 conflict = true;
             }
@@ -4369,7 +4377,15 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableSnapshotTxnStore &txn_store,
         }
         case TransactionType::kCreateTableSnapshot: {
             auto *create_table_snapshot_txn_store = static_cast<CreateTableSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
-            if (create_table_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_) {
+            if (create_table_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_ && CompareCommitTS()) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kCreateSystemSnapshot: {
+            auto *create_system_snapshot_txn_store = static_cast<CreateSystemSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_system_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_ && CompareCommitTS()) {
                 retry_query = false;
                 conflict = true;
             }
@@ -4385,19 +4401,28 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableSnapshotTxnStore &txn_store,
     }
 
     if (conflict) {
-        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
+        cause = fmt::format("{} vs. {}, {} vs. {}",
+                            previous_txn->base_txn_store_->ToString(),
+                            txn_store.ToString(),
+                            previous_txn->CommitTS(),
+                            this->CommitTS());
         return true;
     }
     return false;
 }
 
 bool NewTxn::CheckConflictTxnStore(const CreateDBSnapshotTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    auto CompareCommitTS = [&]() -> bool {
+        TxnTimeStamp commit_ts1 = previous_txn->CommitTS();
+        TxnTimeStamp commit_ts2 = this->CommitTS();
+        return commit_ts1 < commit_ts2;
+    };
     // retry_query = true;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCreateDBSnapshot: {
             auto *create_database_snapshot_txn_store = static_cast<CreateDBSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
-            if (create_database_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_) {
+            if (create_database_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_ && CompareCommitTS()) {
                 retry_query = false;
                 conflict = true;
             }
@@ -4405,7 +4430,15 @@ bool NewTxn::CheckConflictTxnStore(const CreateDBSnapshotTxnStore &txn_store, Ne
         }
         case TransactionType::kCreateTableSnapshot: {
             auto *create_table_snapshot_txn_store = static_cast<CreateTableSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
-            if (create_table_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_) {
+            if (create_table_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_ && CompareCommitTS()) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kCreateSystemSnapshot: {
+            auto *create_system_snapshot_txn_store = static_cast<CreateSystemSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_system_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_ && CompareCommitTS()) {
                 retry_query = false;
                 conflict = true;
             }
@@ -4421,7 +4454,64 @@ bool NewTxn::CheckConflictTxnStore(const CreateDBSnapshotTxnStore &txn_store, Ne
     }
 
     if (conflict) {
-        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
+        cause = fmt::format("{} vs. {}, {} vs. {}",
+                            previous_txn->base_txn_store_->ToString(),
+                            txn_store.ToString(),
+                            previous_txn->CommitTS(),
+                            this->CommitTS());
+        return true;
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictTxnStore(const CreateSystemSnapshotTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    auto CompareCommitTS = [&]() -> bool {
+        TxnTimeStamp commit_ts1 = previous_txn->CommitTS();
+        TxnTimeStamp commit_ts2 = this->CommitTS();
+        return commit_ts1 < commit_ts2;
+    };
+    // retry_query = true;
+    bool conflict = false;
+    switch (previous_txn->base_txn_store_->type_) {
+        case TransactionType::kCreateDBSnapshot: {
+            auto *create_database_snapshot_txn_store = static_cast<CreateDBSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_database_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_ && CompareCommitTS()) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kCreateTableSnapshot: {
+            auto *create_table_snapshot_txn_store = static_cast<CreateTableSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_table_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_ && CompareCommitTS()) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kCreateSystemSnapshot: {
+            auto *create_system_snapshot_txn_store = static_cast<CreateSystemSnapshotTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_system_snapshot_txn_store->snapshot_name_ == txn_store.snapshot_name_ && CompareCommitTS()) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kCleanup: {
+            retry_query = true;
+            conflict = true;
+            break;
+        }
+        default: {
+        }
+    }
+
+    if (conflict) {
+        cause = fmt::format("{} vs. {}, {} vs. {}",
+                            previous_txn->base_txn_store_->ToString(),
+                            txn_store.ToString(),
+                            previous_txn->CommitTS(),
+                            this->CommitTS());
         return true;
     }
     return false;

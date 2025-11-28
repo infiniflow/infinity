@@ -428,8 +428,15 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             }
 
             BufferHandle buffer_handle = buffer_obj->Load();
-            auto *data_ptr = static_cast<SecondaryIndexData *>(buffer_handle.GetDataMut());
-            data_ptr->InsertMergeData(old_buffers);
+
+            auto [cardinality, status] = table_index_meta.GetSecondaryIndexCardinality();
+            if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
+                auto *data_ptr = static_cast<SecondaryIndexData *>(buffer_handle.GetDataMut());
+                data_ptr->InsertMergeData(old_buffers);
+            } else {
+                auto *data_ptr = static_cast<SecondaryIndexDataBase<LowCardinalityTag> *>(buffer_handle.GetDataMut());
+                data_ptr->InsertMergeData(old_buffers);
+            }
             break;
         }
         case IndexType::kFullText: {
