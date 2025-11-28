@@ -359,3 +359,32 @@ TEST_F(VirtualStoreTest, minio_download) {
     infinity::InfinityContext::instance().UnInit();
 }
 */
+
+TEST_F(VirtualStoreTest, TestStorageType) {
+    StorageType type = String2StorageType("local");
+    ASSERT_EQ(ToString(type), std::string("local"));
+
+    type = String2StorageType("minio");
+    ASSERT_EQ(ToString(type), std::string("minio"));
+
+    type = String2StorageType("aws_s3");
+    ASSERT_EQ(ToString(type), std::string("local"));
+
+    type = String2StorageType("azure_blob");
+    ASSERT_EQ(ToString(type), std::string("local"));
+
+    type = String2StorageType("gcs");
+    ASSERT_EQ(ToString(type), std::string("local"));
+
+    type = String2StorageType("oss");
+    ASSERT_EQ(ToString(type), std::string("local"));
+
+    type = String2StorageType("cos");
+    ASSERT_EQ(ToString(type), std::string("local"));
+
+    type = String2StorageType("hdfs");
+    ASSERT_EQ(ToString(type), std::string("local"));
+
+    type = String2StorageType("nfs");
+    ASSERT_EQ(ToString(type), std::string("local"));
+}
