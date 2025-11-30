@@ -16,7 +16,7 @@
 
 # PEP 723 metadata
 # /// script
-# requires-python = ">=3.10"
+# requires-python = ">=3.10,<3.15"
 # dependencies = [
 #     "readerwriterlock>=1.0.0,<2.0.0",
 #     "datrie>=0.8.3,<0.9.0",
@@ -26,13 +26,11 @@
 # ///
 
 import logging
-
 # logging.basicConfig(
 #     level=logging.INFO,
 #     format='%(asctime)s - %(levelname)s - %(message)s',
 #     handlers=[logging.StreamHandler()]
 # )
-
 import argparse
 import copy
 import datrie
@@ -45,7 +43,6 @@ from hanziconv import HanziConv
 from nltk import word_tokenize
 from nltk.stem import SnowballStemmer, WordNetLemmatizer
 
-
 class RagTokenizer:
     def key_(self, line):
         return str(line.lower().encode("utf-8"))[2:-1]
@@ -53,10 +50,10 @@ class RagTokenizer:
     def rkey_(self, line):
         return str(("DD" + (line[::-1].lower())).encode("utf-8"))[2:-1]
 
-    def loadDict_(self, fnm):
+    def _load_dict(self, fnm):
         logging.info(f"[HUQIE]:Build trie from {fnm}")
         try:
-            of = open(fnm, "r", encoding='utf-8')
+            of = open(fnm, "r", encoding="utf-8")
             while True:
                 line = of.readline()
                 if not line:
@@ -64,7 +61,7 @@ class RagTokenizer:
                 line = re.sub(r"[\r\n]+", "", line)
                 line = re.split(r"[ \t]", line)
                 k = self.key_(line[0])
-                F = int(math.log(float(line[1]) / self.DENOMINATOR) + .5)
+                F = int(math.log(float(line[1]) / self.DENOMINATOR) + 0.5)
                 if k not in self.trie_ or self.trie_[k][0] < F:
                     self.trie_[self.key_(line[0])] = (F, line[2])
                 self.trie_[self.rkey_(line[0])] = 1
@@ -112,18 +109,18 @@ class RagTokenizer:
             self.trie_ = datrie.Trie(string.printable)
 
         # load data from dict file and save to trie file
-        self.loadDict_(self.DIR_)
+        self._load_dict(self.DIR_)
 
-    def loadUserDict(self, fnm):
+    def load_user_dict(self, fnm):
         try:
             self.trie_ = datrie.Trie.load(fnm + ".trie")
             return
         except Exception:
             self.trie_ = datrie.Trie(string.printable)
-        self.loadDict_(fnm)
+        self._load_dict(fnm)
 
-    def addUserDict(self, fnm):
-        self.loadDict_(fnm)
+    def add_user_dict(self, fnm):
+        self._load_dict(fnm)
 
     def _strQ2B(self, ustring):
         """Convert full-width characters to half-width characters"""
@@ -133,8 +130,8 @@ class RagTokenizer:
             if inside_code == 0x3000:
                 inside_code = 0x0020
             else:
-                inside_code -= 0xfee0
-            if inside_code < 0x0020 or inside_code > 0x7e:  # After the conversion, if it's not a half-width character, return the original character.
+                inside_code -= 0xFEE0
+            if inside_code < 0x0020 or inside_code > 0x7E:  # After the conversion, if it's not a half-width character, return the original character.
                 rstring += uchar
             else:
                 rstring += chr(inside_code)
@@ -151,7 +148,7 @@ class RagTokenizer:
             if s < len(chars):
                 copy_pretks = copy.deepcopy(preTks)
                 remaining = "".join(chars[s:])
-                copy_pretks.append((remaining, (-12, '')))
+                copy_pretks.append((remaining, (-12, "")))
                 tkslist.append(copy_pretks)
             return s
 
@@ -182,7 +179,7 @@ class RagTokenizer:
                 if k in self.trie_:
                     copy_pretks.append((t, self.trie_[k]))
                 else:
-                    copy_pretks.append((t, (-12, '')))
+                    copy_pretks.append((t, (-12, "")))
                 next_res = self.dfs_(chars, mid, copy_pretks, tkslist, _depth + 1, _memo)
                 res = max(res, next_res)
                 _memo[state_key] = res
@@ -190,12 +187,12 @@ class RagTokenizer:
 
         S = s + 1
         if s + 2 <= len(chars):
-            t1 = "".join(chars[s:s + 1])
-            t2 = "".join(chars[s:s + 2])
+            t1 = "".join(chars[s : s + 1])
+            t2 = "".join(chars[s : s + 2])
             if self.trie_.has_keys_with_prefix(self.key_(t1)) and not self.trie_.has_keys_with_prefix(self.key_(t2)):
                 S = s + 2
         if len(preTks) > 2 and len(preTks[-1][0]) == 1 and len(preTks[-2][0]) == 1 and len(preTks[-3][0]) == 1:
-            t1 = preTks[-1][0] + "".join(chars[s:s + 1])
+            t1 = preTks[-1][0] + "".join(chars[s : s + 1])
             if self.trie_.has_keys_with_prefix(self.key_(t1)):
                 S = s + 2
 
@@ -213,13 +210,13 @@ class RagTokenizer:
             _memo[state_key] = res
             return res
 
-        t = "".join(chars[s:s + 1])
+        t = "".join(chars[s : s + 1])
         k = self.key_(t)
         copy_pretks = copy.deepcopy(preTks)
         if k in self.trie_:
             copy_pretks.append((t, self.trie_[k]))
         else:
-            copy_pretks.append((t, (-12, '')))
+            copy_pretks.append((t, (-12, "")))
         result = self.dfs_(chars, s + 1, copy_pretks, tkslist, _depth + 1, _memo)
         _memo[state_key] = result
         return result
@@ -248,7 +245,7 @@ class RagTokenizer:
         logging.debug("[SC] {} {} {} {} {}".format(tks, len(tks), L, F, B / len(tks) + L + F))
         return tks, B / len(tks) + L + F
 
-    def sortTks_(self, tkslist):
+    def _sort_tokens(self, tkslist):
         res = []
         for tfts in tkslist:
             tks, s = self.score_(tfts)
@@ -273,14 +270,13 @@ class RagTokenizer:
 
         return " ".join(res)
 
-    def maxForward_(self, line):
+    def _max_forward(self, line):
         res = []
         s = 0
         while s < len(line):
             e = s + 1
             t = line[s:e]
-            while e < len(line) and self.trie_.has_keys_with_prefix(
-                    self.key_(t)):
+            while e < len(line) and self.trie_.has_keys_with_prefix(self.key_(t)):
                 e += 1
                 t = line[s:e]
 
@@ -291,13 +287,13 @@ class RagTokenizer:
             if self.key_(t) in self.trie_:
                 res.append((t, self.trie_[self.key_(t)]))
             else:
-                res.append((t, (0, '')))
+                res.append((t, (0, "")))
 
             s = e
 
         return self.score_(res)
 
-    def maxBackward_(self, line):
+    def _max_backward(self, line):
         res = []
         s = len(line) - 1
         while s >= 0:
@@ -314,7 +310,7 @@ class RagTokenizer:
             if self.key_(t) in self.trie_:
                 res.append((t, self.trie_[self.key_(t)]))
             else:
-                res.append((t, (0, '')))
+                res.append((t, (0, "")))
 
             s -= 1
 
@@ -337,16 +333,16 @@ class RagTokenizer:
                 if _zh == zh:
                     e += 1
                     continue
-                txt_lang_pairs.append((a[s: e], zh))
+                txt_lang_pairs.append((a[s:e], zh))
                 s = e
                 e = s + 1
                 zh = _zh
             if s >= len(a):
                 continue
-            txt_lang_pairs.append((a[s: e], zh))
+            txt_lang_pairs.append((a[s:e], zh))
         return txt_lang_pairs
 
-    def tokenize(self, line):
+    def tokenize(self, line: str) -> str:
         line = re.sub(r"\W+", " ", line)
         line = self._strQ2B(line).lower()
         line = self._tradi2simp(line)
@@ -357,14 +353,13 @@ class RagTokenizer:
             if not lang:
                 res.extend([self.stemmer.stem(self.lemmatizer.lemmatize(t)) for t in word_tokenize(L)])
                 continue
-            if len(L) < 2 or re.match(
-                    r"[a-z\.-]+$", L) or re.match(r"[0-9\.-]+$", L):
+            if len(L) < 2 or re.match(r"[a-z\.-]+$", L) or re.match(r"[0-9\.-]+$", L):
                 res.append(L)
                 continue
 
             # use maxforward for the first time
-            tks, s = self.maxForward_(L)
-            tks1, s1 = self.maxBackward_(L)
+            tks, s = self._max_forward(L)
+            tks1, s1 = self._max_backward(L)
             if self.DEBUG:
                 logging.debug("[FW] {} {}".format(tks, s))
                 logging.debug("[BW] {} {}".format(tks1, s1))
@@ -374,7 +369,7 @@ class RagTokenizer:
             while i + same < len(tks1) and j + same < len(tks) and tks1[i + same] == tks[j + same]:
                 same += 1
             if same > 0:
-                res.append(" ".join(tks[j: j + same]))
+                res.append(" ".join(tks[j : j + same]))
             _i = i + same
             _j = j + same
             j = _j + 1
@@ -396,12 +391,12 @@ class RagTokenizer:
                 # backward tokens from_i to i are different from forward tokens from _j to j.
                 tkslist = []
                 self.dfs_("".join(tks[_j:j]), 0, [], tkslist)
-                res.append(" ".join(self.sortTks_(tkslist)[0][0]))
+                res.append(" ".join(self._sort_tokens(tkslist)[0][0]))
 
                 same = 1
                 while i + same < len(tks1) and j + same < len(tks) and tks1[i + same] == tks[j + same]:
                     same += 1
-                res.append(" ".join(tks[j: j + same]))
+                res.append(" ".join(tks[j : j + same]))
                 _i = i + same
                 _j = j + same
                 j = _j + 1
@@ -412,13 +407,13 @@ class RagTokenizer:
                 assert "".join(tks1[_i:]) == "".join(tks[_j:])
                 tkslist = []
                 self.dfs_("".join(tks[_j:]), 0, [], tkslist)
-                res.append(" ".join(self.sortTks_(tkslist)[0][0]))
+                res.append(" ".join(self._sort_tokens(tkslist)[0][0]))
 
         res = " ".join(res)
         logging.debug("[TKS] {}".format(self.merge_(res)))
         return self.merge_(res)
 
-    def fine_grained_tokenize(self, tks):
+    def fine_grained_tokenize(self, tks: str) -> str:
         tks = tks.split()
         zh_num = len([1 for c in tks if c and is_chinese(c[0])])
         if zh_num < len(tks) * 0.2:
@@ -440,7 +435,7 @@ class RagTokenizer:
             if len(tkslist) < 2:
                 res.append(tk)
                 continue
-            stk = self.sortTks_(tkslist)[1][0]
+            stk = self._sort_tokens(tkslist)[1][0]
             if len(stk) == len(tk):
                 stk = tk
             else:
@@ -460,43 +455,42 @@ class RagTokenizer:
 
 
 def is_chinese(s):
-    if s >= u'\u4e00' and s <= u'\u9fa5':
+    if s >= "\u4e00" and s <= "\u9fa5":
         return True
     else:
         return False
 
 
 def is_number(s):
-    if s >= u'\u0030' and s <= u'\u0039':
+    if s >= "\u0030" and s <= "\u0039":
         return True
     else:
         return False
 
 
 def is_alphabet(s):
-    if (s >= u'\u0041' and s <= u'\u005a') or (
-            s >= u'\u0061' and s <= u'\u007a'):
+    if ("\u0041" <= s <= "\u005a") or ("\u0061" <= s <= "\u007a"):
         return True
     else:
         return False
 
 
-def naiveQie(txt):
+def naive_qie(txt):
     tks = []
     for t in txt.split():
-        if tks and re.match(r".*[a-zA-Z]$", tks[-1]
-                            ) and re.match(r".*[a-zA-Z]$", t):
+        if tks and re.match(r".*[a-zA-Z]$", tks[-1]) and re.match(r".*[a-zA-Z]$", t):
             tks.append(" ")
         tks.append(t)
     return tks
+
 
 tokenizer = RagTokenizer()
 tokenize = tokenizer.tokenize
 fine_grained_tokenize = tokenizer.fine_grained_tokenize
 tag = tokenizer.tag
 freq = tokenizer.freq
-loadUserDict = tokenizer.loadUserDict
-addUserDict = tokenizer.addUserDict
+load_user_dict = tokenizer.load_user_dict
+add_user_dict = tokenizer.add_user_dict
 tradi2simp = tokenizer._tradi2simp
 strQ2B = tokenizer._strQ2B
 

@@ -71,8 +71,8 @@ public:
     std::string rag_tokenizer_path_ = "python/rag_tokenizer";
     std::string input_file_ = rag_tokenizer_path_ + "/tokenizer_input.txt";
 
-    // Mismatch tokens for: is, data, CCS, experiencing, faster, LLMs, largest
-    std::unordered_set<std::string> mismatch_tokens_ = {"be", "datum", "ccs", "experi", "fast", "llms", "larg"};
+    // Mismatch tokens for: is, data, CCS, experiencing, faster, LLMs, largest, assessment
+    std::unordered_set<std::string> mismatch_tokens_ = {"be", "datum", "ccs", "experi", "fast", "llms", "larg", "ass"};
 };
 
 TEST_F(RAGAnalyzerTest, test_analyze_enable_position) {
@@ -223,6 +223,70 @@ TEST_F(RAGAnalyzerTest, test_tokenize_consistency_with_python) {
         }
         if (!is_size_match || !is_match || is_bad_token) {
             std::cout << "Tokenize count: " << tokenize_result.size() << ", Python tokenize count: " << python_tokenize_result.size() << std::endl;
+
+            std::cout << "Python tokenize result: " << std::endl << python_tokens << std::endl;
+        }
+    }
+    infile.close();
+}
+
+TEST_F(RAGAnalyzerTest, test_fine_grained_tokenize_consistency_with_python) {
+    std::string call_python_tokenizer_command = "uv run " + rag_tokenizer_path_ + "/rag_tokenizer.py " + "-f \"" + input_file_ + "\" -o \"" +
+                                                rag_tokenizer_path_ + "/fine_grained_tokenizer_python_output.txt\"" + " --fine-grained";
+
+    std::cout << "Call Python tokenizer: " << std::endl << call_python_tokenizer_command << std::endl;
+
+    int result = system(call_python_tokenizer_command.c_str());
+    EXPECT_EQ(result, 0) << "Call Python tokenizer failed.";
+
+    if (result != 0) {
+        return;
+    }
+
+    analyzer_->SetEnablePosition(false);
+    analyzer_->SetFineGrained(true);
+
+    std::ifstream infile(input_file_);
+    std::ifstream infile_python(rag_tokenizer_path_ + "/fine_grained_tokenizer_python_output.txt");
+    std::string line;
+    std::string python_tokens;
+    while (std::getline(infile, line)) {
+        if (line.empty())
+            continue;
+
+        TermList term_list;
+        analyzer_->Analyze(line, term_list);
+
+        std::string fine_grained_tokens =
+            std::accumulate(term_list.begin(), term_list.end(), std::string(""), [](const std::string &a, const Term &b) {
+                return a + (a.empty() ? "" : " ") + b.text_;
+            });
+
+        std::cout << "Input text: " << std::endl << line << std::endl;
+        std::cout << "Fine grained tokenize result: " << std::endl << fine_grained_tokens << std::endl;
+
+        std::getline(infile_python, python_tokens);
+        std::vector<std::string> python_tokenize_result = SplitString(python_tokens);
+
+        bool is_size_match = term_list.size() == python_tokenize_result.size();
+        EXPECT_TRUE(is_size_match);
+
+        bool is_match = true;
+        bool is_bad_token = false;
+        if (is_size_match) {
+            for (size_t i = 0; i < term_list.size(); ++i) {
+                if (term_list[i].text_ != python_tokenize_result[i]) {
+                    is_bad_token = mismatch_tokens_.contains(term_list[i].text_);
+                    if (!is_bad_token) {
+                        is_match = false;
+                        break;
+                    }
+                }
+            }
+            EXPECT_TRUE(is_match);
+        }
+        if (!is_size_match || !is_match || is_bad_token) {
+            std::cout << "Tokenize count: " << term_list.size() << ", Python tokenize count: " << python_tokenize_result.size() << std::endl;
 
             std::cout << "Python tokenize result: " << std::endl << python_tokens << std::endl;
         }

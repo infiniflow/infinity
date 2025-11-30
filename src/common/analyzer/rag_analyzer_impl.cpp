@@ -1128,7 +1128,7 @@ inline void CheckDP2(const RAGAnalyzer *this_ptr, const std::string_view input_s
     const auto dp_faster = dp_duration < dfs_duration;
     std::cerr << "\n!!! " << print_1(dp_faster) << "\nTOP2 DFS duration: " << dfs_duration << " \nTOP2 DP  duration: " << dp_duration;
     const auto dfs_sorted_tokens = get_dfs_sorted_tokens();
-    for (int i = 0; i < topn; ++i) {
+    for (int i = 0; i < std::min(topn, (int)dfs_sorted_tokens.size()); ++i) {
         compare_score_and_tokens(dfs_sorted_tokens[i].first,
                                  dfs_sorted_tokens[i].second,
                                  dp_result[i].first,
