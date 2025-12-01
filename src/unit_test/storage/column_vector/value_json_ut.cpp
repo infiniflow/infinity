@@ -225,9 +225,9 @@ TEST_F(Value2JsonTest, test_sparse) {
     nlohmann::json json;
 
     {
-        std::string name = "float";
-        nlohmann::json json_float;
-        json[name] = json_float;
+        std::string name = "float_int32_t";
+        nlohmann::json json_float_int32_t;
+        json[name] = json_float_int32_t;
 
         std::pair<std::vector<float>, std::vector<int32_t>> vec{std::vector<float>{1.0, 2.0, 3.0, 4.0},
                                                                 std::vector<int32_t>{100, 1000, 10000, 20000}};
@@ -242,15 +242,31 @@ TEST_F(Value2JsonTest, test_sparse) {
     }
 
     {
-        std::string name = "double";
+        std::string name = "double_int64_t";
+        nlohmann::json json_double_int64_t;
+        json[name] = json_double_int64_t;
+
+        std::pair<std::vector<double>, std::vector<int64_t>> vec{std::vector<double>{1.0, 2.0, 3.0, 4.0},
+                                                                 std::vector<int64_t>{100, 1000, 10000, 20000}};
+
+        auto column_typeinfo =
+            std::make_shared<SparseInfo>(EmbeddingDataType::kElemDouble, EmbeddingDataType::kElemInt64, 30000, SparseStoreType::kSort);
+        auto v = Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
+                                   reinterpret_cast<const char *>(vec.second.data()),
+                                   vec.first.size(),
+                                   column_typeinfo);
+        v.AppendToJson(name, json);
+    }
+
+    {
+        std::string name = "double_int8_t";
         nlohmann::json json_double;
         json[name] = json_double;
 
-        std::pair<std::vector<double>, std::vector<int32_t>> vec{std::vector<double>{1.0, 2.0, 3.0, 4.0},
-                                                                 std::vector<int32_t>{100, 1000, 10000, 20000}};
+        std::pair<std::vector<double>, std::vector<int8_t>> vec{std::vector<double>{1.0, 2.0, 3.0, 4.0}, std::vector<int8_t>{1, 2, 3, 4}};
 
         auto column_typeinfo =
-            std::make_shared<SparseInfo>(EmbeddingDataType::kElemDouble, EmbeddingDataType::kElemInt32, 30000, SparseStoreType::kSort);
+            std::make_shared<SparseInfo>(EmbeddingDataType::kElemDouble, EmbeddingDataType::kElemInt8, 30000, SparseStoreType::kSort);
         auto v = Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
                                    reinterpret_cast<const char *>(vec.second.data()),
                                    vec.first.size(),
