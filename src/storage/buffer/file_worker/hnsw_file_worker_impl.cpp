@@ -71,7 +71,7 @@ bool HnswFileWorker::Write(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle
         UnrecoverableError("dsdsdsdsdsdsdsd");
     }
 
-    data_ = data;
+    // data_ = data;
 
     (hnsw_handler)->SaveToPtr(*file_handle);
 
@@ -96,40 +96,40 @@ void HnswFileWorker::Read(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle>
     // });
     // }
     // std::println("{}", std::stacktrace::current());
-    {
-        std::unique_lock l(mutex_);
-        if (data_ == nullptr) {
-            data_ = HnswHandlerPtr{HnswHandler::Make(index_base_.get(), column_def_).release()};
-        }
-    }
+    // {
+    //     std::unique_lock l(mutex_);
+    //     if (data_ == nullptr) {
+    //         data_ = HnswHandlerPtr{HnswHandler::Make(index_base_.get(), column_def_).release()};
+    //     }
+    // }
     // data = std::make_shared<HnswHandlerPtr>(HnswHandlerPtr{HnswHandler::Make(index_base_.get(), column_def_).release()});
-    data = data_;
+    // data = data_;
     // data_ may be nullptr
     if (!file_handle) {
         // data = data_;
         return;
     }
-    if (!mmap_) {
-        // auto *hnsw_handler = data.get();
+    // if (!mmap_) {
+    // auto *hnsw_handler = data.get();
 
-        // (*hnsw_handler)->LoadFromPtr(*file_handle, file_size);
-        (data)->LoadFromPtr(*file_handle, file_size);
+    auto fd = file_handle->fd();
+    mmap_size_ = file_handle->FileSize();
+    mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
 
-        // u8 *tmp_ptr_{};
-        // auto fd = file_handle->fd();
-        // mmap_size_ = file_handle->FileSize();
-        // mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
-        // if (mmap_ == MAP_FAILED) {
-        //     std::println("why failed: {}", mmap_size_);
-        // }
-        // data_ = *hnsw_handler;
-        // data = data_;
-        // data = std::shared_ptr<HnswHandlerPtr>(reinterpret_cast<HnswHandlerPtr *>(mmap_), [](HnswHandlerPtr *ptr) {});
+    // (*hnsw_handler)->LoadFromPtr(*file_handle, file_size);
+    (data)->LoadFromPtr(mmap_, mmap_size_, *file_handle, file_size);
 
-        auto fd = file_handle->fd();
-        mmap_size_ = file_handle->FileSize();
-        mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
-    }
+    // u8 *tmp_ptr_{};
+    // auto fd = file_handle->fd();
+    // mmap_size_ = file_handle->FileSize();
+    // mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+    // if (mmap_ == MAP_FAILED) {
+    //     std::println("why failed: {}", mmap_size_);
+    // }
+    // data_ = *hnsw_handler;
+    // data = data_;
+    // data = std::shared_ptr<HnswHandlerPtr>(reinterpret_cast<HnswHandlerPtr *>(mmap_), [](HnswHandlerPtr *ptr) {});
+    // }
 }
 
 } // namespace infinity

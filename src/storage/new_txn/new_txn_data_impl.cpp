@@ -451,7 +451,7 @@ Status NewTxn::Append(const std::string &db_name, const std::string &table_name,
     }
 
     // Put the data into local txn store
-    if (base_txn_store_ != nullptr) {
+    if (base_txn_store_) {
         return Status::UnexpectedError("txn store is not null");
     }
     base_txn_store_ = std::make_shared<AppendTxnStore>();

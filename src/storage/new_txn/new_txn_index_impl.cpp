@@ -2020,13 +2020,13 @@ Status NewTxn::GetFullTextIndexReader(const std::string &db_name, const std::str
 
 Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     const TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    const std::string &db_name = create_index_cmd->db_name_;
-    const std::string &table_name = create_index_cmd->table_name_;
-    const std::string &index_name = *create_index_cmd->index_base_->index_name_;
-    const std::string &db_id_str = create_index_cmd->db_id_;
-    const std::string &table_id_str = create_index_cmd->table_id_;
-    const std::string &table_key = create_index_cmd->table_key_;
-    const std::string &index_id_str = create_index_cmd->index_id_;
+    const auto &db_name = create_index_cmd->db_name_;
+    const auto &table_name = create_index_cmd->table_name_;
+    const auto &index_name = *create_index_cmd->index_base_->index_name_;
+    const auto &db_id_str = create_index_cmd->db_id_;
+    const auto &table_id_str = create_index_cmd->table_id_;
+    const auto &table_key = create_index_cmd->table_key_;
+    const auto &index_id_str = create_index_cmd->index_id_;
     std::shared_ptr<IndexBase> &index_base = create_index_cmd->index_base_;
 
     TableMeta table_meta(db_id_str, table_id_str, table_name, this);
