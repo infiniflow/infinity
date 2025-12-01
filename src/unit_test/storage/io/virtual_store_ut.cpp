@@ -397,3 +397,21 @@ TEST_F(VirtualStoreTest, TestStorageType) {
     ASSERT_EQ(ToString(StorageType::kHDFS), std::string("hadoop file system"));
     ASSERT_EQ(ToString(StorageType::kNFS), std::string("network file system"));
 }
+
+TEST_F(VirtualStoreTest, TestFileCompress) {
+    std::string file_path("/var/infinity/tmp/test_compress.txt");
+
+    {
+        std::ofstream file(file_path);
+        ASSERT_TRUE(file.is_open());
+        for (char ch = 'a'; ch <= 'z'; ++ch) {
+            file << ch << " ";
+        }
+        file.close();
+    }
+
+    auto file = VirtualStore::BeginCompress(file_path);
+    Status status = VirtualStore::AddFileCompress(file, file_path);
+    ASSERT_TRUE(status.ok());
+    VirtualStore::EndCompress(file);
+}
