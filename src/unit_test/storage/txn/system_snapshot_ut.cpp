@@ -202,6 +202,15 @@ TEST_P(SystemSnapshotTest, test_restore_system_rollback_basic) {
         ASSERT_TRUE(status.ok());
         status = txn_mgr->CommitTxn(txn);
         ASSERT_TRUE(status.ok());
+
+        // Show info
+        LOG_INFO(system_snapshot->ToString());
+
+        auto files = system_snapshot->GetFiles();
+        LOG_TRACE("All files: ");
+        for (auto file : files) {
+            LOG_TRACE(file);
+        }
     }
 
     // Verify
