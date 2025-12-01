@@ -44,7 +44,7 @@ using namespace infinity;
 
 class Value2JsonTest : public BaseTest {};
 
-TEST_F(Value2JsonTest, test1) {
+TEST_F(Value2JsonTest, test_embedding) {
     using namespace infinity;
     nlohmann::json json;
 
@@ -220,7 +220,7 @@ TEST_F(Value2JsonTest, test1) {
     // }
 }
 
-TEST_F(Value2JsonTest, test2) {
+TEST_F(Value2JsonTest, test_sparse) {
     using namespace infinity;
     nlohmann::json json;
 
@@ -232,11 +232,12 @@ TEST_F(Value2JsonTest, test2) {
         std::pair<std::vector<float>, std::vector<int32_t>> vec{std::vector<float>{1.0, 2.0, 3.0, 4.0},
                                                                 std::vector<int32_t>{100, 1000, 10000, 20000}};
 
-        auto column_typeinfo = std::make_shared<SparseInfo>(EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemInt32, 30000, SparseStoreType::kSort);
+        auto column_typeinfo =
+            std::make_shared<SparseInfo>(EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemInt32, 30000, SparseStoreType::kSort);
         auto v = Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
-                                    reinterpret_cast<const char *>(vec.second.data()),
-                                    vec.first.size(),
-                                    column_typeinfo);
+                                   reinterpret_cast<const char *>(vec.second.data()),
+                                   vec.first.size(),
+                                   column_typeinfo);
         v.AppendToJson(name, json);
     }
 
@@ -246,13 +247,14 @@ TEST_F(Value2JsonTest, test2) {
         json[name] = json_double;
 
         std::pair<std::vector<double>, std::vector<int32_t>> vec{std::vector<double>{1.0, 2.0, 3.0, 4.0},
-                                                                std::vector<int32_t>{100, 1000, 10000, 20000}};
+                                                                 std::vector<int32_t>{100, 1000, 10000, 20000}};
 
-        auto column_typeinfo = std::make_shared<SparseInfo>(EmbeddingDataType::kElemDouble, EmbeddingDataType::kElemInt32, 30000, SparseStoreType::kSort);
+        auto column_typeinfo =
+            std::make_shared<SparseInfo>(EmbeddingDataType::kElemDouble, EmbeddingDataType::kElemInt32, 30000, SparseStoreType::kSort);
         auto v = Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
-                                    reinterpret_cast<const char *>(vec.second.data()),
-                                    vec.first.size(),
-                                    column_typeinfo);
+                                   reinterpret_cast<const char *>(vec.second.data()),
+                                   vec.first.size(),
+                                   column_typeinfo);
         v.AppendToJson(name, json);
     }
 }
