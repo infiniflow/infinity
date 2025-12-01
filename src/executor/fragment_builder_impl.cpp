@@ -152,7 +152,9 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
                 UnrecoverableError("No input node of aggregate operator");
             } else {
                 BuildFragments(phys_op->left(), current_fragment_ptr);
-                current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
+                if (current_fragment_ptr->GetFragmentType() != FragmentType::kSerialMaterialize) {
+                    current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
+                }
             }
             return;
         }

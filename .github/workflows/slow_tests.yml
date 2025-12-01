@@ -8,7 +8,7 @@ on:
   # The only difference between pull_request and pull_request_target is the context in which the workflow runs:
   # — pull_request_target workflows use the workflow files from the default branch, and secrets are available.
   # — pull_request workflows use the workflow files from the pull request branch, and secrets are unavailable.
-  pull_request_target:
+  pull_request:
     types: [ synchronize, ready_for_review ]
     paths-ignore:
       - 'docs/**'
@@ -22,14 +22,14 @@ concurrency:
 jobs:
   download_code:
     name: download_code
-    if: ${{ github.event_name != 'pull_request_target' || (github.event.pull_request.draft == false && contains(github.event.pull_request.labels.*.name, 'slow-test')) }}
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && contains(github.event.pull_request.labels.*.name, 'slow-test')) }}
     runs-on: [ "self-hosted", "slow-test" ]
     steps:
       - name: Ensure workspace ownership
         if: ${{ !cancelled() && !failure() }}
         run: |
           echo "Workflow triggered by ${GITHUB_EVENT_NAME}"
-          if [[ ${GITHUB_EVENT_NAME} == 'pull_request_target' ]]; then
+          if [[ ${GITHUB_EVENT_NAME} == 'pull_request' ]]; then
             echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
           fi
           echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}

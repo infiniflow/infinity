@@ -1,0 +1,97 @@
+# name: test/sql/dql/test_agg_search.slt
+# description: Test agg search
+# group: [dql]
+
+statement ok
+DROP TABLE IF EXISTS test_agg_ft;
+
+statement ok
+CREATE TABLE test_agg_ft(doctitle varchar DEFAULT '', docdate varchar DEFAULT '', body varchar DEFAULT '');
+
+# copy data from csv file
+query I
+COPY test_agg_ft FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t', FORMAT CSV );
+----
+
+
+statement ok
+CREATE INDEX ft_index ON test_agg_ft(body) USING FULLTEXT;
+
+
+query TI
+SELECT doctitle, COUNT(*) FROM test_agg_ft SEARCH MATCH TEXT ('body^5', 'harmful chemical anarchism', 'topn=3') GROUP BY doctitle;
+----
+Anarchism 3
+
+
+# Clean up
+statement ok
+DROP TABLE test_agg_ft;
+
+# HNSW Index Aggregation
+statement ok
+DROP TABLE IF EXISTS test_agg_hnsw;
+
+statement ok
+CREATE TABLE test_agg_hnsw(c1 INT, c2 EMBEDDING(FLOAT, 4));
+
+statement ok
+INSERT INTO test_agg_hnsw VALUES (1, [0.1, 0.1, 0.1, 0.1]), (1, [0.1, 0.1, 0.1, 0.1]), (2, [0.9, 0.9, 0.9, 0.9]);
+
+statement ok
+CREATE INDEX idx_hnsw ON test_agg_hnsw (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2);
+
+query II rowsort
+SELECT c1, COUNT(*) FROM test_agg_hnsw SEARCH MATCH VECTOR (c2, [0.1, 0.1, 0.1, 0.1], 'float', 'l2', 3) GROUP BY c1;
+----
+1 2
+2 1
+
+statement ok
+DROP TABLE test_agg_hnsw;
+
+# Secondary Index Aggregation
+statement ok
+DROP TABLE IF EXISTS test_agg_secondary;
+
+statement ok
+CREATE TABLE test_agg_secondary(c1 INT, c2 INT);
+
+statement ok
+INSERT INTO test_agg_secondary VALUES (1, 10), (1, 10), (2, 20), (3, 10);
+
+statement ok
+CREATE INDEX idx_secondary ON test_agg_secondary (c2);
+
+query II
+SELECT c2, COUNT(*) FROM test_agg_secondary WHERE c2 = 10 GROUP BY c2;
+----
+10 3
+
+statement ok
+DROP TABLE test_agg_secondary;
+
+# Fusion Aggregation
+statement ok
+DROP TABLE IF EXISTS test_agg_fusion;
+
+statement ok
+CREATE TABLE test_agg_fusion(c1 INT, body VARCHAR, vec EMBEDDING(FLOAT, 4));
+
+statement ok
+INSERT INTO test_agg_fusion VALUES (1, 'apple', [0.1, 0.1, 0.1, 0.1]), (1, 'apple', [0.1, 0.1, 0.1, 0.1]), (2, 'banana', [0.9, 0.9, 0.9, 0.9]);
+
+statement ok
+CREATE INDEX ft_idx ON test_agg_fusion(body) USING FULLTEXT;
+
+statement ok
+CREATE INDEX hnsw_idx ON test_agg_fusion(vec) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2);
+
+query II rowsort
+SELECT c1, COUNT(*) FROM test_agg_fusion SEARCH MATCH TEXT ('body', 'apple', 'topn=3'), MATCH VECTOR (vec, [0.1, 0.1, 0.1, 0.1], 'float', 'l2', 3), FUSION('rrf') GROUP BY c1;
+----
+1 2
+2 1
+
+statement ok
+DROP TABLE test_agg_fusion;

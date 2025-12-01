@@ -32,6 +32,7 @@ import :new_catalog;
 import :new_txn_manager;
 import :admin_executor;
 import :utility;
+import :explain_logical_plan;
 
 import std.compat;
 
