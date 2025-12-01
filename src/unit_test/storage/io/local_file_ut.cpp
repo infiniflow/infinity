@@ -43,13 +43,26 @@ TEST_F(LocalFileTest, test1) {
 
     file_handle->Seek(0);
 
-    size_t read_size;
-    auto buffer = std::make_unique<char[]>(26);
-    std::tie(read_size, status) = file_handle->Read(buffer.get(), 26);
-    ASSERT_TRUE(status.ok());
-    ASSERT_EQ(read_size, 26);
-    for (auto i = 0; i < 26; i++) {
-        ASSERT_EQ(buffer[i], 'a' + i);
+    {
+        auto buffer = std::make_unique<char[]>(26);
+        auto [read_size, status] = file_handle->Read(buffer.get(), 26);
+        ASSERT_TRUE(status.ok());
+        ASSERT_EQ(read_size, 26);
+        for (auto i = 0; i < 26; i++) {
+            ASSERT_EQ(buffer[i], 'a' + i);
+        }
+    }
+
+    file_handle->Seek(0);
+
+    {
+        std::string buffer(64, '\0');
+        auto [read_size, status] = file_handle->Read(buffer, 26);
+        ASSERT_TRUE(status.ok());
+        ASSERT_EQ(read_size, 26);
+        for (auto i = 0; i < 26; i++) {
+            ASSERT_EQ(buffer[i], 'a' + i);
+        }
     }
 
     std::string mmap_path = fmt::format("{}/{}", GetFullTmpDir(), "test_mmap.txt");
