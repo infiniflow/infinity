@@ -12,7 +12,7 @@ PROJECT (5)
  - expressions: [count(star) (#0)]
 -> AGGREGATE (4)
    - aggregate table index: #3
-   - aggregate: [COUNT(ROW_ID (#1))]
+   - aggregate: [COUNT(c1 (#1))]
   -> FILTER (3)
      - filter: CAST(c2 (#0) AS BigInt) = 5
      - output columns: [c2, __rowid]
@@ -37,7 +37,7 @@ PROJECT (5)
  - expressions: [count(star) (#0)]
 -> AGGREGATE (4)
    - aggregate table index: #3
-   - aggregate: [COUNT(ROW_ID (#1))]
+   - aggregate: [COUNT(c1 (#1))]
   -> FILTER (3)
      - filter: CAST(c2 (#0) AS BigInt) = 5
      - output columns: [c2, __rowid]
@@ -61,10 +61,10 @@ PROJECT (5)
  - table index: #4
  - expressions: [count(star) (#0)]
 -> Merge aggregate (7)
-   - output columns: [COUNT(ROW_ID)]
+   - output columns: [COUNT(c1)]
   -> AGGREGATE (4)
      - aggregate table index: #3
-     - aggregate: [COUNT(ROW_ID (#1))]
+     - aggregate: [COUNT(c1 (#1))]
     -> FILTER (3)
        - filter: CAST(c2 (#0) AS BigInt) = 5
        - output columns: [c2, __rowid]
