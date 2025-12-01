@@ -14,7 +14,10 @@ dependencies = [
     "polars-lts-cpu>=1.9.0,<2.0.0",
     "openpyxl>=3.1.0,<4.0.0",
     "requests>=2.32.0,<3.0.0",
-    "readerwriterlock>=1.0.0,<2.0.0"
+    "readerwriterlock>=1.0.0,<2.0.0",
+    "datrie>=0.8.3,<0.9.0",
+    "hanziconv>=0.3.0,<0.4.0",
+    "nltk>=3.9.0,<4.0.0"
 ]
 description = "infinity"
 readme = "README.md"
