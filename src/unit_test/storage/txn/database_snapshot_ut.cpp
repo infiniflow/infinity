@@ -169,6 +169,15 @@ TEST_P(DatabaseSnapshotTest, test_restore_database_rollback_basic) {
         EXPECT_TRUE(status.ok());
         status = txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
+
+        // Show info
+        LOG_INFO(database_snapshot->ToString());
+
+        auto files = database_snapshot->GetFiles();
+        LOG_TRACE("All files: ");
+        for (auto file : files) {
+            LOG_TRACE(file);
+        }
     }
 
     // Verify that the table was restored with data

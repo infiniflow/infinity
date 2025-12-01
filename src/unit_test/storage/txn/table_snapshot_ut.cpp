@@ -166,6 +166,23 @@ TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, "tb1_snapshot");
     EXPECT_TRUE(status.ok());
 
+    // Show info
+    {
+        LOG_INFO(table_snapshot->ToString());
+
+        auto files = table_snapshot->GetFiles();
+        LOG_TRACE("All files: ");
+        for (auto file : files) {
+            LOG_TRACE(file);
+        }
+
+        auto index_files = table_snapshot->GetIndexFiles();
+        LOG_TRACE("Index files: ");
+        for (auto file : index_files) {
+            LOG_TRACE(file);
+        }
+    }
+
     // Attempt to restore table
     status = restore_txn->RestoreTableSnapshot("default_db", table_snapshot);
     EXPECT_TRUE(status.ok());
