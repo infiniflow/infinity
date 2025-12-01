@@ -31,7 +31,7 @@ namespace infinity {
 AggregateExpression::AggregateExpression(AggregateFunction aggregate_function, std::vector<std::shared_ptr<BaseExpression>> arguments)
     : BaseExpression(ExpressionType::kAggregate, std::move(arguments)), aggregate_function_(std::move(aggregate_function)) {}
 
-bool AggregateExpression::IsCountStar() const { return false; }
+bool AggregateExpression::IsCountStar() const { return count_star_; }
 
 std::string AggregateExpression::ToString() const {
     std::stringstream ss;

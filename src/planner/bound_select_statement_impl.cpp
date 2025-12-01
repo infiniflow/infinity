@@ -88,8 +88,9 @@ namespace infinity {
 
 std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_context) {
     const std::shared_ptr<BindContext> &bind_context = this->bind_context_;
+    std::shared_ptr<LogicalNode> root = nullptr;
     if (search_expr_.get() == nullptr) {
-        std::shared_ptr<LogicalNode> root = BuildFrom(table_ref_ptr_, query_context, bind_context);
+        root = BuildFrom(table_ref_ptr_, query_context, bind_context);
 
         if (!unnest_expressions_.empty()) {
             std::shared_ptr<LogicalNode> unnest = BuildUnnest(root, unnest_expressions_, query_context, bind_context);
@@ -102,78 +103,7 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
             filter->set_left_node(root);
             root = filter;
         }
-
-        if (!group_by_expressions_.empty() || !aggregate_expressions_.empty()) {
-            // Build logical aggregate
-            auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
-            auto aggregate = std::make_shared<LogicalAggregate>(bind_context->GetNewLogicalNodeId(),
-                                                                base_table_ref,
-                                                                group_by_expressions_,
-                                                                groupby_index_,
-                                                                aggregate_expressions_,
-                                                                aggregate_index_);
-            aggregate->set_left_node(root);
-            root = aggregate;
-        }
-
-        if (!having_expressions_.empty()) {
-            // Build logical filter
-            auto having_filter = BuildFilter(root, having_expressions_, query_context, bind_context);
-            having_filter->set_left_node(root);
-            root = having_filter;
-        }
-
-        if (!order_by_expressions_.empty()) {
-            if (order_by_expressions_.size() != order_by_types_.size()) {
-                UnrecoverableError("Unknown error on order by expression");
-            }
-
-            if (limit_expression_.get() == nullptr) {
-                std::shared_ptr<LogicalNode> sort =
-                    std::make_shared<LogicalSort>(bind_context->GetNewLogicalNodeId(), order_by_expressions_, order_by_types_);
-                sort->set_left_node(root);
-                root = sort;
-            } else {
-                std::shared_ptr<LogicalNode> top = std::make_shared<LogicalTop>(bind_context->GetNewLogicalNodeId(),
-                                                                                std::static_pointer_cast<BaseTableRef>(table_ref_ptr_),
-                                                                                limit_expression_,
-                                                                                offset_expression_,
-                                                                                order_by_expressions_,
-                                                                                order_by_types_,
-                                                                                total_hits_count_flag_);
-                top->set_left_node(root);
-                root = top;
-            }
-        } else if (limit_expression_.get() != nullptr) {
-            auto limit = std::make_shared<LogicalLimit>(bind_context->GetNewLogicalNodeId(),
-                                                        std::static_pointer_cast<BaseTableRef>(table_ref_ptr_),
-                                                        limit_expression_,
-                                                        offset_expression_,
-                                                        total_hits_count_flag_);
-            limit->set_left_node(root);
-            root = limit;
-        }
-
-        auto project = std::make_shared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
-                                                        projection_expressions_,
-                                                        projection_index_,
-                                                        std::map<size_t, std::shared_ptr<HighlightInfo>>());
-        project->set_left_node(root);
-        root = project;
-
-        if (!pruned_expression_.empty()) {
-            UnrecoverableError("Projection method changed!");
-            auto pruned_project = std::make_shared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
-                                                                   pruned_expression_,
-                                                                   result_index_,
-                                                                   std::map<size_t, std::shared_ptr<HighlightInfo>>());
-            pruned_project->set_left_node(root);
-            root = pruned_project;
-        }
-
-        return root;
     } else {
-        std::shared_ptr<LogicalNode> root = nullptr;
         const size_t num_children = search_expr_->match_exprs_.size();
         if (num_children <= 0) {
             UnrecoverableError("SEARCH shall have at least one MATCH TEXT or MATCH VECTOR or MATCH TENSOR or MATCH SPARSE expression");
@@ -440,26 +370,77 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
         } else {
             root = std::move(match_knn_nodes[0]);
         }
+    }
 
-        if (limit_expression_.get() != nullptr) {
-            auto limit = std::make_shared<LogicalLimit>(bind_context->GetNewLogicalNodeId(),
-                                                        base_table_ref,
-                                                        limit_expression_,
-                                                        offset_expression_,
-                                                        total_hits_count_flag_);
-            limit->set_left_node(root);
-            root = limit;
+    if (!group_by_expressions_.empty() || !aggregate_expressions_.empty()) {
+        // Build logical aggregate
+        auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
+        auto aggregate = std::make_shared<LogicalAggregate>(bind_context->GetNewLogicalNodeId(),
+                                                            base_table_ref,
+                                                            group_by_expressions_,
+                                                            groupby_index_,
+                                                            aggregate_expressions_,
+                                                            aggregate_index_);
+        aggregate->set_left_node(root);
+        root = aggregate;
+    }
+
+    if (!having_expressions_.empty()) {
+        // Build logical filter
+        auto having_filter = BuildFilter(root, having_expressions_, query_context, bind_context);
+        having_filter->set_left_node(root);
+        root = having_filter;
+    }
+
+    if (!order_by_expressions_.empty()) {
+        if (order_by_expressions_.size() != order_by_types_.size()) {
+            UnrecoverableError("Unknown error on order by expression");
         }
 
-        auto project = std::make_shared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
-                                                        projection_expressions_,
-                                                        projection_index_,
-                                                        std::move(highlight_columns_));
-        project->set_left_node(root);
-        root = std::move(project);
-
-        return root;
+        if (limit_expression_.get() == nullptr) {
+            std::shared_ptr<LogicalNode> sort =
+                std::make_shared<LogicalSort>(bind_context->GetNewLogicalNodeId(), order_by_expressions_, order_by_types_);
+            sort->set_left_node(root);
+            root = sort;
+        } else {
+            std::shared_ptr<LogicalNode> top = std::make_shared<LogicalTop>(bind_context->GetNewLogicalNodeId(),
+                                                                            std::static_pointer_cast<BaseTableRef>(table_ref_ptr_),
+                                                                            limit_expression_,
+                                                                            offset_expression_,
+                                                                            order_by_expressions_,
+                                                                            order_by_types_,
+                                                                            total_hits_count_flag_);
+            top->set_left_node(root);
+            root = top;
+        }
+    } else if (limit_expression_.get() != nullptr) {
+        auto limit = std::make_shared<LogicalLimit>(bind_context->GetNewLogicalNodeId(),
+                                                    std::static_pointer_cast<BaseTableRef>(table_ref_ptr_),
+                                                    limit_expression_,
+                                                    offset_expression_,
+                                                    total_hits_count_flag_);
+        limit->set_left_node(root);
+        root = limit;
     }
+
+    auto project = std::make_shared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
+                                                    projection_expressions_,
+                                                    projection_index_,
+                                                    std::move(highlight_columns_));
+    project->set_left_node(root);
+    root = project;
+
+    if (!pruned_expression_.empty()) {
+        UnrecoverableError("Projection method changed!");
+        auto pruned_project = std::make_shared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
+                                                               pruned_expression_,
+                                                               result_index_,
+                                                               std::map<size_t, std::shared_ptr<HighlightInfo>>());
+        pruned_project->set_left_node(root);
+        root = pruned_project;
+    }
+
+    return root;
 }
 
 std::shared_ptr<LogicalKnnScan> BoundSelectStatement::BuildInitialKnnScan(std::shared_ptr<TableRef> &table_ref,
