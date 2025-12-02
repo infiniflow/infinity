@@ -273,4 +273,52 @@ TEST_F(Value2JsonTest, test_sparse) {
                                    column_typeinfo);
         v.AppendToJson(name, json);
     }
+
+    {
+        std::string name = "double_int16_t";
+        nlohmann::json json_double;
+        json[name] = json_double;
+
+        std::pair<std::vector<double>, std::vector<int16_t>> vec{std::vector<double>{1.0, 2.0, 3.0, 4.0}, std::vector<int16_t>{1, 2, 3, 4}};
+
+        auto column_typeinfo =
+            std::make_shared<SparseInfo>(EmbeddingDataType::kElemDouble, EmbeddingDataType::kElemInt16, 30000, SparseStoreType::kSort);
+        auto v = Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
+                                   reinterpret_cast<const char *>(vec.second.data()),
+                                   vec.first.size(),
+                                   column_typeinfo);
+        v.AppendToJson(name, json);
+    }
+
+    {
+        std::string name = "double_int32_t";
+        nlohmann::json json_double;
+        json[name] = json_double;
+
+        std::pair<std::vector<double>, std::vector<int32_t>> vec{std::vector<double>{1.0, 2.0, 3.0, 4.0}, std::vector<int32_t>{1, 2, 3, 4}};
+
+        auto column_typeinfo =
+            std::make_shared<SparseInfo>(EmbeddingDataType::kElemDouble, EmbeddingDataType::kElemInt32, 30000, SparseStoreType::kSort);
+        auto v = Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
+                                   reinterpret_cast<const char *>(vec.second.data()),
+                                   vec.first.size(),
+                                   column_typeinfo);
+        v.AppendToJson(name, json);
+    }
+
+    {
+        std::string name = "double_int16_t";
+        nlohmann::json json_double;
+        json[name] = json_double;
+
+        std::pair<std::vector<double>, std::vector<int64_t>> vec{std::vector<double>{1.0, 2.0, 3.0, 4.0}, std::vector<int64_t>{1, 2, 3, 4}};
+
+        auto column_typeinfo =
+            std::make_shared<SparseInfo>(EmbeddingDataType::kElemDouble, EmbeddingDataType::kElemInt64, 30000, SparseStoreType::kSort);
+        auto v = Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
+                                   reinterpret_cast<const char *>(vec.second.data()),
+                                   vec.first.size(),
+                                   column_typeinfo);
+        v.AppendToJson(name, json);
+    }
 }
