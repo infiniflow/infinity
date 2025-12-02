@@ -29,6 +29,7 @@ import :default_values;
 import :selection;
 import :vector_buffer;
 import :infinity_context;
+import :physical_export.impl;
 
 import embedding_type;
 import third_party;
@@ -383,11 +384,12 @@ TEST_F(Value2JsonTest, test_tensor_array) {
         nlohmann::json json_tensor_array;
         std::string name = "test_tensor_array";
         json[name] = json_tensor_array;
-        auto type_info_ptr = EmbeddingInfo::Make(type, 16);
-        Value v = Value::MakeTensorArray(std::move(type_info_ptr));
-        v.AppendToJson(name, json);
+        Value v = Value::MakeTensorArray(EmbeddingInfo::Make(type, 16));
 
-        LOG_INFO(fmt::format("Convert tensor array to string", v.ToString()));
+        std::shared_ptr<char[]> data(new char[256]);
+        v.AppendToTensorArray(data.get(), 256); // Maybe need to fill it in the future.
+        v.AppendToJson(name, json);
+        LOG_INFO(fmt::format("Convert tensor array to string: {}", v.ToString()));
     }
 }
 
