@@ -423,5 +423,25 @@ TEST_F(Value2JsonTest, test_basic_type) {
         ASSERT_NEAR(origin, now, 0.01);
     }
 
+    {
+        nlohmann::json test_basic_type;
+        std::string name = "varchar";
+        json[name] = test_basic_type;
+
+        VarcharT tmp(10);
+        Value v = Value::MakeVarchar(tmp);
+        v.AppendToJson(name, json);
+    }
+
+    // {
+    //     nlohmann::json test_basic_type;
+    //     std::string name = "decimal";
+    //     json[name] = test_basic_type;
+    //
+    //     DecimalT tmp(200, 100);
+    //     Value v = Value::MakeDecimal(tmp, nullptr);
+    //     v.AppendToJson(name, json);
+    // }
+
     LOG_INFO(fmt::format("test_basic_type's json: {}", json.dump()));
 }
