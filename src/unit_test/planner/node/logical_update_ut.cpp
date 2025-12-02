@@ -50,6 +50,24 @@ public:
     std::shared_ptr<ColumnDef> column_def2;
     std::shared_ptr<std::string> table_name;
     std::shared_ptr<TableDef> table_def;
+
+    void CheckLogicalNode(const std::shared_ptr<LogicalNode> &node, LogicalNodeType type) {
+        if (!node) {
+            return;
+        }
+
+        if (node->operator_type() == type) {
+            i64 space = 4;
+            LOG_INFO(fmt::format("ToString: {}", node->ToString(space)));
+
+            [[maybe_unused]] auto column_bindings = node->GetColumnBindings();
+            [[maybe_unused]] auto output_names = node->GetOutputNames();
+            [[maybe_unused]] auto output_types = node->GetOutputTypes();
+        }
+
+        CheckLogicalNode(node->left_node(), type);
+        CheckLogicalNode(node->right_node(), type);
+    }
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalUpdateTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
@@ -87,14 +105,7 @@ TEST_P(LogicalUpdateTest, test1) {
 
         auto nodes = query_context->logical_planner()->LogicalPlans();
         for (const auto &node : nodes) {
-            if (node->operator_type() == LogicalNodeType::kUpdate) {
-                i64 space = 4;
-                LOG_INFO(fmt::format("ToString: {}", node->ToString(space)));
-
-                [[maybe_unused]] auto column_bindings = node->GetColumnBindings();
-                [[maybe_unused]] auto output_names = node->GetOutputNames();
-                [[maybe_unused]] auto output_types = node->GetOutputTypes();
-            }
+            CheckLogicalNode(node, LogicalNodeType::kUpdate);
         }
 
         bool ok = HandleQueryResult(query_result);

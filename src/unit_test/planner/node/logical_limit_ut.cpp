@@ -18,7 +18,7 @@ module;
 #include "parser.h"
 #include "unit_test/gtest_expand.h"
 
-module infinity_core:ut.logical_insert;
+module infinity_core:ut.logical_limit;
 
 import :ut.base_test;
 import :ut.sql_runner;
@@ -43,7 +43,7 @@ import :logical_planner;
 import global_resource_usage;
 
 using namespace infinity;
-class LogicalInsertTest : public NewRequestTest {
+class LogicalLimitTest : public NewRequestTest {
 public:
     std::shared_ptr<std::string> db_name;
     std::shared_ptr<ColumnDef> column_def1;
@@ -70,9 +70,9 @@ public:
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalInsertTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalLimitTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
 
-TEST_P(LogicalInsertTest, test1) {
+TEST_P(LogicalLimitTest, test1) {
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     db_name = std::make_shared<std::string>("default_db");
@@ -90,14 +90,22 @@ TEST_P(LogicalInsertTest, test1) {
         EXPECT_TRUE(status.ok());
     }
 
+    for (size_t i = 0; i < 200; i++) {
+        std::string sql = fmt::format("insert into tb values({}, 'abc')", i);
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+
     {
-        std::string sql = "insert into tb values(100, 'abc')";
+        std::string sql = "select col1 from tb limit 100";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(sql);
 
         auto nodes = query_context->logical_planner()->LogicalPlans();
         for (const auto &node : nodes) {
-            CheckLogicalNode(node, LogicalNodeType::kInsert);
+            CheckLogicalNode(node, LogicalNodeType::kLimit);
         }
 
         bool ok = HandleQueryResult(query_result);
