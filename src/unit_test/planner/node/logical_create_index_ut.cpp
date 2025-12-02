@@ -18,7 +18,7 @@ module;
 #include "parser.h"
 #include "unit_test/gtest_expand.h"
 
-module infinity_core:ut.logical_insert;
+module infinity_core:ut.logical_create_index;
 
 import :ut.base_test;
 import :ut.sql_runner;
@@ -44,7 +44,7 @@ import :logical_planner;
 import global_resource_usage;
 
 using namespace infinity;
-class LogicalInsertTest : public NewRequestTest {
+class LogicalCreateIndexTest : public NewRequestTest {
 public:
     std::shared_ptr<std::string> db_name;
     std::shared_ptr<ColumnDef> column_def1;
@@ -53,9 +53,9 @@ public:
     std::shared_ptr<TableDef> table_def;
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalInsertTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalCreateIndexTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
 
-TEST_P(LogicalInsertTest, test1) {
+TEST_P(LogicalCreateIndexTest, test1) {
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     db_name = std::make_shared<std::string>("default_db");
@@ -73,14 +73,15 @@ TEST_P(LogicalInsertTest, test1) {
         EXPECT_TRUE(status.ok());
     }
 
+    // Create index
     {
-        std::string sql = "insert into tb values(100, 'abc')";
+        std::string create_index_sql = "create index idx on tb(col1)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
+        QueryResult query_result = query_context->Query(create_index_sql);
 
         auto nodes = query_context->logical_planner()->LogicalPlans();
         for (const auto &node : nodes) {
-            if (node->operator_type() == LogicalNodeType::kInsert) {
+            if (node->operator_type() == LogicalNodeType::kCreateIndex) {
                 i64 space = 4;
                 LOG_INFO(fmt::format("ToString: {}", node->ToString(space)));
 

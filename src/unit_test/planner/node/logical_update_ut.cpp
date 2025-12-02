@@ -18,7 +18,7 @@ module;
 #include "parser.h"
 #include "unit_test/gtest_expand.h"
 
-module infinity_core:ut.logical_insert;
+module infinity_core:ut.logical_update;
 
 import :ut.base_test;
 import :ut.sql_runner;
@@ -44,7 +44,7 @@ import :logical_planner;
 import global_resource_usage;
 
 using namespace infinity;
-class LogicalInsertTest : public NewRequestTest {
+class LogicalUpdateTest : public NewRequestTest {
 public:
     std::shared_ptr<std::string> db_name;
     std::shared_ptr<ColumnDef> column_def1;
@@ -53,9 +53,9 @@ public:
     std::shared_ptr<TableDef> table_def;
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalInsertTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalUpdateTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
 
-TEST_P(LogicalInsertTest, test1) {
+TEST_P(LogicalUpdateTest, test1) {
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     db_name = std::make_shared<std::string>("default_db");
@@ -77,10 +77,18 @@ TEST_P(LogicalInsertTest, test1) {
         std::string sql = "insert into tb values(100, 'abc')";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+
+    {
+        std::string sql = "update tb set col1 = 666 where col1 = 100";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
 
         auto nodes = query_context->logical_planner()->LogicalPlans();
         for (const auto &node : nodes) {
-            if (node->operator_type() == LogicalNodeType::kInsert) {
+            if (node->operator_type() == LogicalNodeType::kUpdate) {
                 i64 space = 4;
                 LOG_INFO(fmt::format("ToString: {}", node->ToString(space)));
 
