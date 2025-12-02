@@ -355,7 +355,7 @@ private:
                        TableMeta &table_meta,
                        const std::shared_ptr<DataBlock> &input_block);
 
-    Status DeleteInner(const std::string &db_name, const std::string &table_name, TableMeta &table_meta, const std::vector<RowID> &row_ids);
+    Status DeleteInner(const std::string &db_name, const TableMeta &table_meta, const std::vector<RowID> &row_ids);
 
 public:
     Status Delete(const std::string &db_name, const std::string &table_name, const std::vector<RowID> &row_ids);
@@ -440,7 +440,7 @@ public:
     TxnTimeStamp GetCurrentCkpTS() const;
 
 private:
-    void CheckTxnStatus();
+    void CheckTxnStatus() const;
 
     void CheckTxn(const std::string &db_name);
 
