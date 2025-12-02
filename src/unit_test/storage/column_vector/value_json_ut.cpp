@@ -207,17 +207,7 @@ TEST_F(Value2JsonTest, test_embedding) {
         v.AppendToJson(name, json);
     }
 
-    // // Value::MakeTensorArray(type_info_ptr={}) is not supported!
-    // {
-    //     std::string name = "tensor_array";
-    //     nlohmann::json json_tensor_array;
-    //     json[name] = json_tensor_array;
-    //
-    //     DataType datatype(LogicalType::kTensorArray);
-    //     auto info = ArrayInfo::Make(datatype);
-    //     Value v = Value::MakeTensorArray(info);
-    //     v.AppendToJson(name, json);
-    // }
+    LOG_INFO(fmt::format("test_embedding's json: {}", json.dump()));
 }
 
 TEST_F(Value2JsonTest, test_sparse) {
@@ -239,6 +229,7 @@ TEST_F(Value2JsonTest, test_sparse) {
                                    vec.first.size(),
                                    column_typeinfo);
         v.AppendToJson(name, json);
+        LOG_INFO(fmt::format("test_sparse's json: {}", json.dump()));
     }
 
     {
@@ -256,6 +247,7 @@ TEST_F(Value2JsonTest, test_sparse) {
                                    vec.first.size(),
                                    column_typeinfo);
         v.AppendToJson(name, json);
+        LOG_INFO(fmt::format("test_sparse's json: {}", json.dump()));
     }
 
     {
@@ -272,6 +264,7 @@ TEST_F(Value2JsonTest, test_sparse) {
                                    vec.first.size(),
                                    column_typeinfo);
         v.AppendToJson(name, json);
+        LOG_INFO(fmt::format("test_sparse's json: {}", json.dump()));
     }
 
     {
@@ -288,6 +281,7 @@ TEST_F(Value2JsonTest, test_sparse) {
                                    vec.first.size(),
                                    column_typeinfo);
         v.AppendToJson(name, json);
+        LOG_INFO(fmt::format("test_sparse's json: {}", json.dump()));
     }
 
     {
@@ -304,6 +298,7 @@ TEST_F(Value2JsonTest, test_sparse) {
                                    vec.first.size(),
                                    column_typeinfo);
         v.AppendToJson(name, json);
+        LOG_INFO(fmt::format("test_sparse's json: {}", json.dump()));
     }
 
     {
@@ -320,5 +315,111 @@ TEST_F(Value2JsonTest, test_sparse) {
                                    vec.first.size(),
                                    column_typeinfo);
         v.AppendToJson(name, json);
+        LOG_INFO(fmt::format("test_sparse's json: {}", json.dump()));
     }
+}
+
+TEST_F(Value2JsonTest, test_tensor) {
+    using namespace infinity;
+    nlohmann::json json;
+
+    {
+        nlohmann::json json_tensor;
+        std::string name = "kElemFloat";
+        json[name] = json_tensor;
+
+        auto type_info = std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 4);
+
+        std::vector<float> vec1 = {1.0, 2.0, 3.0, 4.0};
+        std::vector<float> vec2 = {5.0, 6.0, 7.0, 8.0};
+
+        std::vector<std::pair<char *, size_t>> embedding_data;
+        embedding_data.emplace_back(std::make_pair(reinterpret_cast<char *>(vec1.data()), vec1.size() * sizeof(*vec1.data())));
+        embedding_data.emplace_back(std::make_pair(reinterpret_cast<char *>(vec2.data()), vec2.size() * sizeof(*vec2.data())));
+        Value v = Value::MakeTensor(embedding_data, type_info);
+        LOG_INFO(v.ToString());
+
+        v.AppendToJson(name, json);
+    }
+
+    {
+        nlohmann::json json_tensor;
+        std::string name = "kElemDouble";
+        json[name] = json_tensor;
+
+        auto type_info = std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemDouble, 4);
+
+        std::vector<double> vec1 = {1.0, 2.0, 3.0, 4.0};
+        std::vector<double> vec2 = {5.0, 6.0, 7.0, 8.0};
+
+        std::vector<std::pair<char *, size_t>> embedding_data;
+        embedding_data.emplace_back(std::make_pair(reinterpret_cast<char *>(vec1.data()), vec1.size() * sizeof(*vec1.data())));
+        embedding_data.emplace_back(std::make_pair(reinterpret_cast<char *>(vec2.data()), vec2.size() * sizeof(*vec2.data())));
+        Value v = Value::MakeTensor(embedding_data, type_info);
+        LOG_INFO(v.ToString());
+
+        v.AppendToJson(name, json);
+    }
+
+    LOG_INFO(fmt::format("test_tensor's json: {}", json.dump()));
+}
+
+TEST_F(Value2JsonTest, test_tensor_array) {
+    using namespace infinity;
+
+    std::vector<EmbeddingDataType> types = {EmbeddingDataType::kElemBit,
+                                            EmbeddingDataType::kElemInt8,
+                                            EmbeddingDataType::kElemInt16,
+                                            EmbeddingDataType::kElemInt32,
+                                            EmbeddingDataType::kElemInt64,
+                                            EmbeddingDataType::kElemFloat,
+                                            EmbeddingDataType::kElemDouble,
+                                            EmbeddingDataType::kElemUInt8,
+                                            EmbeddingDataType::kElemFloat16,
+                                            EmbeddingDataType::kElemBFloat16};
+
+    for (const auto &type : types) {
+        nlohmann::json json;
+        nlohmann::json json_tensor_array;
+        std::string name = "test_tensor_array";
+        json[name] = json_tensor_array;
+        auto type_info_ptr = EmbeddingInfo::Make(type, 16);
+        Value v = Value::MakeTensorArray(std::move(type_info_ptr));
+        v.AppendToJson(name, json);
+
+        LOG_INFO(fmt::format("Convert tensor array to string", v.ToString()));
+    }
+}
+
+TEST_F(Value2JsonTest, test_basic_type) {
+    using namespace infinity;
+    nlohmann::json json;
+
+    {
+        nlohmann::json test_basic_type;
+        std::string name = "float";
+        json[name] = test_basic_type;
+
+        float origin = 0.01;
+        Value v = Value::MakeFloat(origin);
+        v.AppendToJson(name, json);
+
+        float now = v.ToFloat();
+        ASSERT_NEAR(origin, now, 0.01);
+    }
+
+    {
+        nlohmann::json test_basic_type;
+        std::string name = "double";
+        json[name] = test_basic_type;
+
+        double origin = 0.01;
+        Value v = Value::MakeDouble(origin);
+        v.AppendToJson(name, json);
+
+        double now = v.ToDouble();
+        ASSERT_NEAR(origin, now, 0.01);
+    }
+
+    LOG_INFO(fmt::format("test_basic_type's json: {}", json.dump()));
 }
