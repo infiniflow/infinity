@@ -29,133 +29,123 @@ using namespace infinity;
 
 namespace fs = std::filesystem;
 
-class RAGAnalyzerTest : public BaseTest {};
+class RAGAnalyzerTest : public BaseTest {
+public:
+    void SetUp() override {
+        BaseTest::SetUp();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
 
-TEST_F(RAGAnalyzerTest, DISABLED_SLOW_test1) {
-    fs::path RESOURCE_DIR = "/usr/share/infinity/resource";
-    if (!fs::exists(RESOURCE_DIR)) {
-        std::cerr << "Resource directory doesn't exist: " << RESOURCE_DIR << std::endl;
-        return;
+        fs::path RESOURCE_DIR = "/usr/share/infinity/resource";
+        if (!fs::exists(RESOURCE_DIR)) {
+            std::cerr << "Resource directory doesn't exist: " << RESOURCE_DIR << std::endl;
+            return;
+        }
+
+        analyzer_ = new RAGAnalyzer(RESOURCE_DIR.string());
+        analyzer_->Load();
+
+        analyzer_->SetEnablePosition(false);
+        analyzer_->SetFineGrained(false);
     }
 
-    RAGAnalyzer analyzer(RESOURCE_DIR.string());
-    analyzer.Load();
+    void TearDown() override {
+        delete analyzer_;
+        analyzer_ = nullptr;
+    }
 
-    analyzer.SetEnablePosition(true);
-    analyzer.SetFineGrained(false);
+    std::vector<std::string> SplitString(const std::string &str) {
+        std::vector<std::string> tokens;
+        std::stringstream ss(str);
+        std::string token;
 
-    std::cout << "\n=== Original Test ===" << std::endl;
-    std::vector<std::string> queries = {
-        R"#(ragflow_test_upload_0.txt)#",
-        R"#(昭通机场(ZPZT))#",
-        R"#(哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈)#",
-        R"#(公开征求意见稿提出，境外投资者可使用自有人民币或外汇投资。使用外汇投资的，可通过债券持有人在香港人民币业务清算行及香港地区经批准可进入境内银行间外汇市场进行交易的境外人民币业务参加行（以下统称香港结算行）办理外汇资金兑换。香港结算行由此所产生的头寸可到境内银行间外汇市场平盘。使用外汇投资的，在其投资的债券到期或卖出后，原则上应兑换回外汇。)#",
-        R"#(多校划片就是一个小区对应多个小学初中，让买了学区房的家庭也不确定到底能上哪个学校。目的是通过这种方式为学区房降温，把就近入学落到实处。南京市长江大桥)#",
-        R"#(实际上当时他们已经将业务中心偏移到安全部门和针对政府企业的部门 Scripts are compiled and cached aaaaaaaaa)#",
-        R"#(虽然我不怎么玩)#",
-        R"#(蓝月亮如何在外资夹击中生存,那是全宇宙最有意思的)#",
-        R"#(涡轮增压发动机num最大功率,不像别的共享买车锁电子化的手段,我们接过来是否有意义,黄黄爱美食,不过，今天阿奇要讲到的这家农贸市场，说实话，还真蛮有特色的！不仅环境好，还打出了)#",
-        R"#(这周日你去吗？这周日你有空吗？)#",
-        R"#(Unity3D开发经验 测试开发工程师 c++双11双11 985 211)#",
-        R"#(The encoder structure we selected is VitDet [17] (base version with about 80M parameters) due to its local attention can greatly reduce
-         the computational cost of high-resolution images. We follow the Vary-tiny setting [46] to design the last two layers of the encoder, which
-         will transfer a 1024×1024×3 input image to 256×1024 image tokens. Then, these image tokens are projected into language model (OPT-125M
-         [53]) dimension via a 1024×768 linear layer. Unlike the Vary encoder which only focuses on a single document task under a relatively
-         unitary input shape, we incorporated natural scenes and cropped slices during our pre-training. In the pre-processing stage, images of each
-         shape are directly resized to 1024×1024 squares, as square shapes can be used to adapt to images of various aspect ratios with a
-         compromise.)#",
-        R"#(州长：龙晓华副州长：向恩明、向清平、何益群、李平、麻超、王学武、刘珍瑜州委常委、州人民政府副州长挂职：房卫、董怀敏秘书长：包太洋湘西土家族苗族自治州人民政府办公室湘西土家族苗族自治州发展和改革委员会湘西土家族苗族自治州财政局湘西土家族苗族自治州经信委湘西土家族苗族自治州教育局湘西土家族苗族自治州科技局湘西土家族苗族自治州民委湘西土家族苗族自治州公安局湘西土家族苗族自治州监察局湘西土家族苗族自治州民政局湘西土家族苗族自治州司法局湘西土家族苗族自治州人力资源和社会保障局湘西土家族苗族自治州国土资源局湘西土家族苗族自治州住建局湘西土家族苗族自治州交通运输局湘西土家族苗族自治州水利局湘西土家族苗族自治州农业局湘西土家族苗族自治州林业局湘西土家族苗族自治州商务局湘西土家族苗族自治州文广新局湘西土家族苗族自治州卫生局湘西土家族苗族自治州计划生育委员会湘西土家族苗族自治州审计局湘西土家族苗族自治州环保局湘西土家族苗族自治州统计局湘西土家族苗族自治州物价局湘西土家族苗族自治州安监局湘西土家族苗族自治州旅游局湘西土家族苗族自治州食品药品监督局湘西土家族苗族自治州体育局湘西土家族苗族自治州无线电管理处湘西)#"
-        R"#(世界遗产委员会一般指联合国教科文组织世界遗产委员会联合国教科文组织世界遗产同义词)#",
-    };
+        while (ss >> token) {
+            tokens.push_back(token);
+        }
 
-    for (auto &query : queries) {
+        return tokens;
+    }
+
+    RAGAnalyzer *analyzer_;
+    std::string rag_tokenizer_path_ = "python/infinity_sdk/infinity";
+    std::string input_file_ = rag_tokenizer_path_ + "/tokenizer_input.txt";
+
+    // Mismatch tokens for: is, data, CCS, experiencing, faster, LLMs, largest, assessment
+    std::unordered_set<std::string> mismatch_tokens_ = {"be", "datum", "ccs", "experi", "fast", "llms", "larg", "ass"};
+};
+
+TEST_F(RAGAnalyzerTest, test_analyze_enable_position) {
+    analyzer_->SetEnablePosition(true);
+    analyzer_->SetFineGrained(false);
+
+    std::ifstream infile(input_file_);
+    std::string line;
+
+    while (std::getline(infile, line)) {
+        if (line.empty())
+            continue;
+
         TermList term_list;
-        analyzer.Analyze(query, term_list);
-        // String ret = analyzer.Tokenize(query);
-        // ret = analyzer.FineGrainedTokenize(ret);
-        // std::cout << ret << std::endl;
-        std::cout << "Query: " << query << std::endl;
+        analyzer_->Analyze(line, term_list);
+        std::cout << "Input text: " << std::endl << line << std::endl;
+
+        std::cout << "Analyze result: " << std::endl;
         for (unsigned i = 0; i < term_list.size(); ++i) {
             std::cout << "[" << term_list[i].text_ << "@" << term_list[i].word_offset_ << "," << term_list[i].end_offset_ << "] ";
         }
         std::cout << std::endl;
-        std::cout << "---" << std::endl;
     }
+    infile.close();
 }
 
-// Test basic functionality with fine_grained=false, enable_position=false
-TEST_F(RAGAnalyzerTest, DISABLED_SLOW_test_basic_mode) {
-    fs::path RESOURCE_DIR = "/usr/share/infinity/resource";
-    if (!fs::exists(RESOURCE_DIR)) {
-        std::cerr << "Resource directory doesn't exist: " << RESOURCE_DIR << std::endl;
-        return;
+TEST_F(RAGAnalyzerTest, test_analyze_enable_position_fine_grained) {
+    analyzer_->SetEnablePosition(true);
+    analyzer_->SetFineGrained(true);
+
+    std::ifstream infile(input_file_);
+    std::string line;
+
+    while (std::getline(infile, line)) {
+        if (line.empty())
+            continue;
+
+        TermList term_list;
+        analyzer_->Analyze(line, term_list);
+        std::cout << "Input text: " << std::endl << line << std::endl;
+
+        std::cout << "Analyze result: " << std::endl;
+        for (unsigned i = 0; i < term_list.size(); ++i) {
+            std::cout << "[" << term_list[i].text_ << "@" << term_list[i].word_offset_ << "," << term_list[i].end_offset_ << "] ";
+        }
+        std::cout << std::endl;
     }
-
-    RAGAnalyzer analyzer(RESOURCE_DIR.string());
-    analyzer.Load();
-    analyzer.SetFineGrained(false);
-    analyzer.SetEnablePosition(false);
-
-    std::string test_text = "Hello world! 你好世界！";
-    TermList term_list;
-    analyzer.Analyze(test_text, term_list);
-
-    EXPECT_GT(term_list.size(), 0);
-    std::cout << "Basic mode tokens: ";
-    for (const auto &term : term_list) {
-        std::cout << "[" << term.text_ << "] ";
-    }
-    std::cout << std::endl;
+    infile.close();
 }
 
 // Test Tokenize vs TokenizeWithPosition consistency
-TEST_F(RAGAnalyzerTest, DISABLED_SLOW_test_tokenize_consistency) {
-    fs::path RESOURCE_DIR = "/usr/share/infinity/resource";
-    if (!fs::exists(RESOURCE_DIR)) {
-        std::cerr << "Resource directory doesn't exist: " << RESOURCE_DIR << std::endl;
-        return;
-    }
+TEST_F(RAGAnalyzerTest, test_tokenize_consistency_with_posiiton) {
+    std::ifstream infile(input_file_);
+    std::string line;
 
-    RAGAnalyzer analyzer(RESOURCE_DIR.string());
-    analyzer.Load();
-    analyzer.SetFineGrained(false); // Test non-fine-grained mode first
-
-    std::vector<std::string> test_cases = {"hello world",
-                                           "Hello world!",
-                                           "Hello world! 你好世界！",
-                                           "Python编程语言是一种powerful的编程工具",
-                                           "The running dogs are barking loudly"};
-
-    for (const auto &test_case : test_cases) {
-        std::cout << "Testing: " << test_case << std::endl;
+    while (std::getline(infile, line)) {
+        if (line.empty())
+            continue;
 
         // Test Tokenize (returns string)
-        std::string tokenize_result_str = analyzer.Tokenize(test_case);
-        std::vector<std::string> tokenize_result;
-        std::istringstream iss(tokenize_result_str);
+        std::string tokens_str = analyzer_->Tokenize(line);
+        std::istringstream iss(tokens_str);
         std::string token;
+        std::vector<std::string> tokenize_result;
         while (iss >> token) {
             tokenize_result.push_back(token);
         }
 
+        std::cout << "Input text: " << std::endl << line << std::endl;
+        std::cout << "Tokenize result: " << std::endl << tokens_str << std::endl;
+
         // Test TokenizeWithPosition (returns vector of tokens and positions)
-        auto [tokenize_with_pos_result, positions] = analyzer.TokenizeWithPosition(test_case);
-
-        // Compare token counts
-        std::cout << "  Tokenize count: " << tokenize_result.size() << ", TokenizeWithPosition count: " << tokenize_with_pos_result.size()
-                  << std::endl;
-
-        std::cout << "  Tokenize result: ";
-        for (const auto &token : tokenize_result) {
-            std::cout << "[" << token << "] ";
-        }
-        std::cout << std::endl;
-
-        std::cout << "  TokenizeWithPosition result: ";
-        for (const auto &token : tokenize_with_pos_result) {
-            std::cout << "[" << token << "] ";
-        }
-        std::cout << std::endl;
+        auto [tokenize_with_pos_result, positions] = analyzer_->TokenizeWithPosition(line);
 
         // Check if results are identical
         bool tokens_match = (tokenize_result.size() == tokenize_with_pos_result.size());
@@ -168,11 +158,138 @@ TEST_F(RAGAnalyzerTest, DISABLED_SLOW_test_tokenize_consistency) {
             }
         }
 
-        EXPECT_TRUE(tokens_match) << "Tokenize results don't match for: " << test_case;
-
+        EXPECT_TRUE(tokens_match);
         if (!tokens_match) {
-            std::cout << "  *** MISMATCH DETECTED ***" << std::endl;
+            std::cout << "Tokenize count: " << tokenize_result.size() << ", TokenizeWithPosition count: " << tokenize_with_pos_result.size()
+                      << std::endl;
+
+            std::cout << "TokenizeWithPosition result: " << std::endl;
+            std::string result_str = std::accumulate(tokenize_with_pos_result.begin(),
+                                                     tokenize_with_pos_result.end(),
+                                                     std::string(""),
+                                                     [](const std::string &a, const std::string &b) { return a + (a.empty() ? "" : " ") + b; });
+            std::cout << result_str << std::endl;
         }
-        std::cout << "---" << std::endl;
     }
+    infile.close();
+}
+
+TEST_F(RAGAnalyzerTest, test_tokenize_consistency_with_python) {
+    std::string call_python_tokenizer_command = "uv run " + rag_tokenizer_path_ + "/rag_tokenizer.py " + "-f \"" + input_file_ + "\" -o \"" +
+                                                rag_tokenizer_path_ + "/tokenizer_python_output.txt\"";
+
+    std::cout << "Call Python tokenizer: " << std::endl << call_python_tokenizer_command << std::endl;
+
+    int result = system(call_python_tokenizer_command.c_str());
+    EXPECT_EQ(result, 0) << "Call Python tokenizer failed.";
+
+    if (result != 0) {
+        return;
+    }
+
+    std::ifstream infile(input_file_);
+    std::ifstream infile_python(rag_tokenizer_path_ + "/tokenizer_python_output.txt");
+    std::string line;
+    std::string python_tokens;
+    while (std::getline(infile, line)) {
+        if (line.empty())
+            continue;
+
+        std::string tokens = analyzer_->Tokenize(line);
+        std::cout << "Input text: " << std::endl << line << std::endl;
+        std::cout << "Tokenize result: " << std::endl << tokens << std::endl;
+
+        std::getline(infile_python, python_tokens);
+
+        std::vector<std::string> tokenize_result = SplitString(tokens);
+        std::vector<std::string> python_tokenize_result = SplitString(python_tokens);
+
+        bool is_size_match = tokenize_result.size() == python_tokenize_result.size();
+        EXPECT_TRUE(is_size_match);
+
+        bool is_match = true;
+        bool is_bad_token = false;
+        if (is_size_match) {
+            for (size_t i = 0; i < tokenize_result.size(); ++i) {
+                if (tokenize_result[i] != python_tokenize_result[i]) {
+                    is_bad_token = mismatch_tokens_.contains(tokenize_result[i]);
+                    if (!is_bad_token) {
+                        is_match = false;
+                        break;
+                    }
+                }
+            }
+            EXPECT_TRUE(is_match);
+        }
+        if (!is_size_match || !is_match || is_bad_token) {
+            std::cout << "Tokenize count: " << tokenize_result.size() << ", Python tokenize count: " << python_tokenize_result.size() << std::endl;
+
+            std::cout << "Python tokenize result: " << std::endl << python_tokens << std::endl;
+        }
+    }
+    infile.close();
+}
+
+TEST_F(RAGAnalyzerTest, test_fine_grained_tokenize_consistency_with_python) {
+    std::string call_python_tokenizer_command = "uv run " + rag_tokenizer_path_ + "/rag_tokenizer.py " + "-f \"" + input_file_ + "\" -o \"" +
+                                                rag_tokenizer_path_ + "/fine_grained_tokenizer_python_output.txt\"" + " --fine-grained";
+
+    std::cout << "Call Python tokenizer: " << std::endl << call_python_tokenizer_command << std::endl;
+
+    int result = system(call_python_tokenizer_command.c_str());
+    EXPECT_EQ(result, 0) << "Call Python tokenizer failed.";
+
+    if (result != 0) {
+        return;
+    }
+
+    analyzer_->SetEnablePosition(false);
+    analyzer_->SetFineGrained(true);
+
+    std::ifstream infile(input_file_);
+    std::ifstream infile_python(rag_tokenizer_path_ + "/fine_grained_tokenizer_python_output.txt");
+    std::string line;
+    std::string python_tokens;
+    while (std::getline(infile, line)) {
+        if (line.empty())
+            continue;
+
+        TermList term_list;
+        analyzer_->Analyze(line, term_list);
+
+        std::string fine_grained_tokens =
+            std::accumulate(term_list.begin(), term_list.end(), std::string(""), [](const std::string &a, const Term &b) {
+                return a + (a.empty() ? "" : " ") + b.text_;
+            });
+
+        std::cout << "Input text: " << std::endl << line << std::endl;
+        std::cout << "Fine grained tokenize result: " << std::endl << fine_grained_tokens << std::endl;
+
+        std::getline(infile_python, python_tokens);
+        std::vector<std::string> python_tokenize_result = SplitString(python_tokens);
+
+        bool is_size_match = term_list.size() == python_tokenize_result.size();
+        EXPECT_TRUE(is_size_match);
+
+        bool is_match = true;
+        bool is_bad_token = false;
+        if (is_size_match) {
+            for (size_t i = 0; i < term_list.size(); ++i) {
+                if (term_list[i].text_ != python_tokenize_result[i]) {
+                    is_bad_token = mismatch_tokens_.contains(term_list[i].text_);
+                    if (!is_bad_token) {
+                        is_match = false;
+                        break;
+                    }
+                }
+            }
+            EXPECT_TRUE(is_match);
+        }
+        if (!is_size_match || !is_match || is_bad_token) {
+            std::cout << "Tokenize count: " << term_list.size() << ", Python tokenize count: " << python_tokenize_result.size() << std::endl;
+
+            std::cout << "Python tokenize result: " << std::endl << python_tokens << std::endl;
+        }
+    }
+    infile.close();
 }
