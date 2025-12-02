@@ -22,7 +22,6 @@ module infinity_core:ut.logical_insert;
 
 import :ut.base_test;
 import :ut.sql_runner;
-import :logical_insert;
 import :infinity_exception;
 import third_party;
 import :logger;
