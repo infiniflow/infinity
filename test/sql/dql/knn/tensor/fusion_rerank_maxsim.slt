@@ -22,7 +22,7 @@ test77 18 [[0.4,-0.3,0.2,0.1],[-0.4,0.3,0.2,0.1]] off
 statement ok
 CREATE INDEX ft_index ON sqllogic_fusion_rerank_maxsim(body) USING FULLTEXT;
 
-query I
+query TR
 SELECT title, SCORE() FROM sqllogic_fusion_rerank_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', '');
 ----
 test22 636.870056
@@ -34,20 +34,20 @@ test00 -5.190000
 test44 -5.190000
 test11 -9.660001
 
-query I
+query TR
 SELECT title, SCORE() FROM sqllogic_fusion_rerank_maxsim SEARCH MATCH TEXT ('body', 'off', 'topn=4');
 ----
 test77 1.028622
 test22 0.758327
 test44 0.758327
 
-query I
+query TR
 SELECT title, SCORE() FROM sqllogic_fusion_rerank_maxsim SEARCH MATCH TENSOR (t, [1.0, 0.0, 0.0, 0.0], 'float', 'maxsim', 'topn=2');
 ----
 test22 0.400000
 test33 0.400000
 
-query I
+query T
 EXPLAIN SELECT title, SCORE() FROM sqllogic_fusion_rerank_maxsim SEARCH MATCH TEXT ('body', 'off', 'topn=4'), FUSION('match_tensor', 'column_name=t;search_tensor=[[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]];tensor_data_type=float;match_method=MaxSim;topn=2');
 ----
 PROJECT (4)
@@ -64,13 +64,13 @@ PROJECT (4)
      - leftover filter: None
      - output columns: [__score, __rowid]
 
-query I
+query TR
 SELECT title, SCORE() FROM sqllogic_fusion_rerank_maxsim SEARCH MATCH TEXT ('body', 'off', 'topn=4'), FUSION('match_tensor', 'column_name=t;search_tensor=[[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]];tensor_data_type=float;match_method=MaxSim;topn=2');
 ----
 test22 636.870056
 test77 2.260000
 
-query I
+query T
 EXPLAIN SELECT title, SCORE() FROM sqllogic_fusion_rerank_maxsim SEARCH MATCH TEXT ('body', 'off', 'topn=4'), MATCH TENSOR (t, [1.0, 0.0, 0.0, 0.0], 'float', 'maxsim', 'topn=2'), FUSION('match_tensor', 'column_name=t;search_tensor=[[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]];tensor_data_type=float;match_method=MaxSim;topn=2');
 ----
 PROJECT (5)
@@ -95,14 +95,14 @@ PROJECT (5)
      - leftover filter: None
      - output columns: [__score, __rowid]
 
-query I
+query TR
 SELECT title, SCORE() FROM sqllogic_fusion_rerank_maxsim SEARCH MATCH TEXT ('body', 'off', 'topn=4'), MATCH TENSOR (t, [1.0, 0.0, 0.0, 0.0], 'float', 'maxsim', 'topn=2'), FUSION('match_tensor', 'column_name=t;search_tensor=[[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]];tensor_data_type=float;match_method=MaxSim;topn=2');
 ----
 test22 636.870056
 test33 3.620001
 
 
-query I
+query T
 EXPLAIN FRAGMENT SELECT title, SCORE() FROM sqllogic_fusion_rerank_maxsim SEARCH MATCH TEXT ('body', 'off', 'topn=4'), MATCH TENSOR (t, [1.0, 0.0, 0.0, 0.0], 'float', 'maxsim', 'topn=2'), FUSION('rrf'), FUSION('match_tensor', 'column_name=t;search_tensor=[[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]];tensor_data_type=float;match_method=MaxSim;topn=2');
 ----
 FRAGMENT (1, SerialMaterialize)
@@ -144,7 +144,7 @@ FRAGMENT (3, SerialMaterialize)
 (empty)
 (empty)
 
-query I
+query TR
 SELECT title, SCORE() FROM sqllogic_fusion_rerank_maxsim SEARCH MATCH TEXT ('body', 'off', 'topn=4'), MATCH TENSOR (t, [1.0, 0.0, 0.0, 0.0], 'float', 'maxsim', 'topn=2'), FUSION('rrf'), FUSION('match_tensor', 'column_name=t;search_tensor=[[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]];tensor_data_type=float;match_method=MaxSim;topn=2');
 ----
 test22 636.870056

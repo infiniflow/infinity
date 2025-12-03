@@ -10,7 +10,7 @@ COPY cached_fulltext FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMIT
 statement ok
 CREATE INDEX ft_index ON cached_fulltext(body) USING FULLTEXT;
 
-query I
+query T
 EXPLAIN SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
 ----
  PROJECT (3)
@@ -24,7 +24,7 @@ EXPLAIN SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH 
     - leftover filter: None
     - output columns: [doctitle, docdate, __score, __rowid]
 
-query I
+query TTIR
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
 ----
 Anarchism 30-APR-2012 03:25:17.000 0 22.299635
@@ -39,7 +39,7 @@ Anarchism 30-APR-2012 03:25:17.000 0 22.299635
 #     - table name: (default_db.cached_fulltext)
 #     - output columns: [doctitle, docdate, __score, __rowid]
 
-query I
+query TTIR
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
 ----
 Anarchism 30-APR-2012 03:25:17.000 0 22.299635
@@ -62,7 +62,7 @@ SELECT ROW_ID() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemi
 statement ok
 INSERT INTO cached_fulltext VALUES('Anarchism', '30-APR-2012 03:25:17.000', 'Anarchism is a political philosophy that advocates self-governed societies based on voluntary institutions. These are often described as stateless societies, although several authors have defined them more specifically as institutions based on non-hierarchical free associations. Anarchism holds the state to be undesirable, unnecessary and harmful.');
 
-query I
+query T
 EXPLAIN SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
 ----
  PROJECT (3)

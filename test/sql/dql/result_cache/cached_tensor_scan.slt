@@ -7,7 +7,7 @@ CREATE TABLE cached_tensor_scan (title VARCHAR, num INT, t TENSOR(FLOAT, 4), bod
 statement ok
 COPY cached_tensor_scan FROM '/var/infinity/test_data/tensor_maxsim.csv' WITH (DELIMITER ',', FORMAT CSV);
 
-query I
+query T
 EXPLAIN SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
 ----
  PROJECT (3)
@@ -22,7 +22,7 @@ EXPLAIN SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0
     - leftover filter: None
     - output columns: [title, __score, __rowid]
 
-query I
+query TR
 SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
 ----
 test22 636.870056
@@ -44,7 +44,7 @@ test11 -9.660001
 #     - table name: (default_db.cached_tensor_scan)
 #     - output columns: [title, __score, __rowid]
 
-query I
+query TR
 SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
 ----
 test22 636.870056
@@ -56,7 +56,7 @@ test00 -5.190000
 test44 -5.190000
 test11 -9.660001
 
-query I
+query T
 EXPLAIN SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.0], 'float', 'maxsim', '') WHERE 10 > num;
 ----
  PROJECT (3)
@@ -74,7 +74,7 @@ EXPLAIN SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0
 statement ok
 COPY cached_tensor_scan FROM '/var/infinity/test_data/tensor_maxsim.csv' WITH (DELIMITER ',', FORMAT CSV);
 
-query I
+query T
 EXPLAIN SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
 ----
  PROJECT (3)
@@ -95,7 +95,7 @@ EXPLAIN SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0
       - leftover filter: None
       - output columns: [title, __score, __rowid]
 
-query I
+query TR
 SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
 ----
 test22 636.870056
@@ -119,7 +119,7 @@ test77 2.260000
 #     - table name: (default_db.cached_tensor_scan)
 #     - output columns: [title, __score, __rowid]
 
-query I
+query TR
 SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
 ----
 test22 636.870056
@@ -133,7 +133,7 @@ test33 3.620001
 test77 2.260000
 test77 2.260000
 
-query I
+query T
 EXPLAIN SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.0], 'float', 'maxsim', '') WHERE 10 > num;
 ----
  PROJECT (3)
