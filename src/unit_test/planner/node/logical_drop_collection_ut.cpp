@@ -18,7 +18,7 @@ module;
 #include "parser.h"
 #include "unit_test/gtest_expand.h"
 
-module infinity_core:ut.logical_limit;
+module infinity_core:ut.logical_drop_collection;
 
 import :ut.base_test;
 import :ut.sql_runner;
@@ -43,7 +43,7 @@ import :logical_planner;
 import global_resource_usage;
 
 using namespace infinity;
-class LogicalLimitTest : public NewRequestTest {
+class LogicalDropCollectionTest : public NewRequestTest {
 public:
     std::shared_ptr<std::string> db_name;
     std::shared_ptr<ColumnDef> column_def1;
@@ -70,28 +70,11 @@ public:
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalLimitTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalDropCollectionTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
 
-TEST_P(LogicalLimitTest, test1) {
-    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-
-    db_name = std::make_shared<std::string>("default_db");
-    column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-    column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    table_name = std::make_shared<std::string>("tb");
-    table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
-
-    // Create table
+TEST_P(LogicalDropCollectionTest, test1) {
     {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
-        auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-        status = txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-
-    for (size_t i = 0; i < 200; i++) {
-        std::string sql = fmt::format("insert into tb values({}, 'abc')", i);
+        std::string sql = "create collection tb";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(sql);
         bool ok = HandleQueryResult(query_result);
@@ -99,27 +82,13 @@ TEST_P(LogicalLimitTest, test1) {
     }
 
     {
-        std::string sql = "select col1 from tb limit 100";
+        std::string sql = "drop collection tb";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(sql);
 
         auto nodes = query_context->logical_planner()->LogicalPlans();
         for (const auto &node : nodes) {
-            CheckLogicalNode(node, LogicalNodeType::kLimit);
-        }
-
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-    }
-
-    {
-        std::string sql = "select col1 from tb order by col1 limit 100";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-
-        auto nodes = query_context->logical_planner()->LogicalPlans();
-        for (const auto &node : nodes) {
-            CheckLogicalNode(node, LogicalNodeType::kTop);
+            CheckLogicalNode(node, LogicalNodeType::kDropCollection);
         }
 
         bool ok = HandleQueryResult(query_result);
