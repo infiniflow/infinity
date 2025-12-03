@@ -81,7 +81,8 @@ class RagTokenizer:
             self.DIR_ = user_dict
             logging.info(f"Using user dictionary: {user_dict}")
         else:
-            self.DIR_ = os.path.join("/usr/share/infinity/resource/rag", "huqie.txt")
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            self.DIR_ = os.path.join(current_dir, "huqie.txt")
             if user_dict and not os.path.exists(user_dict):
                 logging.warning(f"User dictionary not found: {user_dict}, using default")
             else:
