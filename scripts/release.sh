@@ -42,7 +42,7 @@ function build() {
     docker exec $BUILDER_CONTAINER bash -c "git config --global safe.directory \"*\" && cd $WORKSPACE && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCPACK_PACKAGE_VERSION=$RELEASE_TAG -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -DCMAKE_VERBOSE_MAKEFILE=ON -S $WORKSPACE -B $WORKSPACE/cmake-build-reldeb"
     docker exec $BUILDER_CONTAINER bash -c "cmake --build $WORKSPACE/cmake-build-reldeb --target infinity"
     docker exec $BUILDER_CONTAINER bash -c "cd $WORKSPACE/cmake-build-reldeb && rm -f *.deb *.rpm *.gz && cpack"
-    docker exec $BUILDER_CONTAINER bash -c "cd $WORKSPACE/python/infinity_sdk && uv build"
+    docker exec $BUILDER_CONTAINER bash -c "cd $WORKSPACE/python/infinity_sdk && uv run prepare_huqie.py && uv build"
     docker build -t infiniflow/infinity:${RELEASE_TAG} -f scripts/Dockerfile_infinity .
 }
 
