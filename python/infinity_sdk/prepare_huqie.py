@@ -37,7 +37,7 @@ def prepare_huqie_file(source_file, target_dir):
 
 if __name__ == "__main__":
     current_dir = Path.cwd()
-    project_root = current_dir.parent.parent.parent
+    project_root = current_dir.parent.parent
     source_file = project_root / "resource" / "rag" / "huqie.txt"
     target_dir = current_dir / "infinity"
     txt_file = target_dir / "huqie.txt"
