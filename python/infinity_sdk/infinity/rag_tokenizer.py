@@ -43,6 +43,7 @@ from hanziconv import HanziConv
 from nltk import word_tokenize
 from nltk.stem import SnowballStemmer, WordNetLemmatizer
 
+
 class RagTokenizer:
     def key_(self, line):
         return str(line.lower().encode("utf-8"))[2:-1]
@@ -81,11 +82,20 @@ class RagTokenizer:
             self.DIR_ = user_dict
             logging.info(f"Using user dictionary: {user_dict}")
         else:
-            self.DIR_ = os.path.join("/usr/share/infinity/resource/rag", "huqie.txt")
             if user_dict and not os.path.exists(user_dict):
                 logging.warning(f"User dictionary not found: {user_dict}, using default")
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            resource_dir = "/usr/share/infinity/resource/rag"
+            current_dir_huqie = os.path.join(current_dir, "huqie.txt")
+            resource_dir_huqie = os.path.join(resource_dir, "huqie.txt")
+            if os.path.exists(current_dir_huqie):
+                self.DIR_ = current_dir_huqie
+            elif os.path.exists(resource_dir_huqie):
+                self.DIR_ = resource_dir_huqie
             else:
-                logging.info(f"Using default dictionary: {self.DIR_}")
+                logging.error(f"Dictionary huqie.txt not found in {current_dir} and {resource_dir}")
+                exit(1)
+            logging.info(f"Using default dictionary: {self.DIR_}")
 
         self.stemmer = SnowballStemmer("english")
         self.lemmatizer = WordNetLemmatizer()
@@ -187,12 +197,12 @@ class RagTokenizer:
 
         S = s + 1
         if s + 2 <= len(chars):
-            t1 = "".join(chars[s : s + 1])
-            t2 = "".join(chars[s : s + 2])
+            t1 = "".join(chars[s: s + 1])
+            t2 = "".join(chars[s: s + 2])
             if self.trie_.has_keys_with_prefix(self.key_(t1)) and not self.trie_.has_keys_with_prefix(self.key_(t2)):
                 S = s + 2
         if len(preTks) > 2 and len(preTks[-1][0]) == 1 and len(preTks[-2][0]) == 1 and len(preTks[-3][0]) == 1:
-            t1 = preTks[-1][0] + "".join(chars[s : s + 1])
+            t1 = preTks[-1][0] + "".join(chars[s: s + 1])
             if self.trie_.has_keys_with_prefix(self.key_(t1)):
                 S = s + 2
 
@@ -210,7 +220,7 @@ class RagTokenizer:
             _memo[state_key] = res
             return res
 
-        t = "".join(chars[s : s + 1])
+        t = "".join(chars[s: s + 1])
         k = self.key_(t)
         copy_pretks = copy.deepcopy(preTks)
         if k in self.trie_:
@@ -369,7 +379,7 @@ class RagTokenizer:
             while i + same < len(tks1) and j + same < len(tks) and tks1[i + same] == tks[j + same]:
                 same += 1
             if same > 0:
-                res.append(" ".join(tks[j : j + same]))
+                res.append(" ".join(tks[j: j + same]))
             _i = i + same
             _j = j + same
             j = _j + 1
@@ -396,7 +406,7 @@ class RagTokenizer:
                 same = 1
                 while i + same < len(tks1) and j + same < len(tks) and tks1[i + same] == tks[j + same]:
                     same += 1
-                res.append(" ".join(tks[j : j + same]))
+                res.append(" ".join(tks[j: j + same]))
                 _i = i + same
                 _j = j + same
                 j = _j + 1
@@ -482,6 +492,7 @@ def naive_qie(txt):
             tks.append(" ")
         tks.append(t)
     return tks
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Rag Tokenizer')
