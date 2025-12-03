@@ -24,7 +24,7 @@ namespace infinity {
 
 WhitespaceAnalyzer::WhitespaceAnalyzer(const std::string_view delimiters) {
     delimiters_ = delimiters;
-    std::sort(delimiters_.begin(), delimiters_.end());
+    std::ranges::sort(delimiters_);
     const auto last_unique = std::unique(delimiters_.begin(), delimiters_.end());
     delimiters_.erase(last_unique, delimiters_.end());
 }

@@ -210,7 +210,7 @@ std::unique_ptr<float[]> GetAvgBF(size_t vec_num, size_t dim, const float *data,
                 }
                 distances[j] = distance;
             }
-            std::sort(distances.begin(), distances.end());
+            std::ranges::sort(distances);
             avg[i] = 0;
             for (size_t j = 0; j < ls_k; ++j) {
                 avg[i] += distances[j];
@@ -337,7 +337,7 @@ void Query(const BenchmarkOption &option) {
             const auto &base_vec = base_data.get() + base_id * base_dim;
             pairs[i].first = l2_distance(query_vec, base_vec, base_dim);
         }
-        std::sort(pairs.begin(), pairs.end());
+        std::ranges::sort(pairs);
     };
     auto test = [&](const KnnSearchOption &search_option) -> float {
         profiler.Begin();

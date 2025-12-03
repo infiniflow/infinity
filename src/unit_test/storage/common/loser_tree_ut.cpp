@@ -47,7 +47,7 @@ void LoserTreeTest::GenerateData(size_t num_size, size_t loser_num, u64 max_val)
         loser[GetRandom(loser_num)].emplace_back(val);
     }
     for (size_t i = 0; i < loser_num; ++i) {
-        std::sort(loser[i].begin(), loser[i].end());
+        std::ranges::sort(loser[i]);
     }
 }
 

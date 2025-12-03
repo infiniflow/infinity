@@ -273,7 +273,7 @@ void BuildFastRoughFilterTask::BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &
             }
         }
         // step 3. sort data and remove duplicate
-        std::sort(input_data.begin(), input_data.end());
+        std::ranges::sort(input_data);
         u32 input_distinct_count = std::unique(input_data.begin(), input_data.end()) - input_data.begin();
         // step 4. build probabilistic_data_filter for block
         auto block_filter = arg.segment_filters_->block_filters_[block_id];
@@ -426,7 +426,7 @@ void BuildFastRoughFilterTask::BuildMinMaxAndBloomFilter(NewBuildFastRoughFilter
         UpdateMin(segment_min_value, block_min_value);
         UpdateMax(segment_max_value, block_max_value);
         // step 3. sort data and remove duplicate
-        std::sort(input_data.begin(), input_data.end());
+        std::ranges::sort(input_data);
         u32 input_distinct_count = std::unique(input_data.begin(), input_data.end()) - input_data.begin();
         // step 4. build probabilistic_data_filter and min_max_data_filter for block
         auto block_filter = arg.segment_filters_->block_filters_[block_id];
