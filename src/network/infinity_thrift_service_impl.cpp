@@ -101,7 +101,7 @@ ClientVersions::ClientVersions() {
     client_version_map_[30] = std::string("0.6.0.dev5");
     client_version_map_[31] = std::string("0.6.0.dev6");
     client_version_map_[32] = std::string("0.6.7");
-    client_version_map_[33] = std::string("0.6.9");
+    client_version_map_[33] = std::string("0.6.10");
 }
 
 std::pair<const char *, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
