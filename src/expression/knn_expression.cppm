@@ -44,6 +44,7 @@ public:
 
     std::string ToString() const override;
 
+    // true - larger distance means higher similarity, false - smaller distance means higher similarity
     bool IsKnnMinHeap() const {
         switch (distance_type_) {
             case KnnDistanceType::kL2:

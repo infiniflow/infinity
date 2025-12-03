@@ -2728,6 +2728,8 @@ A non-empty string indicating the reranking methods to use:
   The weighted sum approach assigns different weights to different retrieval ways, allowing you to emphasize specific ways. This is particularly useful when you are certain of each path's relative importance.  
 - `"match_tensor"`  
   Infinity's tensor-based late interaction reranking approach.  
+- `"max"`  
+  The max approach returns the maximum score from multiple retrieval ways.
 
 ##### topn: `int`, *Required*
 
@@ -2744,6 +2746,11 @@ A dictionary representing additional options for the selected reranking method:
 - **weighted_sum-specific options**: *Optional*  
   Settings when employing Weighted Sum for reranking.  
   - `"weights"`: Specifies the weight for each retrieval way. For example, `{"weights": "1,2,0.5"}` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval ways, respectively. The default weight of each retrieval way is `1.0`. If `"weight"` is not specified, all retrieval ways will be assigned the default weight of `1.0`.
+  - `"normalize"`: Specifies the normalization method for each retrieval way. Options: `"minmax"`, `"atan"`, `"l2"`, `"none"`. Defaults to `"minmax"`.
+
+- **max-specific options**: *Optional*
+  Settings when employing Max for reranking.
+  - `"normalize"`: Specifies the normalization method for each retrieval way. Options: `"minmax"`, `"atan"`, `"l2"`, `"none"`. Defaults to `"minmax"`.
 
 - **match_tensor-specific options**: *Optional*  
   Settings when employing match_tensor for reranking.
