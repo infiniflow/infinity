@@ -111,4 +111,32 @@ TEST_P(LogicalLimitTest, test1) {
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
+
+    {
+        std::string sql = "select col1 from tb order by col1";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+
+        auto nodes = query_context->logical_planner()->LogicalPlans();
+        for (const auto &node : nodes) {
+            CheckLogicalNode(node, LogicalNodeType::kSort);
+        }
+
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+
+    {
+        std::string sql = "select col1 from tb order by col1 limit 100";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+
+        auto nodes = query_context->logical_planner()->LogicalPlans();
+        for (const auto &node : nodes) {
+            CheckLogicalNode(node, LogicalNodeType::kTop);
+        }
+
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
 }

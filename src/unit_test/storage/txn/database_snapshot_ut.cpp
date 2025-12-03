@@ -394,3 +394,15 @@ TEST_P(DatabaseSnapshotTest, test_create_snapshot_same_name_multithreaded) {
         LOG_INFO("Final snapshots: " + query_result.ToString());
     }
 }
+
+TEST_P(DatabaseSnapshotTest, test_sql_parser) {
+    std::string sql = fmt::format("restore database snapshot {}", *db_snapshot_names[0]);
+    std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+    QueryResult query_result = query_context->Query(sql);
+    bool ok = HandleQueryResult(query_result);
+    if (ok) {
+        LOG_INFO("test_sql_parser succeeded");
+    } else {
+        LOG_INFO("test_sql_parser failed");
+    }
+}

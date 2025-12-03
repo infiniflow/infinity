@@ -18,7 +18,7 @@ module;
 #include "parser.h"
 #include "unit_test/gtest_expand.h"
 
-module infinity_core:ut.logical_insert;
+module infinity_core:ut.logical_drop_index;
 
 import :ut.base_test;
 import :ut.sql_runner;
@@ -43,7 +43,7 @@ import :logical_planner;
 import global_resource_usage;
 
 using namespace infinity;
-class LogicalInsertTest : public NewRequestTest {
+class LogicalDropIndexTest : public NewRequestTest {
 public:
     std::shared_ptr<std::string> db_name;
     std::shared_ptr<ColumnDef> column_def1;
@@ -70,15 +70,15 @@ public:
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalInsertTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalDropIndexTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
 
-TEST_P(LogicalInsertTest, test1) {
+TEST_P(LogicalDropIndexTest, test1) {
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     db_name = std::make_shared<std::string>("default_db");
     column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    table_name = std::make_shared<std::string>("tb1");
+    table_name = std::make_shared<std::string>("tb");
     table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
 
     // Create table
@@ -90,25 +90,31 @@ TEST_P(LogicalInsertTest, test1) {
         EXPECT_TRUE(status.ok());
     }
 
+    // Create index
     {
-        std::string sql = "create table tb2(col1 int, col2 int)";
+        std::string create_index_sql = "create index idx on tb(col1)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
+        QueryResult query_result = query_context->Query(create_index_sql);
+
+        auto nodes = query_context->logical_planner()->LogicalPlans();
+        for (const auto &node : nodes) {
+            CheckLogicalNode(node, LogicalNodeType::kCreateIndex);
+        }
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
 
-    // {
-    //     std::string sql = "insert into tb2 select * from tb1";
-    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-    //     QueryResult query_result = query_context->Query(sql);
-    //
-    //     auto nodes = query_context->logical_planner()->LogicalPlans();
-    //     for (const auto &node : nodes) {
-    //         CheckLogicalNode(node, LogicalNodeType::kInsert);
-    //     }
-    //
-    //     bool ok = HandleQueryResult(query_result);
-    //     EXPECT_TRUE(ok);
-    // }
+    // Drop index
+    {
+        std::string create_index_sql = "drop index idx on tb";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_index_sql);
+
+        auto nodes = query_context->logical_planner()->LogicalPlans();
+        for (const auto &node : nodes) {
+            CheckLogicalNode(node, LogicalNodeType::kCreateIndex);
+        }
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
 }
