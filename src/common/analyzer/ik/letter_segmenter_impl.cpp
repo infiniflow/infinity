@@ -14,8 +14,8 @@ std::vector<wchar_t> LetterSegmenter::Letter_Connector = {L'#', L'&', L'+', L'-'
 std::vector<wchar_t> LetterSegmenter::Num_Connector = {L',', L'.'};
 
 LetterSegmenter::LetterSegmenter() {
-    std::sort(Letter_Connector.begin(), Letter_Connector.end());
-    std::sort(Num_Connector.begin(), Num_Connector.end());
+    std::ranges::sort(Letter_Connector);
+    std::ranges::sort(Num_Connector);
     start_ = -1;
     end_ = -1;
     english_start_ = -1;

@@ -282,7 +282,7 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                         query_tree->GetQueryColumnsTerms(columns, terms);
 
                         // Deduplicate columns
-                        std::sort(columns.begin(), columns.end());
+                        std::ranges::sort(columns);
                         columns.erase(std::unique(columns.begin(), columns.end()), columns.end());
 
                         for (auto &column_name : columns) {

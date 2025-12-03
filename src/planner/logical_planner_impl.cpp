@@ -684,7 +684,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, std::s
                 }
             }
             // remove duplicate column id
-            std::sort(bloom_filter_columns.begin(), bloom_filter_columns.end());
+            std::ranges::sort(bloom_filter_columns);
             bloom_filter_columns.erase(std::unique(bloom_filter_columns.begin(), bloom_filter_columns.end()), bloom_filter_columns.end());
             // check if bloom filter can be created for the column
             for (ColumnID column_id : bloom_filter_columns) {

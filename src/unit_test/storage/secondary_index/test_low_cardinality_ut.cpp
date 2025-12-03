@@ -148,8 +148,8 @@ TEST_F(LowCardinalitySecondaryIndexTest, TestFloatLowCardinality) {
             }
         }
 
-        std::sort(actual_offsets.begin(), actual_offsets.end());
-        std::sort(expected_offsets.begin(), expected_offsets.end());
+        std::ranges::sort(actual_offsets);
+        std::ranges::sort(expected_offsets);
         EXPECT_EQ(expected_offsets, actual_offsets);
     }
 

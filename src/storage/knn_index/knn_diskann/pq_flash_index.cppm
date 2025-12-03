@@ -159,7 +159,7 @@ public:
             if (shuffle) {
                 std::shuffle(nodes_to_expand.begin(), nodes_to_expand.end(), urng);
             } else {
-                std::sort(nodes_to_expand.begin(), nodes_to_expand.end());
+                std::ranges::sort(nodes_to_expand);
             }
 
             // read expanded nodes data in this level

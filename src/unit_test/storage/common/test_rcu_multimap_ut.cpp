@@ -39,9 +39,9 @@ protected:
     void VerifyValues(const std::vector<i32> &values, const std::vector<i32> &expected) {
         EXPECT_EQ(values.size(), expected.size());
         std::vector<i32> actual_values = values;
-        std::sort(actual_values.begin(), actual_values.end());
+        std::ranges::sort(actual_values);
         std::vector<i32> sorted_expected = expected;
-        std::sort(sorted_expected.begin(), sorted_expected.end());
+        std::ranges::sort(sorted_expected);
         EXPECT_EQ(actual_values, sorted_expected);
     }
 };
@@ -862,7 +862,7 @@ TEST_F(RcuMapTest, TestGetAllValuesWithRef) {
     map.GetAllValuesWithRef(all_values);
 
     EXPECT_EQ(all_values.size(), 3);
-    std::sort(all_values.begin(), all_values.end());
+    std::ranges::sort(all_values);
     std::vector<i32> expected = {10, 20, 30};
     EXPECT_EQ(all_values, expected);
 }
@@ -1052,7 +1052,7 @@ TEST_F(RcuMapTest, TestRange) {
     EXPECT_EQ(count, 3); // Should include keys 3, 5, 7
     EXPECT_EQ(result.size(), 3);
 
-    std::sort(result.begin(), result.end());
+    std::ranges::sort(result);
     std::vector<i32> expected = {300, 500, 700};
     EXPECT_EQ(result, expected);
 }
