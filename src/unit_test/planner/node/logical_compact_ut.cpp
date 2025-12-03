@@ -18,7 +18,7 @@ module;
 #include "parser.h"
 #include "unit_test/gtest_expand.h"
 
-module infinity_core:ut.logical_drop_index;
+module infinity_core:ut.logical_compact;
 
 import :ut.base_test;
 import :ut.sql_runner;
@@ -43,7 +43,7 @@ import :logical_planner;
 import global_resource_usage;
 
 using namespace infinity;
-class LogicalDropIndexTest : public NewRequestTest {
+class LogicalCompactTest : public NewRequestTest {
 public:
     std::shared_ptr<std::string> db_name;
     std::shared_ptr<ColumnDef> column_def1;
@@ -70,24 +70,16 @@ public:
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalDropIndexTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalCompactTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
 
-TEST_P(LogicalDropIndexTest, test1) {
-    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-
-    db_name = std::make_shared<std::string>("default_db");
-    column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-    column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    table_name = std::make_shared<std::string>("tb");
-    table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
-
+TEST_P(LogicalCompactTest, test1) {
     // Create table
     {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
-        auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-        status = txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        std::string create_index_sql = "create table tb(col1 int, col2 int)";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_index_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
     }
 
     // Create index
@@ -95,24 +87,27 @@ TEST_P(LogicalDropIndexTest, test1) {
         std::string create_index_sql = "create index idx on tb(col1)";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_index_sql);
-
-        auto nodes = query_context->logical_planner()->LogicalPlans();
-        for (const auto &node : nodes) {
-            CheckLogicalNode(node, LogicalNodeType::kCreateIndex);
-        }
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
 
-    // Drop index
+    for (size_t i = 0; i < 200; i++) {
+        std::string sql = fmt::format("insert into tb values({}, 'abc')", i);
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+
     {
-        std::string create_index_sql = "drop index idx on tb";
+        std::string create_index_sql = "compact table tb";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_index_sql);
 
         auto nodes = query_context->logical_planner()->LogicalPlans();
         for (const auto &node : nodes) {
-            CheckLogicalNode(node, LogicalNodeType::kDropIndex);
+            CheckLogicalNode(node, LogicalNodeType::kCompact);
+            CheckLogicalNode(node, LogicalNodeType::kCompactIndex);
         }
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
