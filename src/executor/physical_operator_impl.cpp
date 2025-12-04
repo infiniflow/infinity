@@ -130,7 +130,7 @@ std::shared_ptr<std::vector<std::shared_ptr<DataType>>> PhysicalCommonFunctionUs
 void OutputToDataBlockHelper::OutputToDataBlock(BufferManager *buffer_mgr,
                                                 const BlockIndex *block_index,
                                                 const std::vector<std::unique_ptr<DataBlock>> &output_data_blocks) {
-    std::sort(output_job_infos.begin(), output_job_infos.end());
+    std::ranges::sort(output_job_infos);
 
     Status status;
 

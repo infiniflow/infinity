@@ -18,7 +18,7 @@ module;
 #include "parser.h"
 #include "unit_test/gtest_expand.h"
 
-module infinity_core:ut.logical_insert;
+module infinity_core:ut.logical_show;
 
 import :ut.base_test;
 import :ut.sql_runner;
@@ -43,7 +43,7 @@ import :logical_planner;
 import global_resource_usage;
 
 using namespace infinity;
-class LogicalInsertTest : public NewRequestTest {
+class LogicalShowTest : public NewRequestTest {
 public:
     std::shared_ptr<std::string> db_name;
     std::shared_ptr<ColumnDef> column_def1;
@@ -70,15 +70,15 @@ public:
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalInsertTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalShowTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
 
-TEST_P(LogicalInsertTest, test1) {
+TEST_P(LogicalShowTest, test1) {
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     db_name = std::make_shared<std::string>("default_db");
     column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    table_name = std::make_shared<std::string>("tb1");
+    table_name = std::make_shared<std::string>("tb");
     table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
 
     // Create table
@@ -90,25 +90,25 @@ TEST_P(LogicalInsertTest, test1) {
         EXPECT_TRUE(status.ok());
     }
 
-    {
-        std::string sql = "create table tb2(col1 int, col2 int)";
+    for (size_t i = 0; i < 200; i++) {
+        std::string sql = fmt::format("insert into tb values({}, 'abc')", i);
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
 
-    // {
-    //     std::string sql = "insert into tb2 select * from tb1";
-    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-    //     QueryResult query_result = query_context->Query(sql);
-    //
-    //     auto nodes = query_context->logical_planner()->LogicalPlans();
-    //     for (const auto &node : nodes) {
-    //         CheckLogicalNode(node, LogicalNodeType::kInsert);
-    //     }
-    //
-    //     bool ok = HandleQueryResult(query_result);
-    //     EXPECT_TRUE(ok);
-    // }
+    {
+        std::string sql = "show databases";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+
+        auto nodes = query_context->logical_planner()->LogicalPlans();
+        for (const auto &node : nodes) {
+            CheckLogicalNode(node, LogicalNodeType::kShow);
+        }
+
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
 }

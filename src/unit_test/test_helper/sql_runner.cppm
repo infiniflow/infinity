@@ -15,6 +15,7 @@
 export module infinity_core:ut.sql_runner;
 
 import :data_table;
+import :physical_operator;
 
 namespace infinity {
 
@@ -22,6 +23,7 @@ export class SQLRunner {
 
 public:
     static std::shared_ptr<DataTable> Run(const std::string &sql_text, bool print = true);
+    static std::shared_ptr<PhysicalOperator> GetPhysicalPlan(const std::string &sql_text);
 };
 
 } // namespace infinity

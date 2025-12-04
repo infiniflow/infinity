@@ -179,7 +179,7 @@ wheels = [
 
 [[package]]
 name = "infinity-sdk"
-version = "0.6.8"
+version = "0.6.10"
 source = { editable = "." }
 dependencies = [
     { name = "datrie" },

@@ -106,7 +106,7 @@ protected:
             data_indices = GetRandom(data_n - 1, 0, edge_n);
             data_indices.push_back(0);
             data_indices.push_back(edge_n);
-            std::sort(data_indices.begin(), data_indices.end());
+            std::ranges::sort(data_indices);
             bool check = true;
             for (i32 i = 0; i < data_n; ++i) {
                 auto diff = data_indices[i + 1] - data_indices[i];

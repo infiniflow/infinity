@@ -1812,7 +1812,7 @@ Status NewTxn::OptimizeFtIndex(std::shared_ptr<IndexBase> index_base,
         base_name_out = dst_base_name;
     }
 
-    LOG_INFO(fmt::format("done merging {} {}", *index_fulltext->index_name_, dst_base_name));
+    LOG_INFO(fmt::format("finish merging {} {}", *index_fulltext->index_name_, dst_base_name));
 
     return Status::OK();
 }
@@ -2052,7 +2052,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         }
     }
 
-    // NOTE: ChunkIndexMetaInfo::term_cnt_ is unstalbe before MemoryIndexer::Dump()!
+    // NOTE: ChunkIndexMetaInfo::term_cnt_ is unstable before MemoryIndexer::Dump()!
     ChunkIndexMetaInfo chunk_index_meta_info;
     if (mem_index->GetBaseMemIndex() != nullptr) {
         chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();

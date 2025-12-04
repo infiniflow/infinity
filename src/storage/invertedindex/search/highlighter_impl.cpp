@@ -192,7 +192,7 @@ std::vector<std::pair<size_t, size_t>> Highlighter::MergeMatches(const std::vect
     }
 
     auto sorted_matches = matches;
-    std::sort(sorted_matches.begin(), sorted_matches.end());
+    std::ranges::sort(sorted_matches);
 
     std::vector<std::pair<size_t, size_t>> merged;
     size_t current_start = sorted_matches[0].first;

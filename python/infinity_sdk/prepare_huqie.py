@@ -35,9 +35,11 @@ def prepare_huqie_file(source_file, target_dir):
         print(f"Generating huqie.txt.trie failed")
         return False
 
+    return True
+
 if __name__ == "__main__":
     current_dir = Path.cwd()
-    project_root = current_dir.parent.parent.parent
+    project_root = current_dir.parent.parent
     source_file = project_root / "resource" / "rag" / "huqie.txt"
     target_dir = current_dir / "infinity"
     txt_file = target_dir / "huqie.txt"
@@ -46,4 +48,5 @@ if __name__ == "__main__":
     if txt_file.exists() and trie_file.exists():
         print(f"Both huqie.txt and huqie.txt.trie exist in {target_dir}")
     else:
-        prepare_huqie_file(source_file, target_dir)
+        if not prepare_huqie_file(source_file, target_dir):
+            exit(1)

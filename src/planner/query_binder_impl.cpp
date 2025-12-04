@@ -1088,7 +1088,7 @@ std::unique_ptr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatem
         update_expr = CastExpression::AddCastToType(update_expr, *column_types[column_id]);
         bound_update_statement->update_columns_.emplace_back(column_id, update_expr);
     }
-    std::sort(bound_update_statement->update_columns_.begin(), bound_update_statement->update_columns_.end());
+    std::ranges::sort(bound_update_statement->update_columns_);
     // check duplicate in update_columns_
     for (size_t i = 1; i < bound_update_statement->update_columns_.size(); i++) {
         if (bound_update_statement->update_columns_[i].first == bound_update_statement->update_columns_[i - 1].first) {
