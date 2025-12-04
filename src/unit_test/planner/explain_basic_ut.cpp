@@ -69,7 +69,7 @@ public:
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(sql);
             bool ok = HandleQueryResult(query_result);
-            EXPECT_TRUE(ok);
+            ASSERT_TRUE(ok);
 
             LOG_INFO(fmt::format("sql: {}", sql));
             LOG_INFO(fmt::format("explain: {}", query_result.ToString()));
@@ -88,9 +88,17 @@ TEST_P(ExplainBasicTest, test1) {
     table_name = std::make_shared<std::string>("tb");
     table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
 
-    // Create tmp database
+    // Create database
     {
         std::string sql = "create database db1";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+
+    {
+        std::string sql = "create collection collection1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(sql);
         bool ok = HandleQueryResult(query_result);
@@ -115,13 +123,15 @@ TEST_P(ExplainBasicTest, test1) {
     }
 
     // Explain select
+    ExplainSql("select * from tb where col1 > 100 and 1 = 1", true);
     ExplainSql("select * from tb order by col1", true);
     ExplainSql("select * from tb limit 100", true);
-    ExplainSql("select * from tb order by col1 limit 100", true);
+    ExplainSql("select * from tb where col1 > 100 and 1 = 1 order by col1 limit 100", true);
 
     // Explain create
     ExplainSql("create table tb1(c1 int, c2 varchar)", false);
     ExplainSql("create database db1", false);
+    ExplainSql("create collection c1", false);
 
     // Explain insert
     ExplainSql("insert into tb values(1000, 'xyz')", false);
@@ -129,6 +139,7 @@ TEST_P(ExplainBasicTest, test1) {
     // Explain drop
     ExplainSql("drop table tb", false);
     ExplainSql("drop database db1", false);
+    ExplainSql("drop collection collection1", false);
 
     // Explain show
     ExplainSql("show database default_db", true);
