@@ -451,31 +451,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             switch (snapshot_operation) {
                 case SnapshotOp::kCreate: {
                     LOG_INFO(fmt::format("Execute snapshot create"));
-
-                    // TODO: do we need a new checkpoint in case the last one just create the table
-                    // Get WAL manager and check if checkpoint is already in progress
-                    // auto *wal_manager = query_context->storage()->wal_manager();
-                    // if (wal_manager->IsCheckpointing()) {
-                    //     LOG_ERROR("There is a running checkpoint task, skip this checkpoint triggered by snapshot");
-                    //     Status status = Status::Checkpointing();
-                    //     RecoverableError(status);
-                    // } else {
-                    //     // Get current commit state
-                    //     TxnTimeStamp max_commit_ts{};
-                    //     i64 wal_size{};
-                    //     std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
-                    //     LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
-
-                    //     // Create and configure checkpoint task
-                    //     auto checkpoint_task = std::make_shared<NewCheckpointTask>(wal_size);
-                    //     checkpoint_task->ExecuteWithNewTxn();
-                    // }
-
-                    // // wait for checkpoint to complete
-                    // while (wal_manager->LastCheckpointTS() + 2 < begin_ts) {
-                    //     std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                    // }
-
                     switch (snapshot_scope) {
                         case SnapshotScope::kSystem: {
                             NewTxn *new_txn = query_context->GetNewTxn();
