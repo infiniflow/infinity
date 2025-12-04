@@ -18,6 +18,7 @@ import :roaring_bitmap;
 import :base_memindex;
 import :memindex_tracer;
 import :chunk_index_meta;
+import :table_index_meta;
 
 import internal_types;
 import column_def;
@@ -30,7 +31,7 @@ class BufferObj;
 
 export class SecondaryIndexInMem : public BaseMemIndex {
 protected:
-    explicit SecondaryIndexInMem() = default;
+    explicit SecondaryIndexInMem(SecondaryIndexCardinality cardinality) : cardinality_(cardinality) {}
 
     virtual u32 GetRowCountNoLock() const = 0;
 
@@ -55,7 +56,13 @@ public:
 
     virtual std::pair<u32, Bitmask> RangeQuery(const void *input) const = 0;
 
-    static std::shared_ptr<SecondaryIndexInMem> NewSecondaryIndexInMem(const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id);
+    SecondaryIndexCardinality GetCardinality() const { return cardinality_; }
+
+    static std::shared_ptr<SecondaryIndexInMem>
+    NewSecondaryIndexInMem(const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id, SecondaryIndexCardinality cardinality);
+
+private:
+    SecondaryIndexCardinality cardinality_;
 };
 
 } // namespace infinity
