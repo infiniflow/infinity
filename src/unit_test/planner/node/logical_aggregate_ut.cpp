@@ -18,7 +18,7 @@ module;
 #include "parser.h"
 #include "unit_test/gtest_expand.h"
 
-module infinity_core:ut.explain_basic;
+module infinity_core:ut.logical_aggregate;
 
 import :ut.base_test;
 import :ut.sql_runner;
@@ -43,7 +43,7 @@ import :logical_planner;
 import global_resource_usage;
 
 using namespace infinity;
-class ExplainBasicTest : public NewRequestTest {
+class LogicalAggregateTest : public NewRequestTest {
 public:
     std::shared_ptr<std::string> db_name;
     std::shared_ptr<ColumnDef> column_def1;
@@ -51,35 +51,28 @@ public:
     std::shared_ptr<std::string> table_name;
     std::shared_ptr<TableDef> table_def;
 
-    void ExplainSql(std::string sql_statement, bool read_only) {
-        std::vector<std::string> sql_vector;
-        sql_vector.emplace_back(fmt::format("explain ast {}", sql_statement));
-        sql_vector.emplace_back(fmt::format("explain raw {}", sql_statement));
-        sql_vector.emplace_back(fmt::format("explain logical {}", sql_statement));
-        sql_vector.emplace_back(fmt::format("explain physical {}", sql_statement));
-        sql_vector.emplace_back(fmt::format("explain fragment {}", sql_statement));
-        sql_vector.emplace_back(fmt::format("explain {}", sql_statement));
-
-        if (read_only) {
-            sql_vector.emplace_back(fmt::format("explain analyze {}", sql_statement));
-            sql_vector.emplace_back(fmt::format("explain pipeline {}", sql_statement));
+    void CheckLogicalNode(const std::shared_ptr<LogicalNode> &node, LogicalNodeType type) {
+        if (!node) {
+            return;
         }
 
-        for (const auto &sql : sql_vector) {
-            std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-            QueryResult query_result = query_context->Query(sql);
-            bool ok = HandleQueryResult(query_result);
-            EXPECT_TRUE(ok);
+        if (node->operator_type() == type) {
+            i64 space = 4;
+            LOG_INFO(fmt::format("ToString: {}", node->ToString(space)));
 
-            LOG_INFO(fmt::format("sql: {}", sql));
-            LOG_INFO(fmt::format("explain: {}", query_result.ToString()));
+            [[maybe_unused]] auto column_bindings = node->GetColumnBindings();
+            [[maybe_unused]] auto output_names = node->GetOutputNames();
+            [[maybe_unused]] auto output_types = node->GetOutputTypes();
         }
+
+        CheckLogicalNode(node->left_node(), type);
+        CheckLogicalNode(node->right_node(), type);
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, ExplainBasicTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalAggregateTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
 
-TEST_P(ExplainBasicTest, test1) {
+TEST_P(LogicalAggregateTest, test1) {
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     db_name = std::make_shared<std::string>("default_db");
@@ -87,15 +80,6 @@ TEST_P(ExplainBasicTest, test1) {
     column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     table_name = std::make_shared<std::string>("tb");
     table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
-
-    // Create tmp database
-    {
-        std::string sql = "create database db1";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-    }
 
     // Create table
     {
@@ -107,31 +91,24 @@ TEST_P(ExplainBasicTest, test1) {
     }
 
     for (size_t i = 0; i < 200; i++) {
-        std::string sql = fmt::format("insert into {} values({}, 'abc')", *table_name, i);
+        std::string sql = fmt::format("insert into tb values({}, 'abc')", i);
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
 
-    // Explain select
-    ExplainSql("select * from tb order by col1", true);
-    ExplainSql("select * from tb limit 100", true);
-    ExplainSql("select * from tb order by col1 limit 100", true);
+    {
+        std::string sql = "select min(col1), max(col1), sum(col1), avg(col1) from tb";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
 
-    // Explain create
-    ExplainSql("create table tb1(c1 int, c2 varchar)", false);
-    ExplainSql("create database db1", false);
+        auto nodes = query_context->logical_planner()->LogicalPlans();
+        for (const auto &node : nodes) {
+            CheckLogicalNode(node, LogicalNodeType::kAggregate);
+        }
 
-    // Explain insert
-    ExplainSql("insert into tb values(1000, 'xyz')", false);
-
-    // Explain drop
-    ExplainSql("drop table tb", false);
-    ExplainSql("drop database db1", false);
-
-    // Explain show
-    ExplainSql("show database default_db", true);
-    ExplainSql("show table tb", true);
-    ExplainSql("show checkpoint", true);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
 }
