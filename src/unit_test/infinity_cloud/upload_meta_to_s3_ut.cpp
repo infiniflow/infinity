@@ -94,7 +94,7 @@ TEST_P(UploadMetaToS3, DISABLED_MINIO_test1) {
     std::vector<std::string> remote_files;
     VirtualStore::ListObjects(S3_DEFAULT_BUCKET, "", remote_files);
 
-    std::this_thread::sleep_for(1s); // fake async, may cause some fuck issue
+    std::this_thread::sleep_for(1s);
 
     auto catalog_dir = GetCatalogDir();
 

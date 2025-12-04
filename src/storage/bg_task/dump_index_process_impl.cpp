@@ -87,7 +87,7 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
     i64 dump_count = 0;
     do {
         dump_count++;
-        std::shared_ptr<BGTaskInfo> bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kDumpMemIndex);
+        auto bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kDumpMemIndex);
         std::shared_ptr<NewTxn> new_txn_shared =
             new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("Dump index"), TransactionType::kDumpMemIndex);
 
@@ -103,7 +103,7 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
                                       commit_status.message()));
             }
 
-            DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(new_txn_shared->GetTxnStore());
+            auto dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(new_txn_shared->GetTxnStore());
             if (dump_index_txn_store != nullptr) {
                 std::string task_text =
                     fmt::format("Txn: {}, commit: {}, dump mem index: {}.{}.{} in segment: {} into chunk:{}",
