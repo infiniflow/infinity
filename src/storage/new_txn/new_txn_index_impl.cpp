@@ -975,20 +975,13 @@ Status NewTxn::PopulateIndex(const std::string &db_name,
         if (!status.ok()) {
             return status;
         }
-        // } else if (index_base->index_type_ == IndexType::kBMP) {
-        //     Status status = PopulateBMPIndexInner(index_base, *segment_index_meta, segment_meta, segment_row_cnt, column_id, column_def,
-        //     new_chunk_ids); if (!status.ok()) {
-        //         return status;
-        //     }
+    } else if (index_base->index_type_ == IndexType::kBMP) {
+        auto status = PopulateBMPIndexInner(index_base, *segment_index_meta, segment_meta, segment_row_cnt, column_id, column_def, new_chunk_ids);
+        if (!status.ok()) {
+            return status;
+        }
     } else {
         switch (index_base->index_type_) {
-            case IndexType::kBMP: {
-                Status status = PopulateIndexToMem(*segment_index_meta, segment_meta, column_id, segment_row_cnt);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
             case IndexType::kFullText: {
                 Status status = PopulateFtIndexInner(index_base, *segment_index_meta, segment_meta, column_id, segment_row_cnt, new_chunk_ids);
                 if (!status.ok()) {
