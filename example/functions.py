@@ -1,10 +1,6 @@
 import os
-import pandas as pd
 import infinity
-import infinity.index as index
-from numpy import dtype
-from infinity.errors import ErrorCode
-from infinity.common import ConflictType, SortType
+from infinity.common import ConflictType
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 
@@ -129,6 +125,11 @@ if extra_result is not None:
 
 #function round
 res, extra_result = table_obj.output(["*", "round(c1)", "round(c2)"]).to_df()
+print(res)
+if extra_result is not None:
+    print(extra_result)
+
+res, extra_result = table_obj.output(["*", "round(c2, 1)", "round(c2, 0)"]).to_df()
 print(res)
 if extra_result is not None:
     print(extra_result)

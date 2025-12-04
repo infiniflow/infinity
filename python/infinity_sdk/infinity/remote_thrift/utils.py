@@ -378,10 +378,9 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
             arguments.append(this_arg)
         else:
             func_name = cons.key
-            for arg_key, arg_value in cons.arg_types.items():
-                if arg_value:
-                    arg = cons.args[arg_key]
-                    arguments.append(parse_expr(arg))
+            for arg_key in cons.arg_types:
+                if arg_key in cons.args and cons.args[arg_key] is not None:
+                    arguments.append(parse_expr(cons.args[arg_key]))
 
             # for arg in cons.args['expressions']:
             #     if arg:

@@ -979,13 +979,19 @@ class TestInfinity:
                              "c2": {"type": "double"}}, ConflictType.Error)
         table_obj = db_obj.get_table("test_select_round" + suffix)
         table_obj.insert(
-            [{"c1": '1', "c2": '2.4'}, {"c1": '4', "c2": '-2.4'}, {"c1": '9', "c2": '2.5'}, {"c1": '16', "c2": '-2.5'}])
+            [{"c1": '1', "c2": '2.41'}, {"c1": '4', "c2": '-2.49'}, {"c1": '9', "c2": '2.55'}, {"c1": '16', "c2": '-2.55'}])
 
         res, extra_res = table_obj.output(["c1", "round(c2)"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 4, 9, 16),
                                                          'round(c2)': (2, -2, 3, -3)})
                                       .astype({'c1': dtype('int32'), 'round(c2)': dtype('double')}))
+
+        res, extra_res = table_obj.output(["c1", "round(c2, 1)"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 4, 9, 16),
+                                                         'round(c2, 1)': (2.4, -2.5, 2.6, -2.6)})
+                                      .astype({'c1': dtype('int32'), 'round(c2, 1)': dtype('double')}))
 
         res, extra_res = table_obj.output(["c1", "ceil(c2)"]).to_df()
         print(res)
