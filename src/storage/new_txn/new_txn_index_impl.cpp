@@ -704,8 +704,8 @@ Status NewTxn::AppendIndex(TableIndexMeta &table_index_meta, const std::pair<Row
                 return status;
             }
         }
-        BlockID block_id = block_meta->block_id();
         {
+            BlockID block_id = block_meta->block_id();
             Status status = this->AppendMemIndex(*segment_index_meta, block_id, col, cur_offset, cur_row_cnt);
             if (!status.ok()) {
                 return status;
@@ -893,7 +893,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
     mem_index->UpdateEnd();
     LOG_TRACE(fmt::format("NewTxn::AppendMemIndex UpdateEnd mem_index {:p}", (void *)mem_index.get()));
 
-    // Trigger dump if necessary
+    // // Trigger dump if necessary
     if (!this->IsReplay()) {
         size_t row_count = mem_index->GetRowCount();
         size_t row_quota = InfinityContext::instance().config()->MemIndexCapacity();
@@ -904,8 +904,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
             std::string index_name = *index_base->index_name_;
             SegmentID segment_id = segment_index_meta.segment_id();
             RowID begin_row_id = mem_index->GetBeginRowID();
-            std::shared_ptr<DumpMemIndexTask> dump_task =
-                std::make_shared<DumpMemIndexTask>(db_name, table_name, index_name, segment_id, begin_row_id);
+            auto dump_task = std::make_shared<DumpMemIndexTask>(db_name, table_name, index_name, segment_id, begin_row_id);
             DumpIndexProcessor *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
             LOG_INFO(fmt::format("MemIndex row count {} exceeds quota {}.  Submit dump task: {}", row_count, row_quota, dump_task->ToString()));
             dump_index_processor->Submit(std::move(dump_task));
@@ -956,28 +955,35 @@ Status NewTxn::PopulateIndex(const std::string &db_name,
     }
     std::vector<ChunkID> new_chunk_ids;
     if (index_base->index_type_ == IndexType::kIVF) {
-        Status status = this->PopulateIvfIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_ids);
+        auto status = PopulateIvfIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_ids);
         if (!status.ok()) {
             return status;
         }
     } else if (index_base->index_type_ == IndexType::kEMVB) {
-        Status status = this->PopulateEmvbIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_ids);
+        auto status = PopulateEmvbIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_ids);
+        if (!status.ok()) {
+            return status;
+        }
+    } else if (index_base->index_type_ == IndexType::kHnsw) {
+        auto status = PopulateHnswIndexInner(index_base, *segment_index_meta, segment_meta, segment_row_cnt, column_id, column_def, new_chunk_ids);
+        if (!status.ok()) {
+            return status;
+        }
+    } else if (index_base->index_type_ == IndexType::kSecondary) {
+        auto status =
+            PopulateSecondaryIndexInner(index_base, *segment_index_meta, segment_meta, segment_row_cnt, column_id, column_def, new_chunk_ids);
+        if (!status.ok()) {
+            return status;
+        }
+    } else if (index_base->index_type_ == IndexType::kBMP) {
+        auto status = PopulateBMPIndexInner(index_base, *segment_index_meta, segment_meta, segment_row_cnt, column_id, column_def, new_chunk_ids);
         if (!status.ok()) {
             return status;
         }
     } else {
         switch (index_base->index_type_) {
-            case IndexType::kSecondary:
-            case IndexType::kHnsw:
-            case IndexType::kBMP: {
-                Status status = this->PopulateIndexToMem(*segment_index_meta, segment_meta, column_id, segment_row_cnt);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
             case IndexType::kFullText: {
-                Status status = this->PopulateFtIndexInner(index_base, *segment_index_meta, segment_meta, column_id, segment_row_cnt, new_chunk_ids);
+                Status status = PopulateFtIndexInner(index_base, *segment_index_meta, segment_meta, column_id, segment_row_cnt, new_chunk_ids);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1020,13 +1026,13 @@ Status NewTxn::PopulateIndex(const std::string &db_name,
     // Put the index info local txn store
     switch (dump_index_cause) {
         case DumpIndexCause::kCompact: {
-            CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
+            auto compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
             compact_txn_store->chunk_infos_in_segments_.emplace(segment_meta.segment_id(), chunk_infos);
             compact_txn_store->deprecate_ids_in_segments_.emplace(segment_meta.segment_id(), old_chunk_ids);
             break;
         }
         case DumpIndexCause::kImport: {
-            ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
+            auto import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
             import_txn_store->chunk_infos_in_segments_.emplace(segment_meta.segment_id(), chunk_infos);
             import_txn_store->deprecate_ids_in_segments_.emplace(segment_meta.segment_id(), old_chunk_ids);
         }
@@ -1449,6 +1455,278 @@ Status NewTxn::PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
         auto *data_ptr = static_cast<EMVBIndex *>(buffer_handle.GetDataMut());
         data_ptr->BuildEMVBIndex(base_row_id, row_count, segment_meta, column_def);
     }
+    buffer_obj->Save();
+    return Status::OK();
+}
+
+Status NewTxn::PopulateHnswIndexInner(std::shared_ptr<IndexBase> index_base,
+                                      SegmentIndexMeta &segment_index_meta,
+                                      SegmentMeta &segment_meta,
+                                      size_t segment_row_cnt,
+                                      ColumnID column_id,
+                                      std::shared_ptr<ColumnDef> column_def,
+                                      std::vector<ChunkID> &new_chunk_ids) {
+    auto mem_index = std::make_shared<MemIndex>();
+    bool is_null = true;
+    std::shared_ptr<HnswIndexInMem> memory_hnsw_index;
+
+    auto [block_ids, status] = segment_meta.GetBlockIDs1();
+    if (!status.ok()) {
+        return status;
+    }
+    size_t block_capacity = DEFAULT_BLOCK_CAPACITY;
+    for (BlockID block_id : *block_ids) {
+        BlockMeta block_meta(block_id, segment_meta);
+        ColumnMeta column_meta(column_id, block_meta);
+
+        size_t row_cnt = block_id == block_ids->back() ? segment_row_cnt - block_capacity * (block_ids->size() - 1) : block_capacity;
+
+        ColumnVector col;
+        status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
+        if (!status.ok()) {
+            return status;
+        }
+        u32 offset = 0;
+
+        SegmentOffset block_offset = block_id * DEFAULT_BLOCK_CAPACITY;
+        RowID base_row_id = RowID(segment_index_meta.segment_id(), block_offset + offset);
+        if (is_null) {
+            memory_hnsw_index = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def);
+            mem_index->SetHnswIndex(memory_hnsw_index);
+            is_null = false;
+        } else {
+            memory_hnsw_index = mem_index->GetHnswIndex();
+        }
+
+        memory_hnsw_index->InsertVecs(block_offset, col, offset, row_cnt);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    std::optional<ChunkIndexMeta> chunk_index_meta;
+
+    ChunkID new_chunk_id = 0;
+    std::tie(new_chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+    if (!status.ok()) {
+        return status;
+    }
+
+    new_chunk_ids.push_back(new_chunk_id);
+
+    TableIndexMeta &table_index_meta = segment_index_meta.table_index_meta();
+    chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
+                                                   table_index_meta.table_meta().table_id_str(),
+                                                   segment_index_meta.segment_id(),
+                                                   new_chunk_id});
+
+    ChunkIndexMetaInfo chunk_index_meta_info;
+    if (mem_index->GetBaseMemIndex()) {
+        chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
+    } else if (mem_index->GetEMVBIndex()) {
+        chunk_index_meta_info = mem_index->GetEMVBIndex()->GetChunkIndexMetaInfo();
+    } else {
+        UnrecoverableError("Invalid mem index");
+    }
+
+    status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
+                                           this,
+                                           new_chunk_id,
+                                           chunk_index_meta_info.base_row_id_,
+                                           chunk_index_meta_info.row_cnt_,
+                                           chunk_index_meta_info.term_cnt_,
+                                           chunk_index_meta_info.base_name_,
+                                           chunk_index_meta_info.index_size_,
+                                           chunk_index_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    BufferObj *buffer_obj{};
+
+    status = chunk_index_meta->GetIndexBuffer(buffer_obj);
+    memory_hnsw_index->Dump(buffer_obj);
+    buffer_obj->Save();
+    return Status::OK();
+}
+
+Status NewTxn::PopulateSecondaryIndexInner(std::shared_ptr<IndexBase> index_base,
+                                           SegmentIndexMeta &segment_index_meta,
+                                           SegmentMeta &segment_meta,
+                                           size_t segment_row_cnt,
+                                           ColumnID column_id,
+                                           std::shared_ptr<ColumnDef> column_def,
+                                           std::vector<ChunkID> &new_chunk_ids) {
+    auto mem_index = std::make_shared<MemIndex>();
+    bool is_null = true;
+    std::shared_ptr<SecondaryIndexInMem> memory_secondary_index;
+    // if (is_null)
+    // InitSegmentIndex(*segment_index_meta, segment_meta);
+
+    auto [block_ids, status] = segment_meta.GetBlockIDs1();
+    if (!status.ok()) {
+        return status;
+    }
+    size_t block_capacity = DEFAULT_BLOCK_CAPACITY;
+    for (BlockID block_id : *block_ids) {
+        BlockMeta block_meta(block_id, segment_meta);
+        ColumnMeta column_meta(column_id, block_meta);
+
+        size_t row_cnt = block_id == block_ids->back() ? segment_row_cnt - block_capacity * (block_ids->size() - 1) : block_capacity;
+
+        ColumnVector col;
+        status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
+        if (!status.ok()) {
+            return status;
+        }
+        u32 offset = 0;
+
+        auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
+        if (!status.ok()) {
+            return status;
+        }
+
+        SegmentOffset block_offset = block_id * DEFAULT_BLOCK_CAPACITY;
+        RowID base_row_id = RowID(segment_index_meta.segment_id(), block_offset + offset);
+        if (is_null) {
+            memory_secondary_index = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, base_row_id);
+            mem_index->SetSecondaryIndex(memory_secondary_index);
+            is_null = false;
+        } else {
+            memory_secondary_index = mem_index->GetSecondaryIndex();
+        }
+
+        memory_secondary_index->InsertBlockData(block_offset, col, offset, row_cnt);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    std::optional<ChunkIndexMeta> chunk_index_meta;
+
+    ChunkID new_chunk_id = 0;
+    std::tie(new_chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+    if (!status.ok()) {
+        return status;
+    }
+
+    new_chunk_ids.push_back(new_chunk_id);
+
+    TableIndexMeta &table_index_meta = segment_index_meta.table_index_meta();
+    chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
+                                                   table_index_meta.table_meta().table_id_str(),
+                                                   segment_index_meta.segment_id(),
+                                                   new_chunk_id});
+
+    ChunkIndexMetaInfo chunk_index_meta_info;
+    chunk_index_meta_info = memory_secondary_index->GetChunkIndexMetaInfo();
+
+    status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
+                                           this,
+                                           new_chunk_id,
+                                           chunk_index_meta_info.base_row_id_,
+                                           chunk_index_meta_info.row_cnt_,
+                                           chunk_index_meta_info.term_cnt_,
+                                           chunk_index_meta_info.base_name_,
+                                           chunk_index_meta_info.index_size_,
+                                           chunk_index_meta);
+
+    if (!status.ok()) {
+        return status;
+    }
+    BufferObj *buffer_obj{};
+
+    status = chunk_index_meta->GetIndexBuffer(buffer_obj);
+    memory_secondary_index->Dump(buffer_obj);
+    buffer_obj->Save();
+    return Status::OK();
+}
+
+Status NewTxn::PopulateBMPIndexInner(std::shared_ptr<IndexBase> index_base,
+                                     SegmentIndexMeta &segment_index_meta,
+                                     SegmentMeta &segment_meta,
+                                     size_t segment_row_cnt,
+                                     ColumnID column_id,
+                                     std::shared_ptr<ColumnDef> column_def,
+                                     std::vector<ChunkID> &new_chunk_ids) {
+    auto mem_index = std::make_shared<MemIndex>();
+    std::shared_ptr<BMPIndexInMem> memory_bmp_index;
+    bool is_null = true;
+
+    auto [block_ids, status] = segment_meta.GetBlockIDs1();
+    if (!status.ok()) {
+        return status;
+    }
+    size_t block_capacity = DEFAULT_BLOCK_CAPACITY;
+    for (BlockID block_id : *block_ids) {
+        BlockMeta block_meta(block_id, segment_meta);
+        ColumnMeta column_meta(column_id, block_meta);
+
+        size_t row_cnt = block_id == block_ids->back() ? segment_row_cnt - block_capacity * (block_ids->size() - 1) : block_capacity;
+
+        ColumnVector col;
+        status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
+        if (!status.ok()) {
+            return status;
+        }
+        u32 offset = 0;
+
+        SegmentOffset block_offset = block_id * DEFAULT_BLOCK_CAPACITY;
+        RowID base_row_id = RowID(segment_index_meta.segment_id(), block_offset + offset);
+        if (is_null) {
+            memory_bmp_index = std::make_shared<BMPIndexInMem>(base_row_id, index_base.get(), column_def.get());
+            mem_index->SetBMPIndex(memory_bmp_index);
+            is_null = false;
+        } else {
+            memory_bmp_index = mem_index->GetBMPIndex();
+        }
+
+        memory_bmp_index->AddDocs(block_offset, col, offset, row_cnt);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    std::optional<ChunkIndexMeta> chunk_index_meta;
+
+    ChunkID new_chunk_id = 0;
+    std::tie(new_chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+    if (!status.ok()) {
+        return status;
+    }
+
+    new_chunk_ids.push_back(new_chunk_id);
+
+    TableIndexMeta &table_index_meta = segment_index_meta.table_index_meta();
+    chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
+                                                   table_index_meta.table_meta().table_id_str(),
+                                                   segment_index_meta.segment_id(),
+                                                   new_chunk_id});
+
+    ChunkIndexMetaInfo chunk_index_meta_info;
+    if (mem_index->GetBaseMemIndex()) {
+        chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
+    } else if (mem_index->GetEMVBIndex()) {
+        chunk_index_meta_info = mem_index->GetEMVBIndex()->GetChunkIndexMetaInfo();
+    } else {
+        UnrecoverableError("Invalid mem index");
+    }
+
+    status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
+                                           this,
+                                           new_chunk_id,
+                                           chunk_index_meta_info.base_row_id_,
+                                           chunk_index_meta_info.row_cnt_,
+                                           chunk_index_meta_info.term_cnt_,
+                                           chunk_index_meta_info.base_name_,
+                                           chunk_index_meta_info.index_size_,
+                                           chunk_index_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    BufferObj *buffer_obj{};
+
+    status = chunk_index_meta->GetIndexBuffer(buffer_obj);
+    memory_bmp_index->Dump(buffer_obj);
     buffer_obj->Save();
     return Status::OK();
 }
@@ -2097,9 +2375,7 @@ Status NewTxn::PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
 
     TableMeta table_meta(db_id_str, table_id_str, table_name, this);
     TableIndexMeta table_index_meta(index_id_str, index_name, table_meta);
-    std::shared_ptr<IndexBase> index_base;
-    Status status;
-    std::tie(index_base, status) = table_index_meta.GetIndexBase();
+    auto [index_base, status] = table_index_meta.GetIndexBase();
     if (!status.ok()) {
         return status;
     }

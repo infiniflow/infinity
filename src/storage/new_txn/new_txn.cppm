@@ -535,6 +535,30 @@ private:
                                  std::shared_ptr<ColumnDef> column_def,
                                  std::vector<ChunkID> &new_chunk_ids);
 
+    Status PopulateHnswIndexInner(std::shared_ptr<IndexBase> index_base,
+                                  SegmentIndexMeta &segment_index_meta,
+                                  SegmentMeta &segment_meta,
+                                  size_t segment_row_cnt,
+                                  ColumnID column_id,
+                                  std::shared_ptr<ColumnDef> column_def,
+                                  std::vector<ChunkID> &new_chunk_ids);
+
+    Status PopulateSecondaryIndexInner(std::shared_ptr<IndexBase> index_base,
+                                       SegmentIndexMeta &segment_index_meta,
+                                       SegmentMeta &segment_meta,
+                                       size_t segment_row_cnt,
+                                       ColumnID column_id,
+                                       std::shared_ptr<ColumnDef> column_def,
+                                       std::vector<ChunkID> &new_chunk_ids);
+
+    Status PopulateBMPIndexInner(std::shared_ptr<IndexBase> index_base,
+                                 SegmentIndexMeta &segment_index_meta,
+                                 SegmentMeta &segment_meta,
+                                 size_t segment_row_cnt,
+                                 ColumnID column_id,
+                                 std::shared_ptr<ColumnDef> column_def,
+                                 std::vector<ChunkID> &new_chunk_ids);
+
     Status PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
                                   SegmentIndexMeta &segment_index_meta,
                                   SegmentMeta &segment_meta,
