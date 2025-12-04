@@ -44,7 +44,7 @@ constexpr u32 map_memory_bloat_factor = 3;
 
 // No wrapper needed anymore - RcuMultiMap now works with POD types directly
 
-template <typename RawValueType>
+template <typename RawValueType, typename CardinalityTag>
 class SecondaryIndexInMemT final : public SecondaryIndexInMem {
     using KeyType = ConvertToOrderedType<RawValueType>;
     const RowID begin_row_id_;
@@ -57,7 +57,7 @@ protected:
     u32 MemoryCostOfThis() const override { return sizeof(*this); }
 
 public:
-    explicit SecondaryIndexInMemT(const RowID begin_row_id) : begin_row_id_(begin_row_id) { IncreaseMemoryUsageBase(MemoryCostOfThis()); }
+    explicit SecondaryIndexInMemT(const RowID begin_row_id, SecondaryIndexCardinality cardinality) : SecondaryIndexInMem(cardinality), begin_row_id_(begin_row_id) { IncreaseMemoryUsageBase(MemoryCostOfThis()); }
     ~SecondaryIndexInMemT() override { DecreaseMemoryUsageBase(MemoryCostOfThis() + GetRowCount() * MemoryCostOfEachRow()); }
     virtual RowID GetBeginRowID() const override { return begin_row_id_; }
     u32 GetRowCount() const override {
@@ -74,12 +74,21 @@ public:
 
     void Dump(BufferObj *buffer_obj) const override {
         BufferHandle handle = buffer_obj->Load();
-        auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
-
-        std::multimap<KeyType, u32> temp_map;
-        const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
-
-        data_ptr->InsertData(&temp_map);
+        
+        // Use template specialization based on CardinalityTag
+        if constexpr (std::is_same_v<CardinalityTag, HighCardinalityTag>) {
+            auto data_ptr = static_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(handle.GetDataMut());
+            std::multimap<KeyType, u32> temp_map;
+            const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
+            data_ptr->InsertData(&temp_map);
+        } else if constexpr (std::is_same_v<CardinalityTag, LowCardinalityTag>) {
+            auto data_ptr = static_cast<SecondaryIndexDataBase<LowCardinalityTag> *>(handle.GetDataMut());
+            std::multimap<KeyType, u32> temp_map;
+            const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
+            data_ptr->InsertData(&temp_map);
+        } else {
+            UnrecoverableError("Unsupported cardinality tag type");
+        }
     }
     std::pair<u32, Bitmask> RangeQuery(const void *input) const override {
         const auto &[segment_row_count, b, e] = *static_cast<const std::tuple<u32, KeyType, KeyType> *>(input);
@@ -137,47 +146,93 @@ MemIndexTracerInfo SecondaryIndexInMem::GetInfo() const {
 
 const ChunkIndexMetaInfo SecondaryIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", GetBeginRowID(), GetRowCount(), 0, 0}; }
 
-std::shared_ptr<SecondaryIndexInMem> SecondaryIndexInMem::NewSecondaryIndexInMem(const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id) {
+std::shared_ptr<SecondaryIndexInMem> SecondaryIndexInMem::NewSecondaryIndexInMem(const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id, SecondaryIndexCardinality cardinality) {
     if (!column_def->type()->CanBuildSecondaryIndex()) {
         UnrecoverableError("Column type can't build secondary index");
     }
-    switch (column_def->type()->type()) {
-        case LogicalType::kTinyInt: {
-            return std::make_shared<SecondaryIndexInMemT<TinyIntT>>(begin_row_id);
+    
+    // Select template specialization based on cardinality
+    if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
+        switch (column_def->type()->type()) {
+            case LogicalType::kTinyInt: {
+                return std::make_shared<SecondaryIndexInMemT<TinyIntT, HighCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kSmallInt: {
+                return std::make_shared<SecondaryIndexInMemT<SmallIntT, HighCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kInteger: {
+                return std::make_shared<SecondaryIndexInMemT<IntegerT, HighCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kBigInt: {
+                return std::make_shared<SecondaryIndexInMemT<BigIntT, HighCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kFloat: {
+                return std::make_shared<SecondaryIndexInMemT<FloatT, HighCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kDouble: {
+                return std::make_shared<SecondaryIndexInMemT<DoubleT, HighCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kDate: {
+                return std::make_shared<SecondaryIndexInMemT<DateT, HighCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kTime: {
+                return std::make_shared<SecondaryIndexInMemT<TimeT, HighCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kDateTime: {
+                return std::make_shared<SecondaryIndexInMemT<DateTimeT, HighCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kTimestamp: {
+                return std::make_shared<SecondaryIndexInMemT<TimestampT, HighCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kVarchar: {
+                return std::make_shared<SecondaryIndexInMemT<VarcharT, HighCardinalityTag>>(begin_row_id, cardinality);
+            }
+            default: {
+                return nullptr;
+            }
         }
-        case LogicalType::kSmallInt: {
-            return std::make_shared<SecondaryIndexInMemT<SmallIntT>>(begin_row_id);
+    } else if (cardinality == SecondaryIndexCardinality::kLowCardinality) {
+        switch (column_def->type()->type()) {
+            case LogicalType::kTinyInt: {
+                return std::make_shared<SecondaryIndexInMemT<TinyIntT, LowCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kSmallInt: {
+                return std::make_shared<SecondaryIndexInMemT<SmallIntT, LowCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kInteger: {
+                return std::make_shared<SecondaryIndexInMemT<IntegerT, LowCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kBigInt: {
+                return std::make_shared<SecondaryIndexInMemT<BigIntT, LowCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kFloat: {
+                return std::make_shared<SecondaryIndexInMemT<FloatT, LowCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kDouble: {
+                return std::make_shared<SecondaryIndexInMemT<DoubleT, LowCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kDate: {
+                return std::make_shared<SecondaryIndexInMemT<DateT, LowCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kTime: {
+                return std::make_shared<SecondaryIndexInMemT<TimeT, LowCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kDateTime: {
+                return std::make_shared<SecondaryIndexInMemT<DateTimeT, LowCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kTimestamp: {
+                return std::make_shared<SecondaryIndexInMemT<TimestampT, LowCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kVarchar: {
+                return std::make_shared<SecondaryIndexInMemT<VarcharT, LowCardinalityTag>>(begin_row_id, cardinality);
+            }
+            default: {
+                return nullptr;
+            }
         }
-        case LogicalType::kInteger: {
-            return std::make_shared<SecondaryIndexInMemT<IntegerT>>(begin_row_id);
-        }
-        case LogicalType::kBigInt: {
-            return std::make_shared<SecondaryIndexInMemT<BigIntT>>(begin_row_id);
-        }
-        case LogicalType::kFloat: {
-            return std::make_shared<SecondaryIndexInMemT<FloatT>>(begin_row_id);
-        }
-        case LogicalType::kDouble: {
-            return std::make_shared<SecondaryIndexInMemT<DoubleT>>(begin_row_id);
-        }
-        case LogicalType::kDate: {
-            return std::make_shared<SecondaryIndexInMemT<DateT>>(begin_row_id);
-        }
-        case LogicalType::kTime: {
-            return std::make_shared<SecondaryIndexInMemT<TimeT>>(begin_row_id);
-        }
-        case LogicalType::kDateTime: {
-            return std::make_shared<SecondaryIndexInMemT<DateTimeT>>(begin_row_id);
-        }
-        case LogicalType::kTimestamp: {
-            return std::make_shared<SecondaryIndexInMemT<TimestampT>>(begin_row_id);
-        }
-        case LogicalType::kVarchar: {
-            return std::make_shared<SecondaryIndexInMemT<VarcharT>>(begin_row_id);
-        }
-        default: {
-            return nullptr;
-        }
+    } else {
+        UnrecoverableError("Invalid secondary index cardinality");
+        return nullptr;
     }
 }
 
