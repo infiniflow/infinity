@@ -954,52 +954,49 @@ Status NewTxn::PopulateIndex(const std::string &db_name,
         old_chunk_ids = *old_chunk_ids_ptr;
     }
     std::vector<ChunkID> new_chunk_ids;
-    if (index_base->index_type_ == IndexType::kIVF) {
-        auto status = PopulateIvfIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_ids);
-        if (!status.ok()) {
-            return status;
-        }
-    } else if (index_base->index_type_ == IndexType::kEMVB) {
-        auto status = PopulateEmvbIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_ids);
-        if (!status.ok()) {
-            return status;
-        }
-    } else if (index_base->index_type_ == IndexType::kHnsw) {
-        auto status = PopulateHnswIndexInner(index_base, *segment_index_meta, segment_meta, segment_row_cnt, column_id, column_def, new_chunk_ids);
-        if (!status.ok()) {
-            return status;
-        }
-    } else if (index_base->index_type_ == IndexType::kSecondary) {
-        auto status =
-            PopulateSecondaryIndexInner(index_base, *segment_index_meta, segment_meta, segment_row_cnt, column_id, column_def, new_chunk_ids);
-        if (!status.ok()) {
-            return status;
-        }
-    } else if (index_base->index_type_ == IndexType::kBMP) {
-        auto status = PopulateBMPIndexInner(index_base, *segment_index_meta, segment_meta, segment_row_cnt, column_id, column_def, new_chunk_ids);
-        if (!status.ok()) {
-            return status;
-        }
-    } else {
-        switch (index_base->index_type_) {
-            case IndexType::kFullText: {
-                Status status = PopulateFtIndexInner(index_base, *segment_index_meta, segment_meta, column_id, segment_row_cnt, new_chunk_ids);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
+    switch (index_base->index_type_) {
+        case IndexType::kIVF: {
+            auto status = PopulateIvfIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_ids);
+            if (!status.ok()) {
+                return status;
             }
-            case IndexType::kDiskAnn: { // TODO
-                LOG_WARN("Not implemented yet");
-                return Status::OK();
-            }
-            default: {
-                UnrecoverableError("Invalid index type");
-                return Status::OK();
-            }
+            break;
         }
-        {
-            Status status;
+        case IndexType::kEMVB: {
+            auto status = PopulateEmvbIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_ids);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case IndexType::kHnsw: {
+            auto status =
+                PopulateHnswIndexInner(index_base, *segment_index_meta, segment_meta, segment_row_cnt, column_id, column_def, new_chunk_ids);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case IndexType::kSecondary: {
+            auto status =
+                PopulateSecondaryIndexInner(index_base, *segment_index_meta, segment_meta, segment_row_cnt, column_id, column_def, new_chunk_ids);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case IndexType::kBMP: {
+            auto status = PopulateBMPIndexInner(index_base, *segment_index_meta, segment_meta, segment_row_cnt, column_id, column_def, new_chunk_ids);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case IndexType::kFullText: {
+            auto status = PopulateFtIndexInner(index_base, *segment_index_meta, segment_meta, column_id, segment_row_cnt, new_chunk_ids);
+            if (!status.ok()) {
+                return status;
+            }
             ChunkID new_chunk_id = 0;
             std::tie(new_chunk_id, status) = segment_index_meta->GetAndSetNextChunkID();
             if (!status.ok()) {
@@ -1014,6 +1011,15 @@ Status NewTxn::PopulateIndex(const std::string &db_name,
             } else {
                 new_chunk_ids.push_back(new_chunk_id);
             }
+            break;
+        }
+        case IndexType::kDiskAnn: { // TODO
+            LOG_WARN("Not implemented yet");
+            return Status::OK();
+        }
+        default: {
+            UnrecoverableError("Invalid index type");
+            return Status::OK();
         }
     }
 
@@ -1241,34 +1247,6 @@ Status NewTxn::InitSegmentIndex(SegmentIndexMeta &segment_index_meta, SegmentMet
             }
 
             memory_hnsw_index->SetLSGParam();
-        }
-    }
-    return Status::OK();
-}
-
-Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id, size_t segment_row_cnt) {
-    InitSegmentIndex(segment_index_meta, segment_meta);
-
-    auto [block_ids, status] = segment_meta.GetBlockIDs1();
-    if (!status.ok()) {
-        return status;
-    }
-    size_t block_capacity = DEFAULT_BLOCK_CAPACITY;
-    for (BlockID block_id : *block_ids) {
-        BlockMeta block_meta(block_id, segment_meta);
-        ColumnMeta column_meta(column_id, block_meta);
-
-        size_t row_cnt = block_id == block_ids->back() ? segment_row_cnt - block_capacity * (block_ids->size() - 1) : block_capacity;
-
-        ColumnVector col;
-        status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
-        if (!status.ok()) {
-            return status;
-        }
-        u32 offset = 0;
-        status = this->AppendMemIndex(segment_index_meta, block_id, col, offset, row_cnt);
-        if (!status.ok()) {
-            return status;
         }
     }
     return Status::OK();

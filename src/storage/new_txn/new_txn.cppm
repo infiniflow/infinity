@@ -520,8 +520,6 @@ private:
 
     Status InitSegmentIndex(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta);
 
-    Status PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id, size_t segment_row_cnt);
-
     Status PopulateFtIndexInner(std::shared_ptr<IndexBase> index_base,
                                 SegmentIndexMeta &segment_index_meta,
                                 SegmentMeta &segment_meta,
