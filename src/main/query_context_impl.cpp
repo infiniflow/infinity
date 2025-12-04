@@ -501,7 +501,7 @@ void QueryContext::BeginTxn(const BaseStatement *base_statement) {
                     SnapshotScope snapshot_scope = snapshot_cmd->scope();
                     switch (snapshot_cmd->operation()) {
                         case SnapshotOp::kDrop: {
-                            transaction_type = TransactionType::kDropSnapshot;
+                            transaction_type = TransactionType::kCreateTableSnapshot;
                             break;
                         }
                         case SnapshotOp::kCreate: {
