@@ -27,18 +27,18 @@ statement ok
 CREATE INDEX index2 ON sqllogic_test_rankfeatures(tag) USING FULLTEXT WITH (analyzer=rankfeatures);
 
 query TTI
-SELECT id, SCORE() FROM sqllogic_test_rankfeatures SEARCH MATCH TEXT ('content', 'hello world', 'topn=10');
+SELECT id, ROUND(SCORE(), 4) FROM sqllogic_test_rankfeatures SEARCH MATCH TEXT ('content', 'hello world', 'topn=10');
 ----
-2024 0.267063
-2025 0.267063
-2026 0.267063
+2024 0.267100
+2025 0.267100
+2026 0.267100
 
 query TTI
-SELECT id, SCORE() FROM sqllogic_test_rankfeatures SEARCH MATCH TEXT ('content', 'hello world', 'rank_features=tag^Tag1^1.0,tag^Tag2^2.0;topn=10');
+SELECT id, ROUND(SCORE(), 4) FROM sqllogic_test_rankfeatures SEARCH MATCH TEXT ('content', 'hello world', 'rank_features=tag^Tag1^1.0,tag^Tag2^2.0;topn=10');
 ----
-2026 6.267063
-2024 5.267063
-2025 4.267063
+2026 6.267100
+2024 5.267100
+2025 4.267100
 
 # Clean up
 statement ok

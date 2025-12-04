@@ -2374,6 +2374,8 @@ curl --request GET \
       The weighted sum approach assigns different weights to different retrieval ways, allowing you to emphasize specific ways. This is particularly useful when you are certain of each path's relative importance.  
     - `"match_tensor"`  
       Infinity's tensor-based late interaction reranking approach.  
+    - `"max"`  
+      The max approach returns the maximum score from multiple retrieval ways.
 
   - `"topn"`: `int`, *Required*  
     An integer indicating the number of nearest neighbours (vector search) or most relevant rows (full-text search) to return.  
@@ -2407,7 +2409,7 @@ curl --request GET \
           - PAREN operator: `(`, `)`, need to appear in pairs, and can be nested.
           - COLON operator: `:`: Used to specify field-specific search, e.g., `body:foobar` searches for `foobar` in the `body` field.
           - CARAT operator: `^`: Used to boost the importance of a term, e.g., `quick^2 brown` boosts the importance of `quick` by a factor of 2, making it twice as important as `brown`.
-          - TILDE operator: `~`: Used for sloppy phrase search, e.g., `"harmful chemical"~10` searches for the phrase `"harmful chemical"` within a tolerable distance of 10 words.
+          - TILDE operator: `~`: Used to specify sloppy phrase search, e.g., `"harmful chemical"~10` searches for the phrase `"harmful chemical"` within a tolerable distance of 10 words.
           - SINGLE_QUOTED_STRING: Used to search for a phrase, e.g., `'Bloom filter'`.
           - DOUBLE_QUOTED_STRING: Used to search for a phrase, e.g., `"Bloom filter"`.
           - Escape characters: Used to escape reserved characters, e.g., `space\:efficient`. Starting with a backslash `\` will escape the following characters:
@@ -2423,6 +2425,9 @@ curl --request GET \
       - `"rank_constant"`: The smoothing constant for RRF reranking, e.g., `{"rank_constant": 60}`. Defaults to `60`.  
     - If you set `"fusion_method"` to `"weighted_sum"`, use a separate JSON to set the following parameter:  
       - `"weights"`: Specifies the weight for each retrieval way. For example, `{"weights": "1,2,0.5"}` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval ways, respectively. The default weight of each retrieval way is `1.0`. If `"weight"` is not specified, all retrieval ways will be assigned the default weight of `1.0`.
+      - `"normalize"`: Specifies the normalization method for each retrieval way. Options: `"minmax"`, `"atan"`, `"l2"`, `"none"`. Defaults to `"minmax"`.
+    - If you set `"fusion_method"` to `"max"`, use a separate JSON to set the following parameter:
+      - `"normalize"`: Specifies the normalization method for each retrieval way. Options: `"minmax"`, `"atan"`, `"l2"`, `"none"`. Defaults to `"minmax"`.
     - If you set `"fusion_method"` to `"match_tensor"`, use a separate JSON to set the following parameters:  
       - `"fields"`: The name of the tensor column for reranking.
       - `"query_tensor"`: The tensor data to compare against. This should be provided as a list of lists of numerical values.
