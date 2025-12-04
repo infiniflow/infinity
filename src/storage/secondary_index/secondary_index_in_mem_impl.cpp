@@ -57,7 +57,10 @@ protected:
     u32 MemoryCostOfThis() const override { return sizeof(*this); }
 
 public:
-    explicit SecondaryIndexInMemT(const RowID begin_row_id, SecondaryIndexCardinality cardinality) : SecondaryIndexInMem(cardinality), begin_row_id_(begin_row_id) { IncreaseMemoryUsageBase(MemoryCostOfThis()); }
+    explicit SecondaryIndexInMemT(const RowID begin_row_id, SecondaryIndexCardinality cardinality)
+        : SecondaryIndexInMem(cardinality), begin_row_id_(begin_row_id) {
+        IncreaseMemoryUsageBase(MemoryCostOfThis());
+    }
     ~SecondaryIndexInMemT() override { DecreaseMemoryUsageBase(MemoryCostOfThis() + GetRowCount() * MemoryCostOfEachRow()); }
     virtual RowID GetBeginRowID() const override { return begin_row_id_; }
     u32 GetRowCount() const override {
@@ -74,7 +77,7 @@ public:
 
     void Dump(BufferObj *buffer_obj) const override {
         BufferHandle handle = buffer_obj->Load();
-        
+
         // Use template specialization based on CardinalityTag
         if constexpr (std::is_same_v<CardinalityTag, HighCardinalityTag>) {
             auto data_ptr = static_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(handle.GetDataMut());
@@ -146,11 +149,12 @@ MemIndexTracerInfo SecondaryIndexInMem::GetInfo() const {
 
 const ChunkIndexMetaInfo SecondaryIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", GetBeginRowID(), GetRowCount(), 0, 0}; }
 
-std::shared_ptr<SecondaryIndexInMem> SecondaryIndexInMem::NewSecondaryIndexInMem(const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id, SecondaryIndexCardinality cardinality) {
+std::shared_ptr<SecondaryIndexInMem>
+SecondaryIndexInMem::NewSecondaryIndexInMem(const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id, SecondaryIndexCardinality cardinality) {
     if (!column_def->type()->CanBuildSecondaryIndex()) {
         UnrecoverableError("Column type can't build secondary index");
     }
-    
+
     // Select template specialization based on cardinality
     if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
         switch (column_def->type()->type()) {

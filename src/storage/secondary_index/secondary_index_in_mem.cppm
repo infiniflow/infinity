@@ -58,7 +58,8 @@ public:
 
     SecondaryIndexCardinality GetCardinality() const { return cardinality_; }
 
-    static std::shared_ptr<SecondaryIndexInMem> NewSecondaryIndexInMem(const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id, SecondaryIndexCardinality cardinality);
+    static std::shared_ptr<SecondaryIndexInMem>
+    NewSecondaryIndexInMem(const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id, SecondaryIndexCardinality cardinality);
 
 private:
     SecondaryIndexCardinality cardinality_;
