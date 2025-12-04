@@ -1372,9 +1372,9 @@ class TestInfinity:
 
         res, extra_res = table_obj.output(["datepart(c4, c1)", "datepart(c4, c2)", "datepart(c5, c3)"]).to_pl()
         print(res)
-        assert res['(c4 datepart c1)'][0] == 2025, "The value of c4 datepart c1 should be 2025"
-        assert res['(c4 datepart c2)'][0] == 2025, "The value of c4 datepart c2 should be 2025"
-        assert res['(c5 datepart c3)'][0] == 1, "The value of c5 datepart c3 should be 1"
+        assert res['datepart(c4, c1)'][0] == 2025, "The value of c4 datepart c1 should be 2025"
+        assert res['datepart(c4, c2)'][0] == 2025, "The value of c4 datepart c2 should be 2025"
+        assert res['datepart(c5, c3)'][0] == 1, "The value of c5 datepart c3 should be 1"
 
         res = db_obj.drop_table("test_select_date_part" + suffix)
         assert res.error_code == ErrorCode.OK
