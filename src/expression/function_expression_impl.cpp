@@ -46,11 +46,10 @@ std::string FunctionExpression::ToString() const {
 
     if (arguments_.size() == 2) {
         // Binary argument function
-        static const std::set<std::string> infix_operators = {
-            "+", "-", "*", "/", "%", "=", "<>", "!=", "<", ">", "<=", ">=", "AND", "OR", "LIKE", "NOT LIKE", "IN", "NOT IN", "IS", "IS NOT"
-        };
+        static const std::set<std::string> infix_operators = {"+",  "-",  "*",   "/",  "%",    "=",        "<>", "!=",     "<",  ">",
+                                                              "<=", ">=", "AND", "OR", "LIKE", "NOT LIKE", "IN", "NOT IN", "IS", "IS NOT"};
         std::string upper_name = func_.name();
-        std::transform(upper_name.begin(), upper_name.end(), upper_name.begin(), [](unsigned char c){ return std::toupper(c); });
+        std::transform(upper_name.begin(), upper_name.end(), upper_name.begin(), [](unsigned char c) { return std::toupper(c); });
         if (infix_operators.contains(upper_name)) {
             ss << '(' << arguments_.at(0)->Name() << " " << func_.name() << " " << arguments_.at(1)->Name() << ")";
             return ss.str();

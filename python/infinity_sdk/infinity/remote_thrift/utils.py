@@ -28,6 +28,14 @@ from infinity.common import InfinityException, SparseVector, Array
 from infinity.errors import ErrorCode
 
 
+def column_expr_to_string(column_expr: ttypes.ColumnExpr) -> str:
+    if column_expr.column_name:
+        return str(".".join(column_expr.column_name))
+    if column_expr.star:
+        return "*"
+    return ""
+
+
 def parsed_expression_to_string(expr: ttypes.ParsedExpr) -> str:
     if expr is None:
         return str()
@@ -82,20 +90,20 @@ def parsed_expression_to_string(expr: ttypes.ParsedExpr) -> str:
         return f"between(f{value_str}, f{upper_bound_str}, f{lower_bound_str})"
 
     if expr_type.knn_expr:
-        column_expr_str = parsed_expression_to_string(expr_type.knn_expr.column_expr)
-        return f"match_dense(column=f{column_expr_str}, top={expr_type.knn_expr.topn})"
+        column_expr_str = column_expr_to_string(expr_type.knn_expr.column_expr)
+        return f"match_dense(column={column_expr_str}, top={expr_type.knn_expr.topn})"
 
     if expr_type.match_sparse_expr:
-        column_expr_str = parsed_expression_to_string(expr_type.match_sparse_expr.column_expr)
-        return f"match_sparse(column=f{column_expr_str}, top={expr_type.match_sparse_expr.topn})"
+        column_expr_str = column_expr_to_string(expr_type.match_sparse_expr.column_expr)
+        return f"match_sparse(column={column_expr_str}, top={expr_type.match_sparse_expr.topn})"
 
     if expr_type.match_tensor_expr:
-        column_expr_str = parsed_expression_to_string(expr_type.match_tensor_expr.column_expr)
-        return f"match_tensor(column=f{column_expr_str}, top={expr_type.match_tensor_expr.topn})"
+        column_expr_str = column_expr_to_string(expr_type.match_tensor_expr.column_expr)
+        return f"match_tensor(column={column_expr_str}, top={expr_type.match_tensor_expr.topn})"
 
     if expr_type.match_expr:
-        column_expr_str = parsed_expression_to_string(expr_type.match_expr.column_expr)
-        return f"match_text(column=f{column_expr_str}, top={expr_type.match_expr.topn})"
+        column_expr_str = column_expr_to_string(expr_type.match_expr.column_expr)
+        return f"match_text(column={column_expr_str}, top={expr_type.match_expr.topn})"
 
     if expr_type.fusion_expr:
         return f"fusion(method={expr_type.fusion_expr.method}, options={expr_type.fusion_expr.options_text})"
@@ -122,29 +130,19 @@ def parsed_expression_to_string(expr: ttypes.ParsedExpr) -> str:
 
 
 def search_to_string(search_expr: ttypes.SearchExpr) -> str:
+    exprs = []
     if search_expr.match_exprs:
-        match_exprs_str = str
-        for index, match_expr in enumerate(search_expr.match_exprs):
-            match_expr_str = parsed_expression_to_string(match_expr)
-            if index == 0:
-                match_exprs_str = match_expr_str
-            else:
-                match_exprs_str = f"{match_exprs_str}, {match_expr_str}"
-
-        return match_exprs_str
+        for match_expr in search_expr.match_exprs:
+            exprs.append(generic_match_to_string(match_expr))
 
     if search_expr.fusion_exprs:
-        fusion_exprs_str = str
-        for index, fusion_expr in enumerate(search_expr.fusion_exprs):
-            fusion_expr_str = parsed_expression_to_string(fusion_expr)
-            if index == 0:
-                fusion_exprs_str = fusion_expr_str
-            else:
-                fusion_exprs_str = f"{fusion_exprs_str}, {fusion_expr_str}"
+        for fusion_expr in search_expr.fusion_exprs:
+            exprs.append(fusion_to_string(fusion_expr))
 
-        return fusion_exprs_str
+    if not exprs:
+        raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid search expression")
 
-    raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid search expression")
+    return ", ".join(exprs)
 
 
 def fusion_to_string(fusion_expr: ttypes.FusionExpr) -> str:
@@ -153,7 +151,7 @@ def fusion_to_string(fusion_expr: ttypes.FusionExpr) -> str:
     # 3: optional MatchTensorExpr optional_match_tensor_expr,
     match_tensor_expr_str = None
     if fusion_expr.optional_match_tensor_expr:
-        column_expr_str = parsed_expression_to_string(fusion_expr.optional_match_tensor_expr.column_expr)
+        column_expr_str = column_expr_to_string(fusion_expr.optional_match_tensor_expr.column_expr)
         match_tensor_expr_str = f"match_tensor(column={column_expr_str}, top={fusion_expr.optional_match_tensor_expr.topn})"
 
     if match_tensor_expr_str:
@@ -164,20 +162,19 @@ def fusion_to_string(fusion_expr: ttypes.FusionExpr) -> str:
 
 def generic_match_to_string(generic_match_expr: ttypes.GenericMatchExpr) -> str:
     if generic_match_expr.match_vector_expr:
-        column_expr_str = parsed_expression_to_string(generic_match_expr.match_vector_expr.column_expr)
+        column_expr_str = column_expr_to_string(generic_match_expr.match_vector_expr.column_expr)
         return f"match_dense(column={column_expr_str}, top={generic_match_expr.match_vector_expr.topn})"
 
     if generic_match_expr.match_sparse_expr:
-        column_expr_str = parsed_expression_to_string(generic_match_expr.match_sparse_expr.column_expr)
+        column_expr_str = column_expr_to_string(generic_match_expr.match_sparse_expr.column_expr)
         return f"match_sparse(column={column_expr_str}, top={generic_match_expr.match_sparse_expr.topn})"
 
     if generic_match_expr.match_tensor_expr:
-        column_expr_str = parsed_expression_to_string(generic_match_expr.match_tensor_expr.column_expr)
+        column_expr_str = column_expr_to_string(generic_match_expr.match_tensor_expr.column_expr)
         return f"match_tensor(column={column_expr_str}, top={generic_match_expr.match_tensor_expr.topn})"
 
     if generic_match_expr.match_text_expr:
-        column_expr_str = parsed_expression_to_string(generic_match_expr.match_text_expr.column_expr)
-        return f"match_text(column={column_expr_str}, top={generic_match_expr.match_text_expr.topn})"
+        return f"match_text(fields='{generic_match_expr.match_text_expr.fields}', matching_text='{generic_match_expr.match_text_expr.matching_text}', options='{generic_match_expr.match_text_expr.options_text}')"
 
 
 def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
@@ -380,11 +377,13 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
             func_name = cons.key
             for arg_key in cons.arg_types:
                 if arg_key in cons.args and cons.args[arg_key] is not None:
-                    arguments.append(parse_expr(cons.args[arg_key]))
-
-            # for arg in cons.args['expressions']:
-            #     if arg:
-            #         arguments.append(parse_expr(arg))
+                    arg_value = cons.args[arg_key]
+                    if isinstance(arg_value, list):
+                        for arg in arg_value:
+                            if isinstance(arg, exp.Expression):
+                                arguments.append(parse_expr(arg))
+                    elif isinstance(arg_value, exp.Expression):
+                        arguments.append(parse_expr(arg_value))
 
             if len(arguments) == 0:
                 if cons.alias_or_name == "*":
@@ -435,6 +434,15 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
         )
         expr_type = ttypes.ParsedExprType(in_expr=in_expr)
         parsed_expr = ttypes.ParsedExpr(type=expr_type)
+        return parsed_expr
+    elif isinstance(cons, exp.Star):
+        parsed_expr = ttypes.ParsedExpr()
+        column_expr = ttypes.ColumnExpr()
+        column_expr.star = True
+        column_expr.column_name = []
+        parser_expr_type = ttypes.ParsedExprType()
+        parser_expr_type.column_expr = column_expr
+        parsed_expr.type = parser_expr_type
         return parsed_expr
     else:
         return traverse_conditions(cons[1])

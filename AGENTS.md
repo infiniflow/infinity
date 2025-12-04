@@ -88,4 +88,11 @@ Located in `python/`. Use `uv` to manage the environment.
 - **C++ Standard**: C++23. Use modern features but ensure compatibility with Clang 20.
 - **C++ Formatting**: **MUST** use `clang-format-20` and follow `.clang-format` configuration.
 - **Dependencies**: Managed via `vcpkg` (integrated in CMake).
-- **Python**: **ALWAYS** use `uv` instead of `pip` for installing Python packages. **ALWAYS** use the python interpreter and pytest from the virtual environment created by `uv` (e.g. `.venv/bin/python`, `.venv/bin/pytest`), NOT the system ones.
+- **Python**: **ALWAYS** use `uv` instead of `pip` for installing Python packages. **ALWAYS** use the python interpreter and pytest from the virtual environment created by `uv` at the project root (e.g. `.venv/bin/python`, `.venv/bin/pytest`), NOT the system ones.
+
+## 6. Shell Command Execution Guidelines
+When executing shell commands:
+- NEVER prefix commands with environment variable assignments such as "PYTHONPATH=...", "ENV=...", or "FOO=bar cmd".
+- If an environment variable is required, ask the user to configure it permanently (e.g., via pytest.ini, .env, or shell profile) instead of injecting it inline.
+- ONLY execute direct commands like "pytest", "python -m pytest", or "uv run pytest".
+- NEVER use chained commands with "&&", ";", or "|".

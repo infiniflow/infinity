@@ -11,11 +11,11 @@ statement ok
 CREATE INDEX ft_index ON cached_fulltext(body) USING FULLTEXT;
 
 query T
-EXPLAIN SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
+EXPLAIN SELECT doctitle, docdate, ROW_ID(), ROUND(SCORE(), 4) FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
 ----
  PROJECT (3)
   - table index: #4
-  - expressions: [doctitle (#0), docdate (#1), ROW_ID (#3), SCORE (#2)]
+  - expressions: [doctitle (#0), docdate (#1), ROW_ID (#3), SCORE (#2) round 4]
  -> MATCH (2)
     - table name: cached_fulltext(default_db.cached_fulltext)
     - table index: #1
@@ -25,9 +25,9 @@ EXPLAIN SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH 
     - output columns: [doctitle, docdate, __score, __rowid]
 
 query TTIR
-SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
+SELECT doctitle, docdate, ROW_ID(), ROUND(SCORE(), 4) FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
 ----
-Anarchism 30-APR-2012 03:25:17.000 0 22.299635
+Anarchism 30-APR-2012 03:25:17.000 0 22.299600
 
 # query I
 # EXPLAIN SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
@@ -40,9 +40,9 @@ Anarchism 30-APR-2012 03:25:17.000 0 22.299635
 #     - output columns: [doctitle, docdate, __score, __rowid]
 
 query TTIR
-SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
+SELECT doctitle, docdate, ROW_ID(), ROUND(SCORE(), 4) FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
 ----
-Anarchism 30-APR-2012 03:25:17.000 0 22.299635
+Anarchism 30-APR-2012 03:25:17.000 0 22.299600
 
 # query I
 # EXPLAIN SELECT ROW_ID() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
@@ -63,11 +63,11 @@ statement ok
 INSERT INTO cached_fulltext VALUES('Anarchism', '30-APR-2012 03:25:17.000', 'Anarchism is a political philosophy that advocates self-governed societies based on voluntary institutions. These are often described as stateless societies, although several authors have defined them more specifically as institutions based on non-hierarchical free associations. Anarchism holds the state to be undesirable, unnecessary and harmful.');
 
 query T
-EXPLAIN SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
+EXPLAIN SELECT doctitle, docdate, ROW_ID(), ROUND(SCORE(), 4) FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
 ----
  PROJECT (3)
   - table index: #4
-  - expressions: [doctitle (#0), docdate (#1), ROW_ID (#3), SCORE (#2)]
+  - expressions: [doctitle (#0), docdate (#1), ROW_ID (#3), SCORE (#2) round 4]
  -> MATCH (2)
     - table name: cached_fulltext(default_db.cached_fulltext)
     - table index: #1

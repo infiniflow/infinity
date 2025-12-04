@@ -151,7 +151,7 @@ class InfinityThriftQueryBuilder(ABC):
             if len(embedding_data) % 8 != 0:
                 raise InfinityException(
                     ErrorCode.INVALID_EMBEDDING_DATA_TYPE,
-                    f"Embeddings with data bit must have dimension of times of 8!"
+                    "Embeddings with data bit must have dimension of times of 8!"
                 )
             else:
                 new_embedding_data = []
@@ -542,6 +542,7 @@ class InfinityThriftQueryBuilder(ABC):
             search=self._search,
             filter=self._filter,
             groupby=self._groupby,
+            having=self._having,
             limit=self._limit,
             offset=self._offset,
             sort=self._sort,

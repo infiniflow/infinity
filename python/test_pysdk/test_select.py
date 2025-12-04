@@ -1022,11 +1022,11 @@ class TestInfinity:
 
         res, extra_res = table_obj.output(["trunc(c1, 14)",  "trunc(c2, 2)", "trunc(c3, 2)"]).to_df()
         print(res)
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'(c1 trunc 14)': ("2.12300000000000", "-2.12300000000000", "2.00000000000000", "2.10000000000000"),
-                                                         '(c2 trunc 2)': ("2.12", "-2.12", "2.00", "2.10"),
-                                                         '(c3 trunc 2)': ("2.12", "-2.12", "2.00", "2.10")
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'trunc(c1, 14)': ("2.12300000000000", "-2.12300000000000", "2.00000000000000", "2.10000000000000"),
+                                                         'trunc(c2, 2)': ("2.12", "-2.12", "2.00", "2.10"),
+                                                         'trunc(c3, 2)': ("2.12", "-2.12", "2.00", "2.10")
                                                          })
-                                      .astype({'(c1 trunc 14)': dtype('object'), '(c2 trunc 2)': dtype('object'), '(c3 trunc 2)': dtype('object')}))
+                                      .astype({'trunc(c1, 14)': dtype('object'), 'trunc(c2, 2)': dtype('object'), 'trunc(c3, 2)': dtype('object')}))
 
 
         res = db_obj.drop_table("test_select_truncate" + suffix)

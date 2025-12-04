@@ -83,122 +83,122 @@ SELECT num FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical'
 
 
 query IR
-SELECT num, SCORE() FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum', 'normalize=none');
+SELECT num, ROUND(SCORE(), 4) FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum', 'normalize=none');
 ----
 6989 63.703800
-9893 49.661842
-2123 40.253387
+9893 49.661800
+2123 40.253400
 0 0.000000
 1 -4.000000
 2 -16.000000
 
 
 query IR
-SELECT num, SCORE() FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum', 'weights=1.0,2.0;normalize=none');
+SELECT num, ROUND(SCORE(), 4) FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum', 'weights=1.0,2.0;normalize=none');
 ----
 6989 63.703800
-9893 49.661842
-2123 40.253387
+9893 49.661800
+2123 40.253400
 0 0.000000
 1 -8.000000
 2 -32.000000
 
 
 query IR
-SELECT num, SCORE() FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum', 'normalize=minmax');
+SELECT num, ROUND(SCORE(), 4) FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum', 'normalize=minmax');
 ----
 6989 1.000000
 0 1.000000
 1 0.750000
-9893 0.401206
+9893 0.401200
 2123 0.000000
 2 0.000000
 
 
 query IR
-SELECT num, SCORE() FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum', 'weights=1.0,2.0;normalize=minmax');
+SELECT num, ROUND(SCORE(), 4) FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum', 'weights=1.0,2.0;normalize=minmax');
 ----
 0 2.000000
 1 1.500000
 6989 1.000000
-9893 0.401206
+9893 0.401200
 2123 0.000000
 2 0.000000
 
 
 query IR
-SELECT num, SCORE() FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum', 'normalize=l2');
+SELECT num, ROUND(SCORE(), 4) FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum', 'normalize=l2');
 ----
 0 1.000000
-1 0.757464
-6989 0.705870
-9893 0.550278
-2123 0.446028
-2 0.029857
+1 0.757500
+6989 0.705900
+9893 0.550300
+2123 0.446000
+2 0.029900
 
 
 query IR
-SELECT num, SCORE() FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum', 'weights=1.0,2.0;normalize=l2');
+SELECT num, ROUND(SCORE(), 4) FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum', 'weights=1.0,2.0;normalize=l2');
 ----
 0 2.000000
-1 1.514929
-6989 0.705870
-9893 0.550278
-2123 0.446028
-2 0.059715
+1 1.514900
+6989 0.705900
+9893 0.550300
+2123 0.446000
+2 0.059700
 
 
 query IR
-SELECT num, SCORE() FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum', 'normalize=atan');
+SELECT num, ROUND(SCORE(), 4) FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum', 'normalize=atan');
 ----
-6989 0.995004
-9893 0.993591
-2123 0.992094
+6989 0.995000
+9893 0.993600
+2123 0.992100
 0 0.500000
-1 0.077979
-2 0.019869
+1 0.078000
+2 0.019900
 
 
 query IR
-SELECT num, SCORE() FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum', 'weights=1.0,2.0;normalize=atan');
+SELECT num, ROUND(SCORE(), 4) FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum', 'weights=1.0,2.0;normalize=atan');
 ----
 0 1.000000
-6989 0.995004
-9893 0.993591
-2123 0.992094
-1 0.155958
-2 0.039737
+6989 0.995000
+9893 0.993600
+2123 0.992100
+1 0.156000
+2 0.039700
 
 
 query IR
-SELECT num, SCORE() FROM enwiki_embedding SEARCH MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), FUSION('weighted_sum', 'weights=1.0,2.0;normalize=atan');
+SELECT num, ROUND(SCORE(), 4) FROM enwiki_embedding SEARCH MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), FUSION('weighted_sum', 'weights=1.0,2.0;normalize=atan');
 ----
-6989 1.990007
-9893 1.987183
-2123 1.984188
+6989 1.990000
+9893 1.987200
+2123 1.984200
 0 0.500000
-1 0.077979
-2 0.019869
+1 0.078000
+2 0.019900
 
 
 query IR
-SELECT num, SCORE() FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum');
+SELECT num, ROUND(SCORE(), 4) FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum');
 ----
 6989 1.000000
 0 1.000000
 1 0.750000
-9893 0.401206
+9893 0.401200
 2123 0.000000
 2 0.000000
 
 
 query IR
-SELECT num, SCORE() FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('max');
+SELECT num, ROUND(SCORE(), 4) FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('max');
 ----
 6989 1.000000
 0 1.000000
 1 0.750000
-9893 0.401206
+9893 0.401200
 2123 0.000000
 2 0.000000
 

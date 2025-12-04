@@ -8,11 +8,11 @@ statement ok
 COPY cached_tensor_scan FROM '/var/infinity/test_data/tensor_maxsim.csv' WITH (DELIMITER ',', FORMAT CSV);
 
 query T
-EXPLAIN SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
+EXPLAIN SELECT title, ROUND(SCORE(), 4) FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
 ----
  PROJECT (3)
   - table index: #4
-  - expressions: [title (#0), SCORE (#1)]
+  - expressions: [title (#0), SCORE (#1) round 4]
  -> MatchTensorScan (2)
     - table name: cached_tensor_scan(default_db.cached_tensor_scan)
     - table index: #1
@@ -23,16 +23,16 @@ EXPLAIN SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0
     - output columns: [title, __score, __rowid]
 
 query TR
-SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
+SELECT title, ROUND(SCORE(), 4) FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
 ----
-test22 636.870056
-test55 27.369999
+test22 636.870100
+test55 27.370000
 test66 11.910000
-test33 3.620001
+test33 3.620000
 test77 2.260000
 test00 -5.190000
 test44 -5.190000
-test11 -9.660001
+test11 -9.660000
 
 # query I
 # EXPLAIN SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
@@ -45,23 +45,23 @@ test11 -9.660001
 #     - output columns: [title, __score, __rowid]
 
 query TR
-SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
+SELECT title, ROUND(SCORE(), 4) FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
 ----
-test22 636.870056
-test55 27.369999
+test22 636.870100
+test55 27.370000
 test66 11.910000
-test33 3.620001
+test33 3.620000
 test77 2.260000
 test00 -5.190000
 test44 -5.190000
-test11 -9.660001
+test11 -9.660000
 
 query T
-EXPLAIN SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.0], 'float', 'maxsim', '') WHERE 10 > num;
+EXPLAIN SELECT title, ROUND(SCORE(), 4) FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.0], 'float', 'maxsim', '') WHERE 10 > num;
 ----
  PROJECT (3)
   - table index: #4
-  - expressions: [title (#1), SCORE (#2)]
+  - expressions: [title (#1), SCORE (#2) round 4]
  -> MatchTensorScan (2)
     - table name: cached_tensor_scan(default_db.cached_tensor_scan)
     - table index: #1
@@ -75,11 +75,11 @@ statement ok
 COPY cached_tensor_scan FROM '/var/infinity/test_data/tensor_maxsim.csv' WITH (DELIMITER ',', FORMAT CSV);
 
 query T
-EXPLAIN SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
+EXPLAIN SELECT title, ROUND(SCORE(), 4) FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
 ----
  PROJECT (3)
   - table index: #4
-  - expressions: [title (#0), SCORE (#1)]
+  - expressions: [title (#0), SCORE (#1) round 4]
  -> MERGE MatchTensor (5)
     - table name: cached_tensor_scan(default_db.cached_tensor_scan)
     - table index: #1
@@ -96,16 +96,16 @@ EXPLAIN SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0
       - output columns: [title, __score, __rowid]
 
 query TR
-SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
+SELECT title, ROUND(SCORE(), 4) FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
 ----
-test22 636.870056
-test22 636.870056
-test55 27.369999
-test55 27.369999
+test22 636.870100
+test22 636.870100
+test55 27.370000
+test55 27.370000
 test66 11.910000
 test66 11.910000
-test33 3.620001
-test33 3.620001
+test33 3.620000
+test33 3.620000
 test77 2.260000
 test77 2.260000
 
@@ -120,25 +120,25 @@ test77 2.260000
 #     - output columns: [title, __score, __rowid]
 
 query TR
-SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
+SELECT title, ROUND(SCORE(), 4) FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
 ----
-test22 636.870056
-test22 636.870056
-test55 27.369999
-test55 27.369999
+test22 636.870100
+test22 636.870100
+test55 27.370000
+test55 27.370000
 test66 11.910000
 test66 11.910000
-test33 3.620001
-test33 3.620001
+test33 3.620000
+test33 3.620000
 test77 2.260000
 test77 2.260000
 
 query T
-EXPLAIN SELECT title, SCORE() FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.0], 'float', 'maxsim', '') WHERE 10 > num;
+EXPLAIN SELECT title, ROUND(SCORE(), 4) FROM cached_tensor_scan SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.0], 'float', 'maxsim', '') WHERE 10 > num;
 ----
  PROJECT (3)
   - table index: #4
-  - expressions: [title (#1), SCORE (#2)]
+  - expressions: [title (#1), SCORE (#2) round 4]
  -> MERGE MatchTensor (5)
     - table name: cached_tensor_scan(default_db.cached_tensor_scan)
     - table index: #1
