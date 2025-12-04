@@ -507,11 +507,11 @@ void QueryContext::BeginTxn(const BaseStatement *base_statement) {
                         case SnapshotOp::kCreate: {
                             switch (snapshot_scope) {
                                 case SnapshotScope::kSystem: {
-                                    transaction_type = TransactionType::kCreateSystemSnapshot;
+                                    transaction_type = TransactionType::kCreateTableSnapshot;
                                     break;
                                 }
                                 case SnapshotScope::kDatabase: {
-                                    transaction_type = TransactionType::kCreateDBSnapshot;
+                                    transaction_type = TransactionType::kCreateTableSnapshot;
                                     break;
                                 }
                                 case SnapshotScope::kTable: {
