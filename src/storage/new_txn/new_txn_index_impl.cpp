@@ -955,36 +955,33 @@ Status NewTxn::PopulateIndex(const std::string &db_name,
     }
     std::vector<ChunkID> new_chunk_ids;
     if (index_base->index_type_ == IndexType::kIVF) {
-        Status status = PopulateIvfIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_ids);
+        auto status = PopulateIvfIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_ids);
         if (!status.ok()) {
             return status;
         }
     } else if (index_base->index_type_ == IndexType::kEMVB) {
-        Status status = PopulateEmvbIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_ids);
+        auto status = PopulateEmvbIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_ids);
         if (!status.ok()) {
             return status;
         }
     } else if (index_base->index_type_ == IndexType::kHnsw) {
-        Status status = PopulateHnswIndexInner(index_base, *segment_index_meta, segment_meta, segment_row_cnt, column_id, column_def, new_chunk_ids);
+        auto status = PopulateHnswIndexInner(index_base, *segment_index_meta, segment_meta, segment_row_cnt, column_id, column_def, new_chunk_ids);
         if (!status.ok()) {
             return status;
         }
-        // } else if (index_base->index_type_ == IndexType::kSecondary) {
-        //     Status status =
-        //         PopulateSecondaryIndexInner(index_base, *segment_index_meta, segment_meta, segment_row_cnt, column_id, column_def, new_chunk_ids);
-        //     if (!status.ok()) {
-        //         return status;
-        //     }
+    } else if (index_base->index_type_ == IndexType::kSecondary) {
+        auto status =
+            PopulateSecondaryIndexInner(index_base, *segment_index_meta, segment_meta, segment_row_cnt, column_id, column_def, new_chunk_ids);
+        if (!status.ok()) {
+            return status;
+        }
         // } else if (index_base->index_type_ == IndexType::kBMP) {
         //     Status status = PopulateBMPIndexInner(index_base, *segment_index_meta, segment_meta, segment_row_cnt, column_id, column_def,
         //     new_chunk_ids); if (!status.ok()) {
         //         return status;
         //     }
     } else {
-
         switch (index_base->index_type_) {
-            case IndexType::kSecondary:
-            // case IndexType::kHnsw:
             case IndexType::kBMP: {
                 Status status = PopulateIndexToMem(*segment_index_meta, segment_meta, column_id, segment_row_cnt);
                 if (!status.ok()) {
@@ -1524,6 +1521,12 @@ Status NewTxn::PopulateHnswIndexInner(std::shared_ptr<IndexBase> index_base,
 
     new_chunk_ids.push_back(new_chunk_id);
 
+    TableIndexMeta &table_index_meta = segment_index_meta.table_index_meta();
+    chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
+                                                   table_index_meta.table_meta().table_id_str(),
+                                                   segment_index_meta.segment_id(),
+                                                   new_chunk_id});
+
     ChunkIndexMetaInfo chunk_index_meta_info;
     if (mem_index->GetBaseMemIndex()) {
         chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
@@ -1699,6 +1702,12 @@ Status NewTxn::PopulateBMPIndexInner(std::shared_ptr<IndexBase> index_base,
     }
 
     new_chunk_ids.push_back(new_chunk_id);
+
+    TableIndexMeta &table_index_meta = segment_index_meta.table_index_meta();
+    chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
+                                                   table_index_meta.table_meta().table_id_str(),
+                                                   segment_index_meta.segment_id(),
+                                                   new_chunk_id});
 
     ChunkIndexMetaInfo chunk_index_meta_info;
     if (mem_index->GetBaseMemIndex()) {
