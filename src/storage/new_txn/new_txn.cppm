@@ -518,8 +518,6 @@ private:
 
     Status ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd);
 
-    Status InitSegmentIndex(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta);
-
     Status PopulateFtIndexInner(std::shared_ptr<IndexBase> index_base,
                                 SegmentIndexMeta &segment_index_meta,
                                 SegmentMeta &segment_meta,
