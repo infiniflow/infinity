@@ -134,6 +134,8 @@ public:
 
     size_t MemUsed() const;
 
+    void WaitForTaskCompletion();
+
 private:
     // call with write lock
     void IncreaseMemoryUsage(size_t mem);
