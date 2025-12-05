@@ -131,6 +131,15 @@ public:
                 ASSERT_TRUE(status.ok());
             }
 
+            {
+                std::string sql = fmt::format("show snapshot {}", *snapshot_name);
+                std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+                QueryResult query_result = query_context->Query(sql);
+                bool ok = HandleQueryResult(query_result);
+                EXPECT_TRUE(ok);
+                LOG_INFO("Show snapshot: " + query_result.ToString());
+            }
+
             // Drop database
             {
                 auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("drop database"), TransactionType::kDropDB);

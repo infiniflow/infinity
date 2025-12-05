@@ -228,7 +228,7 @@ TEST_F(ByteSliceReaderWriterTest, test7) {
 
     // There must be something wrong
     // ASSERT_EQ(writer2.GetSize(), 0);
-    // ASSERT_EQ(writer3.GetSize(), (1000 + 500 + 50) * sizeof(i16));
+    // ASSERT_EQ(writer3.GetSize(), (500 + 500 + 50) * sizeof(i16));
 
     // Verify data
     ByteSliceReader reader2(writer3.GetByteSliceList());
@@ -243,6 +243,20 @@ TEST_F(ByteSliceReaderWriterTest, test7) {
     for (i = 500; i < 550; i++) {
         i16 value = reader2.ReadInt16();
         ASSERT_EQ(value, i);
+    }
+
+    auto slice_list = writer3.GetByteSliceList();
+    size_t total_size = slice_list->UpdateTotalSize();
+    ASSERT_EQ(total_size, (500 + 500 + 50) * sizeof(i16));
+
+    auto slice_iter = ByteSliceListIterator(slice_list);
+    slice_iter.SeekSlice(0);
+
+    void *data;
+    size_t size;
+    while (slice_iter.HasNext(writer3.GetSize())) {
+        slice_iter.Next(data, size);
+        LOG_INFO(fmt::format("size: {}", size));
     }
 }
 
