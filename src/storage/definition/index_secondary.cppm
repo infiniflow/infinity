@@ -27,15 +27,17 @@ public:
     static std::shared_ptr<IndexBase> Make(std::shared_ptr<std::string> index_name,
                                            std::shared_ptr<std::string> index_comment,
                                            const std::string &file_name,
-                                           std::vector<std::string> column_names) {
-        return std::make_shared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names));
+                                           std::vector<std::string> column_names,
+                                           SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality) {
+        return std::make_shared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names), secondary_index_cardinality);
     }
 
     IndexSecondary(std::shared_ptr<std::string> index_name,
                    std::shared_ptr<std::string> index_comment,
                    const std::string &file_name,
-                   std::vector<std::string> column_names)
-        : IndexBase(IndexType::kSecondary, index_name, index_comment, file_name, std::move(column_names)) {}
+                   std::vector<std::string> column_names,
+                   SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality)
+        : IndexBase(IndexType::kSecondary, index_name, index_comment, file_name, std::move(column_names), secondary_index_cardinality) {}
 
     ~IndexSecondary() final = default;
 

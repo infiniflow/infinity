@@ -856,7 +856,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
         }
         case IndexType::kSecondary: {
             IndexSecondary::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-            base_index_ptr = IndexSecondary::Make(index_name, index_comment, index_filename, {index_info->column_name_});
+            base_index_ptr = IndexSecondary::Make(index_name, index_comment, index_filename, {index_info->column_name_}, index_info->secondary_index_cardinality_);
             break;
         }
         case IndexType::kEMVB: {

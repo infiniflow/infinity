@@ -24,6 +24,8 @@ import third_party;
 import create_index_info;
 import global_resource_usage;
 
+import create_index_info;
+
 namespace infinity {
 
 // TODO shenyushi: use definition in knn_exprs.h
@@ -44,9 +46,10 @@ protected:
                        std::shared_ptr<std::string> index_name,
                        std::shared_ptr<std::string> index_comment,
                        const std::string &file_name,
-                       std::vector<std::string> column_names)
+                       std::vector<std::string> column_names,
+                       SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality)
         : index_type_(index_type), index_name_(std::move(index_name)), index_comment_(std::move(index_comment)), file_name_(file_name),
-          column_names_(std::move(column_names)) {
+          column_names_(std::move(column_names)), secondary_index_cardinality_(secondary_index_cardinality) {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("IndexBase");
 #endif
@@ -61,7 +64,7 @@ public:
 
     IndexBase(const IndexBase &other)
         : index_type_(other.index_type_), index_name_(other.index_name_), index_comment_(other.index_comment_), file_name_(other.file_name_),
-          column_names_(other.column_names_) {
+          column_names_(other.column_names_), secondary_index_cardinality_(other.secondary_index_cardinality_) {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("IndexBase");
 #endif
@@ -103,5 +106,6 @@ public:
     std::shared_ptr<std::string> index_comment_{};
     const std::string file_name_{};
     const std::vector<std::string> column_names_{};
+    SecondaryIndexCardinality secondary_index_cardinality_{SecondaryIndexCardinality::kHighCardinality};
 };
 } // namespace infinity

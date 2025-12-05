@@ -552,6 +552,16 @@ Status NewCatalog::AddNewTableIndex(TableMeta &table_meta,
     if (!status.ok()) {
         return status;
     }
+    
+    // Set secondary index cardinality if available
+    if (index_base->index_type_ == IndexType::kSecondary) {
+        // Use the secondary index cardinality from the IndexBase
+        status = table_index_meta_ptr->SetSecondaryIndexCardinality(index_base->secondary_index_cardinality_);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    
     return Status::OK();
 }
 
