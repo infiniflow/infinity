@@ -1166,17 +1166,16 @@ class table_http_result:
             k1 = k1.replace(")", " ")
             k1 = k1.replace("+", " ")
             k1 = k1.replace("-", " ")
+            k1 = k1.replace(",", " ")
             cols = k1.split(" ")
             cols = [col for col in cols if col != ""]
-            # print(cols)
 
             function_name = ""
             for col in cols:
-                # print(function_name)
                 if col.strip() in col_types:
                     df_type[k] = type_to_dtype(col_types[col.strip()])
                     df_type[k] = function_return_type(function_name, df_type[k])
-                elif col.strip().isdigit() and df_type[k] != dtype('float64'):
+                elif col.strip().isdigit() and df_type.get(k) != dtype('float64'):
                     df_type[k] = dtype('int32')
                     df_type[k] = function_return_type(function_name, df_type[k])
                 elif is_float(col.strip()):

@@ -762,7 +762,12 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 if (!status.ok()) {
                     return status;
                 }
-                memory_secondary_index = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, base_row_id);
+                auto [cardinality, cardinality_status] = segment_index_meta.table_index_meta().GetSecondaryIndexCardinality();
+                if (!cardinality_status.ok()) {
+                    // Default to HighCardinality if unable to determine
+                    cardinality = SecondaryIndexCardinality::kHighCardinality;
+                }
+                memory_secondary_index = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, base_row_id, cardinality);
 
                 mem_index->SetSecondaryIndex(memory_secondary_index);
             } else {
@@ -1588,7 +1593,12 @@ Status NewTxn::PopulateSecondaryIndexInner(std::shared_ptr<IndexBase> index_base
         SegmentOffset block_offset = block_id * DEFAULT_BLOCK_CAPACITY;
         RowID base_row_id = RowID(segment_index_meta.segment_id(), block_offset + offset);
         if (is_null) {
-            memory_secondary_index = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, base_row_id);
+            auto [cardinality, cardinality_status] = segment_index_meta.table_index_meta().GetSecondaryIndexCardinality();
+            if (!cardinality_status.ok()) {
+                // Default to HighCardinality if unable to determine
+                cardinality = SecondaryIndexCardinality::kHighCardinality;
+            }
+            memory_secondary_index = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, base_row_id, cardinality);
             mem_index->SetSecondaryIndex(memory_secondary_index);
             is_null = false;
         } else {

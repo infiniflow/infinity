@@ -13,49 +13,49 @@ statement ok
 CREATE INDEX ft_index ON ft_delete(doc) USING FULLTEXT;
 
 query I
-SELECT num, doc, ROW_ID(), SCORE() FROM ft_delete SEARCH MATCH TEXT ('doc', 'text');
+SELECT num, doc, ROW_ID(), ROUND(SCORE(), 4) FROM ft_delete SEARCH MATCH TEXT ('doc', 'text');
 ----
-1 first text 0 0.167868
-2 second text multiple 1 0.133531
-3 third text many words 2 0.110856
+1 first text 0 0.167900
+2 second text multiple 1 0.133500
+3 third text many words 2 0.110900
 
 query I
-SELECT num, doc, ROW_ID(), SCORE() FROM ft_delete SEARCH MATCH TEXT ('doc', 'text ", " "? " ');
+SELECT num, doc, ROW_ID(), ROUND(SCORE(), 4) FROM ft_delete SEARCH MATCH TEXT ('doc', 'text ", " "? " ');
 ----
-1 first text 0 0.167868
-2 second text multiple 1 0.133531
-3 third text many words 2 0.110856
+1 first text 0 0.167900
+2 second text multiple 1 0.133500
+3 third text many words 2 0.110900
 
 query I
-SELECT num, doc, ROW_ID(), SCORE() FROM ft_delete SEARCH MATCH TEXT ('doc', 'text') WHERE num != 1;
+SELECT num, doc, ROW_ID(), ROUND(SCORE(), 4) FROM ft_delete SEARCH MATCH TEXT ('doc', 'text') WHERE num != 1;
 ----
-2 second text multiple 1 0.133531
-3 third text many words 2 0.110856
+2 second text multiple 1 0.133500
+3 third text many words 2 0.110900
 
 query I
-SELECT num, doc, ROW_ID(), SCORE() FROM ft_delete SEARCH MATCH TEXT ('doc', 'text', WHERE num != 1);
+SELECT num, doc, ROW_ID(), ROUND(SCORE(), 4) FROM ft_delete SEARCH MATCH TEXT ('doc', 'text', WHERE num != 1);
 ----
-2 second text multiple 1 0.133531
-3 third text many words 2 0.110856
+2 second text multiple 1 0.133500
+3 third text many words 2 0.110900
 
 statement ok
 DELETE FROM ft_delete WHERE 1 = num;
 
 query I
-SELECT num, doc, ROW_ID(), SCORE() FROM ft_delete SEARCH MATCH TEXT ('doc', 'text');
+SELECT num, doc, ROW_ID(), ROUND(SCORE(), 4) FROM ft_delete SEARCH MATCH TEXT ('doc', 'text');
 ----
-2 second text multiple 1 0.133531
-3 third text many words 2 0.110856
+2 second text multiple 1 0.133500
+3 third text many words 2 0.110900
 
 query I
-SELECT num, doc, ROW_ID(), SCORE() FROM ft_delete SEARCH MATCH TEXT ('doc', 'text') WHERE num > 2;
+SELECT num, doc, ROW_ID(), ROUND(SCORE(), 4) FROM ft_delete SEARCH MATCH TEXT ('doc', 'text') WHERE num > 2;
 ----
-3 third text many words 2 0.110856
+3 third text many words 2 0.110900
 
 query I
-SELECT num, doc, ROW_ID(), SCORE() FROM ft_delete SEARCH MATCH TEXT ('doc', 'text', 'topn=3', WHERE num > 2);
+SELECT num, doc, ROW_ID(), ROUND(SCORE(), 4) FROM ft_delete SEARCH MATCH TEXT ('doc', 'text', 'topn=3', WHERE num > 2);
 ----
-3 third text many words 2 0.110856
+3 third text many words 2 0.110900
 
 # Clean up
 statement ok
