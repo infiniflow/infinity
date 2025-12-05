@@ -154,6 +154,10 @@ TEST_P(ExplainBasicTest, test1) {
     ExplainSql("show table tb", true);
     ExplainSql("show table tb columns", true);
     ExplainSql("show table tb segments", true);
+    ExplainSql("show table tb segment 0", true);
+    ExplainSql("show table tb segment 0 blocks", true);
+    ExplainSql("show table tb segment 0 block 0", true);
+    ExplainSql("show table tb segment 0 block 0 column 0", true);
     ExplainSql("show table tb indexes", true);
     ExplainSql("show checkpoint", true);
     ExplainSql("show buffer", true);
@@ -167,4 +171,11 @@ TEST_P(ExplainBasicTest, test1) {
     ExplainSql("show transaction history", true);
     ExplainSql("show session variables", true);
     ExplainSql("show session variable query_count", true);
+    ExplainSql("show snapshots", true);
+
+    // Explain flush
+    // ExplainSql("flush data", true);
+    // ExplainSql("flush log", true);
+    // ExplainSql("flush buffer", true);
+    ExplainSql("flush catalog", true);
 }
