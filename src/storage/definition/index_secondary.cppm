@@ -43,7 +43,7 @@ public:
 
     virtual std::string BuildOtherParamsString() const override;
 
-    static void ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref, const std::string &column_name);
+    static void ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref, const std::string &column_name, SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality);
 };
 
 } // namespace infinity

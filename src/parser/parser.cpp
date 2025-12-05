@@ -934,7 +934,7 @@ static const yytype_int16 yyrline[] =
     3940,  3946,  3952,  3958,  3964,  3975,  3979,  3984,  4016,  4026,
     4031,  4036,  4041,  4047,  4051,  4052,  4054,  4055,  4057,  4058,
     4070,  4078,  4082,  4085,  4089,  4092,  4096,  4100,  4105,  4111,
-    4121,  4131,  4139,  4150,  4182,  4189
+    4121,  4131,  4139,  4150,  4203,  4210
 };
 #endif
 
@@ -9712,6 +9712,8 @@ Return4:
         index_type = infinity::IndexType::kEMVB;
     } else if(strcmp((yyvsp[-1].str_value), "diskann") == 0){
         index_type = infinity::IndexType::kDiskAnn;
+    } else if(strcmp((yyvsp[-1].str_value), "secondary") == 0){
+        index_type = infinity::IndexType::kSecondary;
     } else {
         free((yyvsp[-1].str_value));
         free((yyvsp[-4].str_value));
@@ -9727,13 +9729,32 @@ Return4:
     ParserHelper::ToLower((yyvsp[-4].str_value));
     (yyval.index_info_t)->column_name_ = (yyvsp[-4].str_value);
     (yyval.index_info_t)->index_param_list_ = (yyvsp[0].with_index_param_list_t);
+    
+    // Handle secondary index cardinality parameter
+    if (index_type == infinity::IndexType::kSecondary && (yyval.index_info_t)->index_param_list_ != nullptr) {
+        for (auto *param : *((yyval.index_info_t)->index_param_list_)) {
+            if (strcasecmp(param->param_name_.c_str(), "cardinality") == 0) {
+                if (strcasecmp(param->param_value_.c_str(), "high") == 0) {
+                    (yyval.index_info_t)->secondary_index_cardinality_ = infinity::SecondaryIndexCardinality::kHighCardinality;
+                } else if (strcasecmp(param->param_value_.c_str(), "low") == 0) {
+                    (yyval.index_info_t)->secondary_index_cardinality_ = infinity::SecondaryIndexCardinality::kLowCardinality;
+                } else {
+                    delete (yyvsp[0].with_index_param_list_t);
+                    free((yyvsp[-4].str_value));
+                    yyerror(&yyloc, scanner, result, "Invalid cardinality value. Must be 'high' or 'low'");
+                    YYERROR;
+                }
+            }
+        }
+    }
+    
     free((yyvsp[-4].str_value));
 }
-#line 9733 "parser.cpp"
+#line 9754 "parser.cpp"
     break;
 
   case 564: /* index_info: '(' IDENTIFIER ')'  */
-#line 4182 "parser.y"
+#line 4203 "parser.y"
                      {
     (yyval.index_info_t) = new infinity::IndexInfo();
     (yyval.index_info_t)->index_type_ = infinity::IndexType::kSecondary;
@@ -9741,11 +9762,11 @@ Return4:
     (yyval.index_info_t)->column_name_ = (yyvsp[-1].str_value);
     free((yyvsp[-1].str_value));
 }
-#line 9745 "parser.cpp"
+#line 9766 "parser.cpp"
     break;
 
   case 565: /* index_info: '(' IDENTIFIER ')' USING IDENTIFIER with_index_param_list  */
-#line 4189 "parser.y"
+#line 4210 "parser.y"
                                                             {
     ParserHelper::ToLower((yyvsp[-1].str_value));
     if(strcmp((yyvsp[-1].str_value), "secondary") != 0) {
@@ -9782,11 +9803,11 @@ Return4:
     
     free((yyvsp[-4].str_value));
 }
-#line 9786 "parser.cpp"
+#line 9807 "parser.cpp"
     break;
 
 
-#line 9790 "parser.cpp"
+#line 9811 "parser.cpp"
 
       default: break;
     }
@@ -10015,7 +10036,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 4226 "parser.y"
+#line 4247 "parser.y"
 
 
 void

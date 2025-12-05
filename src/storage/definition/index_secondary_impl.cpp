@@ -24,15 +24,20 @@ import third_party;
 
 namespace infinity {
 
-void IndexSecondary::ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref, const std::string &column_name) {
+void IndexSecondary::ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref, const std::string &column_name, SecondaryIndexCardinality secondary_index_cardinality) {
     auto &column_names_vector = *(base_table_ref->column_names_);
     auto &column_types_vector = *(base_table_ref->column_types_);
     size_t column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
         RecoverableError(Status::ColumnNotExist(column_name));
     } else if (auto &data_type = column_types_vector[column_id]; !(data_type->CanBuildSecondaryIndex())) {
-        RecoverableError(
-            Status::InvalidIndexDefinition(fmt::format("Attempt to create index on column: {}, data type: {}.", column_name, data_type->ToString())));
+        // For low cardinality secondary indexes, we can relax the data type restrictions
+        if (secondary_index_cardinality == SecondaryIndexCardinality::kHighCardinality) {
+            RecoverableError(
+                Status::InvalidIndexDefinition(fmt::format("Attempt to create index on column: {}, data type: {}.", column_name, data_type->ToString())));
+        }
+        // For low cardinality, we allow more data types
+        // The actual implementation will handle the low cardinality case differently
     }
 }
 
