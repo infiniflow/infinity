@@ -21,17 +21,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test_cluster = [
+test = [
     "pytest>=8.3.0,<9.0.0",
     "tomli>=2.0.2,<3.0.0",
     "psutil>=6.0.0,<7.0.0",
     "docker>=7.1.0,<8.0.0",
     "tomli-w>=1.1.0,<2.0.0",
-    "timeout-decorator>=0.5.0,<0.6.0",
-]
-restart_test = [
-    "pytest>=8.3.0,<9.0.0",
-    "psutil>=6.0.0,<7.0.0",
     "timeout-decorator>=0.5.0,<0.6.0",
 ]
 benchmark = [

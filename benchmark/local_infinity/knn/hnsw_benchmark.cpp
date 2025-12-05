@@ -172,7 +172,7 @@ public:
     std::filesystem::path base_path_;
     std::filesystem::path query_path_;
     std::filesystem::path groundtruth_path_;
-    std::filesystem::path index_dir_ = std::filesystem::path(tmp_data_path());
+    std::filesystem::path index_dir_ = std::filesystem::path("/var/infinity/data");
     std::filesystem::path index_save_path_;
 
 private:

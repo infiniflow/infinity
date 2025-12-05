@@ -86,11 +86,11 @@ RUN mkdir -p /usr/lib64/gcc/15 \
     && ls -la /lib/x86_64-linux-gnu/libstdc++.so.6
 
 # Install Python 3.11 from source
-RUN --mount=type=bind,source=Python-3.11.9.tar.xz,target=/root/Python-3.11.9.tar.xz \
-    cd /root && tar xJf Python-3.11.9.tar.xz \
-    && cd Python-3.11.9 && ./configure --enable-shared \
+RUN --mount=type=bind,source=Python-3.11.14.tar.xz,target=/root/Python-3.11.14.tar.xz \
+    cd /root && tar xJf Python-3.11.14.tar.xz \
+    && cd Python-3.11.14 && ./configure --enable-shared \
     && make -j$(nproc) && make altinstall \
-    && ldconfig && cd /root && rm -rf Python-3.11.9 \
+    && ldconfig && cd /root && rm -rf Python-3.11.14 \
     && update-alternatives --install /usr/bin/python3 python3 /usr/local/bin/python3.11 50 \
     && update-alternatives --install /usr/bin/pip3 pip3 /usr/local/bin/pip3.11 50
 
@@ -102,7 +102,7 @@ RUN --mount=type=bind,source=cmake-4.1.0-linux-x86_64.tar.gz,target=/root/cmake-
     && cp -rf cmake-4.1.0-linux-x86_64/share/* /usr/local/share \
     && rm -rf cmake-4.1.0-linux-x86_64
 
-# Install ninja-1.13.1
+# Install ninja-1.13.2
 RUN --mount=type=bind,source=ninja-linux.zip,target=/root/ninja-linux.zip \
     cd /root && unzip ninja-linux.zip \
     && cp ninja /usr/local/bin
@@ -115,43 +115,42 @@ RUN --mount=type=bind,source=jemalloc-5.3.0.tar.bz2,target=/root/jemalloc-5.3.0.
     && cd jemalloc-5.3.0 && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind --disable-initial-exec-tls && make -j install \
     && ldconfig && cd /root && rm -rf jemalloc-5.3.0
 
-# Install gperftools-2.17
-RUN --mount=type=bind,source=gperftools-2.17.tar.gz,target=/root/gperftools-2.17.tar.gz  \
-    cd /root && tar xzf gperftools-2.17.tar.gz \
-    && cd gperftools-2.17 && ./configure && make -j && make install \
-    && ldconfig && cd /root && rm -rf gperftools-2.17
+# Install gperftools-2.17.2
+RUN --mount=type=bind,source=gperftools-2.17.2.tar.gz,target=/root/gperftools-2.17.2.tar.gz  \
+    cd /root && tar xzf gperftools-2.17.2.tar.gz \
+    && cd gperftools-2.17.2 && ./configure && make -j && make install \
+    && ldconfig && cd /root && rm -rf gperftools-2.17.2
 
 # Install sqllogictest
-RUN --mount=type=bind,source=sqllogictest-bin-v0.28.3-x86_64-unknown-linux-musl.tar.gz,target=/root/sqllogictest-bin-v0.28.3-x86_64-unknown-linux-musl.tar.gz \
-    cd /tmp && tar xzf /root/sqllogictest-bin-v0.28.3-x86_64-unknown-linux-musl.tar.gz && cp -rf sqllogictest /usr/local/bin && rm -fr /tmp/*
+RUN --mount=type=bind,source=sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz,target=/root/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz \
+    cd /tmp && tar xzf /root/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz && cp -rf sqllogictest /usr/local/bin && rm -fr /tmp/*
 
-# Install mold-2.40.3
-RUN --mount=type=bind,source=mold-2.40.3-x86_64-linux.tar.gz,target=/root/mold-2.40.3-x86_64-linux.tar.gz \
-    cd /root && tar xf mold-2.40.3-x86_64-linux.tar.gz \
-    && cp -rf mold-2.40.3-x86_64-linux/bin/* /usr/local/bin \
-    && cp -rf mold-2.40.3-x86_64-linux/lib/* /usr/local/lib \
-    && cp -rf mold-2.40.3-x86_64-linux/libexec/* /usr/local/libexec \
-    && rm -rf mold-2.40.3-x86_64-linux
+# Install mold-2.40.4
+RUN --mount=type=bind,source=mold-2.40.4-x86_64-linux.tar.gz,target=/root/mold-2.40.4-x86_64-linux.tar.gz \
+    cd /root && tar xf mold-2.40.4-x86_64-linux.tar.gz \
+    && cp -rf mold-2.40.4-x86_64-linux/bin/* /usr/local/bin \
+    && cp -rf mold-2.40.4-x86_64-linux/lib/* /usr/local/lib \
+    && cp -rf mold-2.40.4-x86_64-linux/libexec/* /usr/local/libexec \
+    && rm -rf mold-2.40.4-x86_64-linux
 
 # Install Docker
-RUN --mount=type=bind,source=docker-28.3.3.tgz,target=/root/docker-28.3.3.tgz \
+RUN --mount=type=bind,source=docker-29.1.2.tgz,target=/root/docker-29.1.2.tgz \
     cd /root \
-    && tar zxf docker-28.3.3.tgz \
+    && tar zxf docker-29.1.2.tgz \
     && cp docker/* /usr/bin
 
 # Set environment variables for vcpkg and infinity build
 ENV CC=clang CXX=clang++
 
-# Setup vcpkg for manifest mode (no global VCPKG_ROOT)
-RUN git clone https://github.com/microsoft/vcpkg.git /opt/vcpkg \
-    && cd /opt/vcpkg \
-    && ./bootstrap-vcpkg.sh --disableMetrics
-
-# Pre-build vcpkg dependencies using manifest mode
+# Setup vcpkg and pre-build dependencies
 # This populates the binary cache at /root/.cache/vcpkg for later use by infinity builds
-RUN --mount=type=bind,source=vcpkg.json,target=/opt/vcpkg/vcpkg.json \
-    cd /opt/vcpkg && \
-    /opt/vcpkg/vcpkg install --clean-after-build
+RUN --mount=type=bind,source=vcpkg.json,target=/tmp/vcpkg.json \
+    git clone https://github.com/microsoft/vcpkg.git /opt/vcpkg \
+    && cd /opt/vcpkg \
+    && git checkout $(grep '"builtin-baseline"' /tmp/vcpkg.json | cut -d '"' -f 4) \
+    && ./bootstrap-vcpkg.sh --disableMetrics \
+    && cp /tmp/vcpkg.json vcpkg.json \
+    && ./vcpkg install --clean-after-build
 
 # Set vcpkg toolchain path for CMake
 # Set Python paths for CMake to find the correct Python installation
@@ -166,7 +165,7 @@ RUN ln -s /opt/vcpkg/vcpkg_installed/x64-linux/tools/thrift/thrift /usr/local/bi
     && chmod 1777 /tmp
 
 # Install uv
-RUN  --mount=type=bind,source=uv-x86_64-unknown-linux-gnu.tar.gz,target=/root/uv-x86_64-unknown-linux-gnu.tar.gz \
+RUN --mount=type=bind,source=uv-x86_64-unknown-linux-gnu.tar.gz,target=/root/uv-x86_64-unknown-linux-gnu.tar.gz \
     mkdir -p /etc/uv \
     && echo "[[index]]" > /etc/uv/uv.toml \
     && echo 'url = "https://pypi.tuna.tsinghua.edu.cn/simple"' >> /etc/uv/uv.toml \
@@ -174,15 +173,10 @@ RUN  --mount=type=bind,source=uv-x86_64-unknown-linux-gnu.tar.gz,target=/root/uv
     && tar xzf /root/uv-x86_64-unknown-linux-gnu.tar.gz \
     && cp uv-x86_64-unknown-linux-gnu/* /usr/local/bin/ \
     && rm -rf uv-x86_64-unknown-linux-gnu \
-    && uv python install python3.11
+    && uv python install 3.10 3.11 3.12
 
 
 RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && pip3 config set global.trusted-host pypi.tuna.tsinghua.edu.cn
-
-# Install infinity python sdk and other packages for later use by infinity tests
-RUN --mount=type=bind,source=pyproject.toml,target=/pyproject.toml \
-    uv export --frozen --format requirements-txt --all-extras | uv pip install --system -r /dev/stdin
-
 
 
 COPY nltk_data /root/nltk_data

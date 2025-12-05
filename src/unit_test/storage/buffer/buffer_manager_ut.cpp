@@ -36,8 +36,6 @@ import :persistence_manager;
 import :default_values;
 import :kv_store;
 
-import compilation_config;
-
 using namespace infinity;
 
 class BufferManagerTest : public BaseTest {
@@ -74,9 +72,9 @@ protected:
 
         Logger::Initialize(&config);
 
-        data_dir_ = std::make_shared<std::string>(std::string(tmp_data_path()) + "/buffer/data");
-        temp_dir_ = std::make_shared<std::string>(std::string(tmp_data_path()) + "/buffer/temp");
-        persistence_dir_ = std::make_shared<std::string>(std::string(tmp_data_path()) + "/buffer/persistence");
+        data_dir_ = std::make_shared<std::string>(std::string(GetFullDataDir()) + "/buffer/data");
+        temp_dir_ = std::make_shared<std::string>(std::string(GetFullDataDir()) + "/buffer/temp");
+        persistence_dir_ = std::make_shared<std::string>(std::string(GetFullDataDir()) + "/buffer/persistence");
         ResetDir();
     }
 

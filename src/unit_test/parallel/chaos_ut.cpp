@@ -49,7 +49,6 @@ import constant_expr;
 import column_expr;
 import insert_row_expr;
 import embedding_info;
-import compilation_config;
 import global_resource_usage;
 import expression_parser_result;
 import expr_parser;

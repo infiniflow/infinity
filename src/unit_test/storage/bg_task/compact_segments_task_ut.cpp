@@ -46,7 +46,6 @@ import internal_types;
 import extra_ddl_info;
 import column_def;
 import data_type;
-import compilation_config;
 
 using namespace infinity;
 

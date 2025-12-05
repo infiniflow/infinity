@@ -56,7 +56,7 @@ Located in `python/`. Use `uv` to manage the environment.
 
 1. **Setup Environment**:
    ```bash
-   uv sync --all-extras
+   uv sync --python 3.11 --frozen --all-extras
    source .venv/bin/activate
    # uv pip install python/infinity_sdk # This is handled by uv sync if infinity_sdk is in workspace
    ```

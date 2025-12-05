@@ -23,8 +23,6 @@ import :status;
 import :user_defined_term_weight;
 import :python_instance;
 
-import compilation_config;
-
 #if 0
 using namespace infinity;
 
