@@ -579,10 +579,11 @@ void QueryContext::BeginTxn(const BaseStatement *base_statement) {
         }
     }
 
-    if (transaction_type == TransactionType::kNewCheckpoint) {
+    if (transaction_type == TransactionType::kNewCheckpoint || transaction_type == TransactionType::kCleanup) {
         new_txn = txn_manager->BeginTxnShared(std::make_unique<std::string>(base_statement->ToString()), transaction_type);
         if (new_txn == nullptr) {
-            RecoverableError(Status::FailToStartTxn("System is checkpointing"));
+            RecoverableError(Status::FailToStartTxn(
+                fmt::format("System is {}", transaction_type == TransactionType::kNewCheckpoint ? "checkpointing" : "cleaning up")));
         }
     } else {
         new_txn = txn_manager->BeginTxnShared(std::make_unique<std::string>(base_statement->ToString()), transaction_type);
@@ -595,16 +596,14 @@ void QueryContext::BeginTxn(const BaseStatement *base_statement) {
     session_ptr_->SetNewTxn(new_txn);
 }
 
-TxnTimeStamp QueryContext::CommitTxn() {
-    TxnTimeStamp commit_ts = 0;
+void QueryContext::CommitTxn() {
     auto *new_txn = session_ptr_->GetNewTxn();
-    if (auto status = storage_->new_txn_manager()->CommitTxn(new_txn, &commit_ts); !status.ok()) {
+    if (auto status = storage_->new_txn_manager()->CommitTxn(new_txn); !status.ok()) {
         session_ptr_->ResetNewTxn();
         RecoverableError(status);
     }
     session_ptr_->IncreaseCommittedTxnCount();
     session_ptr_->ResetNewTxn();
-    return commit_ts;
 }
 
 void QueryContext::RollbackTxn() {

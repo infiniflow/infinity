@@ -112,14 +112,19 @@ std::shared_ptr<NewTxn> NewTxnManager::BeginTxnShared(std::unique_ptr<std::strin
     // Record the start ts of the txn
     TxnTimeStamp begin_ts = current_ts_ + 1;
 
-    if (txn_type == TransactionType::kNewCheckpoint) {
-        if (ckp_begin_ts_ == UNCOMMIT_TS) {
-            LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", begin_ts));
-            ckp_begin_ts_ = begin_ts;
+    if (txn_type == TransactionType::kNewCheckpoint || txn_type == TransactionType::kCleanup) {
+        auto &begin_ts_ref = (txn_type == TransactionType::kNewCheckpoint) ? ckp_begin_ts_ : cleanup_begin_ts_;
+        const char *txn_name = (txn_type == TransactionType::kNewCheckpoint) ? "checkpoint" : "cleanup";
+
+        if (begin_ts_ref == UNCOMMIT_TS) {
+            LOG_DEBUG(fmt::format("{} txn is started in {}", txn_name, begin_ts));
+            begin_ts_ref = begin_ts;
         } else {
-            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new txn: {} checkpoint start at {} will do nothing, not start this txn",
-                                 ckp_begin_ts_,
+            LOG_WARN(fmt::format("Another {} txn is started in {}, new txn: {} {} start at {} will do nothing, not start this txn",
+                                 txn_name,
+                                 begin_ts_ref,
                                  new_txn_id,
+                                 txn_name,
                                  begin_ts));
             return nullptr;
         }
@@ -309,21 +314,12 @@ void NewTxnManager::SendToWAL(NewTxn *txn) {
 }
 
 Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
-
     Status status = txn->Commit();
-
     if (commit_ts_ptr != nullptr) {
         *commit_ts_ptr = txn->CommitTS();
     }
-    if (status.ok()) {
-        TransactionType txn_type = txn->GetTxnType();
-        if (txn_type == TransactionType::kNewCheckpoint or txn_type == TransactionType::kSkippedCheckpoint) {
-            std::lock_guard guard(locker_);
-            ckp_begin_ts_ = UNCOMMIT_TS;
-        }
-    }
-    CollectInfo(txn);
-    CleanupTxn(txn);
+    FinalizeTxn(txn);
+
     return status;
 }
 
@@ -340,15 +336,8 @@ void NewTxnManager::CommitReplayTxn(NewTxn *txn) {
 
 Status NewTxnManager::RollBackTxn(NewTxn *txn) {
     Status status = txn->Rollback();
-    if (status.ok()) {
-        TransactionType txn_type = txn->GetTxnType();
-        if (txn_type == TransactionType::kNewCheckpoint or txn_type == TransactionType::kSkippedCheckpoint) {
-            std::lock_guard guard(locker_);
-            ckp_begin_ts_ = UNCOMMIT_TS;
-        }
-        CollectInfo(txn);
-        CleanupTxn(txn);
-    }
+    FinalizeTxn(txn);
+
     return status;
 }
 
@@ -702,6 +691,26 @@ void NewTxnManager::CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp be
                               first_begin_ts));
         check_txn_map_.erase(check_txn_map_.begin());
     }
+}
+
+void NewTxnManager::FinalizeTxn(NewTxn *txn) {
+    TransactionType txn_type = txn->GetTxnType();
+    {
+        std::lock_guard guard(locker_);
+        switch (txn_type) {
+            case TransactionType::kNewCheckpoint:
+            case TransactionType::kSkippedCheckpoint:
+                ckp_begin_ts_ = UNCOMMIT_TS;
+                break;
+            case TransactionType::kCleanup:
+                cleanup_begin_ts_ = UNCOMMIT_TS;
+                break;
+            default:
+                break;
+        }
+    }
+    CollectInfo(txn);
+    CleanupTxn(txn);
 }
 
 void NewTxnManager::PrintAllKeyValue() const {

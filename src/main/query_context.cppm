@@ -91,7 +91,7 @@ public:
 
     void BeginTxn(const BaseStatement *statement);
 
-    TxnTimeStamp CommitTxn();
+    void CommitTxn();
 
     void RollbackTxn();
 

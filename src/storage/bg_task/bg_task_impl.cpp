@@ -46,7 +46,7 @@ Status NewCheckpointTask::ExecuteWithNewTxn() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
     if (new_txn_shared == nullptr) {
-        // System is checkpointing
+        LOG_INFO("System is checkpointing, skip this checkpoint.");
         return Status::OK();
     }
     new_txn_shared->SetWalSize(wal_size_);
@@ -79,6 +79,10 @@ Status NewCheckpointTask::ExecuteWithNewTxn() {
 Status CleanupTask::Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_cleanup_ts) {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("cleanup"), TransactionType::kCleanup);
+    if (txn == nullptr) {
+        LOG_INFO("System is cleaning up, skip this cleanup.");
+        return Status::OK();
+    }
     Status status = txn->Cleanup();
     if (!status.ok()) {
         return status;

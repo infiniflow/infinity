@@ -5102,7 +5102,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
 
     Status status = kv_instance_->Rollback();
     if (!status.ok()) {
-        return status;
+        UnrecoverableError(fmt::format("Failed to rollback kv_instance : {}", status.message()));
     }
 
     // TODO: due to dead lock, ignore the conflict txn.

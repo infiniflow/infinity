@@ -107,7 +107,6 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
             }
         }
 
-        std::shared_ptr<TxnTimeStamp> ckp_commit_ts = std::make_shared<TxnTimeStamp>(0);
         {
             NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
             WalManager *wal_manager_{};
@@ -115,7 +114,7 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
             auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check point"), TransactionType::kNewCheckpoint);
             Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
-            status = new_txn_mgr->CommitTxn(txn, ckp_commit_ts.get());
+            status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         infinity::InfinityContext::instance().UnInit();
