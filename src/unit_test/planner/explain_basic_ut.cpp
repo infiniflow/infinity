@@ -127,6 +127,8 @@ TEST_P(ExplainBasicTest, test1) {
     ExplainSql("select * from tb order by col1", true);
     ExplainSql("select * from tb limit 100", true);
     ExplainSql("select * from tb where col1 > 100 and 1 = 1 order by col1 limit 100", true);
+    ExplainSql("select * from tb where col1 in (100, 150, 200)", true);
+    ExplainSql("select * from tb where col1 between 100 and 200", true);
 
     // Explain create
     ExplainSql("create table tb1(c1 int, c2 varchar)", false);
