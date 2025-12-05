@@ -1,0 +1,121 @@
+statement ok
+DROP TABLE IF EXISTS test_round;
+
+statement ok
+CREATE TABLE test_round (c1 integer, c2 float, c3 double);
+
+statement ok
+INSERT INTO test_round VALUES (123, 123.456, 123.456), (125, 125.555, 125.555), (128, 128.888, 128.888);
+
+query I
+SELECT round(c1) FROM test_round;
+----
+123
+125
+128
+
+query R
+SELECT round(c2) FROM test_round;
+----
+123.000000
+126.000000
+129.000000
+
+query R
+SELECT round(c3) FROM test_round;
+----
+123.000000
+126.000000
+129.000000
+
+query R
+SELECT round(c1, 0) FROM test_round;
+----
+123.000000
+125.000000
+128.000000
+
+query R
+SELECT round(c2, 0) FROM test_round;
+----
+123.000000
+126.000000
+129.000000
+
+query R
+SELECT round(c1, 1) FROM test_round;
+----
+123.000000
+125.000000
+128.000000
+
+query R
+SELECT round(c2, 1) FROM test_round;
+----
+123.500000
+125.600000
+128.900000
+
+query R
+SELECT round(c2, 2) FROM test_round;
+----
+123.460000
+125.560000
+128.890000
+
+query R
+SELECT round(c1, -1) FROM test_round;
+----
+120.000000
+130.000000
+130.000000
+
+query R
+SELECT round(c2, -1) FROM test_round;
+----
+120.000000
+130.000000
+130.000000
+
+query R
+SELECT round(c2, cast(1 as integer)) FROM test_round;
+----
+123.500000
+125.600000
+128.900000
+
+query R
+SELECT round(c2, cast(1 as bigint)) FROM test_round;
+----
+123.500000
+125.600000
+128.900000
+
+query R
+SELECT round(2.4, 1);
+----
+2.400000
+
+query R
+SELECT round(2.4, 0);
+----
+2.000000
+
+statement ok
+CREATE TABLE test_round_2 (c1 double);
+
+statement ok
+INSERT INTO test_round_2 VALUES (2.4), (4.5), (6.6);
+
+query R
+SELECT round(c1, 1) FROM test_round_2;
+----
+2.400000
+4.500000
+6.600000
+
+statement ok
+DROP TABLE test_round_2;
+
+statement ok
+DROP TABLE test_round;

@@ -26,7 +26,7 @@ namespace infinity {
 // class FusionExpression;
 // struct DataBlock;
 
-export enum class FusionMethod { kRRF, kWeightedSum, kMatchTensor };
+export enum class FusionMethod { kRRF, kWeightedSum, kMatchTensor, kMax };
 
 export class PhysicalFusion final : public PhysicalOperator {
 public:

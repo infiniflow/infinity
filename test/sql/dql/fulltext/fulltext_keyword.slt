@@ -46,21 +46,21 @@ SELECT * FROM ft_keyword;
 5 another multiple another not
 
 query I rowsort
-SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc^4.5', 'multiple another', 'topn=10');
+SELECT num, ROUND(SCORE(), 4) FROM ft_keyword SEARCH MATCH TEXT ('doc^4.5', 'multiple another', 'topn=10');
 ----
 2 4.500000
 4 4.500000
 5 4.500000
 
 query I rowsort
-SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc^4.5', 'multiple another " ," " ， " ', 'topn=10');
+SELECT num, ROUND(SCORE(), 4) FROM ft_keyword SEARCH MATCH TEXT ('doc^4.5', 'multiple another " ," " ， " ', 'topn=10');
 ----
 2 4.500000
 4 4.500000
 5 4.500000
 
 query I rowsort
-SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc', 'second default text', 'topn=10');
+SELECT num, ROUND(SCORE(), 4) FROM ft_keyword SEARCH MATCH TEXT ('doc', 'second default text', 'topn=10');
 ----
 1 1.000000
 2 1.000000
@@ -68,7 +68,7 @@ SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc', 'second default te
 4 1.000000
 
 query I rowsort
-SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc2', 'second default text', 'topn=10;similarity=boolean');
+SELECT num, ROUND(SCORE(), 4) FROM ft_keyword SEARCH MATCH TEXT ('doc2', 'second default text', 'topn=10;similarity=boolean');
 ----
 1 2.000000
 2 2.000000
@@ -76,7 +76,7 @@ SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc2', 'second default t
 4 1.000000
 
 query I rowsort
-SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc^4.5,doc2^3', 'second default text', 'topn=10;similarity=boolean');
+SELECT num, ROUND(SCORE(), 4) FROM ft_keyword SEARCH MATCH TEXT ('doc^4.5,doc2^3', 'second default text', 'topn=10;similarity=boolean');
 ----
 1 10.500000
 2 10.500000
@@ -84,7 +84,7 @@ SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc^4.5,doc2^3', 'second
 4 7.500000
 
 query I rowsort
-SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('', '(doc:"second default text")^4.5 (doc2:second doc2:default doc2:text)^3', 'topn=10;similarity=boolean');
+SELECT num, ROUND(SCORE(), 4) FROM ft_keyword SEARCH MATCH TEXT ('', '(doc:"second default text")^4.5 (doc2:second doc2:default doc2:text)^3', 'topn=10;similarity=boolean');
 ----
 1 10.500000
 2 10.500000
@@ -92,7 +92,7 @@ SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('', '(doc:"second default
 4 7.500000
 
 query I rowsort
-SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('', '(doc:"second default text")^4.5 (doc2:another doc2:not)^3', 'topn=10;similarity=boolean;minimum_should_match=1');
+SELECT num, ROUND(SCORE(), 4) FROM ft_keyword SEARCH MATCH TEXT ('', '(doc:"second default text")^4.5 (doc2:another doc2:not)^3', 'topn=10;similarity=boolean;minimum_should_match=1');
 ----
 4 7.500000
 5 6.000000
