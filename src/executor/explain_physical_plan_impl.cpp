@@ -265,6 +265,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op,
         case PhysicalOperatorType::kIntersect: {
             break;
         }
+        case PhysicalOperatorType::kCommand: {
+            break;
+        }
         case PhysicalOperatorType::kExcept: {
             break;
         }
@@ -335,7 +338,8 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op,
             break;
         }
         default: {
-            UnrecoverableError("Unexpected physical operator type");
+            LOG_INFO("Unexpected physical operator type");
+            break;
         }
     }
 
