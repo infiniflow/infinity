@@ -1,2 +1,0 @@
-psutil~=6.0.0
-timeout-decorator~=0.5.0

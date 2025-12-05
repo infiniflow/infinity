@@ -85,14 +85,15 @@ RUN mkdir -p /usr/lib64/gcc/15 \
     # Verify the symlink points to the correct version
     && ls -la /lib/x86_64-linux-gnu/libstdc++.so.6
 
-# Install Python 3.10 from source
-RUN --mount=type=bind,source=Python-3.10.18.tar.xz,target=/root/Python-3.10.18.tar.xz \
-    cd /root && tar xJf Python-3.10.18.tar.xz \
-    && cd Python-3.10.18 && ./configure --enable-shared \
+# Install Python 3.11 from source
+RUN --mount=type=bind,source=Python-3.11.9.tar.xz,target=/root/Python-3.11.9.tar.xz \
+    cd /root && tar xJf Python-3.11.9.tar.xz \
+    && cd Python-3.11.9 && ./configure --enable-shared \
     && make -j$(nproc) && make altinstall \
-    && ldconfig && cd /root && rm -rf Python-3.10.18 \
-    && update-alternatives --install /usr/bin/python3 python3 /usr/local/bin/python3.10 50 \
-    && update-alternatives --install /usr/bin/pip3 pip3 /usr/local/bin/pip3.10 50
+    && ldconfig && cd /root && rm -rf Python-3.11.9 \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/local/bin/python3.11 50 \
+    && update-alternatives --install /usr/bin/pip3 pip3 /usr/local/bin/pip3.11 50
+
 
 # Install cmake-4.1.0
 RUN --mount=type=bind,source=cmake-4.1.0-linux-x86_64.tar.gz,target=/root/cmake-4.1.0-linux-x86_64.tar.gz \
@@ -155,9 +156,10 @@ RUN --mount=type=bind,source=vcpkg.json,target=/opt/vcpkg/vcpkg.json \
 # Set vcpkg toolchain path for CMake
 # Set Python paths for CMake to find the correct Python installation
 ENV CMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake  \
-    Python3_EXECUTABLE=/usr/local/bin/python3.10 \
-    Python3_INCLUDE_DIR=/usr/local/include/python3.10 \
-    Python3_LIBRARY=/usr/local/lib/libpython3.10.so
+    Python3_EXECUTABLE=/usr/local/bin/python3.11 \
+    Python3_INCLUDE_DIR=/usr/local/include/python3.11 \
+    Python3_LIBRARY=/usr/local/lib/libpython3.11.so
+
 
 # Add thrift compiler to PATH
 RUN ln -s /opt/vcpkg/vcpkg_installed/x64-linux/tools/thrift/thrift /usr/local/bin/thrift \
@@ -172,13 +174,16 @@ RUN  --mount=type=bind,source=uv-x86_64-unknown-linux-gnu.tar.gz,target=/root/uv
     && tar xzf /root/uv-x86_64-unknown-linux-gnu.tar.gz \
     && cp uv-x86_64-unknown-linux-gnu/* /usr/local/bin/ \
     && rm -rf uv-x86_64-unknown-linux-gnu \
-    && uv python install python3.10
+    && uv python install python3.11
+
 
 RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && pip3 config set global.trusted-host pypi.tuna.tsinghua.edu.cn
 
 # Install infinity python sdk and other packages for later use by infinity tests
-RUN --mount=type=bind,source=python/requirements.txt,target=/root/requirements_1.txt --mount=type=bind,source=python/benchmark/requirements.txt,target=/root/requirements_2.txt  --mount=type=bind,source=python/restart_test/requirements.txt,target=/root/requirements_3.txt --mount=type=bind,source=python/test_cluster/requirements.txt,target=/root/requirements_4.txt \
-    pip3 install --no-input -r /root/requirements_1.txt -r /root/requirements_2.txt -r /root/requirements_3.txt -r /root/requirements_4.txt
+RUN --mount=type=bind,source=pyproject.toml,target=/pyproject.toml \
+    uv export --frozen --format requirements-txt --all-extras | uv pip install --system -r /dev/stdin
+
+
 
 COPY nltk_data /root/nltk_data
 

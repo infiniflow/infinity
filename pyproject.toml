@@ -1,7 +1,9 @@
 [project]
 name = "infinity-sdk"
 version = "0.6.10"
-requires-python = ">=3.10"
+description = "infinity"
+readme = "python/infinity_sdk/README.md"
+requires-python = ">=3.11,<3.15"
 dependencies = [
     "sqlglot[rs]>=27.10.0",
     "pydantic>=2.9.0,<3.0.0",
@@ -19,12 +21,34 @@ dependencies = [
     "hanziconv>=0.3.0,<0.4.0",
     "nltk>=3.9.0,<4.0.0"
 ]
-description = "infinity"
-readme = "README.md"
+
+[project.optional-dependencies]
+test_cluster = [
+    "tomli>=2.0.2,<3.0.0",
+    "psutil>=6.0.0,<7.0.0",
+    "docker>=7.1.0,<8.0.0",
+    "tomli-w>=1.1.0,<2.0.0",
+    "timeout-decorator>=0.5.0,<0.6.0",
+]
+restart_test = [
+    "psutil>=6.0.0,<7.0.0",
+    "timeout-decorator>=0.5.0,<0.6.0",
+]
+benchmark = [
+    "elasticsearch>=8.13.0,<9.0.0",
+    "h5py>=3.11.0,<4.0.0",
+    "qdrant_client>=1.9.0,<2.0.0",
+]
 
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "python/infinity_sdk"}
+
+[tool.setuptools.packages.find]
+where = ["python/infinity_sdk"]
 
 [tool.pytest.ini_options]
 addopts = "--strict-markers"

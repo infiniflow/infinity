@@ -79,7 +79,7 @@ def main() -> int:
     urls = [
         "https://github.com/Kitware/CMake/releases/download/v4.1.0/cmake-4.1.0-linux-x86_64.tar.gz",
         "https://github.com/ninja-build/ninja/releases/download/v1.13.1/ninja-linux.zip",
-        "https://www.python.org/ftp/python/3.10.18/Python-3.10.18.tar.xz",
+        "https://www.python.org/ftp/python/3.11.9/Python-3.11.9.tar.xz",
         "https://github.com/gcc-mirror/gcc/archive/refs/tags/releases/gcc-15.2.0.tar.gz",
         "https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2",
         "https://github.com/gperftools/gperftools/releases/download/gperftools-2.17/gperftools-2.17.tar.gz",

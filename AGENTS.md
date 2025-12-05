@@ -7,7 +7,8 @@ It is structured to follow GitHub Copilot's [customization guidelines](https://d
 Infinity is an AI-native database built for LLM applications, providing incredibly fast hybrid search of dense embedding, sparse embedding, tensor, and full-text.
 
 - **Core**: C++23 (requires Clang 20+)
-- **SDK**: Python 3.10+
+- **SDK**: Python 3.11+
+
 - **Architecture**: Single-binary.
   - `src/parser`, `src/planner`, `src/executor`: Query pipeline.
   - `src/storage`: Storage engine.
@@ -55,28 +56,28 @@ Located in `python/`. Use `uv` to manage the environment.
 
 1. **Setup Environment**:
    ```bash
-   uv venv .venv
+   uv sync --all-extras
    source .venv/bin/activate
-   uv pip install -r python/requirements.txt
-   uv pip install python/infinity_sdk
+   # uv pip install python/infinity_sdk # This is handled by uv sync if infinity_sdk is in workspace
    ```
 
 2. **Run Tests**:
    - **Pre-requisite**: Start Infinity server first!
      ```bash
      # Default configurationinfi
+     # Note: Ignore infinity.log, the real log is at /var/infinity/log/infinity.log
      nohup ./cmake-build-debug/src/infinity > infinity.log 2>&1 &
 
      # To enable debug/trace logging:
      # 1. Create a config file (e.g., cp conf/infinity_conf.toml my_conf.toml)
      # 2. Set `log_level = "debug"` or `"trace"` in the config file.
      # 3. Start with -f:
-     nohup ./cmake-build-debug/src/infinity -f my_conf.toml > infinity.log 2>&1 &
      # Note: Ignore infinity.log, the real log is at /var/infinity/log/infinity.log
+     nohup ./cmake-build-debug/src/infinity -f my_conf.toml > infinity.log 2>&1 &
      ```
    - **Run Test**:
      ```bash
-     pytest python/test/cases/test_basic.py::TestInfinity::test_basic
+     uv run pytest python/test/cases/test_basic.py::TestInfinity::test_basic
      ```
    - **Note**: `local infinity` mode is deprecated.
 

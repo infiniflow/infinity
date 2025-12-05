@@ -268,7 +268,7 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv sync"
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
@@ -277,7 +277,7 @@ jobs:
       - name: Run sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
+          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv run python3 tools/sqllogictest.py"
           sleep 1s
 
       - name: Stop infinity debug version
@@ -338,11 +338,11 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv sync"
 
       - name: Run restart test
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv run python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity"
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -382,7 +382,7 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv sync"
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
@@ -391,7 +391,7 @@ jobs:
       - name: Run pysdk remote infinity test debug version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_pysdk_remote_infinity_test.py"
+          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv run python3 tools/run_pysdk_remote_infinity_test.py"
           sleep 1s
 
       - name: Stop infinity debug version
@@ -453,7 +453,7 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv sync"
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
@@ -462,7 +462,7 @@ jobs:
       - name: Run HTTP infinity test debug version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_http_api.py"
+          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv run python3 tools/run_http_api.py"
           sleep 1s
 
       - name: Stop infinity debug version
@@ -525,7 +525,7 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv sync"
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
@@ -534,7 +534,7 @@ jobs:
       - name: Run HTTP infinity test debug version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_parallel_test.py"
+          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv run python3 tools/run_parallel_test.py"
           sleep 1s
 
       - name: Stop infinity debug version
@@ -712,7 +712,7 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv sync"
 
       - name: Start infinity reldeb version
         if: ${{ !cancelled() && !failure() }}
@@ -721,7 +721,7 @@ jobs:
       - name: Run sqllogictest reldeb version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
+          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv run python3 tools/sqllogictest.py"
           sleep 1s
 
       - name: Collect infinity log
@@ -764,7 +764,7 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv sync"
 
       - name: Start infinity reldeb version
         if: ${{ !cancelled() && !failure() }}
@@ -773,7 +773,7 @@ jobs:
       - name: Run pysdk remote infinity test reldeb version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_pysdk_remote_infinity_test.py"
+          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv run python3 tools/run_pysdk_remote_infinity_test.py"
           sleep 1s
 
       - name: Collect infinity log
@@ -815,7 +815,7 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv sync"
 
       - name: Start infinity reldeb version
         if: ${{ !cancelled() && !failure() }}
@@ -824,7 +824,7 @@ jobs:
       - name: Run http api test reldeb version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_http_api.py"
+          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv run python3 tools/run_http_api.py"
           sleep 1s
 
       - name: Collect infinity log
@@ -866,7 +866,7 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv sync"
 
       - name: Start infinity reldeb version
         if: ${{ !cancelled() && !failure() }}
@@ -875,7 +875,7 @@ jobs:
       - name: Run parallel test reldeb version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_parallel_test.py"
+          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv run python3 tools/run_parallel_test.py"
           sleep 1s
 
       - name: Collect infinity log
@@ -917,7 +917,7 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${TEST_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+        run: sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv sync"
 
       - name: Start minio container
         if: ${{ !cancelled() && !failure() }}
@@ -941,7 +941,7 @@ jobs:
       - name: Run minio pysdk infinity test reldeb version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_pysdk_remote_infinity_test.py"
+          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv run python3 tools/run_pysdk_remote_infinity_test.py"
           sleep 1s
 
       - name: Collect infinity log
@@ -984,10 +984,8 @@ jobs:
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf &&
-            cd /infinity/ &&
-            pip3 uninstall -y infinity-sdk &&
-            pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ &&
+            uv sync"
 
       - name: Start minio container
         if: ${{ !cancelled() && !failure() }}
@@ -1011,7 +1009,7 @@ jobs:
       - name: Run minio parallel test
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_parallel_test.py"
+          sudo docker exec ${TEST_CONTAINER} bash -c "cd /infinity/ && uv run python3 tools/run_parallel_test.py"
           sleep 1s
 
       - name: Collect infinity log
