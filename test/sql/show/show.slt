@@ -218,4 +218,5 @@ statement ok
 DROP DATABASE db1;
 
 # Wait for background cleanup to execute
+system ok
 sleep 10
