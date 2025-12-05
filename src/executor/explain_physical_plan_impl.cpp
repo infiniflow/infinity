@@ -338,8 +338,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op,
             break;
         }
         default: {
-            LOG_INFO("Unexpected physical operator type");
-            break;
+            UnrecoverableError("Unexpected physical operator type");
         }
     }
 
