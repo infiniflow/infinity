@@ -265,6 +265,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op,
         case PhysicalOperatorType::kIntersect: {
             break;
         }
+        case PhysicalOperatorType::kCommand: {
+            break;
+        }
         case PhysicalOperatorType::kExcept: {
             break;
         }
