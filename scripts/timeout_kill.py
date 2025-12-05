@@ -6,7 +6,7 @@ import os
 import signal
 
 
-def timeout_kill(duration: int, pids: list[int]):
+def timeout_kill_pids(duration: int, pids: list[int]):
     # Send SIGTERM to all specified processes
     for pid in pids:
         try:
@@ -66,4 +66,4 @@ if __name__ == "__main__":
         sys.exit(1)
     duration = int(sys.argv[1])
     pids = [int(pid) for pid in sys.argv[2:]]
-    timeout_kill(duration, pids)
+    timeout_kill_pids(duration, pids)

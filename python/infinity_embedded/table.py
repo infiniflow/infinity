@@ -14,7 +14,7 @@
 
 from enum import Enum
 
-from infinity_embedded.common import InfinityException, INSERT_DATA
+from infinity_embedded.common import InfinityException
 from infinity_embedded.embedded_infinity_ext import ExplainType as LocalExplainType
 from infinity_embedded.errors import ErrorCode
 

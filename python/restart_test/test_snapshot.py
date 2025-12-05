@@ -3,10 +3,7 @@ from common import common_values
 from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 from infinity import index
 import time
-import pathlib
 from infinity.common import ConflictType, SparseVector
-import pytest
-import threading
 from util import RtnThread
 
 
@@ -259,7 +256,7 @@ class TestSnapshot:
             try:
                 infinity_obj.drop_snapshot("concurrent_snap")
                 db_obj.drop_table("test_snapshot_concurrent", ConflictType.Ignore)
-            except:
+            except Exception:
                 pass
 
         part2()
@@ -376,7 +373,7 @@ class TestSnapshot:
                 res = db_obj.create_table_snapshot("error_snap", "test_snapshot_error")
                 # Should not reach here
                 assert False, "Duplicate snapshot creation should fail"
-            except Exception as e:
+            except Exception:
                 # Expected error
                 pass
             
@@ -385,7 +382,7 @@ class TestSnapshot:
                 res = db_obj.restore_table_snapshot("non_existent_snap")
                 # Should not reach here
                 assert False, "Restore non-existent snapshot should fail"
-            except Exception as e:
+            except Exception:
                 # Expected error
                 pass
             
@@ -609,7 +606,7 @@ class TestSnapshot:
             try:
                 infinity_obj.drop_snapshot("interrupted_snap")
                 db_obj.drop_table("test_snapshot_interrupted", ConflictType.Ignore)
-            except:
+            except Exception:
                 pass
 
         part2()
@@ -709,7 +706,7 @@ class TestSnapshot:
             try:
                 infinity_obj.drop_snapshot("restore_interrupted_snap")
                 db_obj.drop_table("test_snapshot_restore_interrupted", ConflictType.Ignore)
-            except:
+            except Exception:
                 pass
 
         part2()

@@ -1,15 +1,7 @@
-import sys
 import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-grandparent_dir = os.path.dirname(parent_dir)
-if grandparent_dir not in sys.path:
-    sys.path.insert(0, grandparent_dir)
-print(sys.path)
 
-from infinity_http import infinity_http
+from infinity.infinity_http import infinity_http
 import json
-import os
 import h5py
 from typing import Any
 import logging

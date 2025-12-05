@@ -177,15 +177,6 @@ wheels = [
 ]
 
 [[package]]
-name = "et-xmlfile"
-version = "2.0.0"
-source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
-sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/d3/38/af70d7ab1ae9d4da450eeec1fa3918940a5fafb9055e934af8d6eb0c2313/et_xmlfile-2.0.0.tar.gz", hash = "sha256:dab3f4764309081ce75662649be815c4c9081e88f0837825f90fd28317d4da54", size = 17234, upload-time = "2024-10-25T17:25:40.039Z" }
-wheels = [
-    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/c1/8b/5fe2cc11fee489817272089c4203e679c63b570a5aaeb18d852ae3cbba6a/et_xmlfile-2.0.0-py3-none-any.whl", hash = "sha256:7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa", size = 18059, upload-time = "2024-10-25T17:25:39.051Z" },
-]
-
-[[package]]
 name = "grpcio"
 version = "1.76.0"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
@@ -405,12 +396,10 @@ dependencies = [
     { name = "hanziconv" },
     { name = "nltk" },
     { name = "numpy" },
-    { name = "openpyxl" },
     { name = "pandas" },
     { name = "polars-lts-cpu" },
     { name = "pyarrow" },
     { name = "pydantic" },
-    { name = "pytest" },
     { name = "readerwriterlock" },
     { name = "requests" },
     { name = "setuptools" },
@@ -426,11 +415,13 @@ benchmark = [
 ]
 restart-test = [
     { name = "psutil" },
+    { name = "pytest" },
     { name = "timeout-decorator" },
 ]
 test-cluster = [
     { name = "docker" },
     { name = "psutil" },
+    { name = "pytest" },
     { name = "timeout-decorator" },
     { name = "tomli" },
     { name = "tomli-w" },
@@ -445,14 +436,14 @@ requires-dist = [
     { name = "hanziconv", specifier = ">=0.3.0,<0.4.0" },
     { name = "nltk", specifier = ">=3.9.0,<4.0.0" },
     { name = "numpy", specifier = ">=1.26.0,<2.0.0" },
-    { name = "openpyxl", specifier = ">=3.1.0,<4.0.0" },
     { name = "pandas", specifier = ">=2.2.0,<3.0.0" },
     { name = "polars-lts-cpu", specifier = ">=1.9.0,<2.0.0" },
     { name = "psutil", marker = "extra == 'restart-test'", specifier = ">=6.0.0,<7.0.0" },
     { name = "psutil", marker = "extra == 'test-cluster'", specifier = ">=6.0.0,<7.0.0" },
     { name = "pyarrow", specifier = ">=17.0.0,<18.0.0" },
     { name = "pydantic", specifier = ">=2.9.0,<3.0.0" },
-    { name = "pytest", specifier = ">=8.3.0,<9.0.0" },
+    { name = "pytest", marker = "extra == 'restart-test'", specifier = ">=8.3.0,<9.0.0" },
+    { name = "pytest", marker = "extra == 'test-cluster'", specifier = ">=8.3.0,<9.0.0" },
     { name = "qdrant-client", marker = "extra == 'benchmark'", specifier = ">=1.9.0,<2.0.0" },
     { name = "readerwriterlock", specifier = ">=1.0.0,<2.0.0" },
     { name = "requests", specifier = ">=2.32.0,<3.0.0" },
@@ -521,18 +512,6 @@ wheels = [
     { url = "https://pypi.tuna.tsinghua.edu.cn/packages/76/8c/2ba3902e1a0fc1c74962ea9bb33a534bb05984ad7ff9515bf8d07527cadd/numpy-1.26.4-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:1dda2e7b4ec9dd512f84935c5f126c8bd8b9f2fc001e9f54af255e8c5f16b0e0", size = 17786643, upload-time = "2024-02-05T23:57:56.585Z" },
     { url = "https://pypi.tuna.tsinghua.edu.cn/packages/28/4a/46d9e65106879492374999e76eb85f87b15328e06bd1550668f79f7b18c6/numpy-1.26.4-cp312-cp312-win32.whl", hash = "sha256:50193e430acfc1346175fcbdaa28ffec49947a06918b7b92130744e81e640110", size = 5677803, upload-time = "2024-02-05T23:58:08.963Z" },
     { url = "https://pypi.tuna.tsinghua.edu.cn/packages/16/2e/86f24451c2d530c88daf997cb8d6ac622c1d40d19f5a031ed68a4b73a374/numpy-1.26.4-cp312-cp312-win_amd64.whl", hash = "sha256:08beddf13648eb95f8d867350f6a018a4be2e5ad54c8d8caed89ebca558b2818", size = 15517754, upload-time = "2024-02-05T23:58:36.364Z" },
-]
-
-[[package]]
-name = "openpyxl"
-version = "3.1.5"
-source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
-dependencies = [
-    { name = "et-xmlfile" },
-]
-sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/3d/f9/88d94a75de065ea32619465d2f77b29a0469500e99012523b91cc4141cd1/openpyxl-3.1.5.tar.gz", hash = "sha256:cf0e3cf56142039133628b5acffe8ef0c12bc902d2aadd3e0fe5878dc08d1050", size = 186464, upload-time = "2024-06-28T14:03:44.161Z" }
-wheels = [
-    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/c0/da/977ded879c29cbd04de313843e76868e6e13408a94ed6b987245dc7c8506/openpyxl-3.1.5-py2.py3-none-any.whl", hash = "sha256:5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2", size = 250910, upload-time = "2024-06-28T14:03:41.161Z" },
 ]
 
 [[package]]

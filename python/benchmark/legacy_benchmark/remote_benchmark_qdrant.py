@@ -5,8 +5,6 @@ import multiprocessing
 import struct
 
 from qdrant_client import QdrantClient, models
-from qdrant_client.models import PointStruct
-from qdrant_client.models import Distance, VectorParams
 
 class SparseMatrix:
     nrow: int
@@ -74,7 +72,7 @@ def work(remote, queries, topk, alpha, beta):
         client = QdrantClient(host="localhost", port=6333)
 
     for indices, values in queries:
-        res = client.search(
+        client.search(
             collection_name="splade_benchmark_collection",
             query_vector=models.NamedSparseVector(
                 name="text",
@@ -207,7 +205,7 @@ def benchmark(
         print(f"Rounds: {rounds}")
         process_pool(remote, threads, rounds, query_path, topk, alpha, beta)
     else:
-        print(f"Single-thread")
+        print("Single-thread")
         print(f"Rounds: {rounds}")
         one_thread(remote, rounds, query_path, gt_path, alpha, beta)
 

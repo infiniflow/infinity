@@ -1,8 +1,5 @@
-import sys
-import os
 import concurrent.futures
 import pytest
-import polars as pl
 from common import common_values
 from infinity.common import ConflictType, InfinityException
 import infinity
@@ -10,11 +7,7 @@ from infinity.errors import ErrorCode
 from common.utils import trace_expected_exceptions
 import random
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-from infinity_http import infinity_http
+from infinity.infinity_http import infinity_http
 
 
 @pytest.fixture(scope="class")
@@ -236,7 +229,7 @@ class TestInfinity:
         # create table with same column name, dictionary cannot have same keys, the later item will override the previous one,
         # so the column definition sent to infinity will be {"c1": {"type": "float"}}
         table_obj = db_obj.create_table("test_same_column_name" + suffix, {"c1": {"type": "int"},
-                                                                           "c1": {"type": "float"}}, ConflictType.Error)
+                                                                           "c1": {"type": "float"}}, ConflictType.Error)  # noqa: F601
         assert table_obj is not None
 
         res = table_obj.show_columns()

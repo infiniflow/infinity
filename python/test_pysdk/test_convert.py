@@ -1,17 +1,10 @@
-import importlib
-import sys
-import os
 import pytest
 from infinity.errors import ErrorCode
 from common import common_values
 import infinity
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.common import ConflictType, InfinityException
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-from infinity_http import infinity_http
+from infinity.infinity_http import infinity_http
 
 @pytest.mark.usefixtures("http")
 @pytest.mark.usefixtures("suffix")

@@ -7,7 +7,7 @@ def run_command():
     while True:
         try:
             count += 1
-            result = subprocess.run(
+            subprocess.run(
                 ["sqllogictest", "./test/sql/dql/aggregate/test_simple_agg_big.slt"],
                 check=True,
             )

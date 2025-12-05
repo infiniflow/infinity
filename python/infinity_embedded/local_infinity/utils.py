@@ -56,7 +56,7 @@ def traverse_conditions(cons, fn=None):
         parsed_expr.function_expr = function_expr
 
         return parsed_expr
-    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.In) == False:
+    elif isinstance(cons, exp.Not) and not isinstance(cons.args['this'], exp.In):
         parsed_expr = WrapParsedExpr()
         function_expr = WrapFunctionExpr()
         function_expr.func_name = "not"
@@ -199,7 +199,7 @@ def traverse_conditions(cons, fn=None):
 def parse_expr(expr):
     try:
         return traverse_conditions(expr, parse_expr)
-    except:
+    except Exception:
         if isinstance(expr, exp.Star):
             column_expr = WrapColumnExpr()
             column_expr.star = True
@@ -401,7 +401,7 @@ def name_validity_check(arg_name: str, name_type: str = "Table"):
             try:
                 check_valid_name(name, name_type)
                 return func(*args, **kwargs)
-            except ValueError as e:
+            except ValueError:
                 raise
 
         return wrapper
@@ -547,7 +547,7 @@ def get_sparse_type(column_big_info: list[str]) -> WrapDataType:
 
 def get_data_type(column_info: dict) -> WrapDataType:
     if "type" not in column_info:
-        raise InfinityException(ErrorCode.NO_COLUMN_DEFINED, f"Column definition without data type")
+        raise InfinityException(ErrorCode.NO_COLUMN_DEFINED, "Column definition without data type")
     datatype = column_info["type"].lower()
     column_big_info = [item.strip() for item in datatype.split(",")]
     return get_data_type_from_column_big_info(column_big_info)
@@ -566,7 +566,7 @@ def get_data_type_from_column_big_info(column_big_info: list) -> WrapDataType:
             # return get_sparse_info(column_info, column_defs, column_name, index)
         case "array":
             if len(column_big_info) < 2:
-                raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"No element type for array!")
+                raise InfinityException(ErrorCode.INVALID_DATA_TYPE, "No element type for array!")
             proto_column_type = WrapDataType()
             proto_column_type.logical_type = LogicalType.kArray
             proto_column_type.array_type = get_data_type_from_column_big_info(column_big_info[1:])

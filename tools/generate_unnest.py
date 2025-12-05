@@ -1,6 +1,5 @@
 import argparse
 import os
-import csv
 import random
 from collections import defaultdict
 
@@ -11,7 +10,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
     table_name = "test_big_unnest"
     slt_path = slt_dir + "/test_big_unnest.slt"
-    copy_path = copy_dir + "/test_big_unnest.csv"
+    copy_dir + "/test_big_unnest.csv"
 
     os.makedirs(data_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)

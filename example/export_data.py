@@ -17,11 +17,11 @@ This example is about connecting local infinity instance, creating table, ing da
 '''
 
 import os
+import sys
+import infinity
+
 current_path = os.path.abspath(__file__)
 project_directory = os.path.dirname(current_path)
-
-import infinity
-import sys
 
 try:
     # Use infinity_embedded module to open a local directory

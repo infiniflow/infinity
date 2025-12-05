@@ -9,21 +9,20 @@ dependencies = [
     "pydantic>=2.9.0,<3.0.0",
     "thrift>=0.20.0,<1.0.0",
     "setuptools>=75.2.0,<76.0.0",
-    "pytest>=8.3.0,<9.0.0",
     "pandas>=2.2.0,<3.0.0",
     "numpy>=1.26.0,<2.0.0",
     "pyarrow>=17.0.0,<18.0.0",
     "polars-lts-cpu>=1.9.0,<2.0.0",
-    "openpyxl>=3.1.0,<4.0.0",
     "requests>=2.32.0,<3.0.0",
     "readerwriterlock>=1.0.0,<2.0.0",
     "datrie>=0.8.3,<0.9.0",
     "hanziconv>=0.3.0,<0.4.0",
-    "nltk>=3.9.0,<4.0.0"
+    "nltk>=3.9.0,<4.0.0",
 ]
 
 [project.optional-dependencies]
 test_cluster = [
+    "pytest>=8.3.0,<9.0.0",
     "tomli>=2.0.2,<3.0.0",
     "psutil>=6.0.0,<7.0.0",
     "docker>=7.1.0,<8.0.0",
@@ -31,6 +30,7 @@ test_cluster = [
     "timeout-decorator>=0.5.0,<0.6.0",
 ]
 restart_test = [
+    "pytest>=8.3.0,<9.0.0",
     "psutil>=6.0.0,<7.0.0",
     "timeout-decorator>=0.5.0,<0.6.0",
 ]
@@ -71,3 +71,11 @@ filterwarnings = [
     # note the use of single quote below to denote "raw" strings in TOML
     'ignore:function ham\(\) is deprecated:DeprecationWarning',
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"python/infinity_embedded/local_infinity/client.py" = ["F403", "F405"]
+"python/infinity_embedded/local_infinity/query_builder.py" = ["F403", "F405"]
+"python/infinity_embedded/local_infinity/types.py" = ["F403", "F405"]
+"python/infinity_sdk/infinity/remote_thrift/infinity_thrift_rpc/*" = ["F403", "F405", "E501"]
+"src/embedded_infinity/__init__.py" = ["F403"]
+

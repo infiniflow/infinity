@@ -1,13 +1,11 @@
 import argparse
 import os
 import time
-import struct
 
 
 from pymilvus import MilvusClient, DataType
-from pymilvus import connections, db
 
-from utils import SparseMatrix, csr_read_all
+from utils import csr_read_all
 
 def import_data(
     data_set: str,
@@ -73,7 +71,6 @@ def import_data(
     data_mat = csr_read_all(import_path)
 
     vectors = []
-    count = 0
     for data_id in range(data_mat.nrow):
         indices, values = data_mat.at(data_id)
 

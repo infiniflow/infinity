@@ -4,7 +4,15 @@ from infinity.common import ConflictType
 from infinity_runner import InfinityRunner, infinity_runner_decorator_factory, infinity_runner_decorator_factory2
 import time
 import threading
-from restart_util import *
+from restart_util import (
+    SimpleEmbeddingGenerator,
+    SimpleVarcharGenerator,
+    SimpleTensorGenerator,
+    EnwikiGenerator,
+    SiftGenerator,
+    LChYDataGenerato,
+)
+from infinity import index
 from util import RtnThread
 
 

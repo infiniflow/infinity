@@ -3,7 +3,13 @@ import time
 
 import requests
 import logging
-from test_pysdk.common.common_data import *
+import ast
+from numpy import dtype
+from .http_utils import (
+    baseHeader, baseResponse, baseData, default_url, baseCreateOptions, baseDropOptions,
+    index_type_transfrom, ExplainType_transfrom, is_list, is_date, is_time, is_datetime,
+    is_sparse, str2sparse, type_to_dtype, function_return_type, is_float, functions, bool_functions
+)
 from infinity.common import ConflictType, InfinityException, SparseVector, SortType, FDE
 from typing import Optional, Any
 from infinity.errors import ErrorCode
@@ -206,7 +212,7 @@ class infinity_http:
                 d = self.net.set_up_data(["create_option"], {"create_option": opt})
                 r = self.net.request(url, "post", h, d)
                 self.net.raise_exception(r)
-            except:
+            except Exception:
                 raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE)
             # d = self.net.set_up_data(
             #    ["create_option"], {"create_option": str(opt)}
@@ -229,7 +235,7 @@ class infinity_http:
                 d = self.net.set_up_data(["drop_option"], {"drop_option": opt})
                 r = self.net.request(url, "delete", h, d)
                 self.net.raise_exception(r)
-            except:
+            except Exception:
                 raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE)
 
     def get_database(self, db_name, opt=ConflictType.Error):
@@ -239,7 +245,7 @@ class infinity_http:
         try:
             self.net.raise_exception(r)
             return database_http(self.net, database_name=r.json()["database_name"])
-        except:
+        except Exception:
             raise InfinityException(ErrorCode.DB_NOT_EXIST)
 
     def list_databases(self):
@@ -445,7 +451,7 @@ class database_http:
             conflict_type=ConflictType.Error,
     ):
         copt = conflict_type
-        if type(conflict_type) != type([]) and type(conflict_type) != type({}) and type(conflict_type) != type(()):
+        if not isinstance(conflict_type, (list, dict, tuple)):
             exists = baseCreateOptions.get(conflict_type, None)
             if exists is not None:
                 copt = baseCreateOptions[conflict_type]
@@ -458,7 +464,7 @@ class database_http:
                 for param_name in columns_definition[col]:
                     tmp[param_name.lower()] = columns_definition[col][param_name]
                 fields.append(tmp)
-        except:
+        except Exception:
             raise InfinityException(ErrorCode.SYNTAX_ERROR, "http adapter create table parse error")
         # print(fields)
 
@@ -482,7 +488,7 @@ class database_http:
             conflict_type=ConflictType.Error,
     ):
         copt = conflict_type
-        if type(conflict_type) != type([]) and type(conflict_type) != type({}) and type(conflict_type) != type(()):
+        if not isinstance(conflict_type, (list, dict, tuple)):
             exists = baseDropOptions.get(conflict_type, None)
             if exists is not None:
                 copt = baseDropOptions[conflict_type]
@@ -611,7 +617,7 @@ class table_http:
             index_comment: str = ""
     ):
         copt = conflict_type
-        if type(conflict_type) != type([]) and type(conflict_type) != type({}) and type(conflict_type) != type(()):
+        if not isinstance(conflict_type, (list, dict, tuple)):
             exists = baseCreateOptions.get(conflict_type, None)
             if exists is not None:
                 copt = baseCreateOptions[conflict_type]
@@ -646,7 +652,7 @@ class table_http:
             conflict_type=ConflictType.Error,
     ):
         copt = conflict_type
-        if type(conflict_type) != type([]) and type(conflict_type) != type({}) and type(conflict_type) != type(()):
+        if not isinstance(conflict_type, (list, dict, tuple)):
             exists = baseDropOptions.get(conflict_type, None)
             if exists is not None:
                 copt = baseDropOptions[conflict_type]

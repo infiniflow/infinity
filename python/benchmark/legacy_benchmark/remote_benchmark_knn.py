@@ -103,7 +103,7 @@ def trace_unhandled_exceptions(func):
     def wrapped_func(*args, **kwargs):
         try:
             func(*args, **kwargs)
-        except:
+        except Exception:
             print('Exception in ' + func.__name__)
             traceback.print_exc()
 
@@ -236,60 +236,60 @@ def benchmark(threads, rounds, data_set, ef: int, path):
         if threads > 1:
             print(f"Multi-threads: {threads}")
             print(f"Rounds: {rounds}")
-            process_pool(threads, rounds, query_path, ef, f"sift_benchmark")
+            process_pool(threads, rounds, query_path, ef, "sift_benchmark")
 
         else:
-            print(f"Single-thread")
+            print("Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, query_path, ground_truth_path, ef, remote, f"sift_benchmark")
+            one_thread(rounds, query_path, ground_truth_path, ef, "sift_benchmark")
     elif data_set == "sift_10k":
         query_path = path + "/sift10k_query.fvecs"
         ground_truth_path = path + "/sift10k_groundtruth.ivecs"
         if threads > 1:
             print(f"Multi-threads: {threads}")
             print(f"Rounds: {rounds}")
-            process_pool(threads, rounds, query_path, ef, remote, f"sift_benchmark")
+            process_pool(threads, rounds, query_path, ef, "sift_benchmark")
 
         else:
-            print(f"Single-thread")
+            print("Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, query_path, ground_truth_path, ef, f"sift_benchmark")
+            one_thread(rounds, query_path, ground_truth_path, ef, "sift_benchmark")
     elif data_set == "sift_10k":
         query_path = path + "/sift10k_query.fvecs"
         ground_truth_path = path + "/sift10k_groundtruth.ivecs"
         if threads > 1:
             print(f"Multi-threads: {threads}")
             print(f"Rounds: {rounds}")
-            process_pool(threads, rounds, query_path, ef, f"sift_benchmark")
+            process_pool(threads, rounds, query_path, ef, "sift_benchmark")
 
         else:
-            print(f"Single-thread")
+            print("Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, query_path, ground_truth_path, ef, f"sift_benchmark")
+            one_thread(rounds, query_path, ground_truth_path, ef, "sift_benchmark")
     elif data_set == "gist_1m":
         query_path = path + "/gist_query.fvecs"
         ground_truth_path = path + "/gist_groundtruth.ivecs"
         if threads > 1:
             print(f"Multi-threads: {threads}")
             print(f"Rounds: {rounds}")
-            process_pool(threads, rounds, query_path, ef, f"gist_benchmark")
+            process_pool(threads, rounds, query_path, ef, "gist_benchmark")
 
         else:
-            print(f"Single-thread")
+            print("Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, query_path, ground_truth_path, ef, f"gist_benchmark")
+            one_thread(rounds, query_path, ground_truth_path, ef, "gist_benchmark")
     elif data_set == "msmarco_1m":
         query_path = path + "/msmarco_query.fvecs"
         ground_truth_path = path + "/msmarco_groundtruth.ivecs"
         if threads > 1:
             print(f"Multi-threads: {threads}")
             print(f"Rounds: {rounds}")
-            process_pool(threads, rounds, query_path, ef, f"msmarco_benchmark")
+            process_pool(threads, rounds, query_path, ef, "msmarco_benchmark")
 
         else:
-            print(f"Single-thread")
+            print("Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, query_path, ground_truth_path, ef, f"msmarco_benchmark")
+            one_thread(rounds, query_path, ground_truth_path, ef, "msmarco_benchmark")
 
 
 if __name__ == '__main__':
