@@ -60,12 +60,12 @@ public:
         }
 
         for (const auto &sql : sql_vector) {
+            LOG_INFO(fmt::format("sql: {}", sql));
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(sql);
             bool ok = HandleQueryResult(query_result);
-            ASSERT_TRUE(ok);
 
-            LOG_INFO(fmt::format("sql: {}", sql));
+            ASSERT_TRUE(ok);
             LOG_INFO(fmt::format("explain: {}", query_result.ToString()));
         }
     }
@@ -148,7 +148,23 @@ TEST_P(ExplainBasicTest, test1) {
     ExplainSql("drop collection collection1", false);
 
     // Explain show
+    ExplainSql("show databases", true);
+    ExplainSql("show tables", true);
     ExplainSql("show database default_db", true);
     ExplainSql("show table tb", true);
+    ExplainSql("show table tb columns", true);
+    ExplainSql("show table tb segments", true);
+    ExplainSql("show table tb indexes", true);
     ExplainSql("show checkpoint", true);
+    ExplainSql("show buffer", true);
+    ExplainSql("show tasks", true);
+    ExplainSql("show configs", true);
+    ExplainSql("show config version", true);
+    ExplainSql("show profiles", true);
+    // ExplainSql("show memindex", true);
+    ExplainSql("show queries", true);
+    ExplainSql("show transactions", true);
+    ExplainSql("show transaction history", true);
+    ExplainSql("show session variables", true);
+    ExplainSql("show session variable query_count", true);
 }
