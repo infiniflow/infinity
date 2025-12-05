@@ -50,6 +50,31 @@ public:
     std::shared_ptr<ColumnDef> column_def2;
     std::shared_ptr<std::string> table_name;
     std::shared_ptr<TableDef> table_def;
+
+    void ExplainSql(std::string sql_statement, bool read_only) {
+        std::vector<std::string> sql_vector;
+        sql_vector.emplace_back(fmt::format("explain ast {}", sql_statement));
+        sql_vector.emplace_back(fmt::format("explain raw {}", sql_statement));
+        sql_vector.emplace_back(fmt::format("explain logical {}", sql_statement));
+        sql_vector.emplace_back(fmt::format("explain physical {}", sql_statement));
+        sql_vector.emplace_back(fmt::format("explain fragment {}", sql_statement));
+        sql_vector.emplace_back(fmt::format("explain {}", sql_statement));
+
+        if (read_only) {
+            sql_vector.emplace_back(fmt::format("explain analyze {}", sql_statement));
+            sql_vector.emplace_back(fmt::format("explain pipeline {}", sql_statement));
+        }
+
+        for (const auto &sql : sql_vector) {
+            std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+            QueryResult query_result = query_context->Query(sql);
+            bool ok = HandleQueryResult(query_result);
+            ASSERT_TRUE(ok);
+
+            LOG_INFO(fmt::format("sql: {}", sql));
+            LOG_INFO(fmt::format("explain: {}", query_result.ToString()));
+        }
+    }
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, ExplainBasicTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
@@ -62,6 +87,23 @@ TEST_P(ExplainBasicTest, test1) {
     column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     table_name = std::make_shared<std::string>("tb");
     table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
+
+    // Create database
+    {
+        std::string sql = "create database db1";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+
+    {
+        std::string sql = "create collection collection1";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
 
     // Create table
     {
@@ -81,147 +123,28 @@ TEST_P(ExplainBasicTest, test1) {
     }
 
     // Explain select
-    {
-        std::string sql = "explain ast select * from tb order by col1 limit 100";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-
-        LOG_INFO(fmt::format("explain ast: {}", query_result.ToString()));
-    }
-
-    {
-        std::string sql = "explain analyze select * from tb order by col1 limit 100";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-
-        LOG_INFO(fmt::format("explain analyze: {}", query_result.ToString()));
-    }
-
-    {
-        std::string sql = "explain raw select * from tb order by col1 limit 100";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-
-        LOG_INFO(fmt::format("explain raw: {}", query_result.ToString()));
-    }
-
-    {
-        std::string sql = "explain logical select * from tb order by col1 limit 100";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-
-        LOG_INFO(fmt::format("explain logical: {}", query_result.ToString()));
-    }
-
-    {
-        std::string sql = "explain physical select * from tb order by col1 limit 100";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-
-        LOG_INFO(fmt::format("explain physical: {}", query_result.ToString()));
-    }
-
-    {
-        std::string sql = "explain pipeline select * from tb order by col1 limit 100";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-
-        LOG_INFO(fmt::format("explain pipeline: {}", query_result.ToString()));
-    }
-
-    {
-        std::string sql = "explain fragment select * from tb order by col1 limit 100";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-
-        LOG_INFO(fmt::format("explain fragment: {}", query_result.ToString()));
-    }
+    ExplainSql("select * from tb where col1 > 100 and 1 = 1", true);
+    ExplainSql("select * from tb order by col1", true);
+    ExplainSql("select * from tb limit 100", true);
+    ExplainSql("select * from tb where col1 > 100 and 1 = 1 order by col1 limit 100", true);
+    ExplainSql("select * from tb where col1 in (100, 150, 200)", true);
+    ExplainSql("select * from tb where col1 between 100 and 200", true);
 
     // Explain create
-    {
-        std::string sql = "explain ast create table t1(c1 int, c2 varchar)";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-
-        LOG_INFO(fmt::format("explain ast: {}", query_result.ToString()));
-    }
+    ExplainSql("create table tb1(c1 int, c2 varchar)", false);
+    ExplainSql("create database db1", false);
+    ExplainSql("create collection c1", false);
 
     // Explain insert
-    {
-        std::string sql = "explain ast insert into tb111 values(1000, 'xyz')";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-
-        LOG_INFO(fmt::format("explain ast: {}", query_result.ToString()));
-    }
+    ExplainSql("insert into tb values(1000, 'xyz')", false);
 
     // Explain drop
-    {
-        std::string sql = "explain ast drop table t1";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-
-        LOG_INFO(fmt::format("explain ast: {}", query_result.ToString()));
-    }
-
-    {
-        std::string sql = "explain ast drop database default_db";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-
-        LOG_INFO(fmt::format("explain ast: {}", query_result.ToString()));
-    }
+    ExplainSql("drop table tb", false);
+    ExplainSql("drop database db1", false);
+    ExplainSql("drop collection collection1", false);
 
     // Explain show
-    {
-        std::string sql = "explain ast show database default_db";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-
-        LOG_INFO(fmt::format("explain ast: {}", query_result.ToString()));
-    }
-
-    {
-        std::string sql = "explain ast show table tb";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-
-        LOG_INFO(fmt::format("explain ast: {}", query_result.ToString()));
-    }
-
-    {
-        std::string sql = "explain ast show checkpoint";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-
-        LOG_INFO(fmt::format("explain ast: {}", query_result.ToString()));
-    }
+    ExplainSql("show database default_db", true);
+    ExplainSql("show table tb", true);
+    ExplainSql("show checkpoint", true);
 }
