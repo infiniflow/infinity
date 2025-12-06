@@ -19,6 +19,7 @@ import :meta_info;
 import :new_catalog;
 import :snapshot_info;
 
+import create_index_info;
 import column_def;
 
 namespace infinity {
@@ -30,9 +31,6 @@ class IndexBase;
 // class NewCatalog;
 class NewTxn;
 // enum class UsageFlag;
-
-// Enum for secondary index cardinality
-export enum class SecondaryIndexCardinality : u8 { kHighCardinality = 0, kLowCardinality = 1, kInvalid = 255 };
 
 export class TableIndexMeta {
 public:

@@ -24,6 +24,8 @@ import third_party;
 import create_index_info;
 import global_resource_usage;
 
+import create_index_info;
+
 namespace infinity {
 
 // TODO shenyushi: use definition in knn_exprs.h

@@ -197,6 +197,9 @@ SecondaryIndexInMem::NewSecondaryIndexInMem(const std::shared_ptr<ColumnDef> &co
         }
     } else if (cardinality == SecondaryIndexCardinality::kLowCardinality) {
         switch (column_def->type()->type()) {
+            case LogicalType::kBoolean: {
+                return std::make_shared<SecondaryIndexInMemT<BooleanT, LowCardinalityTag>>(begin_row_id, cardinality);
+            }
             case LogicalType::kTinyInt: {
                 return std::make_shared<SecondaryIndexInMemT<TinyIntT, LowCardinalityTag>>(begin_row_id, cardinality);
             }

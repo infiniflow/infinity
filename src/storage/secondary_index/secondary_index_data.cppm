@@ -34,7 +34,7 @@ class BufferObj;
 class TableIndexMeta;
 
 template <typename T>
-concept KeepOrderedSelf = IsAnyOf<T, TinyIntT, SmallIntT, IntegerT, BigIntT, FloatT, DoubleT>;
+concept KeepOrderedSelf = IsAnyOf<T, BooleanT, TinyIntT, SmallIntT, IntegerT, BigIntT, FloatT, DoubleT>;
 
 template <typename T>
 concept ConvertToOrderedI32 = IsAnyOf<T, DateT, TimeT>;

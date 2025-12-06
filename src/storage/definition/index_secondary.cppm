@@ -21,27 +21,42 @@ import create_index_info;
 
 namespace infinity {
 
-// Does not need any extra member.
 export class IndexSecondary final : public IndexBase {
 public:
     static std::shared_ptr<IndexBase> Make(std::shared_ptr<std::string> index_name,
                                            std::shared_ptr<std::string> index_comment,
                                            const std::string &file_name,
-                                           std::vector<std::string> column_names) {
-        return std::make_shared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names));
+                                           std::vector<std::string> column_names,
+                                           SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality) {
+        return std::make_shared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names), secondary_index_cardinality);
     }
 
     IndexSecondary(std::shared_ptr<std::string> index_name,
                    std::shared_ptr<std::string> index_comment,
                    const std::string &file_name,
-                   std::vector<std::string> column_names)
-        : IndexBase(IndexType::kSecondary, index_name, index_comment, file_name, std::move(column_names)) {}
+                   std::vector<std::string> column_names,
+                   SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality)
+        : IndexBase(IndexType::kSecondary, index_name, index_comment, file_name, std::move(column_names)),
+          secondary_index_cardinality_(secondary_index_cardinality) {}
 
     ~IndexSecondary() final = default;
 
     virtual std::string BuildOtherParamsString() const override;
 
-    static void ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref, const std::string &column_name);
+    virtual i32 GetSizeInBytes() const override;
+
+    virtual void WriteAdv(char *&ptr) const override;
+
+    virtual nlohmann::json Serialize() const override;
+
+    inline SecondaryIndexCardinality GetSecondaryIndexCardinality() const { return secondary_index_cardinality_; }
+
+    static void ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref,
+                                       const std::string &column_name,
+                                       SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality);
+
+private:
+    SecondaryIndexCardinality secondary_index_cardinality_{SecondaryIndexCardinality::kHighCardinality};
 };
 
 } // namespace infinity
