@@ -806,7 +806,7 @@ union yyalloc
 /* YYNNTS -- Number of nonterminals.  */
 #define YYNNTS  120
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  565
+#define YYNRULES  564
 /* YYNSTATES -- Number of states.  */
 #define YYNSTATES  1266
 
@@ -934,7 +934,7 @@ static const yytype_int16 yyrline[] =
     3940,  3946,  3952,  3958,  3964,  3975,  3979,  3984,  4016,  4026,
     4031,  4036,  4041,  4047,  4051,  4052,  4054,  4055,  4057,  4058,
     4070,  4078,  4082,  4085,  4089,  4092,  4096,  4100,  4105,  4111,
-    4121,  4131,  4139,  4150,  4203,  4210
+    4121,  4131,  4139,  4150,  4203
 };
 #endif
 
@@ -1859,7 +1859,7 @@ static const yytype_int16 yyr1[] =
      338,   338,   338,   338,   338,   339,   339,   340,   340,   340,
      340,   340,   340,   341,   342,   342,   343,   343,   344,   344,
      345,   345,   346,   346,   347,   347,   348,   348,   349,   349,
-     349,   349,   349,   350,   350,   350
+     349,   349,   349,   350,   350
 };
 
 /* YYR2[RULE-NUM] -- Number of symbols on the right-hand side of rule RULE-NUM.  */
@@ -1921,7 +1921,7 @@ static const yytype_int8 yyr2[] =
        2,     2,     2,     2,     2,     1,     3,     2,     2,     1,
        2,     2,     2,     1,     2,     0,     3,     0,     1,     0,
        2,     0,     4,     0,     4,     0,     1,     3,     1,     3,
-       3,     3,     3,     6,     3,     6
+       3,     3,     3,     6,     3
 };
 
 
@@ -9765,49 +9765,8 @@ Return4:
 #line 9766 "parser.cpp"
     break;
 
-  case 565: /* index_info: '(' IDENTIFIER ')' USING IDENTIFIER with_index_param_list  */
-#line 4210 "parser.y"
-                                                            {
-    ParserHelper::ToLower((yyvsp[-1].str_value));
-    if(strcmp((yyvsp[-1].str_value), "secondary") != 0) {
-        free((yyvsp[-1].str_value));
-        free((yyvsp[-4].str_value));
-        delete (yyvsp[0].with_index_param_list_t);
-        yyerror(&yyloc, scanner, result, "Secondary index cannot use other index types");
-        YYERROR;
-    }
-    free((yyvsp[-1].str_value));
 
-    (yyval.index_info_t) = new infinity::IndexInfo();
-    (yyval.index_info_t)->index_type_ = infinity::IndexType::kSecondary;
-    ParserHelper::ToLower((yyvsp[-4].str_value));
-    (yyval.index_info_t)->column_name_ = (yyvsp[-4].str_value);
-    (yyval.index_info_t)->index_param_list_ = (yyvsp[0].with_index_param_list_t);
-    
-    if ((yyval.index_info_t)->index_param_list_ != nullptr) {
-        for (auto *param : *((yyval.index_info_t)->index_param_list_)) {
-            if (strcasecmp(param->param_name_.c_str(), "cardinality") == 0) {
-                if (strcasecmp(param->param_value_.c_str(), "high") == 0) {
-                    (yyval.index_info_t)->secondary_index_cardinality_ = infinity::SecondaryIndexCardinality::kHighCardinality;
-                } else if (strcasecmp(param->param_value_.c_str(), "low") == 0) {
-                    (yyval.index_info_t)->secondary_index_cardinality_ = infinity::SecondaryIndexCardinality::kLowCardinality;
-                } else {
-                    delete (yyvsp[0].with_index_param_list_t);
-                    free((yyvsp[-4].str_value));
-                    yyerror(&yyloc, scanner, result, "Invalid cardinality value. Must be 'high' or 'low'");
-                    YYERROR;
-                }
-            }
-        }
-    }
-    
-    free((yyvsp[-4].str_value));
-}
-#line 9807 "parser.cpp"
-    break;
-
-
-#line 9811 "parser.cpp"
+#line 9770 "parser.cpp"
 
       default: break;
     }
@@ -10036,7 +9995,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 4247 "parser.y"
+#line 4212 "parser.y"
 
 
 void
