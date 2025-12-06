@@ -13,9 +13,12 @@
 // limitations under the License.
 
 #include "hnsw_benchmark_util.h"
-#include <cassert>
 
+import std;
+#include <cassert>
 import infinity_core;
+
+using std::size_t;
 import compilation_config;
 
 using namespace infinity;

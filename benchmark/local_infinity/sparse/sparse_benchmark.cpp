@@ -12,13 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "sparse_benchmark_util.h"
+#include <CLI/CLI.hpp>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
 
 import infinity_core;
 import compilation_config;
+
+#include "sparse_benchmark_util.h"
 
 using namespace infinity;
 using namespace benchmark;
