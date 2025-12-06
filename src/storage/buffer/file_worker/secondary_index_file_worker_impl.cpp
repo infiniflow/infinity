@@ -47,7 +47,7 @@ void SecondaryIndexFileWorker::AllocateInMemory() {
             auto secondary_index = std::static_pointer_cast<IndexSecondary>(index_base_);
             cardinality = secondary_index->GetSecondaryIndexCardinality();
         }
-        
+
         // Use the correct factory function based on cardinality
         if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
             data_ = static_cast<void *>(GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(data_type, row_count_, true));
@@ -68,7 +68,7 @@ void SecondaryIndexFileWorker::FreeInMemory() {
             auto secondary_index = std::static_pointer_cast<IndexSecondary>(index_base_);
             cardinality = secondary_index->GetSecondaryIndexCardinality();
         }
-        
+
         if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
             auto index = static_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(data_);
             delete index;
@@ -91,7 +91,7 @@ bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_succ
             auto secondary_index = std::static_pointer_cast<IndexSecondary>(index_base_);
             cardinality = secondary_index->GetSecondaryIndexCardinality();
         }
-        
+
         if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
             auto index = static_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(data_);
             index->SaveIndexInner(*file_handle_);
@@ -116,7 +116,7 @@ void SecondaryIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spil
             auto secondary_index = std::static_pointer_cast<IndexSecondary>(index_base_);
             cardinality = secondary_index->GetSecondaryIndexCardinality();
         }
-        
+
         if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
             auto index = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(column_def_->type(), row_count_, false);
             index->ReadIndexInner(*file_handle_);

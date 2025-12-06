@@ -51,7 +51,9 @@ public:
 
     inline SecondaryIndexCardinality GetSecondaryIndexCardinality() const { return secondary_index_cardinality_; }
 
-    static void ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref, const std::string &column_name, SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality);
+    static void ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref,
+                                       const std::string &column_name,
+                                       SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality);
 
 private:
     SecondaryIndexCardinality secondary_index_cardinality_{SecondaryIndexCardinality::kHighCardinality};
