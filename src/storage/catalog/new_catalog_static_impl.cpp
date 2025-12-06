@@ -42,6 +42,7 @@ import :scalar_function_set;
 import :special_function;
 import :meta_cache;
 import :utility;
+import :index_secondary;
 
 import std;
 import third_party;
@@ -555,8 +556,9 @@ Status NewCatalog::AddNewTableIndex(TableMeta &table_meta,
     
     // Set secondary index cardinality if available
     if (index_base->index_type_ == IndexType::kSecondary) {
-        // Use the secondary index cardinality from the IndexBase
-        status = table_index_meta_ptr->SetSecondaryIndexCardinality(index_base->secondary_index_cardinality_);
+        // Cast to IndexSecondary to access the secondary index cardinality
+        auto secondary_index = std::static_pointer_cast<IndexSecondary>(index_base);
+        status = table_index_meta_ptr->SetSecondaryIndexCardinality(secondary_index->GetSecondaryIndexCardinality());
         if (!status.ok()) {
             return status;
         }

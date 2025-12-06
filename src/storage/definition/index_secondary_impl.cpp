@@ -15,12 +15,14 @@
 module infinity_core:index_secondary.impl;
 
 import :index_secondary;
+import :index_base;
 import :status;
 import :base_table_ref;
 import :infinity_exception;
 
 import std;
 import third_party;
+import serialize;
 
 namespace infinity {
 
@@ -39,6 +41,30 @@ void IndexSecondary::ValidateColumnDataType(const std::shared_ptr<BaseTableRef> 
         // For low cardinality, we allow more data types
         // The actual implementation will handle the low cardinality case differently
     }
+}
+
+i32 IndexSecondary::GetSizeInBytes() const {
+    // Call base class implementation
+    i32 size = IndexBase::GetSizeInBytes();
+    // Add size for secondary index cardinality
+    size += sizeof(SecondaryIndexCardinality);
+    return size;
+}
+
+void IndexSecondary::WriteAdv(char *&ptr) const {
+    // Call base class implementation
+    IndexBase::WriteAdv(ptr);
+    // Write secondary index cardinality
+    WriteBufAdv(ptr, u8(secondary_index_cardinality_));
+}
+
+nlohmann::json IndexSecondary::Serialize() const {
+    // Call base class implementation
+    nlohmann::json res = IndexBase::Serialize();
+    // Add secondary index cardinality for secondary indexes
+    res["secondary_index_cardinality"] = secondary_index_cardinality_ == SecondaryIndexCardinality::kLowCardinality ? "low" : "high";
+
+    return res;
 }
 
 std::string IndexSecondary::BuildOtherParamsString() const { return ""; }

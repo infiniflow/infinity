@@ -41,7 +41,14 @@ void SecondaryIndexFileWorker::AllocateInMemory() {
         UnrecoverableError("AllocateInMemory: Already allocated.");
     } else if (auto &data_type = column_def_->type(); data_type->CanBuildSecondaryIndex()) [[likely]] {
         // Determine cardinality and use appropriate function
-        SecondaryIndexCardinality cardinality = index_base_->GetSecondaryIndexCardinality();
+        // For secondary indexes, cast to IndexSecondary to get cardinality
+        SecondaryIndexCardinality cardinality = SecondaryIndexCardinality::kHighCardinality;
+        if (index_base_->index_type_ == IndexType::kSecondary) {
+            auto secondary_index = std::static_pointer_cast<IndexSecondary>(index_base_);
+            cardinality = secondary_index->GetSecondaryIndexCardinality();
+        }
+        
+        // Use the correct factory function based on cardinality
         if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
             data_ = static_cast<void *>(GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(data_type, row_count_, true));
         } else {
@@ -55,8 +62,20 @@ void SecondaryIndexFileWorker::AllocateInMemory() {
 
 void SecondaryIndexFileWorker::FreeInMemory() {
     if (data_) [[likely]] {
-        auto index = static_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(data_);
-        delete index;
+        // Determine cardinality and delete the correct type
+        SecondaryIndexCardinality cardinality = SecondaryIndexCardinality::kHighCardinality;
+        if (index_base_->index_type_ == IndexType::kSecondary) {
+            auto secondary_index = std::static_pointer_cast<IndexSecondary>(index_base_);
+            cardinality = secondary_index->GetSecondaryIndexCardinality();
+        }
+        
+        if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
+            auto index = static_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(data_);
+            delete index;
+        } else {
+            auto index = static_cast<SecondaryIndexDataBase<LowCardinalityTag> *>(data_);
+            delete index;
+        }
         data_ = nullptr;
         LOG_TRACE("Finished SecondaryIndexFileWorker::FreeInMemory(), deleted data_ ptr.");
     } else {
@@ -66,8 +85,20 @@ void SecondaryIndexFileWorker::FreeInMemory() {
 
 bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (data_) [[likely]] {
-        auto index = static_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(data_);
-        index->SaveIndexInner(*file_handle_);
+        // Determine cardinality and use the correct type
+        SecondaryIndexCardinality cardinality = SecondaryIndexCardinality::kHighCardinality;
+        if (index_base_->index_type_ == IndexType::kSecondary) {
+            auto secondary_index = std::static_pointer_cast<IndexSecondary>(index_base_);
+            cardinality = secondary_index->GetSecondaryIndexCardinality();
+        }
+        
+        if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
+            auto index = static_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(data_);
+            index->SaveIndexInner(*file_handle_);
+        } else {
+            auto index = static_cast<SecondaryIndexDataBase<LowCardinalityTag> *>(data_);
+            index->SaveIndexInner(*file_handle_);
+        }
         prepare_success = true;
         LOG_TRACE("Finished WriteToFileImpl(bool &prepare_success).");
     } else {
@@ -79,15 +110,22 @@ bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_succ
 void SecondaryIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     if (!data_) [[likely]] {
         // Determine cardinality and use appropriate function
-        SecondaryIndexCardinality cardinality = index_base_->GetSecondaryIndexCardinality();
-        SecondaryIndexDataBase<HighCardinalityTag> *index = nullptr;
-        if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
-            index = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(column_def_->type(), row_count_, false);
-        } else {
-            index = reinterpret_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(column_def_->type(), row_count_, false));
+        // For secondary indexes, cast to IndexSecondary to get cardinality
+        SecondaryIndexCardinality cardinality = SecondaryIndexCardinality::kHighCardinality;
+        if (index_base_->index_type_ == IndexType::kSecondary) {
+            auto secondary_index = std::static_pointer_cast<IndexSecondary>(index_base_);
+            cardinality = secondary_index->GetSecondaryIndexCardinality();
         }
-        index->ReadIndexInner(*file_handle_);
-        data_ = static_cast<void *>(index);
+        
+        if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
+            auto index = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(column_def_->type(), row_count_, false);
+            index->ReadIndexInner(*file_handle_);
+            data_ = static_cast<void *>(index);
+        } else {
+            auto index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(column_def_->type(), row_count_, false);
+            index->ReadIndexInner(*file_handle_);
+            data_ = static_cast<void *>(index);
+        }
         LOG_TRACE("Finished ReadFromFileImpl().");
     } else {
         UnrecoverableError("ReadFromFileImpl: data_ is not nullptr");

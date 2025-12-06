@@ -84,10 +84,6 @@ int32_t IndexBase::GetSizeInBytes() const {
     for (const std::string &column_name : column_names_) {
         size += sizeof(int32_t) + column_name.length();
     }
-    // Add size for secondary index cardinality if this is a secondary index
-    if (index_type_ == IndexType::kSecondary) {
-        size += sizeof(SecondaryIndexCardinality);
-    }
     return size;
 }
 
@@ -99,10 +95,6 @@ void IndexBase::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, static_cast<int32_t>(column_names_.size()));
     for (const std::string &column_name : column_names_) {
         WriteBufAdv(ptr, column_name);
-    }
-    // Write secondary index cardinality for secondary indexes
-    if (index_type_ == IndexType::kSecondary) {
-        WriteBufAdv(ptr, secondary_index_cardinality_);
     }
 }
 
@@ -169,12 +161,8 @@ std::shared_ptr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes
             break;
         }
         case IndexType::kSecondary: {
-            // Read secondary index cardinality
-            SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality;
-            if (ptr < ptr_end) {
-                secondary_index_cardinality = ReadBufAdv<SecondaryIndexCardinality>(ptr);
-            }
-            res = std::make_shared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names), secondary_index_cardinality);
+            SecondaryIndexCardinality cardinality = SecondaryIndexCardinality(ReadBufAdv<u8>(ptr));
+            res = std::make_shared<IndexSecondary>(index_name, index_comment, file_name, column_names, cardinality);
             break;
         }
         case IndexType::kEMVB: {
@@ -228,10 +216,6 @@ nlohmann::json IndexBase::Serialize() const {
     res["index_comment"] = *index_comment_;
     res["file_name"] = file_name_;
     res["column_names"] = column_names_;
-    // Add secondary index cardinality for secondary indexes
-    if (index_type_ == IndexType::kSecondary) {
-        res["secondary_index_cardinality"] = secondary_index_cardinality_ == SecondaryIndexCardinality::kLowCardinality ? "low" : "high";
-    }
     return res;
 }
 
@@ -319,14 +303,7 @@ std::shared_ptr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str
             break;
         }
         case IndexType::kSecondary: {
-            // Read secondary index cardinality from JSON, default to high cardinality if not present
-            SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality;
-            if (std::string cardinality_str; doc["secondary_index_cardinality"].get<std::string>(cardinality_str) == simdjson::SUCCESS) {
-                if (cardinality_str == "low") {
-                    secondary_index_cardinality = SecondaryIndexCardinality::kLowCardinality;
-                }
-            }
-            res = std::make_shared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names), secondary_index_cardinality);
+            res = std::make_shared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names));
             break;
         }
         case IndexType::kEMVB: {
