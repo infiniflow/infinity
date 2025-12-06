@@ -279,17 +279,16 @@ jobs:
         run: |
           uv run python3 tools/sqllogictest.py
 
-      - name: Stop infinity
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          python3 scripts/timeout_kill.py 10 $(pgrep infinity || true)
-
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_sqllogic_test/ && cp debug_sqllogictest*.log ${ARTIFACTS_DIR}/debug_sqllogic_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_sqllogic_test/
           echo "debug sqllogictest log" && tail -n 1000 debug_sqllogictest*.log
+
+      - name: Stop infinity
+        if: always()
+        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
 
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
@@ -371,17 +370,16 @@ jobs:
         run: |
           uv run python3 tools/run_pysdk_remote_infinity_test.py
 
-      - name: Stop infinity
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          python3 scripts/timeout_kill.py 10 $(pgrep infinity || true)
-
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_pysdk_test && cp debug_pysdk*.log ${ARTIFACTS_DIR}/debug_pysdk_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_pysdk_test/
           echo "debug pysdk log" && tail -n 1000 debug_pysdk*.log
+
+      - name: Stop infinity
+        if: always()
+        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
 
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
@@ -431,17 +429,16 @@ jobs:
         run: |
           uv run python3 tools/run_http_api.py
 
-      - name: Stop infinity
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          python3 scripts/timeout_kill.py 10 $(pgrep infinity || true)
-
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_http_test && cp debug_http*.log ${ARTIFACTS_DIR}/debug_http_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_http_test/
           echo "debug http log" && tail -n 1000 debug_http*.log
+
+      - name: Stop infinity
+        if: always()
+        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
 
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
@@ -492,17 +489,16 @@ jobs:
         run: |
           uv run python3 tools/run_parallel_test.py
 
-      - name: Stop infinity
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          python3 scripts/timeout_kill.py 10 $(pgrep infinity || true)
-
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_parallel_test && cp debug_parallel_stderr.log ${ARTIFACTS_DIR}/debug_parallel_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_parallel_test/
           echo "debug parallel log" && tail -n 1000 debug_parallel*.log
+
+      - name: Stop infinity
+        if: always()
+        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
 
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
@@ -665,11 +661,6 @@ jobs:
         run: |
           uv run python3 tools/sqllogictest.py
 
-      - name: Stop infinity
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          python3 scripts/timeout_kill.py 10 $(pgrep infinity || true)
-
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
@@ -677,6 +668,10 @@ jobs:
           cp reldeb_sqllogic_test* ${ARTIFACTS_DIR}/reldeb_sqllogic_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_sqllogic_test/
           echo "reldeb sqllogic test log" && tail -n 1000 reldeb_sqllogic_test*.log
+
+      - name: Stop infinity
+        if: always()
+        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
 
   reldeb_pysdk_test:
     name: reldeb_pysdk_test
@@ -709,17 +704,16 @@ jobs:
         run: |
           uv run python3 tools/run_pysdk_remote_infinity_test.py
 
-      - name: Stop infinity
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          python3 scripts/timeout_kill.py 10 $(pgrep infinity || true)
-
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_pysdk_test && cp reldeb_pysdk*.log ${ARTIFACTS_DIR}/reldeb_pysdk_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_pysdk_test/
           echo "reldeb pysdk log" && tail -n 1000 reldeb_pysdk*.log
+
+      - name: Stop infinity
+        if: always()
+        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
 
   reldeb_http_test:
     name: reldeb_http_test
@@ -752,17 +746,16 @@ jobs:
         run: |
           uv run python3 tools/run_http_api.py
 
-      - name: Stop infinity
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          python3 scripts/timeout_kill.py 10 $(pgrep infinity || true)
-
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_http_test && cp reldeb_http*.log ${ARTIFACTS_DIR}/reldeb_http_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_http_test/
           echo "reldeb http log" && tail -n 1000 reldeb_http*.log
+
+      - name: Stop infinity
+        if: always()
+        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
 
   reldeb_pysdk_parallel_test:
     name: reldeb_pysdk_parallel_test
@@ -795,17 +788,16 @@ jobs:
         run: |
           uv run python3 tools/run_parallel_test.py
 
-      - name: Stop infinity
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          python3 scripts/timeout_kill.py 10 $(pgrep infinity || true)
-
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_pysdk_parallel_test && cp reldeb_pysdk_parallel*.log ${ARTIFACTS_DIR}/reldeb_pysdk_parallel_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_pysdk_parallel_test/
           echo "reldeb parallel log" && tail -n 1000 reldeb_pysdk_parallel*.log
+
+      - name: Stop infinity
+        if: always()
+        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
 
   reldeb_minio_pysdk_test:
     name: reldeb_minio_pysdk_test
@@ -853,17 +845,16 @@ jobs:
         run: |
           uv run python3 tools/run_pysdk_remote_infinity_test.py
 
-      - name: Stop infinity
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          python3 scripts/timeout_kill.py 10 $(pgrep infinity || true)
-
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_minio_pysdk_test && cp reldeb_minio_pysdk*.log ${ARTIFACTS_DIR}/reldeb_minio_pysdk_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_minio_pysdk_test/
           echo "reldeb minio pysdk log" && tail -n 1000 reldeb_minio_pysdk*.log
+
+      - name: Stop infinity
+        if: always()
+        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
 
       - name: Remove minio container
         if: always()
@@ -917,17 +908,16 @@ jobs:
         run: |
           uv run python3 tools/run_parallel_test.py
 
-      - name: Stop infinity
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          python3 scripts/timeout_kill.py 10 $(pgrep infinity || true)
-
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_minio_parallel_test && cp reldeb_minio_parallel*.log ${ARTIFACTS_DIR}/reldeb_minio_parallel_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_minio_parallel_test/
           echo "reldeb minio parallel log" && tail -n 1000 reldeb_minio_parallel*.log
+
+      - name: Stop infinity
+        if: always()
+        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
 
       - name: Remove minio container
         if: always()

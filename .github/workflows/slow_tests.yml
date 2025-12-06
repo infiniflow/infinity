@@ -240,17 +240,16 @@ jobs:
         run: |
           uv run python3 tools/run_parallel_test.py
 
-      - name: Stop infinity
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          python3 scripts/timeout_kill.py 10 $(pgrep infinity || true)
-
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_tsan_parallel_test && sudo chown -R ${USER} . && cp debug_tsan_parallel*.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
           echo "debug tsan parallel log" && tail -n 1000 debug_tsan_parallel*.log
+
+      - name: Stop infinity
+        if: always()
+        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
 
   reldeb_build:
     name: reldeb_build
@@ -371,17 +370,16 @@ jobs:
         run: |
           uv run python3 tools/run_pytest_parallel_continuous.py
 
-      - name: Stop infinity
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          python3 scripts/timeout_kill.py 10 $(pgrep infinity || true)
-
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_parallel_test && cp reldeb_parallel_stderr.log ${ARTIFACTS_DIR}/reldeb_parallel_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_parallel_test/
           echo "reldeb parallel log" && tail -n 1000 reldeb_parallel*.log
+
+      - name: Stop infinity
+        if: always()
+        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
 
   reldeb_restart_test:
     name: reldeb_restart_test
