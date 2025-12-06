@@ -1,4 +1,3 @@
-import sys
 import os
 import pandas as pd
 from numpy import dtype
@@ -9,13 +8,8 @@ import infinity.index as index
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-from infinity_http import infinity_http
+from infinity.infinity_http import infinity_http
 from common.utils import copy_data
-import importlib
 
 test_csv_file = "embedding_int_dim3.csv"
 test_export_csv_file = "export_embedding_int_dim3.csv"
@@ -64,7 +58,7 @@ class TestInfinity:
         db_name = ""
         with pytest.raises(Exception,
                            match=f"DB name '{db_name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores"):
-            db = infinity_obj.create_database("")
+            infinity_obj.create_database("")
         assert infinity_obj.disconnect()
 
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",

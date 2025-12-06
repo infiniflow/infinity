@@ -1,8 +1,5 @@
 import time
 
-from numpy import dtype
-import pandas as pd
-import pytest
 from infinity_cluster import InfinityCluster
 from infinity.common import ConflictType
 from infinity.common import InfinityException
@@ -78,7 +75,7 @@ class TestTable:
             cluster.set_follower("node2")
             time.sleep(1)
 
-            infinity1 = cluster.client("node1")
+            cluster.client("node1")
             infinity2 = cluster.client("node2")
 
             db = infinity2.get_database("default_db")

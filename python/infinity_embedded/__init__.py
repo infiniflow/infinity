@@ -16,7 +16,6 @@
 #
 # __version__ = importlib.metadata.version("infinity_sdk")
 
-import os
 # import pkg_resources
 # __version__ = pkg_resources.get_distribution("infinity_sdk").version
 
@@ -25,6 +24,12 @@ from infinity_embedded.common import URI, NetworkAddress, LOCAL_HOST, LOCAL_INFI
 from infinity_embedded.infinity import InfinityConnection
 from infinity_embedded.local_infinity.infinity import LocalInfinityConnection
 from infinity_embedded.errors import ErrorCode
+
+__all__ = [
+    "URI", "NetworkAddress", "LOCAL_HOST", "LOCAL_INFINITY_PATH", "InfinityException",
+    "LOCAL_INFINITY_CONFIG_PATH", "InfinityConnection", "LocalInfinityConnection", "ErrorCode", "connect"
+]
+
 
 
 def connect(uri=LOCAL_INFINITY_PATH, config_path=LOCAL_INFINITY_CONFIG_PATH) -> InfinityConnection:

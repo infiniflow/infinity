@@ -17,10 +17,10 @@ def prepare_huqie_file(source_file, target_dir):
 
     target_file = target_dir / "huqie.txt"
     if target_file.exists():
-        print(f"Copying huqie.txt completed")
+        print("Copying huqie.txt completed")
         print(f"   Size: {target_file.stat().st_size} byte")
     else:
-        print(f"Copying huqie.txt failed")
+        print("Copying huqie.txt failed")
         return False
 
     print("Generate huqie.txt.trie")
@@ -29,10 +29,10 @@ def prepare_huqie_file(source_file, target_dir):
 
     trie_file = target_dir / "huqie.txt.trie"
     if trie_file.exists():
-        print(f"Generating huqie.txt.trie completed")
+        print("Generating huqie.txt.trie completed")
         print(f"   Size: {trie_file.stat().st_size} byte")
     else:
-        print(f"Generating huqie.txt.trie failed")
+        print("Generating huqie.txt.trie failed")
         return False
 
     return True

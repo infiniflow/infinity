@@ -4,7 +4,12 @@ from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 import pytest
 from common import common_values
 from infinity.common import ConflictType
-from restart_util import *
+from restart_util import (
+    SimpleEmbeddingGenerator,
+    SimpleVarcharGenerator,
+    SimpleTensorGenerator,
+)
+from infinity import index
 import infinity
 import pathlib
 from infinity.errors import ErrorCode
@@ -249,7 +254,7 @@ class TestCleanup:
                 "idx2", index.IndexInfo("c2", index.IndexType.FullText)
             )
 
-            res = (
+            (
                 table_obj.output(["c1"])
                 .match_text(fields="c1", matching_text="text1", topn=1)
                 .to_result()

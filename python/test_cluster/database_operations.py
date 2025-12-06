@@ -3,9 +3,8 @@ import time
 import infinity_http
 from numpy import dtype
 import pandas as pd
-import time
-from infinity.common import ConflictType
-from dataclasses import dataclass
+from infinity.common import ConflictType, InfinityException
+from infinity.errors import ErrorCode
 from typing import Dict, Set, Tuple
 
 

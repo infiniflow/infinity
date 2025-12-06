@@ -122,7 +122,7 @@ class TestMemIdx:
                 "test_memidx1",
                 {"c1": {"type": "int"}, "c2": {"type": "vector,4,float"}},
             )
-            res = table_obj.create_index(
+            table_obj.create_index(
                 "idx1",
                 index.IndexInfo(
                     "c2",
@@ -669,8 +669,6 @@ class TestMemIdx:
         infinity_runner.clear()
 
         uri = common_values.TEST_LOCAL_HOST
-        data_dir = "/var/infinity/data"
-        catalog_dir = "/var/infinity/data/catalog"
 
         config1 = "test/data/config/restart_test/test_memidx/5.toml"
         config2 = "test/data/config/restart_test/test_memidx/4.toml"

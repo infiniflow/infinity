@@ -18,7 +18,6 @@ This example is to connect local infinity instance, create table, insert data, s
 
 import infinity
 import sys
-from infinity.table import ExplainType
 
 try:
     # open a local directory(default = "/var/infinity") or connect to server(default = NetworkAddress("127.0.0.1", 23817)) to store the data

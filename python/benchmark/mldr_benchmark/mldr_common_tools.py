@@ -370,8 +370,8 @@ def get_colbert_model(model_args):
 def save_colbert_list(multivec_embeddings, multivec_save_file: str):
     with open(multivec_save_file, 'wb') as f:
         for one_multivec in tqdm(multivec_embeddings, desc="Saving multivec embeddings"):
-            l, dim = one_multivec.shape
-            f.write(struct.pack('<i', l))
+            length, dim = one_multivec.shape
+            f.write(struct.pack('<i', length))
             for vec in one_multivec:
                 f.write(struct.pack('<i', dim))
                 vec.astype('float32').tofile(f)

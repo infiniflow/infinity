@@ -13,18 +13,15 @@
 // limitations under the License.
 
 #include "InfinityService.h"
-#include <cassert>
-#include <fstream>
-#include <functional>
-#include <iostream>
-#include <memory>
-#include <thread>
 #include <thrift/protocol/TBinaryProtocol.h>
 #include <thrift/transport/TSocket.h>
 #include <thrift/transport/TTransportUtils.h>
-#include <unordered_set>
 
+import std;
+#include <cassert>
 import infinity_core;
+
+using std::size_t;
 import compilation_config;
 import statement_common;
 import internal_types;

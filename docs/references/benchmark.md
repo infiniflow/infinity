@@ -37,8 +37,9 @@ Test environment:
 1. Install necessary dependencies.
 
 ```bash
-cd python/benchmark
-pip install -r requirements.txt
+uv sync --all-extras
+
+
 ```
 
 2. Download the required Benchmark datasets to your **/datasets** folder：
@@ -203,10 +204,9 @@ mv gist/gist_groundtruth.ivecs test/data/benchmark/gist_1m/gist_groundtruth.ivec
 ### Benchmark dependencies
 
 ```sh
-cd python
+uv sync --all-extras
 
-pip install -r requirements.txt
-pip install .
+
 ```
 
 ### Import the Benchmark datasets

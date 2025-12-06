@@ -12,19 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import std;
 #include <cassert>
-#include <functional>
-#include <iostream>
-#include <memory>
-#include <thread>
-#include <unordered_set>
-
 import infinity_core;
+
+using std::size_t;
 import compilation_config;
 import embedding_info;
 import logical_type;
 import internal_types;
 import parsed_expr;
+import search_expr;
 import column_expr;
 import constant_expr;
 import update_statement;
@@ -40,8 +38,10 @@ using namespace infinity;
 
 constexpr u64 second_unit = 1000 * 1000 * 1000;
 
-double
-Measurement(String name, size_t thread_num, size_t times, const std::function<void(size_t, std::shared_ptr<Infinity>, std::thread::id)> &closure) {
+double Measurement(std::string name,
+                   size_t thread_num,
+                   size_t times,
+                   const std::function<void(size_t, std::shared_ptr<Infinity>, std::thread::id)> &closure) {
     infinity::BaseProfiler profiler(name);
     std::vector<std::thread> threads;
     threads.reserve(thread_num);
@@ -75,7 +75,7 @@ int main() {
     // For Sift1M
     size_t total_times = 100 * 100;
 
-    String path = "/var/infinity";
+    std::string path = "/var/infinity";
 
     VirtualStore::CleanupDirectory(path);
 
@@ -84,7 +84,7 @@ int main() {
     std::cout << ">>> Infinity Benchmark Start <<<" << std::endl;
     std::cout << "std::thread Num: " << thread_num << ", Times: " << total_times << std::endl;
 
-    std::vector<String> results;
+    std::vector<std::string> results;
     // Database
     {
         auto tims_costing_second =
@@ -127,12 +127,12 @@ int main() {
         column_defs.reserve(column_count);
 
         std::shared_ptr<DataType> col_type = std::make_shared<DataType>(LogicalType::kInteger);
-        String col_name_1 = "col1";
+        std::string col_name_1 = "col1";
         auto col_def_1 = new ColumnDef(0, col_type, col_name_1, std::set<ConstraintType>());
         column_defs.emplace_back(col_def_1);
 
         col_type = std::make_shared<DataType>(LogicalType::kInteger);
-        String col_name_2 = "col2";
+        std::string col_name_2 = "col2";
         auto col_def_2 = new ColumnDef(1, col_type, col_name_2, std::set<ConstraintType>());
         column_defs.emplace_back(col_def_2);
         {
@@ -174,12 +174,12 @@ int main() {
                     column_definitions.reserve(column_count);
 
                     std::shared_ptr<DataType> col_type = std::make_shared<DataType>(LogicalType::kInteger);
-                    String col_name_1 = "col1";
+                    std::string col_name_1 = "col1";
                     auto col_def_1 = new ColumnDef(0, col_type, col_name_1, std::set<ConstraintType>());
                     column_definitions.emplace_back(col_def_1);
 
                     col_type = std::make_shared<DataType>(LogicalType::kInteger);
-                    String col_name_2 = "col2";
+                    std::string col_name_2 = "col2";
                     auto col_def_2 = new ColumnDef(1, col_type, col_name_2, std::set<ConstraintType>());
                     column_definitions.emplace_back(col_def_2);
 
@@ -203,7 +203,7 @@ int main() {
             {
                 auto tims_costing_second =
                     Measurement("Select", thread_num, total_times, [&](size_t i, std::shared_ptr<Infinity> infinity, std::thread::id thread_id) {
-                        std::vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
+                        std::vector<ParsedExpr *> *output_columns = new std::vector<ParsedExpr *>();
                         ColumnExpr *col1 = new ColumnExpr();
                         col1->names_.emplace_back("col1");
                         output_columns->emplace_back(col1);
@@ -212,9 +212,10 @@ int main() {
                         col2->names_.emplace_back("col2");
                         output_columns->emplace_back(col2);
 
+                        SearchExpr *search_expr = nullptr;
                         [[maybe_unused]] auto ignored = infinity->Search("default_db",
                                                                          "benchmark_test",
-                                                                         nullptr,
+                                                                         search_expr,
                                                                          nullptr,
                                                                          nullptr,
                                                                          nullptr,
@@ -238,7 +239,7 @@ int main() {
                         auto value2 = std::make_unique<ConstantExpr>(LiteralType::kInteger);
                         value2->integer_value_ = i;
                         insert_row->values_.emplace_back(std::move(value2));
-                        auto insert_rows = new Vector<InsertRowExpr *>({insert_row.release()});
+                        auto insert_rows = new std::vector<InsertRowExpr *>({insert_row.release()});
                         [[maybe_unused]] auto ignored = infinity->Insert("default_db", "benchmark_test", insert_rows);
                     });
                 results.push_back(fmt::format("-> Insert QPS: {}", total_times / tims_costing_second));
@@ -246,9 +247,9 @@ int main() {
             {
                 auto tims_costing_second =
                     Measurement("Update", thread_num, total_times, [&](size_t i, std::shared_ptr<Infinity> infinity, std::thread::id thread_id) {
-                        Vector<UpdateExpr *> *values = new Vector<UpdateExpr *>();
+                        std::vector<UpdateExpr *> *values = new std::vector<UpdateExpr *>();
 
-                        Vector<String> *columns = new Vector<String>();
+                        std::vector<std::string> *columns = new std::vector<std::string>();
                         columns->emplace_back(col_name_1);
                         columns->emplace_back(col_name_2);
 
@@ -284,8 +285,8 @@ int main() {
         size_t sort_row = 1000 * 1000;
         size_t sort_times = 48 * 10;
 
-        String col_name_1 = "c1";
-        String col_name_2 = "c2";
+        std::string col_name_1 = "c1";
+        std::string col_name_2 = "c2";
 
         std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
@@ -294,7 +295,7 @@ int main() {
             CreateTableOptions create_table_opts;
 
             size_t column_count = 2;
-            Vector<ColumnDef *> column_definitions;
+            std::vector<ColumnDef *> column_definitions;
             column_definitions.reserve(column_count);
 
             auto col_def_1 = new ColumnDef(0, col_type, col_name_1, std::set<ConstraintType>());
@@ -305,7 +306,7 @@ int main() {
 
             std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
             [[maybe_unused]] auto ignored =
-                infinity->CreateTable("default_db", "benchmark_test", column_definitions, Vector<TableConstraint *>(), create_table_opts);
+                infinity->CreateTable("default_db", "benchmark_test", column_definitions, std::vector<TableConstraint *>(), create_table_opts);
             infinity->LocalDisconnect();
         }
         {
@@ -321,7 +322,7 @@ int main() {
                                                        auto value2 = std::make_unique<ConstantExpr>(LiteralType::kInteger);
                                                        value2->integer_value_ = std::rand();
                                                        insert_row->values_.emplace_back(std::move(value2));
-                                                       auto insert_rows = new Vector<InsertRowExpr *>({insert_row.release()});
+                                                       auto insert_rows = new std::vector<InsertRowExpr *>({insert_row.release()});
                                                        [[maybe_unused]] auto ignored = infinity->Insert("default_db", "benchmark_test", insert_rows);
                                                    });
             results.push_back(fmt::format("-> Insert for Sort Time: {}s", tims_costing_second));
@@ -329,7 +330,7 @@ int main() {
         {
             auto tims_costing_second =
                 Measurement("Select Sort", thread_num, sort_times, [&](size_t i, std::shared_ptr<Infinity> infinity, std::thread::id thread_id) {
-                    Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
+                    std::vector<ParsedExpr *> *output_columns = new std::vector<ParsedExpr *>();
                     ColumnExpr *col1 = new ColumnExpr();
                     col1->names_.emplace_back("col1");
                     output_columns->emplace_back(col1);
@@ -391,7 +392,7 @@ int main() {
             index_info->index_param_list_ = index_param_list;
         }
 
-        String index_comment = "";
+        std::string index_comment = "";
         infinity->CreateIndex(db_name, table_name, index_name, index_comment, index_info, CreateIndexOptions());
     } while (false);
 

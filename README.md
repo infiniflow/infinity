@@ -66,7 +66,8 @@ This section provides guidance on deploying the Infinity database using Docker, 
   - Linux with glibc 2.17+.
   - Windows 10+ with WSL/WSL2.
   - MacOS
-- Python: Python 3.10+.
+- Python: Python 3.11+.
+
 
 ### Install Infinity server
 

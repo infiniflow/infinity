@@ -3,7 +3,15 @@ import threading
 import time
 import pytest
 from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
-from restart_util import *
+from restart_util import (
+    SimpleEmbeddingGenerator,
+    SimpleVarcharGenerator,
+    SimpleTensorGenerator,
+    EnwikiGenerator,
+    SiftGenerator,
+    LChYDataGenerato,
+)
+from infinity import index
 from common import common_values
 from infinity.common import ConflictType
 import random

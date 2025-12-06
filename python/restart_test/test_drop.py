@@ -1,4 +1,3 @@
-import infinity
 from common import common_values
 from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 import time
@@ -40,7 +39,7 @@ class TestDrop:
 
             db_obj = infinity_obj.get_database("default_db")
             try:
-                table_obj = db_obj.get_table("test_drop")
+                db_obj.get_table("test_drop")
             except Exception as e:
                 assert e.error_code == ErrorCode.TABLE_NOT_EXIST
 

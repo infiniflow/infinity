@@ -1,7 +1,5 @@
 import infinity
-from infinity.table import ExplainType
 from infinity import index
-import sys
 import os
 import time
 # from common import common_values

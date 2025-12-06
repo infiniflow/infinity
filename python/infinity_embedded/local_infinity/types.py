@@ -381,7 +381,7 @@ def parse_datetime_bytes(column_vector):
     epoch = datetime(1970, 1, 1)
     for i in range(0, len(parsed_list), 2):
         if i + 1 < len(parsed_list):
-            datetime_list.append((epoch + timedelta(days = parsed_list[i], seconds = parsed_list[i + 1])).strftime('%Y-%m-%d %H:%M:%S'));
+            datetime_list.append((epoch + timedelta(days = parsed_list[i], seconds = parsed_list[i + 1])).strftime('%Y-%m-%d %H:%M:%S'))
     return datetime_list
 
 
@@ -403,7 +403,6 @@ def parse_sparse_bytes(column_data_type: WrapDataType, column_vector):
 
 
 def parse_single_sparse_bytes(column_data_type: WrapDataType, column_vector, offset):
-    dimension = column_data_type.sparse_type.dimension
     element_type = column_data_type.sparse_type.element_type
     index_type = column_data_type.sparse_type.index_type
     nnz = struct.unpack('I', column_vector[offset:offset + 4])[0]

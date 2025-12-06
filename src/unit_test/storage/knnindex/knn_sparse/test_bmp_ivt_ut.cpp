@@ -29,8 +29,6 @@ import :infinity_exception;
 import :local_file_handle;
 import third_party;
 
-import compilation_config;
-
 using namespace infinity;
 
 class BMPIvtTest : public BaseTest {
@@ -46,8 +44,8 @@ protected:
 
         const SparseMatrix dataset = SparseTestUtil<DataType, IdxType>::GenerateDataset(nrow, ncol, sparsity, 0.0, 10.0);
 
-        std::string save_path = std::string(tmp_data_path()) + "/bmpivt_test1.index";
-        // std::string save2_path = std::string(tmp_data_path()) + "/bmpivt_test2.index";
+        std::string save_path = std::string(GetFullDataDir()) + "/bmpivt_test1.index";
+        // std::string save2_path = std::string(GetFullDataDir()) + "/bmpivt_test2.index";
 
         auto check = [&](const BMPIvt1 &ivt1, const BMPIvt2 &ivt2, BMPBlockID block_num) {
             for (BMPBlockID block_id = 0; block_id < block_num; ++block_id) {

@@ -231,7 +231,7 @@ class RemoteTable():
         options.has_header = False
         options.delimiter = ','
         options.copy_file_type = ttypes.CopyFileType.CSV
-        if import_options != None:
+        if import_options is not None:
             for k, v in import_options.items():
                 key = k.lower()
                 if key == 'file_type':
@@ -284,7 +284,7 @@ class RemoteTable():
         options.limit = 0
         options.row_limit = 0
 
-        if export_options != None:
+        if export_options is not None:
             for k, v in export_options.items():
                 key = k.lower()
                 if key == 'file_type':

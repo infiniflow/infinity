@@ -1,20 +1,12 @@
-import importlib
-import sys
-import os
 import os
 import pytest
 from common import common_values
 import infinity
 from infinity.errors import ErrorCode
-from infinity.common import ConflictType, InfinityException
+from infinity.common import ConflictType
 
-from common.utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs, \
-    generate_commas_enwiki, read_fvecs_file
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-from infinity_http import infinity_http
+from common.utils import copy_data, read_fvecs_file
+from infinity.infinity_http import infinity_http
 
 @pytest.fixture(scope="class")
 def http(request):

@@ -85,7 +85,7 @@ class TestShutDownPytest:
                 try:
                     infinity_obj.get_database("default_db")
                     break
-                except Exception as e:
+                except Exception:
                     infinity_runner.logger.debug(f"retry connect {i}")
                     time.sleep(0.5)
             else:
