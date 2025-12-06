@@ -303,7 +303,13 @@ std::shared_ptr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str
             break;
         }
         case IndexType::kSecondary: {
-            res = std::make_shared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names));
+            SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality;
+            if (std::string cardinality_json; doc["secondary_index_cardinality"].get<std::string>(cardinality_json) == simdjson::SUCCESS) {
+                if (cardinality_json == "low") {
+                    secondary_index_cardinality = SecondaryIndexCardinality::kLowCardinality;
+                }
+            }
+            res = std::make_shared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names), secondary_index_cardinality);
             break;
         }
         case IndexType::kEMVB: {
