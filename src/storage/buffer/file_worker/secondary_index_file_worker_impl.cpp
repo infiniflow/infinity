@@ -25,6 +25,7 @@ import :infinity_exception;
 import :persistence_manager;
 
 import third_party;
+import create_index_info;
 
 namespace infinity {
 
@@ -39,7 +40,13 @@ void SecondaryIndexFileWorker::AllocateInMemory() {
     if (data_) [[unlikely]] {
         UnrecoverableError("AllocateInMemory: Already allocated.");
     } else if (auto &data_type = column_def_->type(); data_type->CanBuildSecondaryIndex()) [[likely]] {
-        data_ = static_cast<void *>(GetSecondaryIndexData(data_type, row_count_, true));
+        // Determine cardinality and use appropriate function
+        SecondaryIndexCardinality cardinality = index_base_->GetSecondaryIndexCardinality();
+        if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
+            data_ = static_cast<void *>(GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(data_type, row_count_, true));
+        } else {
+            data_ = static_cast<void *>(GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, row_count_, true));
+        }
         LOG_TRACE("Finished AllocateInMemory().");
     } else {
         UnrecoverableError(fmt::format("Cannot build secondary index on data type: {}", data_type->ToString()));
@@ -48,7 +55,7 @@ void SecondaryIndexFileWorker::AllocateInMemory() {
 
 void SecondaryIndexFileWorker::FreeInMemory() {
     if (data_) [[likely]] {
-        auto index = static_cast<SecondaryIndexData *>(data_);
+        auto index = static_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(data_);
         delete index;
         data_ = nullptr;
         LOG_TRACE("Finished SecondaryIndexFileWorker::FreeInMemory(), deleted data_ ptr.");
@@ -59,7 +66,7 @@ void SecondaryIndexFileWorker::FreeInMemory() {
 
 bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (data_) [[likely]] {
-        auto index = static_cast<SecondaryIndexData *>(data_);
+        auto index = static_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(data_);
         index->SaveIndexInner(*file_handle_);
         prepare_success = true;
         LOG_TRACE("Finished WriteToFileImpl(bool &prepare_success).");
@@ -71,7 +78,14 @@ bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_succ
 
 void SecondaryIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     if (!data_) [[likely]] {
-        auto index = GetSecondaryIndexData(column_def_->type(), row_count_, false);
+        // Determine cardinality and use appropriate function
+        SecondaryIndexCardinality cardinality = index_base_->GetSecondaryIndexCardinality();
+        SecondaryIndexDataBase<HighCardinalityTag> *index = nullptr;
+        if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
+            index = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(column_def_->type(), row_count_, false);
+        } else {
+            index = reinterpret_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(column_def_->type(), row_count_, false));
+        }
         index->ReadIndexInner(*file_handle_);
         data_ = static_cast<void *>(index);
         LOG_TRACE("Finished ReadFromFileImpl().");

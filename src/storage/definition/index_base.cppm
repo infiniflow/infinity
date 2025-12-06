@@ -100,6 +100,8 @@ public:
 
     bool ContainsColumn(const std::string &column_name) const;
 
+    inline SecondaryIndexCardinality GetSecondaryIndexCardinality() const { return secondary_index_cardinality_; }
+
 public:
     IndexType index_type_{IndexType::kInvalid};
     std::shared_ptr<std::string> index_name_{};
