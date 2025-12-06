@@ -1,7 +1,5 @@
-import time
 
 import infinity.index as index
-import pytest
 import random
 from threading import Thread, Lock
 from infinity.common import ConflictType
@@ -24,7 +22,7 @@ class TestInsertDeleteParallel:
         db_obj = infinity_obj.get_database(db_name)
         res = db_obj.drop_table(table_name, ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
-        table_obj = db_obj.create_table(
+        db_obj.create_table(
             table_name, {"id": {"type": "int64"}, "text": {"type": "varchar"}}, ConflictType.Error
         )
         connection_pool.release_conn(infinity_obj)
@@ -80,7 +78,7 @@ def worker_thread(connection_pool: ConnectionPool, count_num, thread_id):
     db_obj = infinity_obj.get_database(db_name)
     table_obj = db_obj.get_table(table_name)
     while True:
-        choice = random.randint(0, 1)
+        random.randint(0, 1)
         start_i = 0
         lock.acquire()
         if count_num[0] < max_count and random.randint(0, 1) == 0:

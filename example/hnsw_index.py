@@ -18,7 +18,6 @@ This example is about connecting to the local infinity instance, creating table,
 
 import infinity
 import sys
-import time
 
 try:
     # Use infinity_embedded module to open a local directory

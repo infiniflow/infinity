@@ -29,8 +29,6 @@ import :sparse_test_util;
 import :virtual_store;
 import :local_file_handle;
 
-import compilation_config;
-
 using namespace infinity;
 
 class HnswSparseTest : public BaseTest {
@@ -59,7 +57,7 @@ protected:
             hnsw_index->InsertVecs(std::move(iter));
 
             {
-                std::filesystem::path dump_path = std::filesystem::path(tmp_data_path()) / "dump.txt";
+                std::filesystem::path dump_path = std::filesystem::path(GetFullDataDir()) / "dump.txt";
                 std::fstream ss(dump_path, std::fstream::out);
                 if (!ss.is_open()) {
                     UnrecoverableError("Failed to open file");

@@ -32,7 +32,7 @@ try:
 
     try:
         table_obj = db_instance.get_table("test_mem_ivf")
-    except infinity.common.InfinityException as e:
+    except infinity.common.InfinityException:
         # # Drop my_table if it already exists
         # db_instance.drop_table("test_mem_ivf", infinity.common.ConflictType.Ignore)
 

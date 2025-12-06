@@ -1,16 +1,9 @@
-import time
 
 import pytest
 from infinity_cluster import InfinityCluster
-from numpy import dtype
-import pandas as pd
-import time
-from infinity.errors import ErrorCode
 from infinity.common import InfinityException
-from infinity.common import ConflictType
-from database_operations import do_some_operations_cluster, instance_state, clear_instance
-from infinity_http import database_result
-import logging
+from database_operations import do_some_operations_cluster, instance_state
+from infinity.infinity_http import database_result
 
 def test_leader(cluster : InfinityCluster):
     '''
@@ -38,7 +31,7 @@ def test_leader(cluster : InfinityCluster):
         assert res == expected
 
         node1_client.remove_node("node2")
-        with pytest.raises(InfinityException) as e:
+        with pytest.raises(InfinityException):
             node1_client.show_node("node2")
 
         leader_ip, leader_port = cluster.leader_addr()
@@ -63,10 +56,10 @@ def test_leader_failed(cluster : InfinityCluster):
         cluster.set_leader("node1")
         node1_client = cluster.client("node1")
 
-        with pytest.raises(InfinityException) as e:
-            node1_client.remove_node("node1");
+        with pytest.raises(InfinityException):
+            node1_client.remove_node("node1")
 
-        with pytest.raises(InfinityException) as e:
+        with pytest.raises(InfinityException):
             cluster.set_follower("node1")
 
 def test_followerlearner(cluster : InfinityCluster):
@@ -100,15 +93,15 @@ def test_followerlearner_failed(cluster : InfinityCluster):
         node1_client = cluster.client("node1")
         node2_client = cluster.client("node2")
 
-        with pytest.raises(ValueError) as e:
+        with pytest.raises(ValueError):
             cluster.set_follower("node2")
 
         cluster.set_leader("node1")
         cluster.set_follower("node2")
         leader_state = instance_state(node1_client)
 
-        with pytest.raises(InfinityException) as e:
+        with pytest.raises(InfinityException):
             node2_client.remove_node("node1")
 
-        with pytest.raises(InfinityException) as e:
+        with pytest.raises(InfinityException):
             do_some_operations_cluster(node2_client, [node1_client], leader_state)

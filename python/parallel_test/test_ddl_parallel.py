@@ -2,7 +2,6 @@ import logging
 import time
 
 import infinity.index as index
-import pytest
 import random
 from threading import Thread
 from infinity.common import ConflictType
@@ -99,7 +98,7 @@ class TestDDLParallel:
             infinity_obj.drop_database(db_name, conflict_type=ConflictType.Ignore)
             # res = infinity_obj.show_database()
             # print(res)
-        except Exception as e:
+        except Exception:
             self.logger.info(f"drop database {db_name} failed")
         else:
             self.logger.info(f"drop database {db_name}")
@@ -116,7 +115,7 @@ class TestDDLParallel:
             db_obj.create_table(table_name, column, conflict_type=ConflictType.Ignore)
             # res = db_obj.list_tables()
             # print(res)
-        except Exception as e:
+        except Exception:
             self.logger.info(f"create table {table_name} in database {db_name} failed")
         else:
             self.logger.info(f"create table {table_name} in database {db_name}")
@@ -126,7 +125,7 @@ class TestDDLParallel:
         try:
             db_obj = infinity_obj.get_database(db_name)
             exist_tables = db_obj.list_tables().table_names
-        except Exception as e:
+        except Exception:
             self.logger.info(f"drop table in database {db_name} failed")
             return
         if (len(exist_tables) > 0):
@@ -136,7 +135,7 @@ class TestDDLParallel:
                 res = db_obj.list_tables()
                 print(res)
                 self.logger.info(f"drop table {table_name} in database {db_name}")
-            except Exception as e:
+            except Exception:
                 self.logger.info(f"drop table {table_name} in database {db_name} failed")
 
     def create_index(self, infinity_obj: RemoteThriftInfinityConnection):
@@ -144,7 +143,7 @@ class TestDDLParallel:
         try:
             db_obj = infinity_obj.get_database(db_name)
             exist_tables = db_obj.list_tables().table_names
-        except Exception as e:
+        except Exception:
             self.logger.info(f"create index in database {db_name} failed")
             return
         if (len(exist_tables) > 0):
@@ -165,7 +164,7 @@ class TestDDLParallel:
                                        conflict_type=ConflictType.Ignore)
                 res = table_obj.list_indexes()
                 print(res)
-            except Exception as e:
+            except Exception:
                 self.logger.info(f"create index {index_on} in table {table_name} database {db_name} failed")
             else:
                 self.logger.info(f"create index {index_on} in table {table_name} database {db_name}")
@@ -175,7 +174,7 @@ class TestDDLParallel:
         try:
             db_obj = infinity_obj.get_database(db_name)
             exist_tables = db_obj.list_tables().table_names
-        except Exception as e:
+        except Exception:
             self.logger.info(f"drop index in database {db_name} failed")
             return
         if (len(exist_tables) > 0):
@@ -189,7 +188,7 @@ class TestDDLParallel:
                     table_obj.drop_index(index_name, conflict_type=ConflictType.Ignore)
                     res = table_obj.list_indexes()
                     print(res)
-            except Exception as e:
+            except Exception:
                 self.logger.info(f"drop index {index_name} in table {table_name} database {db_name} failed")
             else:
                 self.logger.info(f"drop index {index_name} in table {table_name} database {db_name}")

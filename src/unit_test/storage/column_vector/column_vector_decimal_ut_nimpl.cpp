@@ -34,7 +34,6 @@ import internal_types;
 import logical_type;
 import decimal_info;
 import data_type;
-import compilation_config;
 
 using namespace infinity;
 

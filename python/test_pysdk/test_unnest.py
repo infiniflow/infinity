@@ -1,23 +1,11 @@
-import importlib
-import sys
-import os
-import os
 import pandas as pd
 import pytest
 from common import common_values
 import infinity
-import infinity.index as index
 from numpy import dtype
-from infinity.errors import ErrorCode
-from infinity.common import ConflictType, SortType, Array
+from infinity.common import ConflictType, Array
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-from infinity_http import infinity_http
-from common.utils import copy_data
-from datetime import date, time, datetime
+from infinity.infinity_http import infinity_http
 
 @pytest.fixture(scope="class")
 def http(request):

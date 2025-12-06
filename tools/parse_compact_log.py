@@ -19,7 +19,7 @@ def parse_log1(log_file: str) -> tuple[list[int], list[int]]:
             print("No match")
 
         grp = m.groups()
-        table_name = grp[0]
+        grp[0]
         new_segment = int(grp[1])
         old_segments = list(map(int, grp[2].split(" ")[:-1]))
         # print(f"Compact {old_segments} -> {new_segment}")

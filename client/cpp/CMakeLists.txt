@@ -25,8 +25,7 @@ add_executable(infinity_client_test
 target_link_libraries(
         infinity_client_test
         infinity_client
-        thrift.a
-        thriftnb.a
+        thrift::thrift
         ${STDCXX15EXP_STATIC}
 )
 

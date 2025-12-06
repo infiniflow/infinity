@@ -9,10 +9,7 @@ python generate_colbert_embedding.py \
 --fp16 True \
 """
 import os
-import struct
-import numpy as np
 import datasets
-from tqdm import tqdm
 from dataclasses import dataclass, field
 from transformers import HfArgumentParser
 from mldr_common_tools import EvalArgs, check_languages, load_corpus, get_colbert_model, save_colbert_list

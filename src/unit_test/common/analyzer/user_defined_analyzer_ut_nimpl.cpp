@@ -21,8 +21,6 @@ import :status;
 import :user_defined_analyzer;
 import :python_instance;
 
-import compilation_config;
-
 #if 0
 using namespace infinity;
 

@@ -1,5 +1,4 @@
 from infinity import NetworkAddress
-import numpy as np
 
 TEST_LOCAL_HOST = NetworkAddress("127.0.0.1", 23817)
 # TEST_LOCAL_HOST = NetworkAddress("192.168.200.151", 23817)

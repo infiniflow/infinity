@@ -38,7 +38,6 @@ import math
 import os
 import re
 import string
-import sys
 from hanziconv import HanziConv
 from nltk import word_tokenize
 from nltk.stem import SnowballStemmer, WordNetLemmatizer

@@ -6,7 +6,8 @@ from common import common_values
 from infinity.common import ConflictType
 from infinity import index
 from infinity.errors import ErrorCode
-from restart_util import *
+import os
+from restart_util import EnwikiGenerator
 from util import RtnThread
 import pickle
 import logging

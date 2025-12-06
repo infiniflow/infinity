@@ -1,5 +1,4 @@
 from infinity_cluster import InfinityCluster
-import time
 from database_operations import do_some_operations, instance_state, clear_instance
 
 def test_admin2standalone(cluster: InfinityCluster):

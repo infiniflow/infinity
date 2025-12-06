@@ -18,7 +18,6 @@ This example is about connecting to the local infinity instance, creating table,
 
 import infinity
 import sys
-import time
 from infinity.common import SparseVector
 
 try:

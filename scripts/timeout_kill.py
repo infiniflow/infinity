@@ -6,7 +6,7 @@ import os
 import signal
 
 
-def timeout_kill(duration: int, pids: list[int]):
+def timeout_kill_pids(duration: int, pids: list[int]):
     # Send SIGTERM to all specified processes
     for pid in pids:
         try:
@@ -17,37 +17,37 @@ def timeout_kill(duration: int, pids: list[int]):
     start_time = time.time()
     end_time = start_time + duration
 
+    alive_pids = set(pids)
+
     while True:
-        all_dead = True
-        for pid in pids:
+        # Check status of alive processes
+        for pid in list(alive_pids):
             try:
                 os.kill(pid, 0)
             except ProcessLookupError:
                 print(f"Process {pid} has terminated.")
-                continue
-            else:
-                print(f"Process {pid} is still running.")
-                all_dead = False
-                break
+                alive_pids.remove(pid)
 
-        if all_dead:
+        if not alive_pids:
             print("All processes have terminated successfully.")
-            sys.exit(0)
+            return 0
 
         current_time = time.time()
         if current_time >= end_time:
             print("Some processes did not terminate in time. Sending SIGKILL.")
-            for pid in pids:
+            for pid in alive_pids:
                 try:
+                    print(f"Force killing process {pid}")
                     os.kill(pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
-            sys.exit(2)
+            return 0
 
+        print(f"Waiting for {len(alive_pids)} processes to exit...")
         time.sleep(1)
 
 
-def timeout_kill(timeout: int, process: Popen[bytes], logger:logging.Logger = None):
+def timeout_kill(timeout: int, process: Popen[bytes], logger: logging.Logger = None):
     if logger is None:
         logger = logging.root
     process.terminate()
@@ -66,4 +66,4 @@ if __name__ == "__main__":
         sys.exit(1)
     duration = int(sys.argv[1])
     pids = [int(pid) for pid in sys.argv[2:]]
-    timeout_kill(duration, pids)
+    sys.exit(timeout_kill_pids(duration, pids))

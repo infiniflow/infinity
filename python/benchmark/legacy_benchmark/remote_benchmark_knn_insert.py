@@ -1,10 +1,8 @@
 import argparse
-import functools
 import multiprocessing
 import os
 import struct
 import time
-import traceback
 
 import infinity
 from infinity import index
@@ -58,7 +56,7 @@ def insert_sift_1m(path):
     count = 0
     start = time.time()
 
-    loop_start = time.time()
+    time.time()
     for idx, query_vec in enumerate(fvecs_read(path)):
         table_obj.insert([{"col1": query_vec}])
         count += 1
@@ -97,7 +95,7 @@ def insert_gist_1m(path):
     count = 0
     start = time.time()
 
-    loop_start = time.time()
+    time.time()
     for idx, query_vec in enumerate(fvecs_read(path)):
         table_obj.insert([{"col1": query_vec}])
         count += 1
@@ -161,7 +159,6 @@ def process_pool(threads, path, table_name):
     db_obj.create_table(table_name, {"col1": {"type": "vector,128,float"}})
     infinity_obj.disconnect()
 
-    results = []
     total_vectors = fvecs_read_all(path)
     total_count = len(total_vectors)
     print(f"Total Data Count: {total_count}")
@@ -207,7 +204,7 @@ def insert_data(threads, data_set, path):
             print(f"Multi-threads: {threads}")
             process_pool(threads, data_path, "sift_benchmark")
         else:
-            print(f"Single-thread")
+            print("Single-thread")
             insert_sift_1m(data_path)
     elif data_set == "gist_1m":
         data_path = path + "/gist_base.fvecs"
@@ -215,7 +212,7 @@ def insert_data(threads, data_set, path):
             print(f"Multi-threads: {threads}")
             process_pool(threads, data_path, "gist_benchmark")
         else:
-            print(f"Single-thread")
+            print("Single-thread")
             insert_gist_1m(data_path)
 
 

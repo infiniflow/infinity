@@ -8,20 +8,6 @@ import time
 def benchmark_test(benchmark_dir: str):
     print("benchmark path is {}".format(benchmark_dir))
     # run test
-    all_benchmark_cmds = [
-        [f"{benchmark_dir}blocking_scheduler/blocking_scheduler_benchmark"],
-        [f"{benchmark_dir}csv/csv_benchmark"],
-        [f"{benchmark_dir}polling_scheduler/polling_scheduler_benchmark"],
-        [
-            "echo",
-            "'1 1 centroids'",
-            "|",
-            f"{benchmark_dir}embedding/ann_ivfflat_benchmark",
-        ],
-        [f"{benchmark_dir}embedding/hnsw_benchmark2"],
-        [f"{benchmark_dir}local_infinity/infinity_benchmark"],
-        [f"{benchmark_dir}local_infinity/fulltext_benchmark"],
-    ]
 
     run_benchmark_cmds = [
         [f"{benchmark_dir}blocking_scheduler/blocking_scheduler_benchmark"],

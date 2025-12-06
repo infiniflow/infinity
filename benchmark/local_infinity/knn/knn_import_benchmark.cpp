@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import std.compat;
+import std;
 import infinity_core;
+
+using std::size_t;
 import compilation_config;
 import internal_types;
 import logical_type;

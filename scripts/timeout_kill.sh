@@ -48,7 +48,7 @@ while true; do
             if ps -p $pid > /dev/null; then
                 echo "Pid: $pid didn't terminate"
                 if [ -z $pid ]; then
-                  continue
+                    continue
                 fi
                 ppid=$(ps -o ppid= -p $pid)
                 kill -9 $ppid

@@ -1,12 +1,9 @@
 from numpy import dtype
 import pandas as pd
 from infinity_cluster import InfinityCluster
-import pytest
 import time
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
-import timeout_decorator
-from mocked_infinity_cluster import MockInfinityCluster
 
 
 class TestInsert:
@@ -24,7 +21,7 @@ class TestInsert:
             print("insert in node1")
 
             infinity1 = cluster.client("node1")
-            r = infinity1.list_databases()
+            infinity1.list_databases()
 
             table_name = "table1"
             db1 = infinity1.get_database("default_db")

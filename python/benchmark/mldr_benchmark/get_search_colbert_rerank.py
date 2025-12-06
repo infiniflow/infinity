@@ -17,8 +17,6 @@ from itertools import chain, combinations
 import time
 from dataclasses import dataclass, field
 from tqdm import tqdm
-import numpy as np
-import struct
 from mldr_common_tools import QueryArgs, check_languages, check_query_types
 from mldr_common_tools import FakeJScoredDoc, get_queries_and_qids, save_result
 from mldr_common_tools import query_yields, apply_funcs

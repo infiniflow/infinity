@@ -78,15 +78,15 @@ def main() -> int:
 
     urls = [
         "https://github.com/Kitware/CMake/releases/download/v4.1.0/cmake-4.1.0-linux-x86_64.tar.gz",
-        "https://github.com/ninja-build/ninja/releases/download/v1.13.1/ninja-linux.zip",
-        "https://www.python.org/ftp/python/3.10.18/Python-3.10.18.tar.xz",
+        "https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-linux.zip",
+        "https://www.python.org/ftp/python/3.11.14/Python-3.11.14.tar.xz",
         "https://github.com/gcc-mirror/gcc/archive/refs/tags/releases/gcc-15.2.0.tar.gz",
         "https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2",
-        "https://github.com/gperftools/gperftools/releases/download/gperftools-2.17/gperftools-2.17.tar.gz",
-        "https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.3/sqllogictest-bin-v0.28.3-x86_64-unknown-linux-musl.tar.gz",
-        "https://github.com/rui314/mold/releases/download/v2.40.3/mold-2.40.3-x86_64-linux.tar.gz",
-        "https://download.docker.com/linux/static/stable/x86_64/docker-28.3.3.tgz",
-        "https://github.com/astral-sh/uv/releases/download/0.9.7/uv-x86_64-unknown-linux-gnu.tar.gz",
+        "https://github.com/gperftools/gperftools/releases/download/gperftools-2.17.2/gperftools-2.17.2.tar.gz",
+        "https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz",
+        "https://github.com/rui314/mold/releases/download/v2.40.4/mold-2.40.4-x86_64-linux.tar.gz",
+        "https://download.docker.com/linux/static/stable/x86_64/docker-29.1.2.tgz",
+        "https://github.com/astral-sh/uv/releases/download/0.9.15/uv-x86_64-unknown-linux-gnu.tar.gz",
     ]
 
     for url in urls:

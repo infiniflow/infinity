@@ -1,11 +1,9 @@
-
-
-
-from infinity.common import ConflictType
-from numpy import dtype
 import ast
-from enum import Enum
 import re
+from enum import Enum
+from numpy import dtype
+from infinity.common import ConflictType
+from infinity.table import ExplainType
 
 default_url = "http://localhost:23820/"
 
@@ -164,22 +162,20 @@ def type_to_dtype(type):
             return object
 
 
-def ExplainType_transfrom(ExplainType):
-    if ExplainType == ExplainType.Ast:
+def ExplainType_transfrom(explain_type):
+    if explain_type == ExplainType.Ast:
         return "ast"
-    elif ExplainType == ExplainType.UnOpt:
+    elif explain_type == ExplainType.UnOpt:
         return "unopt"
-    elif ExplainType == ExplainType.UnOpt:
-        return "unopt"
-    elif ExplainType == ExplainType.Opt:
+    elif explain_type == ExplainType.Opt:
         return "opt"
-    elif ExplainType == ExplainType.Physical:
+    elif explain_type == ExplainType.Physical:
         return "physical"
-    elif ExplainType == ExplainType.Pipeline:
+    elif explain_type == ExplainType.Pipeline:
         return "pipeline"
-    elif ExplainType == ExplainType.Fragment:
+    elif explain_type == ExplainType.Fragment:
         return "fragment"
-    elif ExplainType == ExplainType.Analyze:
+    elif explain_type == ExplainType.Analyze:
         return "analyze"
     else:
         return "invalid"
@@ -285,28 +281,6 @@ tableDefaultData = {
     },
     "properties": {"bloomfilter_columns": {"age", "score"}},
 }
-
-
-"""
-enum class LiteralType : int32_t {
-    kBoolean,
-    kDouble,
-    kString,
-    kInteger,
-    kNull,
-    kDate,
-    kTime,
-    kDateTime,
-    kTimestamp,
-    kIntegerArray,
-    kDoubleArray,
-    kSubArrayArray,
-    kInterval,
-    kLongSparseArray,
-    kDoubleSparseArray,
-    kEmptyArray,
-};
-"""
 
 
 class literaltype(Enum):

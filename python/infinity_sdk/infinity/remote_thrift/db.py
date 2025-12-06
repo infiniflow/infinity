@@ -15,14 +15,12 @@
 from abc import ABC
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
-import numpy as np
 from infinity.db import Database
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.table import RemoteTable
 from infinity.remote_thrift.utils import (
     check_valid_name,
     name_validity_check,
-    select_res_to_polars,
     get_ordinary_info,
 )
 from infinity.common import ConflictType

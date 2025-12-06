@@ -3,7 +3,6 @@ import time
 
 from numpy import dtype
 import pandas as pd
-import pytest
 from infinity_cluster import InfinityCluster
 from infinity.common import ConflictType
 import common_values

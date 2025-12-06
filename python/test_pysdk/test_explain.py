@@ -1,6 +1,3 @@
-import importlib
-import sys
-import os
 from common import common_values
 import infinity
 from infinity.errors import ErrorCode
@@ -8,11 +5,7 @@ from infinity.table import ExplainType
 from infinity.common import ConflictType
 import polars as pl
 import pytest
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-from infinity_http import infinity_http
+from infinity.infinity_http import infinity_http
 
 @pytest.mark.usefixtures("http")
 @pytest.mark.usefixtures("suffix")

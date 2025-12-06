@@ -14,16 +14,17 @@
 
 #include "toml.hpp"
 
-#include <cassert>
-#include <csignal>
-#include <filesystem>
 #include <unistd.h>
 #ifdef ENABLE_JEMALLOC_PROF
 #include <jemalloc/jemalloc.h>
 #endif
 
-import std.compat;
+import std;
+#include <cassert>
+#include <signal.h>
 import infinity_core;
+
+using std::size_t;
 import compilation_config;
 import internal_types;
 import logical_type;
@@ -125,7 +126,7 @@ void BenchmarkImport(std::shared_ptr<Infinity> infinity, const std::string &db_n
 
     profiler.Begin();
     ImportOptions import_options;
-    std::string extension = std::filesystem::__cxx11::path(import_from).filename().extension().string();
+    std::string extension = std::filesystem::path(import_from).filename().extension().string();
     if (extension == ".jsonl") {
         import_options.copy_file_type_ = CopyFileType::kJSONL;
     } else if (extension == ".json") {

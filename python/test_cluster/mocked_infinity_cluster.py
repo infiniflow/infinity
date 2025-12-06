@@ -3,7 +3,6 @@ import logging
 import platform
 import shutil
 import subprocess
-import sys
 
 import tomli
 import tomli_w
@@ -16,11 +15,7 @@ import os
 from infinity.errors import ErrorCode
 from infinity.common import InfinityException
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-from infinity_http import http_network_util, infinity_http
+from infinity.infinity_http import http_network_util, infinity_http
 
 
 class http_result:

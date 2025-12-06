@@ -21,7 +21,7 @@ def trace_expected_exceptions(func):
     def wrapped_func(*args, **kwargs):
         try:
             func(*args, **kwargs)
-        except:
+        except Exception:
             print("Expected exception in " + func.__name__)
             traceback.print_exc()
 

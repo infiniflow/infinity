@@ -1,7 +1,6 @@
 # generate 'test/sql/dml/import/test_csr.slt' & 'test/data/csr/test.csr'
 
 import argparse
-import argparse
 import os
 from generate_util.generate_sparse_data import generate_sparse_data
 from generate_util.format_data import sparse_format_float
