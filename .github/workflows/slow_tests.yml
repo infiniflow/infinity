@@ -104,6 +104,7 @@ jobs:
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug/src/test_main | tar --extract --file=-
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Start minio container
         if: ${{ !cancelled() && !failure() }}
@@ -123,7 +124,6 @@ jobs:
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
           ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter=*SLOW_* > debug_unit_test_stdout.log 2> debug_unit_test_stderr.log
 
       - name: Collect infinity log
@@ -131,7 +131,6 @@ jobs:
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_unit_test && cp debug_unit_test*.log ${ARTIFACTS_DIR}/debug_unit_test/
           echo "debug unit test log" && tail -n 1000 debug_unit_test*.log
-          sudo rm -rf /var/infinity/*
 
       - name: Remove minio container
         if: always()
@@ -154,6 +153,7 @@ jobs:
           tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug-tsan/src/infinity | tar --extract --file=-
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Prepare restart test data
         if: ${{ !cancelled() && !failure() }}
@@ -173,7 +173,6 @@ jobs:
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_tsan_restart_test && sudo chown -R ${USER} . && cp restart_test*.log* ${ARTIFACTS_DIR}/debug_tsan_restart_test/
           echo "restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log*
-          sudo rm -rf /var/infinity/*
 
   debug_tsan_cluster_test:
     name: debug_tsan_cluster_test
@@ -190,10 +189,8 @@ jobs:
           tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug-tsan/src/infinity | tar --extract --file=-
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
-      - name: Prepare /var/infinity
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -209,7 +206,6 @@ jobs:
           mkdir -p ${ARTIFACTS_DIR}/debug_tsan_cluster_test
           sudo find /var/infinity/ -name '*.log' -type f | sudo tar --create --gzip --file=cluster_test.tgz --files-from=-
           tar --directory=${ARTIFACTS_DIR}/debug_tsan_cluster_test --strip-components=2 --extract --gzip --file=cluster_test.tgz
-          sudo rm -rf /var/infinity/*
 
   debug_tsan_parallel_test:
     name: debug_tsan_parallel_test
@@ -227,10 +223,8 @@ jobs:
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug-tsan/src/infinity | tar -xf -
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
-      - name: Prepare /var/infinity
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -257,7 +251,6 @@ jobs:
           mkdir -p ${ARTIFACTS_DIR}/debug_tsan_parallel_test && sudo chown -R ${USER} . && cp debug_tsan_parallel*.log ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_tsan_parallel_test/
           echo "debug tsan parallel log" && tail -n 1000 debug_tsan_parallel*.log
-          sudo rm -rf /var/infinity/*
 
   reldeb_build:
     name: reldeb_build
@@ -310,10 +303,8 @@ jobs:
           tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-reldeb/src/test_main | tar --extract --file=-
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
-      - name: Prepare /var/infinity
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Start minio container
         if: ${{ !cancelled() && !failure() }}
@@ -340,7 +331,6 @@ jobs:
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_unit_test && cp reldeb_unit_test*.log ${ARTIFACTS_DIR}/reldeb_unit_test/
           echo "reldeb unit test log" && tail -n 1000 reldeb_unit_test*.log
-          sudo rm -rf /var/infinity/*
 
       - name: Remove minio container
         if: always()
@@ -364,10 +354,8 @@ jobs:
           tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-reldeb/src/infinity | tar --extract --file=-
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
-      - name: Prepare /var/infinity
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -394,7 +382,6 @@ jobs:
           mkdir -p ${ARTIFACTS_DIR}/reldeb_parallel_test && cp reldeb_parallel_stderr.log ${ARTIFACTS_DIR}/reldeb_parallel_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_parallel_test/
           echo "reldeb parallel log" && tail -n 1000 reldeb_parallel*.log
-          sudo rm -rf /var/infinity/*
 
   reldeb_restart_test:
     name: reldeb_restart_test
@@ -411,15 +398,13 @@ jobs:
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/infinity | tar -xf -
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Prepare restart test data
         if: ${{ !cancelled() && !failure() }}
         run: |
           tar --directory=${RUNNER_WORKSPACE_PREFIX} --create --file=- benchmark/sift_1m/{sift_base.fvecs,sift_query.fvecs} benchmark/enwiki/enwiki-10w.csv | tar --directory=test/data --extract --file=-
 
-      - name: Prepare /var/infinity
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -435,4 +420,3 @@ jobs:
           mkdir -p ${ARTIFACTS_DIR}/reldeb_restart_test
           cp restart_test*.log* ${ARTIFACTS_DIR}/reldeb_restart_test/
           echo "reldeb_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log*
-          sudo rm -rf /var/infinity/*

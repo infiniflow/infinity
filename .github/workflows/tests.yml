@@ -203,6 +203,7 @@ jobs:
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug/src/test_main | tar --extract --file=-
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Start minio container
         if: ${{ !cancelled() && !failure() }}
@@ -222,7 +223,6 @@ jobs:
       - name: Unit test
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
           export LLVM_PROFILE_FILE="infinity-%p.profraw"
           ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > debug_unit_test_stdout.log 2> debug_unit_test_stderr.log
 
@@ -231,7 +231,6 @@ jobs:
         run: |
           echo "debug unit test log" && tail -n 1000 debug_unit_test*.log
           mkdir -p ${ARTIFACTS_DIR}/debug_unit_test/ && cp debug_unit_test*.log ${ARTIFACTS_DIR}/debug_unit_test/
-          sudo rm -rf /var/infinity/*
 
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
@@ -262,6 +261,7 @@ jobs:
           tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug/src/infinity | tar --extract --file=-
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -270,7 +270,6 @@ jobs:
       - name: Start infinity
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
           export LLVM_PROFILE_FILE="infinity-%p.profraw"
           export LLVM_PROFILE_DUMP_ON_EXIT=1
           nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> debug_sqllogictest_stderr.log &
@@ -291,7 +290,6 @@ jobs:
           mkdir -p ${ARTIFACTS_DIR}/debug_sqllogic_test/ && cp debug_sqllogictest*.log ${ARTIFACTS_DIR}/debug_sqllogic_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_sqllogic_test/
           echo "debug sqllogictest log" && tail -n 1000 debug_sqllogictest*.log
-          sudo rm -rf /var/infinity/*
 
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
@@ -323,10 +321,8 @@ jobs:
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/infinity | tar -xf -
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
-      - name: Prepare /var/infinity
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -341,7 +337,6 @@ jobs:
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_restart_test && cp restart_test*.log* ${ARTIFACTS_DIR}/debug_restart_test/
           echo "debug_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log*
-          sudo rm -rf /var/infinity/*
 
   debug_pysdk_test:
     name: debug_pysdk_test
@@ -358,6 +353,7 @@ jobs:
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/infinity | tar -xf -
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -366,7 +362,6 @@ jobs:
       - name: Start infinity
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
           export LLVM_PROFILE_FILE="infinity-%p.profraw"
           export LLVM_PROFILE_DUMP_ON_EXIT=1
           nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> debug_pysdk_stderr.log &
@@ -387,7 +382,6 @@ jobs:
           mkdir -p ${ARTIFACTS_DIR}/debug_pysdk_test && cp debug_pysdk*.log ${ARTIFACTS_DIR}/debug_pysdk_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_pysdk_test/
           echo "debug pysdk log" && tail -n 1000 debug_pysdk*.log
-          sudo rm -rf /var/infinity/*
 
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
@@ -419,6 +413,7 @@ jobs:
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/infinity | tar -xf -
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -427,7 +422,6 @@ jobs:
       - name: Start infinity
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
           export LLVM_PROFILE_FILE="infinity-%p.profraw"
           export LLVM_PROFILE_DUMP_ON_EXIT=1
           nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> debug_http_stderr.log &
@@ -448,7 +442,6 @@ jobs:
           mkdir -p ${ARTIFACTS_DIR}/debug_http_test && cp debug_http*.log ${ARTIFACTS_DIR}/debug_http_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_http_test/
           echo "debug http log" && tail -n 1000 debug_http*.log
-          sudo rm -rf /var/infinity/*
 
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
@@ -481,6 +474,7 @@ jobs:
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/infinity | tar -xf -
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -489,7 +483,6 @@ jobs:
       - name: Start infinity
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
           export LLVM_PROFILE_FILE="infinity-%p.profraw"
           export LLVM_PROFILE_DUMP_ON_EXIT=1
           nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> debug_parallel_stderr.log &
@@ -510,7 +503,6 @@ jobs:
           mkdir -p ${ARTIFACTS_DIR}/debug_parallel_test && cp debug_parallel_stderr.log ${ARTIFACTS_DIR}/debug_parallel_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_parallel_test/
           echo "debug parallel log" && tail -n 1000 debug_parallel*.log
-          sudo rm -rf /var/infinity/*
 
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
@@ -543,6 +535,7 @@ jobs:
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/infinity | tar -xf -
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Upload coverage reports to Codecov
         if: ${{ !cancelled() && !failure() }}
@@ -607,6 +600,7 @@ jobs:
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/test_main | tar -xf -
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Start minio container
         if: ${{ !cancelled() && !failure() }}
@@ -626,7 +620,6 @@ jobs:
       - name: Unit test reldeb version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
           cmake-build-reldeb/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > reldeb_unit_test_stdout.log 2> reldeb_unit_test_stderr.log
 
       - name: Collect infinity log
@@ -634,7 +627,6 @@ jobs:
         run: |
           mkdir -p ${ARTIFACTS_DIR}/reldeb_unit_test && cp reldeb_unit_test*.log ${ARTIFACTS_DIR}/reldeb_unit_test/
           echo "reldeb unit test log" && tail -n 1000 reldeb_unit_test*.log
-          sudo rm -rf /var/infinity/*
 
       - name: Remove minio container
         if: always()
@@ -657,6 +649,7 @@ jobs:
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/infinity | tar -xf -
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -665,7 +658,6 @@ jobs:
       - name: Start infinity
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
           nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> reldeb_sqllogic_test_stderr.log &
 
       - name: Run sqllogictest
@@ -685,7 +677,6 @@ jobs:
           cp reldeb_sqllogic_test* ${ARTIFACTS_DIR}/reldeb_sqllogic_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_sqllogic_test/
           echo "reldeb sqllogic test log" && tail -n 1000 reldeb_sqllogic_test*.log
-          sudo rm -rf /var/infinity/*
 
   reldeb_pysdk_test:
     name: reldeb_pysdk_test
@@ -702,6 +693,7 @@ jobs:
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/infinity | tar -xf -
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -710,7 +702,6 @@ jobs:
       - name: Start infinity
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
           nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> reldeb_pysdk_stderr.log &
 
       - name: Run pysdk test
@@ -729,7 +720,6 @@ jobs:
           mkdir -p ${ARTIFACTS_DIR}/reldeb_pysdk_test && cp reldeb_pysdk*.log ${ARTIFACTS_DIR}/reldeb_pysdk_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_pysdk_test/
           echo "reldeb pysdk log" && tail -n 1000 reldeb_pysdk*.log
-          sudo rm -rf /var/infinity/*
 
   reldeb_http_test:
     name: reldeb_http_test
@@ -746,6 +736,7 @@ jobs:
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/infinity | tar -xf -
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -754,10 +745,9 @@ jobs:
       - name: Start infinity
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
           nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> reldeb_http_stderr.log &
 
-      - name: Run http api test reldeb version
+      - name: Run http api test
         if: ${{ !cancelled() && !failure() }}
         run: |
           uv run python3 tools/run_http_api.py
@@ -773,7 +763,6 @@ jobs:
           mkdir -p ${ARTIFACTS_DIR}/reldeb_http_test && cp reldeb_http*.log ${ARTIFACTS_DIR}/reldeb_http_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_http_test/
           echo "reldeb http log" && tail -n 1000 reldeb_http*.log
-          sudo rm -rf /var/infinity/*
 
   reldeb_pysdk_parallel_test:
     name: reldeb_pysdk_parallel_test
@@ -790,6 +779,7 @@ jobs:
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/infinity | tar -xf -
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -798,7 +788,6 @@ jobs:
       - name: Start infinity
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
           nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> reldeb_pysdk_parallel_stderr.log &
 
       - name: Run parallel test 
@@ -817,7 +806,6 @@ jobs:
           mkdir -p ${ARTIFACTS_DIR}/reldeb_pysdk_parallel_test && cp reldeb_pysdk_parallel*.log ${ARTIFACTS_DIR}/reldeb_pysdk_parallel_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_pysdk_parallel_test/
           echo "reldeb parallel log" && tail -n 1000 reldeb_pysdk_parallel*.log
-          sudo rm -rf /var/infinity/*
 
   reldeb_minio_pysdk_test:
     name: reldeb_minio_pysdk_test
@@ -834,6 +822,7 @@ jobs:
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/infinity | tar -xf -
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -857,10 +846,9 @@ jobs:
       - name: Start infinity
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
           nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_minio.toml > /dev/null 2> reldeb_minio_pysdk_stderr.log &
 
-      - name: Run minio pysdk infinity test reldeb version
+      - name: Run minio pysdk test
         if: ${{ !cancelled() && !failure() }}
         run: |
           uv run python3 tools/run_pysdk_remote_infinity_test.py
@@ -876,14 +864,12 @@ jobs:
           mkdir -p ${ARTIFACTS_DIR}/reldeb_minio_pysdk_test && cp reldeb_minio_pysdk*.log ${ARTIFACTS_DIR}/reldeb_minio_pysdk_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_minio_pysdk_test/
           echo "reldeb minio pysdk log" && tail -n 1000 reldeb_minio_pysdk*.log
-          sudo rm -rf /var/infinity/*
 
       - name: Remove minio container
         if: always()
         run: |
           if [[ -n "${MINIO_CONTAINER}" ]]; then sudo docker rm -f -v "${MINIO_CONTAINER}"; fi
           if [[ -n "${MINIO_VOLUME_PATH}" ]]; then sudo rm -rf "${MINIO_VOLUME_PATH}"; fi
-          sudo rm -rf /var/infinity
 
   reldeb_minio_parallel_test:
     name: reldeb_minio_parallel_test
@@ -900,6 +886,7 @@ jobs:
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/infinity | tar -xf -
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -923,7 +910,6 @@ jobs:
       - name: Start infinity
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
           nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_minio.toml > /dev/null 2> reldeb_minio_parallel_stderr.log &
 
       - name: Run minio parallel test
@@ -942,14 +928,12 @@ jobs:
           mkdir -p ${ARTIFACTS_DIR}/reldeb_minio_parallel_test && cp reldeb_minio_parallel*.log ${ARTIFACTS_DIR}/reldeb_minio_parallel_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_minio_parallel_test/
           echo "reldeb minio parallel log" && tail -n 1000 reldeb_minio_parallel*.log
-          sudo rm -rf /var/infinity/*
 
       - name: Remove minio container
         if: always()
         run: |
           if [[ -n "${MINIO_CONTAINER}" ]]; then sudo docker rm -f -v "${MINIO_CONTAINER}"; fi
           if [[ -n "${MINIO_VOLUME_PATH}" ]]; then sudo rm -rf "${MINIO_VOLUME_PATH}"; fi
-          sudo rm -rf /var/infinity
 
   reldeb_benchmark:
     name: reldeb_benchmark
@@ -966,6 +950,7 @@ jobs:
           tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
           tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/benchmark/local_infinity/{knn_import_benchmark,knn_query_benchmark} | tar -xf -
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Prepare sift dataset
         if: ${{ !cancelled() && !failure() }}
