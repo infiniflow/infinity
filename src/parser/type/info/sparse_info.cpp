@@ -113,10 +113,10 @@ std::unique_ptr<SparseInfo> SparseInfo::Deserialize(std::string_view json_str) {
     simdjson::parser parser;
     simdjson::padded_string json(json_str);
     simdjson::document doc = parser.iterate(json);
-    return std::make_unique<SparseInfo>((EmbeddingDataType)(int8_t)doc["data_type"].get<int8_t>(),
-                                        (EmbeddingDataType)(int8_t)doc["index_type"].get<int8_t>(),
+    return std::make_unique<SparseInfo>((EmbeddingDataType)(int64_t)doc["data_type"].get<int64_t>(),
+                                        (EmbeddingDataType)(int64_t)doc["index_type"].get<int64_t>(),
                                         (size_t)doc["dimension"].get<size_t>(),
-                                        (SparseStoreType)(int8_t)doc["sort"].get<int8_t>());
+                                        (SparseStoreType)(int64_t)doc["sort"].get<int64_t>());
 }
 
 } // namespace infinity
