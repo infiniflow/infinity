@@ -5,6 +5,8 @@ import { listDatabase } from '../actions';
 import { DatabaseCard } from '../database-card';
 import { DatabaseCreatingDialog } from '../database-creating-dialog';
 
+export const dynamic = 'force-dynamic';
+
 export default async function HomePage() {
   const ret = await listDatabase();
 

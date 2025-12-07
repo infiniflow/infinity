@@ -5,7 +5,6 @@ import AsyncTree from './tree';
 export default async function DatabaseLayout({
   children
 }: {
-  searchParams: { q: string; offset: string };
   children: React.ReactNode;
 }) {
   return (

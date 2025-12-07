@@ -8,16 +8,16 @@ dependencies = [
     "sqlglot[rs]>=27.10.0",
     "pydantic>=2.9.0,<3.0.0",
     "thrift>=0.20.0,<1.0.0",
-    "setuptools>=75.2.0,<76.0.0",
+    "setuptools>=78.1.1,<79.0.0",
     "pandas>=2.2.0,<3.0.0",
     "numpy>=1.26.0,<2.0.0",
     "pyarrow>=17.0.0,<18.0.0",
     "polars-lts-cpu>=1.9.0,<2.0.0",
-    "requests>=2.32.0,<3.0.0",
+    "requests>=2.32.3,<3.0.0",
     "readerwriterlock>=1.0.0,<2.0.0",
     "datrie>=0.8.3,<0.9.0",
     "hanziconv>=0.3.0,<0.4.0",
-    "nltk>=3.9.0,<4.0.0",
+    "nltk>=3.9.1,<4.0.0",
 ]
 
 [project.optional-dependencies]
@@ -36,7 +36,7 @@ benchmark = [
 ]
 
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=78.1.1", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
@@ -44,6 +44,9 @@ package-dir = {"" = "python/infinity_sdk"}
 
 [tool.setuptools.packages.find]
 where = ["python/infinity_sdk"]
+
+[tool.setuptools.package-data]
+infinity = ["huqie.txt", "huqie.txt.trie"]
 
 [tool.pytest.ini_options]
 addopts = "--strict-markers"
