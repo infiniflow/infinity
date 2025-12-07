@@ -192,8 +192,4 @@ export template <typename CardinalityTag>
 SecondaryIndexDataBase<CardinalityTag> *
 GetSecondaryIndexDataWithCardinality(const std::shared_ptr<DataType> &data_type, u32 chunk_row_count, bool allocate);
 
-// Factory function that determines cardinality from TableIndexMeta
-export void *
-GetSecondaryIndexDataWithMeta(const std::shared_ptr<DataType> &data_type, u32 chunk_row_count, bool allocate, TableIndexMeta *table_index_meta);
-
 } // namespace infinity

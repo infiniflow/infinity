@@ -64,7 +64,7 @@ nlohmann::json IndexSecondary::Serialize() const {
     // Call base class implementation
     nlohmann::json res = IndexBase::Serialize();
     // Add secondary index cardinality for secondary indexes
-    res["secondary_index_cardinality"] = secondary_index_cardinality_ == SecondaryIndexCardinality::kLowCardinality ? "low" : "high";
+    res["cardinality"] = secondary_index_cardinality_ == SecondaryIndexCardinality::kLowCardinality ? "low" : "high";
 
     return res;
 }

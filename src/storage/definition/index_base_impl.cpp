@@ -304,7 +304,7 @@ std::shared_ptr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str
         }
         case IndexType::kSecondary: {
             SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality;
-            if (std::string cardinality_json; doc["secondary_index_cardinality"].get<std::string>(cardinality_json) == simdjson::SUCCESS) {
+            if (std::string cardinality_json; doc["cardinality"].get<std::string>(cardinality_json) == simdjson::SUCCESS) {
                 if (cardinality_json == "low") {
                     secondary_index_cardinality = SecondaryIndexCardinality::kLowCardinality;
                 }
