@@ -60,7 +60,7 @@
     "esbuild": "^0.27.1",
     "eslint": "^9.39.1",
     "eslint-config-next": "16.0.7",
-    "eslint-config-prettier": "^9.1.2",
+    "eslint-config-prettier": "^10.1.8",
     "prettier-plugin-organize-imports": "^4.3.0"
   },
   "pnpm": {
