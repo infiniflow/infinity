@@ -3,11 +3,12 @@ name: release
 on:
   schedule:
     - cron: '0 13 * * *'  # This schedule runs every 13:00:00Z(21:00:00+08:00)
+  # https://github.com/orgs/community/discussions/26286?utm_source=chatgpt.com#discussioncomment-3251208
+  # "The create event does not support branch filter and tag filter."
   # The "create tags" trigger is specifically focused on the creation of new tags, while the "push tags" trigger is activated when tags are pushed, including both new tag creations and updates to existing tags.
-  create:
+  push:
     tags:
-      - 'v*.*.*'                  # normal release, use release.sh instead
-      - 'nightly'                 # mutable tag
+      - 'v*.*.*'                  # normal release
 
 # https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
@@ -34,12 +35,12 @@ jobs:
       run: |
         if [[ ${GITHUB_EVENT_NAME} != 'schedule' ]]; then
           RELEASE_TAG=${GITHUB_REF#refs/tags/}
-          if [[ ${RELEASE_TAG} == 'nightly' ]]; then
+          if [[ ${RELEASE_TAG} == v* ]]; then
             PRERELEASE=true
           else
             PRERELEASE=false
           fi
-          echo "Workflow triggered by create tag: ${RELEASE_TAG}"
+          echo "Workflow triggered by push tag: ${RELEASE_TAG}"
         else
           RELEASE_TAG=nightly
           PRERELEASE=true
