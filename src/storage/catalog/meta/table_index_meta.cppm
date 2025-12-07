@@ -19,7 +19,6 @@ import :meta_info;
 import :new_catalog;
 import :snapshot_info;
 
-import create_index_info;
 import column_def;
 
 namespace infinity {
@@ -74,12 +73,6 @@ public:
 
 private:
     std::string GetTableIndexTag(const std::string &tag) const;
-
-public:
-    // Methods for secondary index cardinality
-    Status SetSecondaryIndexCardinality(SecondaryIndexCardinality cardinality);
-
-    std::tuple<SecondaryIndexCardinality, Status> GetSecondaryIndexCardinality();
 
 private:
     mutable std::mutex mtx_;
