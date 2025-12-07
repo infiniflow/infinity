@@ -439,7 +439,8 @@ std::shared_ptr<DataType> DataType::Deserialize(std::string_view data_type_str) 
     simdjson::padded_string data_type_json(data_type_str);
     simdjson::document doc = parser.iterate(data_type_json);
 
-    const LogicalType logical_type = (LogicalType)(int8_t)doc["data_type"].get<int8_t>();
+    // simdjson parses integers as int64_t, so we must read as int64_t first to avoid INCORRECT_TYPE error, then cast to the target type.
+    const LogicalType logical_type = (LogicalType)(int64_t)doc["data_type"].get<int64_t>();
 
     std::shared_ptr<TypeInfo> type_info{nullptr};
     if (auto type_info_json = doc["type_info"]; type_info_json.error() == simdjson::SUCCESS) {
@@ -461,7 +462,7 @@ std::shared_ptr<DataType> DataType::Deserialize(std::string_view data_type_str) 
             case LogicalType::kTensorArray:
             case LogicalType::kMultiVector:
             case LogicalType::kEmbedding: {
-                type_info = EmbeddingInfo::Make((EmbeddingDataType)(int8_t)type_info_json["embedding_type"].get<int8_t>(),
+                type_info = EmbeddingInfo::Make((EmbeddingDataType)(int64_t)type_info_json["embedding_type"].get<int64_t>(),
                                                 (size_t)type_info_json["dimension"]);
                 break;
             }

@@ -403,8 +403,8 @@ auto tag_invoke(simdjson::deserialize_tag, simdjson_value &val, IndexIVFCentroid
 template <typename simdjson_value>
 auto tag_invoke(simdjson::deserialize_tag, simdjson_value &val, IndexIVFStorageOption &ivf_storage_option) {
     simdjson::object obj = val.get_object();
-    ivf_storage_option.type_ = (IndexIVFStorageOption::Type)(i8)obj["type_"].get<i8>();
-    ivf_storage_option.plain_storage_data_type_ = (EmbeddingDataType)(int8_t)obj["plain_storage_data_type_"].get<int8_t>();
+    ivf_storage_option.type_ = (IndexIVFStorageOption::Type)(int64_t)obj["type_"].get<int64_t>();
+    ivf_storage_option.plain_storage_data_type_ = (EmbeddingDataType)(int64_t)obj["plain_storage_data_type_"].get<int64_t>();
     ivf_storage_option.scalar_quantization_bits_ = obj["scalar_quantization_bits_"].get<u32>();
     ivf_storage_option.product_quantization_subspace_num_ = obj["product_quantization_subspace_num_"].get<u32>();
     ivf_storage_option.product_quantization_subspace_bits_ = obj["product_quantization_subspace_bits_"].get<u32>();

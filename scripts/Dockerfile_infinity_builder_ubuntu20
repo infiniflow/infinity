@@ -95,12 +95,12 @@ RUN --mount=type=bind,source=Python-3.11.14.tar.xz,target=/root/Python-3.11.14.t
     && update-alternatives --install /usr/bin/pip3 pip3 /usr/local/bin/pip3.11 50
 
 
-# Install cmake-4.1.0
-RUN --mount=type=bind,source=cmake-4.1.0-linux-x86_64.tar.gz,target=/root/cmake-4.1.0-linux-x86_64.tar.gz \
-    cd /root && tar xf cmake-4.1.0-linux-x86_64.tar.gz \
-    && cp -rf cmake-4.1.0-linux-x86_64/bin/* /usr/local/bin \
-    && cp -rf cmake-4.1.0-linux-x86_64/share/* /usr/local/share \
-    && rm -rf cmake-4.1.0-linux-x86_64
+# Install cmake-4.2.0
+RUN --mount=type=bind,source=cmake-4.2.0-linux-x86_64.tar.gz,target=/root/cmake-4.2.0-linux-x86_64.tar.gz \
+    cd /root && tar xf cmake-4.2.0-linux-x86_64.tar.gz \
+    && cp -rf cmake-4.2.0-linux-x86_64/bin/* /usr/local/bin \
+    && cp -rf cmake-4.2.0-linux-x86_64/share/* /usr/local/share \
+    && rm -rf cmake-4.2.0-linux-x86_64
 
 # Install ninja-1.13.2
 RUN --mount=type=bind,source=ninja-linux.zip,target=/root/ninja-linux.zip \
