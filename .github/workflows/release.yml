@@ -83,7 +83,7 @@ jobs:
     - name: Build and push infinity-sdk
       if: startsWith(github.ref, 'refs/tags/v')
       run: |
-        sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/python/infinity_sdk && uv run --python 3.11 prepare_huqie.py && uv build && uv publish --token ${{ secrets.PYPI_API_TOKEN }}"
+        uv run --python 3.11 python/infinity_sdk/prepare_huqie.py && uv build && uv publish --token ${{ secrets.PYPI_API_TOKEN }}
 
     - name: Create or overwrite a release
       # https://github.com/actions/upload-release-asset has been replaced by https://github.com/softprops/action-gh-release

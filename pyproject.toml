@@ -45,6 +45,9 @@ package-dir = {"" = "python/infinity_sdk"}
 [tool.setuptools.packages.find]
 where = ["python/infinity_sdk"]
 
+[tool.setuptools.package-data]
+infinity = ["huqie.txt", "huqie.txt.trie"]
+
 [tool.pytest.ini_options]
 addopts = "--strict-markers"
 markers = [
