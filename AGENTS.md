@@ -64,16 +64,16 @@ Located in `python/`. Use `uv` to manage the environment.
 2. **Run Tests**:
    - **Pre-requisite**: Start Infinity server first!
      ```bash
-     # Default configurationinfi
-     # Note: Ignore infinity.log, the real log is at /var/infinity/log/infinity.log
-     nohup ./cmake-build-debug/src/infinity > infinity.log 2>&1 &
+     # Default configuration
+     # Note: The log of infinity is at /var/infinity/log/infinity.log
+     nohup ./cmake-build-debug/src/infinity > /dev/null 2>/dev/null &
 
      # To enable debug/trace logging:
      # 1. Create a config file (e.g., cp conf/infinity_conf.toml my_conf.toml)
      # 2. Set `log_level = "debug"` or `"trace"` in the config file.
      # 3. Start with -f:
-     # Note: Ignore infinity.log, the real log is at /var/infinity/log/infinity.log
-     nohup ./cmake-build-debug/src/infinity -f my_conf.toml > infinity.log 2>&1 &
+     # Note: The log of infinity is at /var/infinity/log/infinity.log
+     nohup ./cmake-build-debug/src/infinity -f my_conf.toml > /dev/null 2>/dev/null &
      ```
    - **Run Test**:
      ```bash
