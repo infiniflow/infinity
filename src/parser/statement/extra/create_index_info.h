@@ -24,6 +24,8 @@ import std.compat;
 
 namespace infinity {
 
+enum class SecondaryIndexCardinality : uint8_t { kHighCardinality = 0, kLowCardinality = 1, kInvalid = 255 };
+
 enum class IndexType {
     kIVF,
     kHnsw,
@@ -40,6 +42,7 @@ struct IndexInfo {
     IndexType index_type_{IndexType::kInvalid};
     std::string column_name_{};
     std::vector<InitParameter *> *index_param_list_{nullptr};
+    SecondaryIndexCardinality secondary_index_cardinality_{SecondaryIndexCardinality::kHighCardinality};
 
     static std::string IndexTypeToString(IndexType index_type);
     static IndexType StringToIndexType(const std::string &index_type_str);

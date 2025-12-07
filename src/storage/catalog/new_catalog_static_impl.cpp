@@ -42,6 +42,7 @@ import :scalar_function_set;
 import :special_function;
 import :meta_cache;
 import :utility;
+import :index_secondary;
 import :memory_indexer;
 
 import std;
@@ -553,6 +554,7 @@ Status NewCatalog::AddNewTableIndex(TableMeta &table_meta,
     if (!status.ok()) {
         return status;
     }
+
     return Status::OK();
 }
 
