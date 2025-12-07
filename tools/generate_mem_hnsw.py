@@ -66,7 +66,7 @@ def generate(generate_if_exist: bool, copy_dir: str):
             slt_file.write(";\n")
             slt_file.write("\n")
 
-        slt_file.write("# Wait HNSW index chunk creation done since the chunk rows are invisiable during dumping.\n")
+        slt_file.write("# Wait HNSW index chunk creation done since the chunk rows are invisible during dumping.\n")
         slt_file.write("system ok\n")
         slt_file.write("sleep 1\n")
         slt_file.write("\n")
