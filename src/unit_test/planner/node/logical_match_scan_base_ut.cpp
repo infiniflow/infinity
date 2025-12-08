@@ -101,7 +101,7 @@ TEST_P(LogicalMatchScanTest, test1) {
     }
 
     {
-        std::string sql = "select col1 from tb_embedding search match vector (col2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 1)";
+        std::string sql = "select col1 from tb_embedding search match vector (col2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 1) where 1 = 1";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(sql);
 
