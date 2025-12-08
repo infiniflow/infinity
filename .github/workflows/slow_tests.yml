@@ -234,6 +234,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           nohup bash -c "ASAN_OPTIONS=detect_leaks=0 TSAN_OPTIONS=log_path=debug_tsan_parallel_tsan.log cmake-build-debug-tsan/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> debug_tsan_parallel_stderr.log" &
+          ./scripts/wait_for_infinity.sh
 
       - name: Run parallel test
         if: ${{ !cancelled() && !failure() }}
@@ -364,6 +365,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           nohup bash -c "cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml 2> reldeb_parallel_stderr.log" &
+          ./scripts/wait_for_infinity.sh
 
       - name: Run parallel test
         if: ${{ !cancelled() && !failure() }}
