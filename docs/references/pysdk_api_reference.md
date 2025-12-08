@@ -698,7 +698,7 @@ Creates a snapshot of the specified database with the given snapshot name.
 
 ##### snapshot_name: `str`, *Required*
 
-A non-empty string indicating the name of the table snapshot.
+A non-empty string indicating the name of the database snapshot.
 
 ##### database_name: `str`, *Required*
 
@@ -750,7 +750,7 @@ A structure containing the following attributes:
 #### Examples
 ```python
 # Create a snapshot named 'my_system_snapshot'.
-# If the specified snapshot already exists or the specified database does not exist, raise an error.
+# If the specified snapshot already exists, raise an error.
 infinity_obj.create_system_snapshot("my_system_snapshot")
 ```
 
