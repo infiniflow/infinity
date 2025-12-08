@@ -850,7 +850,7 @@ A structure containing the following attributes:
 ```python
 # Restore a system from the snapshot 'my_system_snapshot'.
 # If the specified snapshot does not exist, raise an error.
-infinity_obj.restore_database_snapshot("my_system_snapshot")
+infinity_obj.restore_system_snapshot("my_system_snapshot")
 ```
 
 ---
