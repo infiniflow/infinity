@@ -36,9 +36,9 @@ jobs:
         if [[ ${GITHUB_EVENT_NAME} != 'schedule' ]]; then
           RELEASE_TAG=${GITHUB_REF#refs/tags/}
           if [[ ${RELEASE_TAG} == v* ]]; then
-            PRERELEASE=true
-          else
             PRERELEASE=false
+          else
+            PRERELEASE=true
           fi
           echo "Workflow triggered by push tag: ${RELEASE_TAG}"
         else
