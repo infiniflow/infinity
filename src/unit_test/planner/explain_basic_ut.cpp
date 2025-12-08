@@ -125,12 +125,15 @@ TEST_P(ExplainBasicTest, test1) {
     ExplainSql("select * from tb where col1 > 100 and 1 = 1", true);
     ExplainSql("select * from tb order by col1", true);
     ExplainSql("select * from tb limit 100", true);
+    ExplainSql("select min(col1), max(col1), avg(col1) from tb where 1 = 1 group by col1", true);
     ExplainSql("select * from tb where col1 > 100 and 1 = 1 order by col1 limit 100", true);
     ExplainSql("select * from tb where col1 in (100, 150, 200)", true);
     ExplainSql("select * from tb where col1 between 100 and 200", true);
     ExplainSql("select col1 from tb_embedding search match vector (col2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 1)", true);
 
     // Explain create
+    ExplainSql("create index idx on tb(col1) using secondary", false);
+    ExplainSql("create index idx on tb(col2) using fulltext", false);
     ExplainSql("create table tb1(c1 int, c2 varchar)", false);
     ExplainSql("create database db1", false);
     ExplainSql("create collection c1", false);
