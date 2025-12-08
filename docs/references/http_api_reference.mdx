@@ -692,8 +692,6 @@ curl --request POST \
 
 #### Response
 
-#### Response
-
 <Tabs
   defaultValue="s200"
   values={[
@@ -735,6 +733,160 @@ The response includes a JSON object like the following:
 
 ---
 
+### create database snapshot
+
+**POST** `/snapshots/database`
+
+Creates a snapshot of the specified database with the given snapshot name.
+
+#### Request
+
+- Method: POST
+- URL: `/snapshots/database`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+  - `"db_name"`: `string`
+  - `"snapshot_name"`: `string`
+
+##### Request example
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/snapshots/database \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' {
+         "db_name" : "default_db",
+         "snapshot_name" : "my_snapshot"
+    } '
+```
+
+##### Request parameters
+- `db_name`: (*Body parameter*)
+  The name of the database.
+- `snapshot_name`: (*Body parameter*)
+  The name of the snapshot.
+
+#### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3021,
+    "error_msg": "{db_name} doesn't exist."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+### create system snapshot
+
+**POST** `/snapshots/system`
+
+Creates a snapshot of the system with the given snapshot name.
+
+#### Request
+
+- Method: POST
+- URL: `/snapshots/system`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+  - `"snapshot_name"`: `string`
+
+##### Request example
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/snapshots/system \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' {
+         "snapshot_name" : "my_snapshot"
+    } '
+```
+
+##### Request parameters
+- `snapshot_name`: (*Body parameter*)
+  The name of the snapshot.
+
+#### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3100,
+    "error_msg": "Snapshot: {snapshot_name} already exists."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
 ### restore table snapshot
 
 **POST** `/snapshots/restore`
@@ -756,6 +908,156 @@ Restores a table from the specified snapshot.
 ```shell
 curl --request POST \
      --url http://localhost:23820/snapshots/restore \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' {
+         "snapshot_name" : "my_snapshot"
+    } '
+```
+
+##### Request parameters
+- `snapshot_name`: (*Body parameter*)
+The name of the snapshot.
+
+#### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 7008,
+    "error_msg": "File: /var/infinity/snapshot/{snapshot_name}/{snapshot_name}.json isn't found."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+### restore database snapshot
+
+**POST** `/snapshots/database/restore`
+
+Restores a database from the specified snapshot.
+
+#### Request
+
+- Method: POST
+- URL: `/snapshots/database/restore`
+- Headers:
+- `accept: application/json`
+- `content-Type: application/json`
+- Body:
+- `"snapshot_name"`: `string`
+
+##### Request example
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/snapshots/database/restore \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' {
+         "snapshot_name" : "my_snapshot"
+    } '
+```
+
+##### Request parameters
+- `snapshot_name`: (*Body parameter*)
+The name of the snapshot.
+
+#### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 7008,
+    "error_msg": "File: /var/infinity/snapshot/{snapshot_name}/{snapshot_name}.json isn't found."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_msg"`: `string`  
+  When `error_code` is non-zero, `"error_msg"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+### restore system snapshot
+
+**POST** `/snapshots/system/restore`
+
+Restores the system from the specified snapshot.
+
+#### Request
+
+- Method: POST
+- URL: `/snapshots/system/restore`
+- Headers:
+- `accept: application/json`
+- `content-Type: application/json`
+- Body:
+- `"snapshot_name"`: `string`
+
+##### Request example
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/snapshots/system/restore \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' {

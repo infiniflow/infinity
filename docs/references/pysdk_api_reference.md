@@ -679,9 +679,79 @@ A structure containing the following attributes:
 
 #### Examples
 ```python
-# Create a snapshot named 'my_snapshot' of the table 'my_table':
+# Create a snapshot named 'my_table_snapshot' of the table 'my_table'.
 # If the specified snapshot already exists or the specified table does not exist, raise an error.
-db_object.create_table_snapshot("my_snapshot", "my_table")
+db_object.create_table_snapshot("my_table_snapshot", "my_table")
+```
+
+---
+
+### create_database_snapshot
+
+```python
+infinity_obj.create_database_snapshot(snapshot_name, database_name)
+```
+
+Creates a snapshot of the specified database with the given snapshot name.
+
+#### Parameters
+
+##### snapshot_name: `str`, *Required*
+
+A non-empty string indicating the name of the database snapshot.
+
+##### database_name: `str`, *Required*
+
+A non-empty string indicating the name of the database.
+
+#### Returns
+
+A structure containing the following attributes:
+
+- `error_code`: `int`
+  - `0`: The operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
+#### Examples
+```python
+# Create a snapshot named 'my_database_snapshot' of the database 'my_database'.
+# If the specified snapshot already exists or the specified database does not exist, raise an error.
+infinity_obj.create_database_snapshot("my_database_snapshot", "my_database")
+```
+
+---
+
+### create_system_snapshot
+
+```python
+infinity_obj.create_system_snapshot(snapshot_name)
+```
+
+Creates a snapshot of the system with the given snapshot name.
+
+#### Parameters
+
+##### snapshot_name: `str`, *Required*
+
+A non-empty string indicating the name of the system snapshot.
+
+#### Returns
+
+A structure containing the following attributes:
+
+- `error_code`: `int`
+  - `0`: The operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
+#### Examples
+```python
+# Create a snapshot named 'my_system_snapshot'.
+# If the specified snapshot already exists, raise an error.
+infinity_obj.create_system_snapshot("my_system_snapshot")
 ```
 
 ---
@@ -712,9 +782,75 @@ A structure containing the following attributes:
 
 #### Examples
 ```python
-# Restore a table from the snapshot 'my_snapshot':
+# Restore a table from the snapshot 'my_table_snapshot'.
 # If the specified snapshot does not exist, raise an error.
-db_object.restore_table_snapshot("my_snapshot")
+db_object.restore_table_snapshot("my_table_snapshot")
+```
+
+---
+
+### restore_database_snapshot
+
+```python
+infinity_obj.restore_database_snapshot(snapshot_name)
+```
+
+Restores a database from the specified snapshot.
+
+#### Parameters
+
+##### snapshot_name: `str`, *Required*
+
+A non-empty string indicating the name of the database snapshot.
+
+#### Returns
+
+A structure containing the following attributes:
+
+- `error_code`: `int`
+  - `0`: The operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
+#### Examples
+```python
+# Restore a database from the snapshot 'my_database_snapshot'.
+# If the specified snapshot does not exist, raise an error.
+infinity_obj.restore_database_snapshot("my_database_snapshot")
+```
+
+---
+
+### restore_system_snapshot
+
+```python
+infinity_obj.restore_system_snapshot(snapshot_name)
+```
+
+Restores a system from the specified snapshot.
+
+#### Parameters
+
+##### snapshot_name: `str`, *Required*
+
+A non-empty string indicating the name of the system snapshot.
+
+#### Returns
+
+A structure containing the following attributes:
+
+- `error_code`: `int`
+  - `0`: The operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
+#### Examples
+```python
+# Restore a system from the snapshot 'my_system_snapshot'.
+# If the specified snapshot does not exist, raise an error.
+infinity_obj.restore_system_snapshot("my_system_snapshot")
 ```
 
 ---
