@@ -89,7 +89,13 @@ TEST_P(LogicalProjectTest, test1) {
         status = txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-
+    {
+        std::string create_index_sql = "create index idx on tb(col2) using fulltext";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_index_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
     for (size_t i = 0; i < 200; i++) {
         std::string sql = fmt::format("insert into tb values({}, 'abc')", i);
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
@@ -107,6 +113,20 @@ TEST_P(LogicalProjectTest, test1) {
         for (const auto &node : nodes) {
             CheckLogicalNode(node, LogicalNodeType::kProjection);
             CheckLogicalNode(node, LogicalNodeType::kFilter);
+        }
+
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+
+    {
+        std::string sql = "select col1 from tb search match text ('col2', 'abc', 'topn=1')";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+
+        auto nodes = query_context->logical_planner()->LogicalPlans();
+        for (const auto &node : nodes) {
+            CheckLogicalNode(node, LogicalNodeType::kMatch);
         }
 
         bool ok = HandleQueryResult(query_result);
