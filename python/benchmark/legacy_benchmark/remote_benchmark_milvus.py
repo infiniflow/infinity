@@ -2,12 +2,10 @@ import argparse
 import os
 import time
 import multiprocessing
-import struct
 
-from pymilvus import MilvusClient, DataType
-from pymilvus import connections, db
+from pymilvus import MilvusClient
 
-from utils import SparseMatrix, csr_read_all, gt_read_all
+from utils import csr_read_all, gt_read_all
 
 
 def work(remote, queries, topk, alpha, beta):
@@ -20,7 +18,7 @@ def work(remote, queries, topk, alpha, beta):
         query_vector = []
         for i, j in zip(indices, values):
             query_vector.append((i, j))
-        res = client.search(
+        client.search(
             collection_name="splade_benchmark_collection",
             data=[query_vector],
             limit=topk,  # Max. number of search results to return
@@ -154,7 +152,7 @@ def benchmark(
         print(f"Rounds: {rounds}")
         process_pool(remote, threads, rounds, query_path, topk, alpha, beta)
     else:
-        print(f"Single-thread")
+        print("Single-thread")
         print(f"Rounds: {rounds}")
         one_thread(remote, rounds, query_path, gt_path, alpha, beta)
 

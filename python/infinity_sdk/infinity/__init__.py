@@ -17,7 +17,6 @@
 # __version__ = importlib.metadata.version("infinity_sdk")
 
 import logging
-import os
 # import pkg_resources
 # __version__ = pkg_resources.get_distribution("infinity_sdk").version
 
@@ -25,6 +24,12 @@ from infinity.common import URI, NetworkAddress, LOCAL_HOST, LOCAL_INFINITY_PATH
 from infinity.infinity import InfinityConnection
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 from infinity.errors import ErrorCode
+
+__all__ = [
+    "URI", "NetworkAddress", "LOCAL_HOST", "LOCAL_INFINITY_PATH", "InfinityException",
+    "InfinityConnection", "RemoteThriftInfinityConnection", "ErrorCode", "connect"
+]
+
 
 
 def connect(uri=LOCAL_HOST, logger: logging.Logger = None) -> InfinityConnection:

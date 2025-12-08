@@ -12,13 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Optional, Union, Any
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
-from infinity.index import IndexInfo
-from infinity.common import InfinityException, INSERT_DATA
+from infinity.common import InfinityException
 from infinity.errors import ErrorCode
 
 

@@ -1,16 +1,11 @@
-import threading
 import time
 
 import pytest
 from infinity_cluster import InfinityCluster
-from numpy import dtype
 import pandas as pd
-import time
-from infinity.errors import ErrorCode
-from infinity.common import InfinityException
 from infinity.common import ConflictType
 from database_operations import do_some_operations_cluster, clear_instance
-from infinity_http import infinity_http
+from infinity.infinity_http import infinity_http
 from database_operations import instance_state
 from util import RtnThread
 
@@ -89,7 +84,7 @@ def test_cluster_shutdown_and_recover(cluster: InfinityCluster, kill: bool, lead
             infinity_n1.get_database("default_db").drop_table(
                 table_name, ConflictType.Ignore
             )
-            table_n1 = infinity_n1.get_database("default_db").create_table(
+            infinity_n1.get_database("default_db").create_table(
                 table_name, {"c1": {"type": "int"}}
             )
 

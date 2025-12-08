@@ -1,5 +1,5 @@
 from infinity_runner import InfinityRunner
-from restart_timeout import *
+
 
 import logging
 

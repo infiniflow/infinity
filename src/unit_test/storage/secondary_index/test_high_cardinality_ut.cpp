@@ -29,7 +29,6 @@ import :new_txn_manager;
 import :infinity_context;
 import :txn_state;
 import :index_secondary;
-import :table_index_meta;
 import :segment_index_meta;
 import :ut.request_test;
 
@@ -84,8 +83,7 @@ TEST_P(HighCardinalitySecondaryIndexTest, TestSaveLoadHighCardinality) {
     EXPECT_TRUE(status.ok());
     index->SaveIndexInner(*file);
 
-    auto handle = GetSecondaryIndexDataWithMeta(data_type, chunk_row_count, true, nullptr);
-    auto index2 = static_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(handle);
+    auto index2 = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(data_type, chunk_row_count, true);
 
     // Load data
     auto [file2, status2] = VirtualStore::Open(tmp_path, FileAccessMode::kRead);
@@ -128,20 +126,12 @@ TEST_P(HighCardinalitySecondaryIndexTest, TestTxn) {
 
     // Just for coverage
     {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kRead);
-
         std::shared_ptr<DBMeta> db_meta;
         std::shared_ptr<TableMeta> table_meta;
-        std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
-        Status status = txn->GetTableIndexMeta(*db_name, *table_name, "second_idx", db_meta, table_meta, table_index_meta, &table_key, &index_key);
-        EXPECT_TRUE(status.ok());
 
-        table_index_meta->SetSecondaryIndexCardinality(SecondaryIndexCardinality::kHighCardinality);
-
-        auto handle = GetSecondaryIndexDataWithMeta(data_type, chunk_row_count, true, table_index_meta.get());
-        auto index = static_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(handle);
+        auto index = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(data_type, chunk_row_count, true);
 
         auto test_data = CreateHighCardinalityData<i32>(chunk_row_count, unique_values);
         index->InsertData(&test_data);

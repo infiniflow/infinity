@@ -1,4 +1,4 @@
-from infinity.common import ConflictType, InfinityException
+from infinity.common import ConflictType
 from infinity import index
 from numpy import dtype
 import ast
@@ -85,14 +85,14 @@ def is_float(str):
     try:
         float(str)
         return True
-    except:
+    except Exception:
         return False
 
 def is_list(str):
     try:
         result = ast.literal_eval(str)
         return isinstance(result, list)
-    except:
+    except Exception:
         return False
 
 def is_bool(str):

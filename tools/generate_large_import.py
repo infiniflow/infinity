@@ -3,7 +3,6 @@
 
 import os
 import argparse
-import random
 
 
 def generate(generate_if_exists: bool, copy_dir: str):

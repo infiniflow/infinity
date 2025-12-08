@@ -16,12 +16,21 @@ import struct
 import json
 import numpy as np
 from infinity.common import VEC, SparseVector, InfinityException
-from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
+from infinity.remote_thrift.infinity_thrift_rpc.ttypes import (
+    ColumnExpr,
+    ConstantExpr,
+    EmbeddingData,
+    ElementType,
+    InitParameter,
+    LiteralType,
+    MatchSparseExpr,
+    MatchTensorExpr,
+    ParsedExpr,
+)
 from collections import defaultdict
 from typing import Any, Optional
 from datetime import date, time, datetime, timedelta
 
-import polars as pl
 from numpy import dtype
 from infinity.errors import ErrorCode
 
@@ -443,7 +452,6 @@ def parse_sparse_bytes(column_data_type: ttypes.DataType, column_vector):
 
 
 def parse_single_sparse_bytes(column_data_type: ttypes.DataType, column_vector, offset):
-    dimension = column_data_type.physical_type.sparse_type.dimension
     element_type = column_data_type.physical_type.sparse_type.element_type
     index_type = column_data_type.physical_type.sparse_type.index_type
     nnz = struct.unpack('I', column_vector[offset:offset + 4])[0]
@@ -599,7 +607,7 @@ def make_match_sparse_expr(vector_column_name: str, sparse_data: SparseVector | 
             query_sparse_expr.f64_array_value = values
         case SparseVector([int(), *_], None):
             raise InfinityException(ErrorCode.INVALID_CONSTANT_TYPE,
-                                    f"No values! Sparse data does not support bool value type now")
+                                    "No values! Sparse data does not support bool value type now")
         case dict():
             if len(sparse_data) == 0:
                 raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Empty sparse vector")

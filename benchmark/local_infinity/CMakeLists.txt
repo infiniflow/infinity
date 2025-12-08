@@ -34,6 +34,11 @@ target_link_libraries(infinity_benchmark
         absl::any absl::log absl::base absl::bits
         PCRE2::8BIT
         RocksDB::rocksdb
+        simdjson::simdjson
+        nlohmann_json::nlohmann_json
+        CLI11::CLI11
+        magic_enum::magic_enum
+        roaring::roaring
         ${STDCXX15EXP_STATIC}
 )
 

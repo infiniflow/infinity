@@ -1,5 +1,5 @@
-def term_weight(l: list):
+def term_weight(tokens: list):
     print("=====================")
-    print(l)
-    print(len(l))
+    print(tokens)
+    print(len(tokens))
     return 1

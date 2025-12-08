@@ -18,7 +18,7 @@ from typing import Optional, Union, List, Any
 
 from infinity_embedded.embedded_infinity_ext import ConflictType as LocalConflictType
 from infinity_embedded.embedded_infinity_ext import ImportOptions, CopyFileType, WrapParsedExpr, \
-    ParsedExprType, WrapUpdateExpr, ExportOptions, WrapOptimizeOptions, WrapOrderByExpr, WrapInsertRowExpr
+    ParsedExprType, WrapUpdateExpr, ExportOptions, WrapOptimizeOptions, WrapInsertRowExpr
 from infinity_embedded.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN, SortType
 from infinity_embedded.common import INSERT_DATA, VEC, SparseVector, InfinityException
 from infinity_embedded.errors import ErrorCode
@@ -191,7 +191,7 @@ class LocalTable():
         options.header = False
         options.delimiter = ','
         options.copy_file_type = CopyFileType.kCSV
-        if import_options != None:
+        if import_options is not None:
             for k, v in import_options.items():
                 key = k.lower()
                 if key == 'file_type':
@@ -240,7 +240,7 @@ class LocalTable():
         options.header = False
         options.delimiter = ','
         options.copy_file_type = CopyFileType.kCSV
-        if export_options != None:
+        if export_options is not None:
             for k, v in export_options.items():
                 key = k.lower()
                 if key == 'file_type':

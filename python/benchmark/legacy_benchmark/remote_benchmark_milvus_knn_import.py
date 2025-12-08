@@ -1,5 +1,4 @@
 import argparse
-import multiprocessing
 import os
 import struct
 import time
@@ -70,7 +69,7 @@ def insert_sift_1m(path):
     start = time.time()
 
     vectors = []
-    loop_start = time.time()
+    time.time()
     for idx, query_vec in enumerate(fvecs_read(path)):
         vectors.append({"id":idx, "vector":query_vec})
         if len(vectors) == 1000:
@@ -136,7 +135,7 @@ def insert_gist_1m(path):
     start = time.time()
 
     vectors = []
-    loop_start = time.time()
+    time.time()
     for idx, query_vec in enumerate(fvecs_read(path)):
         vectors.append({"id":idx, "vector":query_vec})
         if len(vectors) == 1000:
@@ -168,7 +167,7 @@ def insert_data(threads, data_set, path):
             print(f"Multi-threads: {threads}")
             #process_pool(threads, data_path, "sift_benchmark")
         else:
-            print(f"Single-thread")
+            print("Single-thread")
             insert_sift_1m(data_path)
     elif data_set == "gist_1m":
         data_path = path + "/gist_base.fvecs"
@@ -176,7 +175,7 @@ def insert_data(threads, data_set, path):
             print(f"Multi-threads: {threads}")
             #process_pool(threads, data_path, "gist_benchmark")
         else:
-            print(f"Single-thread")
+            print("Single-thread")
             insert_gist_1m(data_path)
 
 

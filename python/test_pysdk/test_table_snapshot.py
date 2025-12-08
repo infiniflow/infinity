@@ -1,5 +1,3 @@
-import sys
-import os
 import pytest
 from common import common_values
 from infinity.common import ConflictType, InfinityException, SparseVector
@@ -9,11 +7,7 @@ import random
 import time
 import infinity.index as index
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-from infinity_http import infinity_http
+from infinity.infinity_http import infinity_http
 
 
 @pytest.fixture(scope="class")
@@ -536,15 +530,15 @@ class TestSnapshot:
         """Test error conditions for snapshot operations"""
         # Test creating snapshot of non-existent table
         db_obj = self.infinity_obj.get_database("default_db")
-        with pytest.raises(InfinityException) as e:
+        with pytest.raises(InfinityException):
             db_obj.create_table_snapshot("non_existent", "non_existent_table")
 
         # Test restoring non-existent snapshot
-        with pytest.raises(InfinityException) as e:
+        with pytest.raises(InfinityException):
             db_obj.restore_table_snapshot("non_existent_snapshot")
 
         # Test dropping non-existent snapshot
-        with pytest.raises(InfinityException) as e:
+        with pytest.raises(InfinityException):
             self.infinity_obj.drop_snapshot("non_existent_snapshot")
 
     def test_snapshot_naming_conventions(self, suffix):
@@ -668,16 +662,16 @@ class TestSnapshot:
 
         try:
             self.infinity_obj.drop_snapshot(f"restore_snap_{suffix}")
-        except:
+        except Exception:
             pass
 
         # Drop table if it exists
         try:
             db_obj.drop_table(f"test_table_{suffix}", ConflictType.Ignore)
-        except:
+        except Exception:
             pass
 
-        table_obj = db_obj.create_table(
+        db_obj.create_table(
             f"test_table_{suffix}",
             {"c1": {"type": "int", "constraints": ["primary key"]}},
             ConflictType.Error
@@ -694,7 +688,7 @@ class TestSnapshot:
         # Cleanup
         try:
             self.infinity_obj.drop_snapshot(f"restore_snap_{suffix}")
-        except:
+        except Exception:
             pass
         db_obj.drop_table(f"test_table_{suffix}", ConflictType.Ignore)
 
@@ -903,7 +897,7 @@ class TestSnapshot:
     #         # Cleanup
     #         try:
     #             self.infinity_obj.drop_snapshot(snapshot_name)
-    #         except:
+    #         except Exception:
     #             pass
     #         db_obj.drop_table(table_name, ConflictType.Ignore)
 

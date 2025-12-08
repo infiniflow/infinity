@@ -29,8 +29,6 @@ import :infinity_exception;
 import :virtual_store;
 import :local_file_handle;
 
-import compilation_config;
-
 using namespace infinity;
 
 class BMPIndexTest : public BaseTest {
@@ -56,8 +54,8 @@ protected:
         const SparseMatrix query_set = SparseTestUtil<DataType, IdxType>::GenerateDataset(query_n, ncol, sparsity, 0.0, 10.0);
         const auto [gt_indices_list, gt_scores_list] = SparseTestUtil<DataType, IdxType>::GenerateGroundtruth(dataset, query_set, topk, false);
 
-        std::string save_path = std::string(tmp_data_path()) + "/bmindex_test1.index";
-        std::string save2_path = std::string(tmp_data_path()) + "/bmindex_test2.index";
+        std::string save_path = std::string(GetFullDataDir()) + "/bmindex_test1.index";
+        std::string save2_path = std::string(GetFullDataDir()) + "/bmindex_test2.index";
         if (VirtualStore::Exists(save_path)) {
             VirtualStore::DeleteFile(save_path);
         }

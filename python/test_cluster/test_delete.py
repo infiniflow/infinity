@@ -2,7 +2,6 @@ import time
 
 from numpy import dtype
 import pandas as pd
-import pytest
 from infinity_cluster import InfinityCluster
 from infinity.common import ConflictType
 from infinity.common import InfinityException

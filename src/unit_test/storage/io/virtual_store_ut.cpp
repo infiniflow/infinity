@@ -29,7 +29,6 @@ import :virtual_store;
 import :local_file_handle;
 
 import global_resource_usage;
-import compilation_config;
 
 using namespace infinity;
 

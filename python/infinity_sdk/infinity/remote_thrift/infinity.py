@@ -20,7 +20,7 @@ from infinity import InfinityConnection
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.db import RemoteDatabase
-from infinity.remote_thrift.utils import name_validity_check, select_res_to_polars
+from infinity.remote_thrift.utils import name_validity_check
 from infinity.common import ConflictType, InfinityException
 from typing import Any
 from dataclasses import dataclass

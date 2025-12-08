@@ -6,6 +6,8 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { showConfigs, showVariables } from './actions';
+
+export const dynamic = 'force-dynamic';
 // import { getProducts } from '@/lib/db';
 
 export default async function ProductsPage() {

@@ -3,7 +3,6 @@ import time
 
 import infinity.index as index
 import pandas
-import pytest
 import random
 from threading import Thread
 from infinity.common import ConflictType
@@ -209,7 +208,7 @@ def insert(table_obj, data):
             operation_stats['insert_count'] += 1
         # Add sleep to allow more snapshot operations
         time.sleep(0.05)
-    except Exception as e:
+    except Exception:
         pass
 
 
@@ -222,7 +221,7 @@ def delete(table_obj):
             operation_stats['delete_count'] += 1
         # Add sleep to allow more snapshot operations
         time.sleep(0.05)
-    except Exception as e:
+    except Exception:
         pass
 
 
@@ -235,7 +234,7 @@ def updata(table_obj):
             operation_stats['update_count'] += 1
         # Add sleep to allow more snapshot operations
         time.sleep(0.05)
-    except Exception as e:
+    except Exception:
         pass
 
 
@@ -270,7 +269,7 @@ def updata(table_obj):
 #             # Drop the current table if it exists
 #             try:
 #                 db_obj.drop_table("chaos_test", ConflictType.Ignore)
-#             except:
+#             except Exception:
 #                 pass
 #
 #             # Restore from snapshot
@@ -300,7 +299,7 @@ def drop_table(db_obj, thread_id):
         else:
             with snapshot_stats_lock:
                 snapshot_stats['drop_failed'] += 1
-    except Exception as e:
+    except Exception:
         with snapshot_stats_lock:
             snapshot_stats['drop_failed'] += 1
 
@@ -311,14 +310,13 @@ def random_exec(connection_pool: ConnectionPool, data, end_time, thread_id):
     
     # Track start time for timing logic
     start_time = time.time()
-    test_duration = kRunningTime
     
     # Try to get the table, restore from snapshot if it doesn't exist
     
     
     while time.time() < end_time:
         # Calculate elapsed time
-        elapsed_time = time.time() - start_time
+        time.time() - start_time
         # rand_v = random.randint(0, 5)
         rand_v = random.randint(0, 4)
 
@@ -326,7 +324,7 @@ def random_exec(connection_pool: ConnectionPool, data, end_time, thread_id):
         try:
             # try:
             table_obj = db_obj.get_table("chaos_test")
-            # except:
+            # except Exception:
                 # Table doesn't exist, try to restore from snapshot
                 # snapshots_res = infinity_obj.list_snapshots()
                 # if snapshots_res.error_code == ErrorCode.OK and snapshots_res.snapshots:
@@ -377,11 +375,11 @@ def random_exec(connection_pool: ConnectionPool, data, end_time, thread_id):
             #                 snapshot_stats['create_failed'] += 1
             #     else:
             #         drop_table(db_obj, thread_id)
-        except Exception as e:
+        except Exception:
             # If any operation fails, try to get the table object again
             try:
                 table_obj = db_obj.get_table("chaos_test")
-            except:
+            except Exception:
                 pass
         
         # Small delay to prevent overwhelming the system

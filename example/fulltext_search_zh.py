@@ -16,10 +16,8 @@
 This example is to connect local infinity instance, create table, insert data, search the data which Chinese words
 """
 
-"""
-Checkout https://github.com/infiniflow/resource.git under /usr/share/infinity (defined by 'resource_dir' of config file). The jieba dict is
-/usr/share/infinity/resource/jieba/dict/jieba.dict.utf8
-"""
+# Checkout https://github.com/infiniflow/resource.git under /usr/share/infinity (defined by 'resource_dir' of config file). The jieba dict is
+# /usr/share/infinity/resource/jieba/dict/jieba.dict.utf8
 
 import infinity
 import sys

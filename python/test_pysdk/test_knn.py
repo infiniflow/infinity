@@ -1,5 +1,3 @@
-import sys
-import os
 import pytest
 from common import common_values
 from common import common_index
@@ -14,11 +12,7 @@ from polars.testing import assert_frame_equal as pl_assert_frame_equal
 from polars.testing import assert_frame_not_equal as pl_assert_frame_not_equal
 from numpy import dtype
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-from infinity_http import infinity_http
+from infinity.infinity_http import infinity_http
 
 
 @pytest.fixture(scope="class")
@@ -1542,7 +1536,7 @@ class TestInfinity:
 
         table_obj.alter_index("idx1", {"topk": "3"})
 
-        with pytest.raises(InfinityException) as e:
+        with pytest.raises(InfinityException):
             res, extra_result = (table_obj
                                  .output(["*", "_row_id", "_similarity"])
                                  .match_sparse("c2",

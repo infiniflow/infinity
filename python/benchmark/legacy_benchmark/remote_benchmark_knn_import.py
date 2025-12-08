@@ -20,8 +20,6 @@ import infinity
 from infinity import index
 from infinity.common import LOCAL_HOST, ConflictType
 from infinity.errors import ErrorCode
-from infinity.remote_thrift.client import ThriftInfinityClient
-from infinity.remote_thrift.table import RemoteTable
 
 
 def import_data(path, dataset: str, m: int, ef_construction: int, build_type: str, encode_type: str, compress_type: str):
@@ -44,7 +42,7 @@ def import_sift_1m(path, m: int, ef_construction: int, build_type: str, encode_t
 
     db_obj = infinity_obj.get_database("default_db")
     assert db_obj
-    table_name = f"sift_benchmark"
+    table_name = "sift_benchmark"
     db_obj.drop_table(table_name)
     db_obj.create_table(table_name, {"col1": {"type": "vector,128,float"}})
     table_obj = db_obj.get_table(table_name)
@@ -73,7 +71,7 @@ def import_gist_1m(path, m: int, ef_construction: int, build_type: str, encode_t
 
     db_obj = infinity_obj.get_database("default_db")
     assert db_obj
-    table_name = f"gist_benchmark"
+    table_name = "gist_benchmark"
     db_obj.drop_table(table_name)
     db_obj.create_table(table_name, {"col1": {"type": "vector,960,float"}})
     table_obj = db_obj.get_table(table_name)
@@ -102,7 +100,7 @@ def import_msmarco_1m(path, m: int, ef_construction: int, build_type: str, encod
 
     db_obj = infinity_obj.get_database("default_db")
     assert db_obj
-    table_name = f"msmarco_benchmark"
+    table_name = "msmarco_benchmark"
     db_obj.drop_table(table_name)
     db_obj.create_table(table_name, {"col1": {"type": "vector,1024,float"}})
     table_obj = db_obj.get_table(table_name)

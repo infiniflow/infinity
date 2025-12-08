@@ -10,6 +10,8 @@ import {
 import { listDatabase, listTable } from '../actions';
 import { InfinityContextMenuContent } from './context-menu';
 
+export const dynamic = 'force-dynamic';
+
 async function InfinityTable() {
   const tables = await listTable('default_db');
   return (

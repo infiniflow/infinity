@@ -26,7 +26,25 @@ from sqlglot import condition, maybe_parse
 
 from infinity.common import VEC, SparseVector, InfinityException, SortType, FDE
 from infinity.errors import ErrorCode
-from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
+from infinity.remote_thrift.infinity_thrift_rpc.ttypes import (
+    ColumnExpr,
+    ConstantExpr,
+    ElementType,
+    EmbeddingData,
+    ExplainType,
+    FunctionExpr,
+    FusionExpr,
+    GenericMatchExpr,
+    InitParameter,
+    KnnDistanceType,
+    KnnExpr,
+    LiteralType,
+    MatchExpr,
+    OrderByExpr,
+    ParsedExpr,
+    ParsedExprType,
+    SearchExpr,
+)
 from infinity.remote_thrift.types import (
     logic_type_to_dtype,
     make_match_tensor_expr,

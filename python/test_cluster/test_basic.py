@@ -1,9 +1,6 @@
 import time
 
-import pytest
 from infinity_cluster import InfinityCluster
-from mocked_infinity_cluster import MockInfinityCluster
-import time
 
 
 def test_admin(cluster: InfinityCluster):

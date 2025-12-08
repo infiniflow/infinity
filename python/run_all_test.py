@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import os
-import pytest 
 
 def run_sdk(): 
     os.system("cd test")

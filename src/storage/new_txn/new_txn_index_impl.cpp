@@ -50,6 +50,7 @@ import :hnsw_handler;
 import :bmp_handler;
 import :index_hnsw;
 import :index_bmp;
+import :index_secondary;
 import :emvb_index_in_mem;
 import :emvb_index;
 import :meta_key;
@@ -411,6 +412,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
 
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
+            const IndexSecondary *secondary_index = reinterpret_cast<const IndexSecondary *>(index_base.get());
             std::vector<std::pair<u32, BufferObj *>> old_buffers;
             for (size_t i = 0; i < deprecate_ids.size(); ++i) {
                 ChunkID old_chunk_id = deprecate_ids[i];
@@ -429,7 +431,8 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
 
             BufferHandle buffer_handle = buffer_obj->Load();
 
-            auto [cardinality, status] = table_index_meta.GetSecondaryIndexCardinality();
+            // Check cardinality to determine which execution path to use
+            auto cardinality = secondary_index->GetSecondaryIndexCardinality();
             if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
                 auto *data_ptr = static_cast<SecondaryIndexData *>(buffer_handle.GetDataMut());
                 data_ptr->InsertMergeData(old_buffers);
@@ -762,11 +765,8 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 if (!status.ok()) {
                     return status;
                 }
-                auto [cardinality, cardinality_status] = segment_index_meta.table_index_meta().GetSecondaryIndexCardinality();
-                if (!cardinality_status.ok()) {
-                    // Default to HighCardinality if unable to determine
-                    cardinality = SecondaryIndexCardinality::kHighCardinality;
-                }
+                const IndexSecondary *secondary_index = reinterpret_cast<const IndexSecondary *>(index_base.get());
+                auto cardinality = secondary_index->GetSecondaryIndexCardinality();
                 memory_secondary_index = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, base_row_id, cardinality);
 
                 mem_index->SetSecondaryIndex(memory_secondary_index);
@@ -1471,11 +1471,8 @@ Status NewTxn::PopulateSecondaryIndexInner(std::shared_ptr<IndexBase> index_base
         SegmentOffset block_offset = block_id * DEFAULT_BLOCK_CAPACITY;
         RowID base_row_id = RowID(segment_index_meta.segment_id(), block_offset + offset);
         if (is_null) {
-            auto [cardinality, cardinality_status] = segment_index_meta.table_index_meta().GetSecondaryIndexCardinality();
-            if (!cardinality_status.ok()) {
-                // Default to HighCardinality if unable to determine
-                cardinality = SecondaryIndexCardinality::kHighCardinality;
-            }
+            const IndexSecondary *secondary_index = reinterpret_cast<const IndexSecondary *>(index_base.get());
+            auto cardinality = secondary_index->GetSecondaryIndexCardinality();
             memory_secondary_index = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, base_row_id, cardinality);
             mem_index->SetSecondaryIndex(memory_secondary_index);
             is_null = false;

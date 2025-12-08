@@ -7,6 +7,8 @@ import {
 } from '@/components/ui/card';
 import { showConfigs, showVariables } from '../actions';
 
+export const dynamic = 'force-dynamic';
+
 export default async function ProductsPage() {
   const configs = await showConfigs();
   const variables = await showVariables();

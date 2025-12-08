@@ -14,18 +14,37 @@
 
 #pragma once
 
-#include "CLI11.hpp"
-
-import :virtual_store;
-import :infinity_exception;
-import third_party;
-import :infinity_exception;
-import :sparse_util;
-import compilation_config;
-import :bmp_util;
-import :local_file_handle;
+#include <CLI/CLI.hpp>
+#include <atomic>
+#include <filesystem>
+#include <functional>
+#include <memory>
+#include <numeric>
+#include <random>
+#include <string>
+#include <thread>
+#include <tuple>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
 
 using namespace infinity;
+
+using Path = std::filesystem::path;
+template <typename T>
+using Vector = std::vector<T>;
+template <typename T1, typename T2>
+using Pair = std::pair<T1, T2>;
+template <typename... Args>
+using Tuple = std::tuple<Args...>;
+template <typename T>
+using Atomic = std::atomic<T>;
+template <typename T>
+using HashSet = std::unordered_set<T>;
+template <typename K, typename V>
+using Map = std::unordered_map<K, V>;
+using String = std::string;
 
 namespace benchmark {
 
@@ -214,7 +233,7 @@ public:
         query_path_ = dataset_dir / "queries.dev.csr";
         data_path_ = dataset_dir;
         groundtruth_path_ = dataset_dir;
-        index_save_path_ = tmp_data_path();
+        index_save_path_ = std::filesystem::temp_directory_path();
         data_save_path_ = dataset_dir;
         groundtruth_save_path_ = dataset_dir;
         switch (dataset_type_) {

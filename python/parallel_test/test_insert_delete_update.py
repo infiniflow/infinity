@@ -1,6 +1,5 @@
 import time
 
-import pytest
 import random
 from threading import Thread
 from infinity.common import ConflictType

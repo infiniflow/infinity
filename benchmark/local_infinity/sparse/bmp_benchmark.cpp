@@ -12,13 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "sparse_benchmark_util.h"
+#include <CLI/CLI.hpp>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
 
 import infinity_core;
 import compilation_config;
+
+#include "sparse_benchmark_util.h"
 
 using namespace infinity;
 using namespace benchmark;
@@ -74,13 +81,13 @@ int main(int argc, char *argv[]) {
             };
             switch (opt.type_) {
                 case BMPCompressType::kCompressed: {
-                    BMPAlg<f32, i16, BMPCompressType::kCompressed> index = BMPAlg<f32, i16, BMPCompressType::kCompressed>::Load(*file_handler);
-                    inner(index);
+                    auto index = BMPAlg<f32, i16, BMPCompressType::kCompressed>::Load(*file_handler);
+                    inner(*index);
                     break;
                 }
                 case BMPCompressType::kRaw: {
-                    BMPAlg<f32, i16, BMPCompressType::kRaw> index = BMPAlg<f32, i16, BMPCompressType::kRaw>::Load(*file_handler);
-                    inner(index);
+                    auto index = BMPAlg<f32, i16, BMPCompressType::kRaw>::Load(*file_handler);
+                    inner(*index);
                     break;
                 }
                 default: {
@@ -180,7 +187,7 @@ int main(int argc, char *argv[]) {
                                                   indices[i] = static_cast<i16>(query.indices_[i]);
                                               }
                                               SparseVecRef<f32, i16> query1(query.nnz_, indices.data(), query.data_);
-                                              return index.SearchKnn(query1, topk, search_options);
+                                              return index->SearchKnn(query1, topk, search_options);
                                           });
                     profiler.End();
                     std::cout << fmt::format("Search time: {}\n", profiler.ElapsedToString(1000));

@@ -129,7 +129,7 @@ class InfinityLocalQueryBuilder(ABC):
             if len(embedding_data) % 8 != 0:
                 raise InfinityException(
                     ErrorCode.INVALID_EMBEDDING_DATA_TYPE,
-                    f"Embeddings with data bit must have dimension of times of 8!"
+                    "Embeddings with data bit must have dimension of times of 8!"
                 )
             else:
                 new_embedding_data = []

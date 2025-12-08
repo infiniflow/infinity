@@ -36,6 +36,7 @@ import :table_index_meta;
 import :segment_index_meta;
 import :chunk_index_meta;
 import :mem_index;
+import :index_secondary;
 
 import std;
 import third_party;
@@ -907,13 +908,13 @@ template <typename ColumnValueT>
 Bitmask IndexFilterEvaluatorSecondaryT<ColumnValueT>::Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count) const {
     std::optional<SegmentIndexMeta> index_meta;
     index_meta.emplace(segment_id, *new_secondary_index_);
-
-    // Check cardinality to determine which execution path to use
-    auto [cardinality, status] = new_secondary_index_->GetSecondaryIndexCardinality();
-    if (!status.ok()) {
-        // Default to HighCardinality if unable to determine
-        cardinality = SecondaryIndexCardinality::kHighCardinality;
+    auto [index_base, index_status] = new_secondary_index_->GetIndexBase();
+    if (!index_status.ok() || index_base->index_type_ != IndexType::kSecondary) {
+        UnrecoverableError("Fail to get index definition");
     }
+    const IndexSecondary *secondary_index = reinterpret_cast<const IndexSecondary *>(index_base.get());
+    // Check cardinality to determine which execution path to use
+    auto cardinality = secondary_index->GetSecondaryIndexCardinality();
 
     Bitmask result(segment_row_count);
     result.SetAllFalse();
