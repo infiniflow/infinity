@@ -416,7 +416,7 @@ wheels = [
 
 [[package]]
 name = "infinity-sdk"
-version = "0.6.10"
+version = "0.6.11"
 source = { editable = "." }
 dependencies = [
     { name = "datrie" },
@@ -454,21 +454,21 @@ test = [
 requires-dist = [
     { name = "datrie", specifier = ">=0.8.3,<0.9.0" },
     { name = "docker", marker = "extra == 'test'", specifier = ">=7.1.0,<8.0.0" },
-    { name = "elasticsearch", marker = "extra == 'benchmark'", specifier = ">=8.13.0,<9.0.0" },
+    { name = "elasticsearch", marker = "extra == 'benchmark'", specifier = ">=8.13.0,<10.0.0" },
     { name = "h5py", marker = "extra == 'benchmark'", specifier = ">=3.11.0,<4.0.0" },
     { name = "hanziconv", specifier = ">=0.3.0,<0.4.0" },
     { name = "nltk", specifier = ">=3.9.1,<4.0.0" },
     { name = "numpy", specifier = ">=1.26.0,<2.0.0" },
     { name = "pandas", specifier = ">=2.2.0,<3.0.0" },
     { name = "polars-lts-cpu", specifier = ">=1.9.0,<2.0.0" },
-    { name = "psutil", marker = "extra == 'test'", specifier = ">=6.0.0,<7.0.0" },
-    { name = "pyarrow", specifier = ">=17.0.0,<18.0.0" },
+    { name = "psutil", marker = "extra == 'test'", specifier = ">=6.0.0,<8.0.0" },
+    { name = "pyarrow", specifier = ">=17.0.0,<23.0.0" },
     { name = "pydantic", specifier = ">=2.9.0,<3.0.0" },
-    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3.0,<9.0.0" },
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3.0,<10.0.0" },
     { name = "qdrant-client", marker = "extra == 'benchmark'", specifier = ">=1.9.0,<2.0.0" },
     { name = "readerwriterlock", specifier = ">=1.0.0,<2.0.0" },
     { name = "requests", specifier = ">=2.32.3,<3.0.0" },
-    { name = "setuptools", specifier = ">=78.1.1,<79.0.0" },
+    { name = "setuptools", specifier = ">=78.1.1,<81.0.0" },
     { name = "sqlglot", extras = ["rs"], specifier = ">=27.10.0" },
     { name = "thrift", specifier = ">=0.20.0,<1.0.0" },
     { name = "timeout-decorator", marker = "extra == 'test'", specifier = ">=0.5.0,<0.6.0" },
