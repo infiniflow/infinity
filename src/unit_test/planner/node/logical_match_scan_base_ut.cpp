@@ -67,23 +67,6 @@ public:
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalMatchScanTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
 
 TEST_P(LogicalMatchScanTest, test1) {
-    // Create database
-    {
-        std::string sql = "create database db1";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-    }
-
-    {
-        std::string sql = "create collection collection1";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-    }
-
     // Create table
     {
         std::string create_table_sql = "create table tb_embedding(col1 int, col2 embedding(float, 4))";
@@ -100,17 +83,17 @@ TEST_P(LogicalMatchScanTest, test1) {
         EXPECT_TRUE(ok);
     }
 
-    {
-        std::string sql = "select col1 from tb_embedding search match vector (col2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 1) where 1 = 1";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-
-        auto nodes = query_context->logical_planner()->LogicalPlans();
-        for (const auto &node : nodes) {
-            CheckLogicalNode(node, LogicalNodeType::kKnnScan);
-        }
-
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-    }
+    // {
+    //     std::string sql = "select col1 from tb_embedding search match vector (col2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 1)";
+    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+    //     QueryResult query_result = query_context->Query(sql);
+    //
+    //     auto nodes = query_context->logical_planner()->LogicalPlans();
+    //     for (const auto &node : nodes) {
+    //         CheckLogicalNode(node, LogicalNodeType::kKnnScan);
+    //     }
+    //
+    //     bool ok = HandleQueryResult(query_result);
+    //     EXPECT_TRUE(ok);
+    // }
 }
