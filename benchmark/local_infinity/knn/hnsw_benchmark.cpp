@@ -422,7 +422,7 @@ void Compress(const BenchmarkOption &option) {
     } else if constexpr (std::is_same_v<HnswT, HnswLSG>) {
         new_index_name = BenchmarkOption::IndexName(option.benchmark_type_, BuildType::LSGCompressToLVQ, option.M_, option.ef_construction_);
     } else {
-        UnrecoverableError("Unsupport compress type");
+        UnrecoverableError("Unsupported compress type");
     }
     std::filesystem::path new_index_save_path = option.index_dir_ / fmt::format("{}.bin", new_index_name);
 
@@ -534,7 +534,7 @@ int main(int argc, char *argv[]) {
                     break;
                 }
                 default: {
-                    UnrecoverableError("Unsupport compress type");
+                    UnrecoverableError("Unsupported compress type");
                 }
             }
             break;
@@ -550,7 +550,7 @@ int main(int argc, char *argv[]) {
                     break;
                 }
                 default: {
-                    UnrecoverableError("Unsupport compress type");
+                    UnrecoverableError("Unsupported compress type");
                 }
             }
             break;

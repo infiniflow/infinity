@@ -273,6 +273,7 @@ jobs:
           export LLVM_PROFILE_FILE="infinity-%p.profraw"
           export LLVM_PROFILE_DUMP_ON_EXIT=1
           nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> debug_sqllogictest_stderr.log &
+          ./scripts/wait_for_infinity.sh
 
       - name: Run sqllogictest
         if: ${{ !cancelled() && !failure() }}
@@ -364,6 +365,7 @@ jobs:
           export LLVM_PROFILE_FILE="infinity-%p.profraw"
           export LLVM_PROFILE_DUMP_ON_EXIT=1
           nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> debug_pysdk_stderr.log &
+          ./scripts/wait_for_infinity.sh
 
       - name: Run pysdk test
         if: ${{ !cancelled() && !failure() }}
@@ -423,6 +425,7 @@ jobs:
           export LLVM_PROFILE_FILE="infinity-%p.profraw"
           export LLVM_PROFILE_DUMP_ON_EXIT=1
           nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> debug_http_stderr.log &
+          ./scripts/wait_for_infinity.sh
 
       - name: Run http test
         if: ${{ !cancelled() && !failure() }}
@@ -483,6 +486,7 @@ jobs:
           export LLVM_PROFILE_FILE="infinity-%p.profraw"
           export LLVM_PROFILE_DUMP_ON_EXIT=1
           nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> debug_parallel_stderr.log &
+          ./scripts/wait_for_infinity.sh
 
       - name: Run pysdk test
         if: ${{ !cancelled() && !failure() }}
@@ -655,6 +659,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> reldeb_sqllogic_test_stderr.log &
+          ./scripts/wait_for_infinity.sh
 
       - name: Run sqllogictest
         if: ${{ !cancelled() && !failure() }}
@@ -698,6 +703,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> reldeb_pysdk_stderr.log &
+          ./scripts/wait_for_infinity.sh
 
       - name: Run pysdk test
         if: ${{ !cancelled() && !failure() }}
@@ -740,6 +746,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> reldeb_http_stderr.log &
+          ./scripts/wait_for_infinity.sh
 
       - name: Run http api test
         if: ${{ !cancelled() && !failure() }}
@@ -782,6 +789,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> reldeb_pysdk_parallel_stderr.log &
+          ./scripts/wait_for_infinity.sh
 
       - name: Run parallel test 
         if: ${{ !cancelled() && !failure() }}
@@ -839,6 +847,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_minio.toml > /dev/null 2> reldeb_minio_pysdk_stderr.log &
+          ./scripts/wait_for_infinity.sh
 
       - name: Run minio pysdk test
         if: ${{ !cancelled() && !failure() }}
@@ -902,6 +911,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_minio.toml > /dev/null 2> reldeb_minio_parallel_stderr.log &
+          ./scripts/wait_for_infinity.sh
 
       - name: Run minio parallel test
         if: ${{ !cancelled() && !failure() }}

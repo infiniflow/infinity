@@ -166,7 +166,7 @@ if __name__ == "__main__":
     generate30(args.generate_if_exists, args.copy)
     generate31(args.generate_if_exists, args.copy)
 
-    print("Generate file finshed.")
+    print("Generate file finished.")
 
     # remove all file in tmp directory and create an empty tmp
     if os.path.exists("/var/infinity/test_data/tmp"):
