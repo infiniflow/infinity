@@ -18,7 +18,7 @@ module;
 #include "parser.h"
 #include "unit_test/gtest_expand.h"
 
-module infinity_core:ut.logical_aggregate;
+module infinity_core:ut.logical_project;
 
 import :ut.base_test;
 import :ut.sql_runner;
@@ -43,7 +43,7 @@ import :logical_planner;
 import global_resource_usage;
 
 using namespace infinity;
-class LogicalAggregateTest : public NewRequestTest {
+class LogicalProjectTest : public NewRequestTest {
 public:
     std::shared_ptr<std::string> db_name;
     std::shared_ptr<ColumnDef> column_def1;
@@ -70,9 +70,9 @@ public:
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalAggregateTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalProjectTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
 
-TEST_P(LogicalAggregateTest, test1) {
+TEST_P(LogicalProjectTest, test1) {
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     db_name = std::make_shared<std::string>("default_db");
@@ -89,7 +89,13 @@ TEST_P(LogicalAggregateTest, test1) {
         status = txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-
+    {
+        std::string create_index_sql = "create index idx on tb(col2) using fulltext";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_index_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
     for (size_t i = 0; i < 200; i++) {
         std::string sql = fmt::format("insert into tb values({}, 'abc')", i);
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
@@ -99,30 +105,31 @@ TEST_P(LogicalAggregateTest, test1) {
     }
 
     {
-        std::string sql = "select min(col1), max(col1), sum(col1), avg(col1) from tb";
+        std::string sql = "select col1 from tb where col1 > 50 and col1 < 150 and col2 = 'abc'";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(sql);
 
         auto nodes = query_context->logical_planner()->LogicalPlans();
         for (const auto &node : nodes) {
-            CheckLogicalNode(node, LogicalNodeType::kAggregate);
+            CheckLogicalNode(node, LogicalNodeType::kProjection);
+            CheckLogicalNode(node, LogicalNodeType::kFilter);
         }
 
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
 
-    // {
-    //     std::string sql = "select min(case when col2 = 'abc' then col1 else 1 end) from tb";
-    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-    //     QueryResult query_result = query_context->Query(sql);
-    //
-    //     auto nodes = query_context->logical_planner()->LogicalPlans();
-    //     for (const auto &node : nodes) {
-    //         CheckLogicalNode(node, LogicalNodeType::kAggregate);
-    //     }
-    //
-    //     bool ok = HandleQueryResult(query_result);
-    //     EXPECT_TRUE(ok);
-    // }
+    {
+        std::string sql = "select col1 from tb search match text ('col2', 'abc', 'topn=1')";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+
+        auto nodes = query_context->logical_planner()->LogicalPlans();
+        for (const auto &node : nodes) {
+            CheckLogicalNode(node, LogicalNodeType::kMatch);
+        }
+
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
 }

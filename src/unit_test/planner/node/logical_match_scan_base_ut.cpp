@@ -18,7 +18,7 @@ module;
 #include "parser.h"
 #include "unit_test/gtest_expand.h"
 
-module infinity_core:ut.logical_aggregate;
+module infinity_core:ut.logical_match_scan_base;
 
 import :ut.base_test;
 import :ut.sql_runner;
@@ -43,14 +43,8 @@ import :logical_planner;
 import global_resource_usage;
 
 using namespace infinity;
-class LogicalAggregateTest : public NewRequestTest {
+class LogicalMatchScanTest : public NewRequestTest {
 public:
-    std::shared_ptr<std::string> db_name;
-    std::shared_ptr<ColumnDef> column_def1;
-    std::shared_ptr<ColumnDef> column_def2;
-    std::shared_ptr<std::string> table_name;
-    std::shared_ptr<TableDef> table_def;
-
     void CheckLogicalNode(const std::shared_ptr<LogicalNode> &node, LogicalNodeType type) {
         if (!node) {
             return;
@@ -70,56 +64,33 @@ public:
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalAggregateTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalMatchScanTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
 
-TEST_P(LogicalAggregateTest, test1) {
-    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-
-    db_name = std::make_shared<std::string>("default_db");
-    column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-    column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    table_name = std::make_shared<std::string>("tb");
-    table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
-
+TEST_P(LogicalMatchScanTest, test1) {
     // Create table
     {
-        auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
-        auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-        status = txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-
-    for (size_t i = 0; i < 200; i++) {
-        std::string sql = fmt::format("insert into tb values({}, 'abc')", i);
+        std::string create_table_sql = "create table tb_embedding(col1 int, col2 embedding(float, 4))";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
+        QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
-
     {
-        std::string sql = "select min(col1), max(col1), sum(col1), avg(col1) from tb";
+        std::string append_req_sql = "insert into tb_embedding values(1, [0.1, 0.1, 0.1, 0.1]), (2, [0.2, 0.2, 0.2, 0.2])";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-
-        auto nodes = query_context->logical_planner()->LogicalPlans();
-        for (const auto &node : nodes) {
-            CheckLogicalNode(node, LogicalNodeType::kAggregate);
-        }
-
+        QueryResult query_result = query_context->Query(append_req_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
 
     // {
-    //     std::string sql = "select min(case when col2 = 'abc' then col1 else 1 end) from tb";
+    //     std::string sql = "select col1 from tb_embedding search match vector (col2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 1)";
     //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
     //     QueryResult query_result = query_context->Query(sql);
     //
     //     auto nodes = query_context->logical_planner()->LogicalPlans();
     //     for (const auto &node : nodes) {
-    //         CheckLogicalNode(node, LogicalNodeType::kAggregate);
+    //         CheckLogicalNode(node, LogicalNodeType::kKnnScan);
     //     }
     //
     //     bool ok = HandleQueryResult(query_result);

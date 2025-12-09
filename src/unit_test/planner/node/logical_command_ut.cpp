@@ -18,7 +18,7 @@ module;
 #include "parser.h"
 #include "unit_test/gtest_expand.h"
 
-module infinity_core:ut.logical_aggregate;
+module infinity_core:ut.logical_command;
 
 import :ut.base_test;
 import :ut.sql_runner;
@@ -43,13 +43,20 @@ import :logical_planner;
 import global_resource_usage;
 
 using namespace infinity;
-class LogicalAggregateTest : public NewRequestTest {
+class LogicalCommandTest : public NewRequestTest {
 public:
     std::shared_ptr<std::string> db_name;
     std::shared_ptr<ColumnDef> column_def1;
     std::shared_ptr<ColumnDef> column_def2;
     std::shared_ptr<std::string> table_name;
     std::shared_ptr<TableDef> table_def;
+
+    void TearDown() override {
+        std::string cmd = "rm -rf " + InfinityContext::instance().config()->SnapshotDir();
+        system(cmd.c_str());
+
+        BaseTestParamStr::TearDown();
+    }
 
     void CheckLogicalNode(const std::shared_ptr<LogicalNode> &node, LogicalNodeType type) {
         if (!node) {
@@ -70,9 +77,9 @@ public:
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalAggregateTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalCommandTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
 
-TEST_P(LogicalAggregateTest, test1) {
+TEST_P(LogicalCommandTest, test1) {
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     db_name = std::make_shared<std::string>("default_db");
@@ -99,30 +106,89 @@ TEST_P(LogicalAggregateTest, test1) {
     }
 
     {
-        std::string sql = "select min(col1), max(col1), sum(col1), avg(col1) from tb";
+        std::string sql = fmt::format("create index idx on tb(col1) using secondary");
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+
+    {
+        std::string sql = "create snapshot tb_snapshot on table tb";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(sql);
 
         auto nodes = query_context->logical_planner()->LogicalPlans();
         for (const auto &node : nodes) {
-            CheckLogicalNode(node, LogicalNodeType::kAggregate);
+            CheckLogicalNode(node, LogicalNodeType::kCommand);
         }
 
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
+    {
+        std::string sql = "create snapshot db_snapshot on database default_db";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
 
-    // {
-    //     std::string sql = "select min(case when col2 = 'abc' then col1 else 1 end) from tb";
-    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-    //     QueryResult query_result = query_context->Query(sql);
-    //
-    //     auto nodes = query_context->logical_planner()->LogicalPlans();
-    //     for (const auto &node : nodes) {
-    //         CheckLogicalNode(node, LogicalNodeType::kAggregate);
-    //     }
-    //
-    //     bool ok = HandleQueryResult(query_result);
-    //     EXPECT_TRUE(ok);
-    // }
+        auto nodes = query_context->logical_planner()->LogicalPlans();
+        for (const auto &node : nodes) {
+            CheckLogicalNode(node, LogicalNodeType::kCommand);
+        }
+
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        std::string sql = "create snapshot system_snapshot on system";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+
+        auto nodes = query_context->logical_planner()->LogicalPlans();
+        for (const auto &node : nodes) {
+            CheckLogicalNode(node, LogicalNodeType::kCommand);
+        }
+
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        std::string sql = "dump index idx on tb";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+
+        auto nodes = query_context->logical_planner()->LogicalPlans();
+        for (const auto &node : nodes) {
+            CheckLogicalNode(node, LogicalNodeType::kCommand);
+        }
+
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        std::string sql = "clean data";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+
+        auto nodes = query_context->logical_planner()->LogicalPlans();
+        for (const auto &node : nodes) {
+            CheckLogicalNode(node, LogicalNodeType::kCommand);
+        }
+
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        std::string sql = "drop snapshot tb_snapshot";
+        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(sql);
+
+        auto nodes = query_context->logical_planner()->LogicalPlans();
+        for (const auto &node : nodes) {
+            CheckLogicalNode(node, LogicalNodeType::kCommand);
+        }
+
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
 }

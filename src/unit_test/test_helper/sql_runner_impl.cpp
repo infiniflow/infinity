@@ -106,7 +106,7 @@ std::shared_ptr<DataTable> SQLRunner::Run(const std::string &sql_text, bool prin
     return query_result.result_table_;
 }
 
-std::shared_ptr<PhysicalOperator> SQLRunner::GetPhysicalPlan(const std::string &sql_text) {
+std::tuple<std::shared_ptr<PhysicalOperator>, std::shared_ptr<PlanFragment>> SQLRunner::GetPhysicalPlan(const std::string &sql_text) {
     std::shared_ptr<RemoteSession> session_ptr = InfinityContext::instance().session_manager()->CreateRemoteSession();
 
     std::unique_ptr<QueryContext> query_context_ptr = std::make_unique<QueryContext>(session_ptr.get());
@@ -141,11 +141,18 @@ std::shared_ptr<PhysicalOperator> SQLRunner::GetPhysicalPlan(const std::string &
     // Build physical plan
     std::shared_ptr<PhysicalOperator> physical_plan = query_context_ptr->physical_planner()->BuildPhysicalOperator(logical_plan);
 
+    // Fragment Builder, only for test now. plan fragment is same as pipeline.
+    auto plan_fragment = query_context_ptr->fragment_builder()->BuildFragment({physical_plan.get()});
+
+    auto notifier = std::make_unique<Notifier>();
+
+    FragmentContext::BuildTask(query_context_ptr.get(), nullptr, plan_fragment.get(), notifier.get());
+
     // Not do anything, just commit
     parsed_result->Reset();
     query_context_ptr->CommitTxn();
 
-    return physical_plan;
+    return {physical_plan, plan_fragment};
 }
 
 } // namespace infinity
