@@ -99,7 +99,7 @@ struct RoaringBitmap {
 
     inline void SetTrue(const u32 row_index) {
         if (row_index >= count_) {
-            UnrecoverableError("RoaringBitmap::SetTrue: row_index >= count_");
+            UnrecoverableError(fmt::format("RoaringBitmap::SetTrue: row_index >= count_, row_index: {}, count_: {}", row_index, count_));
         }
         if constexpr (init_all_true) {
             if (all_true_flag_.value) {
@@ -111,7 +111,7 @@ struct RoaringBitmap {
 
     inline void SetFalse(const u32 row_index) {
         if (row_index >= count_) {
-            UnrecoverableError("RoaringBitmap::SetFalse: row_index >= count_");
+            UnrecoverableError(fmt::format("RoaringBitmap::SetFalse: row_index >= count_, row_index: {}, count_: {}", row_index, count_));
         }
         if constexpr (init_all_true) {
             TryRemoveAllTrueFlag();
@@ -123,7 +123,8 @@ struct RoaringBitmap {
 
     inline void SetTrueRange(const u32 start, const u32 end) {
         if (start >= end || end > count_) {
-            UnrecoverableError("RoaringBitmap::SetTrueRange: start >= end || end > count_");
+            UnrecoverableError(
+                fmt::format("RoaringBitmap::SetTrueRange: start >= end || end > count_, start: {}, end: {}, count_: {}", start, end, count_));
         }
         if constexpr (init_all_true) {
             if (all_true_flag_.value) {
@@ -135,7 +136,8 @@ struct RoaringBitmap {
 
     inline void SetFalseRange(const u32 start, const u32 end) {
         if (start >= end || end > count_) {
-            UnrecoverableError("RoaringBitmap::SetFalseRange: start >= end || end > count_");
+            UnrecoverableError(
+                fmt::format("RoaringBitmap::SetFalseRange: start >= end || end > count_, start: {}, end: {}, count_: {}", start, end, count_));
         }
         if constexpr (init_all_true) {
             TryRemoveAllTrueFlag();
