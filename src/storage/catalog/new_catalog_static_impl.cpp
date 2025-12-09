@@ -1411,6 +1411,33 @@ Status NewCatalog::SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp beg
     return Status::OK();
 }
 
+Status NewCatalog::SetSegmentDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &segment_bitmask) {
+    NewTxnGetVisibleRangeState state;
+    Status status = GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
+    if (!status.ok()) {
+        return status;
+    }
+    std::pair<BlockOffset, BlockOffset> range;
+    BlockOffset offset = 0;
+    while (true) {
+        bool has_next = state.Next(offset, range);
+        if (!has_next) {
+            break;
+        }
+        for (BlockOffset i = offset; i < range.first; ++i) {
+            SegmentOffset off = block_meta.block_capacity() * block_meta.block_id() + i;
+            segment_bitmask.SetFalse(off);
+        }
+        offset = range.second;
+    }
+    for (BlockOffset i = offset; i < state.block_offset_end(); ++i) {
+        SegmentOffset off = block_meta.block_capacity() * block_meta.block_id() + i;
+        segment_bitmask.SetFalse(off);
+    }
+
+    return Status::OK();
+}
+
 Status NewCatalog::CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask) {
     TxnTimeStamp first_delete_ts = 0;
     Status status = segment_meta.GetFirstDeleteTS(first_delete_ts);
@@ -1427,7 +1454,7 @@ Status NewCatalog::CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeSta
     }
     for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, segment_meta);
-        status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, commit_ts, bitmask);
+        status = SetSegmentDeleteBitmask(block_meta, begin_ts, commit_ts, bitmask);
         if (!status.ok()) {
             return status;
         }
