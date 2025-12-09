@@ -4807,11 +4807,13 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                     mem_index->SetIsDumping(false);
                 }
 
-                metas.emplace_back(std::make_shared<ChunkIndexMetaKey>(dump_index_txn_store->db_id_str_,
-                                                                       dump_index_txn_store->table_id_str_,
-                                                                       dump_index_txn_store->index_id_str_,
-                                                                       segment_id,
-                                                                       dump_index_txn_store->chunk_infos_in_segments_[segment_id][0].chunk_id_));
+                if (dump_index_txn_store->chunk_infos_in_segments_.contains(segment_id)) {
+                    metas.emplace_back(std::make_shared<ChunkIndexMetaKey>(dump_index_txn_store->db_id_str_,
+                                                                           dump_index_txn_store->table_id_str_,
+                                                                           dump_index_txn_store->index_id_str_,
+                                                                           segment_id,
+                                                                           dump_index_txn_store->chunk_infos_in_segments_[segment_id][0].chunk_id_));
+                }
             }
 
             status = CleanupInner(metas);

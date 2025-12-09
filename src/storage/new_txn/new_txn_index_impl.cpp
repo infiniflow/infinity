@@ -123,24 +123,11 @@ Status NewTxn::DumpMemIndex(const std::string &db_name, const std::string &table
         }
         mem_index->SetIsDumping(true);
 
-        ChunkIndexMetaInfo chunk_index_meta_info;
-        if (mem_index->GetBaseMemIndex() != nullptr) {
-            chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
-        } else if (mem_index->GetEMVBIndex() != nullptr) {
-            chunk_index_meta_info = mem_index->GetEMVBIndex()->GetChunkIndexMetaInfo();
-        } else {
-            return Status::UnexpectedError("Invalid mem index.");
-        }
-
         ChunkID chunk_id = 0;
         std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
         if (!status.ok()) {
             return status;
         }
-
-        std::vector<WalChunkIndexInfo> chunk_infos;
-        chunk_infos.emplace_back(chunk_index_meta_info, chunk_id);
-        txn_store->chunk_infos_in_segments_.emplace(segment_id, chunk_infos);
 
         // Dump Mem Index
         status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
@@ -190,34 +177,11 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
     }
     mem_index->SetIsDumping(true);
 
-    ChunkIndexMetaInfo chunk_index_meta_info;
-    if (mem_index->GetBaseMemIndex() != nullptr) {
-        chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
-    } else if (mem_index->GetEMVBIndex() != nullptr) {
-        chunk_index_meta_info = mem_index->GetEMVBIndex()->GetChunkIndexMetaInfo();
-    } else {
-        return Status::UnexpectedError("Invalid mem index.");
-    }
-
-    ChunkID chunk_id = 0;
-    std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
-    if (!status.ok()) {
-        return status;
-    }
-
-    std::vector<WalChunkIndexInfo> chunk_infos;
-    chunk_infos.emplace_back(chunk_index_meta_info, chunk_id);
-
-    // Dump Mem Index
-    status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
-    if (!status.ok() && status.code() != ErrorCode::kEmptyMemIndex) {
-        return status;
-    }
-
     // Put the data into local txn store
+    DumpMemIndexTxnStore *txn_store;
     if (base_txn_store_ == nullptr) {
         base_txn_store_ = std::make_shared<DumpMemIndexTxnStore>();
-        DumpMemIndexTxnStore *txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
+        txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
         txn_store->db_name_ = db_name;
         txn_store->db_id_str_ = segment_index_meta.table_index_meta().table_meta().db_id_str();
         txn_store->table_name_ = table_name;
@@ -227,11 +191,25 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
         txn_store->index_id_ = std::stoull(txn_store->index_id_str_);
         txn_store->table_key_ = table_key;
         txn_store->segment_ids_ = {segment_id};
-        txn_store->chunk_infos_in_segments_.emplace(segment_id, chunk_infos);
     } else {
-        DumpMemIndexTxnStore *txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
+        txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
         txn_store->segment_ids_.emplace_back(segment_id);
-        txn_store->chunk_infos_in_segments_.emplace(segment_id, chunk_infos);
+    }
+
+    ChunkID chunk_id = 0;
+    std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+    if (!status.ok()) {
+        return status;
+    }
+
+    // Dump Mem Index
+    status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
+    if (!status.ok() && status.code() != ErrorCode::kEmptyMemIndex) {
+        return status;
+    }
+
+    if (txn_store->chunk_infos_in_segments_.empty()) {
+        base_txn_store_ = nullptr; // No mem index to dump.
     }
 
     return Status::OK();
@@ -1947,6 +1925,13 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         chunk_index_meta_info = mem_index->GetEMVBIndex()->GetChunkIndexMetaInfo();
     } else {
         UnrecoverableError("Invalid mem index");
+    }
+
+    if (base_txn_store_ != nullptr && base_txn_store_->type_ == TransactionType::kDumpMemIndex) {
+        DumpMemIndexTxnStore *txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
+        std::vector<WalChunkIndexInfo> chunk_infos;
+        chunk_infos.emplace_back(chunk_index_meta_info, new_chunk_id);
+        txn_store->chunk_infos_in_segments_.emplace(segment_index_meta.segment_id(), chunk_infos);
     }
 
     std::optional<ChunkIndexMeta> chunk_index_meta;

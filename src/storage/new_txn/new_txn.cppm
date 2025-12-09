@@ -580,9 +580,6 @@ private:
     Status ReplayAlterIndexByParams(WalCmdAlterIndexV2 *alter_index_cmd);
 
     Status DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id);
-    // Status DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta,
-    //                            const ChunkID &new_chunk_id,
-    //                            const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info);
 
     Status CheckpointDB(DBMeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
     Status CheckpointTable(TableMeta &table_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
