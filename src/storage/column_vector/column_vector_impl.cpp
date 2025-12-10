@@ -16,6 +16,8 @@ module;
 
 #include <cassert>
 
+#include "json_manager.h"
+
 module infinity_core:column_vector.impl;
 
 import :column_vector;
@@ -866,6 +868,14 @@ std::string ColumnVector::ToString(size_t row_index) const {
             std::span<const char> data = this->GetVarchar(row_index);
             return {data.data(), data.size()};
         }
+        case LogicalType::kJson: {
+            const auto &json = reinterpret_cast<const JsonT *>(data_ptr_)[row_index];
+            auto data = buffer_->GetVarchar(json.file_offset_, json.length_);
+            std::vector<uint8_t> bson(json.length_);
+            memcpy(bson.data(), data, json.length_);
+            auto res = JsonManager::from_bson(bson);
+            return res.dump();
+        }
         case LogicalType::kDate: {
             return ((DateT *)data_ptr_)[row_index].ToString();
         }
@@ -966,8 +976,6 @@ std::string ColumnVector::ToString(size_t row_index) const {
         case LogicalType::kMissing:
             [[fallthrough]];
         case LogicalType::kEmptyArray:
-            [[fallthrough]];
-        case LogicalType::kJson: // Need to be finished
             [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError("Attempt to access an unaccepted type");
@@ -2168,12 +2176,11 @@ void ColumnVector::AppendWith(const ColumnVector &other, size_t from, size_t cou
                 JsonT &src_ref = base_src_ptr[from + idx];
                 JsonT &dst_ref = base_dst_ptr[idx];
                 dst_ref.length_ = src_ref.length_;
-                dst_ref.file_offset_ = src_ref.file_offset_;
 
                 auto dst_vec_buffer = buffer_.get();
                 auto src_vec_buffer = other.buffer_.get();
                 const auto data = src_vec_buffer->GetVarchar(src_ref.file_offset_, src_ref.length_);
-                dst_vec_buffer->AppendVarchar(data, src_ref.length_);
+                dst_ref.file_offset_ = dst_vec_buffer->AppendVarchar(data, src_ref.length_);
             }
             break;
         }

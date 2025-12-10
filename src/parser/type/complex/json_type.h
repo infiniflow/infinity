@@ -21,7 +21,7 @@ import std.compat;
 
 namespace infinity {
 struct JsonType {
-    uint64_t length_ : 24 = 0;
+    uint64_t length_{0};
     uint64_t file_offset_{0};
 };
 
