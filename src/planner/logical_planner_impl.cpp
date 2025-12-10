@@ -545,6 +545,7 @@ std::pair<bool, std::string> VerifyColumnDataType(const DataType &data_type) {
         case LogicalType::kDate:
         case LogicalType::kTime:
         case LogicalType::kTimestamp:
+        case LogicalType::kJson: // Need to be finished
         case LogicalType::kDateTime: {
             break;
         }

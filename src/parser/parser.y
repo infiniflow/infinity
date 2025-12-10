@@ -34,6 +34,7 @@ void yyerror(YYLTYPE * llocp, void* lexer, infinity::ParserResult* result, const
 #include "table_reference/table_reference.h"
 #include "table_reference/subquery_reference.h"
 #include "parser_helper.h"
+#include "json_manager.h"
 
 #ifndef PARESER_USE_STD_MODULE
 #define PARESER_USE_STD_MODULE 1
@@ -400,7 +401,7 @@ struct SQL_LTYPE {
 %token DATABASE TABLE COLLECTION TABLES INTO VALUES VIEW INDEX TASKS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMN COLUMNS INDEXES CHUNK CHUNKS SYSTEM
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER HIGHLIGHT CAST END CASE ELSE THEN WHEN
-%token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME FLOAT16 BFLOAT16 UNSIGNED
+%token BOOLEAN JSON INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME FLOAT16 BFLOAT16 UNSIGNED
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP
 %token ARRAY TUPLE EMBEDDING VECTOR MULTIVECTOR TENSOR SPARSE TENSORARRAY BIT TEXT
 %token PRIMARY KEY UNIQUE NULLABLE IS DEFAULT COMMENT IGNORE
@@ -917,6 +918,7 @@ column_type_array : column_type {
 
 column_type :
 BOOLEAN { $$ = new infinity::ColumnType{infinity::LogicalType::kBoolean, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| JSON { $$ = new infinity::ColumnType{infinity::LogicalType::kJson, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
 | TINYINT { $$ = new infinity::ColumnType{infinity::LogicalType::kTinyInt, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
 | SMALLINT { $$ = new infinity::ColumnType{infinity::LogicalType::kSmallInt, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
 | INTEGER { $$ = new infinity::ColumnType{infinity::LogicalType::kInteger, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
@@ -3717,6 +3719,13 @@ constant_expr: STRING {
 | LONG_VALUE {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInteger);
     const_expr->integer_value_ = $1;
+    $$ = const_expr;
+}
+| JSON STRING {
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kJson);
+    auto value_str = infinity::JsonManager::parse($2);
+    auto value_bson = infinity::JsonManager::to_bson(value_str);
+    const_expr->json_value_ = value_bson;
     $$ = const_expr;
 }
 | DATE STRING {

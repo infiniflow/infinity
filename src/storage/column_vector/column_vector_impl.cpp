@@ -954,6 +954,8 @@ std::string ColumnVector::ToString(size_t row_index) const {
             [[fallthrough]];
         case LogicalType::kEmptyArray:
             [[fallthrough]];
+        case LogicalType::kJson: // Need to be finished
+            [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError("Attempt to access an unaccepted type");
             // Null/Missing/Invalid
@@ -1115,6 +1117,8 @@ Value ColumnVector::GetArrayValueRecursively(const DataType &data_type, const ch
             [[fallthrough]];
         case LogicalType::kEmptyArray:
             [[fallthrough]];
+        case LogicalType::kJson: // Need to be finished
+            [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError(fmt::format("{}: Attempt to access an unaccepted type", __func__));
         }
@@ -1257,6 +1261,12 @@ void ColumnVector::SetArrayValueRecursively(const Value &value, char *dst_ptr) {
             VarcharT varchar{};
             AppendVarcharInner(data, varchar);
             std::memcpy(dst_ptr, &varchar, sizeof(VarcharT));
+            break;
+        }
+        case LogicalType::kJson: {
+            auto bson_data = value.GetBson();
+            auto total_size = bson_data.size() * sizeof(uint8_t);
+            std::memcpy(dst_ptr, bson_data.data(), total_size);
             break;
         }
         case LogicalType::kEmbedding: {
@@ -1515,6 +1525,8 @@ void ColumnVector::SetByRawPtr(size_t index, const char *raw_ptr) {
         case LogicalType::kMissing:
             [[fallthrough]];
         case LogicalType::kEmptyArray:
+            [[fallthrough]];
+        case LogicalType::kJson: // Need to be finished
             [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError("Attempt to access an unaccepted type");
@@ -2028,6 +2040,8 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             [[fallthrough]];
         case LogicalType::kEmptyArray:
             [[fallthrough]];
+        case LogicalType::kJson: // Need to be finished
+            [[fallthrough]];
         case LogicalType::kInvalid: {
             RecoverableError(Status::NotSupport("Not implemented"));
         }
@@ -2260,6 +2274,8 @@ void ColumnVector::AppendWith(const ColumnVector &other, size_t from, size_t cou
         case LogicalType::kMissing:
             [[fallthrough]];
         case LogicalType::kEmptyArray:
+            [[fallthrough]];
+        case LogicalType::kJson: // Need to be finished
             [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError("Attempt to access an unaccepted type");
@@ -2897,6 +2913,8 @@ void CopyArray(ArrayT &dst_array,
         case LogicalType::kEmptyArray:
             [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
+        case LogicalType::kJson: // Need to be finished
             [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError(fmt::format("{}: Unhandled element type: {}", __func__, elem_type.ToString()));

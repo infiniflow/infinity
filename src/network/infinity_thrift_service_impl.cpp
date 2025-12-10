@@ -3153,6 +3153,7 @@ void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
         case LogicalType::kNull:
         case LogicalType::kEmptyArray:
         case LogicalType::kMissing:
+        case LogicalType::kJson: // Need to be finished
         case LogicalType::kInvalid: {
             UnrecoverableError(fmt::format("{}: Unexpected data type: {}", __func__, element_type.ToString()));
             break;

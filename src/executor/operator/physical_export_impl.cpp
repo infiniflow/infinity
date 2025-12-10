@@ -840,6 +840,7 @@ std::shared_ptr<arrow::DataType> GetArrowType(const DataType &column_data_type) 
         case LogicalType::kNull:
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
+        case LogicalType::kJson: // Need to be finished
         case LogicalType::kInvalid: {
             UnrecoverableError("Invalid data type");
         }
@@ -1086,6 +1087,7 @@ std::shared_ptr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type
         case LogicalType::kNull:
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
+        case LogicalType::kJson: // Need to be finished
         case LogicalType::kInvalid: {
             UnrecoverableError("Invalid data type");
         }

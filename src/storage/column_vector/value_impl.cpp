@@ -652,6 +652,12 @@ Value Value::MakeArray(std::vector<Value> array_elements, std::shared_ptr<TypeIn
     return value;
 }
 
+Value Value::MakeJson(std::vector<uint8_t> bson_elements, std::shared_ptr<TypeInfo> type_info_ptr) {
+    Value value(LogicalType::kJson, std::move(type_info_ptr));
+    value.value_info_ = std::make_shared<JsonValueInfo>(std::move(bson_elements));
+    return value;
+}
+
 Value Value::MakeSparse(const char *raw_data_ptr, const char *raw_idx_ptr, size_t nnz, const std::shared_ptr<TypeInfo> type_info) {
     const auto *sparse_info = static_cast<const SparseInfo *>(type_info.get());
 
@@ -1042,6 +1048,8 @@ bool Value::operator==(const Value &other) const {
             [[fallthrough]];
         case LogicalType::kMissing:
             [[fallthrough]];
+        case LogicalType::kJson: // Need to be finished
+            [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError("Unhandled cases.");
             return false;
@@ -1173,6 +1181,8 @@ void Value::CopyUnionValue(const Value &other) {
             [[fallthrough]];
         case LogicalType::kMissing:
             [[fallthrough]];
+        case LogicalType::kJson: // Need to be finished
+            [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError("Unhandled cases.");
             break;
@@ -1281,6 +1291,8 @@ void Value::MoveUnionValue(Value &&other) noexcept {
             // No value for null type
             break;
         }
+        case LogicalType::kJson:
+            [[fallthrough]];
         case LogicalType::kArray:
             [[fallthrough]];
         case LogicalType::kVarchar:
@@ -1526,6 +1538,8 @@ std::string Value::ToString() const {
             [[fallthrough]];
         case LogicalType::kMissing:
             [[fallthrough]];
+        case LogicalType::kJson: // Need to be finished
+            [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError(fmt::format("Value::ToString() not implemented for type {}", type_.ToString()));
             return {};
@@ -1674,6 +1688,8 @@ void Value::AppendToJson(const std::string &name, nlohmann::json &json) const {
         case LogicalType::kNull:
             [[fallthrough]];
         case LogicalType::kMissing:
+            [[fallthrough]];
+        case LogicalType::kJson: // Need to be finished
             [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError(fmt::format("Value::AppendToJson() not implemented for type {}", type_.ToString()));
@@ -1839,6 +1855,7 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
         case LogicalType::kNull:
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
+        case LogicalType::kJson: // Need to be finished
         case LogicalType::kInvalid: {
             UnrecoverableError("Invalid data type");
         }

@@ -1203,6 +1203,7 @@ void PhysicalImport::JSONLRowHandler(std::string_view line_sv, std::vector<std::
                 case LogicalType::kNull:
                 case LogicalType::kMissing:
                 case LogicalType::kEmptyArray:
+                case LogicalType::kJson: // Need to be finished
                 case LogicalType::kInvalid: {
                     UnrecoverableError("Not implement: Invalid data type.");
                 }
@@ -1815,6 +1816,7 @@ void PhysicalImport::ParquetValueHandler(const std::shared_ptr<arrow::Array> &ar
         case LogicalType::kNull:
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
+        case LogicalType::kJson: // Need to be finished
         case LogicalType::kInvalid: {
             UnrecoverableError("Not implement: Invalid data type.");
         }
@@ -2110,6 +2112,7 @@ Value GetValueFromParquetRecursively(const DataType &data_type, const std::share
         case LogicalType::kNull:
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
+        case LogicalType::kJson: // Need to be finished
         case LogicalType::kInvalid: {
             UnrecoverableError("Not implement: Invalid data type.");
             return Value::MakeInvalid();

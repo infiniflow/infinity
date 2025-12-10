@@ -91,6 +91,9 @@ static const char *type2name[] = {
     // multi-vector
     "MultiVector",
 
+    // json
+    "Json",
+
     "Invalid",
 };
 
@@ -170,6 +173,9 @@ std::unordered_map<std::string, LogicalType> name2type = {
     // multi-vector
     {"multivector", LogicalType::kMultiVector},
 
+    // json
+    {"json", LogicalType::kJson},
+
     {"invalid", LogicalType::kInvalid},
 };
 
@@ -241,6 +247,8 @@ static int64_t type_size[] = {
     2, // BFloat16
 
     8, // MultiVector
+
+    0, // Json
 
     0, // Invalid
 };

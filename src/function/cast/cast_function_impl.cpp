@@ -112,6 +112,7 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
         case LogicalType::kMixed:
         case LogicalType::kNull:
         case LogicalType::kMissing:
+        case LogicalType::kJson: // Need to be finished
         case LogicalType::kInvalid: {
             UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
             break;
