@@ -1,3 +1,4 @@
+find_package(miniocpp REQUIRED)
 
 # query benchmark
 add_executable(remote_query_benchmark
@@ -9,9 +10,6 @@ add_executable(remote_query_benchmark
 target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src/network/infinity_thrift")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
-target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 
 target_link_libraries(
@@ -32,15 +30,13 @@ target_link_libraries(
         Parquet::parquet_static
         Arrow::arrow_static
         ${JEMALLOC_STATIC_LIB}
-        miniocpp.a
+        miniocpp::miniocpp
         re2::re2
         absl::any absl::log absl::base absl::bits
         PCRE2::8BIT
         pugixml::static
-        curlpp_static
         unofficial::inih::libinih
         unofficial::inih::inireader
-        libcurl_static
         OpenSSL::SSL
         OpenSSL::Crypto
         RocksDB::rocksdb

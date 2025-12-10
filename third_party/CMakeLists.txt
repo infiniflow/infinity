@@ -29,8 +29,3 @@ add_subdirectory(ijma)
 add_subdirectory(opencc)
 #endif ()
 
-add_subdirectory(minio-cpp)
-add_subdirectory(curlpp)
-
-add_subdirectory(curl)
-

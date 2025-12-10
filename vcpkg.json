@@ -32,6 +32,7 @@
     "tomlplusplus",
     "zlib",
     "zstd",
+    "minio-cpp",
     {
       "name": "vcpkg-cmake",
       "host": true
