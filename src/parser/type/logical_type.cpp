@@ -14,6 +14,7 @@
 
 #include "type/logical_type.h"
 #include "complex/array_type.h"
+#include "complex/json_type.h"
 #include "complex/sparse_type.h"
 
 #ifndef PARESER_USE_STD_MODULE
@@ -248,7 +249,7 @@ static int64_t type_size[] = {
 
     8, // MultiVector
 
-    0, // Json
+    sizeof(JsonType), // Json
 
     0, // Invalid
 };

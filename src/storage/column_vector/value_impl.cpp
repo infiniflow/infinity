@@ -1163,6 +1163,8 @@ void Value::CopyUnionValue(const Value &other) {
             [[fallthrough]];
         case LogicalType::kVarchar:
             [[fallthrough]];
+        case LogicalType::kJson:
+            [[fallthrough]];
         case LogicalType::kTensor:
             [[fallthrough]];
         case LogicalType::kTensorArray:
@@ -1180,8 +1182,6 @@ void Value::CopyUnionValue(const Value &other) {
         case LogicalType::kMixed:
             [[fallthrough]];
         case LogicalType::kMissing:
-            [[fallthrough]];
-        case LogicalType::kJson: // Need to be finished
             [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError("Unhandled cases.");

@@ -3725,7 +3725,7 @@ constant_expr: STRING {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kJson);
     auto value_str = infinity::JsonManager::parse($2);
     auto value_bson = infinity::JsonManager::to_bson(value_str);
-    const_expr->json_value_ = value_bson;
+    const_expr->json_value_ = std::move(value_bson);
     $$ = const_expr;
 }
 | DATE STRING {

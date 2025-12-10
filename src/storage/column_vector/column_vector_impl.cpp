@@ -168,6 +168,7 @@ VectorBufferType ColumnVector::GetVectorBufferType(const DataType &data_type) {
         case LogicalType::kArray:
         case LogicalType::kSparse:
         case LogicalType::kVarchar:
+        case LogicalType::kJson:
         case LogicalType::kMultiVector:
         case LogicalType::kTensor:
         case LogicalType::kTensorArray: {
@@ -350,6 +351,10 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
                 CopyFrom<VarcharT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
+            case LogicalType::kJson: {
+                CopyFrom<JsonT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
+                break;
+            }
             case LogicalType::kMultiVector: {
                 CopyFrom<MultiVectorT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
@@ -515,6 +520,10 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
             }
             case LogicalType::kVarchar: {
                 CopyFrom<VarcharT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case LogicalType::kJson: {
+                CopyFrom<JsonT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
             case LogicalType::kMultiVector: {
@@ -702,6 +711,10 @@ void ColumnVector::CopyRow(const ColumnVector &other, size_t dst_idx, size_t src
         }
         case LogicalType::kVarchar: {
             CopyRowFrom<VarcharT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
+            break;
+        }
+        case LogicalType::kJson: {
+            CopyRowFrom<JsonT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
         case LogicalType::kMultiVector: {
@@ -1026,6 +1039,13 @@ Value ColumnVector::GetArrayValueRecursively(const DataType &data_type, const ch
             const auto data = GetVarcharInner(varchar);
             return Value::MakeVarchar(data.data(), data.size());
         }
+        case LogicalType::kJson: {
+            const auto json = *reinterpret_cast<const JsonT *>(data_ptr);
+            const auto data = buffer_->GetVarchar(json.file_offset_, json.length_);
+            std::vector<uint8_t> bson(json.length_);
+            memcpy(bson.data(), data, json.length_);
+            return Value::MakeJson(bson, nullptr);
+        }
         case LogicalType::kDate: {
             return Value::MakeDate(*reinterpret_cast<const DateT *>(data_ptr));
         }
@@ -1116,8 +1136,6 @@ Value ColumnVector::GetArrayValueRecursively(const DataType &data_type, const ch
         case LogicalType::kMissing:
             [[fallthrough]];
         case LogicalType::kEmptyArray:
-            [[fallthrough]];
-        case LogicalType::kJson: // Need to be finished
             [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError(fmt::format("{}: Attempt to access an unaccepted type", __func__));
@@ -1264,9 +1282,11 @@ void ColumnVector::SetArrayValueRecursively(const Value &value, char *dst_ptr) {
             break;
         }
         case LogicalType::kJson: {
+            JsonT json{};
             auto bson_data = value.GetBson();
-            auto total_size = bson_data.size() * sizeof(uint8_t);
-            std::memcpy(dst_ptr, bson_data.data(), total_size);
+            json.length_ = bson_data.size() * sizeof(uint8_t);
+            json.file_offset_ = buffer_->AppendVarchar(reinterpret_cast<const char *>(bson_data.data()), json.length_);
+            std::memcpy(dst_ptr, &json, sizeof(JsonT));
             break;
         }
         case LogicalType::kEmbedding: {
@@ -2141,6 +2161,22 @@ void ColumnVector::AppendWith(const ColumnVector &other, size_t from, size_t cou
             }
             break;
         }
+        case LogicalType::kJson: {
+            auto *base_src_ptr = (JsonT *)(other.data_ptr_);
+            JsonT *base_dst_ptr = &((JsonT *)(data_ptr_))[tail_index_.load()];
+            for (size_t idx = 0; idx < count; ++idx) {
+                JsonT &src_ref = base_src_ptr[from + idx];
+                JsonT &dst_ref = base_dst_ptr[idx];
+                dst_ref.length_ = src_ref.length_;
+                dst_ref.file_offset_ = src_ref.file_offset_;
+
+                auto dst_vec_buffer = buffer_.get();
+                auto src_vec_buffer = other.buffer_.get();
+                const auto data = src_vec_buffer->GetVarchar(src_ref.file_offset_, src_ref.length_);
+                dst_vec_buffer->AppendVarchar(data, src_ref.length_);
+            }
+            break;
+        }
         case LogicalType::kMultiVector: {
             auto *base_src_ptr = (MultiVectorT *)(other.data_ptr_);
             MultiVectorT *base_dst_ptr = ((MultiVectorT *)(data_ptr_)) + tail_index_.load();
@@ -2274,8 +2310,6 @@ void ColumnVector::AppendWith(const ColumnVector &other, size_t from, size_t cou
         case LogicalType::kMissing:
             [[fallthrough]];
         case LogicalType::kEmptyArray:
-            [[fallthrough]];
-        case LogicalType::kJson: // Need to be finished
             [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError("Attempt to access an unaccepted type");

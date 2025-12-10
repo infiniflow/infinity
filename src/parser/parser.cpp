@@ -8889,7 +8889,7 @@ yyreduce:
             infinity::ConstantExpr *const_expr = new infinity::ConstantExpr(infinity::LiteralType::kJson);
             auto value_str = infinity::JsonManager::parse((yyvsp[0].str_value));
             auto value_bson = infinity::JsonManager::to_bson(value_str);
-            const_expr->json_value_ = value_bson;
+            const_expr->json_value_ = std::move(value_bson);
             (yyval.const_expr_t) = const_expr;
         }
 #line 8944 "parser.cpp"
