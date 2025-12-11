@@ -26,6 +26,7 @@ import :status;
 import std.compat;
 import third_party;
 
+import json_manager;
 import type_info;
 import array_info;
 import internal_types;
@@ -652,9 +653,11 @@ Value Value::MakeArray(std::vector<Value> array_elements, std::shared_ptr<TypeIn
     return value;
 }
 
-Value Value::MakeJson(std::vector<uint8_t> bson_elements, std::shared_ptr<TypeInfo> type_info_ptr) {
+Value Value::MakeJson(const char *ptr, std::shared_ptr<TypeInfo> type_info_ptr) {
     Value value(LogicalType::kJson, std::move(type_info_ptr));
-    value.value_info_ = std::make_shared<JsonValueInfo>(std::move(bson_elements));
+    auto value_str = infinity::JsonManager::parse(ptr);
+    auto value_bson = infinity::JsonManager::to_bson(value_str);
+    value.value_info_ = std::make_shared<JsonValueInfo>(std::move(value_bson));
     return value;
 }
 

@@ -158,7 +158,7 @@ std::string ConstantExpr::ToString() const {
             return std::move(oss).str();
         }
         case LiteralType::kJson: { // Need to be finished
-            return {};
+            return fmt::format("{}", json_value_);
         }
     }
 }
@@ -233,8 +233,7 @@ int32_t ConstantExpr::GetSizeInBytes() const {
             break;
         }
         case LiteralType::kJson: {
-            size += sizeof(int64_t);
-            size += sizeof(uint8_t) * json_value_.size();
+            size += sizeof(int32_t) + (std::string(json_value_)).length();
             break;
         }
     }
@@ -327,10 +326,7 @@ void ConstantExpr::WriteAdv(char *&ptr) const {
             break;
         }
         case LiteralType::kJson: {
-            WriteBufAdv<int64_t>(ptr, json_value_.size());
-            for (const auto &val : json_value_) {
-                WriteBufAdv<uint8_t>(ptr, val);
-            }
+            WriteBufAdv<std::string>(ptr, std::string(json_value_));
             break;
         }
     }
@@ -439,11 +435,8 @@ std::shared_ptr<ParsedExpr> ConstantExpr::ReadAdv(const char *&ptr, int32_t maxb
             break;
         }
         case LiteralType::kJson: {
-            const size_t len = ReadBufAdv<int64_t>(ptr);
-            for (size_t i = 0; i < len; ++i) {
-                auto val = ReadBufAdv<uint8_t>(ptr);
-                const_expr->json_value_.push_back(val);
-            }
+            std::string json_value = ReadBufAdv<std::string>(ptr);
+            const_expr->json_value_ = strdup(json_value.c_str());
             break;
         }
     }
@@ -525,7 +518,7 @@ nlohmann::json ConstantExpr::Serialize() const {
             break;
         }
         case LiteralType::kJson: {
-            // Need to be finished
+            j["value"] = json_value_;
             break;
         }
     }
@@ -602,7 +595,7 @@ std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(std::string_view constant_
             break;
         }
         case LiteralType::kJson: {
-            // Need to be finished
+            const_expr->json_value_ = strdup(static_cast<std::string>(doc["value"].get<std::string>()).c_str());
             break;
         }
     }

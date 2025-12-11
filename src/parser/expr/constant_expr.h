@@ -81,7 +81,7 @@ public:
     int64_t integer_value_{0};
     double double_value_{0};
     char *str_value_{nullptr};
-    std::vector<uint8_t> json_value_{};
+    char *json_value_{nullptr};
     TimeUnit interval_type_{TimeUnit::kInvalidUnit};
     char *date_value_{nullptr};
     std::vector<int64_t> long_array_{};

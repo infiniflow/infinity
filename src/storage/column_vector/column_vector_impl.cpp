@@ -1050,9 +1050,7 @@ Value ColumnVector::GetArrayValueRecursively(const DataType &data_type, const ch
         case LogicalType::kJson: {
             const auto json = *reinterpret_cast<const JsonT *>(data_ptr);
             const auto data = buffer_->GetVarchar(json.file_offset_, json.length_);
-            std::vector<uint8_t> bson(json.length_);
-            memcpy(bson.data(), data, json.length_);
-            return Value::MakeJson(bson, nullptr);
+            return Value::MakeJson(data, nullptr);
         }
         case LogicalType::kDate: {
             return Value::MakeDate(*reinterpret_cast<const DateT *>(data_ptr));

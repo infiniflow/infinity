@@ -304,7 +304,7 @@ public:
 
     static Value MakeArray(std::vector<Value> array_elements, std::shared_ptr<TypeInfo> type_info_ptr);
 
-    static Value MakeJson(std::vector<uint8_t> bson_elements, std::shared_ptr<TypeInfo> type_info_ptr);
+    static Value MakeJson(const char *ptr, std::shared_ptr<TypeInfo> type_info_ptr);
 
     template <typename Idx, typename T>
     static Value MakeSparse(const std::pair<std::vector<Idx>, std::vector<T>> &vec) {

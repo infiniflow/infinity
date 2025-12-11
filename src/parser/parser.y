@@ -3723,9 +3723,7 @@ constant_expr: STRING {
 }
 | JSON STRING {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kJson);
-    auto value_str = infinity::JsonManager::parse($2);
-    auto value_bson = infinity::JsonManager::to_bson(value_str);
-    const_expr->json_value_ = std::move(value_bson);
+    const_expr->json_value_ = $2;
     $$ = const_expr;
 }
 | DATE STRING {
@@ -3990,15 +3988,17 @@ copy_option_list : copy_option {
     $$ = $1;
 };
 
-copy_option : FORMAT IDENTIFIER {
+copy_option : FORMAT JSON {
+    $$ = new infinity::CopyOption();
+    $$->option_type_ = infinity::CopyOptionType::kFormat;
+    $$->file_type_ = infinity::CopyFileType::kJSON;
+}
+| FORMAT IDENTIFIER {
     $$ = new infinity::CopyOption();
     $$->option_type_ = infinity::CopyOptionType::kFormat;
     ParserHelper::ToLower($2);
     if (strcasecmp($2, "csv") == 0) {
         $$->file_type_ = infinity::CopyFileType::kCSV;
-        free($2);
-    } else if (strcasecmp($2, "json") == 0) {
-        $$->file_type_ = infinity::CopyFileType::kJSON;
         free($2);
     } else if (strcasecmp($2, "jsonl") == 0) {
         $$->file_type_ = infinity::CopyFileType::kJSONL;
