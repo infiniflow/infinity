@@ -1461,6 +1461,9 @@ void ColumnVector::SetByRawPtr(size_t index, const char *raw_ptr) {
         case LogicalType::kVarchar: {
             UnrecoverableError("Cannot SetByRawPtr to Varchar.");
         }
+        case LogicalType::kJson: {
+            UnrecoverableError("Cannot SetByRawPtr to Json.");
+        }
         case LogicalType::kDate: {
             ((DateT *)data_ptr_)[index] = *(DateT *)(raw_ptr);
             break;
@@ -1551,8 +1554,6 @@ void ColumnVector::SetByRawPtr(size_t index, const char *raw_ptr) {
         case LogicalType::kMissing:
             [[fallthrough]];
         case LogicalType::kEmptyArray:
-            [[fallthrough]];
-        case LogicalType::kJson: // Need to be finished
             [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError("Attempt to access an unaccepted type");
@@ -1981,6 +1982,12 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             this->AppendVarcharInner(sv, index);
             break;
         }
+        case LogicalType::kJson: {
+            auto &json = reinterpret_cast<JsonT *>(data_ptr_)[index];
+            json.length_ = sv.length();
+            json.file_offset_ = buffer_->AppendVarchar(reinterpret_cast<const char *>(sv.data()), sv.length());
+            break;
+        }
         case LogicalType::kSparse: {
             const auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
             std::vector<std::string_view> ele_str_views = SplitArrayElement(sv, ',');
@@ -2065,8 +2072,6 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
         case LogicalType::kMissing:
             [[fallthrough]];
         case LogicalType::kEmptyArray:
-            [[fallthrough]];
-        case LogicalType::kJson: // Need to be finished
             [[fallthrough]];
         case LogicalType::kInvalid: {
             RecoverableError(Status::NotSupport("Not implemented"));
@@ -2774,6 +2779,8 @@ template <typename T>
 void CopyVarBufferType(T &dst_ref, VectorBuffer *dst_vec_buffer, const T &src_ref, const VectorBuffer *src_vec_buffer, const TypeInfo *type_info) {
     if constexpr (std::is_same_v<T, VarcharT>) {
         CopyVarchar(dst_ref, dst_vec_buffer, src_ref, src_vec_buffer);
+    } else if constexpr (std::is_same_v<T, JsonT>) {
+        CopyJson(dst_ref, dst_vec_buffer, src_ref, src_vec_buffer);
     } else if constexpr (std::is_same_v<T, MultiVectorT>) {
         CopyMultiVector(dst_ref, dst_vec_buffer, src_ref, src_vec_buffer, dynamic_cast<const EmbeddingInfo *>(type_info));
     } else if constexpr (std::is_same_v<T, TensorT>) {
@@ -2800,6 +2807,13 @@ void CopyVarchar(VarcharT &dst_ref, VectorBuffer *dst_vec_buffer, const VarcharT
         dst_ref.vector_.file_offset_ =
             dst_vec_buffer->AppendVarchar(src_vec_buffer->GetVarchar(src_ref.vector_.file_offset_, varchar_len), varchar_len);
     }
+}
+
+void CopyJson(JsonT &dst_ref, VectorBuffer *dst_vec_buffer, const JsonT &src_ref, const VectorBuffer *src_vec_buffer) {
+    auto len = src_ref.length_;
+    dst_ref.length_ = len;
+    auto data = src_vec_buffer->GetVarchar(src_ref.file_offset_, len);
+    dst_ref.file_offset_ = dst_vec_buffer->AppendVarchar(data, len);
 }
 
 void CopyMultiVector(MultiVectorT &dst_ref,
@@ -2923,6 +2937,10 @@ void CopyArray(ArrayT &dst_array,
             loop_copy.operator()<VarcharT>();
             return;
         }
+        case LogicalType::kJson: {
+            loop_copy.operator()<JsonT>();
+            return;
+        }
         case LogicalType::kSparse: {
             loop_copy.operator()<SparseT>();
             return;
@@ -2952,8 +2970,6 @@ void CopyArray(ArrayT &dst_array,
         case LogicalType::kEmptyArray:
             [[fallthrough]];
         case LogicalType::kMissing:
-            [[fallthrough]];
-        case LogicalType::kJson: // Need to be finished
             [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError(fmt::format("{}: Unhandled element type: {}", __func__, elem_type.ToString()));

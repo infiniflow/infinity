@@ -1015,6 +1015,11 @@ bool Value::operator==(const Value &other) const {
             const std::string &s2 = other.value_info_->Get<StringValueInfo>().GetString();
             return s1 == s2;
         }
+        case LogicalType::kJson: {
+            const auto &bson1 = this->GetBson();
+            const auto &bson2 = other.GetBson();
+            return bson1 == bson2;
+        }
         case LogicalType::kEmbedding:
             [[fallthrough]];
         case LogicalType::kMultiVector:
@@ -1050,8 +1055,6 @@ bool Value::operator==(const Value &other) const {
         case LogicalType::kMixed:
             [[fallthrough]];
         case LogicalType::kMissing:
-            [[fallthrough]];
-        case LogicalType::kJson: // Need to be finished
             [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError("Unhandled cases.");
@@ -1445,6 +1448,11 @@ std::string Value::ToString() const {
         case LogicalType::kVarchar: {
             return value_info_->Get<StringValueInfo>().GetString();
         }
+        case LogicalType::kJson: {
+            const auto &bson = this->GetBson();
+            auto json = JsonManager::from_bson(bson);
+            return json.dump();
+        }
         case LogicalType::kEmbedding: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             std::span<char> data_span = this->GetEmbedding();
@@ -1541,8 +1549,6 @@ std::string Value::ToString() const {
             [[fallthrough]];
         case LogicalType::kMissing:
             [[fallthrough]];
-        case LogicalType::kJson: // Need to be finished
-            [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError(fmt::format("Value::ToString() not implemented for type {}", type_.ToString()));
             return {};
@@ -1615,6 +1621,12 @@ void Value::AppendToJson(const std::string &name, nlohmann::json &json) const {
         }
         case LogicalType::kVarchar: {
             json[name] = value_info_->Get<StringValueInfo>().GetString();
+            return;
+        }
+        case LogicalType::kJson: {
+            const auto &bson = this->GetBson();
+            auto tmp = JsonManager::from_bson(bson);
+            json[name] = tmp; // Need json --> string ?
             return;
         }
         case LogicalType::kEmbedding: {
@@ -1692,8 +1704,6 @@ void Value::AppendToJson(const std::string &name, nlohmann::json &json) const {
             [[fallthrough]];
         case LogicalType::kMissing:
             [[fallthrough]];
-        case LogicalType::kJson: // Need to be finished
-            [[fallthrough]];
         case LogicalType::kInvalid: {
             UnrecoverableError(fmt::format("Value::AppendToJson() not implemented for type {}", type_.ToString()));
         }
@@ -1770,6 +1780,13 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
         case LogicalType::kVarchar: {
             auto *builder = dynamic_cast<::arrow::StringBuilder *>(array_builder);
             auto status = builder->Append(value_info_->Get<StringValueInfo>().GetString());
+            break;
+        }
+        case LogicalType::kJson: {
+            auto *builder = dynamic_cast<::arrow::StringBuilder *>(array_builder);
+            const auto &bson = this->GetBson();
+            auto json = JsonManager::from_bson(bson);
+            auto status = builder->Append(json.dump());
             break;
         }
         case LogicalType::kEmbedding: {
@@ -1858,7 +1875,6 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
         case LogicalType::kNull:
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
-        case LogicalType::kJson: // Need to be finished
         case LogicalType::kInvalid: {
             UnrecoverableError("Invalid data type");
         }

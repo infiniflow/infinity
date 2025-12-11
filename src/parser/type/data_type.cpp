@@ -68,7 +68,7 @@ DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info
             break;
         }
         case LogicalType::kMixed:
-        case LogicalType::kJson: // Need to be finished
+        case LogicalType::kJson:
         case LogicalType::kVarchar:
         case LogicalType::kSparse:
         case LogicalType::kTensor:
