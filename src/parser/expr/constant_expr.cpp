@@ -157,7 +157,7 @@ std::string ConstantExpr::ToString() const {
             oss << '}';
             return std::move(oss).str();
         }
-        case LiteralType::kJson: { // Need to be finished
+        case LiteralType::kJson: {
             return fmt::format("{}", json_value_);
         }
     }

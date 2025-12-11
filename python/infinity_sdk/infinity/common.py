@@ -75,6 +75,14 @@ class Array:
     def __repr__(self):
         return str(self)
 
+@dataclass
+class Json:
+    value: str
+
+    def __init__(self, json_string: str):
+        if not isinstance(json_string, str):
+            return f"Json: value need str."
+        self.value = json_string
 
 @dataclass
 class FDE:

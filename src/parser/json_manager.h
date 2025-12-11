@@ -21,6 +21,7 @@ namespace infinity {
 
 class JsonManager {
 public:
+    static bool valid_json(const std::string &json_str);
     static nlohmann::json parse(const std::string &json_str);
     static nlohmann::json from_bson(const std::vector<uint8_t> &bson_data);
     static nlohmann::json dump(const nlohmann::json &json_obj);

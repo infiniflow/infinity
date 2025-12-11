@@ -136,6 +136,7 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                 case LogicalType::kTimestamp:
                 case LogicalType::kInterval:
                 case LogicalType::kVarchar:
+                case LogicalType::kJson:
                     return true;
                 default:
                     return false;

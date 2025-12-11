@@ -16,6 +16,8 @@
 
 namespace infinity {
 
+bool JsonManager::valid_json(const std::string &valid_json) { return nlohmann::json::accept(valid_json); }
+
 nlohmann::json JsonManager::parse(const std::string &json_str) { return nlohmann::json::parse(json_str); }
 
 nlohmann::json JsonManager::from_bson(const std::vector<uint8_t> &bson_data) { return nlohmann::json::from_bson(bson_data); }
