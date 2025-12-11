@@ -1997,6 +1997,8 @@ std::shared_ptr<DataType> InfinityThriftService::GetColumnTypeFromProto(const in
         }
         case infinity_thrift_rpc::LogicType::Varchar:
             return std::make_shared<infinity::DataType>(infinity::LogicalType::kVarchar);
+        case infinity_thrift_rpc::LogicType::Json:
+            return std::make_shared<infinity::DataType>(infinity::LogicalType::kJson);
         case infinity_thrift_rpc::LogicType::Sparse: {
             auto embedding_type = GetEmbeddingDataTypeFromProto(type.physical_type.sparse_type.element_type);
             if (embedding_type == EmbeddingDataType::kElemInvalid) {

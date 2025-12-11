@@ -41,7 +41,8 @@ class LogicType(object):
     Timestamp = 20
     Interval = 21
     Array = 22
-    Invalid = 23
+    Json = 23
+    Invalid = 24
 
     _VALUES_TO_NAMES = {
         0: "Boolean",
@@ -67,7 +68,8 @@ class LogicType(object):
         20: "Timestamp",
         21: "Interval",
         22: "Array",
-        23: "Invalid",
+        23: "Json",
+        24: "Invalid",
     }
 
     _NAMES_TO_VALUES = {
@@ -94,7 +96,8 @@ class LogicType(object):
         "Timestamp": 20,
         "Interval": 21,
         "Array": 22,
-        "Invalid": 23,
+        "Json": 23,
+        "Invalid": 24,
     }
 
 
@@ -328,7 +331,8 @@ class ColumnType(object):
     ColumnTimestamp = 19
     ColumnInterval = 20
     ColumnArray = 21
-    ColumnInvalid = 22
+    ColumnJson = 22
+    ColumnInvalid = 23
 
     _VALUES_TO_NAMES = {
         0: "ColumnBool",
@@ -353,7 +357,8 @@ class ColumnType(object):
         19: "ColumnTimestamp",
         20: "ColumnInterval",
         21: "ColumnArray",
-        22: "ColumnInvalid",
+        22: "ColumnJson",
+        23: "ColumnInvalid",
     }
 
     _NAMES_TO_VALUES = {
@@ -379,7 +384,8 @@ class ColumnType(object):
         "ColumnTimestamp": 19,
         "ColumnInterval": 20,
         "ColumnArray": 21,
-        "ColumnInvalid": 22,
+        "ColumnJson": 22,
+        "ColumnInvalid": 23,
     }
 
 
