@@ -66,7 +66,8 @@ This section provides guidance on deploying the Infinity database using Docker, 
   - Linux with glibc 2.17+.
   - Windows 10+ with WSL/WSL2.
   - MacOS
-- Python: Python 3.10+.
+- Python: Python 3.11+.
+
 
 ### Install Infinity server
 
@@ -95,7 +96,7 @@ If you are on Windows 10+, you must enable WSL or WSL2 to deploy Infinity using 
 ### Install Infinity client
 
 ```
-pip install infinity-sdk==0.6.7
+pip install infinity-sdk==0.6.11
 ```
 
 ### Run a vector search

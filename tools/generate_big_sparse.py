@@ -3,7 +3,7 @@
 
 import argparse
 import os
-from generate_util.generate_sparse_data import *
+from generate_util.generate_sparse_data import generate_sparse_data, find_topk
 from generate_util.format_data import sparse_format_float
 
 

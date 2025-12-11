@@ -36,6 +36,7 @@ import :chunk_index_meta;
 import :mem_index;
 import :file_worker;
 import :index_file_worker;
+import :index_secondary;
 
 import std;
 import third_party;
@@ -656,7 +657,7 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
             // Low cardinality: use RoaringBitmap approach
             const auto [begin_val, end_val] = current_range_;
             // const SecondaryIndexDataBase<CardinalityTag> *index{};
-            std::shared_ptr<SecondaryIndexDataBase<CardinalityTag>> index;
+            SecondaryIndexDataBase<CardinalityTag> *index;
             index_file_worker_->Read(index);
 
             // Get unique keys count and pointer through base class interface
@@ -912,13 +913,13 @@ template <typename ColumnValueT>
 Bitmask IndexFilterEvaluatorSecondaryT<ColumnValueT>::Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count) const {
     std::optional<SegmentIndexMeta> index_meta;
     index_meta.emplace(segment_id, *new_secondary_index_);
-
-    // Check cardinality to determine which execution path to use
-    auto [cardinality, status] = new_secondary_index_->GetSecondaryIndexCardinality();
-    if (!status.ok()) {
-        // Default to HighCardinality if unable to determine
-        cardinality = SecondaryIndexCardinality::kHighCardinality;
+    auto [index_base, index_status] = new_secondary_index_->GetIndexBase();
+    if (!index_status.ok() || index_base->index_type_ != IndexType::kSecondary) {
+        UnrecoverableError("Fail to get index definition");
     }
+    const IndexSecondary *secondary_index = reinterpret_cast<const IndexSecondary *>(index_base.get());
+    // Check cardinality to determine which execution path to use
+    auto cardinality = secondary_index->GetSecondaryIndexCardinality();
 
     Bitmask result(segment_row_count);
     result.SetAllFalse();

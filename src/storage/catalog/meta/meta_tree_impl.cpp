@@ -651,7 +651,7 @@ SegmentID MetaTableObject::GetNextSegmentID() const {
     for (const auto &segment_pair : segment_map_) {
         segments.push_back(segment_pair.first);
     }
-    std::sort(segments.begin(), segments.end());
+    std::ranges::sort(segments);
     SegmentID next_segment_id = segments.empty() ? 0 : segments.back() + 1;
     return next_segment_id;
 }
@@ -815,7 +815,7 @@ BlockID MetaSegmentObject::GetCurrentBlockID() const {
     for (const auto &block_pair : block_map_) {
         blocks.push_back(block_pair.first);
     }
-    std::sort(blocks.begin(), blocks.end());
+    std::ranges::sort(blocks);
     BlockID current_block_id = blocks.empty() ? 0 : blocks.back();
     return current_block_id;
 }

@@ -44,6 +44,8 @@ import :meta_cache;
 import :utility;
 // import :file_worker;
 import :version_file_worker;
+import :index_secondary;
+import :memory_indexer;
 
 import std;
 import third_party;
@@ -500,19 +502,6 @@ Status NewCatalog::CleanTable(TableMeta &table_meta, TxnTimeStamp begin_ts, Usag
 
     Status status;
 
-    std::vector<SegmentID> *segment_ids_ptr{};
-    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
-    if (!status.ok()) {
-        return status;
-    }
-    for (SegmentID segment_id : *segment_ids_ptr) {
-        SegmentMeta segment_meta(segment_id, table_meta);
-        status = CleanSegment(segment_meta, begin_ts, usage_flag);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-
     std::vector<std::string> *index_id_strs_ptr{};
     std::vector<std::string> *index_names_ptr{};
     status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
@@ -524,6 +513,19 @@ Status NewCatalog::CleanTable(TableMeta &table_meta, TxnTimeStamp begin_ts, Usag
         const std::string &index_name_str = (*index_names_ptr)[i];
         TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
         status = CleanTableIndex(table_index_meta, usage_flag);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    std::vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
+    if (!status.ok()) {
+        return status;
+    }
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentMeta segment_meta(segment_id, table_meta);
+        status = NewCatalog::CleanSegment(segment_meta, begin_ts, usage_flag);
         if (!status.ok()) {
             return status;
         }
@@ -556,6 +558,7 @@ Status NewCatalog::AddNewTableIndex(TableMeta &table_meta,
     if (!status.ok()) {
         return status;
     }
+
     return Status::OK();
 }
 
@@ -926,6 +929,22 @@ Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, Usage
         auto status = table_meta.InvalidateFtIndexCache();
         if (!status.ok()) {
             return status;
+        }
+    }
+
+    auto [index_base, index_status] = segment_index_meta.table_index_meta().GetIndexBase();
+    if (!index_status.ok()) {
+        return index_status;
+    }
+
+    // Wait for inflight tasks to complete for fulltext index
+    if (index_base->index_type_ == IndexType::kFullText) {
+        std::shared_ptr<MemIndex> mem_index = segment_index_meta.PopMemIndex();
+        if (mem_index != nullptr) {
+            std::shared_ptr<MemoryIndexer> memory_indexer = mem_index->GetFulltextIndex();
+            if (memory_indexer != nullptr) {
+                memory_indexer->WaitForTaskCompletion();
+            }
         }
     }
 
@@ -1377,13 +1396,39 @@ Status NewCatalog::SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp beg
             break;
         }
         for (BlockOffset i = offset; i < range.first; ++i) {
-            SegmentOffset off = block_meta.block_capacity() * block_meta.block_id() + i;
-            bitmask.SetFalse(off);
+            bitmask.SetFalse(i);
         }
         offset = range.second;
     }
     for (BlockOffset i = offset; i < state.block_offset_end(); ++i) {
         bitmask.SetFalse(i);
+    }
+
+    return Status::OK();
+}
+
+Status NewCatalog::SetSegmentDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &segment_bitmask) {
+    NewTxnGetVisibleRangeState state;
+    Status status = GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
+    if (!status.ok()) {
+        return status;
+    }
+    std::pair<BlockOffset, BlockOffset> range;
+    BlockOffset offset = 0;
+    while (true) {
+        bool has_next = state.Next(offset, range);
+        if (!has_next) {
+            break;
+        }
+        for (BlockOffset i = offset; i < range.first; ++i) {
+            SegmentOffset off = block_meta.block_capacity() * block_meta.block_id() + i;
+            segment_bitmask.SetFalse(off);
+        }
+        offset = range.second;
+    }
+    for (BlockOffset i = offset; i < state.block_offset_end(); ++i) {
+        SegmentOffset off = block_meta.block_capacity() * block_meta.block_id() + i;
+        segment_bitmask.SetFalse(off);
     }
 
     return Status::OK();
@@ -1405,7 +1450,7 @@ Status NewCatalog::CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeSta
     }
     for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, segment_meta);
-        status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, commit_ts, bitmask);
+        status = SetSegmentDeleteBitmask(block_meta, begin_ts, commit_ts, bitmask);
         if (!status.ok()) {
             return status;
         }

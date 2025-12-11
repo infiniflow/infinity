@@ -19,7 +19,6 @@ module infinity_core:build_fast_rough_filter_task.impl;
 import :build_fast_rough_filter_task;
 import :infinity_exception;
 import :logger;
-
 import :column_vector;
 import :value;
 import :block_column_iter;
@@ -273,7 +272,7 @@ void BuildFastRoughFilterTask::BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &
             }
         }
         // step 3. sort data and remove duplicate
-        std::sort(input_data.begin(), input_data.end());
+        std::ranges::sort(input_data);
         u32 input_distinct_count = std::unique(input_data.begin(), input_data.end()) - input_data.begin();
         // step 4. build probabilistic_data_filter for block
         auto block_filter = arg.segment_filters_->block_filters_[block_id];

@@ -4,8 +4,6 @@ import time
 import struct
 
 from qdrant_client import QdrantClient, models
-from qdrant_client.models import PointStruct
-from qdrant_client.models import Distance, VectorParams
 
 class SparseMatrix:
     nrow: int

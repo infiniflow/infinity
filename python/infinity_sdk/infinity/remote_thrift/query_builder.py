@@ -26,7 +26,25 @@ from sqlglot import condition, maybe_parse
 
 from infinity.common import VEC, SparseVector, InfinityException, SortType, FDE
 from infinity.errors import ErrorCode
-from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
+from infinity.remote_thrift.infinity_thrift_rpc.ttypes import (
+    ColumnExpr,
+    ConstantExpr,
+    ElementType,
+    EmbeddingData,
+    ExplainType,
+    FunctionExpr,
+    FusionExpr,
+    GenericMatchExpr,
+    InitParameter,
+    KnnDistanceType,
+    KnnExpr,
+    LiteralType,
+    MatchExpr,
+    OrderByExpr,
+    ParsedExpr,
+    ParsedExprType,
+    SearchExpr,
+)
 from infinity.remote_thrift.types import (
     logic_type_to_dtype,
     make_match_tensor_expr,
@@ -151,7 +169,7 @@ class InfinityThriftQueryBuilder(ABC):
             if len(embedding_data) % 8 != 0:
                 raise InfinityException(
                     ErrorCode.INVALID_EMBEDDING_DATA_TYPE,
-                    f"Embeddings with data bit must have dimension of times of 8!"
+                    "Embeddings with data bit must have dimension of times of 8!"
                 )
             else:
                 new_embedding_data = []
@@ -542,6 +560,7 @@ class InfinityThriftQueryBuilder(ABC):
             search=self._search,
             filter=self._filter,
             groupby=self._groupby,
+            having=self._having,
             limit=self._limit,
             offset=self._offset,
             sort=self._sort,

@@ -60,11 +60,10 @@ protected:
             hnsw_index->InsertVecs(std::move(iter));
 
             {
-                auto tmp_path = tmp_data_path();
-                if (!VirtualStore::Exists(tmp_path)) {
-                    VirtualStore::MakeDirectory(tmp_path);
-                }
-                std::filesystem::path dump_path = std::filesystem::path(tmp_path) / "dump.txt";
+                // if (!VirtualStore::Exists(tmp_path)) {
+                //     VirtualStore::MakeDirectory(tmp_path);
+                // }
+                std::filesystem::path dump_path = std::filesystem::path(GetFullTmpDir()) / "dump.txt";
                 std::fstream ss(dump_path, std::fstream::out);
                 if (!ss.is_open()) {
                     UnrecoverableError(fmt::format("Failed to open file: {}", dump_path.string()));

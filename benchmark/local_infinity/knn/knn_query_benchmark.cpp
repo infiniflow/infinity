@@ -13,10 +13,12 @@
 // limitations under the License.
 
 #include "hnsw_benchmark_util.h"
-#include <cassert>
 
-import std.compat;
+import std;
+#include <cassert>
 import infinity_core;
+
+using std::size_t;
 import compilation_config;
 import knn_expr;
 import column_expr;

@@ -1,6 +1,7 @@
 from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 from common import common_values
-from restart_util import *
+from restart_util import LChYDataGenerato
+from infinity import index
 from infinity.common import ConflictType
 
 
@@ -128,7 +129,7 @@ class TestCompact:
         def part1(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
             db_obj.drop_table(table_name, ConflictType.Ignore)
-            table_obj = db_obj.create_table(
+            db_obj.create_table(
                 table_name,
                 {
                     "col1": {"type": "int"},

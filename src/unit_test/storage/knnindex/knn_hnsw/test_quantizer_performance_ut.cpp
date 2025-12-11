@@ -175,7 +175,7 @@ public:
                     }
                     distances[j] = distance;
                 }
-                std::sort(distances.begin(), distances.end());
+                std::ranges::sort(distances);
                 avg[i] = 0;
                 for (size_t j = 0; j < ls_k; ++j) {
                     avg[i] += distances[j];

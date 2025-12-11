@@ -138,7 +138,7 @@ auto get_random_doc_ids = [](std::mt19937 &rng, u32 param_len) -> std::vector<Ro
         doc_ids.push_back(gen_id(rng));
     }
     // sort and unique
-    std::sort(doc_ids.begin(), doc_ids.end());
+    std::ranges::sort(doc_ids);
     doc_ids.erase(std::unique(doc_ids.begin(), doc_ids.end()), doc_ids.end());
     return doc_ids;
 };

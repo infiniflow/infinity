@@ -333,8 +333,8 @@ TEST_P(TestTxnCompact, compact_with_index_commit) {
     PrepareForCompact();
     auto index_name1 = std::make_shared<std::string>("index1");
     auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<std::string>(), "file_name", {column_def1->name()});
-    // auto index_name2 = std::make_shared<std::string>("index2");
-    // auto index_def2 = IndexFullText::Make(index_name2, std::make_shared<std::string>(), "file_name", {column_def2->name()}, {});
+    auto index_name2 = std::make_shared<std::string>("index2");
+    auto index_def2 = IndexFullText::Make(index_name2, std::make_shared<std::string>(), "file_name", {column_def2->name()}, {});
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
                                           TransactionType::kCreateIndex);
@@ -344,7 +344,7 @@ TEST_P(TestTxnCompact, compact_with_index_commit) {
         EXPECT_TRUE(status.ok());
     };
     create_index(index_def1);
-    // create_index(index_def2);
+    create_index(index_def2);
 
     auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
 
@@ -356,7 +356,7 @@ TEST_P(TestTxnCompact, compact_with_index_commit) {
 
     CheckDataAfterSuccesfulCompact();
     CheckIndexAfterSuccessfulCompact(*index_name1);
-    // CheckIndexAfterSuccessfulCompact(*index_name2);
+    CheckIndexAfterSuccessfulCompact(*index_name2);
 }
 
 TEST_P(TestTxnCompact, compact_with_index_rollback) {

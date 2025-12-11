@@ -684,7 +684,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, std::s
                 }
             }
             // remove duplicate column id
-            std::sort(bloom_filter_columns.begin(), bloom_filter_columns.end());
+            std::ranges::sort(bloom_filter_columns);
             bloom_filter_columns.erase(std::unique(bloom_filter_columns.begin(), bloom_filter_columns.end()), bloom_filter_columns.end());
             // check if bloom filter can be created for the column
             for (ColumnID column_id : bloom_filter_columns) {
@@ -855,8 +855,11 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
             break;
         }
         case IndexType::kSecondary: {
-            IndexSecondary::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-            base_index_ptr = IndexSecondary::Make(index_name, index_comment, index_filename, {index_info->column_name_});
+            IndexSecondary::ValidateColumnDataType(base_table_ref,
+                                                   index_info->column_name_,
+                                                   index_info->secondary_index_cardinality_); // may throw exception
+            base_index_ptr =
+                IndexSecondary::Make(index_name, index_comment, index_filename, {index_info->column_name_}, index_info->secondary_index_cardinality_);
             break;
         }
         case IndexType::kEMVB: {

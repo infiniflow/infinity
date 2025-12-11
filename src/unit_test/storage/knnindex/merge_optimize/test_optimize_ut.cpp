@@ -67,10 +67,12 @@ protected:
     void WaitCleanup(Storage *storage) {
         NewTxnManager *new_txn_mgr = storage->new_txn_manager();
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("cleanup"), TransactionType::kCleanup);
-        Status status = txn->Cleanup();
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        if (txn != nullptr) {
+            Status status = txn->Cleanup();
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
     }
 
     void WaitCheckpoint(Storage *storage) {

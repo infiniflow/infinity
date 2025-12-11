@@ -23,7 +23,7 @@ if (NOT CMAKE_TOOLCHAIN_FILE)
     endif ()
 endif ()
 
-project(infinity VERSION 0.6.7)
+project(infinity VERSION 0.6.11)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -236,10 +236,6 @@ endif ()
 
 # attach additional cmake modules
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
-
-set(TEST_DATA_PATH ${CMAKE_SOURCE_DIR}/test/data)
-set(CSV_DATA_PATH ${CMAKE_SOURCE_DIR}/third_party/zsv/data)
-set(TMP_DATA_PATH ${CMAKE_SOURCE_DIR}/tmp)
 
 # You can disable jemalloc by passing the `-DENABLE_JEMALLOC=OFF` option to CMake.
 option(ENABLE_JEMALLOC "Enable jemalloc support" ON)

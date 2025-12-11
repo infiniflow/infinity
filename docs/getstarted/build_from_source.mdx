@@ -110,7 +110,7 @@ This section provides instructions for building Infinity from source on Ubuntu.
    <TabItem value="ubuntu2204">
 
 ```shell
-sudo apt update && sudo apt install git wget unzip software-properties-common
+sudo apt update && sudo apt install git wget unzip software-properties-common pkg-config bison
 wget https://github.com/Kitware/CMake/releases/download/v4.0.3/cmake-4.0.3-linux-x86_64.tar.gz
 tar zxvf cmake-4.0.3-linux-x86_64.tar.gz
 sudo cp -rf cmake-4.0.3-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-4.0.3-linux-x86_64/share/* /usr/local/share && rm -rf cmake-4.0.3-linux-x86_64
@@ -141,25 +141,20 @@ sudo ln -s /usr/lib/llvm-20/bin/clang-scan-deps /usr/bin/clang-scan-deps
 sudo ln -s /usr/bin/clang-format-20 /usr/bin/clang-format
 sudo ln -s /usr/bin/clang-tidy-20 /usr/bin/clang-tidy
 sudo ln -s /usr/bin/llvm-symbolizer-20 /usr/bin/llvm-symbolizer
-sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
+sudo ln -s /usr/lib/llvm-20/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-20/include/c++/v1/__config_site
 ```
 
   </TabItem>
   <TabItem value="ubuntu2404">
 
 ```shell
-sudo apt update && sudo apt install -y git wget lsb-release software-properties-common
+sudo apt update && sudo apt install -y git wget lsb-release software-properties-common pkg-config bison mold
 wget https://github.com/Kitware/CMake/releases/download/v4.0.3/cmake-4.0.3-linux-x86_64.tar.gz
 tar zxvf cmake-4.0.3-linux-x86_64.tar.gz
 sudo cp -rf cmake-4.0.3-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-4.0.3-linux-x86_64/share/* /usr/local/share && rm -rf cmake-4.0.3-linux-x86_64
 wget https://github.com/ninja-build/ninja/archive/refs/tags/v1.13.1.zip
 unzip v1.13.1.zip && cd ninja-1.13.1 && cmake -Bbuild-cmake -DBUILD_TESTING=OFF && cmake --build build-cmake --parallel $(nproc) && cd build-cmake && sudo cp ninja /usr/local/bin
 cd ../.. && rm -rf v1.13.1.zip ninja-1.13.1
-wget https://github.com/rui314/mold/archive/refs/tags/v2.40.3.zip
-./install-build-deps.sh
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++-15 -B build
-cmake --build build -j$(nproc)
-sudo cmake --build build --target install
 sudo add-apt-repository ppa:puni070/gcc-noble
 sudo apt update
 sudo apt install gcc-15 g++-15
@@ -300,7 +295,7 @@ cmake --build . -t test_main
 
 2. Install Python sdk of infinity:
    ```bash
-   pip install infinity-sdk==0.6.7
+   pip install infinity-sdk==0.6.11
    ```
 
 3. Run the functional tests:
@@ -322,7 +317,7 @@ cmake --build . -t test_main
 
 2. Install Python sdk of infinity:
    ```bash
-   pip install infinity-sdk==0.6.7
+   pip install infinity-sdk==0.6.11
    ```
 
 3. Run the functional tests: 
@@ -347,7 +342,7 @@ cmake --build . -t test_main
 
 2. Install Python sdk of infinity:
    ```bash
-   pip install infinity-sdk==0.6.7
+   pip install infinity-sdk==0.6.11
    ```
 
 3. Run the functional tests: 

@@ -59,7 +59,7 @@ std::shared_ptr<std::vector<SegmentID>> GetTableSegments(KVInstance *kv_instance
         }
         iter->Next();
     }
-    std::sort(segment_ids->begin(), segment_ids->end());
+    std::ranges::sort(*segment_ids);
     return segment_ids;
 }
 
@@ -91,7 +91,7 @@ std::vector<SegmentID> GetTableIndexSegments(KVInstance *kv_instance,
         }
         iter->Next();
     }
-    std::sort(segment_ids.begin(), segment_ids.end());
+    std::ranges::sort(segment_ids);
     return segment_ids;
 }
 
@@ -119,7 +119,7 @@ std::vector<BlockID> GetTableSegmentBlocks(KVInstance *kv_instance,
         iter->Next();
     }
 
-    std::sort(block_ids.begin(), block_ids.end());
+    std::ranges::sort(block_ids);
     return block_ids;
 }
 

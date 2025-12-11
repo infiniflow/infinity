@@ -35,7 +35,6 @@ import logical_type;
 import embedding_info;
 import knn_expr;
 import data_type;
-import compilation_config;
 
 using namespace infinity;
 

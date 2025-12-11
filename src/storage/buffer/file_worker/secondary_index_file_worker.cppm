@@ -51,8 +51,9 @@ protected:
                const FileWorkerSaveCtx &ctx) override;
 
     void Read(SecondaryIndexDataBase<HighCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
-    void
-    Read(std::shared_ptr<SecondaryIndexDataBase<LowCardinalityTag>> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+
+    void Read(SecondaryIndexDataBase<LowCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+    // void Read(auto &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
 
     const u32 row_count_{};
 };

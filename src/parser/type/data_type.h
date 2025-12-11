@@ -98,6 +98,7 @@ public:
 
     [[nodiscard]] inline bool CanBuildSecondaryIndex() const {
         switch (type_) {
+            case LogicalType::kBoolean:
             case LogicalType::kTinyInt:
             case LogicalType::kSmallInt:
             case LogicalType::kInteger:

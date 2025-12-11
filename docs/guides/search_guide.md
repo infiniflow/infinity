@@ -183,14 +183,16 @@ Infinity offers two approaches for improving the performance of a tensor search:
 
 Infinity allows you to integrate various search methods, including full-text search, dense vector search, and sparse vector search, into a hybrid search pipeline. For any search combination in a hybrid search, a fusion method is required to determine the final reranking results. The results can be further combined with other search paths. For instance, you can integrate dense vector search with sparse vector search to build the first-stage retrieval, apply a fusion reranker to this path, and integrate the reranking results with a full-text search path to build a second-stage retrieval.
 
-Infinity offers three types of rerankers for fusion:
+Infinity offers four types of rerankers for fusion:
 
 - `rrf` (Reciprocal rank fusion)  
   RRF is a method that combines multiple result sets with varying relevance indicators into a single result set. This method requires no tuning, and the relevance indicators need not be correlated to achieve high-quality results. It is particularly useful when you are uncertain of each retrieval path's relative importance.
 - `weighted_sum`  
-  The weighted sum approach assigns different weights to different retrieval paths, allowing you to emphasize specific paths. It is particularly useful when you are certain of each path's relative importance.
+  The weighted sum approach assigns different weights to different retrieval paths, allowing you to emphasize specific paths. It is particularly useful when you are certain of each path's relative importance. It supports `normalize` parameter to normalize the scores before summation. Supported normalization methods are `minmax`, `atan`, `l2`, and `none`. Defaults to `minmax`.
 - `match_tensor`  
   The tensor-based rank fusion, where the final results are determined by the MaxSim operator between the query tensor and each document tensor.
+- `max`
+  The max method returns the maximum score from the different retrieval paths. It supports `normalize` parameter to normalize the scores before comparison. Supported normalization methods are `minmax`, `atan`, `l2`, and `none`. Defaults to `minmax`.
 
 ## Conditional filters
 

@@ -161,7 +161,8 @@ std::shared_ptr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes
             break;
         }
         case IndexType::kSecondary: {
-            res = std::make_shared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names));
+            SecondaryIndexCardinality cardinality = SecondaryIndexCardinality(ReadBufAdv<u8>(ptr));
+            res = std::make_shared<IndexSecondary>(index_name, index_comment, file_name, column_names, cardinality);
             break;
         }
         case IndexType::kEMVB: {
@@ -302,7 +303,13 @@ std::shared_ptr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str
             break;
         }
         case IndexType::kSecondary: {
-            res = std::make_shared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names));
+            SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality;
+            if (std::string cardinality_json; doc["cardinality"].get<std::string>(cardinality_json) == simdjson::SUCCESS) {
+                if (cardinality_json == "low") {
+                    secondary_index_cardinality = SecondaryIndexCardinality::kLowCardinality;
+                }
+            }
+            res = std::make_shared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names), secondary_index_cardinality);
             break;
         }
         case IndexType::kEMVB: {

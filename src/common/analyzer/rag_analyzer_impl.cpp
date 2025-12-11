@@ -1128,7 +1128,7 @@ inline void CheckDP2(const RAGAnalyzer *this_ptr, const std::string_view input_s
     const auto dp_faster = dp_duration < dfs_duration;
     std::cerr << "\n!!! " << print_1(dp_faster) << "\nTOP2 DFS duration: " << dfs_duration << " \nTOP2 DP  duration: " << dp_duration;
     const auto dfs_sorted_tokens = get_dfs_sorted_tokens();
-    for (int i = 0; i < topn; ++i) {
+    for (int i = 0; i < std::min(topn, (int)dfs_sorted_tokens.size()); ++i) {
         compare_score_and_tokens(dfs_sorted_tokens[i].first,
                                  dfs_sorted_tokens[i].second,
                                  dp_result[i].first,
@@ -2066,7 +2066,7 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
             while (std::getline(iss, sub_token, '/')) {
                 if (!sub_token.empty()) {
                     unsigned sub_end = sub_start + sub_token.size();
-                    temp_tokens.push_back(sub_token);
+                    fine_tokens.push_back(sub_token);
                     fine_positions.emplace_back(sub_start, sub_end);
                     sub_start = sub_end + 1;
                 }
@@ -2074,8 +2074,8 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
         }
 
         // Apply English normalization to get lowercase and stemmed tokens
-        std::vector<std::pair<unsigned, unsigned>> temp_positions = fine_positions;
-        EnglishNormalizeWithPosition(temp_tokens, temp_positions, fine_tokens, fine_positions);
+        // std::vector<std::pair<unsigned, unsigned>> temp_positions = fine_positions;
+        // EnglishNormalizeWithPosition(temp_tokens, temp_positions, fine_tokens, fine_positions);
     } else {
         // Chinese or mixed text processing - match FineGrainedTokenize behavior
         for (size_t i = 0; i < tks.size(); ++i) {

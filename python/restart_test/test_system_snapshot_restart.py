@@ -2,15 +2,8 @@ import infinity
 from common import common_values
 from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 from infinity import index
-import time
-import pathlib
 from infinity.common import ConflictType, SparseVector
-import pytest
-import threading
 import random
-import json
-import base64
-from util import RtnThread
 
 
 class TestSystemSnapshotRestart:
@@ -110,14 +103,14 @@ class TestSystemSnapshotRestart:
     #     try:
     #         search_result = table_obj.query("name", "user_1", index_name="idx_name_fts")
     #         assert len(search_result) > 0, "Full-text search should return results"
-    #     except:
+    #     except Exception:
     #         pass  # Index might not exist
     #
     #     # Test vector similarity search if available
     #     try:
     #         vector_result = table_obj.query("vector_col", [0.5], index_name="idx_vector_ivf")
     #         assert len(vector_result) > 0, "Vector similarity search should return results"
-    #     except:
+    #     except Exception:
     #         pass  # Index might not exist
     #
     #     print(f"   Table {table_name} functionality verified")
@@ -144,7 +137,7 @@ class TestSystemSnapshotRestart:
     #         for expected_table in expected_tables:
     #             assert expected_table in table_names, f"Expected table {expected_table} not found"
     #
-    #     print(f"   Database operations verification completed successfully")
+    #     print("   Database operations verification completed successfully")
     #
     # def test_system_snapshot_basic_restart(self, infinity_runner: InfinityRunner):
     #     """Test basic system snapshot functionality across restarts"""
@@ -497,7 +490,7 @@ class TestSystemSnapshotRestart:
     #         snapshots_response = infinity_obj.list_snapshots()
     #         snapshots = snapshots_response.snapshots
     #         snapshot_name = "large_data_snapshot"
-    #         assert snapshot_name in [snapshot.name for snapshot in snapshots], f"Large data snapshot not found after restart"
+    #         assert snapshot_name in [snapshot.name for snapshot in snapshots], "Large data snapshot not found after restart"
     #
     #         # Add more large data after restart
     #         infinity_obj.create_database("post_restart_large_db")

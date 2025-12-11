@@ -259,7 +259,7 @@ std::shared_ptr<ColumnDef> ColumnDef::FromJson(std::string_view col_def_str) {
     std::set<ConstraintType> constraints;
     if (simdjson::array constraints_json; doc["constraints"].get(constraints_json) == simdjson::SUCCESS) {
         for (auto item : constraints_json) {
-            ConstraintType constraint = static_cast<ConstraintType>(static_cast<char>(item.get<char>()));
+            ConstraintType constraint = static_cast<ConstraintType>(static_cast<char>(item.get<int64_t>()));
             constraints.insert(constraint);
         }
     }

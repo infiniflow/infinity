@@ -3,11 +3,18 @@ name: release
 on:
   schedule:
     - cron: '0 13 * * *'  # This schedule runs every 13:00:00Z(21:00:00+08:00)
+  # https://github.com/orgs/community/discussions/26286?utm_source=chatgpt.com#discussioncomment-3251208
+  # "The create event does not support branch filter and tag filter."
   # The "create tags" trigger is specifically focused on the creation of new tags, while the "push tags" trigger is activated when tags are pushed, including both new tag creations and updates to existing tags.
-  create:
+  push:
     tags:
-      - 'v*.*.*'                  # normal release, use release.sh instead
-      - 'nightly'                 # mutable tag
+      - 'v*.*.*'                  # normal release
+
+permissions:
+  contents: write
+  actions: read
+  checks: read
+  statuses: read
 
 # https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
@@ -24,9 +31,9 @@ jobs:
     - name: Ensure workspace ownership
       run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
 
-    # https://github.com/actions/checkout/blob/v5/README.md
+    # https://github.com/actions/checkout/blob/v6/README.md
     - name: Check out code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         submodules: recursive
 
@@ -34,12 +41,12 @@ jobs:
       run: |
         if [[ ${GITHUB_EVENT_NAME} != 'schedule' ]]; then
           RELEASE_TAG=${GITHUB_REF#refs/tags/}
-          if [[ ${RELEASE_TAG} == 'nightly' ]]; then
-            PRERELEASE=true
-          else
+          if [[ ${RELEASE_TAG} == v* ]]; then
             PRERELEASE=false
+          else
+            PRERELEASE=true
           fi
-          echo "Workflow triggered by create tag: ${RELEASE_TAG}"
+          echo "Workflow triggered by push tag: ${RELEASE_TAG}"
         else
           RELEASE_TAG=nightly
           PRERELEASE=true
@@ -58,7 +65,7 @@ jobs:
       run: |
         if [[ ${GITHUB_EVENT_NAME} == 'schedule' ]]; then
           # Determine if a given tag exists and matches a specific Git commit.
-          # actions/checkout@v5 fetch-tags doesn't work when triggered by schedule
+          # actions/checkout@v6 fetch-tags doesn't work when triggered by schedule
           git fetch --tags
           if [ "$(git rev-parse -q --verify "refs/tags/${RELEASE_TAG}")" = "${GITHUB_SHA}" ]; then
             echo "mutable tag ${RELEASE_TAG} exists and matches ${GITHUB_SHA}"
@@ -74,7 +81,7 @@ jobs:
         BUILDER_CONTAINER=infinity_build_$(od -An -N4 -t u8 < /dev/urandom | tr -d ' ')
         echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> ${GITHUB_ENV}
         TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-        sudo docker rm -f ${BUILDER_CONTAINER} && sudo docker run -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+        sudo docker rm -f ${BUILDER_CONTAINER} && sudo docker run -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -e UV_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
 
     - name: Build release version
       run: |
@@ -83,7 +90,7 @@ jobs:
     - name: Build and push infinity-sdk
       if: startsWith(github.ref, 'refs/tags/v')
       run: |
-        sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/python/infinity_sdk && uv build && uv publish --token ${{ secrets.PYPI_API_TOKEN }}"
+        uv run --python 3.11 python/infinity_sdk/prepare_huqie.py && uv build && uv publish --token ${{ secrets.PYPI_API_TOKEN }}
 
     - name: Create or overwrite a release
       # https://github.com/actions/upload-release-asset has been replaced by https://github.com/softprops/action-gh-release

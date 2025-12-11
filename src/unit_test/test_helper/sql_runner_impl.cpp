@@ -106,4 +106,53 @@ std::shared_ptr<DataTable> SQLRunner::Run(const std::string &sql_text, bool prin
     return query_result.result_table_;
 }
 
+std::tuple<std::shared_ptr<PhysicalOperator>, std::shared_ptr<PlanFragment>> SQLRunner::GetPhysicalPlan(const std::string &sql_text) {
+    std::shared_ptr<RemoteSession> session_ptr = InfinityContext::instance().session_manager()->CreateRemoteSession();
+
+    std::unique_ptr<QueryContext> query_context_ptr = std::make_unique<QueryContext>(session_ptr.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+    query_context_ptr->set_current_schema(session_ptr->current_database());
+
+    std::shared_ptr<SQLParser> parser = std::make_shared<SQLParser>();
+    std::shared_ptr<ParserResult> parsed_result = std::make_shared<ParserResult>();
+    parser->Parse(sql_text, parsed_result.get());
+
+    if (parsed_result->IsError()) {
+        UnrecoverableError(parsed_result->error_message_);
+    }
+
+    BaseStatement *statement = (*parsed_result->statements_ptr_)[0];
+    query_context_ptr->BeginTxn(statement);
+
+    std::shared_ptr<BindContext> bind_context;
+    query_context_ptr->logical_planner()->Build(statement, bind_context);
+    query_context_ptr->set_max_node_id(bind_context->GetNewLogicalNodeId());
+
+    std::shared_ptr<LogicalNode> logical_plan = query_context_ptr->logical_planner()->LogicalPlans()[0];
+
+    // Apply optimized rule to the logical plan
+    query_context_ptr->optimizer()->optimize(logical_plan, statement->Type());
+
+    // Build physical plan
+    std::shared_ptr<PhysicalOperator> physical_plan = query_context_ptr->physical_planner()->BuildPhysicalOperator(logical_plan);
+
+    // Fragment Builder, only for test now. plan fragment is same as pipeline.
+    auto plan_fragment = query_context_ptr->fragment_builder()->BuildFragment({physical_plan.get()});
+
+    auto notifier = std::make_unique<Notifier>();
+
+    FragmentContext::BuildTask(query_context_ptr.get(), nullptr, plan_fragment.get(), notifier.get());
+
+    // Not do anything, just commit
+    parsed_result->Reset();
+    query_context_ptr->CommitTxn();
+
+    return {physical_plan, plan_fragment};
+}
+
 } // namespace infinity

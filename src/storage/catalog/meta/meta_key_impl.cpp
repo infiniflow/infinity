@@ -223,7 +223,21 @@ nlohmann::json TableIndexMetaKey::ToJson() const {
 
 nlohmann::json TableIndexTagMetaKey::ToJson() const {
     nlohmann::json json_res;
-    json_res[tag_name_] = nlohmann::json::parse(value_);
+
+    // Handle empty or invalid JSON gracefully
+    if (value_.empty()) {
+        // If value is empty, set it as an empty JSON object
+        json_res[tag_name_] = nlohmann::json::object();
+    } else {
+        try {
+            // Try to parse the JSON, if it fails, use the raw string value
+            json_res[tag_name_] = nlohmann::json::parse(value_);
+        } catch (const nlohmann::json::parse_error &) {
+            // If parsing fails, use the raw string value
+            json_res[tag_name_] = value_;
+        }
+    }
+
     return json_res;
 }
 

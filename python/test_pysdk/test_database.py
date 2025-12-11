@@ -1,5 +1,3 @@
-import sys
-import os
 import threading
 import pytest
 from infinity.common import ConflictType, InfinityException
@@ -7,11 +5,7 @@ from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-from infinity_http import infinity_http
+from infinity.infinity_http import infinity_http
 
 
 @pytest.fixture(scope="class")
@@ -114,7 +108,7 @@ class TestInfinity:
 
         for i in range(loop_count):
             # 2.1 create database:
-            db = self.infinity_obj.create_database('test_pysdk_test_repeatedly_create_drop_show_databases' + suffix)
+            self.infinity_obj.create_database('test_pysdk_test_repeatedly_create_drop_show_databases' + suffix)
 
             # 2.2 show database
             dbs = self.infinity_obj.list_databases()
@@ -193,7 +187,7 @@ class TestInfinity:
 
         for db_name in common_values.invalid_name_array:
             with pytest.raises(InfinityException) as e:
-                res = self.infinity_obj.drop_database("my_database")
+                self.infinity_obj.drop_database("my_database")
             assert e.type == InfinityException
             assert e.value.args[0] == ErrorCode.DB_NOT_EXIST
 

@@ -1,8 +1,8 @@
-// A Bison parser, made by GNU Bison 3.5.1.
+// A Bison parser, made by GNU Bison 3.8.2.
 
 // Skeleton implementation for Bison LALR(1) parsers in C++
 
-// Copyright (C) 2002-2015, 2018-2020 Free Software Foundation, Inc.
+// Copyright (C) 2002-2015, 2018-2021 Free Software Foundation, Inc.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // As a special exception, you may create a larger work that contains
 // part or all of the Bison parser skeleton and distribute that work
@@ -30,8 +30,9 @@
 // This special exception was added by the Free Software Foundation in
 // version 2.2 of Bison.
 
-// Undocumented macros, especially those whose name start with YY_,
-// are private implementation details.  Do not rely on them.
+// DO NOT RELY ON FEATURES THAT ARE NOT DOCUMENTED in the manual,
+// especially those whose name start with YY_ or yy_.  They are
+// private implementation details that can be changed or removed.
 
 #include "search_parser.h"
 
@@ -55,7 +56,7 @@ import search_scanner;
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #endif
 
-#line 64 "search_parser.cpp"
+#line 65 "search_parser.cpp"
 
 #ifndef YY_
 #if defined YYENABLE_NLS && YYENABLE_NLS
@@ -121,7 +122,7 @@ import search_scanner;
 #define YY_STACK_PRINT()                                                                                                                             \
     do {                                                                                                                                             \
         if (yydebug_)                                                                                                                                \
-            yystack_print_();                                                                                                                        \
+            yy_stack_print_();                                                                                                                       \
     } while (false)
 
 #else // !YYDEBUG
@@ -129,7 +130,7 @@ import search_scanner;
 #define YYCDEBUG                                                                                                                                     \
     if (false)                                                                                                                                       \
     std::cerr
-#define YY_SYMBOL_PRINT(Title, Symbol) YYUSE(Symbol)
+#define YY_SYMBOL_PRINT(Title, Symbol) YY_USE(Symbol)
 #define YY_REDUCE_PRINT(Rule) static_cast<void>(0)
 #define YY_STACK_PRINT() static_cast<void>(0)
 
@@ -145,43 +146,7 @@ import search_scanner;
 
 #line 10 "search_parser.y"
 namespace infinity {
-#line 156 "search_parser.cpp"
-
-/* Return YYSTR after stripping away unnecessary quotes and
-   backslashes, so that it's suitable for yyerror.  The heuristic is
-   that double-quoting is unnecessary unless the string contains an
-   apostrophe, a comma, or backslash (other than backslash-backslash).
-   YYSTR is taken from yytname.  */
-std::string SearchParser::yytnamerr_(const char *yystr) {
-    if (*yystr == '"') {
-        std::string yyr;
-        char const *yyp = yystr;
-
-        for (;;)
-            switch (*++yyp) {
-                case '\'':
-                case ',':
-                    goto do_not_strip_quotes;
-
-                case '\\':
-                    if (*++yyp != '\\')
-                        goto do_not_strip_quotes;
-                    else
-                        goto append;
-
-                append:
-                default:
-                    yyr += *yyp;
-                    break;
-
-                case '"':
-                    return yyr;
-            }
-    do_not_strip_quotes:;
-    }
-
-    return yystr;
-}
+#line 158 "search_parser.cpp"
 
 /// Build a parser object.
 SearchParser::SearchParser(SearchScanner &scanner_yyarg,
@@ -200,63 +165,32 @@ SearchParser::~SearchParser() {}
 
 SearchParser::syntax_error::~syntax_error() YY_NOEXCEPT YY_NOTHROW {}
 
-/*---------------.
-| Symbol types.  |
-`---------------*/
+/*---------.
+| symbol.  |
+`---------*/
 
 // basic_symbol.
-#if 201103L <= YY_CPLUSPLUS
-template <typename Base>
-SearchParser::basic_symbol<Base>::basic_symbol(basic_symbol &&that) : Base(std::move(that)), value(), location(std::move(that.location)) {
-    switch (this->type_get()) {
-        case 11: // STRING
-            value.move<InfString>(std::move(that.value));
-            break;
-
-        case 10: // CARAT
-            value.move<float>(std::move(that.value));
-            break;
-
-        case 13: // topLevelQuery
-        case 14: // query
-        case 15: // clause
-        case 16: // term
-        case 17: // basic_filter_boost
-        case 18: // basic_filter
-            value.move<std::unique_ptr<QueryNode>>(std::move(that.value));
-            break;
-
-        case 9: // TILDE
-            value.move<unsigned long>(std::move(that.value));
-            break;
-
-        default:
-            break;
-    }
-}
-#endif
-
 template <typename Base>
 SearchParser::basic_symbol<Base>::basic_symbol(const basic_symbol &that) : Base(that), value(), location(that.location) {
-    switch (this->type_get()) {
-        case 11: // STRING
+    switch (this->kind()) {
+        case symbol_kind::S_STRING: // STRING
             value.copy<InfString>(YY_MOVE(that.value));
             break;
 
-        case 10: // CARAT
+        case symbol_kind::S_CARAT: // CARAT
             value.copy<float>(YY_MOVE(that.value));
             break;
 
-        case 13: // topLevelQuery
-        case 14: // query
-        case 15: // clause
-        case 16: // term
-        case 17: // basic_filter_boost
-        case 18: // basic_filter
+        case symbol_kind::S_topLevelQuery:      // topLevelQuery
+        case symbol_kind::S_query:              // query
+        case symbol_kind::S_clause:             // clause
+        case symbol_kind::S_term:               // term
+        case symbol_kind::S_basic_filter_boost: // basic_filter_boost
+        case symbol_kind::S_basic_filter:       // basic_filter
             value.copy<std::unique_ptr<QueryNode>>(YY_MOVE(that.value));
             break;
 
-        case 9: // TILDE
+        case symbol_kind::S_TILDE: // TILDE
             value.copy<unsigned long>(YY_MOVE(that.value));
             break;
 
@@ -266,32 +200,37 @@ SearchParser::basic_symbol<Base>::basic_symbol(const basic_symbol &that) : Base(
 }
 
 template <typename Base>
+SearchParser::symbol_kind_type SearchParser::basic_symbol<Base>::type_get() const YY_NOEXCEPT {
+    return this->kind();
+}
+
+template <typename Base>
 bool SearchParser::basic_symbol<Base>::empty() const YY_NOEXCEPT {
-    return Base::type_get() == empty_symbol;
+    return this->kind() == symbol_kind::S_YYEMPTY;
 }
 
 template <typename Base>
 void SearchParser::basic_symbol<Base>::move(basic_symbol &s) {
     super_type::move(s);
-    switch (this->type_get()) {
-        case 11: // STRING
+    switch (this->kind()) {
+        case symbol_kind::S_STRING: // STRING
             value.move<InfString>(YY_MOVE(s.value));
             break;
 
-        case 10: // CARAT
+        case symbol_kind::S_CARAT: // CARAT
             value.move<float>(YY_MOVE(s.value));
             break;
 
-        case 13: // topLevelQuery
-        case 14: // query
-        case 15: // clause
-        case 16: // term
-        case 17: // basic_filter_boost
-        case 18: // basic_filter
+        case symbol_kind::S_topLevelQuery:      // topLevelQuery
+        case symbol_kind::S_query:              // query
+        case symbol_kind::S_clause:             // clause
+        case symbol_kind::S_term:               // term
+        case symbol_kind::S_basic_filter_boost: // basic_filter_boost
+        case symbol_kind::S_basic_filter:       // basic_filter
             value.move<std::unique_ptr<QueryNode>>(YY_MOVE(s.value));
             break;
 
-        case 9: // TILDE
+        case symbol_kind::S_TILDE: // TILDE
             value.move<unsigned long>(YY_MOVE(s.value));
             break;
 
@@ -302,25 +241,27 @@ void SearchParser::basic_symbol<Base>::move(basic_symbol &s) {
     location = YY_MOVE(s.location);
 }
 
-// by_type.
-SearchParser::by_type::by_type() : type(empty_symbol) {}
+// by_kind.
+SearchParser::by_kind::by_kind() YY_NOEXCEPT : kind_(symbol_kind::S_YYEMPTY) {}
 
 #if 201103L <= YY_CPLUSPLUS
-SearchParser::by_type::by_type(by_type &&that) : type(that.type) { that.clear(); }
+SearchParser::by_kind::by_kind(by_kind &&that) YY_NOEXCEPT : kind_(that.kind_) { that.clear(); }
 #endif
 
-SearchParser::by_type::by_type(const by_type &that) : type(that.type) {}
+SearchParser::by_kind::by_kind(const by_kind &that) YY_NOEXCEPT : kind_(that.kind_) {}
 
-SearchParser::by_type::by_type(token_type t) : type(yytranslate_(t)) {}
+SearchParser::by_kind::by_kind(token_kind_type t) YY_NOEXCEPT : kind_(yytranslate_(t)) {}
 
-void SearchParser::by_type::clear() { type = empty_symbol; }
+void SearchParser::by_kind::clear() YY_NOEXCEPT { kind_ = symbol_kind::S_YYEMPTY; }
 
-void SearchParser::by_type::move(by_type &that) {
-    type = that.type;
+void SearchParser::by_kind::move(by_kind &that) {
+    kind_ = that.kind_;
     that.clear();
 }
 
-int SearchParser::by_type::type_get() const YY_NOEXCEPT { return type; }
+SearchParser::symbol_kind_type SearchParser::by_kind::kind() const YY_NOEXCEPT { return kind_; }
+
+SearchParser::symbol_kind_type SearchParser::by_kind::type_get() const YY_NOEXCEPT { return this->kind(); }
 
 // by_state.
 SearchParser::by_state::by_state() YY_NOEXCEPT : state(empty_state) {}
@@ -336,35 +277,35 @@ void SearchParser::by_state::move(by_state &that) {
 
 SearchParser::by_state::by_state(state_type s) YY_NOEXCEPT : state(s) {}
 
-SearchParser::symbol_number_type SearchParser::by_state::type_get() const YY_NOEXCEPT {
+SearchParser::symbol_kind_type SearchParser::by_state::kind() const YY_NOEXCEPT {
     if (state == empty_state)
-        return empty_symbol;
+        return symbol_kind::S_YYEMPTY;
     else
-        return yystos_[+state];
+        return YY_CAST(symbol_kind_type, yystos_[+state]);
 }
 
 SearchParser::stack_symbol_type::stack_symbol_type() {}
 
 SearchParser::stack_symbol_type::stack_symbol_type(YY_RVREF(stack_symbol_type) that) : super_type(YY_MOVE(that.state), YY_MOVE(that.location)) {
-    switch (that.type_get()) {
-        case 11: // STRING
+    switch (that.kind()) {
+        case symbol_kind::S_STRING: // STRING
             value.YY_MOVE_OR_COPY<InfString>(YY_MOVE(that.value));
             break;
 
-        case 10: // CARAT
+        case symbol_kind::S_CARAT: // CARAT
             value.YY_MOVE_OR_COPY<float>(YY_MOVE(that.value));
             break;
 
-        case 13: // topLevelQuery
-        case 14: // query
-        case 15: // clause
-        case 16: // term
-        case 17: // basic_filter_boost
-        case 18: // basic_filter
+        case symbol_kind::S_topLevelQuery:      // topLevelQuery
+        case symbol_kind::S_query:              // query
+        case symbol_kind::S_clause:             // clause
+        case symbol_kind::S_term:               // term
+        case symbol_kind::S_basic_filter_boost: // basic_filter_boost
+        case symbol_kind::S_basic_filter:       // basic_filter
             value.YY_MOVE_OR_COPY<std::unique_ptr<QueryNode>>(YY_MOVE(that.value));
             break;
 
-        case 9: // TILDE
+        case symbol_kind::S_TILDE: // TILDE
             value.YY_MOVE_OR_COPY<unsigned long>(YY_MOVE(that.value));
             break;
 
@@ -379,25 +320,25 @@ SearchParser::stack_symbol_type::stack_symbol_type(YY_RVREF(stack_symbol_type) t
 }
 
 SearchParser::stack_symbol_type::stack_symbol_type(state_type s, YY_MOVE_REF(symbol_type) that) : super_type(s, YY_MOVE(that.location)) {
-    switch (that.type_get()) {
-        case 11: // STRING
+    switch (that.kind()) {
+        case symbol_kind::S_STRING: // STRING
             value.move<InfString>(YY_MOVE(that.value));
             break;
 
-        case 10: // CARAT
+        case symbol_kind::S_CARAT: // CARAT
             value.move<float>(YY_MOVE(that.value));
             break;
 
-        case 13: // topLevelQuery
-        case 14: // query
-        case 15: // clause
-        case 16: // term
-        case 17: // basic_filter_boost
-        case 18: // basic_filter
+        case symbol_kind::S_topLevelQuery:      // topLevelQuery
+        case symbol_kind::S_query:              // query
+        case symbol_kind::S_clause:             // clause
+        case symbol_kind::S_term:               // term
+        case symbol_kind::S_basic_filter_boost: // basic_filter_boost
+        case symbol_kind::S_basic_filter:       // basic_filter
             value.move<std::unique_ptr<QueryNode>>(YY_MOVE(that.value));
             break;
 
-        case 9: // TILDE
+        case symbol_kind::S_TILDE: // TILDE
             value.move<unsigned long>(YY_MOVE(that.value));
             break;
 
@@ -406,31 +347,31 @@ SearchParser::stack_symbol_type::stack_symbol_type(state_type s, YY_MOVE_REF(sym
     }
 
     // that is emptied.
-    that.type = empty_symbol;
+    that.kind_ = symbol_kind::S_YYEMPTY;
 }
 
 #if YY_CPLUSPLUS < 201103L
 SearchParser::stack_symbol_type &SearchParser::stack_symbol_type::operator=(const stack_symbol_type &that) {
     state = that.state;
-    switch (that.type_get()) {
-        case 11: // STRING
+    switch (that.kind()) {
+        case symbol_kind::S_STRING: // STRING
             value.copy<InfString>(that.value);
             break;
 
-        case 10: // CARAT
+        case symbol_kind::S_CARAT: // CARAT
             value.copy<float>(that.value);
             break;
 
-        case 13: // topLevelQuery
-        case 14: // query
-        case 15: // clause
-        case 16: // term
-        case 17: // basic_filter_boost
-        case 18: // basic_filter
+        case symbol_kind::S_topLevelQuery:      // topLevelQuery
+        case symbol_kind::S_query:              // query
+        case symbol_kind::S_clause:             // clause
+        case symbol_kind::S_term:               // term
+        case symbol_kind::S_basic_filter_boost: // basic_filter_boost
+        case symbol_kind::S_basic_filter:       // basic_filter
             value.copy<std::unique_ptr<QueryNode>>(that.value);
             break;
 
-        case 9: // TILDE
+        case symbol_kind::S_TILDE: // TILDE
             value.copy<unsigned long>(that.value);
             break;
 
@@ -444,25 +385,25 @@ SearchParser::stack_symbol_type &SearchParser::stack_symbol_type::operator=(cons
 
 SearchParser::stack_symbol_type &SearchParser::stack_symbol_type::operator=(stack_symbol_type &that) {
     state = that.state;
-    switch (that.type_get()) {
-        case 11: // STRING
+    switch (that.kind()) {
+        case symbol_kind::S_STRING: // STRING
             value.move<InfString>(that.value);
             break;
 
-        case 10: // CARAT
+        case symbol_kind::S_CARAT: // CARAT
             value.move<float>(that.value);
             break;
 
-        case 13: // topLevelQuery
-        case 14: // query
-        case 15: // clause
-        case 16: // term
-        case 17: // basic_filter_boost
-        case 18: // basic_filter
+        case symbol_kind::S_topLevelQuery:      // topLevelQuery
+        case symbol_kind::S_query:              // query
+        case symbol_kind::S_clause:             // clause
+        case symbol_kind::S_term:               // term
+        case symbol_kind::S_basic_filter_boost: // basic_filter_boost
+        case symbol_kind::S_basic_filter:       // basic_filter
             value.move<std::unique_ptr<QueryNode>>(that.value);
             break;
 
-        case 9: // TILDE
+        case symbol_kind::S_TILDE: // TILDE
             value.move<unsigned long>(that.value);
             break;
 
@@ -487,17 +428,15 @@ void SearchParser::yy_destroy_(const char *yymsg, basic_symbol<Base> &yysym) con
 template <typename Base>
 void SearchParser::yy_print_(std::ostream &yyo, const basic_symbol<Base> &yysym) const {
     std::ostream &yyoutput = yyo;
-    YYUSE(yyoutput);
-    symbol_number_type yytype = yysym.type_get();
-#if defined __GNUC__ && !defined __clang__ && !defined __ICC && __GNUC__ * 100 + __GNUC_MINOR__ <= 408
-    // Avoid a (spurious) G++ 4.8 warning about "array subscript is
-    // below array bounds".
+    YY_USE(yyoutput);
     if (yysym.empty())
-        std::abort();
-#endif
-    yyo << (yytype < yyntokens_ ? "token" : "nterm") << ' ' << yytname_[yytype] << " (" << yysym.location << ": ";
-    YYUSE(yytype);
-    yyo << ')';
+        yyo << "empty symbol";
+    else {
+        symbol_kind_type yykind = yysym.kind();
+        yyo << (yykind < YYNTOKENS ? "token" : "nterm") << ' ' << yysym.name() << " (" << yysym.location << ": ";
+        YY_USE(yykind);
+        yyo << ')';
+    }
 }
 #endif
 
@@ -516,7 +455,7 @@ void SearchParser::yypush_(const char *m, state_type s, YY_MOVE_REF(symbol_type)
 #endif
 }
 
-void SearchParser::yypop_(int n) { yystack_.pop(n); }
+void SearchParser::yypop_(int n) YY_NOEXCEPT { yystack_.pop(n); }
 
 #if YYDEBUG
 std::ostream &SearchParser::debug_stream() const { return *yycdebug_; }
@@ -529,16 +468,16 @@ void SearchParser::set_debug_level(debug_level_type l) { yydebug_ = l; }
 #endif // YYDEBUG
 
 SearchParser::state_type SearchParser::yy_lr_goto_state_(state_type yystate, int yysym) {
-    int yyr = yypgoto_[yysym - yyntokens_] + yystate;
+    int yyr = yypgoto_[yysym - YYNTOKENS] + yystate;
     if (0 <= yyr && yyr <= yylast_ && yycheck_[yyr] == yystate)
         return yytable_[yyr];
     else
-        return yydefgoto_[yysym - yyntokens_];
+        return yydefgoto_[yysym - YYNTOKENS];
 }
 
-bool SearchParser::yy_pact_value_is_default_(int yyvalue) { return yyvalue == yypact_ninf_; }
+bool SearchParser::yy_pact_value_is_default_(int yyvalue) YY_NOEXCEPT { return yyvalue == yypact_ninf_; }
 
-bool SearchParser::yy_table_value_is_error_(int yyvalue) { return yyvalue == yytable_ninf_; }
+bool SearchParser::yy_table_value_is_error_(int yyvalue) YY_NOEXCEPT { return yyvalue == yytable_ninf_; }
 
 int SearchParser::operator()() { return parse(); }
 
@@ -578,6 +517,7 @@ int SearchParser::parse() {
     `-----------------------------------------------*/
     yynewstate:
         YYCDEBUG << "Entering state " << int(yystack_[0].state) << '\n';
+        YY_STACK_PRINT();
 
         // Accept?
         if (yystack_[0].state == yyfinal_)
@@ -596,12 +536,12 @@ int SearchParser::parse() {
 
         // Read a lookahead token.
         if (yyla.empty()) {
-            YYCDEBUG << "Reading a token: ";
+            YYCDEBUG << "Reading a token\n";
 #if YY_EXCEPTIONS
             try
 #endif // YY_EXCEPTIONS
             {
-                yyla.type = yytranslate_(yylex(&yyla.value, &yyla.location));
+                yyla.kind_ = yytranslate_(yylex(&yyla.value, &yyla.location));
             }
 #if YY_EXCEPTIONS
             catch (const syntax_error &yyexc) {
@@ -613,10 +553,19 @@ int SearchParser::parse() {
         }
         YY_SYMBOL_PRINT("Next token is", yyla);
 
+        if (yyla.kind() == symbol_kind::S_YYerror) {
+            // The scanner already issued an error message, process directly
+            // to error recovery.  But do not keep the error token as
+            // lookahead, it is too special and may lead us to an endless
+            // loop in error recovery. */
+            yyla.kind_ = symbol_kind::S_YYUNDEF;
+            goto yyerrlab1;
+        }
+
         /* If the proper action on seeing token YYLA.TYPE is to reduce or
            to detect an error, take that action.  */
-        yyn += yyla.type_get();
-        if (yyn < 0 || yylast_ < yyn || yycheck_[yyn] != yyla.type_get()) {
+        yyn += yyla.kind();
+        if (yyn < 0 || yylast_ < yyn || yycheck_[yyn] != yyla.kind()) {
             goto yydefault;
         }
 
@@ -658,24 +607,24 @@ int SearchParser::parse() {
                correct type. The default '$$ = $1' action is NOT applied
                when using variants.  */
             switch (yyr1_[yyn]) {
-                case 11: // STRING
+                case symbol_kind::S_STRING: // STRING
                     yylhs.value.emplace<InfString>();
                     break;
 
-                case 10: // CARAT
+                case symbol_kind::S_CARAT: // CARAT
                     yylhs.value.emplace<float>();
                     break;
 
-                case 13: // topLevelQuery
-                case 14: // query
-                case 15: // clause
-                case 16: // term
-                case 17: // basic_filter_boost
-                case 18: // basic_filter
+                case symbol_kind::S_topLevelQuery:      // topLevelQuery
+                case symbol_kind::S_query:              // query
+                case symbol_kind::S_clause:             // clause
+                case symbol_kind::S_term:               // term
+                case symbol_kind::S_basic_filter_boost: // basic_filter_boost
+                case symbol_kind::S_basic_filter:       // basic_filter
                     yylhs.value.emplace<std::unique_ptr<QueryNode>>();
                     break;
 
-                case 9: // TILDE
+                case symbol_kind::S_TILDE: // TILDE
                     yylhs.value.emplace<unsigned long>();
                     break;
 
@@ -697,23 +646,23 @@ int SearchParser::parse() {
 #endif // YY_EXCEPTIONS
             {
                 switch (yyn) {
-                    case 2:
+                    case 2: // topLevelQuery: query "end of file"
 #line 86 "search_parser.y"
                     {
                         parse_result = std::move(yystack_[1].value.as<std::unique_ptr<QueryNode>>());
                     }
-#line 848 "search_parser.cpp"
+#line 799 "search_parser.cpp"
                     break;
 
-                    case 3:
+                    case 3: // query: clause
 #line 91 "search_parser.y"
                     {
                         yylhs.value.as<std::unique_ptr<QueryNode>>() = std::move(yystack_[0].value.as<std::unique_ptr<QueryNode>>());
                     }
-#line 854 "search_parser.cpp"
+#line 805 "search_parser.cpp"
                     break;
 
-                    case 4:
+                    case 4: // query: query clause
 #line 92 "search_parser.y"
                     {
                         assert(driver.operator_option_ == FulltextQueryOperatorOption::kInfinitySyntax);
@@ -728,10 +677,10 @@ int SearchParser::parse() {
                             yylhs.value.as<std::unique_ptr<QueryNode>>() = std::move(q);
                         }
                     }
-#line 872 "search_parser.cpp"
+#line 823 "search_parser.cpp"
                     break;
 
-                    case 5:
+                    case 5: // query: query OR clause
 #line 105 "search_parser.y"
                     {
                         if (!(yystack_[2].value.as<std::unique_ptr<QueryNode>>())) {
@@ -745,18 +694,18 @@ int SearchParser::parse() {
                             yylhs.value.as<std::unique_ptr<QueryNode>>() = std::move(q);
                         }
                     }
-#line 889 "search_parser.cpp"
+#line 840 "search_parser.cpp"
                     break;
 
-                    case 6:
+                    case 6: // clause: term
 #line 119 "search_parser.y"
                     {
                         yylhs.value.as<std::unique_ptr<QueryNode>>() = std::move(yystack_[0].value.as<std::unique_ptr<QueryNode>>());
                     }
-#line 895 "search_parser.cpp"
+#line 846 "search_parser.cpp"
                     break;
 
-                    case 7:
+                    case 7: // clause: clause AND term
 #line 120 "search_parser.y"
                     {
                         if (!(yystack_[2].value.as<std::unique_ptr<QueryNode>>())) {
@@ -770,18 +719,18 @@ int SearchParser::parse() {
                             yylhs.value.as<std::unique_ptr<QueryNode>>() = std::move(query);
                         }
                     }
-#line 912 "search_parser.cpp"
+#line 863 "search_parser.cpp"
                     break;
 
-                    case 8:
+                    case 8: // term: basic_filter_boost
 #line 134 "search_parser.y"
                     {
                         yylhs.value.as<std::unique_ptr<QueryNode>>() = std::move(yystack_[0].value.as<std::unique_ptr<QueryNode>>());
                     }
-#line 918 "search_parser.cpp"
+#line 869 "search_parser.cpp"
                     break;
 
-                    case 9:
+                    case 9: // term: NOT term
 #line 135 "search_parser.y"
                     {
                         if (!(yystack_[0].value.as<std::unique_ptr<QueryNode>>())) {
@@ -792,18 +741,18 @@ int SearchParser::parse() {
                             yylhs.value.as<std::unique_ptr<QueryNode>>() = std::move(query);
                         }
                     }
-#line 932 "search_parser.cpp"
+#line 883 "search_parser.cpp"
                     break;
 
-                    case 10:
+                    case 10: // term: LPAREN query RPAREN
 #line 144 "search_parser.y"
                     {
                         yylhs.value.as<std::unique_ptr<QueryNode>>() = std::move(yystack_[1].value.as<std::unique_ptr<QueryNode>>());
                     }
-#line 938 "search_parser.cpp"
+#line 889 "search_parser.cpp"
                     break;
 
-                    case 11:
+                    case 11: // term: LPAREN query RPAREN CARAT
 #line 145 "search_parser.y"
                     {
                         yylhs.value.as<std::unique_ptr<QueryNode>>() = std::move(yystack_[2].value.as<std::unique_ptr<QueryNode>>());
@@ -811,18 +760,18 @@ int SearchParser::parse() {
                             yylhs.value.as<std::unique_ptr<QueryNode>>()->MultiplyWeight(yystack_[0].value.as<float>());
                         }
                     }
-#line 949 "search_parser.cpp"
+#line 900 "search_parser.cpp"
                     break;
 
-                    case 12:
+                    case 12: // basic_filter_boost: basic_filter
 #line 153 "search_parser.y"
                     {
                         yylhs.value.as<std::unique_ptr<QueryNode>>() = std::move(yystack_[0].value.as<std::unique_ptr<QueryNode>>());
                     }
-#line 957 "search_parser.cpp"
+#line 908 "search_parser.cpp"
                     break;
 
-                    case 13:
+                    case 13: // basic_filter_boost: basic_filter CARAT
 #line 156 "search_parser.y"
                     {
                         yylhs.value.as<std::unique_ptr<QueryNode>>() = std::move(yystack_[1].value.as<std::unique_ptr<QueryNode>>());
@@ -830,10 +779,10 @@ int SearchParser::parse() {
                             yylhs.value.as<std::unique_ptr<QueryNode>>()->MultiplyWeight(yystack_[0].value.as<float>());
                         }
                     }
-#line 968 "search_parser.cpp"
+#line 919 "search_parser.cpp"
                     break;
 
-                    case 14:
+                    case 14: // basic_filter: STRING
 #line 164 "search_parser.y"
                     {
                         const std::string &field = default_field;
@@ -845,10 +794,10 @@ int SearchParser::parse() {
                         yylhs.value.as<std::unique_ptr<QueryNode>>() =
                             driver.AnalyzeAndBuildQueryNode(field, text, yystack_[0].value.as<InfString>().from_quoted_);
                     }
-#line 982 "search_parser.cpp"
+#line 933 "search_parser.cpp"
                     break;
 
-                    case 15:
+                    case 15: // basic_filter: STRING OP_COLON STRING
 #line 173 "search_parser.y"
                     {
                         std::string field = SearchDriver::Unescape(yystack_[2].value.as<InfString>().text_);
@@ -856,10 +805,10 @@ int SearchParser::parse() {
                         yylhs.value.as<std::unique_ptr<QueryNode>>() =
                             driver.AnalyzeAndBuildQueryNode(field, text, yystack_[0].value.as<InfString>().from_quoted_);
                     }
-#line 992 "search_parser.cpp"
+#line 943 "search_parser.cpp"
                     break;
 
-                    case 16:
+                    case 16: // basic_filter: STRING TILDE
 #line 178 "search_parser.y"
                     {
                         const std::string &field = default_field;
@@ -873,10 +822,10 @@ int SearchParser::parse() {
                                                                                                        yystack_[1].value.as<InfString>().from_quoted_,
                                                                                                        yystack_[0].value.as<unsigned long>());
                     }
-#line 1006 "search_parser.cpp"
+#line 957 "search_parser.cpp"
                     break;
 
-                    case 17:
+                    case 17: // basic_filter: STRING OP_COLON STRING TILDE
 #line 187 "search_parser.y"
                     {
                         std::string field = SearchDriver::Unescape(yystack_[3].value.as<InfString>().text_);
@@ -886,10 +835,10 @@ int SearchParser::parse() {
                                                                                                        yystack_[1].value.as<InfString>().from_quoted_,
                                                                                                        yystack_[0].value.as<unsigned long>());
                     }
-#line 1016 "search_parser.cpp"
+#line 967 "search_parser.cpp"
                     break;
 
-#line 1020 "search_parser.cpp"
+#line 971 "search_parser.cpp"
 
                     default:
                         break;
@@ -905,7 +854,6 @@ int SearchParser::parse() {
             YY_SYMBOL_PRINT("-> $$ =", yylhs);
             yypop_(yylen);
             yylen = 0;
-            YY_STACK_PRINT();
 
             // Shift the result of the reduction.
             yypush_(YY_NULLPTR, YY_MOVE(yylhs));
@@ -919,7 +867,9 @@ int SearchParser::parse() {
         // If not already recovering from an error, report this error.
         if (!yyerrstatus_) {
             ++yynerrs_;
-            error(yyla.location, yysyntax_error_(yystack_[0].state, yyla));
+            context yyctx(*this, yyla);
+            std::string msg = yysyntax_error_(yyctx);
+            error(yyla.location, YY_MOVE(msg));
         }
 
         yyerror_range[1].location = yyla.location;
@@ -928,7 +878,7 @@ int SearchParser::parse() {
                error, discard it.  */
 
             // Return failure if at end of input.
-            if (yyla.type_get() == yyeof_)
+            if (yyla.kind() == symbol_kind::S_YYEOF)
                 YYABORT;
             else if (!yyla.empty()) {
                 yy_destroy_("Error: discarding", yyla);
@@ -952,6 +902,7 @@ int SearchParser::parse() {
            this YYERROR.  */
         yypop_(yylen);
         yylen = 0;
+        YY_STACK_PRINT();
         goto yyerrlab1;
 
     /*-------------------------------------------------------------.
@@ -959,28 +910,29 @@ int SearchParser::parse() {
     `-------------------------------------------------------------*/
     yyerrlab1:
         yyerrstatus_ = 3; // Each real token shifted decrements this.
+        // Pop stack until we find a state that shifts the error token.
+        for (;;) {
+            yyn = yypact_[+yystack_[0].state];
+            if (!yy_pact_value_is_default_(yyn)) {
+                yyn += symbol_kind::S_YYerror;
+                if (0 <= yyn && yyn <= yylast_ && yycheck_[yyn] == symbol_kind::S_YYerror) {
+                    yyn = yytable_[yyn];
+                    if (0 < yyn)
+                        break;
+                }
+            }
+
+            // Pop the current state because it cannot handle the error token.
+            if (yystack_.size() == 1)
+                YYABORT;
+
+            yyerror_range[1].location = yystack_[0].location;
+            yy_destroy_("Error: popping", yystack_[0]);
+            yypop_();
+            YY_STACK_PRINT();
+        }
         {
             stack_symbol_type error_token;
-            for (;;) {
-                yyn = yypact_[+yystack_[0].state];
-                if (!yy_pact_value_is_default_(yyn)) {
-                    yyn += yy_error_token_;
-                    if (0 <= yyn && yyn <= yylast_ && yycheck_[yyn] == yy_error_token_) {
-                        yyn = yytable_[yyn];
-                        if (0 < yyn)
-                            break;
-                    }
-                }
-
-                // Pop the current state because it cannot handle the error token.
-                if (yystack_.size() == 1)
-                    YYABORT;
-
-                yyerror_range[1].location = yystack_[0].location;
-                yy_destroy_("Error: popping", yystack_[0]);
-                yypop_();
-                YY_STACK_PRINT();
-            }
 
             yyerror_range[2].location = yyla.location;
             YYLLOC_DEFAULT(error_token.location, yyerror_range, 2);
@@ -1015,6 +967,7 @@ int SearchParser::parse() {
         /* Do not reclaim the symbols of the rule whose action triggered
            this YYABORT or YYACCEPT.  */
         yypop_(yylen);
+        YY_STACK_PRINT();
         while (1 < yystack_.size()) {
             yy_destroy_("Cleanup: popping", yystack_[0]);
             yypop_();
@@ -1041,16 +994,77 @@ int SearchParser::parse() {
 
 void SearchParser::error(const syntax_error &yyexc) { error(yyexc.location, yyexc.what()); }
 
-// Generate an error message.
-std::string SearchParser::yysyntax_error_(state_type yystate, const symbol_type &yyla) const {
-    // Number of reported tokens (one for the "unexpected", one per
-    // "expected").
-    std::ptrdiff_t yycount = 0;
-    // Its maximum.
-    enum { YYERROR_VERBOSE_ARGS_MAXIMUM = 5 };
-    // Arguments of yyformat.
-    char const *yyarg[YYERROR_VERBOSE_ARGS_MAXIMUM];
+/* Return YYSTR after stripping away unnecessary quotes and
+   backslashes, so that it's suitable for yyerror.  The heuristic is
+   that double-quoting is unnecessary unless the string contains an
+   apostrophe, a comma, or backslash (other than backslash-backslash).
+   YYSTR is taken from yytname.  */
+std::string SearchParser::yytnamerr_(const char *yystr) {
+    if (*yystr == '"') {
+        std::string yyr;
+        char const *yyp = yystr;
 
+        for (;;)
+            switch (*++yyp) {
+                case '\'':
+                case ',':
+                    goto do_not_strip_quotes;
+
+                case '\\':
+                    if (*++yyp != '\\')
+                        goto do_not_strip_quotes;
+                    else
+                        goto append;
+
+                append:
+                default:
+                    yyr += *yyp;
+                    break;
+
+                case '"':
+                    return yyr;
+            }
+    do_not_strip_quotes:;
+    }
+
+    return yystr;
+}
+
+std::string SearchParser::symbol_name(symbol_kind_type yysymbol) { return yytnamerr_(yytname_[yysymbol]); }
+
+// SearchParser::context.
+SearchParser::context::context(const SearchParser &yyparser, const symbol_type &yyla) : yyparser_(yyparser), yyla_(yyla) {}
+
+int SearchParser::context::expected_tokens(symbol_kind_type yyarg[], int yyargn) const {
+    // Actual number of expected tokens
+    int yycount = 0;
+
+    const int yyn = yypact_[+yyparser_.yystack_[0].state];
+    if (!yy_pact_value_is_default_(yyn)) {
+        /* Start YYX at -YYN if negative to avoid negative indexes in
+           YYCHECK.  In other words, skip the first -YYN actions for
+           this state because they are default actions.  */
+        const int yyxbegin = yyn < 0 ? -yyn : 0;
+        // Stay within bounds of both yycheck and yytname.
+        const int yychecklim = yylast_ - yyn + 1;
+        const int yyxend = yychecklim < YYNTOKENS ? yychecklim : YYNTOKENS;
+        for (int yyx = yyxbegin; yyx < yyxend; ++yyx)
+            if (yycheck_[yyx + yyn] == yyx && yyx != symbol_kind::S_YYerror && !yy_table_value_is_error_(yytable_[yyx + yyn])) {
+                if (!yyarg)
+                    ++yycount;
+                else if (yycount == yyargn)
+                    return 0;
+                else
+                    yyarg[yycount++] = YY_CAST(symbol_kind_type, yyx);
+            }
+    }
+
+    if (yyarg && yycount == 0 && 0 < yyargn)
+        yyarg[0] = symbol_kind::S_YYEMPTY;
+    return yycount;
+}
+
+int SearchParser::yy_syntax_error_arguments_(const context &yyctx, symbol_kind_type yyarg[], int yyargn) const {
     /* There are many possibilities here to consider:
        - If this state is a consistent state with a default action, then
          the only way this function was invoked is if the default action
@@ -1075,29 +1089,23 @@ std::string SearchParser::yysyntax_error_(state_type yystate, const symbol_type 
          one exception: it will still contain any token that will not be
          accepted due to an error action in a later state.
     */
-    if (!yyla.empty()) {
-        symbol_number_type yytoken = yyla.type_get();
-        yyarg[yycount++] = yytname_[yytoken];
 
-        int yyn = yypact_[+yystate];
-        if (!yy_pact_value_is_default_(yyn)) {
-            /* Start YYX at -YYN if negative to avoid negative indexes in
-               YYCHECK.  In other words, skip the first -YYN actions for
-               this state because they are default actions.  */
-            int yyxbegin = yyn < 0 ? -yyn : 0;
-            // Stay within bounds of both yycheck and yytname.
-            int yychecklim = yylast_ - yyn + 1;
-            int yyxend = yychecklim < yyntokens_ ? yychecklim : yyntokens_;
-            for (int yyx = yyxbegin; yyx < yyxend; ++yyx)
-                if (yycheck_[yyx + yyn] == yyx && yyx != yy_error_token_ && !yy_table_value_is_error_(yytable_[yyx + yyn])) {
-                    if (yycount == YYERROR_VERBOSE_ARGS_MAXIMUM) {
-                        yycount = 1;
-                        break;
-                    } else
-                        yyarg[yycount++] = yytname_[yyx];
-                }
-        }
+    if (!yyctx.lookahead().empty()) {
+        if (yyarg)
+            yyarg[0] = yyctx.token();
+        int yyn = yyctx.expected_tokens(yyarg ? yyarg + 1 : yyarg, yyargn - 1);
+        return yyn + 1;
     }
+    return 0;
+}
+
+// Generate an error message.
+std::string SearchParser::yysyntax_error_(const context &yyctx) const {
+    // Its maximum.
+    enum { YYARGS_MAX = 5 };
+    // Arguments of yyformat.
+    symbol_kind_type yyarg[YYARGS_MAX];
+    int yycount = yy_syntax_error_arguments_(yyctx, yyarg, YYARGS_MAX);
 
     char const *yyformat = YY_NULLPTR;
     switch (yycount) {
@@ -1120,7 +1128,7 @@ std::string SearchParser::yysyntax_error_(state_type yystate, const symbol_type 
     std::ptrdiff_t yyi = 0;
     for (char const *yyp = yyformat; *yyp; ++yyp)
         if (yyp[0] == '%' && yyp[1] == 's' && yyi < yycount) {
-            yyres += yytnamerr_(yyarg[yyi++]);
+            yyres += symbol_name(yyarg[yyi++]);
             ++yyp;
         } else
             yyres += *yyp;
@@ -1137,7 +1145,7 @@ const signed char SearchParser::yydefact_[] = {0, 0, 0, 14, 0, 0, 3, 6, 8, 12, 9
 
 const signed char SearchParser::yypgoto_[] = {-4, -4, 22, -3, -1, -4, -4};
 
-const signed char SearchParser::yydefgoto_[] = {-1, 4, 5, 6, 7, 8, 9};
+const signed char SearchParser::yydefgoto_[] = {0, 4, 5, 6, 7, 8, 9};
 
 const signed char SearchParser::yytable_[] = {10, 15, 17, 1, 2, 16, 1, 2, 17, 3, 12, 13, 3, 22, 18, 14, 19, 23, 16, 1, 2, 20, 25, 21, 11, 3, 24};
 
@@ -1149,26 +1157,42 @@ const signed char SearchParser::yyr1_[] = {0, 12, 13, 14, 14, 14, 15, 15, 16, 16
 
 const signed char SearchParser::yyr2_[] = {0, 2, 2, 1, 2, 3, 1, 3, 1, 2, 3, 4, 1, 2, 1, 3, 2, 4};
 
+#if YYDEBUG || 1
 // YYTNAME[SYMBOL-NUM] -- String name of the symbol SYMBOL-NUM.
-// First, the terminals, then, starting at \a yyntokens_, nonterminals.
-const char *const SearchParser::yytname_[] = {"\"end of file\"", "error",         "$undefined", "AND",    "OR",    "NOT",
-                                              "LPAREN",          "RPAREN",        "OP_COLON",   "TILDE",  "CARAT", "STRING",
-                                              "$accept",         "topLevelQuery", "query",      "clause", "term",  "basic_filter_boost",
-                                              "basic_filter",    YY_NULLPTR};
+// First, the terminals, then, starting at \a YYNTOKENS, nonterminals.
+const char *const SearchParser::yytname_[] = {"\"end of file\"",
+                                              "error",
+                                              "\"invalid token\"",
+                                              "AND",
+                                              "OR",
+                                              "NOT",
+                                              "LPAREN",
+                                              "RPAREN",
+                                              "OP_COLON",
+                                              "TILDE",
+                                              "CARAT",
+                                              "STRING",
+                                              "$accept",
+                                              "topLevelQuery",
+                                              "query",
+                                              "clause",
+                                              "term",
+                                              "basic_filter_boost",
+                                              "basic_filter",
+                                              YY_NULLPTR};
+#endif
 
 #if YYDEBUG
 const unsigned char SearchParser::yyrline_[] = {0, 86, 86, 91, 92, 105, 119, 120, 134, 135, 144, 145, 153, 156, 164, 173, 178, 187};
 
-// Print the state stack on the debug stream.
-void SearchParser::yystack_print_() {
+void SearchParser::yy_stack_print_() const {
     *yycdebug_ << "Stack now";
     for (stack_type::const_iterator i = yystack_.begin(), i_end = yystack_.end(); i != i_end; ++i)
         *yycdebug_ << ' ' << int(i->state);
     *yycdebug_ << '\n';
 }
 
-// Report on the debug stream that the rule \a yyrule is going to be reduced.
-void SearchParser::yy_reduce_print_(int yyrule) {
+void SearchParser::yy_reduce_print_(int yyrule) const {
     int yylno = yyrline_[yyrule];
     int yynrhs = yyr2_[yyrule];
     // Print the symbols being reduced, and their result.
@@ -1179,11 +1203,11 @@ void SearchParser::yy_reduce_print_(int yyrule) {
 }
 #endif // YYDEBUG
 
-SearchParser::token_number_type SearchParser::yytranslate_(int t) { return static_cast<token_number_type>(t); }
+SearchParser::symbol_kind_type SearchParser::yytranslate_(int t) YY_NOEXCEPT { return static_cast<symbol_kind_type>(t); }
 
 #line 10 "search_parser.y"
 } // namespace infinity
-#line 1419 "search_parser.cpp"
+#line 1451 "search_parser.cpp"
 
 #line 193 "search_parser.y"
 

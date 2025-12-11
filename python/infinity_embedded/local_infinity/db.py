@@ -59,7 +59,7 @@ class LocalDatabase(Database, ABC):
         elif conflict_type == ConflictType.Replace:
             create_table_conflict = LocalConflictType.kReplace
         else:
-            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, f"Invalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
         res = self._conn.create_table(db_name=self._db_name, table_name=table_name,
                                       column_defs=column_defs,
                                       conflict_type=create_table_conflict)

@@ -49,7 +49,7 @@ def evaluate(script_path, qrels_path, query_result_path, metrics: list):
         result_str = stdout.decode("utf-8")
         try:
             results[metric] = float(result_str.split(' ')[-1].split('\t')[-1])
-        except:
+        except Exception:
             results[metric] = result_str
     return results
 

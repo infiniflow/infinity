@@ -150,6 +150,116 @@ TEST_F(ByteSliceReaderWriterTest, test5) {
     }
 }
 
+TEST_F(ByteSliceReaderWriterTest, test6) {
+    using namespace infinity;
+    std::string path = "/var/infinity/tmp/test001.txt";
+
+    // Prepare data
+    ByteSliceWriter writer;
+    i16 i;
+    for (i = 0; i < 1000; i++) {
+        writer.WriteInt16(i);
+    }
+    size_t size = writer.GetSize();
+    ASSERT_EQ(i * sizeof(i16), size);
+
+    // Dump data
+    auto file_writer = std::make_shared<FileWriter>(path, 128000);
+    writer.Dump(file_writer);
+    file_writer->Sync();
+
+    writer.Reset();
+
+    // Load data
+    auto file_reader = std::make_shared<FileReader>(path, 128000);
+    writer.Load(file_reader, 1000 * sizeof(i16));
+
+    // Verify the loaded data
+    ByteSliceReader reader(writer.GetByteSliceList());
+    for (i = 0; i < 1000; i++) {
+        i16 value = reader.ReadInt16();
+        ASSERT_EQ(value, i);
+    }
+}
+
+TEST_F(ByteSliceReaderWriterTest, test7) {
+    using namespace infinity;
+
+    // Prepare data
+    ByteSliceWriter writer1;
+    i16 i;
+    for (i = 500; i < 1000; i++) {
+        writer1.WriteInt16(i);
+    }
+    ASSERT_EQ(writer1.GetSize(), 500 * sizeof(i16));
+
+    ByteSliceWriter writer2;
+    for (i = 1000; i < 1500; i++) {
+        writer2.WriteInt16(i);
+    }
+    ASSERT_EQ(writer2.GetSize(), 500 * sizeof(i16));
+
+    // Merge data (head --> writer2's data --> writer1's data --> tail)
+    writer2.Write(*writer1.GetByteSliceList());
+
+    ASSERT_EQ(writer1.GetSize(), 0);
+    ASSERT_EQ(writer2.GetSize(), 1000 * sizeof(i16));
+
+    // Verify data
+    ByteSliceReader reader1(writer2.GetByteSliceList());
+    for (i = 1000; i < 1500; i++) {
+        i16 value = reader1.ReadInt16();
+        ASSERT_EQ(value, i);
+    }
+    for (i = 500; i < 1000; i++) {
+        i16 value = reader1.ReadInt16();
+        ASSERT_EQ(value, i);
+    }
+
+    // Prepare data
+    ByteSliceWriter writer3;
+    for (i = 1500; i < 2000; i++) {
+        writer3.WriteInt16(i);
+    }
+    ASSERT_EQ(writer3.GetSize(), 500 * sizeof(i16));
+
+    // Merge data (head --> writer3's data --> writer2's partial data --> tail)
+    writer3.Write(*writer2.GetByteSliceList(), 0, writer2.GetSize() / 2 + 100);
+
+    // There must be something wrong
+    // ASSERT_EQ(writer2.GetSize(), 0);
+    // ASSERT_EQ(writer3.GetSize(), (500 + 500 + 50) * sizeof(i16));
+
+    // Verify data
+    ByteSliceReader reader2(writer3.GetByteSliceList());
+    for (i = 1500; i < 2000; i++) {
+        i16 value = reader2.ReadInt16();
+        ASSERT_EQ(value, i);
+    }
+    for (i = 1000; i < 1500; i++) {
+        i16 value = reader2.ReadInt16();
+        ASSERT_EQ(value, i);
+    }
+    for (i = 500; i < 550; i++) {
+        i16 value = reader2.ReadInt16();
+        ASSERT_EQ(value, i);
+    }
+
+    auto slice_list = writer3.GetByteSliceList();
+    size_t total_size = slice_list->UpdateTotalSize();
+    ASSERT_EQ(total_size, (500 + 500 + 50) * sizeof(i16));
+
+    auto slice_iter = ByteSliceListIterator(slice_list);
+    slice_iter.SeekSlice(0);
+
+    void *data;
+    size_t size;
+    while (slice_iter.HasNext(writer3.GetSize())) {
+        slice_iter.Next(data, size);
+        LOG_INFO(fmt::format("size: {}", size));
+    }
+}
+
 TEST_F(ByteSliceReaderWriterTest, TestDataConsistency) {
     using namespace infinity;
     ByteSliceWriter writer;

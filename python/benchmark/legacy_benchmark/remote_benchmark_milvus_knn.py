@@ -6,7 +6,7 @@ import struct
 import time
 import traceback
 
-from pymilvus import MilvusClient, DataType
+from pymilvus import MilvusClient
 
 def fvecs_read_all(filename):
     vectors = []
@@ -86,7 +86,7 @@ def trace_unhandled_exceptions(func):
     def wrapped_func(*args, **kwargs):
         try:
             func(*args, **kwargs)
-        except:
+        except Exception:
             print('Exception in ' + func.__name__)
             traceback.print_exc()
 
@@ -95,14 +95,13 @@ def trace_unhandled_exceptions(func):
 
 @trace_unhandled_exceptions
 def work(queries, topk, metric_type, column_name, data_type, ef: int, remote: bool, table_name="sift_benchmark"):
-    infinity_obj = None
     if remote:
         client = MilvusClient(
             uri="http://localhost:19530"
         )
     client.load_collection(collection_name="sift_benchmark_collection")
     for query in queries:
-        res = client.search(
+        client.search(
             collection_name="sift_benchmark_collection",  # Replace with the actual name of your collection
             data=[query],
             limit=topk,  # Max. number of search results to return
@@ -168,7 +167,6 @@ def one_thread(rounds, query_path, ground_truth_path, ef: int, limit: int, remot
     results = []
     queries = fvecs_read_all(query_path)
 
-    infinity_obj = None
     if remote:
         client = MilvusClient(
             uri="http://localhost:19530"
@@ -237,7 +235,7 @@ def benchmark(threads, rounds, data_set, ef: int, limit: int, remote: bool, path
             process_pool(threads, rounds, query_path, ef, limit, remote, "sift_benchmark")
 
         else:
-            print(f"Single-thread")
+            print("Single-thread")
             print(f"Rounds: {rounds}")
             one_thread(rounds, query_path, ground_truth_path, ef, limit, remote, "sift_benchmark")
     elif data_set == "gist_1m":
@@ -249,7 +247,7 @@ def benchmark(threads, rounds, data_set, ef: int, limit: int, remote: bool, path
             process_pool(threads, rounds, query_path, ef, "gist_benchmark")
 
         else:
-            print(f"Single-thread")
+            print("Single-thread")
             print(f"Rounds: {rounds}")
             one_thread(rounds, query_path, ground_truth_path, ef, limit, remote, "gist_benchmark")
 

@@ -28,8 +28,79 @@ import std;
 
 namespace infinity {
 
+export template <typename DataT>
+struct FileWorkerCacheManager {
+    void Pin(std::string path) {
+        auto &cnt = ref_cnt_[path];
+        ++cnt;
+    }
+
+    void UnPin(std::string path) {
+        auto &cnt = ref_cnt_[path];
+        --cnt;
+        if (!cnt) {
+            cv_.notify_one();
+        }
+    }
+
+    void Evict() {
+        for (auto iter = li_.rbegin(); iter != li_.rend(); ++iter) {
+            auto &data = *iter;
+            auto &path = rev_dic_[data];
+            if (auto ref_cnt_iter = ref_cnt_.find(path); ref_cnt_iter != ref_cnt_.end()) {
+                ref_cnt_.erase(path);
+                li_.erase(data);
+                map_.erase(path);
+                delete data;
+                return;
+            }
+        }
+    }
+
+    bool Get(std::string path, DataT &data) {
+        {
+            std::unique_lock l(rw_mutex_);
+            if (auto map_iter = map_.find(path); map_iter != map_.end()) {
+                Pin(path);
+                li_.splice(li_.begin(), li_, map_iter->second);
+                data = map_iter->second;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void Set(std::string path, DataT data) {
+        std::unique_lock l(rw_mutex_);
+        if (auto map_iter = map_.find(path); map_iter != map_.end()) {
+            li_.splice(li_.begin(), li_, map_iter->second);
+        } else {
+            cv_.wait(l, [this] { return ref_cnt_.size() < MAX_CAPACITY_; });
+            li_.push_front(data);
+            map_.emplace(path, li_.begin());
+            rev_dic_[data] = path;
+        }
+    }
+
+    mutable std::shared_mutex rw_mutex_;
+    static constexpr size_t MAX_CAPACITY_ = 2;
+    std::list<DataT> li_;
+    std::unordered_map<DataT, std::string> rev_dic_;
+    std::unordered_map<std::string, decltype(li_.begin())> map_;
+    std::unordered_map<std::string, size_t> ref_cnt_;
+    std::condition_variable_any cv_;
+};
+
+export template <typename FileWorkerT, bool = requires(FileWorkerT t) { t.data_; }>
+struct FileWorkerMapInjectHelper {};
+
 export template <typename FileWorkerT>
-struct FileWorkerMap {
+struct FileWorkerMapInjectHelper<FileWorkerT, true> {
+    FileWorkerCacheManager<decltype(std::declval<FileWorkerT>().data_)> cache_manager_;
+};
+
+export template <typename FileWorkerT>
+struct FileWorkerMap : FileWorkerMapInjectHelper<FileWorkerT> {
     FileWorkerT *EmplaceFileWorker(std::unique_ptr<FileWorkerT> file_worker);
 
     void RemoveImport(TransactionID txn_id);

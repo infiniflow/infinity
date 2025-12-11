@@ -3784,7 +3784,7 @@ public:
         std::string db_name = doc["db_name"].get<std::string>();
         nlohmann::json json_response;
         HTTPStatus http_status;
-        QueryResult result = infinity->CreateDatabaseSnapshot(snapshot_name, db_name);
+        QueryResult result = infinity->CreateDatabaseSnapshot(db_name, snapshot_name);
 
         if (result.IsOk()) {
             json_response["error_code"] = 0;

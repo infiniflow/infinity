@@ -33,7 +33,6 @@ import global_resource_usage;
 import internal_types;
 import logical_type;
 import data_type;
-import compilation_config;
 
 using namespace infinity;
 class ColumnVectorVarcharTest : public BaseTest {

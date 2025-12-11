@@ -29,7 +29,7 @@ def trace_unhandled_exceptions(func):
     def wrapped_func(*args, **kwargs):
         try:
             func(*args, **kwargs)
-        except:
+        except Exception:
             print('Exception in ' + func.__name__)
             traceback.print_exc()
 
@@ -77,7 +77,7 @@ def execute(some_functions: list, protocols: list, num_threads, num_times) -> pd
     results = pd.DataFrame(
         columns=['rpc name', 'function', 'qps', 'elapsed_time', 'average_latency', 'num_threads',
                  'num_times'])
-    print(f"\n")
+    print("\n")
 
     for (protocol, ip, port) in protocols:
         for some_function in some_functions:
@@ -111,9 +111,9 @@ class TestBenchmark:
 
         @trace_unhandled_exceptions
         def get_database(infinity_obj, port, thread_id, num_iteration):
-            db_obj = infinity_obj.get_database(f"default_db")
+            db_obj = infinity_obj.get_database("default_db")
             if db_obj is None:
-                raise Exception(f"get_database failed")
+                raise Exception("get_database failed")
 
         @trace_unhandled_exceptions
         def list_databases(infinity_obj, port, thread_id, num_iteration):
@@ -130,7 +130,7 @@ class TestBenchmark:
 
         @trace_unhandled_exceptions
         def create_table(infinity_obj, port, thread_id, num_iteration):
-            res = infinity_obj.get_database(f"default_db").create_table(
+            res = infinity_obj.get_database("default_db").create_table(
                 f"table_{port}_{thread_id}_{num_iteration}",
                 {"c1": {"type": "int", "constraints": ["primary key"]}, "c2": {"type": "float"}})
             if res.error_code != ErrorCode.OK:
@@ -139,7 +139,7 @@ class TestBenchmark:
         @trace_unhandled_exceptions
         def insert_table(infinity_obj, port, thread_id, num_iteration):
             res = (infinity_obj
-                   .get_database(f"default_db")
+                   .get_database("default_db")
                    .get_table(f"table_{port}_{thread_id}_{num_iteration}")
                    .insert([{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}]))
             if res.error_code != ErrorCode.OK:
@@ -148,13 +148,13 @@ class TestBenchmark:
         @trace_unhandled_exceptions
         def list_tables(infinity_obj, port, thread_id, num_iteration):
             (infinity_obj
-             .get_database(f"default_db")
+             .get_database("default_db")
              .list_tables())
 
         @trace_unhandled_exceptions
         def select_table(infinity_obj, port, thread_id, num_iteration):
             res = (infinity_obj
-                   .get_database(f"default_db")
+                   .get_database("default_db")
                    .get_table(f"table_{port}_{thread_id}_{num_iteration}")
                    .query_builder()
                    .output(["*"])
@@ -165,7 +165,7 @@ class TestBenchmark:
         @trace_unhandled_exceptions
         def drop_table(infinity_obj, port, thread_id, num_iteration):
             res = (infinity_obj
-                   .get_database(f"default_db")
+                   .get_database("default_db")
                    .drop_table(f"table_{port}_{thread_id}_{num_iteration}"))
             if res.error_code != ErrorCode.OK:
                 raise Exception(f"drop_table failed: {res.error_msg}")
@@ -173,7 +173,7 @@ class TestBenchmark:
         @trace_unhandled_exceptions
         def create_index(infinity_obj, port, thread_id, num_iteration):
             res = (infinity_obj
-                   .get_database(f"default_db")
+                   .get_database("default_db")
                    .get_table(f"table_{port}_{thread_id}_{num_iteration}")
                    .create_index("my_index", ["c1"], "IVF_FLAT", None))
             if res.error_code != ErrorCode.OK:
@@ -182,7 +182,7 @@ class TestBenchmark:
         @trace_unhandled_exceptions
         def drop_index(infinity_obj, port, thread_id, num_iteration):
             res = (infinity_obj
-                   .get_database(f"default_db")
+                   .get_database("default_db")
                    .get_table(f"table_{port}_{thread_id}_{num_iteration}")
                    .drop_index("my_index"))
             if res.error_code != ErrorCode.OK:
@@ -192,9 +192,7 @@ class TestBenchmark:
         # Using the tune
 
         ip: str = '127.0.0.1'
-        thrift = ("Thrift", ip, 23817)
         thread_pool_thrift = ("Thread Pool Thrift", ip, 23817)
-        async_thrift = ("AsyncThrift", ip, 23817)
         num_threads = 1
         num_times = 10
         protocols = [thread_pool_thrift]

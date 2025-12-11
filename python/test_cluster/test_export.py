@@ -1,11 +1,7 @@
 import time
 import os
-from numpy import dtype
-import pandas as pd
-import pytest
 from infinity_cluster import InfinityCluster
 from infinity.common import ConflictType
-from infinity.common import InfinityException
 from infinity.errors import ErrorCode
 import common_values
 

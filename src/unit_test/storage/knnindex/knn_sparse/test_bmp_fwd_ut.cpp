@@ -28,8 +28,6 @@ import :infinity_exception;
 import :local_file_handle;
 import third_party;
 
-import compilation_config;
-
 using namespace infinity;
 
 class BMPFwdTest : public BaseTest {
@@ -45,8 +43,8 @@ protected:
 
         const SparseMatrix dataset = SparseTestUtil<DataType, IdxType>::GenerateDataset(nrow, ncol, sparsity, 0.0, 10.0);
 
-        std::string save_path = std::string(tmp_data_path()) + "/bmpfwd_test1.index";
-        // std::string save2_path = std::string(tmp_data_path()) + "/bmpfwd_test2.index";
+        std::string save_path = std::string(GetFullDataDir()) + "/bmpfwd_test1.index";
+        // std::string save2_path = std::string(GetFullDataDir()) + "/bmpfwd_test2.index";
 
         auto check = [&](const BMPFwd1 &fwd1, const BMPFwd2 &fwd2) {
             EXPECT_EQ(fwd1.block_size(), fwd2.block_size());

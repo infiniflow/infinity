@@ -1,6 +1,3 @@
-import importlib
-import sys
-import os
 import pytest
 import polars as pl
 import infinity.index as index
@@ -9,11 +6,7 @@ from infinity.common import ConflictType, InfinityException
 from infinity.errors import ErrorCode
 import infinity
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-from infinity_http import infinity_http
+from infinity.infinity_http import infinity_http
 
 
 @pytest.fixture(scope="class")
@@ -308,3 +301,33 @@ class TestInfinity:
             assert e.error_code == ErrorCode.NO_SUCH_SYSTEM_VAR
         else:
             raise Exception("Should raise exception")
+
+    # @pytest.mark.usefixtures("skip_if_remote_infinity")
+    # def test_show_index_segment(self, suffix):
+    #     db_obj = self.infinity_obj.get_database("default_db")
+    # db_obj.drop_table("test_show_index_segment" + suffix, ConflictType.Ignore)
+    # table_obj = db_obj.create_table(
+    #     "test_show_index_segment" + suffix,
+    #     {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
+    # assert table_obj is not None
+    # for i in range(10):
+    #     res = table_obj.create_index("my_index_" + str(i),
+    #                                  index.IndexInfo("c1",
+    #                                                  index.IndexType.Hnsw,
+    #                                                  {
+    #                                                      "m": "16",
+    #                                                      "ef_construction": "50",
+    #                                                      "metric": "l2"
+    #                                                  }), ConflictType.Error)
+    #     assert res.error_code == ErrorCode.OK
+    #     res = table_obj.show_index("my_index_" + str(i))
+    #     assert res.error_code == ErrorCode.OK
+    #     assert res.index_type == "HNSW"
+    #
+    # for i in range(10):
+    #     res = table_obj.drop_index(
+    #         "my_index_" + str(i), ConflictType.Error)
+    #     assert res.error_code == ErrorCode.OK
+    #
+    # res = db_obj.drop_table("test_show_index" + suffix, ConflictType.Error)
+    # assert res.error_code == ErrorCode.OK

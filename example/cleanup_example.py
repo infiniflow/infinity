@@ -1,13 +1,8 @@
 import infinity
-from infinity.table import ExplainType
 from infinity import index
-import sys
-import os
-import time
 # from common import common_values
 from infinity.common import ConflictType
 import pathlib
-from infinity.errors import ErrorCode
 
 
 class SimpleEmbeddingGenerator:

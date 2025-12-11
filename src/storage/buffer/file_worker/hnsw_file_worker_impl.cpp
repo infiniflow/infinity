@@ -30,6 +30,7 @@ import :hnsw_handler;
 import :virtual_store;
 import :persistence_manager;
 import :local_file_handle;
+import :fileworker_manager;
 
 import std;
 import third_party;
@@ -66,11 +67,11 @@ HnswFileWorker::~HnswFileWorker() {
 
 bool HnswFileWorker::Write(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     data->SaveToPtr(*file_handle);
-    file_handle->Sync();
-    // std::terminate();
     auto fd = file_handle->fd();
     mmap_size_ = file_handle->FileSize();
     mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
+    cache_manager.Set(*rel_file_path_, data);
     prepare_success = true;
     return true;
 }

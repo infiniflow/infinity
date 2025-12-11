@@ -3,7 +3,6 @@ import time
 from infinity_cluster import InfinityCluster
 from numpy import dtype
 import pandas as pd
-import time
 from infinity.errors import ErrorCode
 from infinity.common import InfinityException
 from infinity.common import ConflictType

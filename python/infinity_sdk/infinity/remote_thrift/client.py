@@ -17,15 +17,28 @@ from functools import wraps
 from readerwriterlock import rwlock
 
 from thrift.protocol import TBinaryProtocol
-from thrift.transport import TSocket
+from thrift.transport import TSocket, TTransport
 from thrift.transport.TTransport import TTransportException
 
 from infinity import URI
-from infinity.remote_thrift.infinity_thrift_rpc import *
-from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
+from infinity.remote_thrift.infinity_thrift_rpc import InfinityService
+from infinity.remote_thrift.infinity_thrift_rpc.ttypes import (
+    SelectRequest, ExplainRequest, DeleteRequest, UpdateRequest, CommonResponse, CommonRequest,
+    ShowSegmentsRequest, ShowSegmentRequest, ShowBlocksRequest, ShowBlockRequest, ShowBlockColumnRequest,
+    ShowCurrentNodeRequest, OptimizeRequest, AlterIndexRequest, AddColumnsRequest, DropColumnsRequest,
+    DumpIndexRequest, CreateTableSnapshotRequest, CreateDatabaseSnapshotRequest,
+    CreateSystemSnapshotRequest, RestoreSnapshotRequest, ListSnapshotsRequest, ShowSnapshotRequest,
+    DropSnapshotRequest, ConfigValue, SetConfigRequest, ShowConfigRequest,
+    CompactRequest,
+    ConnectRequest, CreateConflict, CreateOption, DropConflict, DropOption,
+    CreateDatabaseRequest, DropDatabaseRequest, ListDatabaseRequest, ShowDatabaseRequest, GetDatabaseRequest,
+    CreateTableRequest, DropTableRequest, RenameTableRequest, ListTableRequest, ShowTableRequest, ShowColumnsRequest,
+    GetTableRequest, IndexInfo, CreateIndexRequest, DropIndexRequest, ShowIndexRequest, ListIndexRequest,
+    Field, InsertRequest, ImportRequest, ExportRequest
+)
+import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.errors import ErrorCode
 from infinity.common import InfinityException
-from typing import Any
 
 TRY_TIMES = 10
 
@@ -104,7 +117,9 @@ class ThriftInfinityClient:
         # version: 0.6.0.dev4 and 0.6.0.dev5, client_version: 30
         # version: 0.6.0.dev6, client_version: 31
         # version: 0.6.0.dev7 and 0.6.0 and 0.6.1 and 0.6.2 and 0.6.3 and 0.6.4 and 0.6.5 and 0.6.6 and 0.6.7, client_version: 32
-        res = self.client.Connect(ConnectRequest(client_version=32))  # 0.6.7
+        # version: 0.6.8 and 0.6.9 and 0.6.10, client_version: 33
+        # version: 0.6.11, client_version: 34
+        res = self.client.Connect(ConnectRequest(client_version=34))  # 0.6.11
         if res.error_code != 0:
             raise InfinityException(res.error_code, res.error_msg)
         self.session_id = res.session_id
@@ -125,7 +140,7 @@ class ThriftInfinityClient:
                             self.session_i += 1
                             self.logger.debug(
                                 f"Tried {i} times, session_id: {self.session_id}, session_i: {self.session_i}, exception: {str(e)}")
-                except Exception as e:
+                except Exception:
                     raise
             else:
                 return CommonResponse(ErrorCode.TOO_MANY_CONNECTIONS, f"Try {self.try_times} times, but still failed")
@@ -402,11 +417,11 @@ class ThriftInfinityClient:
                                                       table_name=table_name,
                                                       index_name=index_name))
 
-    @retry_wrapper
-    def restore_table_snapshot(self, db_name: str, snapshot_name: str):
-        return self.client.RestoreTableSnapshot(RestoreTableSnapshotRequest(session_id=self.session_id,
-                                                                            db_name=db_name,
-                                                                            snapshot_name=snapshot_name))
+    # @retry_wrapper
+    # def restore_table_snapshot(self, db_name: str, snapshot_name: str):
+    #     return self.client.RestoreTableSnapshot(RestoreTableSnapshotRequest(session_id=self.session_id,
+    #                                                                         db_name=db_name,
+    #                                                                         snapshot_name=snapshot_name))
 
     @retry_wrapper
     def create_table_snapshot(self, db_name: str, table_name: str, snapshot_name: str):
@@ -428,13 +443,6 @@ class ThriftInfinityClient:
     @retry_wrapper
     def compact(self, db_name: str, table_name: str):
         return self.client.Compact(CompactRequest(session_id=self.session_id, db_name=db_name, table_name=table_name))
-
-    @retry_wrapper
-    def create_table_snapshot(self, db_name: str, table_name: str, snapshot_name: str):
-        return self.client.CreateTableSnapshot(CreateTableSnapshotRequest(session_id=self.session_id,
-                                                                          db_name=db_name,
-                                                                          table_name=table_name,
-                                                                          snapshot_name=snapshot_name))
 
     @retry_wrapper
     def create_database_snapshot(self, db_name: str, snapshot_name: str):
@@ -475,7 +483,7 @@ class ThriftInfinityClient:
             value = ConfigValue(int_value=config_value)
         elif isinstance(config_value, bool):
             value = ConfigValue(bool_value=config_value)
-        elif isinstance(config_value, double):
+        elif isinstance(config_value, float):
             value = ConfigValue(double_value=config_value)
         else:
             raise ValueError(f"Unsupported type: {type(config_value)}")

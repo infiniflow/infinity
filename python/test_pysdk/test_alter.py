@@ -1,19 +1,12 @@
 from numpy import dtype
 import pytest
-import os
-import sys
 from common import common_values
 import infinity
 import pandas as pd
 from infinity.common import ConflictType
 import infinity.index as index
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-import importlib
-from infinity_http import infinity_http
+from infinity.infinity_http import infinity_http
 
 
 class TestInfinity:

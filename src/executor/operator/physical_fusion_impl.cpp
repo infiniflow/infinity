@@ -90,6 +90,8 @@ void PhysicalFusion::Init(QueryContext *query_context) {
             fusion_method_ = FusionMethod::kWeightedSum;
         } else if (to_lower_method == "match_tensor") {
             fusion_method_ = FusionMethod::kMatchTensor;
+        } else if (to_lower_method == "max") {
+            fusion_method_ = FusionMethod::kMax;
         } else {
             fusion_method_ = FusionMethod::kRRF;
         }
@@ -118,6 +120,8 @@ void PhysicalFusion::ExecuteRRFWeighted(const std::map<u64, std::vector<std::uni
     size_t rank_constant = 60;
     size_t topn = DEFAULT_FUSION_OPTION_TOP_N;
     std::vector<float> weights;
+    enum class FusionNormalizationMethod { kNone, kAtan, kMinMax, kL2 };
+    FusionNormalizationMethod normalization = FusionNormalizationMethod::kMinMax;
     if (fusion_expr_->options_.get() != nullptr) {
         if (auto it = fusion_expr_->options_->options_.find("window_size"); it != fusion_expr_->options_->options_.end()) {
             long l = std::strtol(it->second.c_str(), nullptr, 10);
@@ -147,6 +151,19 @@ void PhysicalFusion::ExecuteRRFWeighted(const std::map<u64, std::vector<std::uni
                 while (std::getline(ss, item, ',')) {
                     double value = std::stod(item);
                     weights.push_back(value);
+                }
+            }
+            if (auto it = fusion_expr_->options_->options_.find("normalize"); it != fusion_expr_->options_->options_.end()) {
+                std::string normalize_str = it->second;
+                std::transform(normalize_str.begin(), normalize_str.end(), normalize_str.begin(), [](unsigned char c) { return std::tolower(c); });
+                if (normalize_str == "atan") {
+                    normalization = FusionNormalizationMethod::kAtan;
+                } else if (normalize_str == "min_max" || normalize_str == "minmax") {
+                    normalization = FusionNormalizationMethod::kMinMax;
+                } else if (normalize_str == "l2" || normalize_str == "l2_norm") {
+                    normalization = FusionNormalizationMethod::kL2;
+                } else if (normalize_str == "none") {
+                    normalization = FusionNormalizationMethod::kNone;
                 }
             }
         }
@@ -198,7 +215,7 @@ void PhysicalFusion::ExecuteRRFWeighted(const std::map<u64, std::vector<std::uni
                 if (fusion_method_ == FusionMethod::kRRF) {
                     doc.child_scores_[fragment_idx] = base_rank + i;
                 } else {
-                    assert(fusion_method_ == FusionMethod::kWeightedSum);
+                    assert(fusion_method_ == FusionMethod::kWeightedSum || fusion_method_ == FusionMethod::kMax);
                     doc.child_scores_[fragment_idx] = row_scores[i];
                 }
             }
@@ -258,16 +275,74 @@ void PhysicalFusion::ExecuteRRFWeighted(const std::map<u64, std::vector<std::uni
                 }
             }
         }
+
+        std::vector<float> min_scores(num_children, std::numeric_limits<float>::max());
+        std::vector<float> max_scores(num_children, std::numeric_limits<float>::lowest());
+        std::vector<double> l2_sums(num_children, 0.0);
+        if (normalization == FusionNormalizationMethod::kMinMax || normalization == FusionNormalizationMethod::kL2) {
+            for (const auto &doc : rescore_vec) {
+                for (size_t i = 0; i < num_children; ++i) {
+                    if (doc.mask_[i]) {
+                        float score = doc.child_scores_[i];
+                        if (normalization == FusionNormalizationMethod::kMinMax) {
+                            if (score < min_scores[i])
+                                min_scores[i] = score;
+                            if (score > max_scores[i])
+                                max_scores[i] = score;
+                        } else if (normalization == FusionNormalizationMethod::kL2) {
+                            l2_sums[i] += (double)score * score;
+                        }
+                    }
+                }
+            }
+        }
+
         for (auto &doc : rescore_vec) {
-            doc.fusion_score_ = 0.0f;
+            if (fusion_method_ == FusionMethod::kMax) {
+                doc.fusion_score_ = std::numeric_limits<float>::lowest();
+            } else {
+                doc.fusion_score_ = 0.0f;
+            }
             for (size_t i = 0; i < num_children; ++i) {
                 if (!doc.mask_[i])
                     continue;
-                // Normalize the child score in R to [0, 1]
-                double normalized_score = std::atan(doc.child_scores_[i]) / std::numbers::pi + 0.5;
-                if (!min_heaps[i])
-                    normalized_score = 1.0 - normalized_score;
-                doc.fusion_score_ += weights[i] * normalized_score;
+                double score = doc.child_scores_[i];
+                if (normalization != FusionNormalizationMethod::kNone) {
+                    if (normalization == FusionNormalizationMethod::kAtan) {
+                        score = std::atan(score) / std::numbers::pi + 0.5;
+                    } else if (normalization == FusionNormalizationMethod::kMinMax) {
+                        if (max_scores[i] != min_scores[i]) {
+                            score = (score - min_scores[i]) / (max_scores[i] - min_scores[i]);
+                        } else {
+                            score = 0.0f;
+                        }
+                    } else if (normalization == FusionNormalizationMethod::kL2) {
+                        double l2_norm = std::sqrt(l2_sums[i]);
+                        if (l2_norm > 0) {
+                            score = score / l2_norm;
+                        }
+                    }
+                }
+                if (!min_heaps[i]) {
+                    if (normalization == FusionNormalizationMethod::kNone) {
+                        score *= -1.0;
+                    } else {
+                        score = 1.0 - score;
+                    }
+                }
+                LOG_TRACE(fmt::format("Doc: {} Child: {} RawScore: {} MinHeap: {} NormScore: {}",
+                                      doc.row_id_.ToUint64(),
+                                      i,
+                                      doc.child_scores_[i],
+                                      static_cast<bool>(min_heaps[i]),
+                                      score));
+                if (fusion_method_ == FusionMethod::kWeightedSum) {
+                    doc.fusion_score_ += weights[i] * score;
+                } else if (fusion_method_ == FusionMethod::kMax) {
+                    if (score > doc.fusion_score_) {
+                        doc.fusion_score_ = score;
+                    }
+                }
             }
         }
     }
@@ -433,7 +508,7 @@ bool PhysicalFusion::ExecuteFirstOp(QueryContext *query_context, FusionOperatorS
     if (!fusion_operator_state->input_complete_) {
         return false;
     }
-    if (fusion_method_ == FusionMethod::kRRF || fusion_method_ == FusionMethod::kWeightedSum) {
+    if (fusion_method_ == FusionMethod::kRRF || fusion_method_ == FusionMethod::kWeightedSum || fusion_method_ == FusionMethod::kMax) {
         ExecuteRRFWeighted(fusion_operator_state->input_data_blocks_, fusion_operator_state->data_block_array_);
         fusion_operator_state->input_data_blocks_.clear();
         fusion_operator_state->SetComplete();

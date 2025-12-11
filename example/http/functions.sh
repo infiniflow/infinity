@@ -352,7 +352,7 @@ curl --request GET \
      {
          "output":
          [
-             "decimal", "round(decimal)", "ceil(decimal)", "floor(decimal)"
+             "decimal", "round(decimal)", "round(decimal, 1)", "ceil(decimal)", "floor(decimal)"
          ]
      } '
 

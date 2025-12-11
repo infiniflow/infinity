@@ -148,8 +148,8 @@ TEST_F(LowCardinalitySecondaryIndexTest, TestFloatLowCardinality) {
             }
         }
 
-        std::sort(actual_offsets.begin(), actual_offsets.end());
-        std::sort(expected_offsets.begin(), expected_offsets.end());
+        std::ranges::sort(actual_offsets);
+        std::ranges::sort(expected_offsets);
         EXPECT_EQ(expected_offsets, actual_offsets);
     }
 
@@ -252,4 +252,138 @@ TEST_F(LowCardinalitySecondaryIndexTest, TestComparisonWithHighCardinality) {
 
     delete high_card_index;
     delete low_card_index;
+}
+
+TEST_F(LowCardinalitySecondaryIndexTest, TestSaveLoadLowCardinality) {
+    const u32 chunk_row_count = 1000;
+    const u32 unique_values = 5;
+
+    // Create test data
+    auto test_data = CreateLowCardinalityData<i32>(chunk_row_count, unique_values);
+
+    // Create low cardinality secondary index
+    auto data_type = std::make_shared<DataType>(LogicalType::kInteger);
+    auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
+    ASSERT_NE(index, nullptr);
+
+    // Insert data
+    index->InsertData(&test_data);
+    auto key_count = index->GetUniqueKeyCount();
+
+    // Save data
+    std::string tmp_path = fmt::format("{}/{}", "/var/infinity/tmp", "test001.idx");
+    auto [file, status] = VirtualStore::Open(tmp_path, FileAccessMode::kWrite);
+    EXPECT_TRUE(status.ok());
+    index->SaveIndexInner(*file);
+
+    // Load data
+    auto [file2, status2] = VirtualStore::Open(tmp_path, FileAccessMode::kRead);
+    EXPECT_TRUE(status2.ok());
+    index->ReadIndexInner(*file2);
+    EXPECT_EQ(key_count, index->GetUniqueKeyCount());
+}
+
+TEST_F(LowCardinalitySecondaryIndexTest, TestAllDataType) {
+    {
+        const u32 chunk_row_count = 500;
+        const u32 unique_values = 10;
+
+        // Create test data with only one unique value
+        auto test_data = CreateLowCardinalityData<BigIntT>(chunk_row_count, unique_values);
+
+        // Create low cardinality secondary index
+        auto data_type = std::make_shared<DataType>(LogicalType::kBigInt);
+        auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
+
+        // Insert data
+        index->InsertData(&test_data);
+
+        // Verify single unique key
+        EXPECT_EQ(index->GetUniqueKeyCount(), 10);
+    }
+    {
+        const u32 chunk_row_count = 500;
+        const u32 unique_values = 10;
+
+        // Create test data with only one unique value
+        auto test_data = CreateLowCardinalityData<DoubleT>(chunk_row_count, unique_values);
+
+        // Create low cardinality secondary index
+        auto data_type = std::make_shared<DataType>(LogicalType::kDouble);
+        auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
+
+        // Insert data
+        index->InsertData(&test_data);
+
+        // Verify single unique key
+        EXPECT_EQ(index->GetUniqueKeyCount(), 10);
+    }
+    {
+        const u32 chunk_row_count = 500;
+        const u32 unique_values = 10;
+
+        // Create test data with only one unique value
+        auto test_data = CreateLowCardinalityData<DateT>(chunk_row_count, unique_values);
+
+        // Create low cardinality secondary index
+        auto data_type = std::make_shared<DataType>(LogicalType::kDate);
+        auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
+
+        // Insert data
+        index->InsertData(&test_data);
+
+        // Verify single unique key
+        EXPECT_EQ(index->GetUniqueKeyCount(), 10);
+    }
+    {
+        const u32 chunk_row_count = 500;
+        const u32 unique_values = 10;
+
+        // Create test data with only one unique value
+        auto test_data = CreateLowCardinalityData<TimeT>(chunk_row_count, unique_values);
+
+        // Create low cardinality secondary index
+        auto data_type = std::make_shared<DataType>(LogicalType::kTime);
+        auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
+
+        // Insert data
+        index->InsertData(&test_data);
+
+        // Verify single unique key
+        EXPECT_EQ(index->GetUniqueKeyCount(), 10);
+    }
+    {
+        const u32 chunk_row_count = 500;
+        const u32 unique_values = 10;
+
+        // Create test data with only one unique value
+        auto test_data = CreateLowCardinalityData<DateTimeT>(chunk_row_count, unique_values);
+
+        // Create low cardinality secondary index
+        auto data_type = std::make_shared<DataType>(LogicalType::kDateTime);
+        auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
+
+        // Insert data
+        index->InsertData(&test_data);
+
+        // Verify single unique key
+        EXPECT_EQ(index->GetUniqueKeyCount(), 10);
+    }
+    {
+        const u32 chunk_row_count = 500;
+        const u32 unique_values = 10;
+
+        // Create test data with only one unique value
+        auto test_data = CreateLowCardinalityData<TimestampT>(chunk_row_count, unique_values);
+
+        // Create low cardinality secondary index
+        auto data_type = std::make_shared<DataType>(LogicalType::kTimestamp);
+        auto *index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, true);
+
+        // Insert data
+        index->InsertData(&test_data);
+
+        // Verify single unique key
+        EXPECT_EQ(index->GetUniqueKeyCount(), 10);
+    }
 }

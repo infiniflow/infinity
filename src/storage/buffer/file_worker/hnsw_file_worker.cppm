@@ -39,12 +39,12 @@ public:
     virtual ~HnswFileWorker() override;
 
     FileWorkerType Type() const override { return FileWorkerType::kHNSWIndexFile; }
+    HnswHandlerPtr data_{};
 
 protected:
     bool Write(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
     void Read(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
-    HnswHandlerPtr data_{};
 
 private:
     mutable std::mutex mutex_;

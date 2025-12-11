@@ -211,14 +211,13 @@ TEST_P(RepeatReplayTest, append) {
         CheckTable(new_txn_mgr, 2);
         {
             //  manually add checkpoint
-            std::shared_ptr<TxnTimeStamp> ckp_commit_ts = std::make_shared<TxnTimeStamp>(0);
             NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
             WalManager *wal_manager_{};
             wal_manager_ = infinity::InfinityContext::instance().storage()->wal_manager();
             auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check point"), TransactionType::kNewCheckpoint);
             Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
-            status = new_txn_mgr->CommitTxn(txn, ckp_commit_ts.get());
+            status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         TestAppend();
@@ -339,14 +338,13 @@ TEST_P(RepeatReplayTest, import) {
         CheckTable(new_txn_mgr, 2);
         {
             //  manually add checkpoint
-            std::shared_ptr<TxnTimeStamp> ckp_commit_ts = std::make_shared<TxnTimeStamp>(0);
             NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
             WalManager *wal_manager_{};
             wal_manager_ = infinity::InfinityContext::instance().storage()->wal_manager();
             auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kNewCheckpoint);
             Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
             EXPECT_TRUE(status.ok());
-            status = new_txn_mgr->CommitTxn(txn, ckp_commit_ts.get());
+            status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         TestImport(new_txn_mgr, fileworker_mgr);

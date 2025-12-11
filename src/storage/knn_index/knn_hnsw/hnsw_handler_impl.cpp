@@ -559,8 +559,9 @@ void HnswHandler::CompressToRabitq() {
 }
 
 HnswIndexInMem::~HnswIndexInMem() {
-    size_t mem_usage = hnsw_handler_->MemUsage();
+    size_t mem_usage{};
     if (own_memory_ && hnsw_handler_ != nullptr) {
+        mem_usage = hnsw_handler_->MemUsage();
         delete hnsw_handler_;
     }
     // delete hnsw_handler_;
@@ -627,11 +628,6 @@ void HnswIndexInMem::Dump(FileWorker *index_file_worker, size_t *dump_size_ptr) 
         *dump_size_ptr = dump_size;
     }
 
-    // std::shared_ptr<HnswHandlerPtr> data_ptr;
-    // index_file_worker->Read(data_ptr);
-    // delete *data_ptr;
-    // auto some = new HnswHandlerPtr();
-    // *data_ptr = hnsw_handler_;
     own_memory_ = false;
     index_file_worker_ = std::move(index_file_worker);
     index_file_worker_->Write(hnsw_handler_);

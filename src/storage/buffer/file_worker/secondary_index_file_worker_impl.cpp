@@ -77,11 +77,11 @@ void SecondaryIndexFileWorker::Read(SecondaryIndexDataBase<HighCardinalityTag> *
     LOG_TRACE("Finished Read().");
 }
 
-void SecondaryIndexFileWorker::Read(std::shared_ptr<SecondaryIndexDataBase<LowCardinalityTag>> &data,
+void SecondaryIndexFileWorker::Read(SecondaryIndexDataBase<LowCardinalityTag> *&data,
                                     std::unique_ptr<LocalFileHandle> &file_handle,
                                     size_t file_size) {
     auto index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(column_def_->type(), row_count_, false);
-    data = std::shared_ptr<SecondaryIndexDataBase<LowCardinalityTag>>(index);
+    data = index;
     if (!file_handle) {
         return;
     }

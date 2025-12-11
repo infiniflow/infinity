@@ -5,7 +5,6 @@ from infinity import index
 import time
 import pathlib
 from infinity.common import ConflictType, SparseVector
-import pytest
 
 
 class TestMemIdx:
@@ -98,6 +97,9 @@ class TestMemIdx:
                 data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
                 assert data_dict["count(star)"] == [13]
 
+            # Wait for memindex dump
+            # If search is processed during memindex dump, it is possible to get partial results.
+            time.sleep(5)
             check()
             table_obj.optimize()
             check()
@@ -123,7 +125,7 @@ class TestMemIdx:
                 "test_memidx1",
                 {"c1": {"type": "int"}, "c2": {"type": "vector,4,float"}},
             )
-            res = table_obj.create_index(
+            table_obj.create_index(
                 "idx1",
                 index.IndexInfo(
                     "c2",
@@ -483,7 +485,7 @@ class TestMemIdx:
         decorator1 = infinity_runner_decorator_factory(config1, uri, infinity_runner)
         decorator2 = infinity_runner_decorator_factory(config2, uri, infinity_runner)
 
-        tmp_dir = "/var/infinity/tmp"
+        data_dir = "/var/infinity/data"
         idx1_name = "index1"
         idx2_name = "index2"
 
@@ -539,14 +541,23 @@ class TestMemIdx:
             table_obj2.insert([{"c1": 4, "c2": [0.2, 0.1, 0.3, 0.4]} for i in range(6)])
 
             # wait for mem index dump
-            time.sleep(5)
+            # time.sleep(5)
 
             # 2 chunk indexes for each index
-            db1_dir = tmp_dir + "/db_2"
-            idx1_dirs = list(pathlib.Path(db1_dir).rglob(f"*chunk*"))
+            db1_dir = data_dir + "/db_2"
+            db2_dir = data_dir + "/db_3"
+
+            start_time = time.time()
+            while time.time() - start_time < 30:
+                idx1_dirs = list(pathlib.Path(db1_dir).rglob("*chunk*"))
+                idx2_dirs = list(pathlib.Path(db2_dir).rglob("*chunk*"))
+                if len(idx1_dirs) == 2 and len(idx2_dirs) == 2:
+                    break
+                time.sleep(1)
+
+            idx1_dirs = list(pathlib.Path(db1_dir).rglob("*chunk*"))
             assert len(idx1_dirs) == 2
-            db2_dir = tmp_dir + "/db_3"
-            idx2_dirs = list(pathlib.Path(db2_dir).rglob(f"*chunk*"))
+            idx2_dirs = list(pathlib.Path(db2_dir).rglob("*chunk*"))
             assert len(idx2_dirs) == 2
 
         part1()
@@ -554,16 +565,32 @@ class TestMemIdx:
         @decorator2
         def part2(infinity_obj):
             # wait for optimize
-            time.sleep(20)
+            # time.sleep(20)
 
             # new chunk index is generated after optimize for each index
-            db1_dir = tmp_dir + "/db_2"
-            idx1_dirs = list(pathlib.Path(db1_dir).rglob(f"*chunk*"))
+            db1_dir = data_dir + "/db_2"
+            db2_dir = data_dir + "/db_3"
+
+            start_time = time.time()
+            while time.time() - start_time < 60:
+                idx1_dirs = list(pathlib.Path(db1_dir).rglob("*chunk*"))
+                idx2_dirs = list(pathlib.Path(db2_dir).rglob("*chunk*"))
+                if len(idx1_dirs) == 3 and len(idx2_dirs) == 3:
+                    break
+                time.sleep(1)
+
+            idx1_dirs = list(pathlib.Path(db1_dir).rglob("*chunk*"))
             print(idx1_dirs)
             assert len(idx1_dirs) == 3
-            db2_dir = tmp_dir + "/db_3"
-            idx2_dirs = list(pathlib.Path(db2_dir).rglob(f"*chunk*"))
+            idx2_dirs = list(pathlib.Path(db2_dir).rglob("*chunk*"))
             assert len(idx2_dirs) == 3
+
+            # wait for optimize commit
+            # The optimization transaction creates the file before committing.
+            # We need to wait for the commit to ensure the catalog update (marking old chunks as deprecated) is persisted to WAL.
+            time.sleep(3)
+
+            infinity_obj.flush_data()
 
         part2()
 
@@ -572,12 +599,21 @@ class TestMemIdx:
             infinity_obj.cleanup()
 
             # after checkpoint (during restart) and cleanup, 2 old chunks of each index are removed
-            db1_dir = tmp_dir + "/db_2"
-            idx1_dirs = list(pathlib.Path(db1_dir).rglob(f"*chunk*"))
+            db1_dir = data_dir + "/db_2"
+            db2_dir = data_dir + "/db_3"
+
+            start_time = time.time()
+            while time.time() - start_time < 30:
+                idx1_dirs = list(pathlib.Path(db1_dir).rglob("*chunk*"))
+                idx2_dirs = list(pathlib.Path(db2_dir).rglob("*chunk*"))
+                if len(idx1_dirs) == 1 and len(idx2_dirs) == 1:
+                    break
+                time.sleep(1)
+
+            idx1_dirs = list(pathlib.Path(db1_dir).rglob("*chunk*"))
             print(idx1_dirs)
             assert len(idx1_dirs) == 1
-            db2_dir = tmp_dir + "/db_3"
-            idx2_dirs = list(pathlib.Path(db2_dir).rglob(f"*chunk*"))
+            idx2_dirs = list(pathlib.Path(db2_dir).rglob("*chunk*"))
             assert len(idx2_dirs) == 1
 
         part3()
@@ -636,8 +672,6 @@ class TestMemIdx:
         infinity_runner.clear()
 
         uri = common_values.TEST_LOCAL_HOST
-        data_dir = "/var/infinity/data"
-        catalog_dir = "/var/infinity/data/catalog"
 
         config1 = "test/data/config/restart_test/test_memidx/5.toml"
         config2 = "test/data/config/restart_test/test_memidx/4.toml"

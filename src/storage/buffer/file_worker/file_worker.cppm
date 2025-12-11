@@ -271,8 +271,8 @@ protected:
     }
 
     virtual void Read(SecondaryIndexDataBase<HighCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
-    virtual void
-    Read(std::shared_ptr<SecondaryIndexDataBase<LowCardinalityTag>> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
+    virtual void Read(SecondaryIndexDataBase<LowCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
+    // virtual void Read(SecondaryIndexDataLowCardinalityT<BooleanT> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
 
     virtual bool
     Write(std::span<VarBuffer> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {

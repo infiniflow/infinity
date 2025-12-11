@@ -111,7 +111,6 @@ TEST_P(TestTxnDelete, test_delete) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    TxnTimeStamp first_delete_ts = 0;
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("delete"), TransactionType::kDelete);
         std::vector<RowID> row_ids;
@@ -119,7 +118,7 @@ TEST_P(TestTxnDelete, test_delete) {
         row_ids.push_back(RowID(0, 3));
         Status status = txn->Delete(*db_name, *table_name, row_ids);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn, &first_delete_ts);
+        status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
 
@@ -182,7 +181,7 @@ TEST_P(TestTxnDelete, test_delete) {
         row_ids.push_back(RowID(0, 0));
         Status status = txn->Delete(*db_name, *table_name, row_ids);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn, &first_delete_ts);
+        status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {

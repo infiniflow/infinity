@@ -260,7 +260,7 @@ Status SegmentIndexMeta::LoadChunkIDs1() {
         iter->Next();
     }
 
-    std::sort(chunk_ids.begin(), chunk_ids.end());
+    std::ranges::sort(chunk_ids);
     return Status::OK();
 }
 

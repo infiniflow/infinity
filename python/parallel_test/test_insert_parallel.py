@@ -1,9 +1,8 @@
 import time
 
 import infinity.index as index
-import pytest
 import random
-from threading import Thread, Lock
+from threading import Thread
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from infinity.connection_pool import ConnectionPool

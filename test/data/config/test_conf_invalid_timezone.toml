@@ -1,5 +1,5 @@
 [general]
-version                  = "0.6.7"
+version                  = "0.6.11"
 time_zone                = "invalid_timezone"  # Changed to an unparseable string
 
 [network]

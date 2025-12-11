@@ -46,6 +46,11 @@ target_link_libraries(
         OpenSSL::SSL
         OpenSSL::Crypto
         RocksDB::rocksdb
+        simdjson::simdjson
+        nlohmann_json::nlohmann_json
+        CLI11::CLI11
+        magic_enum::magic_enum
+        roaring::roaring
 )
 
 # add_definitions(-march=native)

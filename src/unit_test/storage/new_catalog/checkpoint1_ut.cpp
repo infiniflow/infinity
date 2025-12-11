@@ -118,7 +118,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_db) {
             std::vector<std::string> db_names;
             Status status = txn->ListDatabase(db_names);
             EXPECT_TRUE(status.ok());
-            std::sort(db_names.begin(), db_names.end());
+            std::ranges::sort(db_names);
             EXPECT_EQ(db_names, std::vector<std::string>({*db_name, "default_db"}));
 
             status = new_txn_mgr_->CommitTxn(txn);

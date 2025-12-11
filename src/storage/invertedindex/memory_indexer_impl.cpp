@@ -371,6 +371,11 @@ size_t MemoryIndexer::CommitSync(size_t wait_if_empty_ms) {
     return num_generated;
 }
 
+void MemoryIndexer::WaitForTaskCompletion() {
+    std::unique_lock<std::mutex> task_lock(mutex_);
+    cv_.wait(task_lock, [this] { return inflight_tasks_ == 0; });
+}
+
 void MemoryIndexer::Dump(bool offline, bool spill) {
     if (offline) {
         assert(!spill);

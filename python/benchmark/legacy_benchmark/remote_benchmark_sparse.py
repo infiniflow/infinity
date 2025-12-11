@@ -225,7 +225,7 @@ def benchmark(
         print(f"Rounds: {rounds}")
         process_pool(remote, threads, rounds, query_path, topk, alpha, beta)
     else:
-        print(f"Single-thread")
+        print("Single-thread")
         print(f"Rounds: {rounds}")
         one_thread(remote, rounds, query_path, gt_path, alpha, beta)
 

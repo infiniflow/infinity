@@ -128,6 +128,8 @@ private:
 
     void CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    void FinalizeTxn(NewTxn *txn);
+
 public:
     // Only used by follower and learner when received the replicated log from leader
     void SetStartTS(TxnTimeStamp new_start_ts) {
@@ -185,6 +187,7 @@ private:
     TxnTimeStamp last_kv_commit_ts_{};        // record last kv commit ts, used for conflict check
     TxnTimeStamp last_commit_ts_{};           // record last commit ts, used for conflict check
     TxnTimeStamp ckp_begin_ts_ = UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
+    TxnTimeStamp cleanup_begin_ts_ = UNCOMMIT_TS;
 
     // For stop the txn manager
     std::atomic_bool is_running_{false};

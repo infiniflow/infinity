@@ -149,7 +149,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
                 write_twice(f"{distance_result[j][0]}\n")
         # drop table
         write_twice("\nstatement ok\n")
-        write_twice(f"DROP TABLE \u007b\u007d;\n", True)
+        write_twice("DROP TABLE \u007b\u007d;\n", True)
 
 
 if __name__ == "__main__":
