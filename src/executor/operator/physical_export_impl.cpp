@@ -674,6 +674,7 @@ std::shared_ptr<arrow::DataType> GetArrowType(const DataType &column_data_type) 
         case LogicalType::kDateTime:
         case LogicalType::kTimestamp:
             return arrow::timestamp(arrow::TimeUnit::SECOND);
+        case LogicalType::kJson:
         case LogicalType::kVarchar:
             return arrow::utf8();
         case LogicalType::kSparse: {
@@ -840,7 +841,6 @@ std::shared_ptr<arrow::DataType> GetArrowType(const DataType &column_data_type) 
         case LogicalType::kNull:
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
-        case LogicalType::kJson: // Need to be finished
         case LogicalType::kInvalid: {
             UnrecoverableError("Invalid data type");
         }
@@ -900,6 +900,7 @@ std::shared_ptr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type
             array_builder = std::make_shared<arrow::TimestampBuilder>(arrow::timestamp(arrow::TimeUnit::SECOND), arrow::DefaultMemoryPool());
             break;
         }
+        case LogicalType::kJson:
         case LogicalType::kVarchar: {
             array_builder = std::make_shared<arrow::StringBuilder>();
             break;
@@ -1087,7 +1088,6 @@ std::shared_ptr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type
         case LogicalType::kNull:
         case LogicalType::kMissing:
         case LogicalType::kEmptyArray:
-        case LogicalType::kJson: // Need to be finished
         case LogicalType::kInvalid: {
             UnrecoverableError("Invalid data type");
         }

@@ -1297,11 +1297,11 @@ void Value::MoveUnionValue(Value &&other) noexcept {
             // No value for null type
             break;
         }
-        case LogicalType::kJson:
-            [[fallthrough]];
         case LogicalType::kArray:
             [[fallthrough]];
         case LogicalType::kVarchar:
+            [[fallthrough]];
+        case LogicalType::kJson:
             [[fallthrough]];
         case LogicalType::kTensor:
             [[fallthrough]];

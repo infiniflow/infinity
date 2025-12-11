@@ -2689,6 +2689,8 @@ infinity_thrift_rpc::ColumnType::type InfinityThriftService::DataTypeToProtoColu
             return infinity_thrift_rpc::ColumnType::ColumnBFloat16;
         case LogicalType::kVarchar:
             return infinity_thrift_rpc::ColumnType::ColumnVarchar;
+        case LogicalType::kJson:
+            return infinity_thrift_rpc::ColumnType::ColumnJson;
         case LogicalType::kEmbedding:
             return infinity_thrift_rpc::ColumnType::ColumnEmbedding;
         case LogicalType::kMultiVector:
@@ -2986,6 +2988,10 @@ Status InfinityThriftService::ProcessColumnFieldType(infinity_thrift_rpc::Column
             HandleVarcharType(output_column_field, row_count, column_vector);
             break;
         }
+        case LogicalType::kJson: {
+            HandleJsonType(output_column_field, row_count, column_vector);
+            break;
+        }
         case LogicalType::kEmbedding: {
             HandleEmbeddingType(output_column_field, row_count, column_vector);
             break;
@@ -3069,6 +3075,7 @@ void InfinityThriftService::HandlePodType(infinity_thrift_rpc::ColumnField &outp
                                                            const std::shared_ptr<ColumnVector> &column_vector);
 
 DECLARE_HANDLE_ARRAY_TYPE_RECURSIVELY(VarcharT)
+DECLARE_HANDLE_ARRAY_TYPE_RECURSIVELY(JsonT)
 DECLARE_HANDLE_ARRAY_TYPE_RECURSIVELY(SparseT)
 DECLARE_HANDLE_ARRAY_TYPE_RECURSIVELY(TensorT)
 DECLARE_HANDLE_ARRAY_TYPE_RECURSIVELY(TensorArrayT)
@@ -3128,6 +3135,10 @@ void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
             output_var_buffer_types.operator()<VarcharT>();
             break;
         }
+        case LogicalType::kJson: {
+            output_var_buffer_types.operator()<JsonT>();
+            break;
+        }
         case LogicalType::kSparse: {
             output_var_buffer_types.operator()<SparseT>();
             break;
@@ -3153,7 +3164,6 @@ void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
         case LogicalType::kNull:
         case LogicalType::kEmptyArray:
         case LogicalType::kMissing:
-        case LogicalType::kJson: // Need to be finished
         case LogicalType::kInvalid: {
             UnrecoverableError(fmt::format("{}: Unexpected data type: {}", __func__, element_type.ToString()));
             break;
@@ -3188,6 +3198,17 @@ void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
     output_str.append(data.data(), data.size());
 }
 
+template <>
+void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
+                                                       const DataType &data_type,
+                                                       const JsonT &data_value,
+                                                       const std::shared_ptr<ColumnVector> &column_vector) {
+    auto len = data_value.length_;
+    auto data = column_vector->buffer_->GetVarchar(data_value.file_offset_, len);
+    output_str.append(reinterpret_cast<const char *>(&len), sizeof(i32));
+    output_str.append(data, len);
+}
+
 void InfinityThriftService::HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field,
                                               size_t row_count,
                                               const std::shared_ptr<ColumnVector> &column_vector) {
@@ -3196,6 +3217,19 @@ void InfinityThriftService::HandleVarcharType(infinity_thrift_rpc::ColumnField &
     const auto &varchar_type = *column_vector->data_type();
     for (size_t i = 0; i < row_count; ++i) {
         HandleArrayTypeRecursively(dst, varchar_type, varchar_ptr[i], column_vector);
+    }
+    output_column_field.column_vectors.emplace_back(std::move(dst));
+    output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
+}
+
+void InfinityThriftService::HandleJsonType(infinity_thrift_rpc::ColumnField &output_column_field,
+                                           size_t row_count,
+                                           const std::shared_ptr<ColumnVector> &column_vector) {
+    std::string dst;
+    const auto json_ptr = reinterpret_cast<const JsonT *>(column_vector->data());
+    const auto &json_type = *column_vector->data_type();
+    for (size_t i = 0; i < row_count; ++i) {
+        HandleArrayTypeRecursively(dst, json_type, json_ptr[i], column_vector);
     }
     output_column_field.column_vectors.emplace_back(std::move(dst));
     output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
