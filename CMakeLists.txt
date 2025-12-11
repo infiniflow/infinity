@@ -23,6 +23,9 @@ if (NOT CMAKE_TOOLCHAIN_FILE)
     endif ()
 endif ()
 
+set(VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_SOURCE_DIR}/custom_ports"
+    CACHE STRING "Custom vcpkg ports")
+
 project(infinity VERSION 0.6.11)
 
 set(CMAKE_CXX_STANDARD 23)
