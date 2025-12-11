@@ -121,13 +121,14 @@ Status NewTxn::DumpMemIndex(const std::string &db_name, const std::string &table
         if (mem_index == nullptr || mem_index->IsDumping() || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
             continue;
         }
-        mem_index->SetIsDumping(true);
 
         ChunkID chunk_id = 0;
         std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
         if (!status.ok()) {
             return status;
         }
+
+        mem_index->SetIsDumping(true);
 
         // Dump Mem Index
         status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
@@ -175,7 +176,6 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
                              mem_index->IsDumping()));
         return Status::OK();
     }
-    mem_index->SetIsDumping(true);
 
     // Put the data into local txn store
     DumpMemIndexTxnStore *txn_store;
@@ -201,6 +201,8 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
     if (!status.ok()) {
         return status;
     }
+
+    mem_index->SetIsDumping(true);
 
     // Dump Mem Index
     status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);

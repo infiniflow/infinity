@@ -97,6 +97,9 @@ class TestMemIdx:
                 data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
                 assert data_dict["count(star)"] == [13]
 
+            # Wait for memindex dump
+            # If search is processed during memindex dump, it is possible to get partial results.
+            time.sleep(5)
             check()
             table_obj.optimize()
             check()
