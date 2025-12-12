@@ -1022,6 +1022,7 @@ void PhysicalImport::JSONLRowHandler(std::string_view line_sv, std::vector<std::
                 case LogicalType::kTime:
                 case LogicalType::kDateTime:
                 case LogicalType::kTimestamp:
+                case LogicalType::kJson:
                 case LogicalType::kVarchar: {
                     std::string_view str_view = doc[column_def->name_];
                     column_vector.AppendByStringView(str_view);
@@ -1672,6 +1673,7 @@ void PhysicalImport::ParquetValueHandler(const std::shared_ptr<arrow::Array> &ar
             column_vector.AppendByPtr(reinterpret_cast<const char *>(&timestamp_value));
             break;
         }
+        case LogicalType::kJson:
         case LogicalType::kVarchar: {
             std::string value_str = std::static_pointer_cast<arrow::StringArray>(array)->GetString(value_idx);
             std::string_view value(value_str);
@@ -1998,6 +2000,10 @@ Value GetValueFromParquetRecursively(const DataType &data_type, const std::share
         case LogicalType::kVarchar: {
             std::string value_str = std::static_pointer_cast<arrow::StringArray>(array)->GetString(value_idx);
             return Value::MakeVarchar(std::move(value_str));
+        }
+        case LogicalType::kJson: {
+            std::string value_str = std::static_pointer_cast<arrow::StringArray>(array)->GetString(value_idx);
+            return Value::MakeJson(value_str.c_str(), nullptr);
         }
         case LogicalType::kEmbedding: {
             auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type.type_info().get());

@@ -27,6 +27,7 @@ DateTime,
 Timestamp,
 Interval,
 Array,
+Json,
 Invalid
 }
 
@@ -322,6 +323,7 @@ ColumnDateTime,
 ColumnTimestamp,
 ColumnInterval,
 ColumnArray,
+ColumnJson,
 ColumnInvalid,
 }
 

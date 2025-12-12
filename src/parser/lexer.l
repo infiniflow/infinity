@@ -43,6 +43,7 @@ BIGINT          { return BIGINT; }
 BIT             { return BIT; }
 BITMAP          { return BITMAP; }
 BOOLEAN         { return BOOLEAN; }
+JSON            { return JSON; }
 BOX             { return BOX; }
 BLOB            { return BLOB; }
 BLOCK           { return BLOCK; }

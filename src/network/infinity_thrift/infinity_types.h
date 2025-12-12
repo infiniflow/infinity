@@ -45,7 +45,8 @@ struct LogicType {
         Timestamp = 20,
         Interval = 21,
         Array = 22,
-        Invalid = 23
+        Json = 23,
+        Invalid = 24
     };
 };
 
@@ -180,7 +181,8 @@ struct ColumnType {
         ColumnTimestamp = 19,
         ColumnInterval = 20,
         ColumnArray = 21,
-        ColumnInvalid = 22
+        ColumnJson = 22,
+        ColumnInvalid = 23
     };
 };
 

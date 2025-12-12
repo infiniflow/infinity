@@ -17,11 +17,11 @@ int _kLogicTypeValues[] = {LogicType::Boolean,   LogicType::TinyInt,     LogicTy
                            LogicType::HugeInt,   LogicType::Decimal,     LogicType::Float,     LogicType::Double,  LogicType::Float16,
                            LogicType::BFloat16,  LogicType::Varchar,     LogicType::Embedding, LogicType::Tensor,  LogicType::TensorArray,
                            LogicType::Sparse,    LogicType::MultiVector, LogicType::Date,      LogicType::Time,    LogicType::DateTime,
-                           LogicType::Timestamp, LogicType::Interval,    LogicType::Array,     LogicType::Invalid};
-const char *_kLogicTypeNames[] = {"Boolean",     "TinyInt", "SmallInt", "Integer",  "BigInt",    "HugeInt",  "Decimal",     "Float",
-                                  "Double",      "Float16", "BFloat16", "Varchar",  "Embedding", "Tensor",   "TensorArray", "Sparse",
-                                  "MultiVector", "Date",    "Time",     "DateTime", "Timestamp", "Interval", "Array",       "Invalid"};
-const std::map<int, const char *> _LogicType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(24, _kLogicTypeValues, _kLogicTypeNames),
+                           LogicType::Timestamp, LogicType::Interval,    LogicType::Array,     LogicType::Json,    LogicType::Invalid};
+const char *_kLogicTypeNames[] = {"Boolean", "TinyInt",  "SmallInt",  "Integer",   "BigInt", "HugeInt",     "Decimal", "Float",       "Double",
+                                  "Float16", "BFloat16", "Varchar",   "Embedding", "Tensor", "TensorArray", "Sparse",  "MultiVector", "Date",
+                                  "Time",    "DateTime", "Timestamp", "Interval",  "Array",  "Json",        "Invalid"};
+const std::map<int, const char *> _LogicType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(25, _kLogicTypeValues, _kLogicTypeNames),
                                                              ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
 
 std::ostream &operator<<(std::ostream &out, const LogicType::type &val) {
@@ -272,12 +272,12 @@ int _kColumnTypeValues[] = {ColumnType::ColumnBool,        ColumnType::ColumnInt
                             ColumnType::ColumnBFloat16,    ColumnType::ColumnVarchar, ColumnType::ColumnEmbedding,   ColumnType::ColumnTensor,
                             ColumnType::ColumnTensorArray, ColumnType::ColumnSparse,  ColumnType::ColumnMultiVector, ColumnType::ColumnRowID,
                             ColumnType::ColumnDate,        ColumnType::ColumnTime,    ColumnType::ColumnDateTime,    ColumnType::ColumnTimestamp,
-                            ColumnType::ColumnInterval,    ColumnType::ColumnArray,   ColumnType::ColumnInvalid};
+                            ColumnType::ColumnInterval,    ColumnType::ColumnArray,   ColumnType::ColumnJson,        ColumnType::ColumnInvalid};
 const char *_kColumnTypeNames[] = {"ColumnBool",        "ColumnInt8",      "ColumnInt16",       "ColumnInt32",   "ColumnInt64",     "ColumnFloat32",
                                    "ColumnFloat64",     "ColumnFloat16",   "ColumnBFloat16",    "ColumnVarchar", "ColumnEmbedding", "ColumnTensor",
                                    "ColumnTensorArray", "ColumnSparse",    "ColumnMultiVector", "ColumnRowID",   "ColumnDate",      "ColumnTime",
-                                   "ColumnDateTime",    "ColumnTimestamp", "ColumnInterval",    "ColumnArray",   "ColumnInvalid"};
-const std::map<int, const char *> _ColumnType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(23, _kColumnTypeValues, _kColumnTypeNames),
+                                   "ColumnDateTime",    "ColumnTimestamp", "ColumnInterval",    "ColumnArray",   "ColumnJson",      "ColumnInvalid"};
+const std::map<int, const char *> _ColumnType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(24, _kColumnTypeValues, _kColumnTypeNames),
                                                               ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
 
 std::ostream &operator<<(std::ostream &out, const ColumnType::type &val) {

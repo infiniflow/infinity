@@ -415,9 +415,14 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantE
             Value value = Value::MakeArray(std::move(element_values), ArrayInfo::Make(std::move(common_element_type)));
             return std::make_shared<ValueExpression>(value);
         }
+        case LiteralType::kJson: {
+            Value value = Value::MakeJson(expr.json_value_, nullptr);
+            return std::make_shared<ValueExpression>(std::move(value));
+        }
     }
 
     UnrecoverableError("Unreachable");
+    return nullptr;
 }
 
 std::shared_ptr<BaseExpression> ExpressionBinder::BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {

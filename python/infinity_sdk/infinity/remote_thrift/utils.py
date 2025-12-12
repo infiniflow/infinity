@@ -852,6 +852,8 @@ def get_data_type_from_column_big_info(column_big_info: list) -> ttypes.DataType
                     proto_column_type.logic_type = ttypes.LogicType.SmallInt
                 case "integer" | "int32" | "int":
                     proto_column_type.logic_type = ttypes.LogicType.Integer
+                case "json":
+                    proto_column_type.logic_type = ttypes.LogicType.Json
                 case "int64":
                     proto_column_type.logic_type = ttypes.LogicType.BigInt
                 case "int128":
