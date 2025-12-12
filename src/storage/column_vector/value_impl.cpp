@@ -653,6 +653,12 @@ Value Value::MakeArray(std::vector<Value> array_elements, std::shared_ptr<TypeIn
     return value;
 }
 
+Value Value::MakeJson(std::vector<uint8_t> &bson, std::shared_ptr<TypeInfo> type_info_ptr) {
+    Value value(LogicalType::kJson, std::move(type_info_ptr));
+    value.value_info_ = std::make_shared<JsonValueInfo>(std::move(bson));
+    return value;
+}
+
 Value Value::MakeJson(const char *ptr, std::shared_ptr<TypeInfo> type_info_ptr) {
     Value value(LogicalType::kJson, std::move(type_info_ptr));
     auto value_str = infinity::JsonManager::parse(ptr);
