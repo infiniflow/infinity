@@ -195,6 +195,27 @@ class TestInfinity:
         res = db_obj.drop_table("test_select" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    def test_select_json(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_json" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_json" + suffix,
+                            {"c1": {"type": "int"},
+                             "c2": {"type": "varchar"},
+                             "c3": {"type": "json"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_json" + suffix)
+        table_obj.insert([{"c1":123456,"c2":'{"1":null,"2":"123","3":12,"4":1.123}',"c3":'{"1":null,"2":"123","3":12,"4":1.123}'}])
+        res, extra_res = table_obj.output(["c2"]).to_pl()
+        print(res)
+        print(extra_res)
+        res, extra_res = table_obj.output(["c3"]).to_pl()
+        print(res)
+        print(extra_res)
+        res, extra_res = table_obj.output(["count(*)"]).to_pl()
+        print(res)
+        print(extra_res)
+
+
+
     def test_select_datetime(self, suffix):
         """
         target: test table select apis

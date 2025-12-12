@@ -65,6 +65,7 @@ import search_options;
 import column_def;
 import statement_common;
 import data_type;
+import json_manager;
 
 namespace infinity {
 
@@ -2780,6 +2781,15 @@ std::unique_ptr<infinity_thrift_rpc::DataType> InfinityThriftService::DataTypeTo
             data_type_proto->__set_physical_type(physical_type);
             return data_type_proto;
         }
+        case LogicalType::kJson: {
+            auto data_type_proto = std::make_unique<infinity_thrift_rpc::DataType>();
+            infinity_thrift_rpc::VarcharType varchar_type;
+            data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Json);
+            infinity_thrift_rpc::PhysicalType physical_type;
+            physical_type.__set_varchar_type(varchar_type);
+            data_type_proto->__set_physical_type(physical_type);
+            return data_type_proto;
+        }
         case LogicalType::kTensor:
         case LogicalType::kTensorArray:
         case LogicalType::kMultiVector:
@@ -3206,9 +3216,13 @@ void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
                                                        const JsonT &data_value,
                                                        const std::shared_ptr<ColumnVector> &column_vector) {
     auto len = data_value.length_;
-    auto data = column_vector->buffer_->GetVarchar(data_value.file_offset_, len);
     output_str.append(reinterpret_cast<const char *>(&len), sizeof(i32));
-    output_str.append(data, len);
+
+    std::vector<uint8_t> bson(len);
+    auto data = column_vector->buffer_->GetVarchar(data_value.file_offset_, len);
+    memcpy(bson.data(), data, len);
+    auto json_data = JsonManager::from_bson(bson);
+    output_str.append(json_data.dump().c_str(), len);
 }
 
 void InfinityThriftService::HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field,

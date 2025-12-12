@@ -22,7 +22,7 @@ nlohmann::json JsonManager::parse(const std::string &json_str) { return nlohmann
 
 nlohmann::json JsonManager::from_bson(const std::vector<uint8_t> &bson_data) { return nlohmann::json::from_bson(bson_data); }
 
-nlohmann::json JsonManager::dump(const nlohmann::json &json_obj) { return json_obj.dump(); }
+std::string JsonManager::dump(const nlohmann::json &json_obj) { return json_obj.dump(); }
 
 std::vector<uint8_t> JsonManager::to_bson(const nlohmann::json &json_obj) { return nlohmann::json::to_bson(json_obj); }
 
