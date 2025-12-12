@@ -29,6 +29,7 @@ export struct VersionFileWorkerSaveCtx : public FileWorkerSaveCtx {
 
 export class VersionFileWorker : public FileWorker {
 public:
+    static constexpr BlockVersion *has_cache_manager_{}; // now not used
     explicit VersionFileWorker(std::shared_ptr<std::string> file_path, size_t capacity);
 
     virtual ~VersionFileWorker() override;
@@ -39,8 +40,6 @@ public:
     Write(std::span<BlockVersion> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
     void Read(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
-
-    BlockVersion *data_;
 
 private:
     size_t capacity_{};

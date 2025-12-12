@@ -543,15 +543,13 @@ public:
     }
 
     static std::unique_ptr<This> LoadFromPtr(void *&m_mmap, size_t &mmap_size, LocalFileHandle &file_handle, size_t size) {
-        auto buffer = std::make_unique<char[]>(size);
-        // file_handle.Read(buffer.get(), size);
-        std::memcpy(buffer.get(), (char *)m_mmap, mmap_size);
-        const char *ptr = buffer.get();
+        auto *buffer = static_cast<char *>(m_mmap);
+        const char *ptr = buffer;
         size_t M = ReadBufAdv<size_t>(ptr);
         size_t ef_construction = ReadBufAdv<size_t>(ptr);
         auto data_store = DataStore::LoadFromPtr(ptr);
         Distance distance(data_store.dim());
-        if (size_t diff = ptr - buffer.get(); diff != size) {
+        if (size_t diff = ptr - buffer; diff != size) {
             UnrecoverableError("LoadFromPtr failed");
         }
         return std::make_unique<This>(M, ef_construction, std::move(data_store), std::move(distance));

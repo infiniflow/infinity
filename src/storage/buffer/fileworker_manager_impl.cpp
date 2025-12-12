@@ -27,6 +27,7 @@ FileWorkerT *FileWorkerMap<FileWorkerT>::EmplaceFileWorker(std::unique_ptr<FileW
     std::unique_lock lock(rw_mtx_);
     auto rel_file_path = file_worker->rel_file_path_;
     active_dic_.emplace(*rel_file_path);
+    // std::println("file worker cnt: {}", active_dic_.size());
     if (auto iter = map_.find(*rel_file_path); iter != map_.end()) {
         return iter->second.get();
     }

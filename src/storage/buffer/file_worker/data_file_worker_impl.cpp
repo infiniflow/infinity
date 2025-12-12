@@ -147,7 +147,7 @@ void DataFileWorker::Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFi
         // std::memcpy((char *)mmap_true_, data_, mmap_true_size_);
         mmap_ = mmap(nullptr, mmap_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 /*align_offset*/);
         if (mmap_ == MAP_FAILED) {
-            std::println("that code data: {}", mmap_size_);
+            // std::println("that code data: {}", mmap_size_);
             mmap_ = nullptr;
         }
     } else {

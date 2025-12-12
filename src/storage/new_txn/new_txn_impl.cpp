@@ -1647,13 +1647,11 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
     CatalogMeta catalog_meta(this);
     Status status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
     if (!status.ok()) {
-        std::println("*fuck 1");
         return status;
     }
 
     // Put the data into local txn store
     if (base_txn_store_ != nullptr) {
-        std::println("*fuck 3");
         return Status::UnexpectedError("txn store is not null");
     }
     base_txn_store_ = std::make_shared<CheckpointTxnStore>(checkpoint_ts, auto_checkpoint);
@@ -1670,7 +1668,6 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
 
     status = txn_mgr_->kv_store()->Flush();
     if (!status.ok()) {
-        std::println("*fuck 2");
         return status;
     }
 
@@ -4612,7 +4609,6 @@ Status NewTxn::Rollback() {
 
 Status NewTxn::Cleanup() {
     if (base_txn_store_) {
-        std::println("fuck 114");
         return Status::UnexpectedError("txn store is not null");
     }
     auto begin_ts = BeginTS();
@@ -4643,14 +4639,12 @@ Status NewTxn::Cleanup() {
     std::vector<std::shared_ptr<MetaKey>> metas;
     Status status = new_catalog_->GetCleanedMeta(visible_ts, kv_instance, metas, dropped_keys);
     if (!status.ok()) {
-        std::println("fuck 1");
         return status;
     }
 
     for (auto &key : dropped_keys) {
         status = kv_instance->Delete(key);
         if (!status.ok()) {
-            std::println("fuck 2");
             return status;
         }
     }
@@ -4673,7 +4667,6 @@ Status NewTxn::Cleanup() {
 
     status = CleanupInner(metas);
     if (!status.ok()) {
-        std::println("fuck 3");
         return status;
     }
 

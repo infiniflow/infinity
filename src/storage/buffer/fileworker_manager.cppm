@@ -29,74 +29,111 @@ import std;
 namespace infinity {
 
 export template <typename DataT>
-struct FileWorkerCacheManager {
+class FileWorkerCacheManager {
+public:
     void Pin(std::string path) {
-        auto &cnt = ref_cnt_[path];
+        // std::lock_guard l(ref_cnt_mutex_);
+        std::unique_lock l(rw_mutex_);
+        auto &cnt = ref_cnt_map_[path];
         ++cnt;
     }
 
     void UnPin(std::string path) {
-        auto &cnt = ref_cnt_[path];
+        // std::lock_guard l(ref_cnt_mutex_);
+        std::unique_lock l(rw_mutex_);
+        auto &cnt = ref_cnt_map_[path];
         --cnt;
         if (!cnt) {
-            cv_.notify_one();
-        }
-    }
-
-    void Evict() {
-        for (auto iter = li_.rbegin(); iter != li_.rend(); ++iter) {
-            auto &data = *iter;
-            auto &path = rev_dic_[data];
-            if (auto ref_cnt_iter = ref_cnt_.find(path); ref_cnt_iter != ref_cnt_.end()) {
-                ref_cnt_.erase(path);
-                li_.erase(data);
-                map_.erase(path);
-                delete data;
-                return;
-            }
+            ref_cnt_map_.erase(path);
         }
     }
 
     bool Get(std::string path, DataT &data) {
         {
             std::unique_lock l(rw_mutex_);
-            if (auto map_iter = map_.find(path); map_iter != map_.end()) {
-                Pin(path);
+            std::println("Get");
+            if (auto map_iter = path_data_map_.find(path); map_iter != path_data_map_.end()) {
                 li_.splice(li_.begin(), li_, map_iter->second);
-                data = map_iter->second;
+                data = *map_iter->second;
                 return true;
             }
         }
         return false;
     }
 
-    void Set(std::string path, DataT data) {
+    void Set(std::string path, DataT data, size_t request_space) {
         std::unique_lock l(rw_mutex_);
-        if (auto map_iter = map_.find(path); map_iter != map_.end()) {
+        std::println("Set");
+        if (auto map_iter = path_data_map_.find(path); map_iter != path_data_map_.end()) {
             li_.splice(li_.begin(), li_, map_iter->second);
         } else {
-            cv_.wait(l, [this] { return ref_cnt_.size() < MAX_CAPACITY_; });
+            if (!IsAccomodatable(request_space)) {
+                Evict(request_space);
+            }
             li_.push_front(data);
-            map_.emplace(path, li_.begin());
-            rev_dic_[data] = path;
+            path_data_map_.emplace(path, li_.begin());
+            data_path_map_[data] = path;
+            memory_map_[path] = request_space;
+            current_mem_usage_ += request_space;
         }
     }
 
+private:
+    void Evict(size_t request_space) {
+        // std::println("Evict called");
+        std::println("Evict");
+        for (auto iter = li_.rbegin(); iter != li_.rend(); ++iter) {
+            auto data = *iter;
+            auto &path = data_path_map_[data];
+
+            if (!ref_cnt_map_.contains(path)) { // not pin
+                current_mem_usage_ -= memory_map_[path];
+                ref_cnt_map_.erase(path);
+                li_.erase(std::next(iter.base(), -1));
+                path_data_map_.erase(path);
+                data_path_map_.erase(data);
+                std::println("delete: {}", path);
+                delete data;
+                // ClearData();
+                if (IsAccomodatable(request_space)) {
+                    return;
+                }
+            }
+        }
+        UnrecoverableError("Buffer manager's memory size is too small.");
+    }
+
+    bool IsAccomodatable(size_t request_space) { return current_mem_usage_ + request_space <= MAX_CAPACITY_; }
+    // void ClearData() { // should implement as a hook
+    //     munmap(mmap_, mmap_size_);
+    //     mmap_ = nullptr;
+    //     auto mem_usage = data_->MemUsage();
+    //     auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
+    //     if (memindex_tracer != nullptr) {
+    //         memindex_tracer->DecreaseMemUsed(mem_usage);
+    //     }
+    //     delete data_;
+    // }
+
     mutable std::shared_mutex rw_mutex_;
-    static constexpr size_t MAX_CAPACITY_ = 2;
+    // mutable std::mutex ref_cnt_mutex_;
+    // static constexpr size_t MAX_BUCKET_NUM_ = 42;
+    size_t MAX_CAPACITY_ = InfinityContext::instance().config()->BufferManagerSize();
+    size_t current_mem_usage_{};
     std::list<DataT> li_;
-    std::unordered_map<DataT, std::string> rev_dic_;
-    std::unordered_map<std::string, decltype(li_.begin())> map_;
-    std::unordered_map<std::string, size_t> ref_cnt_;
-    std::condition_variable_any cv_;
+    std::unordered_map<DataT, std::string> data_path_map_;
+    std::unordered_map<std::string, decltype(li_.begin())> path_data_map_;
+    std::unordered_map<std::string, size_t> ref_cnt_map_;
+    std::unordered_map<std::string, size_t> memory_map_;
 };
 
-export template <typename FileWorkerT, bool = requires(FileWorkerT t) { t.data_; }>
+export template <typename FileWorkerT, bool = requires(FileWorkerT t) { t.has_cache_manager_; }>
 struct FileWorkerMapInjectHelper {};
 
 export template <typename FileWorkerT>
 struct FileWorkerMapInjectHelper<FileWorkerT, true> {
-    FileWorkerCacheManager<decltype(std::declval<FileWorkerT>().data_)> cache_manager_;
+    using data_t = std::remove_cvref_t<decltype(std::declval<FileWorkerT>().has_cache_manager_)>;
+    FileWorkerCacheManager<data_t> cache_manager_;
 };
 
 export template <typename FileWorkerT>

@@ -62,38 +62,51 @@ HnswFileWorker::HnswFileWorker(std::shared_ptr<std::string> file_path,
 HnswFileWorker::~HnswFileWorker() {
     munmap(mmap_, mmap_size_);
     mmap_ = nullptr;
-    delete data_;
 }
 
 bool HnswFileWorker::Write(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+    std::println("A");
     data->SaveToPtr(*file_handle);
+    std::println("B");
     auto fd = file_handle->fd();
+    std::println("C");
     mmap_size_ = file_handle->FileSize();
-    mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+    std::println("D");
+    mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
+    std::println("E");
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
-    cache_manager.Set(*rel_file_path_, data);
+    std::println("F");
+    size_t request_spapce = file_handle->FileSize();
+    std::println("G");
+    cache_manager.Set(*rel_file_path_, data, request_spapce);
     prepare_success = true;
     return true;
 }
 
 void HnswFileWorker::Read(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
-    {
-        std::unique_lock l(mutex_);
-        if (data_ == nullptr) {
-            data_ = HnswHandlerPtr{HnswHandler::Make(index_base_.get(), column_def_).release()};
-        }
-    }
-    data = data_;
-
     if (!file_handle) {
         return;
     }
-    if (!mmap_) {
+    auto &path = *rel_file_path_;
+    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
+    cache_manager.Pin(path);
+    bool flag = cache_manager.Get(path, data);
+    if (!flag) {
+        data = HnswHandlerPtr{HnswHandler::Make(index_base_.get(), column_def_).release()};
         auto fd = file_handle->fd();
         mmap_size_ = file_handle->FileSize();
-        mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+        mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
         data->LoadFromPtr(mmap_, mmap_size_, *file_handle, file_size);
+        size_t request_space = file_handle->FileSize();
+        cache_manager.Set(path, data, request_space);
     }
+
+    // if (!mmap_) {
+    //     auto fd = file_handle->fd();
+    //     mmap_size_ = file_handle->FileSize();
+    //     mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+    //     data->LoadFromPtr(mmap_, mmap_size_, *file_handle, file_size);
+    // }
 }
 
 } // namespace infinity

@@ -146,14 +146,12 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
                             const std::string &index_name,
                             SegmentID segment_id,
                             RowID begin_row_id) {
-    Status status;
-
     std::shared_ptr<DBMeta> db_meta;
     std::shared_ptr<TableMeta> table_meta;
     std::shared_ptr<TableIndexMeta> table_index_meta;
     std::string table_key;
     std::string index_key;
-    status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
+    Status status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
     if (!status.ok()) {
         return status;
     }
@@ -1346,6 +1344,9 @@ Status NewTxn::PopulateHnswIndexInner(std::shared_ptr<IndexBase> index_base,
     }
     size_t block_capacity = DEFAULT_BLOCK_CAPACITY;
     for (BlockID block_id : *block_ids) {
+        if (block_id % 16 == 0) {
+            std::println("{}", block_id);
+        }
         BlockMeta block_meta(block_id, segment_meta);
         ColumnMeta column_meta(column_id, block_meta);
 

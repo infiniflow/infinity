@@ -277,7 +277,6 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_db) {
             EXPECT_TRUE(status.ok());
         }
         Checkpoint();
-        std::println("1");
         new_txn_mgr_->PrintAllKeyValue();
         Cleanup();
 

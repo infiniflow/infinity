@@ -25,7 +25,7 @@ import :knn_scan_data;
 import :knn_filter;
 import :infinity_exception;
 import :column_expression;
-
+import :fileworker_manager;
 import :merge_knn;
 import :knn_result_handler;
 import :data_block;
@@ -959,6 +959,8 @@ void ExecuteHnswSearch(QueryContext *query_context,
         HnswHandlerPtr hnsw_handler{};
         index_file_worker->Read(hnsw_handler);
         hnsw_search(hnsw_handler, false);
+        auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
+        cache_manager.UnPin(*index_file_worker->rel_file_path_);
     }
     if (mem_index) {
         auto memory_hnsw_index = mem_index->GetHnswIndex();
