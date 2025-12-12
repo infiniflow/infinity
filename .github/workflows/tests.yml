@@ -105,7 +105,7 @@ jobs:
         uses: astral-sh/ruff-action@v3
         with:
           version: ">=0.14.x"
-          args: "check"
+          args: "check --exclude=python/infinity_sdk/remote_thrift/"
 
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
@@ -123,7 +123,7 @@ jobs:
               | grep -E '\.(cpp|h|hpp|cppm)$' \
               | grep -v 'third_party/' \
               | grep -v 'network/' \
-              | grep -v 'remote_thrift/' \
+              | grep -v 'remote_thrift/infinity_thrift_rpc/' \
               | grep -v 'parser/' || true)
 
             if [ -n "$CHANGED_FILES" ]; then
