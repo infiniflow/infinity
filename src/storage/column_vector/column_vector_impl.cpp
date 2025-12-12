@@ -1050,8 +1050,7 @@ Value ColumnVector::GetArrayValueRecursively(const DataType &data_type, const ch
         case LogicalType::kJson: {
             const auto json = *reinterpret_cast<const JsonT *>(data_ptr);
             const auto data = buffer_->GetVarchar(json.file_offset_, json.length_);
-            std::vector<uint8_t> bson(json.length_);
-            memcpy(bson.data(), data, json.length_);
+            std::vector<uint8_t> bson(reinterpret_cast<const uint8_t *>(data), reinterpret_cast<const uint8_t *>(data) + json.length_);
             return Value::MakeJson(bson, nullptr);
         }
         case LogicalType::kDate: {
@@ -1986,8 +1985,11 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
         }
         case LogicalType::kJson: {
             auto &json = reinterpret_cast<JsonT *>(data_ptr_)[index];
-            json.length_ = sv.length();
-            json.file_offset_ = buffer_->AppendVarchar(reinterpret_cast<const char *>(sv.data()), sv.length());
+            auto json_str = JsonManager::parse(sv.data());
+            auto bson = JsonManager::to_bson(json_str);
+
+            json.length_ = bson.size() * sizeof(uint8_t);
+            json.file_offset_ = buffer_->AppendVarchar(reinterpret_cast<const char *>(bson.data()), json.length_);
             break;
         }
         case LogicalType::kSparse: {

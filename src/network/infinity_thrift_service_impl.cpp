@@ -3215,14 +3215,14 @@ void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
                                                        const DataType &data_type,
                                                        const JsonT &data_value,
                                                        const std::shared_ptr<ColumnVector> &column_vector) {
-    auto len = data_value.length_;
-    output_str.append(reinterpret_cast<const char *>(&len), sizeof(i32));
-
-    std::vector<uint8_t> bson(len);
-    auto data = column_vector->buffer_->GetVarchar(data_value.file_offset_, len);
-    memcpy(bson.data(), data, len);
+    auto data = column_vector->buffer_->GetVarchar(data_value.file_offset_, data_value.length_);
+    std::vector<uint8_t> bson(reinterpret_cast<const uint8_t *>(data), reinterpret_cast<const uint8_t *>(data) + data_value.length_);
     auto json_data = JsonManager::from_bson(bson);
-    output_str.append(json_data.dump().c_str(), len);
+    auto json_str = json_data.dump();
+    auto json_length = json_str.length();
+
+    output_str.append(reinterpret_cast<const char *>(&json_length), sizeof(i32));
+    output_str.append(json_str.c_str(), json_length);
 }
 
 void InfinityThriftService::HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field,
