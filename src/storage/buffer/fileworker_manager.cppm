@@ -53,7 +53,7 @@ public:
             std::unique_lock l(rw_mutex_);
             std::println("Get");
             if (auto map_iter = path_data_map_.find(path); map_iter != path_data_map_.end()) {
-                li_.splice(li_.begin(), li_, map_iter->second);
+                payloads_.splice(payloads_.begin(), payloads_, map_iter->second);
                 data = *map_iter->second;
                 return true;
             }
@@ -63,15 +63,16 @@ public:
 
     void Set(std::string path, DataT data, size_t request_space) {
         std::unique_lock l(rw_mutex_);
-        std::println("Set");
+        std::println("Set: {}", request_space);
         if (auto map_iter = path_data_map_.find(path); map_iter != path_data_map_.end()) {
-            li_.splice(li_.begin(), li_, map_iter->second);
+            std::println("Set A");
+            payloads_.splice(payloads_.begin(), payloads_, map_iter->second);
         } else {
             if (!IsAccomodatable(request_space)) {
                 Evict(request_space);
             }
-            li_.push_front(data);
-            path_data_map_.emplace(path, li_.begin());
+            payloads_.push_front(data);
+            path_data_map_.emplace(path, payloads_.begin());
             data_path_map_[data] = path;
             memory_map_[path] = request_space;
             current_mem_usage_ += request_space;
@@ -82,14 +83,14 @@ private:
     void Evict(size_t request_space) {
         // std::println("Evict called");
         std::println("Evict");
-        for (auto iter = li_.rbegin(); iter != li_.rend(); ++iter) {
+        for (auto iter = payloads_.rbegin(); iter != payloads_.rend(); ++iter) {
             auto data = *iter;
             auto &path = data_path_map_[data];
 
             if (!ref_cnt_map_.contains(path)) { // not pin
                 current_mem_usage_ -= memory_map_[path];
                 ref_cnt_map_.erase(path);
-                li_.erase(std::next(iter.base(), -1));
+                payloads_.erase(std::next(iter.base(), -1));
                 path_data_map_.erase(path);
                 data_path_map_.erase(data);
                 std::println("delete: {}", path);
@@ -120,9 +121,9 @@ private:
     // static constexpr size_t MAX_BUCKET_NUM_ = 42;
     size_t MAX_CAPACITY_ = InfinityContext::instance().config()->BufferManagerSize();
     size_t current_mem_usage_{};
-    std::list<DataT> li_;
+    std::list<DataT> payloads_;
     std::unordered_map<DataT, std::string> data_path_map_;
-    std::unordered_map<std::string, decltype(li_.begin())> path_data_map_;
+    std::unordered_map<std::string, decltype(payloads_.begin())> path_data_map_;
     std::unordered_map<std::string, size_t> ref_cnt_map_;
     std::unordered_map<std::string, size_t> memory_map_;
 };
