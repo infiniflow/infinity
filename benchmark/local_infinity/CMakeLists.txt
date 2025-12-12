@@ -1,3 +1,5 @@
+find_package(miniocpp REQUIRED)
+
 # infinity benchmark
 add_executable(infinity_benchmark
         infinity_benchmark.cpp
@@ -8,8 +10,8 @@ target_link_libraries(infinity_benchmark
         benchmark_profiler
         infinity_core
         sql_parser
-        onnxruntime_mlas
-        zsv_parser
+        onnxruntime::onnxruntime
+        zsv
         newpfor
         fastpfor
         jma
@@ -22,12 +24,10 @@ target_link_libraries(infinity_benchmark
         Parquet::parquet_static
         Arrow::arrow_static
         ${JEMALLOC_STATIC_LIB}
-        miniocpp.a
+        miniocpp::miniocpp
         pugixml::static
-        curlpp_static
         unofficial::inih::libinih
         unofficial::inih::inireader
-        libcurl_static
         OpenSSL::SSL
         OpenSSL::Crypto
         re2::re2
@@ -43,9 +43,6 @@ target_link_libraries(infinity_benchmark
 )
 
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
-target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 
 # ########################################
@@ -54,15 +51,14 @@ target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_par
 add_executable(knn_import_benchmark
         ./knn/knn_import_benchmark.cpp
 )
-add_dependencies(knn_import_benchmark miniocpp)
 
 target_include_directories(knn_import_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_link_libraries(knn_import_benchmark
         infinity_core
         benchmark_profiler
         sql_parser
-        onnxruntime_mlas
-        zsv_parser
+        onnxruntime::onnxruntime
+        zsv
         newpfor
         fastpfor
         jma
@@ -75,12 +71,10 @@ target_link_libraries(knn_import_benchmark
         Parquet::parquet_static
         Arrow::arrow_static
         ${JEMALLOC_STATIC_LIB}
-        miniocpp.a
+        miniocpp::miniocpp
         pugixml::static
-        curlpp_static
         unofficial::inih::libinih
         unofficial::inih::inireader
-        libcurl_static
         OpenSSL::SSL
         OpenSSL::Crypto
         re2::re2
@@ -96,24 +90,20 @@ target_link_libraries(knn_import_benchmark
 )
 
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
-target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 
 # query benchmark
 add_executable(knn_query_benchmark
         ./knn/knn_query_benchmark.cpp
 )
-add_dependencies(knn_query_benchmark miniocpp)
 
 target_include_directories(knn_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_link_libraries(knn_query_benchmark
         infinity_core
         benchmark_profiler
         sql_parser
-        onnxruntime_mlas
-        zsv_parser
+        onnxruntime::onnxruntime
+        zsv
         newpfor
         fastpfor
         jma
@@ -126,12 +116,10 @@ target_link_libraries(knn_query_benchmark
         libevent::core
         oatpp::oatpp
         ${JEMALLOC_STATIC_LIB}
-        miniocpp.a
+        miniocpp::miniocpp
         pugixml::static
-        curlpp_static
         unofficial::inih::libinih
         unofficial::inih::inireader
-        libcurl_static
         OpenSSL::SSL
         OpenSSL::Crypto
         re2::re2
@@ -147,9 +135,6 @@ target_link_libraries(knn_query_benchmark
 )
 
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
-target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 
 # ########################################
@@ -164,7 +149,7 @@ target_link_libraries(fulltext_benchmark
         infinity_core
         benchmark_profiler
         sql_parser
-        onnxruntime_mlas
+        onnxruntime::onnxruntime
         zsv_parser
         newpfor
         fastpfor
@@ -178,12 +163,10 @@ target_link_libraries(fulltext_benchmark
         Parquet::parquet_static
         Arrow::arrow_static
         ${JEMALLOC_STATIC_LIB}
-        miniocpp.a
+        miniocpp::miniocpp
         pugixml::static
-        curlpp_static
         unofficial::inih::libinih
         unofficial::inih::inireader
-        libcurl_static
         OpenSSL::SSL
         OpenSSL::Crypto
         re2::re2
@@ -199,9 +182,6 @@ target_link_libraries(fulltext_benchmark
 )
 
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
-target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 
 # ########################################
@@ -214,8 +194,8 @@ target_link_libraries(sparse_benchmark
         infinity_core
         benchmark_profiler
         sql_parser
-        onnxruntime_mlas
-        zsv_parser
+        onnxruntime::onnxruntime
+        zsv
         newpfor
         fastpfor
         jma
@@ -224,12 +204,10 @@ target_link_libraries(sparse_benchmark
         Parquet::parquet_static
         Arrow::arrow_static
         ${JEMALLOC_STATIC_LIB}
-        miniocpp.a
+        miniocpp::miniocpp
         pugixml::static
-        curlpp_static
         unofficial::inih::libinih
         unofficial::inih::inireader
-        libcurl_static
         OpenSSL::SSL
         OpenSSL::Crypto
         re2::re2
@@ -245,9 +223,6 @@ target_link_libraries(sparse_benchmark
 )
 
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
-target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 
 add_executable(bmp_benchmark
@@ -259,8 +234,8 @@ target_link_libraries(bmp_benchmark
         infinity_core
         benchmark_profiler
         sql_parser
-        onnxruntime_mlas
-        zsv_parser
+        onnxruntime::onnxruntime
+        zsv
         newpfor
         fastpfor
         jma
@@ -273,12 +248,10 @@ target_link_libraries(bmp_benchmark
         Parquet::parquet_static
         Arrow::arrow_static
         ${JEMALLOC_STATIC_LIB}
-        miniocpp.a
+        miniocpp::miniocpp
         pugixml::static
-        curlpp_static
         unofficial::inih::libinih
         unofficial::inih::inireader
-        libcurl_static
         OpenSSL::SSL
         OpenSSL::Crypto
         re2::re2
@@ -294,9 +267,6 @@ target_link_libraries(bmp_benchmark
 )
 
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
-target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 
 add_executable(hnsw_benchmark
@@ -308,8 +278,8 @@ target_link_libraries(hnsw_benchmark
         infinity_core
         benchmark_profiler
         sql_parser
-        onnxruntime_mlas
-        zsv_parser
+        onnxruntime::onnxruntime
+        zsv
         newpfor
         fastpfor
         jma
@@ -322,12 +292,10 @@ target_link_libraries(hnsw_benchmark
         libevent::core
         oatpp::oatpp
         ${JEMALLOC_STATIC_LIB}
-        miniocpp.a
+        miniocpp::miniocpp
         pugixml::static
-        curlpp_static
         unofficial::inih::libinih
         unofficial::inih::inireader
-        libcurl_static
         OpenSSL::SSL
         OpenSSL::Crypto
         re2::re2
@@ -343,9 +311,6 @@ target_link_libraries(hnsw_benchmark
 )
 
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
-target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 
 # add_definitions(-march=native)

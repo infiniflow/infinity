@@ -296,7 +296,6 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/newpfor")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/fastpfor/headers")
@@ -304,14 +303,10 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/deps/limonp/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ijma/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/pgm/include")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/mlas")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/xor_singleheader/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/base64/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/eigen-3.4.0")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/opencc")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/minio-cpp/include")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curlpp/include")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curl/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/darts/")
 
 add_executable(infinity
@@ -327,14 +322,12 @@ add_executable(infinity
 ### Parser (built after infinity_core so it can access modules)
 add_subdirectory(parser)
 
-add_dependencies(infinity miniocpp curlpp_static libcurl_static)
-
 target_link_libraries(infinity
         PUBLIC
         infinity_core
         sql_parser
-        onnxruntime_mlas
-        zsv_parser
+        onnxruntime::onnxruntime
+        zsv
         newpfor
         fastpfor
         jma
@@ -348,13 +341,10 @@ target_link_libraries(infinity
         Parquet::parquet_static
         Arrow::arrow_static
         ${JEMALLOC_STATIC_LIB}
-        miniocpp.a
-        # miniocpp::miniocpp
+        miniocpp::miniocpp
         pugixml::static
-        curlpp_static
         unofficial::inih::libinih
         unofficial::inih::inireader
-        libcurl_static
         OpenSSL::SSL
         OpenSSL::Crypto
         re2::re2
@@ -372,9 +362,6 @@ target_link_libraries(infinity
         ${STDCXX15EXP_STATIC}
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
-target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -403,8 +390,8 @@ target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 #            ${libname}
 #            infinity_core
 #            sql_parser
-#            onnxruntime_mlas
-#            zsv_parser
+#            onnxruntime::onnxruntime
+#            zsv
 #            newpfor
 #            fastpfor
 #            jma
@@ -488,14 +475,13 @@ target_sources(unit_test
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
-add_dependencies(unit_test miniocpp curlpp_static libcurl_static)
 
 target_link_libraries(unit_test
         infinity_core
         GTest::gtest GTest::gtest_main
         sql_parser
-        onnxruntime_mlas
-        zsv_parser
+        onnxruntime::onnxruntime
+        zsv
         newpfor
         fastpfor
         jma
@@ -508,13 +494,10 @@ target_link_libraries(unit_test
         Parquet::parquet_static
         Arrow::arrow_static
         ${JEMALLOC_STATIC_LIB}
-        miniocpp.a
-        # miniocpp::miniocpp
+        miniocpp::miniocpp
         pugixml::static
-        curlpp_static
         unofficial::inih::libinih
         unofficial::inih::inireader
-        libcurl_static
         OpenSSL::SSL
         OpenSSL::Crypto
         re2::re2
@@ -539,9 +522,6 @@ target_compile_options(unit_test PRIVATE
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
-target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
