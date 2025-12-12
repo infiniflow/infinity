@@ -105,7 +105,7 @@ jobs:
         uses: astral-sh/ruff-action@v3
         with:
           version: ">=0.14.x"
-          args: "check --exclude=python/infinity_sdk/remote_thrift/"
+          args: "check --exclude=**/remote_thrift/infinity_thrift_rpc/**"
 
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
