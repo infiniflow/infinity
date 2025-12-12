@@ -1,7 +1,5 @@
 spdlog v1.15.3
 tlx v0.6.1
-zsv commit-id:9db4bd2f99dff430485710d303b7435e269e1edc # 12/24/2024
-mlas onnxruntime:2c53b4a534a9b64466e435d384c91f0b684ea58a
 cppjieba v5.1.0
 xor_singleheader v1.0.3
 base64 commit-id: d354224643b1b1343cf4944c5cd2ff94e33c3768

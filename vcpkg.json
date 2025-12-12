@@ -33,6 +33,8 @@
     "zlib",
     "zstd",
     "minio-cpp",
+    "zsv",
+    "onnxruntime",
     {
       "name": "vcpkg-cmake",
       "host": true

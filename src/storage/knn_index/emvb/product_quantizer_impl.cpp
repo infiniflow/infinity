@@ -14,7 +14,7 @@
 
 module;
 
-#include "inc/mlas.h"
+#include "onnxruntime/core/mlas/mlas.h"
 
 module infinity_core:product_quantizer.impl;
 

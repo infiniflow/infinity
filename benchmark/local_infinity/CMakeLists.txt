@@ -10,8 +10,8 @@ target_link_libraries(infinity_benchmark
         benchmark_profiler
         infinity_core
         sql_parser
-        onnxruntime_mlas
-        zsv_parser
+        onnxruntime::onnxruntime
+        zsv
         newpfor
         fastpfor
         jma
@@ -57,8 +57,8 @@ target_link_libraries(knn_import_benchmark
         infinity_core
         benchmark_profiler
         sql_parser
-        onnxruntime_mlas
-        zsv_parser
+        onnxruntime::onnxruntime
+        zsv
         newpfor
         fastpfor
         jma
@@ -102,8 +102,8 @@ target_link_libraries(knn_query_benchmark
         infinity_core
         benchmark_profiler
         sql_parser
-        onnxruntime_mlas
-        zsv_parser
+        onnxruntime::onnxruntime
+        zsv
         newpfor
         fastpfor
         jma
@@ -149,7 +149,7 @@ target_link_libraries(fulltext_benchmark
         infinity_core
         benchmark_profiler
         sql_parser
-        onnxruntime_mlas
+        onnxruntime::onnxruntime
         zsv_parser
         newpfor
         fastpfor
@@ -194,8 +194,8 @@ target_link_libraries(sparse_benchmark
         infinity_core
         benchmark_profiler
         sql_parser
-        onnxruntime_mlas
-        zsv_parser
+        onnxruntime::onnxruntime
+        zsv
         newpfor
         fastpfor
         jma
@@ -234,8 +234,8 @@ target_link_libraries(bmp_benchmark
         infinity_core
         benchmark_profiler
         sql_parser
-        onnxruntime_mlas
-        zsv_parser
+        onnxruntime::onnxruntime
+        zsv
         newpfor
         fastpfor
         jma
@@ -278,8 +278,8 @@ target_link_libraries(hnsw_benchmark
         infinity_core
         benchmark_profiler
         sql_parser
-        onnxruntime_mlas
-        zsv_parser
+        onnxruntime::onnxruntime
+        zsv
         newpfor
         fastpfor
         jma

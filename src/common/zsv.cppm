@@ -14,6 +14,10 @@
 
 module;
 
+#ifdef __cplusplus
+#define restrict __restrict
+#endif
+
 extern "C" {
 // Do not use "zsv/api.h" or "zsv/common.h" directly
 #include "zsv.h"

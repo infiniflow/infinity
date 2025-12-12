@@ -14,7 +14,7 @@
 
 module;
 
-#include "inc/mlas.h"
+#include "onnxruntime/core/mlas/mlas.h"
 
 module infinity_core:mlas_matrix_multiply.impl;
 
@@ -88,7 +88,7 @@ void transpose_matrixA_multiply_transpose_matrixB_output_to_C(const float *x,
 }
 
 void TransposeMatrix(const float *input, float *output, const size_t input_row_count, const size_t input_column_count) {
-    MlasTranspose(input, output, input_row_count, input_column_count);
+    MlasTranspose(input, output, input_row_count, input_column_count, nullptr);
 }
 
 } // namespace infinity

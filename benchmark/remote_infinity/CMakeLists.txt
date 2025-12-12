@@ -17,8 +17,8 @@ target_link_libraries(
         infinity_core
         benchmark_profiler
         sql_parser
-        onnxruntime_mlas
-        zsv_parser
+        onnxruntime::onnxruntime
+        zsv
         newpfor
         fastpfor
         jma

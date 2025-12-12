@@ -24,7 +24,7 @@ if (NOT CMAKE_TOOLCHAIN_FILE)
 endif ()
 
 set(VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_SOURCE_DIR}/custom_ports"
-    CACHE STRING "Custom vcpkg ports")
+        CACHE STRING "Custom vcpkg ports")
 
 project(infinity VERSION 0.6.11)
 
@@ -126,7 +126,9 @@ find_package(CLI11 CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 find_package(Libevent CONFIG REQUIRED)
 find_package(magic_enum CONFIG REQUIRED)
-#find_package(miniocpp CONFIG REQUIRED) # wait for s3
+find_package(miniocpp CONFIG REQUIRED) # wait for s3
+find_package(onnxruntime CONFIG REQUIRED)
+
 #nanobind   don't need it
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(oatpp CONFIG REQUIRED)
@@ -171,6 +173,24 @@ message(STATUS "Found oatpp include directories: ${OATPP_INCLUDE_DIRS}")
 include_directories(${OATPP_INCLUDE_DIRS})
 message(STATUS "Using vcpkg toolchain - automatic package discovery enabled")
 
+# Copy mlas headers in onnxruntime to project
+if (CMAKE_TOOLCHAIN_FILE)
+    get_filename_component(VCPKG_TOOLCHAIN_FILE "${CMAKE_TOOLCHAIN_FILE}" ABSOLUTE)
+    get_filename_component(VCPKG_BUILDSYSTEMS_DIR "${VCPKG_TOOLCHAIN_FILE}" DIRECTORY)  # 得到 .../vcpkg/scripts/buildsystems
+    get_filename_component(VCPKG_SCRIPTS_DIR "${VCPKG_BUILDSYSTEMS_DIR}" DIRECTORY)       # 得到 .../vcpkg/scripts
+    get_filename_component(VCPKG_ROOT "${VCPKG_SCRIPTS_DIR}" DIRECTORY)
+
+    set(MLAS_INC_SRC_PATTERN "${VCPKG_ROOT}/buildtrees/onnxruntime/src/*/onnxruntime/core/mlas/inc")
+    file(GLOB MLAS_INC_SRC_DIR LIST_DIRECTORIES true "${MLAS_INC_SRC_PATTERN}")
+    message(STATUS "MLAS_INC_SRC_DIR: ${MLAS_INC_SRC_DIR}")
+
+    set(MLAS_DEST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake-build-debug/vcpkg_installed/x64-linux/include/onnxruntime/core/mlas")
+    file(MAKE_DIRECTORY "${MLAS_DEST_DIR}")
+    message(STATUS "MLAS_DEST_DIR: ${MLAS_DEST_DIR}")
+
+    file(INSTALL "${MLAS_INC_SRC_DIR}/" DESTINATION "${MLAS_DEST_DIR}" FILES_MATCHING PATTERN "*.h")
+    message(STATUS "Copied mlas headers")
+endif ()
 
 # https://youtrack.jetbrains.com/issue/CPP-39632/import-std-CLion-cant-resolve-module-std-in-case-of-clang
 add_library(unused_std_target STATIC)

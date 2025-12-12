@@ -296,7 +296,6 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/newpfor")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/fastpfor/headers")
@@ -304,7 +303,6 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/deps/limonp/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ijma/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/pgm/include")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/mlas")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/xor_singleheader/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/base64/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/eigen-3.4.0")
@@ -324,14 +322,12 @@ add_executable(infinity
 ### Parser (built after infinity_core so it can access modules)
 add_subdirectory(parser)
 
-find_package(miniocpp REQUIRED)
-
 target_link_libraries(infinity
         PUBLIC
         infinity_core
         sql_parser
-        onnxruntime_mlas
-        zsv_parser
+        onnxruntime::onnxruntime
+        zsv
         newpfor
         fastpfor
         jma
@@ -394,8 +390,8 @@ target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 #            ${libname}
 #            infinity_core
 #            sql_parser
-#            onnxruntime_mlas
-#            zsv_parser
+#            onnxruntime::onnxruntime
+#            zsv
 #            newpfor
 #            fastpfor
 #            jma
@@ -484,8 +480,8 @@ target_link_libraries(unit_test
         infinity_core
         GTest::gtest GTest::gtest_main
         sql_parser
-        onnxruntime_mlas
-        zsv_parser
+        onnxruntime::onnxruntime
+        zsv
         newpfor
         fastpfor
         jma
