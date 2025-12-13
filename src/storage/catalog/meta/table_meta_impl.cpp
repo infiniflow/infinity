@@ -140,7 +140,7 @@ Status TableMeta::GetIndexID(const std::string &index_name, std::string &index_k
     size_t max_visible_index_index = std::numeric_limits<size_t>::max();
     TxnTimeStamp max_commit_ts = 0;
     for (size_t i = 0; i < index_kvs.size(); ++i) {
-        TxnTimeStamp commit_ts = infinity::GetTimestampFromKey(index_kvs[i].first);
+        TxnTimeStamp commit_ts = GetTimestampFromKey(index_kvs[i].first);
         if ((commit_ts <= begin_ts_ || (txn_ != nullptr && txn_->IsReplay() && commit_ts == commit_ts_)) && commit_ts > max_commit_ts) {
             max_commit_ts = commit_ts;
             max_visible_index_index = i;
@@ -436,9 +436,8 @@ Status TableMeta::GetTableInfo(TableInfo &table_info) {
         return status;
     }
     table_info.column_defs_ = *column_defs;
-    std::sort(table_info.column_defs_.begin(),
-              table_info.column_defs_.end(),
-              [](const std::shared_ptr<ColumnDef> &a, const std::shared_ptr<ColumnDef> &b) { return a->id_ < b->id_; });
+    std::ranges::sort(table_info.column_defs_,
+                      [](const std::shared_ptr<ColumnDef> &a, const std::shared_ptr<ColumnDef> &b) { return a->id_ < b->id_; });
     table_info.column_count_ = table_info.column_defs_.size();
 
     table_info.db_id_ = db_id_str_;
@@ -493,18 +492,13 @@ Status TableMeta::GetTableDetail(TableDetail &table_detail) {
 Status TableMeta::AddColumn(const ColumnDef &column_def) {
     std::string column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_def.name(), commit_ts_);
     std::string column_name_value;
-    Status status = kv_instance_->Put(column_key, column_def.ToJson().dump());
-    return status;
+    return kv_instance_->Put(column_key, column_def.ToJson().dump());
 }
 
 Status TableMeta::AddFtIndexCache(std::shared_ptr<TableIndexReaderCache> ft_index_cache) {
     std::string ft_index_cache_key = GetTableTag("ft_index_cache");
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    Status status = new_catalog->AddFtIndexCache(std::move(ft_index_cache_key), std::move(ft_index_cache));
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
+    return new_catalog->AddFtIndexCache(std::move(ft_index_cache_key), std::move(ft_index_cache));
 }
 
 Status TableMeta::GetFtIndexCache(std::shared_ptr<TableIndexReaderCache> &ft_index_cache) {
@@ -512,27 +506,19 @@ Status TableMeta::GetFtIndexCache(std::shared_ptr<TableIndexReaderCache> &ft_ind
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
 
     ft_index_cache = std::make_shared<TableIndexReaderCache>(db_id_str_, table_id_str_, table_name_);
-    Status status = new_catalog->GetFtIndexCache(ft_index_cache_key, ft_index_cache);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
+    return new_catalog->GetFtIndexCache(ft_index_cache_key, ft_index_cache);
 }
 
 Status TableMeta::RemoveFtIndexCache() {
     std::string ft_index_cache_key = GetTableTag("ft_index_cache");
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    Status status = new_catalog->DropFtIndexCacheByFtIndexCacheKey(ft_index_cache_key);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
+    return new_catalog->DropFtIndexCacheByFtIndexCacheKey(ft_index_cache_key);
 }
 
 Status TableMeta::InvalidateFtIndexCache() {
     std::string ft_index_cache_key = GetTableTag("ft_index_cache");
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    std::shared_ptr<TableIndexReaderCache> ft_index_cache = std::make_shared<TableIndexReaderCache>(db_id_str_, table_id_str_, table_name_);
+    auto ft_index_cache = std::make_shared<TableIndexReaderCache>(db_id_str_, table_id_str_, table_name_);
     Status status = new_catalog->GetFtIndexCache(ft_index_cache_key, ft_index_cache);
     if (!status.ok()) {
         if (status.code() == ErrorCode::kCatalogError) {
@@ -581,7 +567,7 @@ Status TableMeta::LoadColumnDefs() {
         }
     }
 
-    std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs = std::make_shared<std::vector<std::shared_ptr<ColumnDef>>>();
+    auto column_defs = std::make_shared<std::vector<std::shared_ptr<ColumnDef>>>();
     std::map<std::string, std::vector<std::pair<std::string, std::string>>> column_kvs_map;
     std::string column_prefix = KeyEncode::TableColumnPrefix(db_id_str_, table_id_str_);
 
@@ -622,9 +608,7 @@ Status TableMeta::LoadColumnDefs() {
             }
         }
     }
-    std::sort(column_defs->begin(), column_defs->end(), [](const std::shared_ptr<ColumnDef> &a, const std::shared_ptr<ColumnDef> &b) {
-        return a->id_ < b->id_;
-    });
+    std::ranges::sort(*column_defs, [](const std::shared_ptr<ColumnDef> &a, const std::shared_ptr<ColumnDef> &b) { return a->id_ < b->id_; });
     column_defs_ = std::move(column_defs);
     if (table_cache.get() != nullptr && txn_ != nullptr && txn_->readonly()) {
         txn_->AddCacheInfo(std::make_shared<TableCacheColumnInfo>(db_id_, table_name_, begin_ts_, column_defs_));
@@ -634,7 +618,7 @@ Status TableMeta::LoadColumnDefs() {
 
 Status TableMeta::LoadIndexIDs() {
 
-    std::shared_ptr<MetaTableCache> table_cache{};
+    std::shared_ptr<MetaTableCache> table_cache;
     if (index_id_strs_ == std::nullopt or index_name_strs_ == std::nullopt) {
         if (txn_ != nullptr and txn_->readonly()) {
             table_cache = meta_cache_->GetTable(db_id_, table_name_, begin_ts_);
@@ -1077,7 +1061,7 @@ Status TableMeta::SetBeginTS(TxnTimeStamp begin_ts) {
 }
 
 std::tuple<size_t, Status> TableMeta::GetTableRowCount() {
-    Status status{};
+    Status status;
     size_t row_count{};
     auto [segment_ids, seg_status] = GetSegmentIDs1();
     for (auto &segment_id : *segment_ids) {

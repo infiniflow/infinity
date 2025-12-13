@@ -37,13 +37,14 @@ namespace infinity {
 HnswEncodeType StringToHnswEncodeType(const std::string &str) {
     if (str == "plain") {
         return HnswEncodeType::kPlain;
-    } else if (str == "lvq") {
-        return HnswEncodeType::kLVQ;
-    } else if (str == "rabitq") {
-        return HnswEncodeType::kRabitq;
-    } else {
-        return HnswEncodeType::kInvalid;
     }
+    if (str == "lvq") {
+        return HnswEncodeType::kLVQ;
+    }
+    if (str == "rabitq") {
+        return HnswEncodeType::kRabitq;
+    }
+    return HnswEncodeType::kInvalid;
 }
 
 std::string HnswEncodeTypeToString(HnswEncodeType encode_type) {
@@ -73,11 +74,11 @@ std::string HnswBuildTypeToString(HnswBuildType build_type) {
 HnswBuildType StringToHnswBuildType(const std::string &str) {
     if (str == "plain") {
         return HnswBuildType::kPlain;
-    } else if (str == "lsg") {
-        return HnswBuildType::kLSG;
-    } else {
-        return HnswBuildType::kInvalid;
     }
+    if (str == "lsg") {
+        return HnswBuildType::kLSG;
+    }
+    return HnswBuildType::kInvalid;
 }
 
 void TrimSpace(std::string_view &str) {
@@ -182,8 +183,7 @@ std::shared_ptr<IndexBase> IndexHnsw::Make(std::shared_ptr<std::string> index_na
         } else if (param->param_name_ == "lsg_config") {
             lsg_config = LSGConfig::FromString(param->param_value_);
         } else {
-            Status status = Status::InvalidIndexParam(param->param_name_);
-            RecoverableError(status);
+            RecoverableError(Status::InvalidIndexParam(param->param_name_));
         }
     }
     if (build_type != HnswBuildType::kLSG && lsg_config) {
@@ -194,13 +194,11 @@ std::shared_ptr<IndexBase> IndexHnsw::Make(std::shared_ptr<std::string> index_na
     }
 
     if (metric_type == MetricType::kInvalid) {
-        Status status = Status::InvalidIndexParam("Metric type");
-        RecoverableError(status);
+        RecoverableError(Status::InvalidIndexParam("Metric type"));
     }
 
     if (encode_type == HnswEncodeType::kInvalid) {
-        Status status = Status::InvalidIndexParam("Encode type");
-        RecoverableError(status);
+        RecoverableError(Status::InvalidIndexParam("Encode type"));
     }
 
     return std::make_shared<IndexHnsw>(index_name,

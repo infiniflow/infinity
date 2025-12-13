@@ -14,114 +14,287 @@
 
 module;
 
+#include <unistd.h>
+
 export module infinity_core:file_worker;
 
 import :file_worker_type;
 import :persistence_manager;
 import :defer_op;
-import :snapshot_info;
+import :virtual_store;
+// import :bmp_handler;
+// import :hnsw_handler;
+// import :secondary_index_data;
+import :block_version;
+import :emvb_index;
+import :boost;
 
 import std.compat;
 import third_party;
 
 namespace infinity {
 
-class KVInstance;
 class LocalFileHandle;
 class Status;
+// export class FileWorkerManager;
+export class BMPHandler;
+using BMPHandlerPtr = BMPHandler *;
+
+export struct HnswHandler;
+using HnswHandlerPtr = HnswHandler *;
+
+// std::shared_ptr<Foo> foo_shared = foo->shared_from_this();
+
+export struct HighCardinalityTag;
+export struct LowCardinalityTag;
+export template <typename CardinalityTag>
+class SecondaryIndexDataBase;
+export class FileWorkerManager;
+
+export class IVFIndexInChunk;
+
+export class VarBuffer;
 
 export struct FileWorkerSaveCtx {};
 
+export struct FileWorkerTag {};
+
+export template <typename FileWorkerT>
+concept FileWorkerConcept = std::derived_from<FileWorkerT, FileWorkerTag> && requires(FileWorkerT file_worker) {
+    file_worker.Read();
+    file_worker.Write();
+};
+
+export struct DataFileWorkerV2 : FileWorkerTag {
+    void Write() {}
+    void Read() {}
+};
+
+export struct VarFileWorkerV2 : FileWorkerTag {
+    void Write() {}
+    void Read() {}
+};
+
+export struct VersionFileWorkerV2 : FileWorkerTag {
+    void Write() {}
+    void Read() {}
+};
+
 export class FileWorker {
 public:
-    // spill_dir_ is not init here
-    explicit FileWorker(std::shared_ptr<std::string> data_dir,
-                        std::shared_ptr<std::string> temp_dir,
-                        std::shared_ptr<std::string> file_dir,
-                        std::shared_ptr<std::string> file_name,
-                        PersistenceManager *persistence_manager);
+    explicit FileWorker(std::shared_ptr<std::string> file_path);
 
     // No destruct here
-    virtual ~FileWorker();
+    virtual ~FileWorker() = default;
 
-public:
-    [[nodiscard]] bool WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx = {});
+    bool Write(auto data, const FileWorkerSaveCtx &ctx = {}) {
+        boost::unique_lock l(boost_rw_mutex_);
 
-    bool WriteSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info,
-                           bool use_memory,
-                           const FileWorkerSaveCtx &ctx = {},
-                           size_t row_cnt = 0,
-                           size_t data_size = 0);
-    // bool WriteSnapshotFile1(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info,
-    //                         bool use_memory,
-    //                         const FileWorkerSaveCtx &ctx = {},
-    //                         size_t data_size = 0);
+        [[maybe_unused]] auto tmp = GetFilePathTemp();
+        auto [file_handle, status] = VirtualStore::Open(GetFilePathTemp(), FileAccessMode::kReadWrite);
+        if (!status.ok()) {
+            // fuck
+            // UnrecoverableError(status.message());
+        }
 
-    void ReadFromFile(bool from_spill);
-    void ReadFromSnapshotFile(const std::string &snapshot_name, bool from_spill);
+        bool prepare_success = false;
+
+        bool all_save = Write(data, file_handle, prepare_success, ctx);
+        close(file_handle->fd());
+        return all_save;
+    }
+
+    void Read(auto &data) {
+        boost::upgrade_lock l(boost_rw_mutex_);
+        if (mmap_) {
+            size_t file_size = 0;
+
+            auto temp_path = GetFilePathTemp();
+            auto data_path = GetFilePath();
+            std::string file_path;
+            if (VirtualStore::Exists(temp_path)) { // branchless
+                file_path = temp_path;
+                auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kReadWrite);
+                if (!status.ok()) {
+                    std::unique_ptr<LocalFileHandle> file_handle;
+                    Read(data, file_handle, file_size);
+                    // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+                    return;
+                }
+                file_size = file_handle->FileSize();
+                Read(data, file_handle, file_size);
+                close(file_handle->fd());
+            } else if (persistence_manager_) {
+                file_path = data_path;
+                auto result = persistence_manager_->GetObjCache(file_path);
+                obj_addr_ = result.obj_addr_;
+                auto true_file_path = fmt::format("{}/{}", persistence_manager_->workspace(), obj_addr_.obj_key_);
+                auto [file_handle, status] = VirtualStore::Open(true_file_path, FileAccessMode::kReadWrite);
+                if (!status.ok()) {
+                    std::unique_ptr<LocalFileHandle> file_handle;
+                    Read(data, file_handle, file_size);
+                    // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+                    return;
+                }
+                file_handle->Seek(obj_addr_.part_offset_);
+                file_size = obj_addr_.part_size_;
+                Read(data, file_handle, file_size);
+                close(file_handle->fd());
+            } else if (VirtualStore::Exists(data_path, true)) {
+                file_path = data_path;
+                auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kReadWrite);
+                if (!status.ok()) {
+                    std::unique_ptr<LocalFileHandle> file_handle;
+                    Read(data, file_handle, file_size);
+                    // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+                    return;
+                }
+                file_size = file_handle->FileSize();
+                Read(data, file_handle, file_size);
+                close(file_handle->fd());
+            } else {
+                std::unique_ptr<LocalFileHandle> file_handle;
+                Read(data, file_handle, file_size);
+            }
+        } else {
+            boost::upgrade_to_unique_lock ll(l);
+            size_t file_size = 0;
+
+            auto temp_path = GetFilePathTemp();
+            auto data_path = GetFilePath();
+            std::string file_path;
+            if (VirtualStore::Exists(temp_path)) { // branchless
+                file_path = temp_path;
+                auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kReadWrite);
+                if (!status.ok()) {
+                    std::unique_ptr<LocalFileHandle> file_handle;
+                    Read(data, file_handle, file_size);
+                    // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+                    return;
+                }
+                file_size = file_handle->FileSize();
+                Read(data, file_handle, file_size);
+                close(file_handle->fd());
+            } else if (persistence_manager_) {
+                file_path = data_path;
+                auto result = persistence_manager_->GetObjCache(file_path);
+                obj_addr_ = result.obj_addr_;
+                auto true_file_path = fmt::format("{}/{}", persistence_manager_->workspace(), obj_addr_.obj_key_);
+                auto [file_handle, status] = VirtualStore::Open(true_file_path, FileAccessMode::kReadWrite);
+                if (!status.ok()) {
+                    std::unique_ptr<LocalFileHandle> file_handle;
+                    Read(data, file_handle, file_size);
+                    // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+                    return;
+                }
+                file_handle->Seek(obj_addr_.part_offset_);
+                file_size = obj_addr_.part_size_;
+                Read(data, file_handle, file_size);
+                close(file_handle->fd());
+            } else if (VirtualStore::Exists(data_path, true)) {
+                file_path = data_path;
+                auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kReadWrite);
+                if (!status.ok()) {
+                    std::unique_ptr<LocalFileHandle> file_handle;
+                    Read(data, file_handle, file_size);
+                    // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+                    return;
+                }
+                file_size = file_handle->FileSize();
+                Read(data, file_handle, file_size);
+                close(file_handle->fd());
+            } else {
+                std::unique_ptr<LocalFileHandle> file_handle;
+                Read(data, file_handle, file_size);
+            }
+        }
+    }
+
+    // void PickForCleanup();
 
     void MoveFile();
 
-    virtual void AllocateInMemory() = 0;
-
-    virtual void FreeInMemory() = 0;
-
-    virtual size_t GetMemoryCost() const = 0;
-
     virtual FileWorkerType Type() const = 0;
 
-    void *GetData() const { return data_; }
-
-    void SetData(void *data);
-
-    virtual void SetDataSize(size_t size);
-
     // Get an absolute file path. As key of a buffer handle.
-    std::string GetFilePath() const;
+    [[nodiscard]] std::string GetFilePath() const;
+
+    [[nodiscard]] std::string GetFilePathTemp() const;
 
     Status CleanupFile() const;
 
-    void CleanupTempFile() const;
-
 protected:
-    virtual bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
+    virtual bool
+    Write(std::span<BMPHandlerPtr> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+        return false;
+    }
 
-    virtual bool WriteSnapshotFileImpl(size_t row_cnt, size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx = {});
+    virtual void Read(std::shared_ptr<BMPHandlerPtr> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
 
-    virtual void ReadFromFileImpl(size_t file_size, bool from_spill) = 0;
+    virtual bool Write(std::span<char> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+        return false;
+    }
 
-    std::string ChooseFileDir(bool spill) const;
+    virtual void Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
 
-    std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> GetFilePathInner(bool spill);
+    virtual bool
+    Write(std::span<EMVBIndex> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+        return false;
+    }
+
+    virtual void Read(std::shared_ptr<EMVBIndex> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
+
+    virtual bool Write(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+        return false;
+    }
+
+    virtual void Read(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
+
+    virtual bool
+    Write(std::span<IVFIndexInChunk> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+        return false;
+    }
+
+    virtual void Read(IVFIndexInChunk *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
+
+    virtual bool Write(SecondaryIndexDataBase<HighCardinalityTag> *data,
+                       std::unique_ptr<LocalFileHandle> &file_handle,
+                       bool &prepare_success,
+                       const FileWorkerSaveCtx &ctx) {
+        return false;
+    }
+    virtual bool Write(SecondaryIndexDataBase<LowCardinalityTag> *data,
+                       std::unique_ptr<LocalFileHandle> &file_handle,
+                       bool &prepare_success,
+                       const FileWorkerSaveCtx &ctx) {
+        return false;
+    }
+
+    virtual void Read(SecondaryIndexDataBase<HighCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
+    virtual void Read(SecondaryIndexDataBase<LowCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
+    // virtual void Read(SecondaryIndexDataLowCardinalityT<BooleanT> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
+
+    virtual bool
+    Write(std::span<VarBuffer> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+        return false;
+    }
+
+    virtual void Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
+
+    virtual bool
+    Write(std::span<BlockVersion> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+        return false;
+    }
+
+    virtual void Read(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
 
 public:
-    const std::shared_ptr<std::string> data_dir_{};
-    const std::shared_ptr<std::string> temp_dir_{};
-    const std::shared_ptr<std::string> file_dir_{};
-    const std::shared_ptr<std::string> file_name_{};
+    mutable boost::shared_mutex boost_rw_mutex_;
+    std::shared_ptr<std::string> rel_file_path_;
     PersistenceManager *persistence_manager_{};
-    ObjAddr obj_addr_{};
-
-protected:
-    void *data_{nullptr};
-    std::unique_ptr<LocalFileHandle> file_handle_{nullptr};
-
-public:
-    void *GetMmapData() const { return mmap_data_; }
-
-    void Mmap();
-
-    void Munmap();
-
-    void MmapNotNeed();
-
-protected:
-    virtual bool ReadFromMmapImpl([[maybe_unused]] const void *ptr, [[maybe_unused]] size_t size);
-
-    virtual void FreeFromMmapImpl();
-
-protected:
-    u8 *mmap_addr_{nullptr};
-    u8 *mmap_data_{nullptr};
+    FileWorkerManager *file_worker_manager_{};
+    ObjAddr obj_addr_;
+    void *mmap_{};
+    size_t mmap_size_{};
 };
 } // namespace infinity

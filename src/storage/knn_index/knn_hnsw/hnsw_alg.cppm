@@ -97,9 +97,21 @@ public:
     }
 
     void SaveToPtr(LocalFileHandle &file_handle) const {
+        // size_t cur_vec_num = data_store_->cur_vec_num();
+        // size_t mmap_size = sizeof(M_) + sizeof(ef_construction_) + sizeof(cur_vec_num);
+
         file_handle.Append(&M_, sizeof(M_));
         file_handle.Append(&ef_construction_, sizeof(ef_construction_));
         data_store_.SaveToPtr(file_handle);
+
+        // size_t cur_vec_num = this->cur_vec_num();
+        //
+        // file_handle.Append(&cur_vec_num, sizeof(cur_vec_num));
+        // this->vec_store_meta_.Save(file_handle);
+        // this->graph_store_meta_.Save(file_handle, cur_vec_num); // could get
+        //
+        // auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
+        // Inner::SaveToPtr(file_handle, inners_.get(), this->vec_store_meta_, this->graph_store_meta_, chunk_size_, chunk_num, last_chunk_size);
     }
 
 protected:
@@ -530,15 +542,14 @@ public:
         return std::make_unique<This>(M, ef_construction, std::move(data_store), std::move(distance));
     }
 
-    static std::unique_ptr<This> LoadFromPtr(LocalFileHandle &file_handle, size_t size) {
-        auto buffer = std::make_unique<char[]>(size);
-        file_handle.Read(buffer.get(), size);
-        const char *ptr = buffer.get();
+    static std::unique_ptr<This> LoadFromPtr(void *&m_mmap, size_t &mmap_size, LocalFileHandle &file_handle, size_t size) {
+        auto *buffer = static_cast<char *>(m_mmap);
+        const char *ptr = buffer;
         size_t M = ReadBufAdv<size_t>(ptr);
         size_t ef_construction = ReadBufAdv<size_t>(ptr);
         auto data_store = DataStore::LoadFromPtr(ptr);
         Distance distance(data_store.dim());
-        if (size_t diff = ptr - buffer.get(); diff != size) {
+        if (size_t diff = ptr - buffer; diff != size) {
             UnrecoverableError("LoadFromPtr failed");
         }
         return std::make_unique<This>(M, ef_construction, std::move(data_store), std::move(distance));

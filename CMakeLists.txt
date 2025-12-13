@@ -114,7 +114,7 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static
 
 find_package(absl CONFIG REQUIRED)
 find_package(Arrow CONFIG REQUIRED)
-find_package(Boost REQUIRED COMPONENTS asio)
+find_package(Boost REQUIRED COMPONENTS asio thread)
 find_package(CLI11 CONFIG REQUIRED)
 #find_package(CURL REQUIRED) # wait for s3
 #darts-clone # wait for fix
@@ -319,8 +319,8 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 
     set(CMAKE_DEBUG_POSTFIX "")
 
-else ()
-    message(FATAL_ERROR "Only support CMake build type: Debug, RelWithDebInfo, and Release")
+#else ()
+#    message(FATAL_ERROR "Only support CMake build type: Debug, RelWithDebInfo, and Release")
 endif ()
 
 if (CLANG_VERSION_STRING VERSION_EQUAL 17)

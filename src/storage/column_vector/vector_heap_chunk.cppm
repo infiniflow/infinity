@@ -15,9 +15,8 @@
 export module infinity_core:vector_heap_chunk;
 
 import :allocator;
-import :buffer_obj;
-import :buffer_handle;
 import :infinity_exception;
+import :file_worker;
 
 import global_resource_usage;
 
@@ -28,28 +27,17 @@ export constexpr ChunkId INVALID_CHUNK_ID = -1;
 
 export struct VectorHeapChunk {
 public:
-    explicit VectorHeapChunk(BufferObj *buffer_obj) : ptr_(buffer_obj->Load()) {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount("VectorHeapChunk");
-#endif
-    }
+    explicit VectorHeapChunk(FileWorker *file_worker) : ptr_(file_worker) {}
 
-    explicit VectorHeapChunk(u64 capacity) : ptr_(std::make_unique_for_overwrite<char[]>(capacity)) {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount("VectorHeapChunk");
-#endif
-    }
+    explicit VectorHeapChunk(u64 capacity) : ptr_(std::make_unique_for_overwrite<char[]>(capacity)) {}
 
     VectorHeapChunk(const VectorHeapChunk &) = delete;
 
     VectorHeapChunk(VectorHeapChunk &&other) {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount("VectorHeapChunk");
-#endif
         if (std::holds_alternative<std::unique_ptr<char[]>>(other.ptr_)) {
             ptr_ = std::move(std::get<std::unique_ptr<char[]>>(other.ptr_));
         } else {
-            ptr_ = std::move(std::get<BufferHandle>(other.ptr_));
+            ptr_ = std::move(std::get<FileWorker *>(other.ptr_));
         }
     }
 
@@ -57,30 +45,19 @@ public:
 
     VectorHeapChunk &operator=(VectorHeapChunk &&) = delete;
 
-    ~VectorHeapChunk() {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::DecrObjectCount("VectorHeapChunk");
-#endif
-    }
+    ~VectorHeapChunk() {}
 
     const char *GetPtr() const { // Pattern Matching here
         if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
             return std::get<std::unique_ptr<char[]>>(ptr_).get();
-        } else {
-            return static_cast<const char *>(std::get<BufferHandle>(ptr_).GetData());
         }
-    }
-
-    char *GetPtrMut() {
-        if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
-            return std::get<std::unique_ptr<char[]>>(ptr_).get();
-        } else {
-            return static_cast<char *>(std::get<BufferHandle>(ptr_).GetDataMut());
-        }
+        std::shared_ptr<char[]> data;
+        std::get<FileWorker *>(ptr_)->Read(data);
+        return data.get(); // dangling
     }
 
 private:
-    std::variant<std::unique_ptr<char[]>, BufferHandle> ptr_;
+    std::variant<std::unique_ptr<char[]>, FileWorker *> ptr_;
 };
 
 } // namespace infinity

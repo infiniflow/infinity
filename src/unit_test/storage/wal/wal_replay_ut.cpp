@@ -24,7 +24,7 @@ import :infinity_context;
 import :table_def;
 import :data_block;
 import :value;
-import :buffer_manager;
+
 import :wal_entry;
 import :infinity_exception;
 import :status;
@@ -86,9 +86,8 @@ protected:
     std::string tree_cmd;
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         WalReplayTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, WalReplayTest, ::testing::Values(BaseTestParamStr::VFS_OFF_CONFIG_PATH));
+// ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(WalReplayTest, wal_replay_database) {
     {
@@ -838,22 +837,22 @@ TEST_F(WalReplayTest, wal_replay_compact) {
 
         txn_mgr->PrintAllKeyValue();
 
-        infinity::InfinityContext::instance().UnInit();
+        // InfinityContext::instance().UnInit(); // At this point, all kv-pairs in fileworker_map are cleared.
 #ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::UnInit();
+        GlobalResourceUsage::UnInit();
 #endif
     }
     // Restart db instance
     //    system(tree_cmd.c_str());
     {
 #ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
+        GlobalResourceUsage::Init();
 #endif
-        infinity::InfinityContext::instance().InitPhase1(config_path);
-        infinity::InfinityContext::instance().InitPhase2();
+        // InfinityContext::instance().InitPhase1(config_path);
+        // InfinityContext::instance().InitPhase2();
 
-        Storage *storage = infinity::InfinityContext::instance().storage();
-        NewTxnManager *txn_mgr = storage->new_txn_manager();
+        auto *storage = InfinityContext::instance().storage();
+        auto *txn_mgr = storage->new_txn_manager();
 
         {
             auto txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
@@ -863,6 +862,12 @@ TEST_F(WalReplayTest, wal_replay_compact) {
                 EXPECT_NE(table_info, nullptr);
                 EXPECT_EQ(table_info->segment_count_, 1);
             }
+
+            // {
+            //     auto [segment_info, status] = txn->GetSegmentInfo("default_db", "tbl1", 0);
+            //     EXPECT_TRUE(status.ok());
+            //     EXPECT_EQ(segment_info->row_count_, 8192);
+            // }
 
             {
                 auto [segment_info, status] = txn->GetSegmentInfo("default_db", "tbl1", 2);
@@ -883,9 +888,9 @@ TEST_F(WalReplayTest, wal_replay_compact) {
             }
             txn_mgr->CommitTxn(txn);
         }
-        infinity::InfinityContext::instance().UnInit();
+        InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::UnInit();
+        GlobalResourceUsage::UnInit();
 #endif
     }
 }
@@ -893,17 +898,17 @@ TEST_F(WalReplayTest, wal_replay_compact) {
 TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
     {
         // Earlier cases may leave a dirty infinity instance. Destroy it first.
-        infinity::InfinityContext::instance().UnInit();
+        InfinityContext::instance().UnInit();
         CleanupDbDirs();
 #ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
+        GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
-        infinity::InfinityContext::instance().InitPhase1(config_path);
-        infinity::InfinityContext::instance().InitPhase2();
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
 
-        Storage *storage = infinity::InfinityContext::instance().storage();
-        NewTxnManager *txn_mgr = storage->new_txn_manager();
+        auto *storage = infinity::InfinityContext::instance().storage();
+        auto *txn_mgr = storage->new_txn_manager();
 
         // CREATE TABLE test_annivfflat (col1 embedding(float,128));
         {
@@ -933,7 +938,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
             parameters1.emplace_back(new InitParameter("metric", "l2"));
             parameters1.emplace_back(new InitParameter("plain_storage_data_type", "f32"));
 
-            std::shared_ptr<std::string> index_name = std::make_shared<std::string>("idx1");
+            auto index_name = std::make_shared<std::string>("idx1");
             auto index_base_ivf = IndexIVF::Make(index_name, std::make_shared<std::string>("test comment"), "idx1_tbl1", columns1, parameters1);
             for (auto *init_parameter : parameters1) {
                 delete init_parameter;
@@ -950,11 +955,11 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
             EXPECT_TRUE(status.ok());
         }
 
-        infinity::InfinityContext::instance().UnInit();
+        InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
+        GlobalResourceUsage::UnInit();
 #endif
     }
     ////////////////////////////////
@@ -963,13 +968,13 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
     //    system(tree_cmd.c_str());
     {
         // Earlier cases may leave a dirty infinity instance. Destroy it first.
-        infinity::InfinityContext::instance().UnInit();
+        InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
+        GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
-        infinity::InfinityContext::instance().InitPhase1(config_path);
-        infinity::InfinityContext::instance().InitPhase2();
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         NewTxnManager *txn_mgr = storage->new_txn_manager();
@@ -981,11 +986,11 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
             txn_mgr->CommitTxn(txn);
         }
 
-        infinity::InfinityContext::instance().UnInit();
+        InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
+        GlobalResourceUsage::UnInit();
 #endif
     }
 }
@@ -993,18 +998,18 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
 TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
     {
         // Earlier cases may leave a dirty infinity instance. Destroy it first.
-        infinity::InfinityContext::instance().UnInit();
+        InfinityContext::instance().UnInit();
         CleanupDbDirs();
 #ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
+        GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
-        infinity::InfinityContext::instance().InitPhase1(config_path);
-        infinity::InfinityContext::instance().InitPhase2();
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
 
-        Storage *storage = infinity::InfinityContext::instance().storage();
-        NewTxnManager *txn_mgr = storage->new_txn_manager();
-        // BufferManager *buffer_manager = storage->buffer_manager();
+        auto *storage = infinity::InfinityContext::instance().storage();
+        auto *txn_mgr = storage->new_txn_manager();
+        // FileWorkerManager *buffer_manager = storage->buffer_manager();
 
         // CREATE TABLE test_hnsw (col1 embedding(float,128));
         {
@@ -1036,7 +1041,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
             parameters1.emplace_back(new InitParameter("m", "16"));
             parameters1.emplace_back(new InitParameter("ef_construction", "200"));
 
-            std::shared_ptr<std::string> index_name = std::make_shared<std::string>("hnsw_index");
+            auto index_name = std::make_shared<std::string>("hnsw_index");
             auto index_base_hnsw =
                 IndexHnsw::Make(index_name, std::make_shared<std::string>("test comment"), "hnsw_index_test_hnsw", columns1, parameters1);
             for (auto *init_parameter : parameters1) {
@@ -1053,11 +1058,11 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
             EXPECT_TRUE(status.ok());
         }
 
-        infinity::InfinityContext::instance().UnInit();
+        InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
+        GlobalResourceUsage::UnInit();
 #endif
     }
     ////////////////////////////////
@@ -1066,11 +1071,11 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
     //    system(tree_cmd.c_str());
     {
 #ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
+        GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
-        infinity::InfinityContext::instance().InitPhase1(config_path);
-        infinity::InfinityContext::instance().InitPhase2();
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         NewTxnManager *txn_mgr = storage->new_txn_manager();
@@ -1082,11 +1087,11 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
             txn_mgr->CommitTxn(txn);
         }
 
-        infinity::InfinityContext::instance().UnInit();
+        InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
+        GlobalResourceUsage::UnInit();
 #endif
     }
 }

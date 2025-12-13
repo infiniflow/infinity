@@ -341,6 +341,8 @@ target_link_libraries(infinity
         opencc
         #        $<IF:$<BOOL:${ARM64}>,opencc,>
         dl
+        Boost::asio
+        Boost::thread
         thrift::thrift
         # thriftnb::thriftnb
         libevent::core
@@ -501,6 +503,8 @@ target_link_libraries(unit_test
         jma
         opencc
         dl
+        Boost::asio
+        Boost::thread
         thrift::thrift
         # thriftnb::thriftnb
         libevent::core

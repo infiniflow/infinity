@@ -24,7 +24,8 @@ namespace infinity {
 
 class BlockMeta;
 class KVInstance;
-class BufferObj;
+class DataFileWorker;
+class VarFileWorker;
 
 export class ColumnMeta {
 public:
@@ -42,11 +43,9 @@ public:
 
     Status LoadSet();
 
-    Status RestoreSet(const ColumnDef *column_def);
+    Status UninitSet(const std::shared_ptr<ColumnDef> &column_def, UsageFlag usage_flag);
 
-    Status UninitSet(const ColumnDef *column_def, UsageFlag usage_flag);
-
-    Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer);
+    Status GetFileWorker(DataFileWorker *&data_file_worker, VarFileWorker *&var_file_worker);
 
     std::tuple<size_t, Status> GetColumnSize(size_t row_cnt, const std::shared_ptr<ColumnDef> &col_def) const;
 
@@ -57,17 +56,19 @@ public:
     Status RestoreFromSnapshot(ColumnID column_id);
 
 private:
-    Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer, const ColumnDef *column_def);
+    Status GetFileWorker(DataFileWorker *&data_file_worker, VarFileWorker *&var_file_worker, const std::shared_ptr<ColumnDef> &column_def);
 
-    Status LoadColumnBuffer(const ColumnDef *col_def);
+    Status LoadFileWorker(std::shared_ptr<ColumnDef> column_def);
 
 private:
     KVInstance &kv_instance_;
     BlockMeta &block_meta_;
-    size_t column_idx_;
+    size_t column_idx_{};
 
-    BufferObj *column_buffer_ = nullptr;
-    BufferObj *outline_buffer_ = nullptr;
+    std::optional<size_t> chunk_offset_;
+
+    DataFileWorker *data_file_worker_{};
+    VarFileWorker *var_file_worker_{};
 };
 
 } // namespace infinity

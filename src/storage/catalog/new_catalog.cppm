@@ -17,7 +17,6 @@ export module infinity_core:new_catalog;
 import :status;
 import :meta_info;
 import :default_values;
-import :buffer_handle;
 import :profiler;
 import :storage;
 import :meta_tree;
@@ -41,7 +40,6 @@ export class ColumnMeta;
 export class TableIndexMeta;
 export class SegmentIndexMeta;
 export class ChunkIndexMeta;
-class BufferObj;
 export struct ColumnVector;
 struct MetaKey;
 class KVStore;
@@ -60,6 +58,7 @@ class SystemCache;
 class FunctionSet;
 class SpecialFunction;
 class MetaCache;
+class VersionFileWorker;
 
 enum class ColumnVectorMode;
 
@@ -99,7 +98,7 @@ export class NewTxnGetVisibleRangeState {
 public:
     NewTxnGetVisibleRangeState() = default;
 
-    void Init(std::shared_ptr<BlockLock> block_lock, BufferHandle version_buffer_handle, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts_);
+    void Init(std::shared_ptr<BlockLock> block_lock, VersionFileWorker *version_file_worker, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts_);
 
     bool Next(BlockOffset block_offset_begin, std::pair<BlockOffset, BlockOffset> &visible_range);
 
@@ -113,7 +112,7 @@ public:
 
 private:
     std::shared_ptr<BlockLock> block_lock_;
-    BufferHandle version_buffer_handle_;
+    VersionFileWorker *version_file_worker_{};
     TxnTimeStamp begin_ts_ = 0;
     TxnTimeStamp commit_ts_ = 0;
     BlockOffset block_offset_begin_ = 0;
@@ -130,7 +129,7 @@ public:
     BlockOffset cur() const { return cur_; }
 
 private:
-    NewTxnGetVisibleRangeState *visit_state_ = nullptr;
+    NewTxnGetVisibleRangeState *visit_state_{};
     std::pair<BlockOffset, BlockOffset> visible_range_ = {0, 0};
     BlockOffset cur_ = 0;
     bool end_ = false;
@@ -191,12 +190,6 @@ private:
     std::shared_mutex ft_index_cache_mtx_{};
     std::unordered_map<std::string, std::shared_ptr<TableIndexReaderCache>> ft_index_cache_map_{};
 
-public:
-    Status AddSegmentUpdateTS(std::string segment_update_ts_key, std::shared_ptr<SegmentUpdateTS> segment_update_ts);
-    Status GetSegmentUpdateTS(const std::string &segment_update_ts_key, std::shared_ptr<SegmentUpdateTS> &segment_update_ts);
-    void DropSegmentUpdateTSByKey(const std::string &segment_update_ts_key);
-
-private:
     std::shared_mutex segment_update_ts_mtx_{};
     std::unordered_map<std::string, std::shared_ptr<SegmentUpdateTS>> segment_update_ts_map_{};
 
@@ -289,7 +282,7 @@ public:
     static Status
     AddNewBlockColumn(BlockMeta &block_meta, size_t column_idx, const std::shared_ptr<ColumnDef> &column_def, std::optional<ColumnMeta> &column_meta);
 
-    static Status CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag);
+    static Status CleanBlockColumn(ColumnMeta &column_meta, const std::shared_ptr<ColumnDef> &column_def, UsageFlag usage_flag);
 
     static Status RestoreNewSegmentIndex1(TableIndexMeta &table_index_meta,
                                           NewTxn *new_txn,

@@ -22,7 +22,6 @@ import :ut.base_test;
 import :storage;
 import :infinity_context;
 import :status;
-import :buffer_manager;
 import :column_vector;
 import :table_def;
 import :value;
@@ -60,7 +59,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ::testing::Values(BaseTestParamStr::NEW_BG_ON_CONFIG_PATH2, BaseTestParamStr::NEW_VFS_OFF_BG_ON_CONFIG_PATH2));
 
 TEST_P(DumpMemIndexTaskTest2, row_cnt_exceed_memory_quota) {
-    auto *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
     auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
@@ -136,15 +135,15 @@ TEST_P(DumpMemIndexTaskTest2, row_cnt_exceed_memory_quota) {
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
         ChunkID chunk_id = 0;
         {
-            std::vector<ChunkID> *chunk_ids_ptr = nullptr;
+            std::vector<ChunkID> *chunk_ids_ptr{};
             std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids_ptr, std::vector<ChunkID>({0}));
             chunk_id = (*chunk_ids_ptr)[0];
         }
-        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
         {
-            ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+            ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+            ChunkIndexMetaInfo *chunk_info_ptr{};
             status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_info_ptr->base_row_id_, RowID(segment_id, 0));

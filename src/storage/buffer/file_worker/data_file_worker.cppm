@@ -22,39 +22,18 @@ namespace infinity {
 
 export class DataFileWorker : public FileWorker {
 public:
-    explicit DataFileWorker(std::shared_ptr<std::string> data_dir,
-                            std::shared_ptr<std::string> temp_dir,
-                            std::shared_ptr<std::string> file_dir,
-                            std::shared_ptr<std::string> file_name,
-                            size_t buffer_size,
-                            PersistenceManager *persistence_manager);
+    explicit DataFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_sizer);
 
     virtual ~DataFileWorker() override;
-
-public:
-    void AllocateInMemory() override;
-
-    void FreeInMemory() override;
-
-    size_t GetMemoryCost() const override { return buffer_size_; }
 
     FileWorkerType Type() const override { return FileWorkerType::kDataFile; }
 
 protected:
-    bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(std::span<char> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    bool WriteSnapshotFileImpl(size_t row_cnt, size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
-
-    void ReadFromFileImpl(size_t file_size, bool from_spill) override;
-
-    bool ReadFromMmapImpl(const void *ptr, size_t size) override;
-
-    void FreeFromMmapImpl() override;
-
-    void SetDataSize(size_t size) override;
+    void Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
 
 private:
-    const size_t buffer_size_;
-    std::atomic<size_t> data_size_{};
+    size_t buffer_size_{};
 };
 } // namespace infinity

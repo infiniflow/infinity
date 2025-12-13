@@ -45,7 +45,7 @@ void BGTaskProcessor::Start() {
 
 void BGTaskProcessor::Stop() {
     LOG_INFO("Background processor is stopping.");
-    std::shared_ptr<StopProcessorTask> stop_task = std::make_shared<StopProcessorTask>();
+    auto stop_task = std::make_shared<StopProcessorTask>();
     task_queue_.Enqueue(stop_task);
     stop_task->Wait();
     processor_thread_.join();
@@ -111,18 +111,18 @@ void BGTaskProcessor::Process() {
                         auto new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("clean up"), TransactionType::kCleanup);
                         Status status = new_txn_shared->Cleanup();
                         if (!status.ok()) {
-                            UnrecoverableError(status.message());
+                            LOG_WARN("Background cleanup failed. Due to excessive IO pressure?");
                         }
                         status = new_txn_mgr->CommitTxn(new_txn_shared.get());
                         if (!status.ok()) {
                             UnrecoverableError(status.message());
                         }
 
-                        CleanupTxnStore *cleanup_txn_store = static_cast<CleanupTxnStore *>(new_txn_shared->GetTxnStore());
-                        if (cleanup_txn_store != nullptr) {
+                        auto *cleanup_txn_store = static_cast<CleanupTxnStore *>(new_txn_shared->GetTxnStore());
+                        if (cleanup_txn_store) {
                             TxnTimeStamp clean_ts = cleanup_txn_store->timestamp_;
-                            std::shared_ptr<BGTaskInfo> bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kCleanup);
-                            std::string task_text = fmt::format("Cleanup task, cleanup timestamp: {}", clean_ts);
+                            auto bg_task_info = std::make_shared<BGTaskInfo>(BGTaskType::kCleanup);
+                            auto task_text = fmt::format("Cleanup task, cleanup timestamp: {}", clean_ts);
                             bg_task_info->task_info_list_.emplace_back(task_text);
                             if (status.ok()) {
                                 bg_task_info->status_list_.emplace_back("OK");

@@ -15,6 +15,8 @@ target_link_libraries(infinity_benchmark
         jma
         opencc
         dl
+        Boost::asio
+        Boost::thread
         thrift::thrift
         # thriftnb::thriftnb
         libevent::core
@@ -68,6 +70,8 @@ target_link_libraries(knn_import_benchmark
         jma
         opencc
         dl
+        Boost::asio
+        Boost::thread
         thrift::thrift
         # thriftnb::thriftnb
         libevent::core
@@ -119,6 +123,8 @@ target_link_libraries(knn_query_benchmark
         jma
         opencc
         dl
+        Boost::asio
+        Boost::thread
         Parquet::parquet_static
         Arrow::arrow_static
         thrift::thrift
@@ -171,6 +177,8 @@ target_link_libraries(fulltext_benchmark
         jma
         opencc
         dl
+        Boost::asio
+        Boost::thread
         thrift::thrift
         # thriftnb::thriftnb
         libevent::core
@@ -221,6 +229,8 @@ target_link_libraries(sparse_benchmark
         jma
         opencc
         dl
+        Boost::asio
+        Boost::thread
         Parquet::parquet_static
         Arrow::arrow_static
         ${JEMALLOC_STATIC_LIB}
@@ -266,6 +276,8 @@ target_link_libraries(bmp_benchmark
         jma
         opencc
         dl
+        Boost::asio
+        Boost::thread
         thrift::thrift
         # thriftnb::thriftnb
         libevent::core
@@ -315,6 +327,8 @@ target_link_libraries(hnsw_benchmark
         jma
         opencc
         dl
+        Boost::asio
+        Boost::thread
         Parquet::parquet_static
         Arrow::arrow_static
         thrift::thrift

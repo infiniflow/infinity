@@ -14,19 +14,16 @@
 
 module;
 
-#include "base_statement.h"
-#include "parser.h"
 #include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.explain_basic;
 
 import :ut.base_test;
+import :ut.request_test;
 import :ut.sql_runner;
 import :infinity_exception;
-import third_party;
 import :logger;
 import :infinity_context;
-import :ut.request_test;
 import :status;
 import :txn_state;
 import :new_txn_manager;
@@ -39,6 +36,8 @@ import :query_result;
 import :query_context;
 import :logical_node;
 import :logical_planner;
+
+import third_party;
 
 import global_resource_usage;
 
@@ -163,7 +162,7 @@ TEST_P(ExplainBasicTest, test1) {
     ExplainSql("show table tb segment 0 block 0 column 0", true);
     ExplainSql("show table tb indexes", true);
     ExplainSql("show checkpoint", true);
-    ExplainSql("show buffer", true);
+    // ExplainSql("show buffer", true); // deprecated
     ExplainSql("show tasks", true);
     ExplainSql("show configs", true);
     ExplainSql("show config version", true);

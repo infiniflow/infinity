@@ -27,7 +27,6 @@ import logical_type;
 namespace infinity {
 
 class IndexBase;
-class BufferManager;
 class SegmentMeta;
 
 export class IVFDataAccessorBase {

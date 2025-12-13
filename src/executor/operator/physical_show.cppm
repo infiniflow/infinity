@@ -119,8 +119,6 @@ private:
 
     void ExecuteShowConfig(QueryContext *query_context, ShowOperatorState *operator_state);
 
-    void ExecuteShowBuffer(QueryContext *query_context, ShowOperatorState *operator_state);
-
     void ExecuteShowMemIndex(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowQueries(QueryContext *query_context, ShowOperatorState *operator_state);

@@ -82,16 +82,16 @@ public:
 private:
     mutable std::mutex mtx_; // Used by append / mem index dump / clear
     std::condition_variable cv_;
-    bool is_dumping_{false};
-    bool is_updating_{false};
+    bool is_dumping_{};
+    bool is_updating_{};
 
-    std::shared_ptr<HnswIndexInMem> memory_hnsw_index_{};
-    std::shared_ptr<IVFIndexInMem> memory_ivf_index_{};
-    std::shared_ptr<MemoryIndexer> memory_indexer_{};
-    std::shared_ptr<SecondaryIndexInMem> memory_secondary_index_{};
-    std::shared_ptr<EMVBIndexInMem> memory_emvb_index_{};
-    std::shared_ptr<BMPIndexInMem> memory_bmp_index_{};
-    std::shared_ptr<DummyIndexInMem> memory_dummy_index_{};
+    std::shared_ptr<HnswIndexInMem> memory_hnsw_index_;
+    std::shared_ptr<IVFIndexInMem> memory_ivf_index_;
+    std::shared_ptr<MemoryIndexer> memory_indexer_;
+    std::shared_ptr<SecondaryIndexInMem> memory_secondary_index_;
+    std::shared_ptr<EMVBIndexInMem> memory_emvb_index_;
+    std::shared_ptr<BMPIndexInMem> memory_bmp_index_;
+    std::shared_ptr<DummyIndexInMem> memory_dummy_index_;
 };
 
 } // namespace infinity

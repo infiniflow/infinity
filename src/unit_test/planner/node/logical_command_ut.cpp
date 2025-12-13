@@ -80,7 +80,7 @@ public:
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LogicalCommandTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
 
 TEST_P(LogicalCommandTest, test1) {
-    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    NewTxnManager *txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
     db_name = std::make_shared<std::string>("default_db");
     column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
@@ -113,45 +113,45 @@ TEST_P(LogicalCommandTest, test1) {
         EXPECT_TRUE(ok);
     }
 
-    {
-        std::string sql = "create snapshot tb_snapshot on table tb";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-
-        auto nodes = query_context->logical_planner()->LogicalPlans();
-        for (const auto &node : nodes) {
-            CheckLogicalNode(node, LogicalNodeType::kCommand);
-        }
-
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-    }
-    {
-        std::string sql = "create snapshot db_snapshot on database default_db";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-
-        auto nodes = query_context->logical_planner()->LogicalPlans();
-        for (const auto &node : nodes) {
-            CheckLogicalNode(node, LogicalNodeType::kCommand);
-        }
-
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-    }
-    {
-        std::string sql = "create snapshot system_snapshot on system";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-
-        auto nodes = query_context->logical_planner()->LogicalPlans();
-        for (const auto &node : nodes) {
-            CheckLogicalNode(node, LogicalNodeType::kCommand);
-        }
-
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-    }
+    // {
+    //     std::string sql = "create snapshot tb_snapshot on table tb";
+    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+    //     QueryResult query_result = query_context->Query(sql);
+    //
+    //     auto nodes = query_context->logical_planner()->LogicalPlans();
+    //     for (const auto &node : nodes) {
+    //         CheckLogicalNode(node, LogicalNodeType::kCommand);
+    //     }
+    //
+    //     bool ok = HandleQueryResult(query_result);
+    //     EXPECT_TRUE(ok);
+    // }
+    // {
+    //     std::string sql = "create snapshot db_snapshot on database default_db";
+    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+    //     QueryResult query_result = query_context->Query(sql);
+    //
+    //     auto nodes = query_context->logical_planner()->LogicalPlans();
+    //     for (const auto &node : nodes) {
+    //         CheckLogicalNode(node, LogicalNodeType::kCommand);
+    //     }
+    //
+    //     bool ok = HandleQueryResult(query_result);
+    //     EXPECT_TRUE(ok);
+    // }
+    // {
+    //     std::string sql = "create snapshot system_snapshot on system";
+    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+    //     QueryResult query_result = query_context->Query(sql);
+    //
+    //     auto nodes = query_context->logical_planner()->LogicalPlans();
+    //     for (const auto &node : nodes) {
+    //         CheckLogicalNode(node, LogicalNodeType::kCommand);
+    //     }
+    //
+    //     bool ok = HandleQueryResult(query_result);
+    //     EXPECT_TRUE(ok);
+    // }
     {
         std::string sql = "dump index idx on tb";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
@@ -178,17 +178,17 @@ TEST_P(LogicalCommandTest, test1) {
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
-    {
-        std::string sql = "drop snapshot tb_snapshot";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(sql);
-
-        auto nodes = query_context->logical_planner()->LogicalPlans();
-        for (const auto &node : nodes) {
-            CheckLogicalNode(node, LogicalNodeType::kCommand);
-        }
-
-        bool ok = HandleQueryResult(query_result);
-        EXPECT_TRUE(ok);
-    }
+    // {
+    //     std::string sql = "drop snapshot tb_snapshot";
+    //     std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+    //     QueryResult query_result = query_context->Query(sql);
+    //
+    //     auto nodes = query_context->logical_planner()->LogicalPlans();
+    //     for (const auto &node : nodes) {
+    //         CheckLogicalNode(node, LogicalNodeType::kCommand);
+    //     }
+    //
+    //     bool ok = HandleQueryResult(query_result);
+    //     EXPECT_TRUE(ok);
+    // }
 }

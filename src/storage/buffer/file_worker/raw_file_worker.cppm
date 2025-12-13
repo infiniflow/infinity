@@ -17,6 +17,7 @@ export module infinity_core:raw_file_worker;
 import :file_worker;
 import :file_worker_type;
 import :persistence_manager;
+import :index_file_worker;
 
 namespace infinity {
 
@@ -24,30 +25,18 @@ namespace infinity {
 // - There's no file header nor footer.
 // - The buffer size is just the file size.
 // - The file size is consistant since creation.
-export class RawFileWorker : public FileWorker {
+export class RawFileWorker : public IndexFileWorker {
 public:
-    explicit RawFileWorker(std::shared_ptr<std::string> data_dir,
-                           std::shared_ptr<std::string> temp_dir,
-                           std::shared_ptr<std::string> file_dir,
-                           std::shared_ptr<std::string> file_name,
-                           u32 file_size,
-                           PersistenceManager *persistence_manager);
+    explicit RawFileWorker(std::shared_ptr<std::string> file_path, u32 file_size);
 
     virtual ~RawFileWorker() override;
-
-public:
-    void AllocateInMemory() override;
-
-    void FreeInMemory() override;
-
-    size_t GetMemoryCost() const override { return buffer_size_; }
 
     FileWorkerType Type() const override { return FileWorkerType::kRawFile; }
 
 protected:
-    bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(std::span<char> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void ReadFromFileImpl(size_t file_size, bool from_spill) override;
+    void Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
 
 private:
     size_t buffer_size_;

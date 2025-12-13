@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <sys/mman.h>
+#include <unistd.h>
+
 module infinity_core:version_file_worker.impl;
 
 import :version_file_worker;
@@ -20,81 +25,42 @@ import :block_version;
 import :infinity_exception;
 import :logger;
 import :persistence_manager;
+import :infinity_context;
 
 import third_party;
 
 namespace infinity {
 
-VersionFileWorker::VersionFileWorker(std::shared_ptr<std::string> data_dir,
-                                     std::shared_ptr<std::string> temp_dir,
-                                     std::shared_ptr<std::string> file_dir,
-                                     std::shared_ptr<std::string> file_name,
-                                     size_t capacity,
-                                     PersistenceManager *persistence_manager)
-    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), capacity_(capacity) {}
+VersionFileWorker::VersionFileWorker(std::shared_ptr<std::string> file_path, size_t capacity)
+    : FileWorker(std::move(file_path)), capacity_(capacity) {}
 
 VersionFileWorker::~VersionFileWorker() {
-    if (data_ != nullptr) {
-        FreeInMemory();
-        data_ = nullptr;
-    }
+    madvise(mmap_, mmap_size_, MADV_FREE);
+    munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
-void VersionFileWorker::AllocateInMemory() {
-    if (data_ != nullptr) {
-        UnrecoverableError("Data is already allocated.");
-    }
-    if (capacity_ == 0) {
-        UnrecoverableError("Capacity is 0.");
-    }
-    auto *data = new BlockVersion(capacity_);
-    data_ = static_cast<void *>(data);
-}
-
-void VersionFileWorker::FreeInMemory() {
-    if (data_ == nullptr) {
-        UnrecoverableError("Data is already freed.");
-    }
-    auto *data = static_cast<BlockVersion *>(data_);
-    delete data;
-    data_ = nullptr;
-}
-
-// FIXME
-size_t VersionFileWorker::GetMemoryCost() const { return capacity_ * sizeof(TxnTimeStamp); }
-
-bool VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &base_ctx) {
-    if (data_ == nullptr) {
-        UnrecoverableError("Data is not allocated.");
-    }
-    auto *data = static_cast<BlockVersion *>(data_);
-
-    // if spill to file, return true if success
-    if (to_spill) {
-        data->SpillToFile(file_handle_.get());
+bool VersionFileWorker::Write(std::span<BlockVersion> data,
+                              std::unique_ptr<LocalFileHandle> &file_handle,
+                              bool &prepare_success,
+                              const FileWorkerSaveCtx &base_ctx) {
+    const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
+    TxnTimeStamp ckp_ts = ctx.checkpoint_ts_;
+    bool is_full = data.data()->SaveToFile(mmap_, mmap_size_, *rel_file_path_, ckp_ts, *file_handle);
+    if (is_full) {
+        LOG_TRACE(fmt::format("Version file is full: {}", GetFilePath()));
+        // if the version file is full, return true to spill to file
         return true;
-    } else {
-        const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
-        bool is_full = data->SaveToFile(ctx.checkpoint_ts_, *file_handle_);
-        if (is_full) {
-            LOG_TRACE(fmt::format("Version file is full: {}", GetFilePath()));
-            // if the version file is full, return true to spill to file
-            return true;
-        }
     }
     return false;
 }
 
-bool VersionFileWorker::WriteSnapshotFileImpl(size_t row_cnt, size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-    return WriteToFileImpl(false, prepare_success, ctx);
-}
-
-void VersionFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
-    if (data_ != nullptr) {
-        UnrecoverableError("Data is already allocated.");
+void VersionFileWorker::Read(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
+    if (!file_handle) {
+        data = std::make_shared<BlockVersion>(8192);
+        return;
     }
-    auto *data = BlockVersion::LoadFromFile(file_handle_.get()).release();
-    data_ = static_cast<void *>(data);
+    BlockVersion::LoadFromFile(data, mmap_size_, mmap_, file_handle.get());
 }
 
 } // namespace infinity

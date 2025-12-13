@@ -12,15 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 export module infinity_core:bmp_index_file_worker;
 
 import :index_file_worker;
-import :file_worker;
-import :index_base;
-import :file_worker_type;
-import :persistence_manager;
+// // import :file_worker;
+// import :index_base;
+// import :file_worker_type;
+// import :persistence_manager;
+// import :bmp_handler;
 
 import std.compat;
 
@@ -29,36 +28,22 @@ import sparse_info;
 
 namespace infinity {
 
-export class BMPIndexFileWorker final : public IndexFileWorker {
+export class BMPIndexFileWorker : public IndexFileWorker {
 public:
-    explicit BMPIndexFileWorker(std::shared_ptr<std::string> data_dir,
-                                std::shared_ptr<std::string> temp_dir,
-                                std::shared_ptr<std::string> file_dir,
-                                std::shared_ptr<std::string> file_name,
+    explicit BMPIndexFileWorker(std::shared_ptr<std::string> file_path,
                                 std::shared_ptr<IndexBase> index_base,
                                 std::shared_ptr<ColumnDef> column_def,
-                                PersistenceManager *persistence_manager,
                                 size_t index_size = 0);
 
     ~BMPIndexFileWorker() override;
 
-public:
-    void AllocateInMemory() override;
-
-    void FreeInMemory() override;
-
     FileWorkerType Type() const override { return FileWorkerType::kBMPIndexFile; }
 
-    size_t GetMemoryCost() const override { return index_size_; }
-
 protected:
-    bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool
+    Write(std::span<BMPHandlerPtr> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void ReadFromFileImpl(size_t file_size, bool from_spill) override;
-
-    bool ReadFromMmapImpl(const void *ptr, size_t size) override;
-
-    void FreeFromMmapImpl() override;
+    void Read(std::shared_ptr<BMPHandlerPtr> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
 
 private:
     size_t index_size_{};

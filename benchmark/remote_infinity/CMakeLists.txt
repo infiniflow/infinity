@@ -26,6 +26,8 @@ target_link_libraries(
         jma
         opencc
         dl
+        Boost::asio
+        Boost::thread
         thrift::thrift
         # thriftnb::thriftnb
         ${STDCXX15EXP_STATIC}

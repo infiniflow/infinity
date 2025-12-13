@@ -20,7 +20,6 @@ import :physical_index_scan;
 import :query_context;
 import :operator_state;
 import :default_values;
-import :buffer_handle;
 import :infinity_exception;
 import :logger;
 import :data_block;

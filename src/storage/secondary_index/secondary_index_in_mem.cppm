@@ -25,9 +25,8 @@ import column_def;
 
 namespace infinity {
 
-class BufferManager;
 struct ColumnVector;
-class BufferObj;
+class IndexFileWorker;
 
 export class SecondaryIndexInMem : public BaseMemIndex {
 protected:
@@ -40,7 +39,7 @@ protected:
     virtual u32 MemoryCostOfThis() const = 0;
 
 public:
-    virtual ~SecondaryIndexInMem() = default;
+    ~SecondaryIndexInMem() override = default;
 
     MemIndexTracerInfo GetInfo() const override;
 
@@ -52,7 +51,7 @@ public:
 
     virtual void InsertBlockData(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt) = 0;
 
-    virtual void Dump(BufferObj *buffer_obj) const = 0;
+    virtual void Dump(IndexFileWorker *file_worker) const = 0;
 
     virtual std::pair<u32, Bitmask> RangeQuery(const void *input) const = 0;
 
