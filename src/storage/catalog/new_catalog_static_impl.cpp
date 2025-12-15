@@ -714,7 +714,6 @@ Status NewCatalog::LoadImportedOrCompactedSegment(TableMeta &table_meta, const W
 
         std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs_ptr;
         {
-            TableMeta &table_meta = segment_meta.table_meta();
             std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
             if (!status.ok()) {
                 return status;

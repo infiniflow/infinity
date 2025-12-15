@@ -418,7 +418,7 @@ public:
     TxnTimeStamp GetCurrentCkpTS() const;
 
 private:
-    void CheckTxnStatus();
+    void CheckTxnStatus() const;
 
     void CheckTxn(const std::string &db_name);
 

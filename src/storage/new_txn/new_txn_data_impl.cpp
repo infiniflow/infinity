@@ -91,9 +91,10 @@ struct NewTxnCompactState {
         return Status::OK();
     };
 
-    size_t column_cnt() const { return column_cnt_; }
+    [[nodiscard]] size_t column_cnt() const { return column_cnt_; }
 
     Status NextBlock() {
+
         if (block_meta_) {
             block_row_cnts_.push_back(cur_block_row_cnt_);
             segment_row_cnt_ += cur_block_row_cnt_;
@@ -800,7 +801,7 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_t
             TxnTimeStamp commit_ts_from_kv = std::stoull(commit_ts_str);
             if (commit_ts == commit_ts_from_kv) {
                 if (skip_cmd.has_value() && !skip_cmd.value()) {
-                    return Status::UnexpectedError("Compact segments replay are mismatched in timestamp");
+                    return Status::UnexpectedError("Previous segments are not skipped, this segment should be skipped, mismatched");
                 }
                 LOG_WARN(fmt::format("Skipping replay compact: Segment {} already exists in table {} of database {} with commit ts {}, txn: {}.",
                                      segment_info.segment_id_,
@@ -809,7 +810,7 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_t
                                      commit_ts,
                                      txn_id));
 
-                for (const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
+                for (const WalSegmentInfo &new_segment_info : compact_cmd->new_segment_infos_) {
                     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
                     std::shared_ptr<DBMeta> db_meta;
@@ -820,7 +821,7 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_t
                         return status;
                     }
                     TableMeta &table_meta = *table_meta_opt;
-                    status = NewCatalog::LoadImportedOrCompactedSegment(table_meta, segment_info, fake_commit_ts);
+                    status = NewCatalog::LoadImportedOrCompactedSegment(table_meta, new_segment_info, fake_commit_ts);
                     if (!status.ok()) {
                         return status;
                     }

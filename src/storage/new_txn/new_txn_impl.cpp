@@ -129,7 +129,7 @@ NewTxn::~NewTxn() {
 
 TransactionID NewTxn::TxnID() const { return txn_context_ptr_->txn_id_; }
 
-void NewTxn::CheckTxnStatus() {
+void NewTxn::CheckTxnStatus() const {
     TxnState txn_state = GetTxnState();
     if (txn_state != TxnState::kStarted) {
         UnrecoverableError("Transaction isn't started.");
@@ -4493,7 +4493,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             if (VirtualStore::Exists(table_dir)) {
                 Status remove_status = VirtualStore::RemoveDirectory(table_dir);
                 if (!remove_status.ok()) {
-                    LOG_WARN(fmt::format("Failed to removetable directory during rollback: {}", table_dir));
+                    LOG_WARN(fmt::format("Failed to remove table directory during rollback: {}", table_dir));
                 }
             }
 
@@ -4621,7 +4621,7 @@ Status NewTxn::Cleanup() {
     auto oldest_txn_begin_ts = txn_mgr_->GetOldestAliveTS();
     auto last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
 
-    // We will only clean up entities dropped before both the begin timestamp of active transactions and the latest checkpoint,
+    // We will only clean up entities dropped before both the beginning timestamp of active transactions and the latest checkpoint,
     // ensuring the entities are no longer needed.
     TxnTimeStamp visible_ts = std::min(oldest_txn_begin_ts, last_checkpoint_ts);
     if (last_cleanup_ts < visible_ts) {
