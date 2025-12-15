@@ -9,3 +9,6 @@ COPY test_import_json FROM '/var/infinity/test_data/test_json.csv' WITH ( DELIMI
 
 statement ok
 COPY test_import_json FROM '/var/infinity/test_data/test_json_type.jsonl' WITH ( DELIMITER ',', FORMAT JSONL );
+
+statement ok
+COPY test_import_json FROM '/var/infinity/test_data/test_json_type.json' WITH ( DELIMITER ',', FORMAT JSON );
