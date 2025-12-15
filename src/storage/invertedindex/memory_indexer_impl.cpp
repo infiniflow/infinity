@@ -325,7 +325,7 @@ size_t MemoryIndexer::CommitOffline(size_t wait_if_empty_ms) {
 }
 
 size_t MemoryIndexer::CommitSync(size_t wait_if_empty_ms) {
-    std::unique_lock<std::mutex> lock(mutex_commit_, std::defer_lock);
+    std::unique_lock lock(mutex_commit_, std::defer_lock);
     if (!lock.try_lock()) {
         return 0;
     }

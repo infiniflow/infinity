@@ -51,7 +51,6 @@ public:
     bool Get(std::string path, DataT &data) {
         {
             std::unique_lock l(rw_mutex_);
-            std::println("Get");
             if (auto map_iter = path_data_map_.find(path); map_iter != path_data_map_.end()) {
                 payloads_.splice(payloads_.begin(), payloads_, map_iter->second);
                 data = *map_iter->second;
@@ -63,9 +62,7 @@ public:
 
     void Set(std::string path, DataT data, size_t request_space) {
         std::unique_lock l(rw_mutex_);
-        std::println("Set: {}", request_space);
         if (auto map_iter = path_data_map_.find(path); map_iter != path_data_map_.end()) {
-            std::println("Set A");
             payloads_.splice(payloads_.begin(), payloads_, map_iter->second);
         } else {
             if (!IsAccomodatable(request_space)) {
@@ -81,8 +78,6 @@ public:
 
 private:
     void Evict(size_t request_space) {
-        // std::println("Evict called");
-        std::println("Evict");
         for (auto iter = payloads_.rbegin(); iter != payloads_.rend(); ++iter) {
             auto data = *iter;
             auto &path = data_path_map_[data];
@@ -93,7 +88,6 @@ private:
                 payloads_.erase(std::next(iter.base(), -1));
                 path_data_map_.erase(path);
                 data_path_map_.erase(data);
-                std::println("delete: {}", path);
                 delete data;
                 // ClearData();
                 if (IsAccomodatable(request_space)) {
