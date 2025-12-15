@@ -5,12 +5,15 @@ statement ok
 CREATE TABLE test_export_json (col1 INT, col2 VARCHAR, col3 JSON);
 
 query I
-INSERT INTO test_export_json VALUES (0, '{}', '{}'), (1, '{"1":0.123}', '{"1":0.123}');
+INSERT INTO test_export_json VALUES (0, '{}', '{}'), (1, 'abc', '{"1":{"2":null,"3":123}}');
 ----
 
 query I
-INSERT INTO test_export_json VALUES (2, '{"1":"1","2":"2"}', '{"1":"1","2":"2"}');
+INSERT INTO test_export_json VALUES (2, 'abc', '{"1":"1","2":"2"}');
 ----
 
 query I
 COPY test_export_json TO '/var/infinity/test_data/tmp/test_export_json.csv' WITH (FORMAT CSV, DELIMITER ',');
+
+query I
+COPY test_export_json TO '/var/infinity/test_data/tmp/test_export_json.jsonl' WITH (FORMAT JSONL, DELIMITER ',');

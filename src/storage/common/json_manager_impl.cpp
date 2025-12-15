@@ -18,17 +18,21 @@ import :json_manager;
 
 namespace infinity {
 
+// " --> ""
+std::string JsonManager::escapeQuotes(const std::string& input) {
+    std::regex pattern("\"");
+    return std::regex_replace(input, pattern, "\"\"");
+}
+
+// \" --> "
+std::string JsonManager::unescapeQuotes(const std::string& input) {
+    std::regex pattern("\\\"");
+    return std::regex_replace(input, pattern, "\"");
+}
+
 bool JsonManager::valid_json(const std::string &valid_json) { return JsonType::accept(valid_json); }
 
 JsonType JsonManager::parse(std::string &json_str) {
-    // size_t start_pos = 0;
-    // while ((start_pos = json_str.find("\\\"", start_pos)) != std::string::npos) {
-    //     json_str.replace(start_pos, 2, "\"");
-    // }
-
-    // std::regex escape_pattern1("\\\\\"");
-    // json_str = std::regex_replace(json_str, escape_pattern1, "\"");
-
     try {
         return JsonType::parse(json_str);
     } catch (const JsonType::parse_error& e) {

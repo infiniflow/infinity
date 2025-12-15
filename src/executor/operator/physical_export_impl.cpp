@@ -33,6 +33,7 @@ import :block_meta;
 import :column_meta;
 import :new_catalog;
 import :roaring_bitmap;
+import :json_manager;
 
 import std;
 import third_party;
@@ -119,14 +120,8 @@ size_t PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSt
                     break;
                 }
                 case LogicalType::kJson: {
-                    auto tmp = v.ToString();
-
-                    size_t pos = 0;
-                    while ((pos = tmp.find("\"", pos)) != std::string::npos) {
-                        tmp.replace(pos, 1, "\"\"");
-                        pos += 2;
-                    }
-
+                    auto data = v.ToString();
+                    auto tmp = JsonManager::escapeQuotes(data);
                     line += fmt::format("\"{}\"", tmp);
                     break;
                 }

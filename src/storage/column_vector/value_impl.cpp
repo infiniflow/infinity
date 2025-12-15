@@ -1631,8 +1631,8 @@ void Value::AppendToJson(const std::string &name, nlohmann::json &json) const {
         }
         case LogicalType::kJson: {
             const auto &bson = this->GetBson();
-            auto tmp = JsonManager::from_bson(bson);
-            json[name] = tmp; // Need json --> string ?
+            auto data = JsonManager::from_bson(bson);
+            json[name] = data.dump();
             return;
         }
         case LogicalType::kEmbedding: {

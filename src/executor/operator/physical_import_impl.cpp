@@ -47,6 +47,7 @@ import :wal_manager;
 import :infinity_context;
 import :new_txn;
 import :txn_state;
+import :json_manager;
 
 import std.compat;
 import third_party;
@@ -1022,9 +1023,14 @@ void PhysicalImport::JSONLRowHandler(std::string_view line_sv, std::vector<std::
                 case LogicalType::kTime:
                 case LogicalType::kDateTime:
                 case LogicalType::kTimestamp:
-                case LogicalType::kJson:
                 case LogicalType::kVarchar: {
                     std::string_view str_view = doc[column_def->name_];
+                    column_vector.AppendByStringView(str_view);
+                    break;
+                }
+                case LogicalType::kJson: {
+                    std::string_view str_view = doc[column_def->name_];
+                    auto tmp = JsonManager::unescapeQuotes(std::string(str_view));
                     column_vector.AppendByStringView(str_view);
                     break;
                 }
