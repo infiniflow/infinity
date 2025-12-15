@@ -659,7 +659,7 @@ Value Value::MakeJson(std::vector<uint8_t> &bson, std::shared_ptr<TypeInfo> type
     return value;
 }
 
-Value Value::MakeJson(const std::string &json_str, std::shared_ptr<TypeInfo> type_info_ptr) {
+Value Value::MakeJson(std::string &json_str, std::shared_ptr<TypeInfo> type_info_ptr) {
     Value value(LogicalType::kJson, std::move(type_info_ptr));
     auto value_json = infinity::JsonManager::parse(json_str);
     auto value_bson = infinity::JsonManager::to_bson(value_json);
