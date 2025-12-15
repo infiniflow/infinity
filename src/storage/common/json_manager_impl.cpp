@@ -65,9 +65,8 @@ std::vector<uint8_t> JsonManager::to_bson(const JsonType &json_obj) {
         return JsonType::to_bson(json_obj);
     } catch (const JsonType::parse_error &e) {
         LOG_INFO(fmt::format("JsonManager::to_bson error: {}", e.what()));
-
-        return {};
     }
+    return {};
 }
 
 } // namespace infinity
