@@ -29,7 +29,6 @@ export class JsonManager {
 public:
     static std::string escapeQuotes(const std::string &input);
     static std::string unescapeQuotes(const std::string &input);
-
     static bool valid_json(const std::string &json_str);
     static JsonType parse(std::string &json_str);
     static JsonType from_bson(const std::vector<uint8_t> &bson_data);

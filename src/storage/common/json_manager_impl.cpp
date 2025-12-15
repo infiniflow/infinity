@@ -19,13 +19,13 @@ import :json_manager;
 namespace infinity {
 
 // " --> ""
-std::string JsonManager::escapeQuotes(const std::string& input) {
+std::string JsonManager::escapeQuotes(const std::string &input) {
     std::regex pattern("\"");
     return std::regex_replace(input, pattern, "\"\"");
 }
 
 // \" --> "
-std::string JsonManager::unescapeQuotes(const std::string& input) {
+std::string JsonManager::unescapeQuotes(const std::string &input) {
     std::regex pattern("\\\"");
     return std::regex_replace(input, pattern, "\"");
 }
@@ -35,41 +35,38 @@ bool JsonManager::valid_json(const std::string &valid_json) { return JsonType::a
 JsonType JsonManager::parse(std::string &json_str) {
     try {
         return JsonType::parse(json_str);
-    } catch (const JsonType::parse_error& e) {
+    } catch (const JsonType::parse_error &e) {
         LOG_INFO(fmt::format("JsonManager::parse error: {}", e.what()));
     }
-
-    return{};
+    return {};
 }
 
 JsonType JsonManager::from_bson(const std::vector<uint8_t> &bson_data) {
     try {
         return JsonType::from_bson(bson_data);
-    } catch (const JsonType::parse_error& e) {
+    } catch (const JsonType::parse_error &e) {
         LOG_INFO(fmt::format("JsonManager::from_bson error: {}", e.what()));
     }
-
-    return{};
+    return {};
 }
 
 std::string JsonManager::dump(const JsonType &json_obj) {
     try {
-        return json_obj.dump();;
-    } catch (const JsonType::parse_error& e) {
+        return json_obj.dump();
+        ;
+    } catch (const JsonType::parse_error &e) {
         LOG_INFO(fmt::format("JsonManager::dump error: {}", e.what()));
     }
-
-    return{};
+    return {};
 }
 
 std::vector<uint8_t> JsonManager::to_bson(const JsonType &json_obj) {
     try {
         return JsonType::to_bson(json_obj);
-    } catch (const JsonType::parse_error& e) {
+    } catch (const JsonType::parse_error &e) {
         LOG_INFO(fmt::format("JsonManager::to_bson error: {}", e.what()));
-    }
 
-    return{};
-}
+        return {};
+    }
 
 } // namespace infinity
