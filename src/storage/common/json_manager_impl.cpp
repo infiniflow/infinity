@@ -68,5 +68,6 @@ std::vector<uint8_t> JsonManager::to_bson(const JsonType &json_obj) {
 
         return {};
     }
+}
 
 } // namespace infinity
