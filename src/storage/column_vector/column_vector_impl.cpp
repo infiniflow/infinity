@@ -16,7 +16,6 @@ module;
 
 #include <cassert>
 
-#include "json_manager.h"
 
 module infinity_core:column_vector.impl;
 
@@ -38,6 +37,7 @@ import :bound_cast_func;
 import :cast_expression;
 import :expression_evaluator;
 import :expression_state;
+import :json_manager;
 
 import std.compat;
 import third_party;

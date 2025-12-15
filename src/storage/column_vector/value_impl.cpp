@@ -22,11 +22,11 @@ import :cast_function;
 import :column_vector;
 import :default_values;
 import :status;
+import :json_manager;
 
 import std.compat;
 import third_party;
 
-import json_manager;
 import type_info;
 import array_info;
 import internal_types;

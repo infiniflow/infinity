@@ -34,6 +34,7 @@ import :data_table;
 import :column_vector;
 import :query_result;
 import :utility;
+import :json_manager;
 
 import std.compat;
 import third_party;
@@ -65,7 +66,6 @@ import search_options;
 import column_def;
 import statement_common;
 import data_type;
-import json_manager;
 
 namespace infinity {
 

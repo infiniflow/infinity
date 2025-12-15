@@ -14,12 +14,20 @@
 
 module;
 
-#include "json_manager.h"
+export module infinity_core:json_manager;
 
-export module json_manager;
+import std.compat;
+import third_party;
 
 namespace infinity {
 
-export using infinity::JsonManager;
+export class JsonManager {
+public:
+    static bool valid_json(const std::string &json_str);
+    static nlohmann::json parse(const std::string &json_str);
+    static nlohmann::json from_bson(const std::vector<uint8_t> &bson_data);
+    static std::string dump(const nlohmann::json &json_obj);
+    static std::vector<uint8_t> to_bson(const nlohmann::json &json_obj);
+};
 
 } // namespace infinity

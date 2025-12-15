@@ -34,7 +34,6 @@ void yyerror(YYLTYPE * llocp, void* lexer, infinity::ParserResult* result, const
 #include "table_reference/table_reference.h"
 #include "table_reference/subquery_reference.h"
 #include "parser_helper.h"
-#include "json_manager.h"
 
 #ifndef PARESER_USE_STD_MODULE
 #define PARESER_USE_STD_MODULE 1

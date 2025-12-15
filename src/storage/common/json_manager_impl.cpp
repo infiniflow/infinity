@@ -12,20 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+module infinity_core:json_manager.impl;
 
-import std.compat;
-import third_party;
+import :json_manager;
 
 namespace infinity {
 
-class JsonManager {
-public:
-    static bool valid_json(const std::string &json_str);
-    static nlohmann::json parse(const std::string &json_str);
-    static nlohmann::json from_bson(const std::vector<uint8_t> &bson_data);
-    static std::string dump(const nlohmann::json &json_obj);
-    static std::vector<uint8_t> to_bson(const nlohmann::json &json_obj);
-};
+bool JsonManager::valid_json(const std::string &valid_json) { return nlohmann::json::accept(valid_json); }
+
+nlohmann::json JsonManager::parse(const std::string &json_str) { return nlohmann::json::parse(json_str); }
+
+nlohmann::json JsonManager::from_bson(const std::vector<uint8_t> &bson_data) { return nlohmann::json::from_bson(bson_data); }
+
+std::string JsonManager::dump(const nlohmann::json &json_obj) { return json_obj.dump(); }
+
+std::vector<uint8_t> JsonManager::to_bson(const nlohmann::json &json_obj) { return nlohmann::json::to_bson(json_obj); }
 
 } // namespace infinity
