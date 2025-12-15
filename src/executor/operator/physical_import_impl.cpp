@@ -1030,8 +1030,8 @@ void PhysicalImport::JSONLRowHandler(std::string_view line_sv, std::vector<std::
                 }
                 case LogicalType::kJson: {
                     std::string_view str_view = doc[column_def->name_];
-                    auto tmp = JsonManager::unescapeQuotes(std::string(str_view));
-                    column_vector.AppendByStringView(str_view);
+                    auto modified_data = JsonManager::unescapeQuotes(std::string(str_view));
+                    column_vector.AppendByStringView(modified_data);
                     break;
                 }
                 case LogicalType::kEmbedding: {
