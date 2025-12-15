@@ -12,3 +12,7 @@ COPY test_import_json FROM '/var/infinity/test_data/test_json_type.jsonl' WITH (
 
 statement ok
 COPY test_import_json FROM '/var/infinity/test_data/test_json_type.json' WITH ( DELIMITER ',', FORMAT JSON );
+
+query III
+SELECT * FROM sqllogic_test_insert_json;
+----
