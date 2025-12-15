@@ -118,6 +118,18 @@ size_t PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSt
                     line += fmt::format("\"{}\"", v.ToString());
                     break;
                 }
+                case LogicalType::kJson: {
+                    auto tmp = v.ToString();
+
+                    size_t pos = 0;
+                    while ((pos = tmp.find("\"", pos)) != std::string::npos) {
+                        tmp.replace(pos, 1, "\"\"");
+                        pos += 2;
+                    }
+
+                    line += fmt::format("\"{}\"", tmp);
+                    break;
+                }
                 default: {
                     line += v.ToString();
                 }
