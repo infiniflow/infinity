@@ -416,7 +416,8 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantE
             return std::make_shared<ValueExpression>(value);
         }
         case LiteralType::kJson: {
-            Value value = Value::MakeJson(expr.json_value_, nullptr);
+            std::string json_value(expr.json_value_);
+            Value value = Value::MakeJson(json_value, nullptr);
             return std::make_shared<ValueExpression>(std::move(value));
         }
     }

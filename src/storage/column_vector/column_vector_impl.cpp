@@ -1985,7 +1985,8 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
         }
         case LogicalType::kJson: {
             auto &json = reinterpret_cast<JsonT *>(data_ptr_)[index];
-            auto json_str = JsonManager::parse(sv.data());
+            std::string sub_data(sv.data(), sv.length());
+            auto json_str = JsonManager::parse(sub_data);
             auto bson = JsonManager::to_bson(json_str);
 
             json.length_ = bson.size() * sizeof(uint8_t);
