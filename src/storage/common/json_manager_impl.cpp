@@ -53,7 +53,6 @@ JsonType JsonManager::from_bson(const std::vector<uint8_t> &bson_data) {
 std::string JsonManager::dump(const JsonType &json_obj) {
     try {
         return json_obj.dump();
-        ;
     } catch (const JsonType::parse_error &e) {
         LOG_INFO(fmt::format("JsonManager::dump error: {}", e.what()));
     }
