@@ -89,10 +89,9 @@ struct NewTxnCompactState {
         return Status::OK();
     };
 
-    size_t column_cnt() const { return column_cnt_; }
+    [[nodiscard]] size_t column_cnt() const { return column_cnt_; }
 
     Status NextBlock() {
-        Status status;
 
         if (block_meta_) {
             block_row_cnts_.push_back(cur_block_row_cnt_);
@@ -100,7 +99,7 @@ struct NewTxnCompactState {
             block_meta_.reset();
         }
 
-        status = NewCatalog::AddNewBlock1(*new_segment_meta_, commit_ts_, block_meta_);
+        Status status = NewCatalog::AddNewBlock1(*new_segment_meta_, commit_ts_, block_meta_);
         if (!status.ok()) {
             return status;
         }
@@ -163,10 +162,10 @@ struct NewTxnCompactState {
     std::optional<SegmentMeta> new_segment_meta_{};
     std::optional<BlockMeta> block_meta_{};
 
-    std::vector<size_t> block_row_cnts_;
+    std::vector<size_t> block_row_cnts_{};
     size_t segment_row_cnt_{};
     BlockOffset cur_block_row_cnt_{};
-    std::vector<ColumnVector> column_vectors_;
+    std::vector<ColumnVector> column_vectors_{};
     size_t column_cnt_{};
 };
 
@@ -804,7 +803,7 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_t
             TxnTimeStamp commit_ts_from_kv = std::stoull(commit_ts_str);
             if (commit_ts == commit_ts_from_kv) {
                 if (skip_cmd.has_value() && !skip_cmd.value()) {
-                    return Status::UnexpectedError("Compact segments replay are mismatched in timestamp");
+                    return Status::UnexpectedError("Previous segments are not skipped, this segment should be skipped, mismatched");
                 }
                 LOG_WARN(fmt::format("Skipping replay compact: Segment {} already exists in table {} of database {} with commit ts {}, txn: {}.",
                                      segment_info.segment_id_,
@@ -813,7 +812,7 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_t
                                      commit_ts,
                                      txn_id));
 
-                for (const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
+                for (const WalSegmentInfo &new_segment_info : compact_cmd->new_segment_infos_) {
                     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
                     std::shared_ptr<DBMeta> db_meta;
@@ -824,7 +823,7 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_t
                         return status;
                     }
                     TableMeta &table_meta = *table_meta_opt;
-                    status = NewCatalog::LoadImportedOrCompactedSegment(table_meta, segment_info, fake_commit_ts);
+                    status = NewCatalog::LoadImportedOrCompactedSegment(table_meta, new_segment_info, fake_commit_ts);
                     if (!status.ok()) {
                         return status;
                     }
@@ -896,8 +895,8 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
             return status;
         }
     }
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     {
+        TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
 
         block_lock->min_ts_ = std::min(block_lock->min_ts_, commit_ts);
@@ -962,8 +961,8 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
         return status;
     }
 
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     {
+        TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
         std::shared_ptr<BlockLock> block_lock;
         status = block_meta.GetBlockLock(block_lock);
         if (!status.ok()) {

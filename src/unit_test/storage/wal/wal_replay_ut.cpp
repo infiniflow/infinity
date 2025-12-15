@@ -836,6 +836,15 @@ TEST_F(WalReplayTest, wal_replay_compact) {
             EXPECT_TRUE(status.ok());
         }
 
+        {
+            auto txn = txn_mgr->BeginTxn(std::make_unique<std::string>("check table"), TransactionType::kRead);
+            auto [table_info, status] = txn->GetTableInfo("default_db", "tbl1");
+            EXPECT_NE(table_info, nullptr);
+            EXPECT_EQ(table_info->segment_count_, 1);
+            status = txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+
         txn_mgr->PrintAllKeyValue();
 
         infinity::InfinityContext::instance().UnInit();
