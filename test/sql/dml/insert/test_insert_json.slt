@@ -1,0 +1,40 @@
+statement ok
+DROP TABLE IF EXISTS sqllogic_test_insert_json;
+
+statement ok
+CREATE TABLE sqllogic_test_insert_json (col1 INT, col2 VARCHAR, col3 JSON);
+
+query I
+INSERT INTO sqllogic_test_insert_json VALUES (0, '{}', JSON '{}');
+----
+
+query I
+INSERT INTO sqllogic_test_insert_json VALUES (1, '{"1":{"1":null}}', JSON '{"1":{"1":null}}');
+----
+
+query I
+INSERT INTO sqllogic_test_insert_json VALUES (2, '{"2":123}', JSON '{"2":123}');
+----
+
+query I
+INSERT INTO sqllogic_test_insert_json VALUES (3, '{"3":4.5678}', JSON '{"3":4.5678}');
+----
+
+query I
+INSERT INTO sqllogic_test_insert_json VALUES (4, '{"4":null,"5":1234,"6":0.76}', JSON '{"4":null,"5":1234,"6":0.76}');
+----
+
+query I
+INSERT INTO sqllogic_test_insert_json VALUES (4, '{"6":0.76, "4":null,"5":1234}', '{"6":0.76, "4":null,"5":1234}');
+----
+
+query III
+SELECT * FROM sqllogic_test_insert_json;
+----
+0 {} {}
+1 {"1":{"1":null}} {"1":{"1":null}}
+2 {"2":123} {"2":123}
+3 {"3":4.5678} {"3":4.5678}
+4 {"4":null,"5":1234,"6":0.76} {"4":null,"5":1234,"6":0.76}
+4 {"6":0.76, "4":null,"5":1234} {"4":null,"5":1234,"6":0.76}
+
