@@ -1344,9 +1344,6 @@ Status NewTxn::PopulateHnswIndexInner(std::shared_ptr<IndexBase> index_base,
     }
     size_t block_capacity = DEFAULT_BLOCK_CAPACITY;
     for (BlockID block_id : *block_ids) {
-        if (block_id % 16 == 0) {
-            std::println("{} {}", block_id, InfinityContext::instance().config()->BufferManagerSize());
-        }
         BlockMeta block_meta(block_id, segment_meta);
         ColumnMeta column_meta(column_id, block_meta);
 

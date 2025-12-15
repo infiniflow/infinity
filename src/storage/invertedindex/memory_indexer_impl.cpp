@@ -14,14 +14,6 @@
 
 module;
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-variable"
-#pragma clang diagnostic ignored "-Wunused-but-set-variable"
-#pragma clang diagnostic ignored "-Wmissing-field-initializers"
-#pragma clang diagnostic ignored "-W#pragma-messages"
-
-#pragma clang diagnostic pop
-
 #include <cassert>
 #include <cerrno>
 #include <cstdio>
@@ -296,6 +288,9 @@ void MemoryIndexer::Commit(bool offline) {
 
 size_t MemoryIndexer::CommitOffline(size_t wait_if_empty_ms) {
     std::unique_lock<std::mutex> lock(mutex_commit_, std::defer_lock);
+    if (lock.owns_lock()) {
+        return 0;
+    }
     if (!lock.try_lock()) {
         return 0;
     }
@@ -326,6 +321,9 @@ size_t MemoryIndexer::CommitOffline(size_t wait_if_empty_ms) {
 
 size_t MemoryIndexer::CommitSync(size_t wait_if_empty_ms) {
     std::unique_lock lock(mutex_commit_, std::defer_lock);
+    if (lock.owns_lock()) {
+        return 0;
+    }
     if (!lock.try_lock()) {
         return 0;
     }
@@ -350,7 +348,7 @@ size_t MemoryIndexer::CommitSync(size_t wait_if_empty_ms) {
         }
     }
     if (num_generated > 0) {
-        std::unique_lock<std::mutex> lock(mutex_);
+        std::unique_lock lock(mutex_);
         inflight_tasks_ -= num_generated;
         if (inflight_tasks_ == 0) {
             cv_.notify_all();

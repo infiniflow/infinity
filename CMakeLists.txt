@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 4.0.3...4.2.0)
+cmake_minimum_required(VERSION 4.0.3...4.2.1)
 
 cmake_policy(SET CMP0167 OLD)
 
 set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS TRUE)
 
-if (CMAKE_VERSION GREATER_EQUAL 4.0.3 AND CMAKE_VERSION LESS_EQUAL 4.2.0)
+if (CMAKE_VERSION GREATER_EQUAL 4.0.3 AND CMAKE_VERSION LESS_EQUAL 4.2.1)
     set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
 endif ()
 
@@ -48,6 +48,7 @@ message(STATUS "CXX: ${CMAKE_CXX_COMPILER}")
 execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string)
 string(REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" CLANG_VERSION_STRING ${clang_full_version_string})
 if (CLANG_VERSION_STRING VERSION_GREATER_EQUAL 20)
+#if (CLANG_VERSION_STRING VERSION_EQUAL 20)
     # Print CMake version and project name
     message(STATUS "Building ${PROJECT_NAME} with CMake version: ${CMAKE_VERSION} On CLANG-${CLANG_VERSION_STRING}")
 
@@ -85,10 +86,10 @@ set(GCC15_SUFFIXES
         #        lib
         lib/gcc/15
         lib/gcc/x86_64-linux-gnu/15
-        lib/gcc/x86_64-pc-linux-gnu/15.1.0
+        lib/gcc/x86_64-pc-linux-gnu/15.2.1
         lib64/gcc/x86_64-linux-gnu/15
         lib64/gcc/15
-        lib64/gcc/x86_64-pc-linux-gnu/15.1.0
+        lib64/gcc/x86_64-pc-linux-gnu/15.2.1
 )
 
 find_library(STDCXX15_STATIC
@@ -175,7 +176,7 @@ add_library(unused_std_target STATIC)
 # just tmp solution
 set(LIBSTDCXX_MODULE_FILE_PATH_SUFFIX
         include/c++/15/bits
-        include/c++/15.2.0/bits
+        include/c++/15.2.1/bits
 )
 
 find_file(LIBSTDCXX_MODULE_FILE
@@ -323,11 +324,7 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 #    message(FATAL_ERROR "Only support CMake build type: Debug, RelWithDebInfo, and Release")
 endif ()
 
-if (CLANG_VERSION_STRING VERSION_EQUAL 17)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wno-read-modules-implicitly -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics")
-else ()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics")
-endif ()
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics")
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
 
