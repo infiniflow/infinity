@@ -14,5 +14,15 @@ statement ok
 COPY test_import_json FROM '/var/infinity/test_data/test_json_type.json' WITH ( DELIMITER ',', FORMAT JSON );
 
 query III
-SELECT * FROM sqllogic_test_insert_json;
+SELECT * FROM test_import_json;
 ----
+0 {} {}
+1 abc {"1":0.123}
+2 abc {"2":null}
+3 abc {"3":{"1":"2"}}
+4 abc {"4":12345}
+5 abc {"1":0.123,"2":null,"3":{"1":"2"},"4":12345}
+123 abc {"a":"aaa"}
+123 abc {"222":{"333":null,"444":0.314},"a":"aaa"}
+123 abc {"a":"aaa"}
+123 abc {"222":{"333":null,"444":0.314},"a":"aaa"}
