@@ -38,3 +38,5 @@ SELECT * FROM sqllogic_test_insert_json;
 4 {"4":null,"5":1234,"6":0.76} {"4":null,"5":1234,"6":0.76}
 4 {"6":0.76, "4":null,"5":1234} {"4":null,"5":1234,"6":0.76}
 
+statement ok
+DROP TABLE IF EXISTS sqllogic_test_insert_json;

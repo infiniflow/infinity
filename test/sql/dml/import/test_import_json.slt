@@ -1,0 +1,8 @@
+statement ok
+DROP TABLE IF EXISTS test_import_json;
+
+statement ok
+CREATE TABLE test_import_json (col1 INT, col2 VARCHAR, col3 JSON);
+
+statement ok
+COPY test_import_json FROM '/var/infinity/test_data/test_json.csv' WITH ( DELIMITER ',', FORMAT CSV );
