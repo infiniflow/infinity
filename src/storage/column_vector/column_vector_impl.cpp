@@ -16,7 +16,6 @@ module;
 
 #include <cassert>
 
-
 module infinity_core:column_vector.impl;
 
 import :column_vector;
@@ -1988,7 +1987,6 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             std::string sub_data(sv.data(), sv.length());
             auto json_str = JsonManager::parse(sub_data);
             auto bson = JsonManager::to_bson(json_str);
-
             json.length_ = bson.size() * sizeof(uint8_t);
             json.file_offset_ = buffer_->AppendVarchar(reinterpret_cast<const char *>(bson.data()), json.length_);
             break;
