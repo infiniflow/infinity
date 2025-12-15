@@ -430,7 +430,7 @@ inline bool TryCastVarcharVectorToJson::Run(const VarcharT &input,
     auto len = data.size();
     std::string substr(data.data(), len);
 
-    Value value = Value::MakeJson(substr.data(), nullptr);
+    Value value = Value::MakeJson(substr, nullptr);
     target_vector->AppendValue(value);
     return true;
 }

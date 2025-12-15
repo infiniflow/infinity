@@ -2003,7 +2003,7 @@ Value GetValueFromParquetRecursively(const DataType &data_type, const std::share
         }
         case LogicalType::kJson: {
             std::string value_str = std::static_pointer_cast<arrow::StringArray>(array)->GetString(value_idx);
-            return Value::MakeJson(value_str.c_str(), nullptr);
+            return Value::MakeJson(value_str, nullptr);
         }
         case LogicalType::kEmbedding: {
             auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type.type_info().get());
