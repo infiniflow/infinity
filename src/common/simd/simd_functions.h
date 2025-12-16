@@ -16,6 +16,6 @@
 
 namespace infinity {
 
-void SIMDPrefetch(const void* ptr);
+void SIMDPrefetch(const void *ptr);
 
 } // namespace infinity

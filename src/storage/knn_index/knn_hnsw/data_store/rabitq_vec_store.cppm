@@ -15,9 +15,9 @@
 module;
 
 #include <cassert>
+#include <common/simd/simd_functions.h>
 #include <ostream>
 #include <random>
-#include <common/simd/simd_functions.h>
 
 export module infinity_core:rabitq_vec_store;
 
