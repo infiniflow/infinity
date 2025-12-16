@@ -55,7 +55,8 @@ if (CLANG_VERSION_STRING VERSION_GREATER_EQUAL 20)
     # add_compile_options(-ftime-trace)
     #    add_compile_options(-fmodule-header)
     add_link_options(-fuse-ld=mold)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field --rtlib=libgcc")
+#    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field")
 
     add_link_options(-L/usr/local/lib)
     set(CMAKE_FIND_PACKAGE_SORT_ORDER NATURAL)
@@ -75,7 +76,7 @@ elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
     set(X86_64 TRUE)
 endif ()
 
-#strength, for image maintainer
+###strength, for image maintainer
 #set(GCC_SEARCH_ROOTS
 #        /usr
 #        /usr/local
@@ -100,6 +101,14 @@ endif ()
 #        NO_DEFAULT_PATH
 #)
 #
+#find_library(GCC15_STATIC
+#        NAMES libgcc.a
+#        PATHS ${GCC_SEARCH_ROOTS}
+#        PATH_SUFFIXES ${GCC15_SUFFIXES}
+#        REQUIRED
+#        NO_DEFAULT_PATH
+#)
+#
 #find_library(STDCXX15EXP_STATIC
 #        NAMES libstdc++exp.a
 #        PATHS ${GCC_SEARCH_ROOTS}
@@ -108,10 +117,12 @@ endif ()
 #        NO_DEFAULT_PATH
 #)
 #
-#get_filename_component(GCC15_LIB_DIR ${STDCXX15_STATIC} DIRECTORY)
+#get_filename_component(GCC15_LIB_DIR "${STDCXX15_STATIC}" DIRECTORY)
 
-#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -static-libgcc")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++")
+#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -L${GCC15_LIB_DIR} -static-libgcc")
+#set(CMAKE_EXE_LINKER_FLAGS
+#        "${CMAKE_EXE_LINKER_FLAGS} /usr/lib/gcc/x86_64-linux-gnu/15/libgcc.a")
 ########
 
 find_package(absl CONFIG REQUIRED)

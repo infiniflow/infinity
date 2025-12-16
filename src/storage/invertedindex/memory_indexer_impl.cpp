@@ -287,10 +287,7 @@ void MemoryIndexer::Commit(bool offline) {
 }
 
 size_t MemoryIndexer::CommitOffline(size_t wait_if_empty_ms) {
-    std::unique_lock<std::mutex> lock(mutex_commit_, std::defer_lock);
-    if (lock.owns_lock()) {
-        return 0;
-    }
+    std::unique_lock lock(mutex_commit_, std::defer_lock);
     if (!lock.try_lock()) {
         return 0;
     }
@@ -321,9 +318,6 @@ size_t MemoryIndexer::CommitOffline(size_t wait_if_empty_ms) {
 
 size_t MemoryIndexer::CommitSync(size_t wait_if_empty_ms) {
     std::unique_lock lock(mutex_commit_, std::defer_lock);
-    if (lock.owns_lock()) {
-        return 0;
-    }
     if (!lock.try_lock()) {
         return 0;
     }
@@ -686,12 +680,10 @@ void MemoryIndexer::OfflineDump() {
     // LOG_INFO(fmt::format("MemoryIndexer::OfflineDump begin, num_runs_ {}\n", num_runs_));
     FinalSpillFile();
     constexpr u32 buffer_size_of_each_run = 2 * 1024 * 1024;
-    std::unique_ptr<SortMergerTermTuple<TermTuple, u32>> merger =
-        std::make_unique<SortMergerTermTuple<TermTuple, u32>>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
+    auto merger = std::make_unique<SortMergerTermTuple<TermTuple, u32>>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
     std::vector<std::unique_ptr<std::thread>> threads;
     merger->Run(threads);
-    std::unique_ptr<std::thread> output_thread =
-        std::make_unique<std::thread>(std::bind(&MemoryIndexer::TupleListToIndexFile, this, std::ref(merger)));
+    auto output_thread = std::make_unique<std::thread>(std::bind(&MemoryIndexer::TupleListToIndexFile, this, std::ref(merger)));
     threads.emplace_back(std::move(output_thread));
 
     merger->JoinThreads(threads);
