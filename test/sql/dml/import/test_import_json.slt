@@ -1,0 +1,28 @@
+statement ok
+DROP TABLE IF EXISTS test_import_json;
+
+statement ok
+CREATE TABLE test_import_json (col1 INT, col2 VARCHAR, col3 JSON);
+
+statement ok
+COPY test_import_json FROM '/var/infinity/test_data/test_json.csv' WITH ( DELIMITER ',', FORMAT CSV );
+
+statement ok
+COPY test_import_json FROM '/var/infinity/test_data/test_json_type.jsonl' WITH ( DELIMITER ',', FORMAT JSONL );
+
+statement ok
+COPY test_import_json FROM '/var/infinity/test_data/test_json_type.json' WITH ( DELIMITER ',', FORMAT JSON );
+
+query III
+SELECT * FROM test_import_json;
+----
+0 {} {}
+1 abc {"1":0.123}
+2 abc {"2":null}
+3 abc {"3":{"1":"2"}}
+4 abc {"4":12345}
+5 abc {"1":0.123,"2":null,"3":{"1":"2"},"4":12345}
+123 abc {"a":"aaa"}
+123 abc {"222":{"333":null,"444":0.314},"a":"aaa"}
+123 abc {"a":"aaa"}
+123 abc {"222":{"333":null,"444":0.314},"a":"aaa"}

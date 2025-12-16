@@ -47,6 +47,7 @@ import :wal_manager;
 import :infinity_context;
 import :new_txn;
 import :txn_state;
+import :json_manager;
 
 import std.compat;
 import third_party;
@@ -1027,6 +1028,12 @@ void PhysicalImport::JSONLRowHandler(std::string_view line_sv, std::vector<std::
                     column_vector.AppendByStringView(str_view);
                     break;
                 }
+                case LogicalType::kJson: {
+                    std::string_view str_view = doc[column_def->name_];
+                    auto modified_data = JsonManager::unescapeQuotes(std::string(str_view));
+                    column_vector.AppendByStringView(modified_data);
+                    break;
+                }
                 case LogicalType::kEmbedding: {
                     auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
                     size_t dim = embedding_info->Dimension();
@@ -1672,6 +1679,7 @@ void PhysicalImport::ParquetValueHandler(const std::shared_ptr<arrow::Array> &ar
             column_vector.AppendByPtr(reinterpret_cast<const char *>(&timestamp_value));
             break;
         }
+        case LogicalType::kJson:
         case LogicalType::kVarchar: {
             std::string value_str = std::static_pointer_cast<arrow::StringArray>(array)->GetString(value_idx);
             std::string_view value(value_str);
@@ -1998,6 +2006,10 @@ Value GetValueFromParquetRecursively(const DataType &data_type, const std::share
         case LogicalType::kVarchar: {
             std::string value_str = std::static_pointer_cast<arrow::StringArray>(array)->GetString(value_idx);
             return Value::MakeVarchar(std::move(value_str));
+        }
+        case LogicalType::kJson: {
+            std::string value_str = std::static_pointer_cast<arrow::StringArray>(array)->GetString(value_idx);
+            return Value::MakeJson(value_str, nullptr);
         }
         case LogicalType::kEmbedding: {
             auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type.type_info().get());

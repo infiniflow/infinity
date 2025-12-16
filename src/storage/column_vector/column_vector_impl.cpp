@@ -36,6 +36,7 @@ import :bound_cast_func;
 import :cast_expression;
 import :expression_evaluator;
 import :expression_state;
+import :json_manager;
 
 import std.compat;
 import third_party;
@@ -168,6 +169,7 @@ VectorBufferType ColumnVector::GetVectorBufferType(const DataType &data_type) {
         case LogicalType::kArray:
         case LogicalType::kSparse:
         case LogicalType::kVarchar:
+        case LogicalType::kJson:
         case LogicalType::kMultiVector:
         case LogicalType::kTensor:
         case LogicalType::kTensorArray: {
@@ -350,6 +352,10 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
                 CopyFrom<VarcharT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
+            case LogicalType::kJson: {
+                CopyFrom<JsonT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
+                break;
+            }
             case LogicalType::kMultiVector: {
                 CopyFrom<MultiVectorT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
@@ -515,6 +521,10 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
             }
             case LogicalType::kVarchar: {
                 CopyFrom<VarcharT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case LogicalType::kJson: {
+                CopyFrom<JsonT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
             case LogicalType::kMultiVector: {
@@ -704,6 +714,10 @@ void ColumnVector::CopyRow(const ColumnVector &other, size_t dst_idx, size_t src
             CopyRowFrom<VarcharT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
+        case LogicalType::kJson: {
+            CopyRowFrom<JsonT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
+            break;
+        }
         case LogicalType::kMultiVector: {
             CopyRowFrom<MultiVectorT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
@@ -852,6 +866,14 @@ std::string ColumnVector::ToString(size_t row_index) const {
         case LogicalType::kVarchar: {
             std::span<const char> data = this->GetVarchar(row_index);
             return {data.data(), data.size()};
+        }
+        case LogicalType::kJson: {
+            const auto &json = reinterpret_cast<const JsonT *>(data_ptr_)[row_index];
+            auto data = buffer_->GetVarchar(json.file_offset_, json.length_);
+            std::vector<uint8_t> bson(json.length_);
+            memcpy(bson.data(), data, json.length_);
+            auto res = JsonManager::from_bson(bson);
+            return res.dump();
         }
         case LogicalType::kDate: {
             return ((DateT *)data_ptr_)[row_index].ToString();
@@ -1023,6 +1045,12 @@ Value ColumnVector::GetArrayValueRecursively(const DataType &data_type, const ch
             const auto varchar = *reinterpret_cast<const VarcharT *>(data_ptr);
             const auto data = GetVarcharInner(varchar);
             return Value::MakeVarchar(data.data(), data.size());
+        }
+        case LogicalType::kJson: {
+            const auto json = *reinterpret_cast<const JsonT *>(data_ptr);
+            const auto data = buffer_->GetVarchar(json.file_offset_, json.length_);
+            std::vector<uint8_t> bson(reinterpret_cast<const uint8_t *>(data), reinterpret_cast<const uint8_t *>(data) + json.length_);
+            return Value::MakeJson(bson, nullptr);
         }
         case LogicalType::kDate: {
             return Value::MakeDate(*reinterpret_cast<const DateT *>(data_ptr));
@@ -1259,6 +1287,14 @@ void ColumnVector::SetArrayValueRecursively(const Value &value, char *dst_ptr) {
             std::memcpy(dst_ptr, &varchar, sizeof(VarcharT));
             break;
         }
+        case LogicalType::kJson: {
+            JsonT json{};
+            auto bson_data = value.GetBson();
+            json.length_ = bson_data.size() * sizeof(uint8_t);
+            json.file_offset_ = buffer_->AppendVarchar(reinterpret_cast<const char *>(bson_data.data()), json.length_);
+            std::memcpy(dst_ptr, &json, sizeof(JsonT));
+            break;
+        }
         case LogicalType::kEmbedding: {
             const std::span<char> data_span = value.GetEmbedding();
             if (data_span.size() != data_type.Size()) {
@@ -1424,6 +1460,9 @@ void ColumnVector::SetByRawPtr(size_t index, const char *raw_ptr) {
         }
         case LogicalType::kVarchar: {
             UnrecoverableError("Cannot SetByRawPtr to Varchar.");
+        }
+        case LogicalType::kJson: {
+            UnrecoverableError("Cannot SetByRawPtr to Json.");
         }
         case LogicalType::kDate: {
             ((DateT *)data_ptr_)[index] = *(DateT *)(raw_ptr);
@@ -1943,6 +1982,15 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             this->AppendVarcharInner(sv, index);
             break;
         }
+        case LogicalType::kJson: {
+            auto &json = reinterpret_cast<JsonT *>(data_ptr_)[index];
+            std::string sub_data(sv.data(), sv.length());
+            auto json_str = JsonManager::parse(sub_data);
+            auto bson = JsonManager::to_bson(json_str);
+            json.length_ = bson.size() * sizeof(uint8_t);
+            json.file_offset_ = buffer_->AppendVarchar(reinterpret_cast<const char *>(bson.data()), json.length_);
+            break;
+        }
         case LogicalType::kSparse: {
             const auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
             std::vector<std::string_view> ele_str_views = SplitArrayElement(sv, ',');
@@ -2124,6 +2172,21 @@ void ColumnVector::AppendWith(const ColumnVector &other, size_t from, size_t cou
                 VarcharT &src_ref = base_src_ptr[from + idx];
                 VarcharT &dst_ref = base_dst_ptr[idx];
                 CopyVarchar(dst_ref, buffer_.get(), src_ref, other.buffer_.get());
+            }
+            break;
+        }
+        case LogicalType::kJson: {
+            auto *base_src_ptr = (JsonT *)(other.data_ptr_);
+            JsonT *base_dst_ptr = &((JsonT *)(data_ptr_))[tail_index_.load()];
+            for (size_t idx = 0; idx < count; ++idx) {
+                JsonT &src_ref = base_src_ptr[from + idx];
+                JsonT &dst_ref = base_dst_ptr[idx];
+                dst_ref.length_ = src_ref.length_;
+
+                auto dst_vec_buffer = buffer_.get();
+                auto src_vec_buffer = other.buffer_.get();
+                const auto data = src_vec_buffer->GetVarchar(src_ref.file_offset_, src_ref.length_);
+                dst_ref.file_offset_ = dst_vec_buffer->AppendVarchar(data, src_ref.length_);
             }
             break;
         }
@@ -2719,6 +2782,8 @@ template <typename T>
 void CopyVarBufferType(T &dst_ref, VectorBuffer *dst_vec_buffer, const T &src_ref, const VectorBuffer *src_vec_buffer, const TypeInfo *type_info) {
     if constexpr (std::is_same_v<T, VarcharT>) {
         CopyVarchar(dst_ref, dst_vec_buffer, src_ref, src_vec_buffer);
+    } else if constexpr (std::is_same_v<T, JsonT>) {
+        CopyJson(dst_ref, dst_vec_buffer, src_ref, src_vec_buffer);
     } else if constexpr (std::is_same_v<T, MultiVectorT>) {
         CopyMultiVector(dst_ref, dst_vec_buffer, src_ref, src_vec_buffer, dynamic_cast<const EmbeddingInfo *>(type_info));
     } else if constexpr (std::is_same_v<T, TensorT>) {
@@ -2745,6 +2810,13 @@ void CopyVarchar(VarcharT &dst_ref, VectorBuffer *dst_vec_buffer, const VarcharT
         dst_ref.vector_.file_offset_ =
             dst_vec_buffer->AppendVarchar(src_vec_buffer->GetVarchar(src_ref.vector_.file_offset_, varchar_len), varchar_len);
     }
+}
+
+void CopyJson(JsonT &dst_ref, VectorBuffer *dst_vec_buffer, const JsonT &src_ref, const VectorBuffer *src_vec_buffer) {
+    auto len = src_ref.length_;
+    dst_ref.length_ = len;
+    auto data = src_vec_buffer->GetVarchar(src_ref.file_offset_, len);
+    dst_ref.file_offset_ = dst_vec_buffer->AppendVarchar(data, len);
 }
 
 void CopyMultiVector(MultiVectorT &dst_ref,
@@ -2866,6 +2938,10 @@ void CopyArray(ArrayT &dst_array,
         }
         case LogicalType::kVarchar: {
             loop_copy.operator()<VarcharT>();
+            return;
+        }
+        case LogicalType::kJson: {
+            loop_copy.operator()<JsonT>();
             return;
         }
         case LogicalType::kSparse: {

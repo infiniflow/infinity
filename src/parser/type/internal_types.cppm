@@ -21,7 +21,7 @@ export module internal_types;
 namespace infinity {
 
 export using infinity::BooleanT;
-
+export using infinity::JsonT;
 export using infinity::TinyIntT;
 export using infinity::SmallIntT;
 export using infinity::IntegerT;
