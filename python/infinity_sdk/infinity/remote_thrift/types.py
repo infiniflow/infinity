@@ -59,6 +59,8 @@ def logic_type_to_dtype(ttype: ttypes.DataType):
             return dtype('float32')
         case ttypes.LogicType.Varchar:
             return dtype('str')
+        case ttypes.LogicType.Json:
+            return dtype('str')
         case ttypes.LogicType.Embedding:
             return object
         case ttypes.LogicType.MultiVector:
@@ -110,6 +112,8 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
         case ttypes.ColumnType.ColumnBFloat16:
             return bf16_bytes_to_float32_list(column_vector)
         case ttypes.ColumnType.ColumnVarchar:
+            return list(parse_bytes(column_vector))
+        case ttypes.ColumnType.ColumnJson:
             return list(parse_bytes(column_vector))
         case ttypes.ColumnType.ColumnBool:
             return list(struct.unpack('<{}?'.format(len(column_vector)), column_vector))
@@ -315,6 +319,8 @@ def parse_single_array_bytes(column_data_type: ttypes.DataType, bytes_data, offs
             tmp_column_type = ttypes.ColumnType.ColumnInterval
             single_pod_element_size = 4
         case ttypes.LogicType.Varchar:
+            parse_single_element_func = parse_single_str_bytes
+        case ttypes.LogicType.Json:
             parse_single_element_func = parse_single_str_bytes
         case ttypes.LogicType.MultiVector:
             parse_single_element_func = parse_single_tensor_bytes
