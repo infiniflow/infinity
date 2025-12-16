@@ -55,12 +55,12 @@ if (CLANG_VERSION_STRING VERSION_GREATER_EQUAL 20)
     # add_compile_options(-ftime-trace)
     #    add_compile_options(-fmodule-header)
     add_link_options(-fuse-ld=mold)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field -rtlib=libgcc -unwindlib=libgcc -Wl,-rpath-link,/usr/lib/gcc/x86_64-linux-gnu/15 -Wl,-rpath,/usr/lib/gcc/x86_64-linux-gnu/15")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field -rtlib=libgcc -unwindlib=libgcc -Wl,-rpath-link,/usr/lib/gcc/x86_64-linux-gnu/15 -Wl,-rpath,/usr/lib/gcc/x86_64-linux-gnu/15 -mno-rtm")
 #        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field /usr/lib/gcc/x86_64-linux-gnu/15/libgcc_s.so")
 
-#    add_link_options(-L/usr/local/lib)
-#    set(CMAKE_FIND_PACKAGE_SORT_ORDER NATURAL)
-#    set(CMAKE_FIND_PACKAGE_SORT_DIRECTION DEC)
+    add_link_options(-L/usr/local/lib)
+    set(CMAKE_FIND_PACKAGE_SORT_ORDER NATURAL)
+    set(CMAKE_FIND_PACKAGE_SORT_DIRECTION DEC)
 
 else ()
 
@@ -87,10 +87,10 @@ set(GCC15_SUFFIXES
         #        lib
         lib/gcc/15
         lib/gcc/x86_64-linux-gnu/15
-        lib/gcc/x86_64-pc-linux-gnu/15.2.1
+        lib/gcc/x86_64-pc-linux-gnu/15.2.0
         lib64/gcc/x86_64-linux-gnu/15
         lib64/gcc/15
-        lib64/gcc/x86_64-pc-linux-gnu/15.2.1
+        lib64/gcc/x86_64-pc-linux-gnu/15.2.0
 )
 
 find_library(STDCXX15_STATIC
@@ -101,13 +101,13 @@ find_library(STDCXX15_STATIC
         NO_DEFAULT_PATH
 )
 
-find_library(GCC15_STATIC
-        NAMES libgcc.a
-        PATHS ${GCC_SEARCH_ROOTS}
-        PATH_SUFFIXES ${GCC15_SUFFIXES}
-        REQUIRED
-        NO_DEFAULT_PATH
-)
+# find_library(GCC15_STATIC
+#         NAMES libgcc.a
+#         PATHS ${GCC_SEARCH_ROOTS}
+#         PATH_SUFFIXES ${GCC15_SUFFIXES}
+#         REQUIRED
+#         NO_DEFAULT_PATH
+# )
 
 find_library(STDCXX15EXP_STATIC
         NAMES libstdc++exp.a
