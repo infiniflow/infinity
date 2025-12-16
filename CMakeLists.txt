@@ -340,6 +340,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -W
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
 
+add_definitions(-mno-rtm)
+add_definitions(-DGLIBCXX_FORCE_NEW_LOCK=1)
+
 if (APPLE)
     if (X86_64)
         execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep SSE4.2"
