@@ -6,8 +6,6 @@ from threading import Thread
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from infinity.connection_pool import ConnectionPool
-from time import sleep
-
 
 class TestInsertParallel:
     def test_insert_parallel(self, get_infinity_connection_pool):
@@ -18,12 +16,6 @@ class TestInsertParallel:
 
         db_obj = infinity_obj.create_database("db_par_insert", ConflictType.Ignore,
                                               "db_par_insert")
-
-        # sleep(5)
-        # infinity_obj.flush_data()
-        # sleep(5)
-        # infinity_obj.cleanup()
-        # sleep(5)
         table_obj = db_obj.create_table("parallel_insert_test1", {
             "id": {"type": "int64"},
             "text": {"type": "varchar"},

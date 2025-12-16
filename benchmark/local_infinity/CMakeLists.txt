@@ -41,7 +41,8 @@ target_link_libraries(infinity_benchmark
         CLI11::CLI11
         magic_enum::magic_enum
         roaring::roaring
-        ${STDCXX15EXP_STATIC}
+#        ${STDCXX15EXP_STATIC}
+        libstdc++exp.a
 )
 
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -96,7 +97,8 @@ target_link_libraries(knn_import_benchmark
         CLI11::CLI11
         magic_enum::magic_enum
         roaring::roaring
-        ${STDCXX15EXP_STATIC}
+#        ${STDCXX15EXP_STATIC}
+        libstdc++exp.a
 )
 
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -149,7 +151,8 @@ target_link_libraries(knn_query_benchmark
         CLI11::CLI11
         magic_enum::magic_enum
         roaring::roaring
-        ${STDCXX15EXP_STATIC}
+#        ${STDCXX15EXP_STATIC}
+        libstdc++exp.a
 )
 
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -203,7 +206,8 @@ target_link_libraries(fulltext_benchmark
         CLI11::CLI11
         magic_enum::magic_enum
         roaring::roaring
-        ${STDCXX15EXP_STATIC}
+#        ${STDCXX15EXP_STATIC}
+        libstdc++exp.a
 )
 
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -251,7 +255,8 @@ target_link_libraries(sparse_benchmark
         CLI11::CLI11
         magic_enum::magic_enum
         roaring::roaring
-        ${STDCXX15EXP_STATIC}
+#        ${STDCXX15EXP_STATIC}
+        libstdc++exp.a
 )
 
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -302,7 +307,8 @@ target_link_libraries(bmp_benchmark
         CLI11::CLI11
         magic_enum::magic_enum
         roaring::roaring
-        ${STDCXX15EXP_STATIC}
+#        ${STDCXX15EXP_STATIC}
+        libstdc++exp.a
 )
 
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -353,7 +359,8 @@ target_link_libraries(hnsw_benchmark
         CLI11::CLI11
         magic_enum::magic_enum
         roaring::roaring
-        ${STDCXX15EXP_STATIC}
+#        ${STDCXX15EXP_STATIC}
+        libstdc++exp.a
 )
 
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")

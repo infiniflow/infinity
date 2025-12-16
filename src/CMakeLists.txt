@@ -371,7 +371,8 @@ target_link_libraries(infinity
         # turbo::base64
         resolv.a
         atomic.a
-        ${STDCXX15EXP_STATIC}
+#        ${STDCXX15EXP_STATIC}
+        libstdc++exp.a
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
@@ -532,7 +533,8 @@ target_link_libraries(unit_test
         roaring::roaring
         resolv.a
         atomic.a
-        ${STDCXX15EXP_STATIC}
+#        ${STDCXX15EXP_STATIC}
+        libstdc++exp.a
 )
 
 target_compile_options(unit_test PRIVATE

@@ -977,7 +977,6 @@ Value ColumnVector::GetValueByIndex(size_t index) const {
         UnrecoverableError("Column vector isn't initialized.");
     }
     size_t tail_index = tail_index_.load();
-    fmt::print("{}\n", tail_index);
     if (index >= tail_index) {
         UnrecoverableError(fmt::format("Attempt to access an invalid index of column vector: {}, current tail index: {}", index, tail_index));
     }
