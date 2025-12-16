@@ -33,6 +33,7 @@ import :block_meta;
 import :column_meta;
 import :new_catalog;
 import :roaring_bitmap;
+import :json_manager;
 
 import std;
 import third_party;
@@ -116,6 +117,12 @@ size_t PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSt
                 case LogicalType::kTensorArray:
                 case LogicalType::kSparse: {
                     line += fmt::format("\"{}\"", v.ToString());
+                    break;
+                }
+                case LogicalType::kJson: {
+                    auto data = v.ToString();
+                    auto tmp = JsonManager::escapeQuotes(data);
+                    line += fmt::format("\"{}\"", tmp);
                     break;
                 }
                 default: {
@@ -674,6 +681,7 @@ std::shared_ptr<arrow::DataType> GetArrowType(const DataType &column_data_type) 
         case LogicalType::kDateTime:
         case LogicalType::kTimestamp:
             return arrow::timestamp(arrow::TimeUnit::SECOND);
+        case LogicalType::kJson:
         case LogicalType::kVarchar:
             return arrow::utf8();
         case LogicalType::kSparse: {
@@ -899,6 +907,7 @@ std::shared_ptr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type
             array_builder = std::make_shared<arrow::TimestampBuilder>(arrow::timestamp(arrow::TimeUnit::SECOND), arrow::DefaultMemoryPool());
             break;
         }
+        case LogicalType::kJson:
         case LogicalType::kVarchar: {
             array_builder = std::make_shared<arrow::StringBuilder>();
             break;

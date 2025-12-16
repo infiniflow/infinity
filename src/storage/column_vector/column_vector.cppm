@@ -523,6 +523,8 @@ void ColumnVector::AppendSparseInner(size_t nnz, const DataT *data, const IdxT *
 
 void CopyVarchar(VarcharT &dst_ref, VectorBuffer *dst_vec_buffer, const VarcharT &src_ref, const VectorBuffer *src_vec_buffer);
 
+void CopyJson(JsonT &dst_ref, VectorBuffer *dst_vec_buffer, const JsonT &src_ref, const VectorBuffer *src_vec_buffer);
+
 void CopyMultiVector(MultiVectorT &dst_ref,
                      VectorBuffer *dst_vec_buffer,
                      const MultiVectorT &src_ref,

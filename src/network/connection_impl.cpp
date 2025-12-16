@@ -233,6 +233,11 @@ void Connection::SendTableDescription(const std::shared_ptr<DataTable> &result_t
                 object_width = -1;
                 break;
             }
+            case LogicalType::kJson: {
+                object_id = 250;
+                object_width = -1;
+                break;
+            }
             case LogicalType::kDate: {
                 object_id = 1082;
                 object_width = 8;

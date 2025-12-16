@@ -34,6 +34,7 @@ import :data_table;
 import :column_vector;
 import :query_result;
 import :utility;
+import :json_manager;
 
 import std.compat;
 import third_party;
@@ -1997,6 +1998,8 @@ std::shared_ptr<DataType> InfinityThriftService::GetColumnTypeFromProto(const in
         }
         case infinity_thrift_rpc::LogicType::Varchar:
             return std::make_shared<infinity::DataType>(infinity::LogicalType::kVarchar);
+        case infinity_thrift_rpc::LogicType::Json:
+            return std::make_shared<infinity::DataType>(infinity::LogicalType::kJson);
         case infinity_thrift_rpc::LogicType::Sparse: {
             auto embedding_type = GetEmbeddingDataTypeFromProto(type.physical_type.sparse_type.element_type);
             if (embedding_type == EmbeddingDataType::kElemInvalid) {
@@ -2689,6 +2692,8 @@ infinity_thrift_rpc::ColumnType::type InfinityThriftService::DataTypeToProtoColu
             return infinity_thrift_rpc::ColumnType::ColumnBFloat16;
         case LogicalType::kVarchar:
             return infinity_thrift_rpc::ColumnType::ColumnVarchar;
+        case LogicalType::kJson:
+            return infinity_thrift_rpc::ColumnType::ColumnJson;
         case LogicalType::kEmbedding:
             return infinity_thrift_rpc::ColumnType::ColumnEmbedding;
         case LogicalType::kMultiVector:
@@ -2771,6 +2776,15 @@ std::unique_ptr<infinity_thrift_rpc::DataType> InfinityThriftService::DataTypeTo
             auto data_type_proto = std::make_unique<infinity_thrift_rpc::DataType>();
             infinity_thrift_rpc::VarcharType varchar_type;
             data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Varchar);
+            infinity_thrift_rpc::PhysicalType physical_type;
+            physical_type.__set_varchar_type(varchar_type);
+            data_type_proto->__set_physical_type(physical_type);
+            return data_type_proto;
+        }
+        case LogicalType::kJson: {
+            auto data_type_proto = std::make_unique<infinity_thrift_rpc::DataType>();
+            infinity_thrift_rpc::VarcharType varchar_type;
+            data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Json);
             infinity_thrift_rpc::PhysicalType physical_type;
             physical_type.__set_varchar_type(varchar_type);
             data_type_proto->__set_physical_type(physical_type);
@@ -2986,6 +3000,10 @@ Status InfinityThriftService::ProcessColumnFieldType(infinity_thrift_rpc::Column
             HandleVarcharType(output_column_field, row_count, column_vector);
             break;
         }
+        case LogicalType::kJson: {
+            HandleJsonType(output_column_field, row_count, column_vector);
+            break;
+        }
         case LogicalType::kEmbedding: {
             HandleEmbeddingType(output_column_field, row_count, column_vector);
             break;
@@ -3069,6 +3087,7 @@ void InfinityThriftService::HandlePodType(infinity_thrift_rpc::ColumnField &outp
                                                            const std::shared_ptr<ColumnVector> &column_vector);
 
 DECLARE_HANDLE_ARRAY_TYPE_RECURSIVELY(VarcharT)
+DECLARE_HANDLE_ARRAY_TYPE_RECURSIVELY(JsonT)
 DECLARE_HANDLE_ARRAY_TYPE_RECURSIVELY(SparseT)
 DECLARE_HANDLE_ARRAY_TYPE_RECURSIVELY(TensorT)
 DECLARE_HANDLE_ARRAY_TYPE_RECURSIVELY(TensorArrayT)
@@ -3126,6 +3145,10 @@ void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
         }
         case LogicalType::kVarchar: {
             output_var_buffer_types.operator()<VarcharT>();
+            break;
+        }
+        case LogicalType::kJson: {
+            output_var_buffer_types.operator()<JsonT>();
             break;
         }
         case LogicalType::kSparse: {
@@ -3187,6 +3210,21 @@ void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
     output_str.append(data.data(), data.size());
 }
 
+template <>
+void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
+                                                       const DataType &data_type,
+                                                       const JsonT &data_value,
+                                                       const std::shared_ptr<ColumnVector> &column_vector) {
+    auto data = column_vector->buffer_->GetVarchar(data_value.file_offset_, data_value.length_);
+    std::vector<uint8_t> bson(reinterpret_cast<const uint8_t *>(data), reinterpret_cast<const uint8_t *>(data) + data_value.length_);
+    auto json_data = JsonManager::from_bson(bson);
+    auto json_str = json_data.dump();
+    auto json_length = json_str.length();
+
+    output_str.append(reinterpret_cast<const char *>(&json_length), sizeof(i32));
+    output_str.append(json_str.c_str(), json_length);
+}
+
 void InfinityThriftService::HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field,
                                               size_t row_count,
                                               const std::shared_ptr<ColumnVector> &column_vector) {
@@ -3195,6 +3233,19 @@ void InfinityThriftService::HandleVarcharType(infinity_thrift_rpc::ColumnField &
     const auto &varchar_type = *column_vector->data_type();
     for (size_t i = 0; i < row_count; ++i) {
         HandleArrayTypeRecursively(dst, varchar_type, varchar_ptr[i], column_vector);
+    }
+    output_column_field.column_vectors.emplace_back(std::move(dst));
+    output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
+}
+
+void InfinityThriftService::HandleJsonType(infinity_thrift_rpc::ColumnField &output_column_field,
+                                           size_t row_count,
+                                           const std::shared_ptr<ColumnVector> &column_vector) {
+    std::string dst;
+    const auto json_ptr = reinterpret_cast<const JsonT *>(column_vector->data());
+    const auto &json_type = *column_vector->data_type();
+    for (size_t i = 0; i < row_count; ++i) {
+        HandleArrayTypeRecursively(dst, json_type, json_ptr[i], column_vector);
     }
     output_column_field.column_vectors.emplace_back(std::move(dst));
     output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
