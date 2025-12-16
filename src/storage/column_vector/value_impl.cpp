@@ -22,6 +22,7 @@ import :cast_function;
 import :column_vector;
 import :default_values;
 import :status;
+import :json_manager;
 
 import std.compat;
 import third_party;
@@ -652,6 +653,20 @@ Value Value::MakeArray(std::vector<Value> array_elements, std::shared_ptr<TypeIn
     return value;
 }
 
+Value Value::MakeJson(std::vector<uint8_t> &bson, std::shared_ptr<TypeInfo> type_info_ptr) {
+    Value value(LogicalType::kJson, std::move(type_info_ptr));
+    value.value_info_ = std::make_shared<JsonValueInfo>(std::move(bson));
+    return value;
+}
+
+Value Value::MakeJson(std::string &json_str, std::shared_ptr<TypeInfo> type_info_ptr) {
+    Value value(LogicalType::kJson, std::move(type_info_ptr));
+    auto value_json = infinity::JsonManager::parse(json_str);
+    auto value_bson = infinity::JsonManager::to_bson(value_json);
+    value.value_info_ = std::make_shared<JsonValueInfo>(std::move(value_bson));
+    return value;
+}
+
 Value Value::MakeSparse(const char *raw_data_ptr, const char *raw_idx_ptr, size_t nnz, const std::shared_ptr<TypeInfo> type_info) {
     const auto *sparse_info = static_cast<const SparseInfo *>(type_info.get());
 
@@ -1006,6 +1021,11 @@ bool Value::operator==(const Value &other) const {
             const std::string &s2 = other.value_info_->Get<StringValueInfo>().GetString();
             return s1 == s2;
         }
+        case LogicalType::kJson: {
+            const auto &bson1 = this->GetBson();
+            const auto &bson2 = other.GetBson();
+            return bson1 == bson2;
+        }
         case LogicalType::kEmbedding:
             [[fallthrough]];
         case LogicalType::kMultiVector:
@@ -1155,6 +1175,8 @@ void Value::CopyUnionValue(const Value &other) {
             [[fallthrough]];
         case LogicalType::kVarchar:
             [[fallthrough]];
+        case LogicalType::kJson:
+            [[fallthrough]];
         case LogicalType::kTensor:
             [[fallthrough]];
         case LogicalType::kTensorArray:
@@ -1284,6 +1306,8 @@ void Value::MoveUnionValue(Value &&other) noexcept {
         case LogicalType::kArray:
             [[fallthrough]];
         case LogicalType::kVarchar:
+            [[fallthrough]];
+        case LogicalType::kJson:
             [[fallthrough]];
         case LogicalType::kTensor:
             [[fallthrough]];
@@ -1429,6 +1453,11 @@ std::string Value::ToString() const {
         }
         case LogicalType::kVarchar: {
             return value_info_->Get<StringValueInfo>().GetString();
+        }
+        case LogicalType::kJson: {
+            const auto &bson = this->GetBson();
+            auto json = JsonManager::from_bson(bson);
+            return json.dump();
         }
         case LogicalType::kEmbedding: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
@@ -1600,6 +1629,12 @@ void Value::AppendToJson(const std::string &name, nlohmann::json &json) const {
             json[name] = value_info_->Get<StringValueInfo>().GetString();
             return;
         }
+        case LogicalType::kJson: {
+            const auto &bson = this->GetBson();
+            auto data = JsonManager::from_bson(bson);
+            json[name] = data.dump();
+            return;
+        }
         case LogicalType::kEmbedding: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             std::span<char> data_span = this->GetEmbedding();
@@ -1751,6 +1786,13 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
         case LogicalType::kVarchar: {
             auto *builder = dynamic_cast<::arrow::StringBuilder *>(array_builder);
             auto status = builder->Append(value_info_->Get<StringValueInfo>().GetString());
+            break;
+        }
+        case LogicalType::kJson: {
+            auto *builder = dynamic_cast<::arrow::StringBuilder *>(array_builder);
+            const auto &bson = this->GetBson();
+            auto json = JsonManager::from_bson(bson);
+            auto status = builder->Append(json.dump());
             break;
         }
         case LogicalType::kEmbedding: {

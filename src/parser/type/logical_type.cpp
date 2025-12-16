@@ -14,6 +14,7 @@
 
 #include "type/logical_type.h"
 #include "complex/array_type.h"
+#include "complex/json_type.h"
 #include "complex/sparse_type.h"
 
 #ifndef PARESER_USE_STD_MODULE
@@ -90,6 +91,9 @@ static const char *type2name[] = {
 
     // multi-vector
     "MultiVector",
+
+    // json
+    "Json",
 
     "Invalid",
 };
@@ -170,6 +174,9 @@ std::unordered_map<std::string, LogicalType> name2type = {
     // multi-vector
     {"multivector", LogicalType::kMultiVector},
 
+    // json
+    {"json", LogicalType::kJson},
+
     {"invalid", LogicalType::kInvalid},
 };
 
@@ -241,6 +248,8 @@ static int64_t type_size[] = {
     2, // BFloat16
 
     8, // MultiVector
+
+    sizeof(JsonType), // Json
 
     0, // Invalid
 };

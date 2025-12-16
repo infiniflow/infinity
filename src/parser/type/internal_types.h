@@ -16,6 +16,7 @@
 
 #include "type/complex/array_type.h"
 #include "type/complex/embedding_type.h"
+#include "type/complex/json_type.h"
 #include "type/complex/multi_vector_type.h"
 #include "type/complex/row_id.h"
 #include "type/complex/sparse_type.h"
@@ -116,5 +117,8 @@ using BFloat16T = bfloat16_t;
 
 // MultiVector
 using MultiVectorT = MultiVectorType;
+
+// Json
+using JsonT = JsonType;
 
 } // namespace infinity

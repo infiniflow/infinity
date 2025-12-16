@@ -274,6 +274,9 @@ private:
     HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector);
 
     static void
+    HandleJsonType(infinity_thrift_rpc::ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector);
+
+    static void
     HandleEmbeddingType(infinity_thrift_rpc::ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector);
 
     static void HandleMultiVectorType(infinity_thrift_rpc::ColumnField &output_column_field,

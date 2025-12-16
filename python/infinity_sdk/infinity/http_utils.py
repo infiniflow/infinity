@@ -158,6 +158,8 @@ def type_to_dtype(type):
             return dtype("float64")
         case "varchar":
             return dtype("str")
+        case "json":
+            return dtype("str")
         case _:
             return object
 

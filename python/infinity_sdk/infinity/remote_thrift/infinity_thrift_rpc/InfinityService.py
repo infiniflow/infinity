@@ -6,9 +6,12 @@
 #  options string: py
 #
 
-from thrift.Thrift import TType, TMessageType, TApplicationException
+from thrift.Thrift import TType, TMessageType, TFrozenDict, TException, TApplicationException
+from thrift.protocol.TProtocol import TProtocolException
 from thrift.TRecursive import fix_spec
+from uuid import UUID
 
+import sys
 import logging
 from .ttypes import *
 from thrift.Thrift import TProcessor

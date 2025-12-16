@@ -400,7 +400,7 @@ struct SQL_LTYPE {
 %token DATABASE TABLE COLLECTION TABLES INTO VALUES VIEW INDEX TASKS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMN COLUMNS INDEXES CHUNK CHUNKS SYSTEM
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER HIGHLIGHT CAST END CASE ELSE THEN WHEN
-%token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME FLOAT16 BFLOAT16 UNSIGNED
+%token BOOLEAN JSON INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME FLOAT16 BFLOAT16 UNSIGNED
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP
 %token ARRAY TUPLE EMBEDDING VECTOR MULTIVECTOR TENSOR SPARSE TENSORARRAY BIT TEXT
 %token PRIMARY KEY UNIQUE NULLABLE IS DEFAULT COMMENT IGNORE
@@ -917,6 +917,7 @@ column_type_array : column_type {
 
 column_type :
 BOOLEAN { $$ = new infinity::ColumnType{infinity::LogicalType::kBoolean, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| JSON { $$ = new infinity::ColumnType{infinity::LogicalType::kJson, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
 | TINYINT { $$ = new infinity::ColumnType{infinity::LogicalType::kTinyInt, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
 | SMALLINT { $$ = new infinity::ColumnType{infinity::LogicalType::kSmallInt, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
 | INTEGER { $$ = new infinity::ColumnType{infinity::LogicalType::kInteger, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
@@ -3719,6 +3720,11 @@ constant_expr: STRING {
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
+| JSON STRING {
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kJson);
+    const_expr->json_value_ = $2;
+    $$ = const_expr;
+}
 | DATE STRING {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDate);
     const_expr->date_value_ = $2;
@@ -3981,15 +3987,17 @@ copy_option_list : copy_option {
     $$ = $1;
 };
 
-copy_option : FORMAT IDENTIFIER {
+copy_option : FORMAT JSON {
+    $$ = new infinity::CopyOption();
+    $$->option_type_ = infinity::CopyOptionType::kFormat;
+    $$->file_type_ = infinity::CopyFileType::kJSON;
+}
+| FORMAT IDENTIFIER {
     $$ = new infinity::CopyOption();
     $$->option_type_ = infinity::CopyOptionType::kFormat;
     ParserHelper::ToLower($2);
     if (strcasecmp($2, "csv") == 0) {
         $$->file_type_ = infinity::CopyFileType::kCSV;
-        free($2);
-    } else if (strcasecmp($2, "json") == 0) {
-        $$->file_type_ = infinity::CopyFileType::kJSON;
         free($2);
     } else if (strcasecmp($2, "jsonl") == 0) {
         $$->file_type_ = infinity::CopyFileType::kJSONL;
