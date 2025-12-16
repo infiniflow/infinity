@@ -15,7 +15,9 @@
 module;
 
 #include <cassert>
+
 #include <common/simd/simd_functions.h>
+
 export module infinity_core:plain_vec_store;
 
 import :local_file_handle;

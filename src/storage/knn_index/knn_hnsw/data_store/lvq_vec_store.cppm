@@ -15,6 +15,7 @@
 module;
 
 #include <cassert>
+
 #include <common/simd/simd_functions.h>
 
 export module infinity_core:lvq_vec_store;
