@@ -17,12 +17,7 @@ module;
 #include <cassert>
 #include <ostream>
 #include <random>
-
-#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
-#include <xmmintrin.h>
-#elif defined(__GNUC__) && defined(__aarch64__)
-#include <simde/x86/sse.h>
-#endif
+#include <common/simd/simd_functions.h>
 
 export module infinity_core:rabitq_vec_store;
 
@@ -551,7 +546,7 @@ public:
         return meta.MakeQuery(query.get());
     }
 
-    void Prefetch(VertexType vec_i, const Meta &meta) const { _mm_prefetch(reinterpret_cast<const char *>(GetVec(vec_i, meta)), _MM_HINT_T0); }
+    void Prefetch(VertexType vec_i, const Meta &meta) const { SIMDPrefetch(reinterpret_cast<const void *>(GetVec(vec_i, meta))); }
 
     void Dump(std::ostream &os, size_t offset, size_t chunk_size, const Meta &meta) const {
         for (int i = 0; i < (int)chunk_size; ++i) {

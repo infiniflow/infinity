@@ -15,12 +15,7 @@
 module;
 
 #include <cassert>
-
-#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
-#include <xmmintrin.h>
-#elif defined(__GNUC__) && defined(__aarch64__)
-#include <simde/x86/sse.h>
-#endif
+#include <common/simd/simd_functions.h>
 
 export module infinity_core:lvq_vec_store;
 
@@ -357,7 +352,7 @@ public:
 
     QueryType GetVecToQuery(size_t idx, const Meta &meta) const { return QueryType(meta.compress_data_size(), GetVec(idx, meta)); }
 
-    void Prefetch(VertexType vec_i, const Meta &meta) const { _mm_prefetch(reinterpret_cast<const char *>(GetVec(vec_i, meta)), _MM_HINT_T0); }
+    void Prefetch(VertexType vec_i, const Meta &meta) const { SIMDPrefetch(reinterpret_cast<const void *>(GetVec(vec_i, meta))); }
 
 protected:
     ArrayPtr<char, OwnMem> ptr_;
