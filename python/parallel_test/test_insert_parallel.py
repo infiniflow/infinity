@@ -7,16 +7,17 @@ from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from infinity.connection_pool import ConnectionPool
 
+
 class TestInsertParallel:
     def test_insert_parallel(self, get_infinity_connection_pool):
         total_row_count = 500 * 40
         insert_thread_count = 8
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
-
-        db_obj = infinity_obj.create_database("db_par_insert", ConflictType.Ignore,
-                                              "db_par_insert")
-        table_obj = db_obj.create_table("parallel_insert_test1", {
+        db_obj = infinity_obj.get_database("default_db")
+        res = db_obj.drop_table("parallel_insert_test", ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
+        table_obj = db_obj.create_table("parallel_insert_test", {
             "id": {"type": "int64"},
             "text": {"type": "varchar"},
             "c_tiny_int": {"type": "int8"},
@@ -42,14 +43,14 @@ class TestInsertParallel:
         print(f"test_insert_parallel: cost {time.time() - start_ts} s")
 
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("db_par_insert")
-        table_obj = db_obj.get_table("parallel_insert_test1")
+        db_obj = infinity_obj.get_database("default_db")
+        table_obj = db_obj.get_table("parallel_insert_test")
 
         res, extra_result = table_obj.output(['*']).to_df()
         print(res)
         assert len(res) == total_row_count
 
-        res = db_obj.drop_table("parallel_insert_test1", ConflictType.Error)
+        res = db_obj.drop_table("parallel_insert_test", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     def test_insert_one_thread(self, get_infinity_connection_pool):
@@ -57,10 +58,10 @@ class TestInsertParallel:
         total_row_count = 500 * 40
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("db_par_insert")
-        res = db_obj.drop_table("parallel_insert_test1", ConflictType.Ignore)
+        db_obj = infinity_obj.get_database("default_db")
+        res = db_obj.drop_table("parallel_insert_test", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
-        table_obj = db_obj.create_table("parallel_insert_test1", {
+        table_obj = db_obj.create_table("parallel_insert_test", {
             "id": {"type": "int64"},
             "text": {"type": "varchar"},
             "c_tiny_int": {"type": "int8"},
@@ -72,8 +73,8 @@ class TestInsertParallel:
         }, ConflictType.Error)
         table_obj.create_index("text_index", index.IndexInfo("text", index.IndexType.FullText))
 
-        db_obj = infinity_obj.get_database("db_par_insert")
-        table_obj = db_obj.get_table("parallel_insert_test1")
+        db_obj = infinity_obj.get_database("default_db")
+        table_obj = db_obj.get_table("parallel_insert_test")
 
         start_ts = time.time()
         value = []
@@ -93,7 +94,7 @@ class TestInsertParallel:
         print(res)
         assert len(res) == total_row_count
 
-        res = db_obj.drop_table("parallel_insert_test1", ConflictType.Error)
+        res = db_obj.drop_table("parallel_insert_test", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         connection_pool.release_conn(infinity_obj)
@@ -105,10 +106,10 @@ class TestInsertParallel:
         count_star_thread_count = 4
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("db_par_insert")
-        res = db_obj.drop_table("parallel_insert_test1", ConflictType.Ignore)
+        db_obj = infinity_obj.get_database("default_db")
+        res = db_obj.drop_table("parallel_insert_test", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
-        table_obj = db_obj.create_table("parallel_insert_test1", {
+        table_obj = db_obj.create_table("parallel_insert_test", {
             "id": {"type": "int64"},
             "text": {"type": "varchar"},
             "c_tiny_int": {"type": "int8"},
@@ -136,21 +137,21 @@ class TestInsertParallel:
             threads[i].join()
 
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("db_par_insert")
-        table_obj = db_obj.get_table("parallel_insert_test1")
+        db_obj = infinity_obj.get_database("default_db")
+        table_obj = db_obj.get_table("parallel_insert_test")
 
         res, extra_result = table_obj.output(['*']).to_df()
         print(res)
         assert len(res) == total_row_count
 
-        res = db_obj.drop_table("parallel_insert_test1", ConflictType.Error)
+        res = db_obj.drop_table("parallel_insert_test", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
 
 def insert_thread(connection_pool: ConnectionPool, count_num, thread_id):
     infinity_obj = connection_pool.get_conn()
-    db_obj = infinity_obj.get_database("db_par_insert")
-    table_obj = db_obj.get_table("parallel_insert_test1")
+    db_obj = infinity_obj.get_database("default_db")
+    table_obj = db_obj.get_table("parallel_insert_test")
 
     value = []
     for i in range(count_num):
@@ -170,8 +171,8 @@ def insert_thread(connection_pool: ConnectionPool, count_num, thread_id):
 
 def count_star_thread(connection_pool: ConnectionPool, loop_count, thread_id):
     infinity_obj = connection_pool.get_conn()
-    db_obj = infinity_obj.get_database("db_par_insert")
-    table_obj = db_obj.get_table("parallel_insert_test1")
+    db_obj = infinity_obj.get_database("default_db")
+    table_obj = db_obj.get_table("parallel_insert_test")
 
     for i in range(loop_count):
         table_obj.output(["count(*)"]).to_pl()
