@@ -54,6 +54,7 @@ import :expression_type;
 import :meta_info;
 import :column_vector;
 import :new_catalog;
+import :json_manager;
 
 import std;
 import third_party;
@@ -417,6 +418,9 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantE
         }
         case LiteralType::kJson: {
             std::string json_value(expr.json_value_);
+            if (!JsonManager::valid_json(json_value)) {
+                RecoverableError(Status::SyntaxError("JSON validation failed."));
+            }
             Value value = Value::MakeJson(json_value, nullptr);
             return std::make_shared<ValueExpression>(std::move(value));
         }
