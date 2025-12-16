@@ -41,5 +41,9 @@ export using boost::asio::ip::tcp;
 export using boost::asio::ip::make_address;
 export using boost::asio::ip::address;
 } // namespace ip
+namespace error {
+export using boost::asio::error::broken_pipe;
+export using boost::asio::error::connection_reset;
+} // namespace error
 } // namespace asio
 } // namespace boost
