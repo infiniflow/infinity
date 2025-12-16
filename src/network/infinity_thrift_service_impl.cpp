@@ -3242,7 +3242,7 @@ void InfinityThriftService::HandleJsonType(infinity_thrift_rpc::ColumnField &out
                                            size_t row_count,
                                            const std::shared_ptr<ColumnVector> &column_vector) {
     std::string dst;
-    const auto json_ptr = reinterpret_cast<const JsonT *>(column_vector->data());
+    const auto json_ptr = reinterpret_cast<const JsonT *>(column_vector->data().get());
     const auto &json_type = *column_vector->data_type();
     for (size_t i = 0; i < row_count; ++i) {
         HandleArrayTypeRecursively(dst, json_type, json_ptr[i], column_vector);
