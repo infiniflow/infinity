@@ -18,6 +18,7 @@ module;
 
 module infinity_core:buffer_reader.impl;
 
+import :boost;
 import :buffer_reader;
 import :pg_message;
 import :ring_buffer_iterator;

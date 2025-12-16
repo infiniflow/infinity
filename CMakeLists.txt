@@ -84,6 +84,7 @@ set(GCC_SEARCH_ROOTS
 set(GCC15_SUFFIXES
         #        lib
         lib/gcc/15
+	lib/gcc/aarch64-linux-gnu/15
         lib/gcc/x86_64-linux-gnu/15
         lib/gcc/x86_64-pc-linux-gnu/15.1.0
         lib64/gcc/x86_64-linux-gnu/15
@@ -142,9 +143,19 @@ find_package(simdjson CONFIG REQUIRED)
 #find_package(spdlog REQUIRED) # wait for fmt:11.2.0
 if (ARM64)
     add_library(sse2neon INTERFACE)
-    # need this after highway and before simdcomp
-    find_path(SSE2NEON_INCLUDE_DIRS "sse2neon/sse2neon.h")
-    target_include_directories(sse2neon SYSTEM ${SSE2NEON_INCLUDE_DIRS})
+    if (EXISTS "${VCPKG_INSTALLED_DIR}/include/sse2neon/sse2neon.h")
+	    set(SSE2NEON_INCLUDE_DIRS "${VCPKG_INSTALLED_DIR}/include")
+	    message(STATUS "Found sse2neon in vcpkg: ${SSE2NEON_INCLUDE_DIRS}")
+	    target_include_directories(sse2neon SYSTEM INTERFACE ${SSE2NEON_INCLUDE_DIRS})
+    else()
+	    find_path(SSE2NEON_INCLUDE_DIRS "sse2neon/sse2neon.h")
+	    if (SSE2NEON_INCLUDE_DIRS)
+		    message(STATUS "Found sse2neon: ${SSE2NEON_INCLUDE_DIRS}")
+		    target_include_directories(sse2neon SYSTEM INTERFACE ${SSE2NEON_INCLUDE_DIRS})
+	    else()
+		    message(WARNING "sse2neon not found, proceeding without it.")
+	    endif()
+    endif()
 endif ()
 find_package(tomlplusplus CONFIG REQUIRED)
 #find_package(turbobase64 CONFIG REQUIRED)
