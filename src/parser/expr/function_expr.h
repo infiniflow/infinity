@@ -57,8 +57,8 @@ public:
     explicit JsonExtraInfo(char *json_extra_info) : BaseExtraInfo(ExtraInfoType::kJson), json_extra_info_(json_extra_info) {}
     ~JsonExtraInfo() override {
         if (json_extra_info_ != nullptr) {
-            free(json_extra_info_);
-            json_extra_info_ = nullptr;
+            // free(json_extra_info_);
+            // json_extra_info_ = nullptr;
         }
         json_tokens_.clear();
     }
@@ -67,7 +67,6 @@ public:
 
     char *json_extra_info_{nullptr};
     std::vector<std::string> json_tokens_{};
-    void *json_functions_{nullptr};
 };
 
 } // namespace infinity
