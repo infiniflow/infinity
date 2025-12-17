@@ -136,6 +136,11 @@ public:
 
     void WaitForTaskCompletion();
 
+    std::string index_dir_;
+
+    // for column length info
+    VectorWithLock<u32> column_lengths_;
+
 private:
     // call with write lock
     void IncreaseMemoryUsage(size_t mem);
@@ -159,7 +164,6 @@ private:
     void TupleListToIndexFile(std::unique_ptr<SortMergerTermTuple<TermTuple, u32>> &merger);
 
 private:
-    std::string index_dir_;
     std::string base_name_;
     RowID base_row_id_{INVALID_ROWID};
     optionflag_t flag_;
@@ -175,7 +179,7 @@ private:
     u64 inflight_tasks_{0};
     std::condition_variable cv_;
     mutable std::mutex mutex_;
-    std::timed_mutex mutex_commit_;
+    std::mutex mutex_commit_;
     std::shared_mutex mutex_commit_sync_share_;
 
     u32 num_runs_{};              // For offline index building
@@ -185,8 +189,6 @@ private:
 
     bool is_spilled_{};
 
-    // for column length info
-    VectorWithLock<u32> column_lengths_;
     std::atomic<u32> term_cnt_{};
 
     // spill file write buf

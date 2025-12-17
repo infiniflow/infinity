@@ -287,11 +287,8 @@ void MemoryIndexer::Commit(bool offline) {
 }
 
 size_t MemoryIndexer::CommitOffline(size_t wait_if_empty_ms) {
-    std::println("fuck A 1");
     std::unique_lock lock(mutex_commit_, std::defer_lock);
-    std::println("fuck A 2");
     if (!lock.try_lock()) {
-        std::println("fuck A 3");
         return 0;
     }
 
@@ -320,11 +317,8 @@ size_t MemoryIndexer::CommitOffline(size_t wait_if_empty_ms) {
 }
 
 size_t MemoryIndexer::CommitSync(size_t wait_if_empty_ms) {
-    std::println("fuck B 1");
     std::unique_lock lock(mutex_commit_, std::defer_lock);
-    std::println("fuck B 2");
-    if (!lock.try_lock_for(std::chrono::steady_clock::duration(100ms))) {
-        std::println("fuck B 3");
+    if (!lock.try_lock()) {
         return 0;
     }
     size_t num_generated = 0;
@@ -380,9 +374,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         while (GetInflightTasks() > 0) {
             CommitOffline(100);
         }
-        std::println("fuck C 1");
         std::unique_lock lock(mutex_commit_);
-        std::println("fuck C 2");
         // std::unique_lock lock(mutex_commit_, std::defer_lock);
         // if (!lock.try_lock()) {
         //     return;
@@ -448,6 +440,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     {
         auto [file_handle, status] = VirtualStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
         if (!status.ok()) {
+            // return;
             // fuck
             // UnrecoverableError(status.message());
         }

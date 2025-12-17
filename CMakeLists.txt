@@ -53,11 +53,12 @@ if (CLANG_VERSION_STRING VERSION_GREATER_EQUAL 20)
     message(STATUS "Building ${PROJECT_NAME} with CMake version: ${CMAKE_VERSION} On CLANG-${CLANG_VERSION_STRING}")
 
     # add_compile_options(-ftime-trace)
-    #    add_compile_options(-fmodule-header)
+    # add_compile_options(-fmodule-header)
     add_link_options(-fuse-ld=mold)
-#    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field --rtlib=libgcc --unwindlib=libgcc -Wl,-rpath-link,/usr/lib/gcc/x86_64-linux-gnu/15 -Wl,-rpath,/usr/lib/gcc/x86_64-linux-gnu/15 -mno-rtm -fno-rtm")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field -mno-rtm -fno-rtm")
-#        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field /usr/lib/gcc/x86_64-linux-gnu/15/libgcc_s.so")
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field --rtlib=libgcc --unwindlib=libgcc -Wl,-rpath-link,/usr/lib/gcc/x86_64-linux-gnu/15 -Wl,-rpath,/usr/lib/gcc/x86_64-linux-gnu/15 -mno-rtm -fno-rtm")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field --rtlib=libgcc --unwindlib=libgcc")
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field")
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field /usr/lib/gcc/x86_64-linux-gnu/15/libgcc_s.so")
 
     add_link_options(-L/usr/local/lib)
     set(CMAKE_FIND_PACKAGE_SORT_ORDER NATURAL)
@@ -78,29 +79,29 @@ elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
 endif ()
 
 ##strength, for image maintainer
-set(GCC_SEARCH_ROOTS
-        /usr
-        /usr/local
-)
+#set(GCC_SEARCH_ROOTS
+#        /usr
+#        /usr/local
+#)
 
-#if you encounter a problem, try commenting out the code below.
-set(GCC15_SUFFIXES
-        #        lib
-        lib/gcc/15
-        lib/gcc/x86_64-linux-gnu/15
-        lib/gcc/x86_64-pc-linux-gnu/15.2.0
-        lib64/gcc/x86_64-linux-gnu/15
-        lib64/gcc/15
-        lib64/gcc/x86_64-pc-linux-gnu/15.2.0
-)
-
-find_library(STDCXX15_STATIC
-        NAMES libstdc++.a
-        PATHS ${GCC_SEARCH_ROOTS}
-        PATH_SUFFIXES ${GCC15_SUFFIXES}
-        REQUIRED
-        NO_DEFAULT_PATH
-)
+##if you encounter a problem, try commenting out the code below.
+#set(GCC15_SUFFIXES
+#        #        lib
+#        lib/gcc/15
+#        lib/gcc/x86_64-linux-gnu/15
+#        lib/gcc/x86_64-pc-linux-gnu/15.2.0
+#        lib64/gcc/x86_64-linux-gnu/15
+#        lib64/gcc/15
+#        lib64/gcc/x86_64-pc-linux-gnu/15.2.0
+#)
+#
+#find_library(STDCXX15_STATIC
+#        NAMES libstdc++.a
+#        PATHS ${GCC_SEARCH_ROOTS}
+#        PATH_SUFFIXES ${GCC15_SUFFIXES}
+#        REQUIRED
+#        NO_DEFAULT_PATH
+#)
 
 # find_library(GCC15_STATIC
 #         NAMES libgcc.a
@@ -110,19 +111,18 @@ find_library(STDCXX15_STATIC
 #         NO_DEFAULT_PATH
 # )
 
-find_library(STDCXX15EXP_STATIC
-        NAMES libstdc++exp.a
-        PATHS ${GCC_SEARCH_ROOTS}
-        PATH_SUFFIXES ${GCC15_SUFFIXES}
-        REQUIRED
-        NO_DEFAULT_PATH
-)
+#find_library(STDCXX15EXP_STATIC
+#        NAMES libstdc++exp.a
+#        PATHS ${GCC_SEARCH_ROOTS}
+#        PATH_SUFFIXES ${GCC15_SUFFIXES}
+#        REQUIRED
+#        NO_DEFAULT_PATH
+#)
 
-get_filename_component(GCC15_LIB_DIR "${STDCXX15_STATIC}" DIRECTORY)
+#get_filename_component(GCC15_LIB_DIR "${STDCXX15_STATIC}" DIRECTORY)
 
-#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
 #set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -L${GCC15_LIB_DIR} -static-libgcc")
-#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /usr/lib/gcc/x86_64-linux-gnu/15/libgcc.a")
 ########
 
 find_package(absl CONFIG REQUIRED)
@@ -340,11 +340,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -W
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
 
-
-#
-#add_definitions(-DGLIBCXX_FORCE_NEW_LOCK=1)
-#add_definitions(-D_GTHREAD_USE_MUTEX_TIMEDLOCK=0)
-
 if (APPLE)
     if (X86_64)
         execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep SSE4.2"
@@ -396,13 +391,10 @@ if (X86_64)
     else ()
         message(FATAL_ERROR "This project requires following cpu flag: sse4_2.")
     endif ()
-    add_definitions(-mfma -mf16c -mpopcnt -mbmi2 -mno-rtm)
+    add_definitions(-mfma -mf16c -mpopcnt -mbmi2)
 else ()
     add_definitions(-march=native)
 endif ()
-add_definitions(-mno-rtm)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mno-rtm")
-message(STATUS "asdasda ${CMAKE_CXX_FLAGS}")
 execute_process(
         COMMAND bash -c "zgrep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y /proc/config.gz 2>/dev/null; grep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y /boot/config-$(uname -r) 2>/dev/null"
         OUTPUT_VARIABLE HAVE_EFFICIENT_UNALIGNED_ACCESS

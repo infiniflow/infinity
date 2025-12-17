@@ -381,7 +381,6 @@ target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-target_compile_options(infinity PUBLIC -mno-rtm)
 
 # if (SKBUILD)
 #    add_library(embedded_infinity_ext MODULE
