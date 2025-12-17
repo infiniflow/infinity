@@ -94,7 +94,7 @@ void MemIndexAppender::Process() {
                             // Only used for full text index, currently
                             UnrecoverableError("Not inverted index");
                         }
-                        if (memory_indexer_map.find(memory_indexer.get()) == memory_indexer_map.end()) {
+                        if (!memory_indexer_map.contains(memory_indexer.get())) {
                             memory_indexers.push_back(memory_indexer.get());
                             memory_indexer_map.emplace(memory_indexer.get(), std::make_shared<AppendMemIndexBatch>());
                         }

@@ -118,7 +118,7 @@ void AppendMemIndexBatch::InsertTask(AppendMemIndexTask *task) {
 }
 
 void AppendMemIndexBatch::WaitForCompletion() {
-    std::unique_lock<std::mutex> lock(mtx_);
+    std::unique_lock lock(mtx_);
     cv_.wait(lock, [this] { return task_count_ == 0; });
 }
 

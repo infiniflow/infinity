@@ -55,7 +55,8 @@ if (CLANG_VERSION_STRING VERSION_GREATER_EQUAL 20)
     # add_compile_options(-ftime-trace)
     #    add_compile_options(-fmodule-header)
     add_link_options(-fuse-ld=mold)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field -rtlib=libgcc -unwindlib=libgcc -Wl,-rpath-link,/usr/lib/gcc/x86_64-linux-gnu/15 -Wl,-rpath,/usr/lib/gcc/x86_64-linux-gnu/15 -mno-rtm")
+#    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field --rtlib=libgcc --unwindlib=libgcc -Wl,-rpath-link,/usr/lib/gcc/x86_64-linux-gnu/15 -Wl,-rpath,/usr/lib/gcc/x86_64-linux-gnu/15 -mno-rtm -fno-rtm")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field -mno-rtm -fno-rtm")
 #        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field /usr/lib/gcc/x86_64-linux-gnu/15/libgcc_s.so")
 
     add_link_options(-L/usr/local/lib)
@@ -120,7 +121,7 @@ find_library(STDCXX15EXP_STATIC
 get_filename_component(GCC15_LIB_DIR "${STDCXX15_STATIC}" DIRECTORY)
 
 #set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -L${GCC15_LIB_DIR} -static-libgcc")
+#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -L${GCC15_LIB_DIR} -static-libgcc")
 #set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /usr/lib/gcc/x86_64-linux-gnu/15/libgcc.a")
 ########
 
@@ -339,8 +340,10 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -W
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
 
-add_definitions(-mno-rtm)
-add_definitions(-DGLIBCXX_FORCE_NEW_LOCK=1)
+
+#
+#add_definitions(-DGLIBCXX_FORCE_NEW_LOCK=1)
+#add_definitions(-D_GTHREAD_USE_MUTEX_TIMEDLOCK=0)
 
 if (APPLE)
     if (X86_64)
@@ -393,11 +396,13 @@ if (X86_64)
     else ()
         message(FATAL_ERROR "This project requires following cpu flag: sse4_2.")
     endif ()
-    add_definitions(-mfma -mf16c -mpopcnt -mbmi2)
+    add_definitions(-mfma -mf16c -mpopcnt -mbmi2 -mno-rtm)
 else ()
     add_definitions(-march=native)
 endif ()
-
+add_definitions(-mno-rtm)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mno-rtm")
+message(STATUS "asdasda ${CMAKE_CXX_FLAGS}")
 execute_process(
         COMMAND bash -c "zgrep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y /proc/config.gz 2>/dev/null; grep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y /boot/config-$(uname -r) 2>/dev/null"
         OUTPUT_VARIABLE HAVE_EFFICIENT_UNALIGNED_ACCESS

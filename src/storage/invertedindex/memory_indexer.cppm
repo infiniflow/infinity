@@ -175,7 +175,7 @@ private:
     u64 inflight_tasks_{0};
     std::condition_variable cv_;
     mutable std::mutex mutex_;
-    std::mutex mutex_commit_;
+    std::timed_mutex mutex_commit_;
     std::shared_mutex mutex_commit_sync_share_;
 
     u32 num_runs_{};              // For offline index building
