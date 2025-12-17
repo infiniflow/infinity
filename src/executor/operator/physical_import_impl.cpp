@@ -17,6 +17,7 @@ module;
 #include <cassert>
 #include <cerrno>
 #include <cstring>
+#include <zsv.h>
 
 module infinity_core:physical_import.impl;
 

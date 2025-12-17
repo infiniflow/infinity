@@ -14,11 +14,7 @@
 
 module;
 
-#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
-#include <xmmintrin.h>
-#elif defined(__GNUC__) && defined(__aarch64__)
-#include <simde/x86/sse.h>
-#endif
+#include <common/simd/simd_functions.h>
 
 export module infinity_core:sparse_vec_store;
 
@@ -155,8 +151,8 @@ public:
 
     void Prefetch(size_t idx, const Meta &meta) const {
         const SparseVecEle &vec = vecs_[idx];
-        _mm_prefetch((const char *)vec.indices_.get(), _MM_HINT_T0);
-        _mm_prefetch((const char *)vec.data_.get(), _MM_HINT_T0);
+        SIMDPrefetch(vec.indices_.get());
+        SIMDPrefetch(vec.data_.get());
     }
 
 private:
