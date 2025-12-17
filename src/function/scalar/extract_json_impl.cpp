@@ -48,6 +48,7 @@ void JsonExtract(std::shared_ptr<BaseExtraInfo> extract_ptr, const DataBlock &in
         }
         output->Finalize(row_count);
     } else {
+        RecoverableError(Status::SyntaxError("JsonExtract: Invalid column type."));
     }
 }
 
