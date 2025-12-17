@@ -48,7 +48,6 @@ message(STATUS "CXX: ${CMAKE_CXX_COMPILER}")
 execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string)
 string(REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" CLANG_VERSION_STRING ${clang_full_version_string})
 if (CLANG_VERSION_STRING VERSION_GREATER_EQUAL 20)
-    #if (CLANG_VERSION_STRING VERSION_EQUAL 20)
     # Print CMake version and project name
     message(STATUS "Building ${PROJECT_NAME} with CMake version: ${CMAKE_VERSION} On CLANG-${CLANG_VERSION_STRING}")
 
@@ -84,23 +83,16 @@ endif ()
 #        /usr/local
 #)
 
-##if you encounter a problem, try commenting out the code below.
+#if you encounter a problem, try commenting out the code below.
 #set(GCC15_SUFFIXES
 #        #        lib
 #        lib/gcc/15
+#	    lib/gcc/aarch64-linux-gnu/15
 #        lib/gcc/x86_64-linux-gnu/15
-#        lib/gcc/x86_64-pc-linux-gnu/15.2.0
+#        lib/gcc/x86_64-pc-linux-gnu/15.1.0
 #        lib64/gcc/x86_64-linux-gnu/15
 #        lib64/gcc/15
-#        lib64/gcc/x86_64-pc-linux-gnu/15.2.0
-#)
-#
-#find_library(STDCXX15_STATIC
-#        NAMES libstdc++.a
-#        PATHS ${GCC_SEARCH_ROOTS}
-#        PATH_SUFFIXES ${GCC15_SUFFIXES}
-#        REQUIRED
-#        NO_DEFAULT_PATH
+#        lib64/gcc/x86_64-pc-linux-gnu/15.1.0
 #)
 
 # find_library(GCC15_STATIC
@@ -155,9 +147,19 @@ find_package(simdjson CONFIG REQUIRED)
 #find_package(spdlog REQUIRED) # wait for fmt:11.2.0
 if (ARM64)
     add_library(sse2neon INTERFACE)
-    # need this after highway and before simdcomp
-    find_path(SSE2NEON_INCLUDE_DIRS "sse2neon/sse2neon.h")
-    target_include_directories(sse2neon SYSTEM ${SSE2NEON_INCLUDE_DIRS})
+    if (EXISTS "${VCPKG_INSTALLED_DIR}/include/sse2neon/sse2neon.h")
+	    set(SSE2NEON_INCLUDE_DIRS "${VCPKG_INSTALLED_DIR}/include")
+	    message(STATUS "Found sse2neon in vcpkg: ${SSE2NEON_INCLUDE_DIRS}")
+	    target_include_directories(sse2neon SYSTEM INTERFACE ${SSE2NEON_INCLUDE_DIRS})
+    else()
+	    find_path(SSE2NEON_INCLUDE_DIRS "sse2neon/sse2neon.h")
+	    if (SSE2NEON_INCLUDE_DIRS)
+		    message(STATUS "Found sse2neon: ${SSE2NEON_INCLUDE_DIRS}")
+		    target_include_directories(sse2neon SYSTEM INTERFACE ${SSE2NEON_INCLUDE_DIRS})
+	    else()
+		    message(WARNING "sse2neon not found, proceeding without it.")
+	    endif()
+    endif()
 endif ()
 find_package(tomlplusplus CONFIG REQUIRED)
 #find_package(turbobase64 CONFIG REQUIRED)
