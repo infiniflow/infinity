@@ -30,42 +30,54 @@ std::string JsonManager::unescapeQuotes(const std::string &input) {
     return std::regex_replace(input, pattern, "\"");
 }
 
-bool JsonManager::valid_json(const std::string &valid_json) { return JsonType::accept(valid_json); }
+bool JsonManager::valid_json(const std::string &valid_json) { return JsonTypeDef::accept(valid_json); }
 
-JsonType JsonManager::parse(std::string &json_str) {
+JsonTypeDef JsonManager::parse(std::string &json_str) {
     try {
-        return JsonType::parse(json_str);
-    } catch (const JsonType::parse_error &e) {
-        LOG_INFO(fmt::format("JsonManager::parse error: {}", e.what()));
+        return JsonTypeDef::parse(json_str);
+    } catch (const JsonTypeDef::parse_error &e) {
+        LOG_TRACE(fmt::format("JsonManager::parse error: {}", e.what()));
     }
     return {};
 }
 
-JsonType JsonManager::from_bson(const std::vector<uint8_t> &bson_data) {
+JsonTypeDef JsonManager::from_bson(const std::vector<uint8_t> &bson_data) {
     try {
-        return JsonType::from_bson(bson_data);
-    } catch (const JsonType::parse_error &e) {
-        LOG_INFO(fmt::format("JsonManager::from_bson error: {}", e.what()));
+        return JsonTypeDef::from_bson(bson_data);
+    } catch (const JsonTypeDef::parse_error &e) {
+        LOG_TRACE(fmt::format("JsonManager::from_bson error: {}", e.what()));
     }
     return {};
 }
 
-std::string JsonManager::dump(const JsonType &json_obj) {
+std::string JsonManager::dump(const JsonTypeDef &json_obj) {
     try {
         return json_obj.dump();
-    } catch (const JsonType::parse_error &e) {
-        LOG_INFO(fmt::format("JsonManager::dump error: {}", e.what()));
+    } catch (const JsonTypeDef::parse_error &e) {
+        LOG_TRACE(fmt::format("JsonManager::dump error: {}", e.what()));
     }
     return {};
 }
 
-std::vector<uint8_t> JsonManager::to_bson(const JsonType &json_obj) {
+std::vector<uint8_t> JsonManager::to_bson(const JsonTypeDef &json_obj) {
     try {
-        return JsonType::to_bson(json_obj);
-    } catch (const JsonType::parse_error &e) {
-        LOG_INFO(fmt::format("JsonManager::to_bson error: {}", e.what()));
+        return JsonTypeDef::to_bson(json_obj);
+    } catch (const JsonTypeDef::parse_error &e) {
+        LOG_TRACE(fmt::format("JsonManager::to_bson error: {}", e.what()));
     }
     return {};
+}
+
+std::string JsonManager::json_extract(const JsonTypeDef &data, const std::vector<std::string> &tokens) {
+    JsonTypeDef current = data;
+    for (const auto &token : tokens) {
+        if (current.is_object() && current.contains(token)) {
+            current = current[token];
+        } else {
+            return "null";
+        }
+    }
+    return current.dump();
 }
 
 } // namespace infinity

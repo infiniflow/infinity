@@ -40,6 +40,7 @@ import third_party;
 
 import logical_type;
 import internal_types;
+import function_expr;
 
 namespace infinity {
 
@@ -169,7 +170,20 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<FunctionExpression> &exp
         func_input_data_block.Init(arguments);
     }
 
-    expr->func_.function_(func_input_data_block, output_column_vector);
+    if (expr->func_.extra_info_ != nullptr) {
+        auto &data = expr->func_.extra_info_;
+        switch (data->type_) {
+            case ExtraInfoType::kJson: {
+                expr->func_.json_function_(data, func_input_data_block, output_column_vector);
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    } else {
+        expr->func_.function_(func_input_data_block, output_column_vector);
+    }
 }
 
 void ExpressionEvaluator::Execute(const std::shared_ptr<ValueExpression> &expr,

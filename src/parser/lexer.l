@@ -79,6 +79,7 @@ DATABASE        { return DATABASE; }
 DATABASES       { return DATABASES; }
 DATE            { return DATE; }
 DATETIME        { return DATETIME; }
+JSON_EXTRACT    { return JSON_EXTRACT; }
 DAY             { return DAY; }
 DAYS            { return DAYS; }
 DISTINCT        { return DISTINCT; }

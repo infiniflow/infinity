@@ -55,6 +55,7 @@ import :meta_info;
 import :column_vector;
 import :new_catalog;
 import :json_manager;
+import :extract_json;
 
 import std;
 import third_party;
@@ -82,6 +83,7 @@ import data_type;
 import embedding_info;
 import logical_type;
 import internal_types;
+import function_expr;
 
 namespace infinity {
 
@@ -488,6 +490,20 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionEx
             // std::shared_ptr<ScalarFunctionSet> scalar_function_set_ptr
             auto scalar_function_set_ptr = static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
             ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
+
+            if (expr.extra_info_ != nullptr) {
+                auto type = expr.extra_info_->type_;
+                switch (type) {
+                    case ExtraInfoType::kJson: {
+                        scalar_function.extra_info_ = expr.extra_info_;
+                        scalar_function.json_function_ = JsonExtract;
+                        break;
+                    }
+                    default: {
+                        break;
+                    }
+                }
+            }
 
             for (size_t idx = 0; idx < arguments.size(); ++idx) {
                 // Check if the argument is an embedding type but the function doesn't expect it
