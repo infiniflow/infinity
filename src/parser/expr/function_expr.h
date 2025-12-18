@@ -57,8 +57,8 @@ public:
     explicit JsonExtraInfo(char *json_extra_info) : BaseExtraInfo(ExtraInfoType::kJson), json_extra_info_(json_extra_info) {}
     ~JsonExtraInfo() override {
         if (json_extra_info_ != nullptr) {
-            // free(json_extra_info_);
-            // json_extra_info_ = nullptr;
+            free(json_extra_info_);
+            json_extra_info_ = nullptr;
         }
         json_tokens_.clear();
     }

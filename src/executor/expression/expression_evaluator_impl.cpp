@@ -181,7 +181,6 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<FunctionExpression> &exp
                 break;
             }
         }
-        expr->func_.extra_info_ = nullptr;
     } else {
         expr->func_.function_(func_input_data_block, output_column_vector);
     }
