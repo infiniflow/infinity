@@ -3366,7 +3366,6 @@ function_expr : IDENTIFIER '(' ')' {
     free($1);
 
     if (!extra_ptr->Init()) {
-        free($1);
         free($5);
         if (extra_ptr != nullptr) {
             delete extra_ptr;
