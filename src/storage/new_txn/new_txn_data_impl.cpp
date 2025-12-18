@@ -562,7 +562,7 @@ Status NewTxn::ReplayDelete(WalCmdDeleteV2 *delete_cmd, TxnTimeStamp commit_ts, 
     return PrepareCommitDelete(delete_cmd);
 }
 
-Status NewTxn::DeleteInner(const std::string &db_name, const std::string &table_name, TableMeta &table_meta, const std::vector<RowID> &row_ids) {
+Status NewTxn::DeleteInner(const std::string &db_name, const std::string &table_name, const TableMeta &table_meta, const std::vector<RowID> &row_ids) {
     auto delete_command = std::make_shared<WalCmdDeleteV2>(db_name, table_meta.db_id_str(), table_name, table_meta.table_id_str(), row_ids);
     auto wal_command = static_pointer_cast<WalCmd>(delete_command);
     wal_entry_->cmds_.push_back(wal_command);
@@ -1267,9 +1267,7 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
 }
 
 Status NewTxn::DropColumnsData(TableMeta &table_meta, const std::vector<ColumnID> &column_ids) {
-    Status status;
-    std::vector<SegmentID> *segment_ids_ptr;
-    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
+    auto [segment_ids_ptr, status] = table_meta.GetSegmentIDs1();
     if (!status.ok()) {
         return status;
     }
@@ -1284,12 +1282,12 @@ Status NewTxn::DropColumnsData(TableMeta &table_meta, const std::vector<ColumnID
         return status;
     }
 
-    auto drop_columns_in_block = [&](BlockMeta &block_meta) {
+    auto drop_columns_in_block = [&](const BlockMeta &block_meta) {
         TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
         for (ColumnID column_id : column_ids) {
             auto iter = std::find_if(column_defs_ptr->begin(), column_defs_ptr->end(), [&](const std::shared_ptr<ColumnDef> &column_def) {
-                return ColumnID(column_def->id()) == column_id;
+                return static_cast<ColumnID>(column_def->id()) == column_id;
             });
             if (iter == column_defs_ptr->end()) {
                 UnrecoverableError(fmt::format("Column {} not found in table meta", column_id));
@@ -1571,7 +1569,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
                 auto file_size = obj_addr.part_size_;
                 auto buffer = std::make_unique<char[]>(file_size);
-                auto [nread, read_status] = read_handle->Read(buffer.get(), file_size);
+                auto [_, read_status] = read_handle->Read(buffer.get(), file_size);
 
                 auto [write_handle, write_open_status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
                 if (!write_open_status.ok()) {
@@ -1588,7 +1586,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                 std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
                 LOG_TRACE(fmt::format("CreateSnapshotFile, Read path: {}, Write path: {}", read_path, write_path));
 
-                Status status = VirtualStore::Copy(write_path, read_path);
+                status = VirtualStore::Copy(write_path, read_path);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }
@@ -2119,10 +2117,9 @@ Status NewTxn::FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts) {
 }
 
 Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
-    Status status;
-
-    std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs;
-    std::tie(column_defs, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
+    // Status status;
+    // std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs;
+    auto [column_defs, status] = block_meta.segment_meta().table_meta().GetColumnDefs();
     if (!status.ok()) {
         return status;
     }

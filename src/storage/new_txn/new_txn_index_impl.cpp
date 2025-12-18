@@ -327,7 +327,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     RowID base_rowid;
     u32 row_cnt = 0;
     u32 term_cnt = 0;
-    std::vector<size_t> row_cnts;
+    std::vector<size_t> row_count_list;
 
     std::string base_name;
 
@@ -357,7 +357,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             }
             last_rowid.segment_offset_ += chunk_info_ptr->row_cnt_;
             row_cnt += chunk_info_ptr->row_cnt_;
-            row_cnts.push_back(chunk_info_ptr->row_cnt_);
+            row_count_list.push_back(chunk_info_ptr->row_cnt_);
         }
     }
     std::vector<ChunkID> deprecate_ids = *old_chunk_ids_ptr;
@@ -400,7 +400,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                 if (!status.ok()) {
                     return status;
                 }
-                old_buffers.emplace_back(row_cnts[i], buffer_obj);
+                old_buffers.emplace_back(row_count_list[i], buffer_obj);
             }
 
             BufferHandle buffer_handle = buffer_obj->Load();
@@ -1222,7 +1222,7 @@ Status NewTxn::PopulateFtIndexInner(std::shared_ptr<IndexBase> index_base,
 Status NewTxn::PopulateIvfIndexInner(std::shared_ptr<IndexBase> index_base,
                                      SegmentIndexMeta &segment_index_meta,
                                      SegmentMeta &segment_meta,
-                                     std::shared_ptr<ColumnDef> column_def,
+                                     const std::shared_ptr<ColumnDef> &column_def,
                                      std::vector<ChunkID> &new_chunk_ids) {
     RowID base_row_id(segment_index_meta.segment_id(), 0);
     u32 row_count = 0;
@@ -1272,7 +1272,7 @@ Status NewTxn::PopulateIvfIndexInner(std::shared_ptr<IndexBase> index_base,
 Status NewTxn::PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
                                       SegmentIndexMeta &segment_index_meta,
                                       SegmentMeta &segment_meta,
-                                      std::shared_ptr<ColumnDef> column_def,
+                                      const std::shared_ptr<ColumnDef> &column_def,
                                       std::vector<ChunkID> &new_chunk_ids) {
     RowID base_row_id(segment_index_meta.segment_id(), 0);
     u32 row_count = 0;
@@ -2026,7 +2026,7 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta,
         }
         chunk_index_meta_infos.push_back(*chunk_index_meta_info_ptr);
     }
-    std::sort(chunk_index_meta_infos.begin(), chunk_index_meta_infos.end(), [](const ChunkIndexMetaInfo &lhs, const ChunkIndexMetaInfo &rhs) {
+    std::ranges::sort(chunk_index_meta_infos, [](const ChunkIndexMetaInfo &lhs, const ChunkIndexMetaInfo &rhs) {
         return lhs.base_row_id_ < rhs.base_row_id_;
     });
     SegmentID segment_id = segment_meta.segment_id();
@@ -2054,7 +2054,7 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta,
     }
     size_t block_capacity = DEFAULT_BLOCK_CAPACITY;
     std::vector<BlockID> block_ids = *block_ids_ptr;
-    sort(block_ids.begin(), block_ids.end());
+    std::ranges::sort(block_ids);
     {
         BlockID start_block_id = start_row_id.segment_offset_ / block_capacity;
         BlockOffset block_offset = start_row_id.segment_offset_ % block_capacity;

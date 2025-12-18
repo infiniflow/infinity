@@ -355,7 +355,7 @@ private:
                        TableMeta &table_meta,
                        const std::shared_ptr<DataBlock> &input_block);
 
-    Status DeleteInner(const std::string &db_name, const std::string &table_name, TableMeta &table_meta, const std::vector<RowID> &row_ids);
+    Status DeleteInner(const std::string &db_name, const std::string &table_name, const TableMeta &table_meta, const std::vector<RowID> &row_ids);
 
 public:
     Status Delete(const std::string &db_name, const std::string &table_name, const std::vector<RowID> &row_ids);
@@ -528,7 +528,7 @@ private:
     Status PopulateIvfIndexInner(std::shared_ptr<IndexBase> index_base,
                                  SegmentIndexMeta &segment_index_meta,
                                  SegmentMeta &segment_meta,
-                                 std::shared_ptr<ColumnDef> column_def,
+                                 const std::shared_ptr<ColumnDef> &column_def,
                                  std::vector<ChunkID> &new_chunk_ids);
 
     Status PopulateHnswIndexInner(std::shared_ptr<IndexBase> index_base,
@@ -558,7 +558,7 @@ private:
     Status PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
                                   SegmentIndexMeta &segment_index_meta,
                                   SegmentMeta &segment_meta,
-                                  std::shared_ptr<ColumnDef> column_def,
+                                  const std::shared_ptr<ColumnDef> &column_def,
                                   std::vector<ChunkID> &new_chunk_ids);
 
     Status OptimizeFtIndex(std::shared_ptr<IndexBase> index_base,
