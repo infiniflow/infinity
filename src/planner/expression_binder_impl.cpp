@@ -497,7 +497,7 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionEx
                 switch (type) {
                     case ExtraInfoType::kJsonToString: {
                         scalar_function.extra_info_ = expr.extra_info_;
-                        scalar_function.json_function_ = JsonExtract;
+                        scalar_function.json_function_ = JsonExtractString;
                         break;
                     }
                     case ExtraInfoType::kJsonToInt: {
@@ -505,7 +505,23 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionEx
                         scalar_function.json_function_ = JsonExtractInt;
                         break;
                     }
+                    case ExtraInfoType::kJsonToDouble: {
+                        scalar_function.extra_info_ = expr.extra_info_;
+                        scalar_function.json_function_ = JsonExtractDouble;
+                        break;
+                    }
+                    case ExtraInfoType::kJsonToBool: {
+                        scalar_function.extra_info_ = expr.extra_info_;
+                        scalar_function.json_function_ = JsonExtractBool;
+                        break;
+                    }
+                    case ExtraInfoType::kJsonToIsNull: {
+                        scalar_function.extra_info_ = expr.extra_info_;
+                        scalar_function.json_function_ = JsonExtractIsNull;
+                        break;
+                    }
                     default: {
+                        RecoverableError(Status::SyntaxError("invalid ExtraInfoType"));
                         break;
                     }
                 }

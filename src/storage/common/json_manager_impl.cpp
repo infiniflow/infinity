@@ -97,4 +97,51 @@ std::tuple<bool, IntegerT> JsonManager::json_extract_int(const JsonTypeDef &data
     }
 }
 
+std::tuple<bool, DoubleT> JsonManager::json_extract_double(const JsonTypeDef &data, const std::vector<std::string> &tokens) {
+    JsonTypeDef current = data;
+    for (const auto &token : tokens) {
+        if (current.is_object() && current.contains(token)) {
+            current = current[token];
+        } else {
+            return {true, 0.0};
+        }
+    }
+
+    if (current.is_number_float()) {
+        return {false, current.get<double>()};
+    } else {
+        return {true, 0.0};
+    }
+}
+
+std::tuple<bool, BooleanT> JsonManager::json_extract_bool(const JsonTypeDef &data, const std::vector<std::string> &tokens) {
+    JsonTypeDef current = data;
+    for (const auto &token : tokens) {
+        if (current.is_object() && current.contains(token)) {
+            current = current[token];
+        } else {
+            return {true, false};
+        }
+    }
+
+    if (current.is_boolean()) {
+        return {false, current.get<bool>()};
+    } else {
+        return {true, false};
+    }
+}
+
+std::tuple<bool, BooleanT> JsonManager::json_extract_is_null(const JsonTypeDef &data, const std::vector<std::string> &tokens) {
+    JsonTypeDef current = data;
+    for (const auto &token : tokens) {
+        if (current.is_object() && current.contains(token)) {
+            current = current[token];
+        } else {
+            return {false, false};
+        }
+    }
+
+    return {false, current.is_null()};
+}
+
 } // namespace infinity

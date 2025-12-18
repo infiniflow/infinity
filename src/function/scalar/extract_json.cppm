@@ -25,7 +25,11 @@ class NewCatalog;
 class DataBlock;
 class ColumnVector;
 export void JsonExtract(std::shared_ptr<BaseExtraInfo> extract_ptr, const DataBlock &, std::shared_ptr<ColumnVector> &);
+export void JsonExtractString(std::shared_ptr<BaseExtraInfo> extract_ptr, const DataBlock &, std::shared_ptr<ColumnVector> &);
 export void JsonExtractInt(std::shared_ptr<BaseExtraInfo> extract_ptr, const DataBlock &, std::shared_ptr<ColumnVector> &);
+export void JsonExtractDouble(std::shared_ptr<BaseExtraInfo> extract_ptr, const DataBlock &, std::shared_ptr<ColumnVector> &);
+export void JsonExtractBool(std::shared_ptr<BaseExtraInfo> extract_ptr, const DataBlock &, std::shared_ptr<ColumnVector> &);
+export void JsonExtractIsNull(std::shared_ptr<BaseExtraInfo> extract_ptr, const DataBlock &, std::shared_ptr<ColumnVector> &);
 export void RegisterJsonFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

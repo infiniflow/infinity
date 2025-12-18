@@ -8,7 +8,7 @@ statement ok
 INSERT INTO test_json_filter VALUES (0, 'a', '{}'), (1, 'b', '{"1":123}'), (2, 'c', '{"2":123}')
 
 statement ok
-INSERT INTO test_json_filter VALUES (3, 'e', '{"1":null}'), (4, 'e', '{"1":0.123}'), (5, 'f', '{"2":123}')
+INSERT INTO test_json_filter VALUES (3, 'e', '{"1":null}'), (4, 'e', '{"1":0.123}'), (5, 'f', '{"2":true}')
 
 query I
 SELECT * FROM test_json_filter where json_extract_string(c3, '$.1') = '123';
@@ -30,7 +30,7 @@ null
 null
 null
 
-query IIII
+query IV
 SELECT json_extract_string(c3, '$.1') FROM test_json_filter;
 ----
 null
@@ -39,6 +39,36 @@ null
 null
 0.123
 null
+
+query V
+SELECT json_extract_double(c3, '$.1') FROM test_json_filter;
+----
+null
+null
+null
+null
+0.123000
+null
+
+query V
+SELECT json_extract_bool(c3, '$.2') FROM test_json_filter;
+----
+null
+null
+null
+null
+null
+true
+
+query VI
+SELECT json_extract_isnull(c3, '$.1') FROM test_json_filter;
+----
+false
+true
+false
+false
+false
+false
 
 statement ok
 DROP TABLE test_json_filter;

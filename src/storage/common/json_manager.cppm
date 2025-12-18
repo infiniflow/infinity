@@ -37,6 +37,9 @@ public:
     static std::vector<uint8_t> to_bson(const JsonTypeDef &json_obj);
     static std::tuple<bool, std::string> json_extract(const JsonTypeDef &data, const std::vector<std::string> &tokens);
     static std::tuple<bool, IntegerT> json_extract_int(const JsonTypeDef &data, const std::vector<std::string> &tokens);
+    static std::tuple<bool, DoubleT> json_extract_double(const JsonTypeDef &data, const std::vector<std::string> &tokens);
+    static std::tuple<bool, BooleanT> json_extract_bool(const JsonTypeDef &data, const std::vector<std::string> &tokens);
+    static std::tuple<bool, BooleanT> json_extract_is_null(const JsonTypeDef &data, const std::vector<std::string> &tokens);
 };
 
 } // namespace infinity
