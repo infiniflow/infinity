@@ -2026,9 +2026,8 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta,
         }
         chunk_index_meta_infos.push_back(*chunk_index_meta_info_ptr);
     }
-    std::ranges::sort(chunk_index_meta_infos, [](const ChunkIndexMetaInfo &lhs, const ChunkIndexMetaInfo &rhs) {
-        return lhs.base_row_id_ < rhs.base_row_id_;
-    });
+    std::ranges::sort(chunk_index_meta_infos,
+                      [](const ChunkIndexMetaInfo &lhs, const ChunkIndexMetaInfo &rhs) { return lhs.base_row_id_ < rhs.base_row_id_; });
     SegmentID segment_id = segment_meta.segment_id();
 
     RowID start_row_id(segment_id, 0);
