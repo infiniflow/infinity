@@ -23,7 +23,7 @@ import std.compat;
 
 namespace infinity {
 
-enum class ExtraInfoType { kInvalid = 0, kJsonToString, kJsonToInt };
+enum class ExtraInfoType { kInvalid = 0, kJsonToString, kJsonToInt, kJsonToDouble, kJsonToBool, kJsonToIsNull };
 class BaseExtraInfo;
 class JsonExtraInfo;
 

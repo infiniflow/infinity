@@ -25,7 +25,10 @@ namespace infinity {
 FunctionExpr::~FunctionExpr() {
     if (arguments_ != nullptr) {
         for (auto &expr_ptr : *arguments_) {
-            delete expr_ptr;
+            if (expr_ptr != nullptr) {
+                delete expr_ptr;
+                expr_ptr = nullptr;
+            }
         }
         delete arguments_;
         arguments_ = nullptr;
