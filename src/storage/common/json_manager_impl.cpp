@@ -137,7 +137,7 @@ std::tuple<bool, BooleanT> JsonManager::json_extract_is_null(const JsonTypeDef &
         if (current.is_object() && current.contains(token)) {
             current = current[token];
         } else {
-            return {false, false};
+            return {true, false};
         }
     }
 
