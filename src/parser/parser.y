@@ -3370,7 +3370,7 @@ function_expr : IDENTIFIER '(' ')' {
         free($5);
         if (extra_ptr != nullptr) {
             delete extra_ptr;
-            extra_ptr = nullptr;m
+            extra_ptr = nullptr;
         }
         if (func_expr != nullptr) {
             delete func_expr;
