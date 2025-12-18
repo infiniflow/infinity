@@ -3334,6 +3334,7 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_->emplace_back($3);
 
     ParserHelper::ToLower($1);
+    ParserHelper::ToLower($5);
     infinity::JsonExtraInfo *extra_ptr = nullptr;
     if(strcmp($1, "json_extract") == 0) {
         func_expr->func_name_ = "json_extract";
