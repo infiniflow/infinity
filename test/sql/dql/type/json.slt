@@ -64,9 +64,9 @@ query VI
 SELECT json_extract_isnull(c3, '$.1') FROM test_json_filter;
 ----
 false
+false
+false
 true
-false
-false
 false
 false
 
