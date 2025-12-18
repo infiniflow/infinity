@@ -141,7 +141,11 @@ std::tuple<bool, BooleanT> JsonManager::json_extract_is_null(const JsonTypeDef &
         }
     }
 
-    return {false, current.is_null()};
+    if (current.is_null()) {
+        return {false, true};
+    } else {
+        return {false, false};
+    }
 }
 
 } // namespace infinity

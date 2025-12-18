@@ -63,13 +63,12 @@ true
 query VI
 SELECT json_extract_isnull(c3, '$.1') FROM test_json_filter;
 ----
-null
-false
-null
-true
-false
-null
-
+ null
+ false
+ null
+ true
+ false
+ null
 
 statement ok
 DROP TABLE test_json_filter;
