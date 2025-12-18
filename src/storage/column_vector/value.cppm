@@ -37,6 +37,7 @@ enum class ExtraValueInfoType : u8 {
     TENSORARRAY_VALUE_INFO = 3,
     SPARSE_VALUE_INFO = 4,
     ARRAY_VALUE_INFO = 5,
+    JSON_VALUE_INFO = 6,
 };
 
 //===--------------------------------------------------------------------===//
@@ -77,6 +78,13 @@ public:
 
 protected:
     virtual bool EqualsInternal(ExtraValueInfo *) const { return true; }
+};
+
+export struct JsonValueInfo : public ExtraValueInfo {
+    static constexpr ExtraValueInfoType TYPE = ExtraValueInfoType::JSON_VALUE_INFO;
+    explicit JsonValueInfo(std::vector<uint8_t> bson_elements)
+        : ExtraValueInfo(ExtraValueInfoType::JSON_VALUE_INFO), bson_elements_(std::move(bson_elements)) {}
+    std::vector<uint8_t> bson_elements_;
 };
 
 //===--------------------------------------------------------------------===//
@@ -296,6 +304,9 @@ public:
 
     static Value MakeArray(std::vector<Value> array_elements, std::shared_ptr<TypeInfo> type_info_ptr);
 
+    static Value MakeJson(std::vector<uint8_t> &bson, std::shared_ptr<TypeInfo> type_info_ptr);
+    static Value MakeJson(std::string &json_str, std::shared_ptr<TypeInfo> type_info_ptr);
+
     template <typename Idx, typename T>
     static Value MakeSparse(const std::pair<std::vector<Idx>, std::vector<T>> &vec) {
         const auto &[indice_vec, data_vec] = vec;
@@ -344,6 +355,8 @@ public:
     const std::string &GetVarchar() const { return this->value_info_->Get<StringValueInfo>().GetString(); }
 
     std::span<char> GetEmbedding() const { return this->value_info_->Get<EmbeddingValueInfo>().GetData(); }
+
+    std::vector<uint8_t> GetBson() const { return this->value_info_->Get<JsonValueInfo>().bson_elements_; }
 
     const std::vector<std::shared_ptr<EmbeddingValueInfo>> &GetTensorArray() const {
         return this->value_info_->Get<TensorArrayValueInfo>().member_tensor_data_;

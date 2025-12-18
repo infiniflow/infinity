@@ -122,6 +122,8 @@ enum class LogicalType : int8_t {
     // multi-vector type * 1
     kMultiVector,
 
+    kJson,
+
     kInvalid,
 };
 
