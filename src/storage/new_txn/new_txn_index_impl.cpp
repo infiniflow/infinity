@@ -173,7 +173,7 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
     }
 
     // Put the data into local txn store
-    DumpMemIndexTxnStore *txn_store;
+    DumpMemIndexTxnStore *txn_store{};
     if (base_txn_store_ == nullptr) {
         base_txn_store_ = std::make_shared<DumpMemIndexTxnStore>();
         txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
@@ -897,7 +897,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
             auto dump_task = std::make_shared<DumpMemIndexTask>(db_name, table_name, index_name, segment_id, begin_row_id);
             DumpIndexProcessor *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
             LOG_INFO(fmt::format("MemIndex row count {} exceeds quota {}.  Submit dump task: {}", row_count, row_quota, dump_task->ToString()));
-            dump_index_processor->Submit(std::move(dump_task));
+            dump_index_processor->Submit(dump_task);
         }
     }
 

@@ -154,7 +154,7 @@ BGMemIndexTracer::~BGMemIndexTracer() {
 void BGMemIndexTracer::TriggerDump(std::shared_ptr<DumpMemIndexTask> dump_task) {
     auto *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
     LOG_INFO(fmt::format("Submit dump task: {}", dump_task->ToString()));
-    dump_index_processor->Submit(std::move(dump_task));
+    dump_index_processor->Submit(dump_task);
 }
 
 std::vector<std::shared_ptr<MemIndexDetail>> BGMemIndexTracer::GetAllMemIndexes(NewTxn *new_txn) {

@@ -55,7 +55,7 @@ void MemIndexAppender::Start() {
 
 void MemIndexAppender::Stop() {
     LOG_INFO("Mem index appender is stopping.");
-    std::shared_ptr<StopProcessorTask> stop_task = std::make_shared<StopProcessorTask>();
+    auto stop_task = std::make_shared<StopProcessorTask>();
     this->Submit(stop_task);
     stop_task->Wait();
     processor_thread_.join();
@@ -63,6 +63,13 @@ void MemIndexAppender::Stop() {
 }
 
 void MemIndexAppender::Submit(std::shared_ptr<BGTask> bg_task) {
+    if (bg_task->type_ == BGTaskType::kAppendMemIndex) {
+        auto tmp = static_cast<AppendMemIndexTask *>(bg_task.get());
+        std::println(">>>>{}", tmp->mem_index_->GetFulltextIndex()->index_dir_.length());
+        if (tmp->mem_index_->GetFulltextIndex()->index_dir_.length() > 100) {
+            std::terminate();
+        }
+    }
     task_queue_.Enqueue(std::move(bg_task));
     ++task_count_;
 }
@@ -88,6 +95,13 @@ void MemIndexAppender::Process() {
                     }
                     if (storage_mode == StorageMode::kWritable) {
                         auto append_mem_index_task = static_cast<AppendMemIndexTask *>(bg_task.get());
+                        if (bg_task->type_ == BGTaskType::kAppendMemIndex) {
+                            auto tmp = static_cast<AppendMemIndexTask *>(bg_task.get());
+                            std::println("<<<<{}", tmp->mem_index_->GetFulltextIndex()->index_dir_.length());
+                            if (tmp->mem_index_->GetFulltextIndex()->index_dir_.length() > 100) {
+                                std::terminate();
+                            }
+                        }
                         auto memory_indexer = append_mem_index_task->mem_index_->GetFulltextIndex();
                         // std::println("#########{}", append_mem_index_task->input_column_->ToString());
                         if (memory_indexer == nullptr) {
@@ -117,10 +131,6 @@ void MemIndexAppender::Process() {
         }
 
         for (auto memory_indexer : memory_indexers) {
-            std::println("memory_indexer->index_dir_: {}", memory_indexer->index_dir_.length());
-            if (memory_indexer->index_dir_.length() > 100) { // fix it // Minio + parallel test: insert parallel
-                continue;
-            }
             auto *append_mem_index_batch = memory_indexer_map[memory_indexer].get();
             append_mem_index_batch->WaitForCompletion();
             memory_indexer->CommitSync();

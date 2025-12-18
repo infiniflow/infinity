@@ -108,7 +108,6 @@ inline void MemIndexTracer::IncreaseMemoryUsage(size_t mem_inc) {
                               cur_index_memory_,
                               proposed_dump_size_));
         if (mem_inc == 0 || index_memory_limit_ == 0) {
-            std::println("---{}", std::stacktrace::current());
             return;
         }
         cur_index_memory_ += mem_inc;

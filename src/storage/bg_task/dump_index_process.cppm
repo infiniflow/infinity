@@ -21,7 +21,7 @@ import :status;
 namespace infinity {
 
 class NewTxn;
-class BGTask;
+struct BGTask;
 class DumpMemIndexTask;
 
 export class DumpIndexProcessor {

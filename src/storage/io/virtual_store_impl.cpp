@@ -636,7 +636,7 @@ Status VirtualStore::UploadObject(const std::string &file_path, const std::strin
     switch (VirtualStore::storage_type_) {
         case StorageType::kMinio: {
             auto upload_task = std::make_shared<UploadTask>(file_path, object_name);
-            auto object_storage_processor = infinity::InfinityContext::instance().storage()->object_storage_processor();
+            auto object_storage_processor = InfinityContext::instance().storage()->object_storage_processor();
             object_storage_processor->Submit(upload_task);
             upload_task->Wait();
             break;
@@ -656,7 +656,7 @@ Status VirtualStore::RemoveObject(const std::string &object_name) {
     switch (VirtualStore::storage_type_) {
         case StorageType::kMinio: {
             auto remove_task = std::make_shared<RemoveTask>(object_name);
-            auto object_storage_processor = infinity::InfinityContext::instance().storage()->object_storage_processor();
+            auto object_storage_processor = InfinityContext::instance().storage()->object_storage_processor();
             object_storage_processor->Submit(remove_task);
             remove_task->Wait();
             break;
@@ -675,7 +675,7 @@ Status VirtualStore::CopyObject(const std::string &src_object_name, const std::s
     switch (VirtualStore::storage_type_) {
         case StorageType::kMinio: {
             auto copy_task = std::make_shared<CopyTask>(src_object_name, dst_object_name);
-            auto object_storage_processor = infinity::InfinityContext::instance().storage()->object_storage_processor();
+            auto object_storage_processor = InfinityContext::instance().storage()->object_storage_processor();
             object_storage_processor->Submit(copy_task);
             copy_task->Wait();
             break;
