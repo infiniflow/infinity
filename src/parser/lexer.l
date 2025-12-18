@@ -80,6 +80,8 @@ DATABASES       { return DATABASES; }
 DATE            { return DATE; }
 DATETIME        { return DATETIME; }
 JSON_EXTRACT    { return JSON_EXTRACT; }
+JSON_EXTRACT_STRING { return JSON_EXTRACT_STRING; }
+JSON_EXTRACT_INT    { return JSON_EXTRACT_INT; }
 DAY             { return DAY; }
 DAYS            { return DAYS; }
 DISTINCT        { return DISTINCT; }

@@ -173,7 +173,8 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<FunctionExpression> &exp
     if (expr->func_.extra_info_ != nullptr) {
         auto &data = expr->func_.extra_info_;
         switch (data->type_) {
-            case ExtraInfoType::kJson: {
+            case ExtraInfoType::kJsonToString:
+            case ExtraInfoType::kJsonToInt: {
                 expr->func_.json_function_(data, func_input_data_block, output_column_vector);
                 break;
             }

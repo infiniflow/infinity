@@ -492,11 +492,17 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionEx
             ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
 
             if (expr.extra_info_ != nullptr) {
+                expr.extra_info_->Init();
                 auto type = expr.extra_info_->type_;
                 switch (type) {
-                    case ExtraInfoType::kJson: {
+                    case ExtraInfoType::kJsonToString: {
                         scalar_function.extra_info_ = expr.extra_info_;
                         scalar_function.json_function_ = JsonExtract;
+                        break;
+                    }
+                    case ExtraInfoType::kJsonToInt: {
+                        scalar_function.extra_info_ = expr.extra_info_;
+                        scalar_function.json_function_ = JsonExtractInt;
                         break;
                     }
                     default: {

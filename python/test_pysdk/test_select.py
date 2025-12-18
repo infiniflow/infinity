@@ -215,6 +215,8 @@ class TestInfinity:
         assert res.item(1, 0) == '{"1":null,"2":"123","3":12,"4":1.123}'
         res, extra_res = table_obj.output(["count(*)"]).to_pl()
         res.item(0, 0) == 2
+        #res, extra_res = table_obj.output(["json_extract(c3,'$.2')"]).to_pl()
+        #res.item(0, 0) == 2
 
     def test_select_datetime(self, suffix):
         """

@@ -68,16 +68,33 @@ std::vector<uint8_t> JsonManager::to_bson(const JsonTypeDef &json_obj) {
     return {};
 }
 
-std::string JsonManager::json_extract(const JsonTypeDef &data, const std::vector<std::string> &tokens) {
+std::tuple<bool, std::string> JsonManager::json_extract(const JsonTypeDef &data, const std::vector<std::string> &tokens) {
     JsonTypeDef current = data;
     for (const auto &token : tokens) {
         if (current.is_object() && current.contains(token)) {
             current = current[token];
         } else {
-            return "null";
+            return {true, "null"};
         }
     }
-    return current.dump();
+    return {false, current.dump()};
+}
+
+std::tuple<bool, IntegerT> JsonManager::json_extract_int(const JsonTypeDef &data, const std::vector<std::string> &tokens) {
+    JsonTypeDef current = data;
+    for (const auto &token : tokens) {
+        if (current.is_object() && current.contains(token)) {
+            current = current[token];
+        } else {
+            return {true, 0};
+        }
+    }
+
+    if (current.is_number_integer()) {
+        return {false, current.get<int>()};
+    } else {
+        return {true, 0};
+    }
 }
 
 } // namespace infinity

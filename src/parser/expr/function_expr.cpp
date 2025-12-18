@@ -69,6 +69,10 @@ std::string FunctionExpr::ToString() const {
 }
 
 bool JsonExtraInfo::Init() {
+    if (initialized_) {
+        return true;
+    }
+
     std::string_view entire_path_view(json_extra_info_);
     if (entire_path_view.empty() || entire_path_view[0] != '$') {
         return false;
@@ -92,6 +96,8 @@ bool JsonExtraInfo::Init() {
         start = end + 1;
         end = remaining.find('.', start);
     }
+
+    initialized_ = true;
     return true;
 }
 

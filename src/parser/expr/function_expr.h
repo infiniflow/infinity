@@ -23,7 +23,7 @@ import std.compat;
 
 namespace infinity {
 
-enum class ExtraInfoType { kInvalid, kJson };
+enum class ExtraInfoType { kInvalid = 0, kJsonToString, kJsonToInt };
 class BaseExtraInfo;
 class JsonExtraInfo;
 
@@ -49,12 +49,15 @@ public:
     explicit BaseExtraInfo(ExtraInfoType type) : type_(type) {}
     virtual ~BaseExtraInfo() = default;
 
+    virtual bool Init() = 0;
+
+    bool initialized_{false};
     ExtraInfoType type_{ExtraInfoType::kInvalid};
 };
 
 class JsonExtraInfo : public BaseExtraInfo {
 public:
-    explicit JsonExtraInfo(char *json_extra_info) : BaseExtraInfo(ExtraInfoType::kJson), json_extra_info_(json_extra_info) {}
+    explicit JsonExtraInfo(ExtraInfoType type, char *json_extra_info) : BaseExtraInfo(type), json_extra_info_(json_extra_info) {}
     ~JsonExtraInfo() override {
         if (json_extra_info_ != nullptr) {
             free(json_extra_info_);
@@ -63,7 +66,7 @@ public:
         json_tokens_.clear();
     }
 
-    bool Init();
+    bool Init() override;
 
     char *json_extra_info_{nullptr};
     std::vector<std::string> json_tokens_{};

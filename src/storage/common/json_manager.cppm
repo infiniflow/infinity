@@ -17,6 +17,7 @@ module;
 export module infinity_core:json_manager;
 
 import :logger;
+import :value;
 
 import std.compat;
 import third_party;
@@ -34,7 +35,8 @@ public:
     static JsonTypeDef from_bson(const std::vector<uint8_t> &bson_data);
     static std::string dump(const JsonTypeDef &json_obj);
     static std::vector<uint8_t> to_bson(const JsonTypeDef &json_obj);
-    static std::string json_extract(const JsonTypeDef &data, const std::vector<std::string> &tokens);
+    static std::tuple<bool, std::string> json_extract(const JsonTypeDef &data, const std::vector<std::string> &tokens);
+    static std::tuple<bool, IntegerT> json_extract_int(const JsonTypeDef &data, const std::vector<std::string> &tokens);
 };
 
 } // namespace infinity

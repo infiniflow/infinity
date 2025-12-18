@@ -36,14 +36,48 @@ void JsonExtract(std::shared_ptr<BaseExtraInfo> extract_ptr, const DataBlock &in
     auto input_data = reinterpret_cast<const JsonT *>(column->data());
     auto row_count = input.row_count();
 
+    [[maybe_unused]] const std::shared_ptr<Bitmask> &input_null = column->nulls_ptr_;
+    [[maybe_unused]] const std::shared_ptr<Bitmask> &output_null = output->nulls_ptr_;
+
     if (column->vector_type() == ColumnVectorType::kFlat) {
         for (size_t row_index = 0; row_index < row_count; row_index++) {
             const auto json_info = input_data[row_index];
             auto json_data = column->buffer_->GetVarchar(json_info.file_offset_, json_info.length_);
             std::vector<uint8_t> bson(reinterpret_cast<const uint8_t *>(json_data), reinterpret_cast<const uint8_t *>(json_data) + json_info.length_);
             auto json = JsonManager::from_bson(bson);
-            auto json_string = JsonManager::json_extract(json, extra_ptr->json_tokens_);
+            auto [is_null, json_string] = JsonManager::json_extract(json, extra_ptr->json_tokens_);
+            output_null->Set(row_index, !is_null);
             Value v = Value::MakeVarchar(json_string.c_str());
+            output->AppendValue(v);
+        }
+        output->Finalize(row_count);
+    } else {
+        RecoverableError(Status::SyntaxError("JsonExtract: Invalid column type."));
+    }
+}
+
+void JsonExtractString(std::shared_ptr<BaseExtraInfo> extract_ptr, const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
+    JsonExtract(extract_ptr, input, output);
+}
+
+void JsonExtractInt(std::shared_ptr<BaseExtraInfo> extract_ptr, const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
+    auto extra_ptr = reinterpret_cast<const JsonExtraInfo *>(extract_ptr.get());
+    auto column = input.column_vectors[0];
+    auto input_data = reinterpret_cast<const JsonT *>(column->data());
+    auto row_count = input.row_count();
+
+    [[maybe_unused]] const std::shared_ptr<Bitmask> &input_null = column->nulls_ptr_;
+    [[maybe_unused]] const std::shared_ptr<Bitmask> &output_null = output->nulls_ptr_;
+
+    if (column->vector_type() == ColumnVectorType::kFlat) {
+        for (size_t row_index = 0; row_index < row_count; row_index++) {
+            const auto json_info = input_data[row_index];
+            auto json_data = column->buffer_->GetVarchar(json_info.file_offset_, json_info.length_);
+            std::vector<uint8_t> bson(reinterpret_cast<const uint8_t *>(json_data), reinterpret_cast<const uint8_t *>(json_data) + json_info.length_);
+            auto json = JsonManager::from_bson(bson);
+            auto [is_null, json_int] = JsonManager::json_extract_int(json, extra_ptr->json_tokens_);
+            output_null->Set(row_index, !is_null);
+            Value v = Value::MakeInt(json_int);
             output->AppendValue(v);
         }
         output->Finalize(row_count);
@@ -57,6 +91,20 @@ void RegisterJsonFunction(NewCatalog *catalog_ptr) {
         std::string func_name = "json_extract";
         std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
         ScalarFunction json_extract(func_name, {DataType(LogicalType::kJson)}, DataType(LogicalType::kVarchar), JsonExtractBase);
+        function_set_ptr->AddFunction(json_extract);
+        NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
+    }
+    {
+        std::string func_name = "json_extract_string";
+        std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
+        ScalarFunction json_extract(func_name, {DataType(LogicalType::kJson)}, DataType(LogicalType::kVarchar), JsonExtractBase);
+        function_set_ptr->AddFunction(json_extract);
+        NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
+    }
+    {
+        std::string func_name = "json_extract_int";
+        std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
+        ScalarFunction json_extract(func_name, {DataType(LogicalType::kJson)}, DataType(LogicalType::kInteger), JsonExtractBase);
         function_set_ptr->AddFunction(json_extract);
         NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
     }
