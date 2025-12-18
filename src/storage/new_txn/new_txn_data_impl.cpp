@@ -562,7 +562,8 @@ Status NewTxn::ReplayDelete(WalCmdDeleteV2 *delete_cmd, TxnTimeStamp commit_ts, 
     return PrepareCommitDelete(delete_cmd);
 }
 
-Status NewTxn::DeleteInner(const std::string &db_name, const std::string &table_name, const TableMeta &table_meta, const std::vector<RowID> &row_ids) {
+Status
+NewTxn::DeleteInner(const std::string &db_name, const std::string &table_name, const TableMeta &table_meta, const std::vector<RowID> &row_ids) {
     auto delete_command = std::make_shared<WalCmdDeleteV2>(db_name, table_meta.db_id_str(), table_name, table_meta.table_id_str(), row_ids);
     auto wal_command = static_pointer_cast<WalCmd>(delete_command);
     wal_entry_->cmds_.push_back(wal_command);
