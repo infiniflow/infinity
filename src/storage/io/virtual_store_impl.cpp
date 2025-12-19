@@ -272,15 +272,15 @@ Status VirtualStore::CleanupDirectory(const std::string &path) {
 }
 
 void VirtualStore::RecursiveCleanupAllEmptyDir(const std::string &path) {
-    if (!VirtualStore::Exists(path) || !std::filesystem::is_directory(path)) {
+    std::error_code ec;
+    if (!Exists(path) || !std::filesystem::is_directory(path, ec)) {
         return;
     }
 
-    for (const auto &entry : std::filesystem::directory_iterator(path)) {
+    for (const auto &entry : std::filesystem::directory_iterator(path, ec)) {
         RecursiveCleanupAllEmptyDir(entry.path());
     }
 
-    std::error_code ec;
     if (std::filesystem::is_directory(path, ec) && std::filesystem::is_empty(path, ec)) {
         // std::error_code ec;
         std::filesystem::remove(path, ec);
