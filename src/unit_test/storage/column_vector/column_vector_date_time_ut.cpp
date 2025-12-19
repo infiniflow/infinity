@@ -74,7 +74,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         DateT date(static_cast<i32>(i));
@@ -95,7 +95,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
-    EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
+    EXPECT_EQ(column_vector.initialized_, clone_column_vector.initialized_);
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
@@ -111,7 +111,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
     //    EXPECT_EQ(col_tinyint.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
 
     // ====
     column_vector.Initialize();
@@ -129,7 +129,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         DateT date(static_cast<i32>(i));
@@ -174,7 +174,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < 1; ++i) {
         DateT date(static_cast<i32>(i));
@@ -199,7 +199,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
     EXPECT_NE(column_vector.buffer_, nullptr);
 
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -217,7 +217,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
     for (i64 i = 0; i < 1; ++i) {
         DateT date(static_cast<i32>(i));
         auto v = Value::MakeDate(date);
@@ -322,7 +322,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_time) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         TimeT time(static_cast<i32>(i));
@@ -343,7 +343,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_time) {
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
-    EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
+    EXPECT_EQ(column_vector.initialized_, clone_column_vector.initialized_);
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
@@ -358,7 +358,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_time) {
     //    EXPECT_EQ(col_tinyint.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
 
     // ====
     column_vector.Initialize();
@@ -376,7 +376,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_time) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         TimeT time(static_cast<i32>(i));
@@ -421,7 +421,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_time) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < 1; ++i) {
         TimeT time(static_cast<i32>(i));
@@ -446,7 +446,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_time) {
     EXPECT_NE(column_vector.buffer_, nullptr);
 
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -464,7 +464,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_time) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
     for (i64 i = 0; i < 1; ++i) {
         TimeT time(static_cast<i32>(i));
         Value v = Value::MakeTime(time);
@@ -569,7 +569,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         DateTimeT datetime(static_cast<i32>(i), static_cast<i32>(i));
@@ -591,7 +591,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
-    EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
+    EXPECT_EQ(column_vector.initialized_, clone_column_vector.initialized_);
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
@@ -606,7 +606,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
     EXPECT_EQ(column_vector.Size(), 0u);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
 
     // ====
     column_vector.Initialize();
@@ -624,7 +624,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         DateTimeT datetime(static_cast<i32>(i), static_cast<i32>(i));
@@ -672,7 +672,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < 1; ++i) {
         DateTimeT datetime(static_cast<i32>(i), static_cast<i32>(i));
@@ -699,7 +699,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
     EXPECT_NE(column_vector.buffer_, nullptr);
 
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -717,7 +717,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
     for (i64 i = 0; i < 1; ++i) {
         DateTimeT datetime(static_cast<i32>(i), static_cast<i32>(i));
         Value v = Value::MakeDateTime(datetime);
@@ -828,7 +828,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         TimestampT timestamp(static_cast<i32>(i), static_cast<i32>(i));
@@ -850,7 +850,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
-    EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
+    EXPECT_EQ(column_vector.initialized_, clone_column_vector.initialized_);
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
@@ -865,7 +865,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
     EXPECT_EQ(column_vector.Size(), 0u);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
 
     // ====
     column_vector.Initialize();
@@ -883,7 +883,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         TimestampT timestamp(static_cast<i32>(i), static_cast<i32>(i));
@@ -931,7 +931,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < 1; ++i) {
         TimestampT timestamp(static_cast<i32>(i), static_cast<i32>(i));
@@ -958,7 +958,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
     EXPECT_NE(column_vector.buffer_, nullptr);
 
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -976,7 +976,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
     for (i64 i = 0; i < 1; ++i) {
         TimestampT timestamp(static_cast<i32>(i), static_cast<i32>(i));
         Value v = Value::MakeTimestamp(timestamp);
@@ -1086,7 +1086,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_interval) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         IntervalT interval;
@@ -1108,7 +1108,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_interval) {
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
-    EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
+    EXPECT_EQ(column_vector.initialized_, clone_column_vector.initialized_);
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
@@ -1123,7 +1123,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_interval) {
     EXPECT_EQ(column_vector.Size(), 0u);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
 
     // ====
     column_vector.Initialize();
@@ -1141,7 +1141,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_interval) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         IntervalT interval;
@@ -1189,7 +1189,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_flat) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < 1; ++i) {
         IntervalT interval;
@@ -1215,7 +1215,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_flat) {
     EXPECT_NE(column_vector.buffer_, nullptr);
 
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -1233,7 +1233,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_flat) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
     for (i64 i = 0; i < 1; ++i) {
         IntervalT interval;
         interval.value = static_cast<i32>(i);

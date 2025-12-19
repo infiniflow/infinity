@@ -240,8 +240,8 @@ struct PhysicalTopCompareSingleValue {
                 return y < x;
             }
         };
-        auto left = (reinterpret_cast<T *>(left_col->data()))[left_id];
-        auto right = (reinterpret_cast<T *>(right_col->data()))[right_id];
+        auto left = (reinterpret_cast<T *>(left_col->data().get()))[left_id];
+        auto right = (reinterpret_cast<T *>(right_col->data().get()))[right_id];
         if (compare_prefer_left(left, right)) {
             return std::strong_ordering::less;
         } else if (left == right) {
@@ -263,8 +263,8 @@ template <OrderType compare_order, BinaryGenerateBoolean T>
 struct PhysicalTopCompareSingleValue<compare_order, T> {
     static std::strong_ordering
     Compare(const std::shared_ptr<ColumnVector> &left_col, u32 left_id, const std::shared_ptr<ColumnVector> &right_col, u32 right_id) {
-        auto left = (reinterpret_cast<T *>(left_col->data()))[left_id];
-        auto right = (reinterpret_cast<T *>(right_col->data()))[right_id];
+        auto left = (reinterpret_cast<T *>(left_col->data().get()))[left_id];
+        auto right = (reinterpret_cast<T *>(right_col->data().get()))[right_id];
         if constexpr (compare_order == OrderType::kAsc) {
             return left <=> right;
         } else {

@@ -19,7 +19,6 @@ module infinity_core:build_fast_rough_filter_task.impl;
 import :build_fast_rough_filter_task;
 import :infinity_exception;
 import :logger;
-import :buffer_manager;
 import :column_vector;
 import :value;
 import :block_column_iter;
@@ -238,7 +237,7 @@ void BuildFastRoughFilterTask::BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &
             // for boolean, only 0 and 1
             bool have_0 = false;
             bool have_1 = false;
-            auto *u8_ptr = reinterpret_cast<const u8 *>(column_vector.data());
+            auto *u8_ptr = reinterpret_cast<const u8 *>(column_vector.data().get());
             for (auto block_off_opt = block_visitor.Next(); block_off_opt; block_off_opt = block_visitor.Next()) {
                 BlockOffset block_off = *block_off_opt;
                 if (!have_0 or !have_1) {
@@ -427,7 +426,7 @@ void BuildFastRoughFilterTask::BuildMinMaxAndBloomFilter(NewBuildFastRoughFilter
         UpdateMax(segment_max_value, block_max_value);
         // step 3. sort data and remove duplicate
         std::ranges::sort(input_data);
-        u32 input_distinct_count = std::unique(input_data.begin(), input_data.end()) - input_data.begin();
+        u32 input_distinct_count = std::ranges::unique(input_data).begin() - input_data.begin();
         // step 4. build probabilistic_data_filter and min_max_data_filter for block
         auto block_filter = arg.segment_filters_->block_filters_[block_id];
         block_filter->BuildProbabilisticDataFilter(begin_ts, arg.column_id_, input_data.data(), input_distinct_count);

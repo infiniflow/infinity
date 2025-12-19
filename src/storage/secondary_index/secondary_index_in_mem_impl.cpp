@@ -20,17 +20,15 @@ module infinity_core:secondary_index_in_mem.impl;
 
 import :secondary_index_in_mem;
 import :default_values;
-import :buffer_manager;
 import :block_column_iter;
 import :infinity_exception;
 import :secondary_index_data;
-import :buffer_handle;
 import :logger;
 import :base_memindex;
 import :memindex_tracer;
 import :column_vector;
-import :buffer_obj;
 import :rcu_multimap;
+import :secondary_index_file_worker;
 
 import std;
 
@@ -46,6 +44,7 @@ constexpr u32 map_memory_bloat_factor = 3;
 
 template <typename RawValueType, typename CardinalityTag>
 class SecondaryIndexInMemT final : public SecondaryIndexInMem {
+
     using KeyType = ConvertToOrderedType<RawValueType>;
     const RowID begin_row_id_;
     // Replaced std::multimap + mutex with RcuMultiMap for better concurrent performance
@@ -75,24 +74,35 @@ public:
         IncreaseMemoryUsageBase(inserted_rows * MemoryCostOfEachRow());
     }
 
-    void Dump(BufferObj *buffer_obj) const override {
-        BufferHandle handle = buffer_obj->Load();
-
-        // Use template specialization based on CardinalityTag
+    void Dump(IndexFileWorker *index_file_worker) const override {
+        // std::shared_ptr<SecondaryIndexData> data_ptr;
         if constexpr (std::is_same_v<CardinalityTag, HighCardinalityTag>) {
-            auto data_ptr = static_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(handle.GetDataMut());
+            SecondaryIndexData *data_ptr{};
+            index_file_worker->Read(data_ptr);
+
             std::multimap<KeyType, u32> temp_map;
             const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
+
             data_ptr->InsertData(&temp_map);
+            index_file_worker->Write(data_ptr);
         } else if constexpr (std::is_same_v<CardinalityTag, LowCardinalityTag>) {
-            auto data_ptr = static_cast<SecondaryIndexDataBase<LowCardinalityTag> *>(handle.GetDataMut());
+            // auto data_ptr = static_cast<SecondaryIndexDataBase<LowCardinalityTag> *>(handle.GetDataMut());
+            // std::multimap<KeyType, u32> temp_map;
+            // const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
+            // data_ptr->InsertData(&temp_map);
+            SecondaryIndexDataBase<LowCardinalityTag> *data_ptr{};
+            index_file_worker->Read(data_ptr);
+
             std::multimap<KeyType, u32> temp_map;
             const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
+
             data_ptr->InsertData(&temp_map);
+            index_file_worker->Write(data_ptr);
         } else {
             UnrecoverableError("Unsupported cardinality tag type");
         }
     }
+
     std::pair<u32, Bitmask> RangeQuery(const void *input) const override {
         const auto &[segment_row_count, b, e] = *static_cast<const std::tuple<u32, KeyType, KeyType> *>(input);
         return RangeQueryInner(segment_row_count, b, e);

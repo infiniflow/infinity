@@ -42,7 +42,7 @@ export struct ObjStat {
     size_t obj_size_{};  // footer (if present) is excluded
     size_t parts_{};     // an object attribute
     size_t ref_count_{}; // the number of user (R and W) of some part of this object
-    std::set<Range> deleted_ranges_{};
+    std::set<Range> deleted_ranges_;
 
     std::atomic<ObjCached> cached_ = ObjCached::kCached; // whether the object is in localdisk cache
 
@@ -70,7 +70,7 @@ export struct ObjStat {
         : obj_size_(other.obj_size_), parts_(other.parts_), ref_count_(other.ref_count_), deleted_ranges_(std::move(other.deleted_ranges_)),
           cached_(other.cached_.load()) {}
 
-    ObjStat &operator=(ObjStat &&other) {
+    ObjStat &operator=(ObjStat &&other) noexcept {
         if (this != &other) {
             obj_size_ = other.obj_size_;
             parts_ = other.parts_;

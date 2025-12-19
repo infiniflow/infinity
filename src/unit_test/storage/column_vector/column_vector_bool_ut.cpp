@@ -75,7 +75,7 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     {
         auto v = Value::MakeBool(true);
@@ -100,7 +100,7 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
-    EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
+    EXPECT_EQ(column_vector.initialized_, clone_column_vector.initialized_);
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
@@ -116,7 +116,7 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
 
     column_vector.Initialize();
     EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kCompactBit), UnrecoverableException);
@@ -133,7 +133,7 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         auto boolean = static_cast<BooleanT>(i % 2 == 0);
@@ -178,7 +178,7 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < 1; ++i) {
         auto v = Value::MakeBool(static_cast<BooleanT>(i % 2 == 0));
@@ -202,7 +202,7 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
     EXPECT_NE(column_vector.buffer_, nullptr);
 
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -220,7 +220,7 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < 1; ++i) {
         auto v = Value::MakeBool(static_cast<BooleanT>(i % 2 == 0));

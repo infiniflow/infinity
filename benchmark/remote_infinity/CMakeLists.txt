@@ -26,9 +26,12 @@ target_link_libraries(
         jma
         opencc
         dl
+        Boost::asio
+        Boost::thread
         thrift::thrift
         # thriftnb::thriftnb
-        ${STDCXX15EXP_STATIC}
+#        ${STDCXX15EXP_STATIC}
+        libstdc++exp.a
         Parquet::parquet_static
         Arrow::arrow_static
         ${JEMALLOC_STATIC_LIB}

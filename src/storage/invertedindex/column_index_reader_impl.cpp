@@ -39,7 +39,6 @@ import :status;
 import :mem_index;
 import :kv_store;
 import :new_catalog;
-import :buffer_handle;
 
 import std;
 import third_party;
@@ -70,7 +69,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeta &table_index_me
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
         std::shared_ptr<std::string> index_dir = segment_index_meta.GetSegmentIndexDir();
-        std::vector<ChunkID> *chunk_ids_ptr = nullptr;
+        std::vector<ChunkID> *chunk_ids_ptr{};
         std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
         if (!status.ok()) {
             return status;
@@ -79,29 +78,29 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeta &table_index_me
         RowID exp_begin_row_id = INVALID_ROWID;
         for (ChunkID chunk_id : *chunk_ids_ptr) {
             ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-            ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+            ChunkIndexMetaInfo *chunk_info_ptr{};
             {
                 status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
                 if (!status.ok()) {
                     return status;
                 }
             }
-            std::shared_ptr<DiskIndexSegmentReader> segment_reader = std::make_shared<DiskIndexSegmentReader>(segment_id,
-                                                                                                              chunk_id,
-                                                                                                              *index_dir,
-                                                                                                              chunk_info_ptr->base_name_,
-                                                                                                              chunk_info_ptr->base_row_id_,
-                                                                                                              flag);
+            auto segment_reader = std::make_shared<DiskIndexSegmentReader>(segment_id,
+                                                                           chunk_id,
+                                                                           *index_dir,
+                                                                           chunk_info_ptr->base_name_,
+                                                                           chunk_info_ptr->base_row_id_,
+                                                                           flag);
             segment_readers_.push_back(std::move(segment_reader));
 
-            BufferObj *index_buffer = nullptr;
-            status = chunk_index_meta.GetIndexBuffer(index_buffer);
+            IndexFileWorker *index_file_worker{};
+            status = chunk_index_meta.GetFileWorker(index_file_worker);
             if (!status.ok()) {
                 return status;
             }
 
             exp_begin_row_id = chunk_info_ptr->base_row_id_ + chunk_info_ptr->row_cnt_;
-            chunk_index_meta_infos_.emplace_back(ColumnReaderChunkInfo{index_buffer,
+            chunk_index_meta_infos_.emplace_back(ColumnReaderChunkInfo{index_file_worker,
                                                                        chunk_info_ptr->base_row_id_,
                                                                        chunk_info_ptr->row_cnt_,
                                                                        chunk_info_ptr->term_cnt_,
@@ -111,14 +110,14 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeta &table_index_me
 
         {
             std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-            std::shared_ptr<MemoryIndexer> memory_indexer = mem_index == nullptr ? nullptr : mem_index->GetFulltextIndex();
+            std::shared_ptr<MemoryIndexer> memory_indexer = mem_index ? mem_index->GetFulltextIndex() : nullptr;
             if (memory_indexer && memory_indexer->GetDocCount() != 0) {
                 RowID act_begin_row_id = memory_indexer->GetBeginRowID();
                 if (exp_begin_row_id != INVALID_ROWID && exp_begin_row_id != act_begin_row_id) {
                     LOG_WARN(
                         fmt::format("ColumnIndexReader::Open rows [{}, {}) are skipped", exp_begin_row_id.ToUint64(), act_begin_row_id.ToUint64()));
                 }
-                std::shared_ptr<InMemIndexSegmentReader> segment_reader = std::make_shared<InMemIndexSegmentReader>(segment_id, memory_indexer.get());
+                auto segment_reader = std::make_shared<InMemIndexSegmentReader>(segment_id, memory_indexer.get());
                 segment_readers_.push_back(std::move(segment_reader));
                 // for loading column length file
                 memory_indexer_ = memory_indexer;

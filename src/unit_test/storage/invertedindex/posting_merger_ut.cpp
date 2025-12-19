@@ -113,7 +113,7 @@ TEST_P(PostingMergerTest, Basic) {
             std::string expected_term("a");
             auto segment_term_posting1 = std::make_unique<SegmentTermPosting>(index_dir, base_name, row_id, flag_);
             auto column_index_iterator = segment_term_posting1->column_index_iterator_;
-            PostingDecoder *decoder;
+            PostingDecoder *decoder{};
             std::string term_str;
             while (column_index_iterator->Next(term_str, decoder)) {
                 EXPECT_EQ(term_str, expected_term);
@@ -145,17 +145,17 @@ TEST_P(PostingMergerTest, Basic) {
         // prepare column length info
         // the indexes to be merged should be from the same segment
         // otherwise the range of row_id will be very large ( >= 2^32)
-        PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-        PersistResultHandler handler(pm);
+        // PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+        // PersistResultHandler handler(pm);
         unsafe_column_length_array.clear();
         for (u32 i = 0; i < base_names.size(); ++i) {
             std::string column_len_file = (std::filesystem::path(index_dir) / base_names[i]).string() + LENGTH_SUFFIX;
             std::string real_column_len_file = column_len_file;
-            if (pm != nullptr) {
-                PersistReadResult result = pm->GetObjCache(real_column_len_file);
-                const ObjAddr &obj_addr = handler.HandleReadResult(result);
-                real_column_len_file = pm->GetObjPath(obj_addr.obj_key_);
-            }
+            // if (pm) {
+            //     PersistReadResult result = pm->GetObjCache(real_column_len_file);
+            //     const ObjAddr &obj_addr = handler.HandleReadResult(result);
+            //     real_column_len_file = pm->GetObjPath(obj_addr.obj_key_);
+            // }
             RowID base_row_id = row_ids[i];
             u32 id_offset = base_row_id - merge_base_rowid;
             auto [file_handle, status] = VirtualStore::Open(real_column_len_file, FileAccessMode::kRead);
@@ -169,10 +169,10 @@ TEST_P(PostingMergerTest, Basic) {
             if (read_count != (size_t)file_size) {
                 UnrecoverableError("ColumnIndexMerger: when loading column length file, read_count != file_size");
             }
-            if (pm != nullptr) {
-                PersistWriteResult res = pm->PutObjCache(column_len_file);
-                handler.HandleWriteResult(res);
-            }
+            // if (pm) {
+            //     PersistWriteResult res = pm->PutObjCache(column_len_file);
+            //     handler.HandleWriteResult(res);
+            // }
         }
     }
 

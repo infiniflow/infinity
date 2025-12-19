@@ -65,9 +65,9 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
         DataBlock *input_data_block_ptr = prev_op_state->data_block_array_[block_idx].get();
         std::vector<RowID> row_ids;
         for (size_t i = 0; i < input_data_block_ptr->column_count(); i++) {
-            if (auto &column_vector = input_data_block_ptr->column_vectors[i]; column_vector->data_type()->type() == LogicalType::kRowID) {
+            if (auto &column_vector = input_data_block_ptr->column_vectors_[i]; column_vector->data_type()->type() == LogicalType::kRowID) {
                 row_ids.resize(column_vector->Size());
-                std::memcpy(row_ids.data(), column_vector->data(), column_vector->Size() * sizeof(RowID));
+                std::memcpy(row_ids.data(), column_vector->data().get(), column_vector->Size() * sizeof(RowID));
                 break;
             }
         }

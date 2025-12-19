@@ -78,7 +78,7 @@ void DocListEncoder::Dump(const std::shared_ptr<FileWriter> &file, bool spill) {
     df_t df;
     std::shared_ptr<SkipListWriter> doc_skiplist_writer;
     {
-        std::shared_lock<std::shared_mutex> lock(rw_mutex_);
+        std::shared_lock lock(rw_mutex_);
         df = df_;
         doc_skiplist_writer = doc_skiplist_writer_;
     }

@@ -25,8 +25,6 @@ import :local_file_handle;
 import :infinity_exception;
 import :secondary_index_pgm;
 import :logger;
-import :buffer_handle;
-import :buffer_obj;
 import :table_index_meta;
 
 import std;
@@ -41,15 +39,17 @@ namespace infinity {
 template <typename RawValueType>
 struct SecondaryIndexChunkDataReader {
     using OrderedKeyType = ConvertToOrderedType<RawValueType>;
-    BufferHandle handle_;
+    FileWorker *handle_;
     u32 row_count_ = 0;
     u32 next_offset_ = 0;
-    const void *key_ptr_ = nullptr;
-    const SegmentOffset *offset_ptr_ = nullptr;
-    SecondaryIndexChunkDataReader(BufferObj *buffer_obj, u32 row_count) {
-        handle_ = buffer_obj->Load();
+    const void *key_ptr_{};
+    const SegmentOffset *offset_ptr_{};
+    SecondaryIndexChunkDataReader(FileWorker *file_worker, u32 row_count) {
+        handle_ = file_worker;
         row_count_ = row_count;
-        auto *index = static_cast<const SecondaryIndexDataBase<HighCardinalityTag> *>(handle_.GetData());
+        // std::shared_ptr<SecondaryIndexDataBase<HighCardinalityTag>> index;
+        SecondaryIndexDataBase<HighCardinalityTag> *index;
+        file_worker->Read(index);
         std::tie(key_ptr_, offset_ptr_) = index->GetKeyOffsetPointer();
         assert(index->GetChunkRowCount() == row_count_);
     }
@@ -72,10 +72,10 @@ struct SecondaryIndexChunkMerger {
                         std::vector<std::tuple<OrderedKeyType, u32, u32>>,
                         std::greater<std::tuple<OrderedKeyType, u32, u32>>>
         pq_;
-    explicit SecondaryIndexChunkMerger(const std::vector<std::pair<u32, BufferObj *>> &buffer_objs) {
-        readers_.reserve(buffer_objs.size());
-        for (const auto &[row_count, buffer_obj] : buffer_objs) {
-            readers_.emplace_back(buffer_obj, row_count);
+    explicit SecondaryIndexChunkMerger(const std::vector<std::pair<u32, FileWorker *>> &file_workers) {
+        readers_.reserve(file_workers.size());
+        for (const auto &[row_count, file_worker] : file_workers) {
+            readers_.emplace_back(file_worker, row_count);
         }
         OrderedKeyType key = {};
         u32 offset = 0;
@@ -150,7 +150,7 @@ public:
         pgm_index_->BuildIndex(chunk_row_count_, key_.get());
     }
 
-    void InsertMergeData(const std::vector<std::pair<u32, BufferObj *>> &old_chunks) override {
+    void InsertMergeData(const std::vector<std::pair<u32, FileWorker *>> &old_chunks) override {
         SecondaryIndexChunkMerger<RawValueType> merger(old_chunks);
         OrderedKeyType key = {};
         u32 offset = 0;
@@ -269,7 +269,7 @@ public:
         SetupCompatibilityPointers();
     }
 
-    void InsertMergeData(const std::vector<std::pair<u32, BufferObj *>> &old_chunks) override {
+    void InsertMergeData(const std::vector<std::pair<u32, FileWorker *>> &old_chunks) override {
         SecondaryIndexChunkMerger<RawValueType> merger(old_chunks);
 
         // Build unique keys and corresponding bitmaps from merged data
@@ -448,7 +448,7 @@ public:
         SetupCompatibilityPointers();
     }
 
-    void InsertMergeData(const std::vector<std::pair<u32, BufferObj *>> &old_buffers) override {
+    void InsertMergeData(const std::vector<std::pair<u32, FileWorker *>> &old_buffers) override {
         // For low cardinality, we need to merge the unique keys and bitmaps
         std::map<OrderedKeyType, Bitmap> merged_data;
 
@@ -460,8 +460,11 @@ public:
         // Then merge data from old buffers
         u32 offset_shift = 0;
         for (const auto &[old_row_count, old_buffer] : old_buffers) {
-            BufferHandle old_handle = old_buffer->Load();
-            auto *old_data = static_cast<const SecondaryIndexDataLowCardinalityT<BooleanT> *>(old_handle.GetDataMut());
+            // SecondaryIndexDataLowCardinalityT<BooleanT> *old_data{};
+            SecondaryIndexDataBase<LowCardinalityTag> *old_data_origin{};
+            old_buffer->Read(old_data_origin); // ? truncted
+
+            auto *old_data = static_cast<SecondaryIndexDataLowCardinalityT<BooleanT> *>(old_data_origin);
 
             const auto &old_keys = old_data->GetUniqueKeys();
             const auto &old_bitmaps = old_data->offset_bitmaps_;

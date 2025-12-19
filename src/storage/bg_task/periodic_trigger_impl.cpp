@@ -64,7 +64,7 @@ void CleanupPeriodicTrigger::Trigger() {
         return;
     }
     auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
-    bg_processor->Submit(std::move(cleanup_task));
+    bg_processor->Submit(cleanup_task);
 }
 
 void CheckpointPeriodicTrigger::Trigger() {
@@ -87,7 +87,7 @@ void CheckpointPeriodicTrigger::Trigger() {
     i64 wal_size{};
     std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
     auto checkpoint_task = std::make_shared<NewCheckpointTask>(wal_size);
-    bg_processor->Submit(std::move(checkpoint_task));
+    bg_processor->Submit(checkpoint_task);
 }
 
 void CompactPeriodicTrigger::Trigger() {

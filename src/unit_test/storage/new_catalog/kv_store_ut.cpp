@@ -65,7 +65,7 @@ TEST_F(TestTxnKVStoreTest, kv_store0) {
     EXPECT_TRUE(status.ok());
 }
 
-TEST_F(TestTxnKVStoreTest, DISABLED_SLOW_kv_store1) {
+TEST_F(TestTxnKVStoreTest, SLOW_kv_store1) {
     using namespace infinity;
     const auto rocksdb_tmp_path = fmt::format("{}/rocksdb_transaction_example", GetFullTmpDir());
     // Test multi-version

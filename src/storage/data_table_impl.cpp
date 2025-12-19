@@ -137,7 +137,7 @@ std::shared_ptr<DataTable> DataTable::MakeSummaryResultTable(u64 count, u64 sum)
 }
 
 DataTable::DataTable(std::shared_ptr<TableDef> table_def_ptr, TableType type)
-    : BaseTable(table_def_ptr->schema_name(), table_def_ptr->table_name()), definition_ptr_(std::move(table_def_ptr)), row_count_(0), type_(type) {}
+    : BaseTable(table_def_ptr->schema_name(), table_def_ptr->table_name()), definition_ptr_(std::move(table_def_ptr)), type_(type), row_count_(0) {}
 
 size_t DataTable::ColumnCount() const { return definition_ptr_->column_count(); }
 

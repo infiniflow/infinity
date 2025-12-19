@@ -65,6 +65,11 @@ public:
             vec_[begin_idx + i] = values[i];
     }
 
+    size_t Size() {
+        std::unique_lock<std::shared_mutex> lock(mutex_);
+        return vec_.size();
+    }
+
     std::vector<ValueType> &UnsafeVec() { return vec_; }
 
     void Clear() {

@@ -55,7 +55,7 @@ void InfinityContext::InitPhase1(const std::shared_ptr<std::string> &config_path
         fmt::print("Error: {}\n", status.message());
         std::exit(static_cast<int>(status.code()));
     }
-    InfinityContext::instance().config()->PrintAll(); // Print all configs
+    instance().config()->PrintAll(); // Print all configs
     status = Logger::Initialize(config_.get());
     if (!status.ok()) {
         std::exit(static_cast<int>(status.code()));
@@ -534,8 +534,8 @@ void InfinityContext::StopThriftServers() {
         stop_servers_func_();
         start_server_ = false;
         // Not set to nullptr, to enable restart the server.
-        // start_servers_func_ = nullptr;
-        // stop_servers_func_ = nullptr;
+        // start_servers_func_ {};
+        // stop_servers_func_ {};
     }
     // close all thrift sessions
     const auto removed_session_count = InfinityThriftService::ClearSessionMap();

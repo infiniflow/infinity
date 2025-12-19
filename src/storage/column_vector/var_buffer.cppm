@@ -14,12 +14,12 @@
 
 export module infinity_core:var_buffer;
 
-import :buffer_obj;
-import :buffer_handle;
+import :file_worker;
 
 namespace infinity {
 
-class BufferManager;
+class DataFileWorker;
+export class VarFileWorker;
 
 export class VarBuffer {
     friend class VarFileWorker;
@@ -27,33 +27,33 @@ export class VarBuffer {
 public:
     VarBuffer() = default;
 
-    VarBuffer(BufferObj *buffer_obj) : buffer_size_prefix_sum_({0}), buffer_obj_(buffer_obj) {}
+    VarBuffer(FileWorker *file_worker) : buffer_size_prefix_sum_({0}), file_worker_(file_worker) {}
 
     // this is called by VarFileWorker
-    VarBuffer(BufferObj *buffer_obj, std::unique_ptr<char[]> buffer, size_t size) : buffer_size_prefix_sum_({0, size}), buffer_obj_(buffer_obj) {
+    VarBuffer(FileWorker *file_worker, std::unique_ptr<char[]> buffer, size_t size) : buffer_size_prefix_sum_({0, size}), file_worker_(file_worker) {
         std::get<std::vector<std::unique_ptr<char[]>>>(buffers_).push_back(std::move(buffer));
     }
 
-    VarBuffer(BufferObj *buffer_obj, const char *buffer, size_t size) : buffer_size_prefix_sum_({0, size}), buffer_obj_(buffer_obj) {
+    VarBuffer(FileWorker *file_worker, const char *buffer, size_t size) : buffer_size_prefix_sum_({0, size}), file_worker_(file_worker) {
         buffers_ = buffer;
     }
 
     VarBuffer(VarBuffer &&other)
-        : buffers_(std::move(other.buffers_)), buffer_size_prefix_sum_(std::move(other.buffer_size_prefix_sum_)), buffer_obj_(other.buffer_obj_) {}
+        : buffers_(std::move(other.buffers_)), buffer_size_prefix_sum_(std::move(other.buffer_size_prefix_sum_)), file_worker_(other.file_worker_) {}
 
     VarBuffer &operator=(VarBuffer &&other) {
         if (this != &other) {
             buffers_ = std::move(other.buffers_);
             buffer_size_prefix_sum_ = std::move(other.buffer_size_prefix_sum_);
-            buffer_obj_ = other.buffer_obj_;
+            file_worker_ = other.file_worker_;
         }
         return *this;
     }
 
 public:
-    size_t Append(std::unique_ptr<char[]> buffer, size_t size, bool *free_success = nullptr);
+    size_t Append(std::unique_ptr<char[]> buffer, size_t size);
 
-    size_t Append(const char *data, size_t size, bool *free_success = nullptr);
+    size_t Append(const char *data, size_t size);
 
     const char *Get(size_t offset, size_t size) const;
 
@@ -63,26 +63,25 @@ public:
 
     size_t TotalSize() const;
 
-    size_t GetSize(size_t row_cnt) const;
+    std::variant<std::vector<std::unique_ptr<char[]>>, const char *> buffers_;
+
+    std::vector<size_t> buffer_size_prefix_sum_ = {0};
 
 private:
     mutable std::shared_mutex mtx_;
 
-    std::variant<std::vector<std::unique_ptr<char[]>>, const char *> buffers_;
-    std::vector<size_t> buffer_size_prefix_sum_ = {0};
-
-    BufferObj *buffer_obj_ = nullptr;
+    FileWorker *file_worker_{};
 };
 
 export class VarBufferManager {
 public:
     VarBufferManager() : type_(BufferType::kBuffer), mem_buffer_(nullptr) {}
 
-    VarBufferManager(BufferObj *outline_buffer_obj);
+    VarBufferManager(VarFileWorker *var_file_worker);
 
-    size_t Append(std::unique_ptr<char[]> buffer, size_t size, bool *free_success = nullptr);
+    size_t Append(std::unique_ptr<char[]> buffer, size_t size);
 
-    size_t Append(const char *data, size_t size, bool *free_success = nullptr);
+    size_t Append(const char *data, size_t size);
 
     const char *Get(size_t offset, size_t size);
 
@@ -92,23 +91,22 @@ public:
 
     size_t TotalSize();
 
-    size_t GetSize(size_t row_cnt);
-
-    void SetToCatalog(BufferObj *outline_buffer_obj);
-
-private:
-    VarBuffer *GetInnerMutNoLock();
-
-    const VarBuffer *GetInnerNoLock();
+    void SetToCatalog(VarFileWorker *var_file_worker);
 
     enum class BufferType {
         kBuffer,
         kNewCatalog,
     } type_;
 
-    std::unique_ptr<VarBuffer> mem_buffer_;
-    std::optional<BufferHandle> buffer_handle_;
-    BufferObj *outline_buffer_obj_ = nullptr;
+    std::shared_ptr<VarBuffer> mem_buffer_;
+
+    std::shared_ptr<VarBuffer> my_var_buffer_;
+
+private:
+    std::shared_ptr<VarBuffer> GetInnerNoLock();
+
+    DataFileWorker *data_file_worker_{};
+    VarFileWorker *var_fileworker_{};
 
     mutable std::mutex mutex_;
 };

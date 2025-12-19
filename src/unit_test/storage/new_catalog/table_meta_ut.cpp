@@ -128,10 +128,10 @@ TEST_P(TestTxnTableMeta, table_meta) {
 
             {
                 BlockMeta block_meta1(1, segment_meta);
-                block_meta1.InitSet();
+                block_meta1.InitOrLoadSet();
 
                 BlockMeta block_meta2(2, segment_meta);
-                block_meta2.InitSet();
+                block_meta2.InitOrLoadSet();
 
                 auto [blocks, block_status] = segment_meta.GetBlockIDs1();
                 EXPECT_TRUE(block_status.ok());

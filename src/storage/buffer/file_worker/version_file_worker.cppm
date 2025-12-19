@@ -16,8 +16,8 @@ export module infinity_core:version_file_worker;
 
 import :file_worker;
 import :file_worker_type;
-import :buffer_obj;
 import :persistence_manager;
+import :block_version;
 
 namespace infinity {
 
@@ -29,29 +29,17 @@ export struct VersionFileWorkerSaveCtx : public FileWorkerSaveCtx {
 
 export class VersionFileWorker : public FileWorker {
 public:
-    explicit VersionFileWorker(std::shared_ptr<std::string> data_dir,
-                               std::shared_ptr<std::string> temp_dir,
-                               std::shared_ptr<std::string> file_dir,
-                               std::shared_ptr<std::string> file_name,
-                               size_t capacity,
-                               PersistenceManager *persistence_manager);
+    static constexpr BlockVersion *has_cache_manager_{}; // now not used
+    explicit VersionFileWorker(std::shared_ptr<std::string> file_path, size_t capacity);
 
     virtual ~VersionFileWorker() override;
 
-public:
-    void AllocateInMemory() override;
-
-    void FreeInMemory() override;
-
-    size_t GetMemoryCost() const override;
-
     FileWorkerType Type() const override { return FileWorkerType::kVersionDataFile; }
 
-protected:
-    bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
-    bool WriteSnapshotFileImpl(size_t row_cnt, size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) override;
+    bool
+    Write(std::span<BlockVersion> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void ReadFromFileImpl(size_t file_size, bool from_spill) override;
+    void Read(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
 
 private:
     size_t capacity_{};

@@ -334,7 +334,6 @@ export {
     constexpr std::string_view NEXT_TABLE_ID = "next_table_id";
     constexpr std::string_view NEXT_COLUMN_ID = "next_column_id";
     constexpr std::string_view NEXT_INDEX_ID = "next_index_id";
-    constexpr std::string_view NEXT_BLOCK_ID = "next_block_id";
 
     // S3 meta
     constexpr std::string_view S3_META_PREFIX = "meta";

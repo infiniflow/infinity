@@ -72,7 +72,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         std::string s = "hello" + std::to_string(i);
@@ -93,7 +93,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
-    EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
+    EXPECT_EQ(column_vector.initialized_, clone_column_vector.initialized_);
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
@@ -109,7 +109,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     EXPECT_EQ(column_vector.Size(), 0u);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
 
     // ====
     column_vector.Initialize();
@@ -128,7 +128,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         std::string s = "hello" + std::to_string(i);
@@ -177,7 +177,7 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < 1; ++i) {
         std::string s = "hello" + std::to_string(i);
@@ -203,7 +203,7 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
     EXPECT_NE(column_vector.buffer_, nullptr);
 
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -222,7 +222,7 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
     for (i64 i = 0; i < 1; ++i) {
         std::string s = "hello" + std::to_string(i);
         Value v = Value::MakeVarchar(s);
@@ -332,7 +332,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         std::string s = "hellohellohello" + std::to_string(i);
@@ -353,7 +353,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
-    EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
+    EXPECT_EQ(column_vector.initialized_, clone_column_vector.initialized_);
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
@@ -369,7 +369,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     EXPECT_NE(column_vector.buffer_, nullptr);
 
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
 
     // ====
     column_vector.Initialize();
@@ -388,7 +388,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         std::string s = "hellohellohello" + std::to_string(i);
@@ -434,7 +434,7 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < 1; ++i) {
         std::string s = "hellohellohello" + std::to_string(i);
@@ -460,7 +460,7 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
     EXPECT_NE(column_vector.buffer_, nullptr);
 
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -479,7 +479,7 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
     for (i64 i = 0; i < 1; ++i) {
         std::string s = "hellohellohello" + std::to_string(i);
         Value v = Value::MakeVarchar(s);
@@ -513,7 +513,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         std::string s = "Professional" + std::to_string(i);
@@ -534,7 +534,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
-    EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
+    EXPECT_EQ(column_vector.initialized_, clone_column_vector.initialized_);
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
@@ -550,7 +550,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     EXPECT_NE(column_vector.buffer_, nullptr);
 
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
+    EXPECT_EQ(column_vector.initialized_, false);
 
     // ====
     column_vector.Initialize();
@@ -569,7 +569,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_TRUE(column_vector.initialized_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         std::string s = "Professional" + std::to_string(i);

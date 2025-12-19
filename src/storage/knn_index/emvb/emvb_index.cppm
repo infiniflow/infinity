@@ -25,10 +25,9 @@ namespace infinity {
 extern template class EMVBSharedVec<u32>;
 class EMVBProductQuantizer;
 class LocalFileHandle;
-class BufferManager;
 struct BlockIndex;
 class NewTxn;
-class SegmentMeta;
+export class SegmentMeta;
 
 using EMVBQueryResultType = std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>>;
 

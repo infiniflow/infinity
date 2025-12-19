@@ -27,7 +27,7 @@ public:
     static void inline Execute(std::shared_ptr<ColumnVector> &result, void *state_ptr) {
         result->Reset();
         result->Initialize(ColumnVectorType::kConstant);
-        auto *result_ptr = (ResultType *)(result->data());
+        auto *result_ptr = (ResultType *)(result->data().get());
         Operator::template Execute<ResultType>(result_ptr[0], state_ptr);
 
         result->Finalize(1);

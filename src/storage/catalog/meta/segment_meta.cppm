@@ -98,8 +98,6 @@ public:
 
     std::tuple<std::shared_ptr<SegmentSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
-    Status RestoreSet();
-
     Status RestoreFromSnapshot(const WalSegmentInfoV2 &segment_info, bool is_link_files = false);
 
 private:
@@ -107,7 +105,6 @@ private:
 
     std::string GetSegmentTag(const std::string &tag) const;
 
-private:
     TxnTimeStamp begin_ts_;
     TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;

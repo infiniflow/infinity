@@ -43,8 +43,6 @@ import :value;
 import :kv_code;
 import :kv_store;
 import :new_txn;
-import :buffer_obj;
-import :buffer_handle;
 import :secondary_index_data;
 import :segment_meta;
 import :block_meta;
@@ -84,7 +82,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnReplayIndex,
                          ::testing::Values(TestTxnReplayIndex::NEW_CONFIG_PATH, TestTxnReplayIndex::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_replay_append_with_index) {
+TEST_P(TestTxnReplayIndex, SLOW_test_replay_append_with_index) {
     using namespace infinity;
 
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
@@ -145,18 +143,18 @@ TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_replay_append_with_index) {
     });
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
-                                          TransactionType::kCreateIndex);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
+                                           TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
     create_index(index_def1);
@@ -238,11 +236,11 @@ TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_replay_append_with_index) {
         input_block->Finalize();
     }
     auto append_a_block = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
 
@@ -251,7 +249,7 @@ TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_replay_append_with_index) {
     RestartTxnMgr();
 
     auto check_index = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("check index {}", index_name)), TransactionType::kRead);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>(fmt::format("check index {}", index_name)), TransactionType::kRead);
 
         Status status;
         std::shared_ptr<DBMeta> db_meta;
@@ -285,7 +283,7 @@ TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_replay_append_with_index) {
             EXPECT_EQ(*chunk_ids_ptr, std::vector<ChunkID>({}));
         }
 
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
 
@@ -327,19 +325,19 @@ TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_replay_append_with_index) {
 
     auto dump_index = [&](const std::string &index_name) {
         auto *txn =
-            new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", index_name)), TransactionType::kDumpMemIndex);
+            new_txn_mgr_->BeginTxn(std::make_unique<std::string>(fmt::format("dump mem index {}", index_name)), TransactionType::kDumpMemIndex);
         SegmentID segment_id = 0;
         Status status = txn->DumpMemIndex(*db_name, *table_name, index_name, segment_id);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
     auto merge_index = [&](const std::string &index_name) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("merge index {}", index_name)), TransactionType::kOptimizeIndex);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>(fmt::format("merge index {}", index_name)), TransactionType::kOptimizeIndex);
         SegmentID segment_id = 0;
         Status status = txn->OptimizeIndex(*db_name, *table_name, index_name, segment_id);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
 
@@ -371,7 +369,7 @@ TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_replay_append_with_index) {
     RestartTxnMgr();
 
     auto check_index2 = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("check merged index {}", index_name)), TransactionType::kRead);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>(fmt::format("check merged index {}", index_name)), TransactionType::kRead);
 
         std::shared_ptr<DBMeta> db_meta;
         std::shared_ptr<TableMeta> table_meta;
@@ -410,19 +408,19 @@ TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_replay_append_with_index) {
         // int32_t begin_val = 2;
         // int32_t end_val = 3;
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         // {
-        //     BufferHandle buffer_handle = buffer_obj->Load();
+        //     BufferHandle buffer_handle = file_worker->Load();
         //     auto *index = static_cast<const SecondaryIndexData *>(buffer_handle.GetData());
 
         //     [[maybe_unused]] const auto [begin_approx_pos, begin_lower, begin_upper] = index->SearchPGM(&begin_val);
         //     [[maybe_unused]] const auto [end_approx_pos, end_lower, end_upper] = index->SearchPGM(&end_val);
         // }
 
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
 
@@ -463,7 +461,7 @@ TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_replay_append_with_index) {
     });
 }
 
-TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_populate_index) {
+TEST_P(TestTxnReplayIndex, SLOW_test_populate_index) {
     using namespace infinity;
 
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
@@ -523,17 +521,17 @@ TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_populate_index) {
         }
     });
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
         Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     u32 block_row_cnt = 8192;
@@ -609,11 +607,11 @@ TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_populate_index) {
     }
     auto append_a_block = [&] {
         {
-            auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
+            auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
 
             Status status = txn->Append(*db_name, *table_name, input_block);
             EXPECT_TRUE(status.ok());
-            status = new_txn_mgr->CommitTxn(txn);
+            status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
     };
@@ -621,11 +619,11 @@ TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_populate_index) {
         append_a_block();
     }
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
-                                          TransactionType::kCreateIndex);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
+                                           TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
     create_index(index_def1);
@@ -639,7 +637,7 @@ TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_populate_index) {
     RestartTxnMgr();
 
     auto check_index = [&](const std::string &index_name, std::function<std::pair<RowID, u32>(const std::shared_ptr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("check index {}", index_name)), TransactionType::kRead);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>(fmt::format("check index {}", index_name)), TransactionType::kRead);
 
         std::shared_ptr<DBMeta> db_meta;
         std::shared_ptr<TableMeta> table_meta;
@@ -683,11 +681,11 @@ TEST_P(TestTxnReplayIndex, DISABLED_SLOW_test_populate_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
     check_index(*index_name1, [&](const std::shared_ptr<MemIndex> &mem_index) {
@@ -739,50 +737,50 @@ TEST_P(TestTxnReplayIndex, drop_index) {
     auto index_def = IndexSecondary::Make(index_name, std::make_shared<std::string>(), "file_name", {column_def1->name()});
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create index {}"), TransactionType::kCreateIndex);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create index {}"), TransactionType::kCreateIndex);
         Status status = txn->CreateIndex(*db_name, *table_name, index_def, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
         auto input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192);
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
         Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS(), false);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kDropIndex);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kDropIndex);
         Status status = txn->DropIndexByName(*db_name, *table_name, *index_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
 
     RestartTxnMgr();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kRead);
+        auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kRead);
         Status status;
         std::shared_ptr<DBMeta> db_meta;
         std::shared_ptr<TableMeta> table_meta;

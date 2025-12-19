@@ -85,7 +85,7 @@ TEST_F(MinFunctionTest, min_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         BooleanT result;
         result = *(BooleanT *)func.finalize_func_(data_state.get());
 
@@ -114,7 +114,7 @@ TEST_F(MinFunctionTest, min_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         TinyIntT result;
         result = *(TinyIntT *)func.finalize_func_(data_state.get());
 
@@ -143,7 +143,7 @@ TEST_F(MinFunctionTest, min_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         SmallIntT result;
         result = *(SmallIntT *)func.finalize_func_(data_state.get());
 
@@ -172,7 +172,7 @@ TEST_F(MinFunctionTest, min_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         IntegerT result;
         result = *(IntegerT *)func.finalize_func_(data_state.get());
 
@@ -201,7 +201,7 @@ TEST_F(MinFunctionTest, min_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         BigIntT result;
         result = *(BigIntT *)func.finalize_func_(data_state.get());
 
@@ -230,7 +230,7 @@ TEST_F(MinFunctionTest, min_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         FloatT result;
         result = *(FloatT *)func.finalize_func_(data_state.get());
 
@@ -259,7 +259,7 @@ TEST_F(MinFunctionTest, min_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         DoubleT result;
         result = *(DoubleT *)func.finalize_func_(data_state.get());
 
@@ -290,7 +290,7 @@ TEST_F(MinFunctionTest, min_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         HugeIntT result;
         result = *(HugeIntT *)func.finalize_func_(data_state.get());
 

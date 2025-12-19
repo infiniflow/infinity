@@ -75,11 +75,11 @@ TEST_P(TestIndexRequest, index_scan) {
         std::shared_ptr<DataBlock> data_block = result_table->data_blocks_[0];
 
         {
-            std::shared_ptr<ColumnVector> col0 = data_block->column_vectors[0];
+            std::shared_ptr<ColumnVector> col0 = data_block->column_vectors_[0];
             EXPECT_EQ(col0->GetValueByIndex(0), Value::MakeInt(2));
         }
         {
-            std::shared_ptr<ColumnVector> col1 = data_block->column_vectors[1];
+            std::shared_ptr<ColumnVector> col1 = data_block->column_vectors_[1];
             EXPECT_EQ(col1->GetValueByIndex(0), Value::MakeVarchar("def"));
         }
     }
@@ -119,11 +119,11 @@ TEST_P(TestIndexRequest, fulltext_index_scan) {
         EXPECT_EQ(result_table->data_blocks_.size(), 1);
         std::shared_ptr<DataBlock> data_block = result_table->data_blocks_[0];
         {
-            std::shared_ptr<ColumnVector> col0 = data_block->column_vectors[0];
+            std::shared_ptr<ColumnVector> col0 = data_block->column_vectors_[0];
             EXPECT_EQ(col0->GetValueByIndex(0), Value::MakeInt(2));
         }
         {
-            std::shared_ptr<ColumnVector> col1 = data_block->column_vectors[1];
+            std::shared_ptr<ColumnVector> col1 = data_block->column_vectors_[1];
             EXPECT_EQ(col1->GetValueByIndex(0), Value::MakeVarchar("def"));
         }
     }
@@ -132,14 +132,14 @@ TEST_P(TestIndexRequest, fulltext_index_scan) {
 TEST_P(TestIndexRequest, vector_index_scan) {
     {
         std::string create_table_sql = "create table t1(c1 int, c2 embedding(float, 4))";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        auto query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
     {
         std::string append_req_sql = "insert into t1 values(1, [0.1, 0.1, 0.1, 0.1]), (2, [0.2, 0.2, 0.2, 0.2])";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        auto query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(append_req_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
@@ -151,22 +151,22 @@ TEST_P(TestIndexRequest, vector_index_scan) {
         } else {
             search_req_sql = "select c1 from t1 search match vector (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 1) using index (" + index_name + ")";
         }
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        auto query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(search_req_sql);
-        DataTable *result_table = nullptr;
+        DataTable *result_table{};
         bool ok = HandleQueryResult(query_result, &result_table);
         EXPECT_TRUE(ok);
-        std::shared_ptr<DataBlock> data_block = result_table->data_blocks_[0];
 
         {
-            std::shared_ptr<ColumnVector> col0 = data_block->column_vectors[0];
+            std::shared_ptr<DataBlock> data_block = result_table->data_blocks_[0];
+            std::shared_ptr<ColumnVector> col0 = data_block->column_vectors_[0];
             EXPECT_EQ(col0->GetValueByIndex(0), Value::MakeInt(2));
         }
     };
     search_vec();
     {
         std::string create_index_sql = "create index idx1 on t1(c2) using hnsw with (M=16, ef_construction=200, metric=l2)";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        auto query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_index_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
@@ -175,7 +175,7 @@ TEST_P(TestIndexRequest, vector_index_scan) {
     search_vec("idx1");
     {
         std::string create_index_sql = "create index idx2 on t1(c2) using ivf with (metric=l2)";
-        std::unique_ptr<QueryContext> query_context = MakeQueryContext();
+        auto query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_index_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
@@ -208,7 +208,7 @@ TEST_P(TestIndexRequest, sparse_index_scan) {
         std::shared_ptr<DataBlock> data_block = result_table->data_blocks_[0];
 
         {
-            std::shared_ptr<ColumnVector> col0 = data_block->column_vectors[0];
+            std::shared_ptr<ColumnVector> col0 = data_block->column_vectors_[0];
             EXPECT_EQ(col0->GetValueByIndex(0), Value::MakeInt(1));
         }
     };
@@ -234,7 +234,7 @@ TEST_P(TestIndexRequest, tensor_index_scan) {
         std::shared_ptr<DataBlock> data_block = result_table->data_blocks_[0];
 
         {
-            std::shared_ptr<ColumnVector> col0 = data_block->column_vectors[0];
+            std::shared_ptr<ColumnVector> col0 = data_block->column_vectors_[0];
             EXPECT_EQ(col0->GetValueByIndex(0), Value::MakeInt(2));
         }
     };
@@ -312,7 +312,7 @@ TEST_P(TestIndexRequest, test_optimize_index) {
         std::shared_ptr<DataBlock> data_block = result_table->data_blocks_[0];
 
         {
-            std::shared_ptr<ColumnVector> col0 = data_block->column_vectors[0];
+            std::shared_ptr<ColumnVector> col0 = data_block->column_vectors_[0];
             EXPECT_EQ(col0->GetValueByIndex(0), Value::MakeInt(2));
         }
     }
