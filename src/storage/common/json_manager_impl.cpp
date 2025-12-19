@@ -68,6 +68,48 @@ std::vector<uint8_t> JsonManager::to_bson(const JsonTypeDef &json_obj) {
     return {};
 }
 
+bool JsonManager::check_json_path(const std::string &json_path) {
+    if (json_path.empty() || json_path[0] != '$') {
+        return false;
+    }
+    return true;
+}
+
+bool JsonManager::check_json_path(const std::string_view &json_path) {
+    if (json_path.empty() || json_path[0] != '$') {
+        return false;
+    }
+    return true;
+}
+
+std::tuple<bool, std::vector<std::string>> JsonManager::get_json_tokens(const std::string &json_path) {
+    std::vector<std::string> json_tokens;
+
+    if (!JsonManager::check_json_path(json_path)) {
+        return {false, {}};
+    }
+
+    std::string_view remaining = std::string_view(json_path).substr(1);
+    size_t start = 0;
+    size_t end = remaining.find('.');
+
+    while (start < remaining.length()) {
+        auto token_end = (end == std::string_view::npos) ? remaining.length() : end;
+
+        if (start < token_end) {
+            json_tokens.emplace_back(remaining.substr(start, token_end - start));
+        }
+
+        if (end == std::string_view::npos)
+            break;
+
+        start = end + 1;
+        end = remaining.find('.', start);
+    }
+
+    return {true, std::move(json_tokens)};
+}
+
 std::tuple<bool, std::string> JsonManager::json_extract(const JsonTypeDef &data, const std::vector<std::string> &tokens) {
     JsonTypeDef current = data;
     for (const auto &token : tokens) {

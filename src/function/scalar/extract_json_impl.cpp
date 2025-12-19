@@ -33,92 +33,121 @@ void JsonExtractBase(const DataBlock &, std::shared_ptr<ColumnVector> &) {}
 template <typename T, std::tuple<bool, T> (*ExtractFunc)(const JsonTypeDef &, const std::vector<std::string> &), Value (*MakeValueFunc)(T)>
 class JsonExtractor {
 public:
-    static void Execute(std::shared_ptr<BaseExtraInfo> extract_ptr, const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
-        auto extra_ptr = reinterpret_cast<const JsonExtraInfo *>(extract_ptr.get());
-        auto column = input.column_vectors[0];
-        auto input_data = reinterpret_cast<const JsonT *>(column->data());
-        auto row_count = input.row_count();
-        const std::shared_ptr<Bitmask> &output_null = output->nulls_ptr_;
+    static void Execute(const DataBlock &input_block, std::shared_ptr<ColumnVector> &output_column) {
+        if (input_block.column_vectors.size() != 2) {
+            RecoverableError(Status::SyntaxError("JsonExtract: Invalid column size."));
+        }
 
-        if (column->vector_type() == ColumnVectorType::kFlat) {
+        const auto &json_column = input_block.column_vectors[0];
+        const auto &path_column = input_block.column_vectors[1];
+
+        auto rvarchar = path_column->GetVarchar(0);
+        auto [is_valid, tokens] = JsonManager::get_json_tokens(std::string(rvarchar.data(), rvarchar.size()));
+        if (!is_valid) {
+            RecoverableError(Status::SyntaxError("JsonExtract: Invalid json path."));
+        }
+
+        auto json_column_data = reinterpret_cast<const JsonT *>(json_column->data());
+        auto row_count = input_block.row_count();
+        const std::shared_ptr<Bitmask> &output_null = output_column->nulls_ptr_;
+
+        if (json_column->vector_type() == ColumnVectorType::kFlat) {
             for (size_t row_index = 0; row_index < row_count; row_index++) {
-                const auto json_info = input_data[row_index];
-                auto json_data = column->buffer_->GetVarchar(json_info.file_offset_, json_info.length_);
+                const auto json_info = json_column_data[row_index];
+                auto json_data = json_column->buffer_->GetVarchar(json_info.file_offset_, json_info.length_);
                 std::vector<uint8_t> bson(reinterpret_cast<const uint8_t *>(json_data),
                                           reinterpret_cast<const uint8_t *>(json_data) + json_info.length_);
                 auto json = JsonManager::from_bson(bson);
-                auto [is_null, extracted_value] = ExtractFunc(json, extra_ptr->json_tokens_);
+                auto [is_null, extracted_value] = ExtractFunc(json, tokens);
                 output_null->Set(row_index, !is_null);
                 Value v = MakeValueFunc(extracted_value);
-                output->AppendValue(v);
+                output_column->AppendValue(v);
             }
-            output->Finalize(row_count);
+            output_column->Finalize(row_count);
         } else {
             RecoverableError(Status::SyntaxError("JsonExtract: Invalid column type."));
         }
     }
 };
 
-void JsonExtractString(std::shared_ptr<BaseExtraInfo> extract_ptr, const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
-    JsonExtractor<std::string, JsonManager::json_extract, Value::MakeVarchar>::Execute(extract_ptr, input, output);
+void JsonExtractString(const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
+    JsonExtractor<std::string, JsonManager::json_extract, Value::MakeVarchar>::Execute(input, output);
 }
 
-void JsonExtractInt(std::shared_ptr<BaseExtraInfo> extract_ptr, const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
-    JsonExtractor<int, JsonManager::json_extract_int, Value::MakeInt>::Execute(extract_ptr, input, output);
+void JsonExtractInt(const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
+    JsonExtractor<int, JsonManager::json_extract_int, Value::MakeInt>::Execute(input, output);
 }
 
-void JsonExtractDouble(std::shared_ptr<BaseExtraInfo> extract_ptr, const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
-    JsonExtractor<double, JsonManager::json_extract_double, Value::MakeDouble>::Execute(extract_ptr, input, output);
+void JsonExtractDouble(const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
+    JsonExtractor<double, JsonManager::json_extract_double, Value::MakeDouble>::Execute(input, output);
 }
 
-void JsonExtractBool(std::shared_ptr<BaseExtraInfo> extract_ptr, const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
-    JsonExtractor<bool, JsonManager::json_extract_bool, Value::MakeBool>::Execute(extract_ptr, input, output);
+void JsonExtractBool(const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
+    JsonExtractor<bool, JsonManager::json_extract_bool, Value::MakeBool>::Execute(input, output);
 }
 
-void JsonExtractIsNull(std::shared_ptr<BaseExtraInfo> extract_ptr, const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
-    JsonExtractor<bool, JsonManager::json_extract_is_null, Value::MakeBool>::Execute(extract_ptr, input, output);
+void JsonExtractIsNull(const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
+    JsonExtractor<bool, JsonManager::json_extract_is_null, Value::MakeBool>::Execute(input, output);
 }
 
 void RegisterJsonFunction(NewCatalog *catalog_ptr) {
     {
         std::string func_name = "json_extract";
         std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
-        ScalarFunction json_extract(func_name, {DataType(LogicalType::kJson)}, DataType(LogicalType::kVarchar), JsonExtractBase);
+        ScalarFunction json_extract(func_name,
+                                    {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
+                                    DataType(LogicalType::kVarchar),
+                                    JsonExtractString);
         function_set_ptr->AddFunction(json_extract);
         NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
     }
     {
         std::string func_name = "json_extract_string";
         std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
-        ScalarFunction json_extract(func_name, {DataType(LogicalType::kJson)}, DataType(LogicalType::kVarchar), JsonExtractBase);
+        ScalarFunction json_extract(func_name,
+                                    {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
+                                    DataType(LogicalType::kVarchar),
+                                    JsonExtractString);
         function_set_ptr->AddFunction(json_extract);
         NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
     }
     {
         std::string func_name = "json_extract_int";
         std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
-        ScalarFunction json_extract(func_name, {DataType(LogicalType::kJson)}, DataType(LogicalType::kInteger), JsonExtractBase);
+        ScalarFunction json_extract(func_name,
+                                    {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
+                                    DataType(LogicalType::kInteger),
+                                    JsonExtractInt);
         function_set_ptr->AddFunction(json_extract);
         NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
     }
     {
         std::string func_name = "json_extract_double";
         std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
-        ScalarFunction json_extract(func_name, {DataType(LogicalType::kJson)}, DataType(LogicalType::kDouble), JsonExtractBase);
+        ScalarFunction json_extract(func_name,
+                                    {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
+                                    DataType(LogicalType::kDouble),
+                                    JsonExtractDouble);
         function_set_ptr->AddFunction(json_extract);
         NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
     }
     {
         std::string func_name = "json_extract_bool";
         std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
-        ScalarFunction json_extract(func_name, {DataType(LogicalType::kJson)}, DataType(LogicalType::kBoolean), JsonExtractBase);
+        ScalarFunction json_extract(func_name,
+                                    {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
+                                    DataType(LogicalType::kBoolean),
+                                    JsonExtractBool);
         function_set_ptr->AddFunction(json_extract);
         NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
     }
     {
         std::string func_name = "json_extract_isnull";
         std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
-        ScalarFunction json_extract(func_name, {DataType(LogicalType::kJson)}, DataType(LogicalType::kBoolean), JsonExtractBase);
+        ScalarFunction json_extract(func_name,
+                                    {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
+                                    DataType(LogicalType::kBoolean),
+                                    JsonExtractIsNull);
         function_set_ptr->AddFunction(json_extract);
         NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
     }

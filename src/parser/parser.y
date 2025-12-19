@@ -3328,60 +3328,6 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->distinct_ = true;
     $$ = func_expr;
 }
-| IDENTIFIER '(' column_expr ',' STRING ')' {
-    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
-    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
-    func_expr->arguments_->emplace_back($3);
-
-    ParserHelper::ToLower($1);
-    infinity::JsonExtraInfo *extra_ptr = nullptr;
-    if(strcmp($1, "json_extract") == 0) {
-        func_expr->func_name_ = "json_extract";
-        extra_ptr = new infinity::JsonExtraInfo(infinity::ExtraInfoType::kJsonToString, $5);
-    } else if (strcmp($1, "json_extract_string") == 0) {
-        func_expr->func_name_ = "json_extract_string";
-        extra_ptr = new infinity::JsonExtraInfo(infinity::ExtraInfoType::kJsonToString, $5);
-    } else if (strcmp($1, "json_extract_int") == 0) {
-        func_expr->func_name_ = "json_extract_int";
-        extra_ptr = new infinity::JsonExtraInfo(infinity::ExtraInfoType::kJsonToInt, $5);
-    } else if (strcmp($1, "json_extract_double") == 0) {
-        func_expr->func_name_ = "json_extract_double";
-        extra_ptr = new infinity::JsonExtraInfo(infinity::ExtraInfoType::kJsonToDouble, $5);
-    } else if (strcmp($1, "json_extract_bool") == 0) {
-        func_expr->func_name_ = "json_extract_bool";
-        extra_ptr = new infinity::JsonExtraInfo(infinity::ExtraInfoType::kJsonToBool, $5);
-    } else if (strcmp($1, "json_extract_isnull") == 0) {
-        func_expr->func_name_ = "json_extract_isnull";
-        extra_ptr = new infinity::JsonExtraInfo(infinity::ExtraInfoType::kJsonToIsNull, $5);
-    } else {
-        free($1);
-        free($5);
-        if (func_expr != nullptr) {
-            delete func_expr;
-            func_expr = nullptr;
-        }
-        yyerror(&yyloc, scanner, result, "Invalid json_extract format");
-        YYERROR;
-    }
-    free($1);
-
-    if (!extra_ptr->Init()) {
-        free($5);
-        if (extra_ptr != nullptr) {
-            delete extra_ptr;
-            extra_ptr = nullptr;
-        }
-        if (func_expr != nullptr) {
-            delete func_expr;
-            func_expr = nullptr;
-        }
-        yyerror(&yyloc, scanner, result, "Invalid json_extract format");
-        YYERROR;
-    }
-
-    func_expr->extra_info_ = std::shared_ptr<infinity::BaseExtraInfo>(extra_ptr);
-    $$ = func_expr;
-}
 | YEAR '(' expr ')' {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "year";

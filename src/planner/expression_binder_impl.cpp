@@ -491,42 +491,6 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionEx
             auto scalar_function_set_ptr = static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
             ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
 
-            if (expr.extra_info_ != nullptr) {
-                expr.extra_info_->Init();
-                auto type = expr.extra_info_->type_;
-                switch (type) {
-                    case ExtraInfoType::kJsonToString: {
-                        scalar_function.extra_info_ = expr.extra_info_;
-                        scalar_function.json_function_ = JsonExtractString;
-                        break;
-                    }
-                    case ExtraInfoType::kJsonToInt: {
-                        scalar_function.extra_info_ = expr.extra_info_;
-                        scalar_function.json_function_ = JsonExtractInt;
-                        break;
-                    }
-                    case ExtraInfoType::kJsonToDouble: {
-                        scalar_function.extra_info_ = expr.extra_info_;
-                        scalar_function.json_function_ = JsonExtractDouble;
-                        break;
-                    }
-                    case ExtraInfoType::kJsonToBool: {
-                        scalar_function.extra_info_ = expr.extra_info_;
-                        scalar_function.json_function_ = JsonExtractBool;
-                        break;
-                    }
-                    case ExtraInfoType::kJsonToIsNull: {
-                        scalar_function.extra_info_ = expr.extra_info_;
-                        scalar_function.json_function_ = JsonExtractIsNull;
-                        break;
-                    }
-                    default: {
-                        RecoverableError(Status::SyntaxError("invalid ExtraInfoType"));
-                        break;
-                    }
-                }
-            }
-
             for (size_t idx = 0; idx < arguments.size(); ++idx) {
                 // Check if the argument is an embedding type but the function doesn't expect it
                 if (arguments[idx]->Type().type() == LogicalType::kEmbedding &&
@@ -556,6 +520,20 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionEx
             }
 
             std::shared_ptr<FunctionExpression> function_expr_ptr = std::make_shared<FunctionExpression>(scalar_function, arguments);
+
+            if (std::strncmp(scalar_function.name().c_str(), "json_extract", strlen("json_extract")) == 0) {
+                if (arguments.size() != 2) {
+                    RecoverableError(Status::SyntaxError("JsonExtract: Invalid expression size."));
+                }
+                if (arguments[0]->type() != ExpressionType::kColumn || arguments[1]->type() != ExpressionType::kValue) {
+                    RecoverableError(Status::SyntaxError("JsonExtract: Invalid expression type."));
+                }
+                auto value_expr = std::static_pointer_cast<ValueExpression>(arguments[1]);
+                std::string_view value_view(value_expr->GetValue().GetVarchar());
+                if (!JsonManager::check_json_path(value_view)) {
+                    RecoverableError(Status::SyntaxError("JsonExtract: Invalid json path."));
+                }
+            }
 
             // Special handling for FDE function - adjust return type based on target dimension parameter
             if (scalar_function.name() == "FDE" && arguments.size() >= 2) {

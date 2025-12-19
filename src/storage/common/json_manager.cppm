@@ -35,6 +35,11 @@ public:
     static JsonTypeDef from_bson(const std::vector<uint8_t> &bson_data);
     static std::string dump(const JsonTypeDef &json_obj);
     static std::vector<uint8_t> to_bson(const JsonTypeDef &json_obj);
+
+    static bool check_json_path(const std::string &json_path);
+    static bool check_json_path(const std::string_view &json_path);
+    static std::tuple<bool, std::vector<std::string>> get_json_tokens(const std::string &json_path);
+
     static std::tuple<bool, std::string> json_extract(const JsonTypeDef &data, const std::vector<std::string> &tokens);
     static std::tuple<bool, IntegerT> json_extract_int(const JsonTypeDef &data, const std::vector<std::string> &tokens);
     static std::tuple<bool, DoubleT> json_extract_double(const JsonTypeDef &data, const std::vector<std::string> &tokens);

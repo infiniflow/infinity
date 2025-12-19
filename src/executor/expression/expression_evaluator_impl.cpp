@@ -170,24 +170,7 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<FunctionExpression> &exp
         func_input_data_block.Init(arguments);
     }
 
-    if (expr->func_.extra_info_ != nullptr) {
-        auto &data = expr->func_.extra_info_;
-        switch (data->type_) {
-            case ExtraInfoType::kJsonToString:
-            case ExtraInfoType::kJsonToInt:
-            case ExtraInfoType::kJsonToDouble:
-            case ExtraInfoType::kJsonToBool:
-            case ExtraInfoType::kJsonToIsNull: {
-                expr->func_.json_function_(data, func_input_data_block, output_column_vector);
-                break;
-            }
-            default: {
-                break;
-            }
-        }
-    } else {
-        expr->func_.function_(func_input_data_block, output_column_vector);
-    }
+    expr->func_.function_(func_input_data_block, output_column_vector);
 }
 
 void ExpressionEvaluator::Execute(const std::shared_ptr<ValueExpression> &expr,
