@@ -133,7 +133,7 @@ target_link_libraries(miniocpp PUBLIC ${MINIO_CPP_LIBS})
 set_target_properties(miniocpp PROPERTIES VERSION "${MINIO_CPP_VERSION_STRING}")
 set_target_properties(miniocpp PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-target_compile_options(miniocpp PUBLIC -Wno-sign-conversion)
+target_compile_options(miniocpp PRIVATE -Wno-sign-conversion)
 
 # Add a cmake alias - this is how users should use minio-cpp in their cmake projects.
 add_library(miniocpp::miniocpp ALIAS miniocpp)

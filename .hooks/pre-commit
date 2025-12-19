@@ -11,6 +11,14 @@ def get_files():
 def apply_code_style():
     files = filter(lambda x: x.find(b'third_party') == -1, get_files())
     files = filter(lambda x: x.find(b'src/networker/third_party/infinity_thrift') == -1, files)
+    files = filter(lambda x: x.find(b'src/parser/expression_parser.cpp') == -1, files)
+    files = filter(lambda x: x.find(b'src/parser/expression_parser.h') == -1, files)
+    files = filter(lambda x: x.find(b'src/parser/lexer.cpp') == -1, files)
+    files = filter(lambda x: x.find(b'src/parser/lexer.h') == -1, files)
+    files = filter(lambda x: x.find(b'src/parser/parser.cpp') == -1, files)
+    files = filter(lambda x: x.find(b'src/parser/parser.h') == -1, files)
+    files = filter(lambda x: x.find(b'src/parser/search_parser.cpp') == -1, files)
+    files = filter(lambda x: x.find(b'src/parser/search_parser.h') == -1, files)
 
     files = filter(lambda x: x.endswith(b'.c') or
                              x.endswith(b'.h') or
