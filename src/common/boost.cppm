@@ -36,7 +36,6 @@ export using boost::upgrade_lock;
 export using boost::upgrade_to_unique_lock;
 export using boost::shared_mutex;
 export using boost::unique_lock;
-// export using boost::mutex;
 namespace asio {
 export using boost::asio::io_context;
 export using boost::asio::read;
@@ -55,9 +54,3 @@ export using boost::asio::error::connection_reset;
 } // namespace error
 } // namespace asio
 } // namespace boost
-
-// export namespace boost {
-// using boost::defer_lock_t;
-// // using boost::defer_lock;
-// // using BOOST_CONSTEXPR_OR_CONST defer_lock_t defer_lock = {};
-// } // namespace boost
