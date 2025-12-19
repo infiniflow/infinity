@@ -374,11 +374,10 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         while (GetInflightTasks() > 0) {
             CommitOffline(100);
         }
-        std::unique_lock lock(mutex_commit_);
-        // std::unique_lock lock(mutex_commit_, std::defer_lock);
-        // if (!lock.try_lock()) {
-        //     return;
-        // }
+        std::unique_lock lock(mutex_commit_, std::defer_lock);
+        if (!lock.try_lock()) {
+            return;
+        }
         OfflineDump();
         return;
     }
@@ -392,9 +391,9 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     }
     std::unique_lock commit_sync_lock(mutex_commit_sync_share_);
 
-    std::string posting_file = std::filesystem::path(index_dir_) / (base_name_ + POSTING_SUFFIX + (spill ? SPILL_SUFFIX : ""));
-    std::string dict_file = std::filesystem::path(index_dir_) / (base_name_ + DICT_SUFFIX + (spill ? SPILL_SUFFIX : ""));
-    std::string column_length_file = std::filesystem::path(index_dir_) / (base_name_ + LENGTH_SUFFIX + (spill ? SPILL_SUFFIX : ""));
+    std::string posting_file = std::filesystem::path(index_dir_) / (base_name_ + POSTING_SUFFIX);
+    std::string dict_file = std::filesystem::path(index_dir_) / (base_name_ + DICT_SUFFIX);
+    std::string column_length_file = std::filesystem::path(index_dir_) / (base_name_ + LENGTH_SUFFIX);
     auto tmp_posting_file{posting_file};
     auto tmp_dict_file{dict_file};
     auto tmp_column_length_file{column_length_file};
@@ -440,8 +439,8 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     {
         auto [file_handle, status] = VirtualStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
         if (!status.ok()) {
-            // return;
-            // fuck
+            return;
+            // // fuck
             // UnrecoverableError(status.message());
         }
 

@@ -72,7 +72,7 @@ void MemIndexTracer::DecreaseMemUsed(size_t mem_dec) {
 }
 
 bool MemIndexTracer::TryTriggerDump() {
-    std::vector<std::shared_ptr<DumpMemIndexTask>> dump_tasks = MakeDumpTask();
+    auto dump_tasks = MakeDumpTask();
     if (dump_tasks.empty()) {
         return false;
     }
@@ -104,17 +104,16 @@ void MemIndexTracer::DumpDone(std::shared_ptr<MemIndex> mem_index) {
 
 std::vector<std::shared_ptr<DumpMemIndexTask>> MemIndexTracer::MakeDumpTask() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    std::shared_ptr<NewTxn> new_txn_shared =
-        new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("Get all mem indexes"), TransactionType::kRead);
+    auto new_txn_shared = new_txn_mgr->BeginTxnShared(std::make_unique<std::string>("Get all mem indexes"), TransactionType::kRead);
 
-    std::vector<std::shared_ptr<MemIndexDetail>> mem_index_details = GetAllMemIndexes(new_txn_shared.get());
+    auto mem_index_details = GetAllMemIndexes(new_txn_shared.get());
     // Generate dump task for all EMVB index and at most one non-EMVB index
     std::vector<std::shared_ptr<DumpMemIndexTask>> dump_tasks;
     for (auto &mem_index_detail : mem_index_details) {
         {
             std::lock_guard lck(mtx_);
             // Skip index that is already in proposed dump
-            if (proposed_dump_.find(mem_index_detail->mem_index_) != proposed_dump_.end()) {
+            if (proposed_dump_.contains(mem_index_detail->mem_index_)) {
                 continue;
             }
             // Record index in proposed dump

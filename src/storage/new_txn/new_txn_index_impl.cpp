@@ -1993,7 +1993,6 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
             UnrecoverableError("Not implemented yet");
         }
     }
-
     mem_index->ClearMemIndex();
     auto *storage = InfinityContext::instance().storage();
     if (storage != nullptr) {
