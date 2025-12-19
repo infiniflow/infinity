@@ -206,7 +206,7 @@ public:
 
     static std::string PMObjectStatPrefix();
 
-    static std::string PMObjectKey(const std::string &key);
+    static std::string PMObjectKey(std::string_view key);
 
     static std::string PMObjectStatKey(const std::string &key);
 

@@ -20,26 +20,12 @@ namespace infinity {
 
 ColumnIndexIterator::ColumnIndexIterator(const std::string &index_dir, const std::string &base_name, optionflag_t flag) {
     PostingFormatOption format_option(flag);
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
 
-    std::filesystem::path path = std::filesystem::path(InfinityContext::instance().config()->DataDir()) / index_dir / base_name;
+    auto path = std::filesystem::path(InfinityContext::instance().config()->TempDir()) / index_dir / base_name;
     std::string dict_file = path.string();
     dict_file.append(DICT_SUFFIX);
     std::string posting_file = path.string();
     posting_file.append(POSTING_SUFFIX);
-
-    if (use_object_cache) {
-        PersistResultHandler handler(pm);
-        dict_file_path_ = dict_file;
-        posting_file_path_ = posting_file;
-        PersistReadResult result = pm->GetObjCache(dict_file);
-        const ObjAddr &obj_addr = handler.HandleReadResult(result);
-        dict_file = pm->GetObjPath(obj_addr.obj_key_);
-        PersistReadResult result2 = pm->GetObjCache(posting_file);
-        const ObjAddr &obj_addr2 = handler.HandleReadResult(result2);
-        posting_file = pm->GetObjPath(obj_addr2.obj_key_);
-    }
 
     dict_reader_ = std::make_shared<DictionaryReader>(dict_file, PostingFormatOption(flag));
     posting_file_ = std::make_shared<FileReader>(posting_file, 1024);
@@ -57,16 +43,6 @@ ColumnIndexIterator::~ColumnIndexIterator() {
     }
     if (pos_list_slice_ != nullptr) {
         ByteSlice::DestroySlice(pos_list_slice_);
-    }
-
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-    if (use_object_cache) {
-        PersistResultHandler handler(pm);
-        PersistWriteResult res1 = pm->PutObjCache(dict_file_path_);
-        PersistWriteResult res2 = pm->PutObjCache(posting_file_path_);
-        handler.HandleWriteResult(res1);
-        handler.HandleWriteResult(res2);
     }
 }
 

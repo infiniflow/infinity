@@ -42,8 +42,6 @@ import :value;
 import :kv_code;
 import :kv_store;
 import :new_txn;
-import :buffer_obj;
-import :buffer_handle;
 import :secondary_index_in_mem;
 import :secondary_index_data;
 import :segment_meta;
@@ -81,13 +79,7 @@ protected:
         db_name = std::make_shared<std::string>("db1");
         column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
         column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-        // auto column3_type_info = std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 4);
-        // column_def3 = std::make_shared<ColumnDef>(2,
-        //                                           std::make_shared<DataType>(LogicalType::kEmbedding, column3_type_info),
-        //                                           "col3",
-        //                                           std::set<ConstraintType>());
         table_name = std::make_shared<std::string>("tb1");
-        // table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2, column_def3});
         table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
     }
 
@@ -95,46 +87,6 @@ protected:
         new_txn_mgr = nullptr;
         BaseTestParamStr::TearDown();
     }
-
-    // std::shared_ptr<DataBlock> MakeInputBlock(const Value &v1, const Value &v2, const Value &v3, size_t row_cnt) {
-    //     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-    //     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    //     auto column3_type_info = std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 4);
-    //     auto column_def3 = std::make_shared<ColumnDef>(2,
-    //                                                    std::make_shared<DataType>(LogicalType::kEmbedding, column3_type_info),
-    //                                                    "col3",
-    //                                                    std::set<ConstraintType>());
-    //
-    //     auto input_block = std::make_shared<DataBlock>();
-    //     {
-    //         auto col1 = ColumnVector::Make(column_def1->type());
-    //         col1->Initialize();
-    //         for (u32 i = 0; i < row_cnt; ++i) {
-    //             col1->AppendValue(v1);
-    //         }
-    //         input_block->InsertVector(col1, 0);
-    //     }
-    //     {
-    //         auto col2 = ColumnVector::Make(column_def2->type());
-    //         col2->Initialize();
-    //         for (u32 i = 0; i < row_cnt; ++i) {
-    //             col2->AppendValue(v2);
-    //         }
-    //         input_block->InsertVector(col2, 1);
-    //     }
-    //
-    //     {
-    //         auto col3 = ColumnVector::Make(column_def3->type());
-    //         col3->Initialize();
-    //         for (u32 i = 0; i < row_cnt; ++i) {
-    //             col3->AppendValue(v3);
-    //         }
-    //         input_block->InsertVector(col3, 2);
-    //     }
-    //
-    //     input_block->Finalize();
-    //     return input_block;
-    // };
 
     void PrepareForCompact() {
         {
@@ -155,9 +107,6 @@ protected:
             auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("import {}", i)), TransactionType::kImport);
             std::vector<std::shared_ptr<DataBlock>> input_blocks = {
                 MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 8192)};
-            // ,
-            //                                                                        Value::MakeEmbedding(std::vector<float>{1.0, 2.0, 3.0, 4.0}),
-            //                                                                        8192)};
             Status status = txn->Import(*db_name, *table_name, input_blocks);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn);
@@ -228,7 +177,7 @@ protected:
         std::shared_ptr<TableIndexMeta> table_index_meta;
         std::string table_key;
         std::string index_key;
-        Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
+        auto status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
         EXPECT_TRUE(status.ok());
 
         SegmentID segment_id = 0;
@@ -242,7 +191,7 @@ protected:
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
         ChunkID chunk_id = 0;
         {
-            std::vector<ChunkID> *chunk_ids_ptr = nullptr;
+            std::vector<ChunkID> *chunk_ids_ptr{};
             std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids_ptr, std::vector<ChunkID>({0}));
@@ -250,7 +199,7 @@ protected:
         }
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
         {
-            ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+            ChunkIndexMetaInfo *chunk_info_ptr{};
             Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_info_ptr->base_row_id_, RowID(segment_id, 0));
@@ -372,7 +321,6 @@ protected:
     std::shared_ptr<std::string> db_name;
     std::shared_ptr<ColumnDef> column_def1;
     std::shared_ptr<ColumnDef> column_def2;
-    // std::shared_ptr<ColumnDef> column_def3;
     std::shared_ptr<std::string> table_name;
     std::shared_ptr<TableDef> table_def;
 };
@@ -382,23 +330,11 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
 TEST_P(TestTxnCompact, compact_with_index_commit) {
-    Status status;
     PrepareForCompact();
     auto index_name1 = std::make_shared<std::string>("index1");
     auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<std::string>(), "file_name", {column_def1->name()});
     auto index_name2 = std::make_shared<std::string>("index2");
     auto index_def2 = IndexFullText::Make(index_name2, std::make_shared<std::string>(), "file_name", {column_def2->name()}, {});
-    //
-    // auto index_name3 = std::make_shared<std::string>("index3");
-    //
-    // std::vector<InitParameter *> parameters1;
-    // parameters1.emplace_back(new InitParameter("metric", "l2"));
-    // parameters1.emplace_back(new InitParameter("encode", "plain"));
-    // parameters1.emplace_back(new InitParameter("m", "16"));
-    // parameters1.emplace_back(new InitParameter("ef_construction", "200"));
-    //
-    // auto index_def3 = IndexHnsw::Make(index_name3, std::make_shared<std::string>("test_comment"), "file_name", {column_def3->name()}, parameters1);
-
     auto create_index = [&](const std::shared_ptr<IndexBase> &index_base) {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>(fmt::format("create index {}", *index_base->index_name_)),
                                           TransactionType::kCreateIndex);
@@ -409,11 +345,10 @@ TEST_P(TestTxnCompact, compact_with_index_commit) {
     };
     create_index(index_def1);
     create_index(index_def2);
-    // create_index(index_def3);
 
     auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("compact"), TransactionType::kCompact);
 
-    status = txn->Compact(*db_name, *table_name, {0, 1});
+    Status status = txn->Compact(*db_name, *table_name, {0, 1});
     EXPECT_TRUE(status.ok());
 
     status = new_txn_mgr->CommitTxn(txn);
@@ -422,7 +357,6 @@ TEST_P(TestTxnCompact, compact_with_index_commit) {
     CheckDataAfterSuccesfulCompact();
     CheckIndexAfterSuccessfulCompact(*index_name1);
     CheckIndexAfterSuccessfulCompact(*index_name2);
-    // CheckIndexAfterSuccessfulCompact(*index_name3);
 }
 
 TEST_P(TestTxnCompact, compact_with_index_rollback) {
@@ -753,13 +687,13 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
         std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
     auto CheckTable = [&](std::vector<ColumnID> column_idxes) {
         auto check_column = [&](ColumnMeta &column_meta) {
-            BufferObj *column_buffer = nullptr;
-            BufferObj *outline_buffer = nullptr;
-            Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
+            DataFileWorker *data_file_worker{};
+            VarFileWorker *var_file_worker{};
+            Status status = column_meta.GetFileWorker(data_file_worker, var_file_worker);
             EXPECT_TRUE(status.ok());
-            EXPECT_NE(column_buffer, nullptr);
+            EXPECT_NE(data_file_worker, nullptr);
             if (column_meta.column_idx() != 0) {
-                EXPECT_NE(outline_buffer, nullptr);
+                EXPECT_NE(var_file_worker, nullptr);
             }
         };
 
@@ -810,13 +744,13 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
 
     auto CheckTable1 = [&](std::vector<ColumnID> column_idxes) {
         auto check_column = [&](ColumnMeta &column_meta) {
-            BufferObj *column_buffer = nullptr;
-            BufferObj *outline_buffer = nullptr;
-            Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
+            DataFileWorker *data_file_worker{};
+            VarFileWorker *var_file_worker{};
+            Status status = column_meta.GetFileWorker(data_file_worker, var_file_worker);
             EXPECT_TRUE(status.ok());
-            EXPECT_NE(column_buffer, nullptr);
+            EXPECT_NE(data_file_worker, nullptr);
             if (column_meta.column_idx() != 0) {
-                EXPECT_NE(outline_buffer, nullptr);
+                EXPECT_NE(var_file_worker, nullptr);
             }
         };
 
@@ -1024,11 +958,11 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
 TEST_P(TestTxnCompact, compact_and_drop_columns) {
     auto CheckTable = [&](const std::vector<ColumnID> &column_idxes, const std::vector<SegmentID> &segment_ids) {
         auto check_column = [&](ColumnMeta &column_meta) {
-            BufferObj *column_buffer = nullptr;
-            BufferObj *outline_buffer = nullptr;
-            Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
+            DataFileWorker *data_file_worker{};
+            VarFileWorker *var_file_worker{};
+            Status status = column_meta.GetFileWorker(data_file_worker, var_file_worker);
             EXPECT_TRUE(status.ok());
-            EXPECT_NE(column_buffer, nullptr);
+            EXPECT_NE(data_file_worker, nullptr);
             // EXPECT_NE(outline_buffer, nullptr);
         };
 

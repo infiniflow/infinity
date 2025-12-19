@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 4.0.3...4.2.0)
+cmake_minimum_required(VERSION 4.0.3...4.2.1)
 
 cmake_policy(SET CMP0167 OLD)
 
 set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS TRUE)
 
-if (CMAKE_VERSION GREATER_EQUAL 4.0.3 AND CMAKE_VERSION LESS_EQUAL 4.2.0)
+if (CMAKE_VERSION GREATER_EQUAL 4.0.3 AND CMAKE_VERSION LESS_EQUAL 4.2.1)
     set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
 endif ()
 
@@ -52,10 +52,10 @@ if (CLANG_VERSION_STRING VERSION_GREATER_EQUAL 20)
     message(STATUS "Building ${PROJECT_NAME} with CMake version: ${CMAKE_VERSION} On CLANG-${CLANG_VERSION_STRING}")
 
     # add_compile_options(-ftime-trace)
-    #    add_compile_options(-fmodule-header)
+    # add_compile_options(-fmodule-header)
     add_link_options(-fuse-ld=mold)
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field --rtlib=libgcc --unwindlib=libgcc")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field")
-
     add_link_options(-L/usr/local/lib)
     set(CMAKE_FIND_PACKAGE_SORT_ORDER NATURAL)
     set(CMAKE_FIND_PACKAGE_SORT_DIRECTION DEC)
@@ -74,48 +74,48 @@ elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
     set(X86_64 TRUE)
 endif ()
 
-#strength, for image maintainer
-set(GCC_SEARCH_ROOTS
-        /usr
-        /usr/local
-)
+##strength, for image maintainer
+#set(GCC_SEARCH_ROOTS
+#        /usr
+#        /usr/local
+#)
 
 #if you encounter a problem, try commenting out the code below.
-set(GCC15_SUFFIXES
-        #        lib
-        lib/gcc/15
-	lib/gcc/aarch64-linux-gnu/15
-        lib/gcc/x86_64-linux-gnu/15
-        lib/gcc/x86_64-pc-linux-gnu/15.1.0
-        lib64/gcc/x86_64-linux-gnu/15
-        lib64/gcc/15
-        lib64/gcc/x86_64-pc-linux-gnu/15.1.0
-)
+#set(GCC15_SUFFIXES
+#        #        lib
+#        lib/gcc/15
+#	    lib/gcc/aarch64-linux-gnu/15
+#        lib/gcc/x86_64-linux-gnu/15
+#        lib/gcc/x86_64-pc-linux-gnu/15.1.0
+#        lib64/gcc/x86_64-linux-gnu/15
+#        lib64/gcc/15
+#        lib64/gcc/x86_64-pc-linux-gnu/15.1.0
+#)
 
-find_library(STDCXX15_STATIC
-        NAMES libstdc++.a
-        PATHS ${GCC_SEARCH_ROOTS}
-        PATH_SUFFIXES ${GCC15_SUFFIXES}
-        REQUIRED
-        NO_DEFAULT_PATH
-)
+# find_library(GCC15_STATIC
+#         NAMES libgcc.a
+#         PATHS ${GCC_SEARCH_ROOTS}
+#         PATH_SUFFIXES ${GCC15_SUFFIXES}
+#         REQUIRED
+#         NO_DEFAULT_PATH
+# )
 
-find_library(STDCXX15EXP_STATIC
-        NAMES libstdc++exp.a
-        PATHS ${GCC_SEARCH_ROOTS}
-        PATH_SUFFIXES ${GCC15_SUFFIXES}
-        REQUIRED
-        NO_DEFAULT_PATH
-)
+#find_library(STDCXX15EXP_STATIC
+#        NAMES libstdc++exp.a
+#        PATHS ${GCC_SEARCH_ROOTS}
+#        PATH_SUFFIXES ${GCC15_SUFFIXES}
+#        REQUIRED
+#        NO_DEFAULT_PATH
+#)
 
-get_filename_component(GCC15_LIB_DIR ${STDCXX15_STATIC} DIRECTORY)
+#get_filename_component(GCC15_LIB_DIR "${STDCXX15_STATIC}" DIRECTORY)
 
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -static-libgcc")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
 ########
 
 find_package(absl CONFIG REQUIRED)
 find_package(Arrow CONFIG REQUIRED)
-find_package(Boost REQUIRED COMPONENTS asio)
+find_package(Boost REQUIRED COMPONENTS asio thread)
 find_package(CLI11 CONFIG REQUIRED)
 #find_package(CURL REQUIRED) # wait for s3
 #darts-clone # wait for fix
@@ -144,18 +144,18 @@ find_package(simdjson CONFIG REQUIRED)
 if (ARM64)
     add_library(sse2neon INTERFACE)
     if (EXISTS "${VCPKG_INSTALLED_DIR}/include/sse2neon/sse2neon.h")
-	    set(SSE2NEON_INCLUDE_DIRS "${VCPKG_INSTALLED_DIR}/include")
-	    message(STATUS "Found sse2neon in vcpkg: ${SSE2NEON_INCLUDE_DIRS}")
-	    target_include_directories(sse2neon SYSTEM INTERFACE ${SSE2NEON_INCLUDE_DIRS})
-    else()
-	    find_path(SSE2NEON_INCLUDE_DIRS "sse2neon/sse2neon.h")
-	    if (SSE2NEON_INCLUDE_DIRS)
-		    message(STATUS "Found sse2neon: ${SSE2NEON_INCLUDE_DIRS}")
-		    target_include_directories(sse2neon SYSTEM INTERFACE ${SSE2NEON_INCLUDE_DIRS})
-	    else()
-		    message(WARNING "sse2neon not found, proceeding without it.")
-	    endif()
-    endif()
+        set(SSE2NEON_INCLUDE_DIRS "${VCPKG_INSTALLED_DIR}/include")
+        message(STATUS "Found sse2neon in vcpkg: ${SSE2NEON_INCLUDE_DIRS}")
+        target_include_directories(sse2neon SYSTEM INTERFACE ${SSE2NEON_INCLUDE_DIRS})
+    else ()
+        find_path(SSE2NEON_INCLUDE_DIRS "sse2neon/sse2neon.h")
+        if (SSE2NEON_INCLUDE_DIRS)
+            message(STATUS "Found sse2neon: ${SSE2NEON_INCLUDE_DIRS}")
+            target_include_directories(sse2neon SYSTEM INTERFACE ${SSE2NEON_INCLUDE_DIRS})
+        else ()
+            message(WARNING "sse2neon not found, proceeding without it.")
+        endif ()
+    endif ()
 endif ()
 find_package(tomlplusplus CONFIG REQUIRED)
 #find_package(turbobase64 CONFIG REQUIRED)
@@ -329,16 +329,9 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     endif ()
 
     set(CMAKE_DEBUG_POSTFIX "")
-
-else ()
-    message(FATAL_ERROR "Only support CMake build type: Debug, RelWithDebInfo, and Release")
 endif ()
 
-if (CLANG_VERSION_STRING VERSION_EQUAL 17)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wno-read-modules-implicitly -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics")
-else ()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics")
-endif ()
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics")
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
 
@@ -397,7 +390,6 @@ if (X86_64)
 else ()
     add_definitions(-march=native)
 endif ()
-
 execute_process(
         COMMAND bash -c "zgrep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y /proc/config.gz 2>/dev/null; grep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y /boot/config-$(uname -r) 2>/dev/null"
         OUTPUT_VARIABLE HAVE_EFFICIENT_UNALIGNED_ACCESS

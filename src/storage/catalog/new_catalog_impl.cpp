@@ -42,7 +42,7 @@ import :config;
 import :virtual_store;
 import :logger;
 import :utility;
-import :buffer_manager;
+
 import :infinity_context;
 import :fast_rough_filter;
 import :persistence_manager;
@@ -242,38 +242,6 @@ Status NewCatalog::DropFtIndexCacheByFtIndexCacheKey(const std::string &ft_index
     return Status::OK();
 }
 
-Status NewCatalog::AddSegmentUpdateTS(std::string segment_update_ts_key, std::shared_ptr<SegmentUpdateTS> segment_update_ts) {
-    bool insert_success = false;
-    std::unordered_map<std::string, std::shared_ptr<SegmentUpdateTS>>::iterator iter;
-    {
-        std::unique_lock lock(segment_update_ts_mtx_);
-        std::tie(iter, insert_success) = segment_update_ts_map_.emplace(std::move(segment_update_ts_key), std::move(segment_update_ts));
-    }
-    if (!insert_success) {
-        return Status::CatalogError(fmt::format("SegmentUpdateTS key: {} already exists", iter->first));
-    }
-    return Status::OK();
-}
-
-Status NewCatalog::GetSegmentUpdateTS(const std::string &segment_update_ts_key, std::shared_ptr<SegmentUpdateTS> &segment_update_ts) {
-    segment_update_ts = nullptr;
-    {
-        std::shared_lock<std::shared_mutex> lck(segment_update_ts_mtx_);
-        if (auto iter = segment_update_ts_map_.find(segment_update_ts_key); iter != segment_update_ts_map_.end()) {
-            segment_update_ts = iter->second;
-        }
-    }
-    if (segment_update_ts == nullptr) {
-        return Status::CatalogError(fmt::format("Get SegmentUpdateTS key: {} not found", segment_update_ts_key));
-    }
-    return Status::OK();
-}
-
-void NewCatalog::DropSegmentUpdateTSByKey(const std::string &segment_update_ts_key) {
-    std::unique_lock lock(segment_update_ts_mtx_);
-    segment_update_ts_map_.erase(segment_update_ts_key);
-}
-
 Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts,
                                   KVInstance *kv_instance,
                                   std::vector<std::shared_ptr<MetaKey>> &metas,
@@ -281,16 +249,15 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts,
     auto GetCleanedMetaImpl = [&](const std::vector<std::string> &keys) {
         const std::string &type_str = keys[1];
         const std::string &meta_str = keys[2];
-        auto meta_infos = infinity::Partition(meta_str, '/');
+        auto meta_infos = Partition(meta_str, '/');
         if (type_str == "db") {
             metas.emplace_back(std::make_shared<DBMetaKey>(std::move(meta_infos[2]), std::move(meta_infos[0]), std::stoull(meta_infos[1])));
         } else if (type_str == "tbl") {
-            std::shared_ptr<TableMetaKey> table_meta_key =
-                std::make_shared<TableMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[3]), std::move(meta_infos[1]));
+            auto table_meta_key = std::make_shared<TableMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[3]), std::move(meta_infos[1]));
             table_meta_key->commit_ts_ = std::stoull(meta_infos[2]);
             metas.emplace_back(std::move(table_meta_key));
         } else if (type_str == "tbl_name") {
-            std::shared_ptr<TableNameMetaKey> table_name_meta_key =
+            auto table_name_meta_key =
                 std::make_shared<TableNameMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[3]), std::move(meta_infos[1]));
             table_name_meta_key->commit_ts_ = std::stoull(meta_infos[2]);
             metas.emplace_back(std::move(table_name_meta_key));
@@ -302,7 +269,7 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts,
                                                               std::stoull(meta_infos[2]),
                                                               std::stoull(meta_infos[3])));
         } else if (type_str == "tbl_col") {
-            std::shared_ptr<TableColumnMetaKey> table_column_meta_key =
+            auto table_column_meta_key =
                 std::make_shared<TableColumnMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::move(meta_infos[2]));
             table_column_meta_key->commit_ts_ = std::stoull(meta_infos[3]);
             metas.emplace_back(std::move(table_column_meta_key));
@@ -313,10 +280,10 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts,
                                                                std::stoull(meta_infos[3]),
                                                                ColumnDef::FromJson(meta_infos[4])));
         } else if (type_str == "idx") {
-            std::shared_ptr<TableIndexMetaKey> table_index_meta_key = std::make_shared<TableIndexMetaKey>(std::move(meta_infos[0]),
-                                                                                                          std::move(meta_infos[1]),
-                                                                                                          std::move(meta_infos[4]),
-                                                                                                          std::move(meta_infos[2]));
+            auto table_index_meta_key = std::make_shared<TableIndexMetaKey>(std::move(meta_infos[0]),
+                                                                            std::move(meta_infos[1]),
+                                                                            std::move(meta_infos[4]),
+                                                                            std::move(meta_infos[2]));
             table_index_meta_key->commit_ts_ = std::stoull(meta_infos[3]);
             metas.emplace_back(std::move(table_index_meta_key));
         } else if (type_str == "idx_seg") {
@@ -338,12 +305,11 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts,
     static constexpr std::string drop_prefix = "drop";
     auto iter = kv_instance->GetIterator();
     iter->Seek(drop_prefix);
-    TxnTimeStamp drop_ts;
 
     while (iter->Valid() && iter->Key().starts_with(drop_prefix)) {
         std::string drop_key = iter->Key().ToString();
         std::string commit_ts_str = iter->Value().ToString();
-        drop_ts = std::stoull(commit_ts_str);
+        TxnTimeStamp drop_ts = std::stoull(commit_ts_str);
 
         if (drop_ts <= ts) {
             drop_keys.emplace_back(drop_key);
@@ -352,11 +318,11 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts,
     }
 
     for (const auto &drop_key : drop_keys) {
-        auto keys = infinity::Partition(drop_key, '|');
+        auto keys = Partition(drop_key, '|');
         GetCleanedMetaImpl(keys);
     }
     // Delete entities at lower hierarchy level first to avoid missing them when removing higher-level entities.
-    std::sort(metas.begin(), metas.end(), [&](const std::shared_ptr<MetaKey> &lhs, const std::shared_ptr<MetaKey> &rhs) {
+    std::ranges::sort(metas, [&](const std::shared_ptr<MetaKey> &lhs, const std::shared_ptr<MetaKey> &rhs) {
         return static_cast<size_t>(lhs->type_) > static_cast<size_t>(rhs->type_);
     });
     return Status::OK();

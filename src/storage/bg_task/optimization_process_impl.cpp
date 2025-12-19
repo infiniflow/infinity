@@ -59,7 +59,7 @@ void OptimizationProcessor::Start() {
 
 void OptimizationProcessor::Stop() {
     LOG_INFO("Optimization processor is stopping.");
-    std::shared_ptr<StopProcessorTask> stop_task = std::make_shared<StopProcessorTask>();
+    auto stop_task = std::make_shared<StopProcessorTask>();
     this->Submit(stop_task);
     stop_task->Wait();
     processor_thread_.join();

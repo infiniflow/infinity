@@ -54,8 +54,8 @@ private:
 
     Storage *storage_{};
 
-    mutable std::mutex mutex_{}; // protect obj_map_
-    std::unordered_map<std::string, std::shared_ptr<ObjStat>> obj_map_{};
+    mutable std::mutex mutex_; // protect obj_map_
+    std::unordered_map<std::string, std::shared_ptr<ObjStat>> obj_map_;
 };
 
 } // namespace infinity

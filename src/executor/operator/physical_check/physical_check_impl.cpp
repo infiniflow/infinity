@@ -114,7 +114,7 @@ void PhysicalCheck::ExecuteCheckSystem(QueryContext *query_context, CheckOperato
         }
         Value value = Value::MakeVarchar(data_mismatch_entry);
         ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         row_count++;
     }
     output_block_ptr->Finalize();
@@ -159,7 +159,7 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
         }
         Value value = Value::MakeVarchar(message);
         ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         output_block_ptr->Finalize();
         check_operator_state->output_.emplace_back(std::move(output_block_ptr));
         return;
@@ -191,7 +191,7 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
         }
         Value value = Value::MakeVarchar(message);
         ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         output_block_ptr->Finalize();
         check_operator_state->output_.emplace_back(std::move(output_block_ptr));
         return;
@@ -210,7 +210,7 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
         for (const auto &data_mismatch_entry : data_mismatch_entries) {
             Value value = Value::MakeVarchar(data_mismatch_entry);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
         }
     }
 

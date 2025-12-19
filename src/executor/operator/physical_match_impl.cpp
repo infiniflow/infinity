@@ -296,15 +296,15 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
             for (; column_id < column_n; ++column_id) {
                 output_to_data_block_helper
                     .AddOutputJobInfo(segment_id, block_id, column_ids[column_id], block_offset, output_block_idx, column_id, output_block_row_id);
-                output_block_ptr->column_vectors[column_id]->Finalize(output_block_ptr->column_vectors[column_id]->Size() + 1);
+                output_block_ptr->column_vectors_[column_id]->Finalize(output_block_ptr->column_vectors_[column_id]->Size() + 1);
             }
             Value v = Value::MakeFloat(score_result[output_id]);
-            output_block_ptr->column_vectors[column_id++]->AppendValue(v);
-            output_block_ptr->column_vectors[column_id]->AppendWith(row_id, 1);
+            output_block_ptr->column_vectors_[column_id++]->AppendValue(v);
+            output_block_ptr->column_vectors_[column_id]->AppendWith(row_id, 1);
             ++output_block_row_id;
         }
         output_block_ptr->Finalize();
-        output_to_data_block_helper.OutputToDataBlock(query_context->storage()->buffer_manager(),
+        output_to_data_block_helper.OutputToDataBlock(query_context->storage()->fileworker_manager(),
                                                       base_table_ref_->block_index_.get(),
                                                       output_data_blocks);
     }

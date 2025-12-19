@@ -48,8 +48,8 @@ void FragmentTask::OnExecute() {
     LOG_TRACE(fmt::format("Task: {} of Fragment: {} is running", task_id_, FragmentId()));
     //    infinity::BaseProfiler prof;
     //    prof.Begin();
-    FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
-    QueryContext *query_context = fragment_context->query_context();
+    auto *fragment_context = (FragmentContext *)fragment_context_;
+    auto *query_context = fragment_context->query_context();
     //    bool enable_profiler = InfinityContext::instance().storage()->catalog()->GetProfile();
     bool explain_analyze = query_context->explain_analyze();
     // TODO:
@@ -67,7 +67,7 @@ void FragmentTask::OnExecute() {
 
     bool execute_success{false};
     source_op->Execute(query_context, source_state_.get());
-    Status operator_status{};
+    Status operator_status;
     if (source_state_->status_.ok()) {
         // No source error
         std::vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();

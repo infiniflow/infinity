@@ -80,6 +80,7 @@ void MemIndex::ClearMemIndex() {
     memory_bmp_index_.reset();
 
     is_dumping_ = false;
+    is_cleared_ = true;
 }
 
 const BaseMemIndex *MemIndex::GetBaseMemIndex() const {

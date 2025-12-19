@@ -81,7 +81,7 @@ std::shared_ptr<ObjStat> ObjectStats::Release(const std::string &key) {
 }
 
 void ObjectStats::PutNew(const std::string &key, const std::shared_ptr<ObjStat> &obj_stat) {
-    this->AddObjStatToKVStore(key, obj_stat);
+    AddObjStatToKVStore(key, obj_stat);
 
     std::unique_lock<std::mutex> lock(mutex_);
     obj_stat->cached_ = ObjCached::kCached;
@@ -90,7 +90,7 @@ void ObjectStats::PutNew(const std::string &key, const std::shared_ptr<ObjStat> 
 
 void ObjectStats::PutNoCount(const std::string &key, std::shared_ptr<ObjStat> obj_stat) {
     obj_stat->cached_ = ObjCached::kCached;
-    this->AddObjStatToKVStore(key, obj_stat); // obj_stat->ref_count_ isn't update if key can be found in obj_map_
+    AddObjStatToKVStore(key, obj_stat); // obj_stat->ref_count_ isn't update if key can be found in obj_map_
 
     std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
@@ -110,7 +110,7 @@ std::shared_ptr<ObjStat> ObjectStats::Invalidate(const std::string &key) {
     std::shared_ptr<ObjStat> obj_stat = std::move(iter->second);
     obj_map_.erase(iter);
 
-    this->RemoveObjStatFromKVStore(key);
+    RemoveObjStatFromKVStore(key);
     return obj_stat;
 }
 
@@ -122,7 +122,7 @@ void ObjectStats::CheckValid(size_t current_object_size) {
 }
 
 void ObjectStats::Deserialize(KVInstance *kv_instance) {
-    const std::string &obj_stat_prefix = KeyEncode::PMObjectStatPrefix();
+    const auto &obj_stat_prefix = KeyEncode::PMObjectStatPrefix();
     size_t obj_stat_prefix_len = obj_stat_prefix.size();
 
     auto iter = kv_instance->GetIterator();
@@ -131,7 +131,7 @@ void ObjectStats::Deserialize(KVInstance *kv_instance) {
     while (iter->Valid() && iter->Key().starts_with(obj_stat_prefix)) {
         std::string obj_key = iter->Key().ToString().substr(obj_stat_prefix_len);
         std::string obj_value = iter->Value().ToString();
-        std::shared_ptr<ObjStat> obj_stat = std::make_shared<ObjStat>();
+        auto obj_stat = std::make_shared<ObjStat>();
         obj_stat->Deserialize(obj_value);
         obj_stat->cached_ = ObjCached::kCached;
         LOG_TRACE(fmt::format("Deserialize added object {}", obj_key));
@@ -149,7 +149,7 @@ void ObjectStats::AddObjStatToKVStore(const std::string &key, const std::shared_
     if (key == "KEY_EMPTY") {
         return;
     }
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    auto *pm = InfinityContext::instance().persistence_manager();
     if (!pm) {
         return;
     }
@@ -164,7 +164,7 @@ void ObjectStats::AddObjStatToKVStore(const std::string &key, const std::shared_
 }
 
 void ObjectStats::RemoveObjStatFromKVStore(const std::string &key) {
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    auto *pm = InfinityContext::instance().persistence_manager();
     if (!pm) {
         return;
     }

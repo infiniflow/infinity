@@ -22,36 +22,36 @@ using namespace infinity;
 export class NewReplayTest : public BaseTestParamStr {
 protected:
     void RestartTxnMgr() {
-        new_txn_mgr->PrintAllKeyValue();
+        new_txn_mgr_->PrintAllKeyValue();
         infinity::InfinityContext::instance().UnInit();
 
         InfinityContext::instance().InitPhase1(this->config_path);
         InfinityContext::instance().InitPhase2();
-        new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+        new_txn_mgr_ = infinity::InfinityContext::instance().storage()->new_txn_manager();
         wal_manager_ = infinity::InfinityContext::instance().storage()->wal_manager();
 
-        new_txn_mgr->PrintAllKeyValue();
+        new_txn_mgr_->PrintAllKeyValue();
     }
 
     void UninitTxnMgr() {
-        new_txn_mgr->PrintAllKeyValue();
+        new_txn_mgr_->PrintAllKeyValue();
         infinity::InfinityContext::instance().UnInit();
-        new_txn_mgr = nullptr;
+        new_txn_mgr_ = nullptr;
     }
 
     void InitTxnMgr() {
         InfinityContext::instance().InitPhase1(this->config_path);
         InfinityContext::instance().InitPhase2();
-        new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+        new_txn_mgr_ = infinity::InfinityContext::instance().storage()->new_txn_manager();
         wal_manager_ = infinity::InfinityContext::instance().storage()->wal_manager();
     }
 
     void SetUp() override {
         BaseTestParamStr::SetUp();
-        new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+        new_txn_mgr_ = infinity::InfinityContext::instance().storage()->new_txn_manager();
         wal_manager_ = infinity::InfinityContext::instance().storage()->wal_manager();
     }
 
     WalManager *wal_manager_{};
-    NewTxnManager *new_txn_mgr{};
+    NewTxnManager *new_txn_mgr_{};
 };

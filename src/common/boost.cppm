@@ -14,12 +14,15 @@
 
 module;
 
+#define BOOST_NO_AUTO_PTR ;
+
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/read.hpp>
 #include <boost/asio/write.hpp>
 #include <boost/bind/bind.hpp>
 #include <boost/dynamic_bitset.hpp>
+#include <boost/thread.hpp>
 
 export module infinity_core:boost;
 
@@ -29,6 +32,11 @@ export using boost::system::error_code;
 }
 export using boost::bind;
 export using boost::dynamic_bitset;
+export using boost::upgrade_lock;
+export using boost::upgrade_to_unique_lock;
+export using boost::shared_mutex;
+export using boost::unique_lock;
+// export using boost::mutex;
 namespace asio {
 export using boost::asio::io_context;
 export using boost::asio::read;
@@ -47,3 +55,9 @@ export using boost::asio::error::connection_reset;
 } // namespace error
 } // namespace asio
 } // namespace boost
+
+// export namespace boost {
+// using boost::defer_lock_t;
+// // using boost::defer_lock;
+// // using BOOST_CONSTEXPR_OR_CONST defer_lock_t defer_lock = {};
+// } // namespace boost

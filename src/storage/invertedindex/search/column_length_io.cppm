@@ -20,8 +20,6 @@ export module infinity_core:column_length_io;
 
 import :index_defines;
 import :memory_indexer;
-import :buffer_obj;
-import :buffer_handle;
 import :column_index_reader;
 
 import internal_types;
@@ -29,6 +27,7 @@ import internal_types;
 namespace infinity {
 class FileSystem;
 struct ColumnReaderChunkInfo;
+class RawFileWorker;
 
 export class FullTextColumnLengthReader {
 public:
@@ -37,9 +36,9 @@ public:
     ~FullTextColumnLengthReader();
 
     inline u32 GetColumnLength(RowID row_id) {
-        if (row_id >= current_chunk_base_rowid_ && row_id < current_chunk_base_rowid_ + current_chunk_row_count_) [[likely]] {
+        if (row_id >= current_chunk_base_rowid_ && row_id < current_chunk_base_rowid_ + current_chunk_row_count_) {
             assert(column_lengths_ != nullptr);
-            return column_lengths_[row_id - current_chunk_base_rowid_];
+            return reinterpret_cast<u32 *>(column_lengths_.get())[row_id - current_chunk_base_rowid_];
         }
         if (memory_indexer_.get() != nullptr) {
             RowID base_rowid = memory_indexer_->GetBeginRowID();
@@ -56,15 +55,15 @@ public:
 private:
     u32 SeekFile(RowID row_id);
     const std::string &index_dir_;
-    std::vector<ColumnReaderChunkInfo> chunk_index_meta_infos_{}; // must in ascending order
-    std::shared_ptr<MemoryIndexer> memory_indexer_{};
+    std::vector<ColumnReaderChunkInfo> chunk_index_meta_infos_; // must in ascending order
+    std::shared_ptr<MemoryIndexer> memory_indexer_;
     size_t chunk_doc_cnt_{};
     size_t chunk_term_cnt_{};
 
-    const u32 *column_lengths_{nullptr};
+    std::shared_ptr<char[]> column_lengths_;
     RowID current_chunk_base_rowid_{(u64)0};
-    u32 current_chunk_row_count_{0};
-    BufferHandle current_chunk_buffer_handle_{};
+    u32 current_chunk_row_count_{};
+    IndexFileWorker *current_chunk_file_worker_{};
 };
 
 } // namespace infinity

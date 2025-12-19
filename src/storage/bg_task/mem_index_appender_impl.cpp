@@ -55,7 +55,7 @@ void MemIndexAppender::Start() {
 
 void MemIndexAppender::Stop() {
     LOG_INFO("Mem index appender is stopping.");
-    std::shared_ptr<StopProcessorTask> stop_task = std::make_shared<StopProcessorTask>();
+    auto stop_task = std::make_shared<StopProcessorTask>();
     this->Submit(stop_task);
     stop_task->Wait();
     processor_thread_.join();
@@ -70,8 +70,8 @@ void MemIndexAppender::Submit(std::shared_ptr<BGTask> bg_task) {
 void MemIndexAppender::Process() {
     std::deque<std::shared_ptr<BGTask>> tasks;
     StopProcessorTask *stop_task_{};
-    std::vector<MemoryIndexer *> memory_indexers;
-    std::unordered_map<MemoryIndexer *, std::shared_ptr<AppendMemIndexBatch>> memory_indexer_map;
+    std::vector<std::shared_ptr<MemoryIndexer>> memory_indexers;
+    std::unordered_map<std::shared_ptr<MemoryIndexer>, std::shared_ptr<AppendMemIndexBatch>> memory_indexer_map;
     while (true) {
         task_queue_.DequeueBulk(tasks);
 
@@ -88,16 +88,17 @@ void MemIndexAppender::Process() {
                     }
                     if (storage_mode == StorageMode::kWritable) {
                         auto append_mem_index_task = static_cast<AppendMemIndexTask *>(bg_task.get());
-                        std::shared_ptr<MemoryIndexer> memory_indexer = append_mem_index_task->mem_index_->GetFulltextIndex();
+                        auto memory_indexer = append_mem_index_task->mem_index_->GetFulltextIndex();
+                        // std::println("#########{}", append_mem_index_task->input_column_->ToString());
                         if (memory_indexer == nullptr) {
                             // Only used for full text index, currently
                             UnrecoverableError("Not inverted index");
                         }
-                        if (memory_indexer_map.find(memory_indexer.get()) == memory_indexer_map.end()) {
-                            memory_indexers.push_back(memory_indexer.get());
-                            memory_indexer_map.emplace(memory_indexer.get(), std::make_shared<AppendMemIndexBatch>());
+                        if (!memory_indexer_map.contains(memory_indexer)) {
+                            memory_indexers.push_back(memory_indexer);
+                            memory_indexer_map.emplace(memory_indexer, std::make_shared<AppendMemIndexBatch>());
                         }
-                        AppendMemIndexBatch *append_mem_index_batch = memory_indexer_map[memory_indexer.get()].get();
+                        auto *append_mem_index_batch = memory_indexer_map[memory_indexer].get();
                         append_mem_index_batch->InsertTask(append_mem_index_task);
                         memory_indexer->AsyncInsertBottom(append_mem_index_task->input_column_,
                                                           append_mem_index_task->offset_,
@@ -116,8 +117,11 @@ void MemIndexAppender::Process() {
         }
 
         for (auto memory_indexer : memory_indexers) {
-            AppendMemIndexBatch *append_mem_index_batch = memory_indexer_map[memory_indexer].get();
+            auto *append_mem_index_batch = memory_indexer_map[memory_indexer].get();
             append_mem_index_batch->WaitForCompletion();
+            if (append_mem_index_batch->append_tasks_[0]->mem_index_->IsCleared()) {
+                continue;
+            }
             memory_indexer->CommitSync();
             for (auto &append_task : append_mem_index_batch->append_tasks_) {
                 append_task->Complete();

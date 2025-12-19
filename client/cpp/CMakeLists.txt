@@ -26,7 +26,8 @@ target_link_libraries(
         infinity_client_test
         infinity_client
         thrift::thrift
-        ${STDCXX15EXP_STATIC}
+#        ${STDCXX15EXP_STATIC}
+        libstdc++exp.a
 )
 
 target_include_directories(infinity_client_test PUBLIC "${CMAKE_SOURCE_DIR}/src/network/infinity_thrift")

@@ -89,16 +89,23 @@ class TestCleanup:
             if cleanup_flush:
                 infinity_obj.cleanup()
                 infinity_obj.flush_data()
+
+                # check
+                dropped_dirs = pathlib.Path(data_dir).rglob(f"*tbl_{table_id}*")
+                assert len(list(dropped_dirs)) == 1
+
+                dropped_dirs = pathlib.Path(data_dir).rglob(f"*tbl_{table2_id}*")
+                assert len(list(dropped_dirs)) == 1
             else:
                 infinity_obj.flush_data()
                 infinity_obj.cleanup()
 
-            # check
-            dropped_dirs = pathlib.Path(data_dir).rglob(f"*tbl_{table_id}*")
-            assert len(list(dropped_dirs)) == 0
+                # check
+                dropped_dirs = pathlib.Path(data_dir).rglob(f"*tbl_{table_id}*")
+                assert len(list(dropped_dirs)) == 0
 
-            dropped_dirs = pathlib.Path(data_dir).rglob(f"*tbl_{table2_id}*")
-            assert len(list(dropped_dirs)) == 1
+                dropped_dirs = pathlib.Path(data_dir).rglob(f"*tbl_{table2_id}*")
+                assert len(list(dropped_dirs)) == 1
 
             db_obj.drop_table(table_name2, ConflictType.Error)
 

@@ -171,10 +171,10 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
         }
     }
 
-    std::vector<std::shared_ptr<LogicalNode>> logical_plans{};
-    std::vector<std::unique_ptr<PhysicalOperator>> physical_plans{};
-    std::shared_ptr<PlanFragment> plan_fragment{};
-    std::unique_ptr<Notifier> notifier{};
+    std::vector<std::shared_ptr<LogicalNode>> logical_plans;
+    std::vector<std::unique_ptr<PhysicalOperator>> physical_plans;
+    std::shared_ptr<PlanFragment> plan_fragment;
+    std::unique_ptr<Notifier> notifier;
 
     query_id_ = session_ptr_->query_count();
     //    ProfilerStart("Query");
@@ -185,7 +185,7 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
         if (global_config_->RecordRunningQuery()) {
             bool add_record_flag = false;
             if (base_statement->type_ == StatementType::kShow) {
-                const ShowStatement *show_statement = static_cast<const ShowStatement *>(base_statement);
+                auto show_statement = static_cast<const ShowStatement *>(base_statement);
                 ShowStmtType show_type = show_statement->show_type_;
                 if (show_type != ShowStmtType::kQueries and show_type != ShowStmtType::kQuery) {
                     add_record_flag = true;
@@ -261,13 +261,13 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
         StopProfile(QueryPhase::kExecution);
         //        LOG_WARN(fmt::format("Before commit cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kCommit);
-        this->CommitTxn();
+        CommitTxn();
         StopProfile(QueryPhase::kCommit);
 
     } catch (RecoverableException &e) {
 
         // If txn has been rollbacked, do not rollback again here.
-        NewTxn *new_txn = this->GetNewTxn();
+        NewTxn *new_txn = GetNewTxn();
         if (new_txn != nullptr) {
             StopProfile();
             StartProfile(QueryPhase::kRollback);

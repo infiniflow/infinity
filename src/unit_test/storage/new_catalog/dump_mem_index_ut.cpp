@@ -28,8 +28,6 @@ import :value;
 import :kv_code;
 import :kv_store;
 import :new_txn;
-import :buffer_obj;
-import :buffer_handle;
 import :secondary_index_in_mem;
 import :secondary_index_data;
 import :segment_meta;
@@ -67,7 +65,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
     using namespace infinity;
 
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
@@ -237,8 +235,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -287,8 +285,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -775,8 +773,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -825,8 +823,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -1153,9 +1151,9 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
+    auto default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
     default_varchar->str_value_ = strdup("");
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     //    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto column3_type_info = std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 4);
@@ -1391,8 +1389,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -1441,8 +1439,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -2024,8 +2022,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -2074,8 +2072,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -2617,8 +2615,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -2667,8 +2665,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -3165,8 +3163,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -3215,8 +3213,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -3448,8 +3446,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -3498,8 +3496,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -4001,8 +3999,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -4051,8 +4049,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -4102,8 +4100,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -4152,8 +4150,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -4752,8 +4750,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -4802,8 +4800,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -4847,8 +4845,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -5358,8 +5356,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -5764,7 +5762,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
     }
 }
 
-TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
+TEST_P(TestTxnDumpMemIndex, SLOW_dump_and_dump) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -5953,8 +5951,8 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -6003,8 +6001,8 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        IndexFileWorker *file_worker{};
+        status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -6257,7 +6255,7 @@ TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_dump_and_dump) {
     }
 }
 
-TEST_P(TestTxnDumpMemIndex, DISABLED_SLOW_test_dump_index_and_optimize_index) {
+TEST_P(TestTxnDumpMemIndex, SLOW_test_dump_index_and_optimize_index) {
 
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();

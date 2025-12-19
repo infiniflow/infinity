@@ -110,9 +110,8 @@ private:
 };
 
 struct MatchTensorRerankDoc;
-class BufferManager;
 export void CalculateFusionMatchTensorRerankerScores(std::vector<MatchTensorRerankDoc> &rerank_docs,
-                                                     BufferManager *buffer_mgr,
+                                                     FileWorkerManager *fileworker_mgr,
                                                      const DataType *column_data_type,
                                                      ColumnID column_id,
                                                      const BlockIndex *block_index,

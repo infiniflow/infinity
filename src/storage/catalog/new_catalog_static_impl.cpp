@@ -42,6 +42,8 @@ import :scalar_function_set;
 import :special_function;
 import :meta_cache;
 import :utility;
+// import :file_worker;
+import :version_file_worker;
 import :index_secondary;
 import :memory_indexer;
 
@@ -62,16 +64,17 @@ namespace infinity {
 // } // namespace
 
 void NewTxnGetVisibleRangeState::Init(std::shared_ptr<BlockLock> block_lock,
-                                      BufferHandle version_buffer_handle,
+                                      VersionFileWorker *version_file_worker,
                                       TxnTimeStamp begin_ts,
                                       TxnTimeStamp commit_ts) {
     block_lock_ = std::move(block_lock);
-    version_buffer_handle_ = std::move(version_buffer_handle);
+    version_file_worker_ = std::move(version_file_worker);
     begin_ts_ = begin_ts;
     commit_ts_ = commit_ts;
     {
         std::shared_lock<std::shared_mutex> lock(block_lock_->mtx_);
-        const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer_handle_.GetData());
+        std::shared_ptr<BlockVersion> block_version;
+        static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
         block_offset_end_ = block_version->GetRowCount(begin_ts_);
     }
 }
@@ -81,7 +84,8 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, std::pair<
         return false;
     }
 
-    const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer_handle_.GetData());
+    std::shared_ptr<BlockVersion> block_version;
+    static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
 
     if (block_offset_begin == block_offset_end_) {
         auto [offset, commit_cnt] = block_version->GetCommitRowCount(commit_ts_);
@@ -145,7 +149,7 @@ Status NewCatalog::InitCatalog(MetaCache *meta_cache, KVInstance *kv_instance, T
                 return status;
             }
         }
-        return block_meta.LoadSet(checkpoint_ts);
+        return block_meta.InitOrLoadSet(checkpoint_ts);
     };
     auto InitSegment = [&](SegmentMeta &segment_meta) {
         auto [block_ids, blocks_status] = segment_meta.GetBlockIDs1();
@@ -498,8 +502,8 @@ Status NewCatalog::CleanTable(TableMeta &table_meta, TxnTimeStamp begin_ts, Usag
 
     Status status;
 
-    std::vector<std::string> *index_id_strs_ptr = nullptr;
-    std::vector<std::string> *index_names_ptr = nullptr;
+    std::vector<std::string> *index_id_strs_ptr{};
+    std::vector<std::string> *index_names_ptr{};
     status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
     if (!status.ok()) {
         return status;
@@ -508,7 +512,7 @@ Status NewCatalog::CleanTable(TableMeta &table_meta, TxnTimeStamp begin_ts, Usag
         const std::string &index_id_str = (*index_id_strs_ptr)[i];
         const std::string &index_name_str = (*index_names_ptr)[i];
         TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
-        status = NewCatalog::CleanTableIndex(table_index_meta, usage_flag);
+        status = CleanTableIndex(table_index_meta, usage_flag);
         if (!status.ok()) {
             return status;
         }
@@ -569,7 +573,7 @@ Status NewCatalog::CleanTableIndex(TableIndexMeta &table_index_meta, UsageFlag u
     }
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-        status = NewCatalog::CleanSegmentIndex(segment_index_meta, usage_flag);
+        status = CleanSegmentIndex(segment_index_meta, usage_flag);
         if (!status.ok()) {
             return status;
         }
@@ -666,15 +670,13 @@ Status NewCatalog::CleanSegment(SegmentMeta &segment_meta, TxnTimeStamp commit_t
 // }
 
 Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, std::optional<BlockMeta> &block_meta) {
-    Status status;
 
-    BlockID block_id;
-    std::tie(block_id, status) = segment_meta.AddBlockID1(commit_ts);
+    auto [block_id, status] = segment_meta.AddBlockID1(commit_ts);
     if (!status.ok()) {
         return status;
     }
     block_meta.emplace(block_id, segment_meta);
-    status = block_meta->InitSet();
+    status = block_meta->InitOrLoadSet();
     if (!status.ok()) {
         return status;
     }
@@ -690,6 +692,7 @@ Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_t
     for (size_t column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
         std::shared_ptr<ColumnDef> &col_def = column_defs_ptr->at(column_idx);
         ColumnMeta column_meta(column_idx, *block_meta);
+        [[maybe_unused]] FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
         status = column_meta.InitSet(col_def);
         if (!status.ok()) {
             return status;
@@ -704,7 +707,7 @@ Status NewCatalog::LoadImportedOrCompactedSegment(TableMeta &table_meta, const W
         SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
         std::optional<BlockMeta> block_meta;
         block_meta.emplace(block_id, segment_meta);
-        Status status = block_meta->LoadSet(commit_ts);
+        Status status = block_meta->InitOrLoadSet(commit_ts);
         if (!status.ok()) {
             return status;
         }
@@ -765,7 +768,7 @@ Status NewCatalog::AddNewBlockWithID(SegmentMeta &segment_meta, TxnTimeStamp com
         return status;
     }
     block_meta.emplace(block_id, segment_meta);
-    status = block_meta->InitSet();
+    status = block_meta->InitOrLoadSet();
     if (!status.ok()) {
         return status;
     }
@@ -801,7 +804,7 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
     }
 
     BlockMeta block_meta(block_id, segment_meta);
-    status = block_meta.LoadSet(checkpoint_ts);
+    status = block_meta.InitOrLoadSet(checkpoint_ts);
     if (!status.ok()) {
         return status;
     }
@@ -816,7 +819,6 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
     }
     for (const auto &column_def : *column_defs_ptr) {
         ColumnMeta column_meta(column_def->id(), block_meta);
-
         status = column_meta.LoadSet();
         if (!status.ok()) {
             return status;
@@ -830,19 +832,17 @@ Status NewCatalog::CleanBlock(BlockMeta &block_meta, UsageFlag usage_flag) {
                           block_meta.segment_meta().table_meta().table_id_str(),
                           block_meta.segment_meta().segment_id(),
                           block_meta.block_id()));
-    block_meta.RestoreSet();
-    Status status;
-    std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs_ptr;
+    block_meta.InitOrLoadSet();
 
-    TableMeta &table_meta = block_meta.segment_meta().table_meta();
-    std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
+    auto &table_meta = block_meta.segment_meta().table_meta();
+    auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
     if (!status.ok()) {
         return status;
     }
 
     for (const auto &column_def : *column_defs_ptr) {
         ColumnMeta column_meta(column_def->id(), block_meta);
-        status = NewCatalog::CleanBlockColumn(column_meta, column_def.get(), usage_flag);
+        status = NewCatalog::CleanBlockColumn(column_meta, column_def, usage_flag);
         if (!status.ok()) {
             return status;
         }
@@ -866,16 +866,14 @@ Status NewCatalog::AddNewBlockColumn(BlockMeta &block_meta,
     return Status::OK();
 }
 
-Status NewCatalog::CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag) {
+Status NewCatalog::CleanBlockColumn(ColumnMeta &column_meta, const std::shared_ptr<ColumnDef> &column_def, UsageFlag usage_flag) {
     LOG_TRACE(fmt::format("CleanBlockColumn: cleaning table id: {}, segment_id: {}, block_id: {}, column_id: {}",
                           column_meta.block_meta().segment_meta().table_meta().table_id_str(),
                           column_meta.block_meta().segment_meta().segment_id(),
                           column_meta.block_meta().block_id(),
                           column_def->id()));
-    column_meta.RestoreSet(column_def);
-    Status status;
-
-    status = column_meta.UninitSet(column_def, usage_flag);
+    column_meta.InitSet(column_def);
+    auto status = column_meta.UninitSet(column_def, usage_flag);
     if (!status.ok()) {
         return status;
     }
@@ -912,7 +910,7 @@ Status NewCatalog::RestoreNewSegmentIndex1(TableIndexMeta &table_index_meta,
     }
 
     segment_index_meta.emplace(segment_id, table_index_meta);
-    status = segment_index_meta->RestoreSet(next_chunk_id);
+    status = segment_index_meta->InitSet(next_chunk_id);
     if (!status.ok()) {
         return status;
     }
@@ -926,8 +924,8 @@ Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, Usage
                           segment_index_meta.table_index_meta().index_id_str()));
     if (usage_flag != UsageFlag::kTransform) {
         // Invalidate the fulltext index cache for this segment
-        TableMeta &table_meta = segment_index_meta.table_index_meta().table_meta();
-        Status status = table_meta.InvalidateFtIndexCache();
+        auto &table_meta = segment_index_meta.table_index_meta().table_meta();
+        auto status = table_meta.InvalidateFtIndexCache();
         if (!status.ok()) {
             return status;
         }
@@ -953,9 +951,9 @@ Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, Usage
     if (!status.ok()) {
         return status;
     }
-    for (ChunkID chunk_id : *chunk_ids_ptr) {
+    for (auto chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-        status = NewCatalog::CleanChunkIndex(chunk_index_meta, usage_flag);
+        status = CleanChunkIndex(chunk_index_meta, usage_flag);
         if (!status.ok()) {
             return status;
         }
@@ -1073,10 +1071,8 @@ Status NewCatalog::CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UsageFlag u
                           chunk_index_meta.segment_index_meta().segment_id(),
                           chunk_index_meta.segment_index_meta().table_index_meta().index_id_str(),
                           chunk_index_meta.chunk_id()));
-    chunk_index_meta.RestoreSet();
-    Status status;
-
-    status = chunk_index_meta.UninitSet(usage_flag);
+    chunk_index_meta.LoadSet();
+    auto status = chunk_index_meta.UninitSet(usage_flag);
     if (!status.ok()) {
         return status;
     }
@@ -1090,25 +1086,25 @@ Status NewCatalog::GetColumnVector(ColumnMeta &column_meta,
                                    ColumnVector &column_vector) {
     std::shared_ptr<DataType> column_type = col_def->type();
 
-    BufferObj *buffer_obj = nullptr;
-    BufferObj *outline_buffer_obj = nullptr;
-    Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
+    DataFileWorker *data_file_worker{};
+    VarFileWorker *var_file_worker{};
+    Status status = column_meta.GetFileWorker(data_file_worker, var_file_worker);
     if (!status.ok()) {
         return status;
     }
 
     column_vector = ColumnVector(column_type);
-    column_vector.Initialize(buffer_obj, outline_buffer_obj, row_count, tipe);
+    // file_worker->file_worker()->ReadFromFile(true);
+    column_vector.Initialize(data_file_worker, var_file_worker, row_count, tipe);
     return Status::OK();
 }
 
 Status NewCatalog::GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, NewTxnGetVisibleRangeState &state) {
-    auto [version_buffer, status] = block_meta.GetVersionBuffer();
+    auto [version_file_worker, status] = block_meta.GetVersionFileWorker();
     if (!status.ok()) {
         return status;
     }
 
-    BufferHandle buffer_handle = version_buffer->Load();
     std::shared_ptr<BlockLock> block_lock;
     {
         status = block_meta.GetBlockLock(block_lock);
@@ -1116,7 +1112,7 @@ Status NewCatalog::GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begi
             return status;
         }
     }
-    state.Init(std::move(block_lock), std::move(buffer_handle), begin_ts, commit_ts);
+    state.Init(std::move(block_lock), std::move(version_file_worker), begin_ts, commit_ts);
     return Status::OK();
 }
 
@@ -1124,7 +1120,7 @@ Status NewCatalog::GetCreateTSVector(BlockMeta &block_meta, size_t offset, size_
     column_vector = ColumnVector(std::make_shared<DataType>(LogicalType::kBigInt));
     column_vector.Initialize(ColumnVectorType::kFlat, size);
 
-    auto [version_buffer, status] = block_meta.GetVersionBuffer();
+    auto [version_buffer, status] = block_meta.GetVersionFileWorker();
     if (!status.ok()) {
         return status;
     }
@@ -1134,8 +1130,8 @@ Status NewCatalog::GetCreateTSVector(BlockMeta &block_meta, size_t offset, size_
         return status;
     }
 
-    BufferHandle buffer_handle = version_buffer->Load();
-    const auto *block_version = reinterpret_cast<const BlockVersion *>(buffer_handle.GetData());
+    std::shared_ptr<BlockVersion> block_version;
+    static_cast<FileWorker *>(version_buffer)->Read(block_version);
     {
         std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
         block_version->GetCreateTS(offset, size, column_vector);
@@ -1147,7 +1143,7 @@ Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, size_t offset, size_
     column_vector = ColumnVector(std::make_shared<DataType>(LogicalType::kBigInt));
     column_vector.Initialize(ColumnVectorType::kFlat, size);
 
-    auto [version_buffer, status] = block_meta.GetVersionBuffer();
+    auto [version_file_worker, status] = block_meta.GetVersionFileWorker();
     if (!status.ok()) {
         return status;
     }
@@ -1157,8 +1153,8 @@ Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, size_t offset, size_
         return status;
     }
 
-    BufferHandle buffer_handle = version_buffer->Load();
-    const auto *block_version = reinterpret_cast<const BlockVersion *>(buffer_handle.GetData());
+    std::shared_ptr<BlockVersion> block_version;
+    static_cast<FileWorker *>(version_file_worker)->Read(block_version);
     {
         std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
         block_version->GetDeleteTS(offset, size, column_vector);

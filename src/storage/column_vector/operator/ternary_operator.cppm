@@ -33,16 +33,16 @@ public:
                                void *state_ptr,
                                bool nullable) {
 
-        const auto *first_ptr = (const FirstType *)(first->data());
+        const auto *first_ptr = (const FirstType *)(first->data().get());
         const std::shared_ptr<Bitmask> &first_null = first->nulls_ptr_;
 
-        const auto *second_ptr = (const SecondType *)(second->data());
+        const auto *second_ptr = (const SecondType *)(second->data()).get();
         const std::shared_ptr<Bitmask> &second_null = second->nulls_ptr_;
 
-        const auto *third_ptr = (const ThirdType *)(third->data());
+        const auto *third_ptr = (const ThirdType *)(third->data().get());
         const std::shared_ptr<Bitmask> &third_null = second->nulls_ptr_;
 
-        auto *result_ptr = (ResultType *)(result->data());
+        auto *result_ptr = (ResultType *)(result->data().get());
         std::shared_ptr<Bitmask> &result_null = result->nulls_ptr_;
 
         // 8 cases for first/second/third
