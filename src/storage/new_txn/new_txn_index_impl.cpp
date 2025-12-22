@@ -1254,14 +1254,14 @@ Status NewTxn::PopulateIvfIndexInner(std::shared_ptr<IndexBase> index_base,
     IndexFileWorker *index_file_worker{};
     {
         status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
-                                                      this,
-                                                      chunk_id,
-                                                      base_row_id,
-                                                      row_count,
-                                                      0 /*term_count*/,
-                                                      "" /*base_name*/,
-                                                      0 /*index_size*/,
-                                                      chunk_index_meta);
+                                               this,
+                                               chunk_id,
+                                               base_row_id,
+                                               row_count,
+                                               0 /*term_count*/,
+                                               "" /*base_name*/,
+                                               0 /*index_size*/,
+                                               chunk_index_meta);
         if (!status.ok()) {
             return status;
         }
@@ -1304,14 +1304,14 @@ Status NewTxn::PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
     {
         std::optional<ChunkIndexMeta> chunk_index_meta;
         status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
-                                                      this,
-                                                      chunk_id,
-                                                      base_row_id,
-                                                      row_count,
-                                                      0 /*term_count*/,
-                                                      "" /*base_name*/,
-                                                      0 /*index_size*/,
-                                                      chunk_index_meta);
+                                               this,
+                                               chunk_id,
+                                               base_row_id,
+                                               row_count,
+                                               0 /*term_count*/,
+                                               "" /*base_name*/,
+                                               0 /*index_size*/,
+                                               chunk_index_meta);
         status = chunk_index_meta->GetFileWorker(index_file_worker);
         if (!status.ok()) {
             return status;
@@ -2065,7 +2065,8 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta,
             if (!status.ok() || block_row_cnt == block_offset) {
                 return status;
             }
-            append_ranges.emplace_back(RowID(segment_id, (static_cast<u32>(block_id) << BLOCK_OFFSET_SHIFT) + block_offset), block_row_cnt - block_offset);
+            append_ranges.emplace_back(RowID(segment_id, (static_cast<u32>(block_id) << BLOCK_OFFSET_SHIFT) + block_offset),
+                                       block_row_cnt - block_offset);
             block_offset = 0;
         }
     }
