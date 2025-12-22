@@ -40,11 +40,12 @@ public:
     static bool check_json_path(const std::string_view &json_path);
     static std::tuple<bool, std::vector<std::string>> get_json_tokens(const std::string &json_path);
 
-    static std::tuple<bool, std::string> json_extract(const JsonTypeDef &data, const std::vector<std::string> &tokens);
-    static std::tuple<bool, IntegerT> json_extract_int(const JsonTypeDef &data, const std::vector<std::string> &tokens);
-    static std::tuple<bool, DoubleT> json_extract_double(const JsonTypeDef &data, const std::vector<std::string> &tokens);
-    static std::tuple<bool, BooleanT> json_extract_bool(const JsonTypeDef &data, const std::vector<std::string> &tokens);
-    static std::tuple<bool, BooleanT> json_extract_is_null(const JsonTypeDef &data, const std::vector<std::string> &tokens);
+    static std::tuple<bool, std::string> json_extract(JsonTypeDef &data, const std::vector<std::string> &tokens);
+    static std::tuple<bool, IntegerT> json_extract_int(JsonTypeDef &data, const std::vector<std::string> &tokens);
+    static std::tuple<bool, DoubleT> json_extract_double(JsonTypeDef &data, const std::vector<std::string> &tokens);
+    static std::tuple<bool, BooleanT> json_extract_bool(JsonTypeDef &data, const std::vector<std::string> &tokens);
+    static std::tuple<bool, BooleanT> json_extract_is_null(JsonTypeDef &data, const std::vector<std::string> &tokens);
+    static std::tuple<bool, BooleanT> json_extract_exists_path(JsonTypeDef &data, const std::vector<std::string> &tokens);
 };
 
 } // namespace infinity

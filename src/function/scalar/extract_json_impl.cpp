@@ -30,7 +30,7 @@ namespace infinity {
 
 void JsonExtractBase(const DataBlock &, std::shared_ptr<ColumnVector> &) {}
 
-template <typename T, std::tuple<bool, T> (*ExtractFunc)(const JsonTypeDef &, const std::vector<std::string> &), Value (*MakeValueFunc)(T)>
+template <typename T, std::tuple<bool, T> (*ExtractFunc)(JsonTypeDef &, const std::vector<std::string> &), Value (*MakeValueFunc)(T)>
 class JsonExtractor {
 public:
     static void Execute(const DataBlock &input_block, std::shared_ptr<ColumnVector> &output_column) {
@@ -58,8 +58,8 @@ public:
                 std::vector<uint8_t> bson(reinterpret_cast<const uint8_t *>(json_data),
                                           reinterpret_cast<const uint8_t *>(json_data) + json_info.length_);
                 auto json = JsonManager::from_bson(bson);
-                auto [is_null, extracted_value] = ExtractFunc(json, tokens);
-                output_null->Set(row_index, !is_null);
+                auto [exist_path, extracted_value] = ExtractFunc(json, tokens);
+                output_null->Set(row_index, exist_path);
                 Value v = MakeValueFunc(extracted_value);
                 output_column->AppendValue(v);
             }
@@ -75,19 +75,23 @@ void JsonExtractString(const DataBlock &input, std::shared_ptr<ColumnVector> &ou
 }
 
 void JsonExtractInt(const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
-    JsonExtractor<int, JsonManager::json_extract_int, Value::MakeInt>::Execute(input, output);
+    JsonExtractor<IntegerT, JsonManager::json_extract_int, Value::MakeInt>::Execute(input, output);
 }
 
 void JsonExtractDouble(const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
-    JsonExtractor<double, JsonManager::json_extract_double, Value::MakeDouble>::Execute(input, output);
+    JsonExtractor<DoubleT, JsonManager::json_extract_double, Value::MakeDouble>::Execute(input, output);
 }
 
 void JsonExtractBool(const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
-    JsonExtractor<bool, JsonManager::json_extract_bool, Value::MakeBool>::Execute(input, output);
+    JsonExtractor<BooleanT, JsonManager::json_extract_bool, Value::MakeBool>::Execute(input, output);
 }
 
 void JsonExtractIsNull(const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
-    JsonExtractor<bool, JsonManager::json_extract_is_null, Value::MakeBool>::Execute(input, output);
+    JsonExtractor<BooleanT, JsonManager::json_extract_is_null, Value::MakeBool>::Execute(input, output);
+}
+
+void JsonExtractExistPath(const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
+    JsonExtractor<BooleanT, JsonManager::json_extract_exists_path, Value::MakeBool>::Execute(input, output);
 }
 
 void RegisterJsonFunction(NewCatalog *catalog_ptr) {
@@ -148,6 +152,16 @@ void RegisterJsonFunction(NewCatalog *catalog_ptr) {
                                     {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
                                     DataType(LogicalType::kBoolean),
                                     JsonExtractIsNull);
+        function_set_ptr->AddFunction(json_extract);
+        NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
+    }
+    {
+        std::string func_name = "json_exists_path";
+        std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
+        ScalarFunction json_extract(func_name,
+                                    {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
+                                    DataType(LogicalType::kBoolean),
+                                    JsonExtractExistPath);
         function_set_ptr->AddFunction(json_extract);
         NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
     }

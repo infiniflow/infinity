@@ -30,7 +30,14 @@ std::string JsonManager::unescapeQuotes(const std::string &input) {
     return std::regex_replace(input, pattern, "\"");
 }
 
-bool JsonManager::valid_json(const std::string &valid_json) { return JsonTypeDef::accept(valid_json); }
+bool JsonManager::valid_json(const std::string &valid_json) {
+    try {
+        return JsonTypeDef::accept(valid_json);
+    } catch (const JsonTypeDef::parse_error &e) {
+        LOG_TRACE(fmt::format("JsonManager::valid_json error: {}", e.what()));
+    }
+    return false;
+}
 
 JsonTypeDef JsonManager::parse(std::string &json_str) {
     try {
@@ -43,7 +50,8 @@ JsonTypeDef JsonManager::parse(std::string &json_str) {
 
 JsonTypeDef JsonManager::from_bson(const std::vector<uint8_t> &bson_data) {
     try {
-        return JsonTypeDef::from_bson(bson_data);
+        auto tmp_bson_data = JsonTypeDef::from_bson(bson_data);
+        return tmp_bson_data["data"];
     } catch (const JsonTypeDef::parse_error &e) {
         LOG_TRACE(fmt::format("JsonManager::from_bson error: {}", e.what()));
     }
@@ -61,7 +69,8 @@ std::string JsonManager::dump(const JsonTypeDef &json_obj) {
 
 std::vector<uint8_t> JsonManager::to_bson(const JsonTypeDef &json_obj) {
     try {
-        return JsonTypeDef::to_bson(json_obj);
+        JsonTypeDef wrapper = {{"data", json_obj}};
+        return JsonTypeDef::to_bson(wrapper);
     } catch (const JsonTypeDef::parse_error &e) {
         LOG_TRACE(fmt::format("JsonManager::to_bson error: {}", e.what()));
     }
@@ -90,104 +99,219 @@ std::tuple<bool, std::vector<std::string>> JsonManager::get_json_tokens(const st
     }
 
     std::string_view remaining = std::string_view(json_path).substr(1);
-    size_t start = 0;
-    size_t end = remaining.find('.');
-
-    while (start < remaining.length()) {
-        auto token_end = (end == std::string_view::npos) ? remaining.length() : end;
-
-        if (start < token_end) {
-            json_tokens.emplace_back(remaining.substr(start, token_end - start));
+    size_t pos = 0;
+    while (pos < remaining.length()) {
+        if (remaining[pos] == '.') {
+            pos++;
+            continue;
         }
 
-        if (end == std::string_view::npos)
-            break;
+        if (remaining[pos] == '[') {
+            size_t bracket_end = remaining.find(']', pos);
+            if (bracket_end == std::string_view::npos) {
+                return {false, {}};
+            }
 
-        start = end + 1;
-        end = remaining.find('.', start);
+            std::string_view index_content = remaining.substr(pos + 1, bracket_end - pos - 1);
+            if (index_content.empty()) {
+                return {false, {}};
+            }
+
+            bool is_numeric_index = true;
+            for (char c : index_content) {
+                if (!std::isdigit(c)) {
+                    is_numeric_index = false;
+                    break;
+                }
+            }
+
+            if (is_numeric_index) {
+                json_tokens.emplace_back(index_content);
+            } else {
+                return {false, {}};
+            }
+
+            pos = bracket_end + 1;
+        } else {
+            size_t token_end = pos;
+            while (token_end < remaining.length()) {
+                if (remaining[token_end] == '.' || remaining[token_end] == '[') {
+                    break;
+                }
+                token_end++;
+            }
+
+            if (token_end > pos) {
+                std::string_view token = remaining.substr(pos, token_end - pos);
+                if (!token.empty()) {
+                    json_tokens.emplace_back(token);
+                }
+                pos = token_end;
+            } else {
+                pos++;
+            }
+        }
     }
 
     return {true, std::move(json_tokens)};
 }
 
-std::tuple<bool, std::string> JsonManager::json_extract(const JsonTypeDef &data, const std::vector<std::string> &tokens) {
-    JsonTypeDef current = data;
+std::tuple<bool, std::string> JsonManager::json_extract(JsonTypeDef &data, const std::vector<std::string> &tokens) {
+    JsonTypeDef &current = data;
     for (const auto &token : tokens) {
-        if (current.is_object() && current.contains(token)) {
+        if (current.is_array() && token.find_first_not_of("0123456789") == std::string::npos) {
+            try {
+                size_t index = std::stoul(token);
+                if (index < current.size()) {
+                    current = current[index];
+                } else {
+                    return {false, "null"};
+                }
+            } catch (const std::exception &e) {
+                return {false, "null"};
+            }
+        } else if (current.is_object() && current.contains(token)) {
             current = current[token];
         } else {
-            return {true, "null"};
+            return {false, "null"};
         }
     }
-    return {false, current.dump()};
+    return {true, current.dump()};
 }
 
-std::tuple<bool, IntegerT> JsonManager::json_extract_int(const JsonTypeDef &data, const std::vector<std::string> &tokens) {
-    JsonTypeDef current = data;
+std::tuple<bool, IntegerT> JsonManager::json_extract_int(JsonTypeDef &data, const std::vector<std::string> &tokens) {
+    JsonTypeDef &current = data;
     for (const auto &token : tokens) {
-        if (current.is_object() && current.contains(token)) {
+        if (current.is_array() && token.find_first_not_of("0123456789") == std::string::npos) {
+            try {
+                size_t index = std::stoul(token);
+                if (index < current.size()) {
+                    current = current[index];
+                } else {
+                    return {false, 0};
+                }
+            } catch (const std::exception &e) {
+                return {false, 0};
+            }
+        } else if (current.is_object() && current.contains(token)) {
             current = current[token];
         } else {
-            return {true, 0};
+            return {false, 0};
         }
     }
 
     if (current.is_number_integer()) {
-        return {false, current.get<int>()};
+        return {true, current.get<int>()};
     } else {
-        return {true, 0};
+        return {false, 0};
     }
 }
 
-std::tuple<bool, DoubleT> JsonManager::json_extract_double(const JsonTypeDef &data, const std::vector<std::string> &tokens) {
-    JsonTypeDef current = data;
+std::tuple<bool, DoubleT> JsonManager::json_extract_double(JsonTypeDef &data, const std::vector<std::string> &tokens) {
+    JsonTypeDef &current = data;
     for (const auto &token : tokens) {
-        if (current.is_object() && current.contains(token)) {
+        if (current.is_array() && token.find_first_not_of("0123456789") == std::string::npos) {
+            try {
+                size_t index = std::stoul(token);
+                if (index < current.size()) {
+                    current = current[index];
+                } else {
+                    return {false, 0.0};
+                }
+            } catch (const std::exception &e) {
+                return {false, 0.0};
+            }
+        } else if (current.is_object() && current.contains(token)) {
             current = current[token];
         } else {
-            return {true, 0.0};
+            return {false, 0.0};
         }
     }
 
     if (current.is_number_float()) {
-        return {false, current.get<double>()};
+        return {true, current.get<double>()};
     } else {
-        return {true, 0.0};
+        return {false, 0.0};
     }
 }
 
-std::tuple<bool, BooleanT> JsonManager::json_extract_bool(const JsonTypeDef &data, const std::vector<std::string> &tokens) {
-    JsonTypeDef current = data;
+std::tuple<bool, BooleanT> JsonManager::json_extract_bool(JsonTypeDef &data, const std::vector<std::string> &tokens) {
+    JsonTypeDef &current = data;
     for (const auto &token : tokens) {
-        if (current.is_object() && current.contains(token)) {
+        if (current.is_array() && token.find_first_not_of("0123456789") == std::string::npos) {
+            try {
+                size_t index = std::stoul(token);
+                if (index < current.size()) {
+                    current = current[index];
+                } else {
+                    return {false, false};
+                }
+            } catch (const std::exception &e) {
+                return {false, false};
+            }
+        } else if (current.is_object() && current.contains(token)) {
             current = current[token];
         } else {
-            return {true, false};
+            return {false, false};
         }
     }
 
     if (current.is_boolean()) {
-        return {false, current.get<bool>()};
+        return {true, current.get<bool>()};
+    } else {
+        return {false, false};
+    }
+}
+
+std::tuple<bool, BooleanT> JsonManager::json_extract_is_null(JsonTypeDef &data, const std::vector<std::string> &tokens) {
+    JsonTypeDef &current = data;
+    for (const auto &token : tokens) {
+        if (current.is_array() && token.find_first_not_of("0123456789") == std::string::npos) {
+            try {
+                size_t index = std::stoul(token);
+                if (index < current.size()) {
+                    current = current[index];
+                } else {
+                    return {false, false};
+                }
+            } catch (const std::exception &e) {
+                return {false, false};
+            }
+        } else if (current.is_object() && current.contains(token)) {
+            current = current[token];
+        } else {
+            return {false, false};
+        }
+    }
+
+    if (current.is_null()) {
+        return {true, true};
     } else {
         return {true, false};
     }
 }
 
-std::tuple<bool, BooleanT> JsonManager::json_extract_is_null(const JsonTypeDef &data, const std::vector<std::string> &tokens) {
-    JsonTypeDef current = data;
+std::tuple<bool, BooleanT> JsonManager::json_extract_exists_path(JsonTypeDef &data, const std::vector<std::string> &tokens) {
+    JsonTypeDef &current = data;
     for (const auto &token : tokens) {
-        if (current.is_object() && current.contains(token)) {
+        if (current.is_array() && token.find_first_not_of("0123456789") == std::string::npos) {
+            try {
+                size_t index = std::stoul(token);
+                if (index < current.size()) {
+                    current = current[index];
+                } else {
+                    return {true, false};
+                }
+            } catch (const std::exception &e) {
+                return {true, false};
+            }
+        } else if (current.is_object() && current.contains(token)) {
             current = current[token];
         } else {
             return {true, false};
         }
     }
-
-    if (current.is_null()) {
-        return {false, true};
-    } else {
-        return {false, false};
-    }
+    return {true, true};
 }
 
 } // namespace infinity

@@ -2979,6 +2979,15 @@ void InfinityThriftService::HandleColumnDef(infinity_thrift_rpc::SelectResponse 
 Status InfinityThriftService::ProcessColumnFieldType(infinity_thrift_rpc::ColumnField &output_column_field,
                                                      size_t row_count,
                                                      const std::shared_ptr<ColumnVector> &column_vector) {
+    if (column_vector->nulls_ptr_ != nullptr && !column_vector->nulls_ptr_->IsAllTrue()) {
+        std::vector<bool> bitmasks(row_count, false);
+        for (size_t i = 0; i < row_count; ++i) {
+            if (column_vector->nulls_ptr_->IsTrue(i)) {
+                bitmasks[i] = true;
+            }
+        }
+        output_column_field.__set_bitmasks(bitmasks);
+    }
     switch (column_vector->data_type()->type()) {
         case LogicalType::kBoolean: {
             HandleBoolType(output_column_field, row_count, column_vector);
