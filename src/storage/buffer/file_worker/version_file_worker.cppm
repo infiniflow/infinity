@@ -36,10 +36,9 @@ public:
 
     FileWorkerType Type() const override { return FileWorkerType::kVersionDataFile; }
 
-    bool
-    Write(std::span<BlockVersion> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(BlockVersion *&data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void Read(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+    void Read(BlockVersion *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
 
 private:
     size_t capacity_{};
